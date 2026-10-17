@@ -15,7 +15,7 @@ export function storybookAccountProviders(email: string) {
   ];
 }
 
-export function createStorybookAccountState(orgId: string) {
+export function createStorybookAccountState(orgId: string, options?: { billingEnabled?: boolean }) {
   let email = STORYBOOK_ME_USER_EMAIL;
   let name = STORYBOOK_ME_USER_NAME;
   const providers = storybookAccountProviders(STORYBOOK_ME_USER_EMAIL);
@@ -28,6 +28,7 @@ export function createStorybookAccountState(orgId: string) {
     avatar_url: STORYBOOK_ME_USER_AVATAR_URL,
     has_password: true,
     providers: providers.map((provider) => ({ ...provider })),
+    ...(options?.billingEnabled === undefined ? {} : { billing_enabled: options.billingEnabled }),
   });
 
   const applyDisconnect = (providerName: string): FixtureResult => {

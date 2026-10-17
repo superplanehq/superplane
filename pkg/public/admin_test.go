@@ -899,7 +899,23 @@ func TestGetAccountIncludesInstallationAdmin(t *testing.T) {
 		err := json.Unmarshal(response.Body.Bytes(), &result)
 		require.NoError(t, err)
 		assert.Equal(t, true, result["installation_admin"])
+		assert.Equal(t, true, result["billing_enabled"])
 		assert.Equal(t, r.Account.ID.String(), result["id"])
+	})
+
+	t.Run("billing_enabled is false when product billing is off", func(t *testing.T) {
+		t.Setenv(models.BillingEnabledEnv, "no")
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/account",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var result map[string]any
+		err := json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.Equal(t, false, result["billing_enabled"])
 	})
 
 	t.Run("non-admin account has installation_admin false", func(t *testing.T) {

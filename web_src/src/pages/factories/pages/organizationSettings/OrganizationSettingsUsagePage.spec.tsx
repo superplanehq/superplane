@@ -83,6 +83,24 @@ describe("OrganizationSettingsUsagePage", () => {
     expect(rows[2]).toHaveTextContent("$0.17");
   }, 10000);
 
+  it("keeps the usage report and hides credit grant copy when billing is off", async () => {
+    render(
+      <FactoriesHarness
+        billingEnabled={false}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Usage" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export all usage as CSV" })).toBeInTheDocument();
+    expect(screen.getByText("Your keys spend is estimated.")).toBeInTheDocument();
+    expect(
+      screen.queryByText("This list does not show which credit grant paid. Your keys spend is estimated."),
+    ).not.toBeInTheDocument();
+    expect(await screen.findByTestId("organization-usage-history", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
+
   it("shows VM price below one cent", async () => {
     render(
       <FactoriesHarness

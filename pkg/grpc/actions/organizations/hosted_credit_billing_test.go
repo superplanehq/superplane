@@ -37,6 +37,15 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 		assert.Empty(t, resp.Products)
 	})
 
+	t.Run("billing disabled even when Polar is configured", func(t *testing.T) {
+		t.Setenv(models.BillingEnabledEnv, "no")
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		resp, err := ListHostedCreditProducts(context.Background(), r.Organization.ID.String(), &pb.ListHostedCreditProductsRequest{})
+		require.NoError(t, err)
+		assert.False(t, resp.BillingEnabled)
+		assert.Empty(t, resp.Products)
+	})
+
 	t.Run("lists credit packs", func(t *testing.T) {
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 			assert.Equal(t, "/products/", req.URL.Path)
@@ -112,6 +121,13 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 
 	t.Run("billing not configured", func(t *testing.T) {
 		t.Setenv("POLAR_ACCESS_TOKEN", "")
+		_, err := CreateHostedCreditCheckout(context.Background(), r.Organization.ID.String(), &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"}, "", "")
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	})
+
+	t.Run("rejects checkout when product billing is off", func(t *testing.T) {
+		t.Setenv(models.BillingEnabledEnv, "no")
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 		_, err := CreateHostedCreditCheckout(context.Background(), r.Organization.ID.String(), &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"}, "", "")
 		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	})

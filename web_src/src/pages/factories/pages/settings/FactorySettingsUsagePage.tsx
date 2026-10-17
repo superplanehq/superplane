@@ -1,6 +1,7 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useFactoryUsage } from "@/hooks/useFactoryUsage";
 import { useUpdateFactory } from "@/hooks/useFactoryData";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { usePermissions } from "@/contexts/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,12 @@ function FactorySettingsUsageBody({
     return <p className="text-[13px] text-destructive">Unable to load usage.</p>;
   }
 
+  return <FactorySettingsUsageReport data={data} />;
+}
+
+function FactorySettingsUsageReport({ data }: { data: FactoriesDescribeFactoryUsageResponse }) {
+  const billingProductEnabled = useBillingProductEnabled();
+
   return (
     <div className="flex flex-col gap-4">
       <WorkspaceUsageTotals
@@ -62,16 +69,18 @@ function FactorySettingsUsageBody({
         totalCostCents={parseWorkOrderMetric(data.totalCostCents)}
         totalDurationSeconds={parseWorkOrderMetric(data.totalDurationSeconds)}
       />
-      <HostedSpendLimitCard />
-      <HostedCreditSummary
-        remainingCreditCents={data.remainingCreditCents}
-        grantTotalCents={data.grantTotalCents}
-        hostedBilledCents={data.hostedBilledCents}
-        remainingCreditWarning={data.remainingCreditWarning}
-        cardClassName={`${factoryCardClassName} p-4`}
-        labelClassName="workspace-section-label"
-        valueClassName="workspace-page-title mt-1"
-      />
+      {billingProductEnabled ? <HostedSpendLimitCard /> : null}
+      {billingProductEnabled ? (
+        <HostedCreditSummary
+          remainingCreditCents={data.remainingCreditCents}
+          grantTotalCents={data.grantTotalCents}
+          hostedBilledCents={data.hostedBilledCents}
+          remainingCreditWarning={data.remainingCreditWarning}
+          cardClassName={`${factoryCardClassName} p-4`}
+          labelClassName="workspace-section-label"
+          valueClassName="workspace-page-title mt-1"
+        />
+      ) : null}
       <WorkspaceUsageByModelTable byModel={data.byModel ?? []} />
       <WorkspaceUsageByMachineTypeTable byMachineType={data.byMachineType ?? []} />
     </div>

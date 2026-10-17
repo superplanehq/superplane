@@ -2,6 +2,7 @@ import SuperplaneLogo from "@/assets/superplane.svg";
 import { Sidebar, SidebarBody, SidebarSection } from "@/components/Sidebar/sidebar";
 import { Text } from "@/components/Text/text";
 import { useAccount } from "@/contexts/useAccount";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, BookOpen, Building, KeyRound, Network, Shield, Terminal, Users, Webhook } from "lucide-react";
@@ -45,6 +46,10 @@ function adminSidebarNavIconClass(active: boolean) {
 
 function AdminLayout() {
   const { account, loading } = useAccount();
+  const billingProductEnabled = useBillingProductEnabled();
+  const links = billingProductEnabled
+    ? adminPageLinks
+    : adminPageLinks.filter((link) => link.to !== "/admin/polar-webhooks");
 
   if (loading) {
     return (
@@ -97,7 +102,7 @@ function AdminLayout() {
         >
           <SidebarBody>
             <SidebarSection className="p-4">
-              {adminPageLinks.map((link) => (
+              {links.map((link) => (
                 <NavLink
                   key={link.to}
                   to={link.to}

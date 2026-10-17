@@ -49,6 +49,8 @@ interface FactoriesHarnessProps {
   experimentalFeatures?: string[];
   /** Override Storybook preview flags. Defaults turn the design-review surfaces on. */
   previewFlags?: Partial<FactoryPreviewFlags>;
+  /** When false, the account response turns product billing off. */
+  billingEnabled?: boolean;
 }
 
 function DefaultWikiWireframe() {
@@ -81,6 +83,7 @@ export function FactoriesHarness({
   orgIntegrations,
   experimentalFeatures = [],
   previewFlags,
+  billingEnabled,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
@@ -96,6 +99,7 @@ export function FactoriesHarness({
       name: factory.name ?? "",
       description: factory.description ?? "",
     })),
+    billingEnabled,
   };
 
   const harness = (

@@ -815,6 +815,9 @@ func AssertFactoryHostedBudgetAvailable(tx *gorm.DB, factory *Factory) error {
 // factory hosted budget is exhausted. Pass a committed connection so remaining
 // credit includes billed spend from other runs.
 func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) error {
+	if !BillingEnabled() {
+		return nil
+	}
 	if orgID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
