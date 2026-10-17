@@ -181,12 +181,17 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 
 FROM ${RUNNER_IMAGE} AS runner
 
+ARG SUPERPLANE_VERSION=dev
+ARG SOURCE_REVISION=unknown
+
 LABEL org.opencontainers.image.title="superplane" \
   org.opencontainers.image.description="SuperPlane" \
   org.opencontainers.image.vendor="SuperPlane" \
   org.opencontainers.image.source="https://github.com/superplanehq/superplane" \
   org.opencontainers.image.url="https://superplane.com" \
-  org.opencontainers.image.documentation="https://docs.superplane.com"
+  org.opencontainers.image.documentation="https://docs.superplane.com" \
+  org.opencontainers.image.version="${SUPERPLANE_VERSION}" \
+  org.opencontainers.image.revision="${SOURCE_REVISION}"
 
 # postgresql-client needs to be installed here too,
 # otherwise the createdb command won't work.

@@ -154,6 +154,19 @@ export function boardLineIdFromNavigationState(state: unknown): string | undefin
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+/** Mobile board column key stashed on `navigate(..., { state })` when a card opens a task. */
+export function boardColumnKeyFromNavigationState(state: unknown): string | undefined {
+  if (!state || typeof state !== "object" || !("column" in state)) {
+    return undefined;
+  }
+  const column = (state as { column?: unknown }).column;
+  if (typeof column !== "string") {
+    return undefined;
+  }
+  const trimmed = column.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 /**
  * Order stashed on `navigate(..., { state })` so a just-imported task
  * can open before the list query includes it (and so remount after permalink

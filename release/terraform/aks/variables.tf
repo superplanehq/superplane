@@ -125,13 +125,13 @@ variable "superplane_namespace" {
 }
 
 variable "superplane_image_tag" {
-  description = "SuperPlane image tag. Empty uses the chart's <git-sha>-selfhosted image. The plain <git-sha> and stable images load UI files from the hosted CDN and fail CORS on a customer domain. A local build can use a local- tag."
+  description = "SuperPlane image tag override. Empty uses the chart appVersion. Versioned, legacy selfhosted, and local tags are supported."
   type        = string
   default     = ""
 
   validation {
-    condition     = var.superplane_image_tag == "" || strcontains(var.superplane_image_tag, "selfhosted") || startswith(var.superplane_image_tag, "local-")
-    error_message = "Set superplane_image_tag to a tag that contains selfhosted, for example <git-sha>-selfhosted, or leave it empty. A local image can use a local- tag."
+    condition     = var.superplane_image_tag == "" || can(regex("^v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$", var.superplane_image_tag)) || strcontains(var.superplane_image_tag, "selfhosted") || startswith(var.superplane_image_tag, "local-")
+    error_message = "Use a vMAJOR.MINOR.PATCH release tag, a legacy selfhosted tag, a local- tag, or leave the value empty."
   }
 }
 
@@ -166,9 +166,9 @@ variable "helm_chart_path" {
 }
 
 variable "superplane_chart_version" {
-  description = "Published SuperPlane Helm chart version with a matching self-hosted image. Ignored when helm_chart_path is set."
+  description = "Published SuperPlane Helm chart version with a matching versioned image. Ignored when helm_chart_path is set."
   type        = string
-  default     = "0.0.0-25eae97f1259c9c4a8f10cada152fa94764846b8"
+  default     = "1.0.0-rc1"
 }
 
 variable "fleet_manager_version" {

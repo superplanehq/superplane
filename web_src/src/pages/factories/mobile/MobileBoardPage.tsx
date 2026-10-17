@@ -21,10 +21,11 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
+import { BOARD_COLUMN_SEARCH_PARAM, boardColumnKeyFromSearch } from "../lib/boardColumnSearch";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import {
@@ -111,11 +112,11 @@ export function MobileBoardPage() {
       lineId={selectedLine.id}
       canUpdateWorkOrders={canAct("work_orders", "update")}
       currentUserId={currentUserId}
-      onOpenWorkOrder={(order) => {
+      onOpenWorkOrder={(order, columnKey) => {
         const number = canonicalWorkOrderNumber(order);
         if (number) {
           navigate(workOrderDetailPath(organizationId, routeSegment, number), {
-            state: { peekOrder: order, lineId: selectedLine.id },
+            state: { peekOrder: order, lineId: selectedLine.id, column: columnKey },
           });
         }
       }}
@@ -272,7 +273,7 @@ function MobileLineBoard(props: {
   lineId: string;
   canUpdateWorkOrders: boolean;
   currentUserId?: string;
-  onOpenWorkOrder: (order: FactoriesWorkOrderSummary) => void;
+  onOpenWorkOrder: (order: FactoriesWorkOrderSummary, columnKey?: string) => void;
 }) {
   const { organizationId, factoryId, routeSegment, line, lineId, onOpenWorkOrder } = props;
   const navigate = useNavigate();
@@ -326,6 +327,7 @@ function MobileLineBoard(props: {
             }}
           />
           <MobileColumnCarousel
+            key={lineId}
             columns={model.columns}
             cardsPending={model.cardsPending}
             laneClassName={(column) =>
@@ -336,7 +338,7 @@ function MobileLineBoard(props: {
               <LineBoardWorkOrderCard
                 order={order}
                 workOrderCardContext={model.workOrderCardContext}
-                onOpen={() => onOpenWorkOrder(order)}
+                onOpen={() => onOpenWorkOrder(order, column.key)}
                 isAnalyzing={column.key === "backlog" && Boolean(order.id && model.analyzingOrderIds.has(order.id))}
                 creditLabel={order.id ? model.creditFailureLabels.get(order.id) : undefined}
                 showMergeConfidence={column.key !== "done"}
@@ -357,6 +359,11 @@ function MobileLineBoard(props: {
 /**
  * Horizontal snap carousel. Each column fills the screen width and scrolls
  * on its own. Tabs above mirror the swipe position and jump on tap.
+ *
+ * The active column is the `column` search param, so it survives opening a
+ * task and Back to board. A key that is missing or not in `columns` shows
+ * Backlog. The track scrolls to a restored key once, when that key first
+ * appears in `columns`.
  */
 function MobileColumnCarousel({
   columns,
@@ -372,30 +379,68 @@ function MobileColumnCarousel({
   renderCard: (column: MobileBoardColumn, order: FactoriesWorkOrder) => ReactNode;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const { search } = useLocation();
+  const [, setSearchParams] = useSearchParams();
+  const requestedColumnKey = boardColumnKeyFromSearch(search);
+  const [initialColumnKey] = useState(requestedColumnKey);
+  const restoredRef = useRef(false);
+  const requestedIndex = columns.findIndex((column) => column.key === requestedColumnKey);
+  const activeIndex = requestedIndex >= 0 ? requestedIndex : 0;
+
+  const selectColumn = useCallback(
+    (index: number) => {
+      const key = columns[index]?.key;
+      if (!key) {
+        return;
+      }
+      restoredRef.current = true;
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          next.set(BOARD_COLUMN_SEARCH_PARAM, key);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [columns, setSearchParams],
+  );
+
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (restoredRef.current || !track || !initialColumnKey) {
+      return;
+    }
+    const index = columns.findIndex((column) => column.key === initialColumnKey);
+    if (index < 0) {
+      return;
+    }
+    restoredRef.current = true;
+    track.scrollTo({ left: index * track.clientWidth, behavior: "auto" });
+  }, [columns, initialColumnKey]);
 
   const syncActiveFromScroll = useCallback(() => {
     const track = trackRef.current;
     if (!track) {
       return;
     }
-    setActiveIndex(activeColumnIndex(track.scrollLeft, track.clientWidth, columns.length));
-  }, [columns.length]);
-
-  const scrollToColumn = useCallback((index: number) => {
-    const track = trackRef.current;
-    if (!track) {
-      return;
+    const index = activeColumnIndex(track.scrollLeft, track.clientWidth, columns.length);
+    if (index !== activeIndex) {
+      selectColumn(index);
     }
-    track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
-    setActiveIndex(index);
-  }, []);
+  }, [activeIndex, columns.length, selectColumn]);
 
-  useEffect(() => {
-    if (activeIndex > columns.length - 1) {
-      setActiveIndex(Math.max(columns.length - 1, 0));
-    }
-  }, [activeIndex, columns.length]);
+  const scrollToColumn = useCallback(
+    (index: number) => {
+      const track = trackRef.current;
+      if (!track) {
+        return;
+      }
+      track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
+      selectColumn(index);
+    },
+    [selectColumn],
+  );
 
   return (
     <>
