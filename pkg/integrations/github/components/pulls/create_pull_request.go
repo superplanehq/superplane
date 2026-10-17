@@ -268,30 +268,6 @@ func (c *CreatePullRequest) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-// explainGitHubError unwraps a *github.ErrorResponse into a more user-friendly
-// error so common GitHub 422 messages (e.g. "A pull request already exists",
-// "No commits between base and head") surface in the run log instead of a
-// generic transport error.
 func explainGitHubError(err error) error {
-	var ghErr *github.ErrorResponse
-	if !errors.As(err, &ghErr) {
-		return err
-	}
-
-	msg := ghErr.Message
-	for _, inner := range ghErr.Errors {
-		if inner.Message == "" {
-			continue
-		}
-		if msg == "" {
-			msg = inner.Message
-			continue
-		}
-		msg = fmt.Sprintf("%s: %s", msg, inner.Message)
-	}
-
-	if msg == "" {
-		return err
-	}
-	return errors.New(msg)
+	return common.ExplainError(err)
 }
