@@ -26,7 +26,7 @@ export interface IntakeSourceSettings {
   newIssues: boolean;
   /** Create a task when a closed GitHub issue is re-opened. */
   reopenedIssues: boolean;
-  /** Also create a task when somebody adds the "superplane" label to an open issue. */
+  /** Also create a task when the include label, or "superplane" when none is set, is added to an open issue. */
   superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
   /** Move the originating Jira issue when SuperPlane completes the task. */
@@ -72,8 +72,8 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   assignment: "any",
   newIssues: true,
   reopenedIssues: true,
-  superplaneLabelAdded: true,
-  authorsWithAccess: false,
+  superplaneLabelAdded: false,
+  authorsWithAccess: true,
   jiraMoveOnComplete: true,
   jiraCompletionColumn: "",
   sentryNewIssues: true,
@@ -148,13 +148,14 @@ export const INTAKE_SETTINGS_COPY = {
   newIssues: "A new issue is opened",
   reopenedIssues: "A closed issue is re-opened",
   filterByLabel: "Issue has one of these labels",
-  labelInput: "Issue label",
-  labelPlaceholder: "Type a label name",
-  labelNew: "Add label",
-  labelAdd: "Add",
-  labelCancel: "Cancel",
+  labelAddedHelper: "SuperPlane also creates a task when one of these labels is added to an open issue.",
+  labelInput: "Search or add a label",
+  labelPlaceholder: "Search labels",
+  labelNamePlaceholder: "Label name",
+  labelAdd: "Add label",
+  labelsAllSelected: "All labels selected",
+  labelsNoMatch: "No labels match the search.",
   labelsLoading: "Loading labels from the repository",
-  labelsEmpty: "No labels found in the repository. Add a label name.",
   superplaneLabelAdded: 'The "superplane" label is added to the issue',
   authorsWithAccess: "Author is a repository collaborator",
   save: "Save",
@@ -192,6 +193,22 @@ export function addIntakeLabel(labels: string[], label: string): string[] {
   }
   return [...labels, next];
 }
+
+/** Stable key for comparing intake settings from the server without reference churn. */
+export function intakeSettingsContentKey(settings: IntakeSourceSettings): string {
+  return JSON.stringify({
+    ...settings,
+    labels: [...settings.labels].sort(),
+    taskListIds: [...settings.taskListIds].sort(),
+    datadogEnvironments: [...settings.datadogEnvironments].sort(),
+    linearProjectIds: [...settings.linearProjectIds].sort(),
+    linearLabels: [...settings.linearLabels].sort(),
+    sentryProjectIds: [...settings.sentryProjectIds].sort(),
+    dependabotSeverities: [...settings.dependabotSeverities].sort(),
+    sentryLevels: [...settings.sentryLevels].sort(),
+  });
+}
+
 export function normalizeIntakeSourceSettings(
   draft: IntakeSourceSettings,
   sourceId?: LineIntakeSourceId,
@@ -207,27 +224,28 @@ export function normalizeIntakeSourceSettings(
   const linearProjectIds = normalizeLinearValues(draft.linearProjectIds);
   const linearLabels = normalizeLinearValues(draft.linearLabels);
   const sentryProjectIds = normalizeLinearValues(draft.sentryProjectIds);
-  if (!draft.filterByLabel) {
-    return {
-      ...draft,
-      ...hiddenSentryTriggers,
-      confidencePct,
-      labels: [],
-      labelFilterMode: "include",
-      sentryLevels,
-      dependabotSeverities,
-      taskListIds,
-      datadogEnvironments,
-      datadogService,
-      linearProjectIds,
-      linearLabels,
-      sentryProjectIds,
-    };
-  }
+  const filterByLabel =
+    sourceId === "github-issues" ? draft.filterByLabel || draft.labels.length > 0 : draft.filterByLabel;
+  const labels = filterByLabel ? draft.labels : [];
+  // GitHub intakes no longer offer an exclude mode. Force include on save so
+  // an intake that still stores exclude keeps its labels and changes only
+  // when the user saves the intake again.
+  const labelFilterMode = sourceId === "github-issues" || !filterByLabel ? "include" : draft.labelFilterMode;
+  const githubListening =
+    sourceId === "github-issues"
+      ? {
+          newIssues: true,
+          superplaneLabelAdded: filterByLabel && labels.length > 0,
+        }
+      : {};
   return {
     ...draft,
     ...hiddenSentryTriggers,
+    ...githubListening,
     confidencePct,
+    filterByLabel,
+    labels,
+    labelFilterMode,
     sentryLevels,
     dependabotSeverities,
     taskListIds,
@@ -375,8 +393,19 @@ function productiveFiltersFromApi(
   };
 }
 
-export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFactoryIntakeSettings {
-  const labels = settings.filterByLabel ? settings.labels : [];
+export function githubIntakeLabelsForApi(settings: IntakeSourceSettings): string[] {
+  if (settings.filterByLabel || settings.labels.length > 0) {
+    return settings.labels;
+  }
+  return [];
+}
+
+export function intakeSettingsToApi(
+  settings: IntakeSourceSettings,
+  sourceId?: LineIntakeSourceId,
+): FactoriesFactoryIntakeSettings {
+  const labels =
+    sourceId === "github-issues" ? githubIntakeLabelsForApi(settings) : settings.filterByLabel ? settings.labels : [];
   return {
     confidencePct: settings.confidencePct,
     labels,

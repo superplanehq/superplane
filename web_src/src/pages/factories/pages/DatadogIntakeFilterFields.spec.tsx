@@ -76,7 +76,8 @@ describe("DatadogIntakeFilterFields", () => {
 
     expect(screen.queryByText(DATADOG_INTAKE_SETTINGS_COPY.triggered)).not.toBeInTheDocument();
     expect(screen.queryByTestId("datadog-service-name")).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "A new issue is opened" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
   });
 
   it("shows the service, alert types, and environments for a Datadog intake", () => {
