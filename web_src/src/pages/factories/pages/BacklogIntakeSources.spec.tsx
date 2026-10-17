@@ -79,6 +79,14 @@ describe("BacklogIntakeSources", () => {
     expect(within(intake).queryByTestId("line-intake-source-intake-github-needs-repair")).not.toBeInTheDocument();
   });
 
+  it("marks a GitHub intake that cannot create its webhook", () => {
+    renderSources({
+      intakes: [configuredIntake({ healthy: false, health: "HEALTH_WEBHOOK_FAILED" })],
+    });
+
+    expect(screen.getByTestId("line-intake-source-intake-github-needs-repair")).toHaveTextContent("Needs repair");
+  });
+
   it("says listening is paused and keeps the needs-repair state separate", () => {
     renderSources({
       intakes: [

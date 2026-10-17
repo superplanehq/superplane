@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,10 +71,24 @@ func (w *Webhook) IncrementRetry(tx *gorm.DB) error {
 }
 
 func (w *Webhook) MarkFailed(tx *gorm.DB) error {
-	return tx.Model(w).
-		Update("state", WebhookStateFailed).
-		Update("updated_at", time.Now()).
-		Error
+	return w.Fail(tx, "")
+}
+
+// Fail marks the webhook failed and stores the setup error for the factory UI.
+// An empty reason leaves metadata unchanged.
+func (w *Webhook) Fail(tx *gorm.DB, reason string) error {
+	updates := map[string]any{
+		"state":      WebhookStateFailed,
+		"updated_at": time.Now(),
+	}
+	reason = strings.TrimSpace(reason)
+	if reason != "" {
+		if len(reason) > 500 {
+			reason = reason[:500]
+		}
+		updates["metadata"] = datatypes.NewJSONType(map[string]any{"setupError": reason})
+	}
+	return tx.Model(w).Updates(updates).Error
 }
 
 func (w *Webhook) HasExceededRetries() bool {

@@ -251,7 +251,7 @@ func applyIntakeGraphUpdate(
 		}
 	}
 
-	return canvases.PublishGeneratedCanvasNodes(
+	if err := canvases.PublishGeneratedCanvasNodes(
 		ctx,
 		tx,
 		canvas,
@@ -260,7 +260,26 @@ func applyIntakeGraphUpdate(
 		nodes,
 		edges,
 		intakePublisherOptions(deps, canvas.OrganizationID),
-	)
+	); err != nil {
+		return err
+	}
+
+	// A save with the same settings does not set the trigger up again.
+	// Reset a failed webhook so the user can try after they free a GitHub hook.
+	if settings != nil {
+		return retryFailedIntakeWebhook(tx, intake.CanvasID, graph.TriggerNodeID)
+	}
+	return nil
+}
+
+func retryFailedIntakeWebhook(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) error {
+	webhook := intakeTriggerWebhook(tx, canvasID, triggerNodeID)
+	if webhook == nil || webhook.State != models.WebhookStateFailed {
+		return nil
+	}
+
+	_, err := webhook.Reprovision(tx, webhook.Configuration.Data())
+	return err
 }
 
 func applyIntakeSettingsToGraph(

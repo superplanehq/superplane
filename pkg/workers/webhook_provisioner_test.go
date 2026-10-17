@@ -138,6 +138,9 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.WebhookStateFailed, updatedWebhook.State)
 	assert.Equal(t, 3, updatedWebhook.RetryCount)
+	metadata, ok := updatedWebhook.Metadata.Data().(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, metadata["setupError"], "oops")
 }
 
 func Test__WebhookProvisioner_PersistsIntegrationMetadataWrittenBySetup(t *testing.T) {

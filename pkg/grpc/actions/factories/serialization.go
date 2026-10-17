@@ -233,6 +233,10 @@ func serializeFactoryIntake(
 ) *pb.FactoryIntake {
 	graph := resolveIntakeGraph(intake.Source, spec)
 	health := intakeHealth(tx, intake, graph, spec, states)
+	healthMessage := ""
+	if intake.Source == models.FactoryIntakeSourceGitHubIssues && health == pb.FactoryIntake_HEALTH_WEBHOOK_FAILED {
+		_, healthMessage = githubIntakeWebhookFailure(tx, intake.CanvasID, graph.TriggerNodeID)
+	}
 
 	serialized := &pb.FactoryIntake{
 		Id:                  intake.ID.String(),
@@ -243,6 +247,7 @@ func serializeFactoryIntake(
 		Settings:            serializeIntakeSettings(intake.Source, intakeSettingsFromGraph(intake.Source, graph, spec)),
 		Healthy:             health == pb.FactoryIntake_HEALTH_OK,
 		Health:              health,
+		HealthMessage:       healthMessage,
 		IntegrationId:       graph.TriggerIntegrationID(spec),
 		ResourceId:          graph.TriggerResourceID(spec),
 		CreatedAt:           timestamppb.New(intake.CreatedAt),
