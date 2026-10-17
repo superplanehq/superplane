@@ -41,8 +41,8 @@ export function LinearIntakeSetupDialog(props: LinearIntakeSetupDialogProps) {
         step={setup.step}
         title={title}
         helper={helper}
-        resourceStepLabel="Choose projects"
-        resourceStepCaption="Awaiting projects"
+        resourceStepLabel="Choose projects (optional)"
+        resourceStepCaption="Projects are an optional filter"
         stepAction={
           showConnectAction ? (
             <Button
@@ -200,7 +200,7 @@ function SetupFooter({ setup, onCreated }: { setup: LinearIntakeSetupModel; onCr
       <Button
         type="button"
         className="w-full"
-        disabled={setup.projectIds.length === 0 || setup.createIntake.isPending}
+        disabled={!setup.integrationId || setup.createIntake.isPending}
         onClick={() => {
           void setup.createBoundIntake().then((created) => {
             if (created) {

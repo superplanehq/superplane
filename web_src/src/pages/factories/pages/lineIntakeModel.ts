@@ -236,7 +236,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
     id: "linear-issues",
     name: "Linear issues",
-    description: "Create a task when a Linear issue is added to a selected project.",
+    description: "Create a task when a Linear issue is created.",
     iconSrc: linearIcon,
     iconAlt: "Linear",
     tabLabel: "Linear",

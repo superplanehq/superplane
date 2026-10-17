@@ -159,7 +159,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 	},
 	models.FactoryIntakeSourceLinearIssues: {
 		name:             "Linear issues",
-		description:      "Create a work order when a Linear issue is added to a selected project.",
+		description:      "Create a work order when a Linear issue is created.",
 		triggerComponent: "linear.onIssue",
 		triggerName:      "On Issue",
 		triggerConfiguration: map[string]any{
@@ -477,10 +477,13 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 }
 
 func intakeTriggerMetadata(source string, settings intakeSettings) map[string]any {
-	if source != models.FactoryIntakeSourceJiraIssues {
-		return nil
+	if source == models.FactoryIntakeSourceJiraIssues {
+		return jiraCompletionMetadata(intakeSettingsOrDefault(source, settings))
 	}
-	return jiraCompletionMetadata(intakeSettingsOrDefault(source, settings))
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return linearCompletionMetadata(intakeSettingsOrDefault(source, settings))
+	}
+	return nil
 }
 
 func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSettings {

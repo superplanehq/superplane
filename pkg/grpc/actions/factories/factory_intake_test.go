@@ -186,17 +186,21 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		}
 	})
 
-	t.Run("a Linear intake rejects a connection without a project", func(t *testing.T) {
+	t.Run("a Linear intake accepts a connection without a project", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "linear")
 
-		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
 			FactoryId:     factory.ID.String(),
 			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
 			IntegrationId: integrationID,
 		})
-		require.Error(t, err)
-		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Empty(t, configurationStrings(trigger.Configuration["projects"]))
+		assert.Empty(t, intake.GetResourceId())
 	})
 
 	t.Run("a Datadog intake listens to the selected service", func(t *testing.T) {

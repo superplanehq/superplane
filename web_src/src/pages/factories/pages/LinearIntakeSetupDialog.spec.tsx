@@ -75,7 +75,7 @@ describe("LinearIntakeSetupDialog", () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId("linear-skip-initial-import")).toBeChecked();
     expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.importExistingHelper)).toBeInTheDocument();
-    expect(screen.getByTestId("linear-setup-finish")).toBeDisabled();
+    expect(screen.getByTestId("linear-setup-finish")).toBeEnabled();
   });
 
   it("creates the intake for the selected projects and every label", async () => {
@@ -100,6 +100,29 @@ describe("LinearIntakeSetupDialog", () => {
         integrationId: "integration-1",
         settings: {
           linearProjectIds: ["project-1", "project-2"],
+          linearLabels: [],
+        },
+      });
+    });
+    expect(onCreated).toHaveBeenCalled();
+  });
+
+  it("creates the intake for every project when none are selected", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    renderDialog(onCreated);
+
+    expect(
+      await screen.findByRole("heading", { name: LINEAR_INTAKE_SETUP_COPY.wizardStepProject }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByTestId("linear-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_LINEAR_ISSUES",
+        integrationId: "integration-1",
+        settings: {
+          linearProjectIds: [],
           linearLabels: [],
         },
       });

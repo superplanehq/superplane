@@ -241,8 +241,8 @@ func resolveLinearIntakeBinding(
 	if integrationID == "" && len(projectIDs) == 0 {
 		return nil, nil
 	}
-	if integrationID == "" || len(projectIDs) == 0 {
-		return nil, invalidArgument("Linear integration and project are required")
+	if integrationID == "" {
+		return nil, invalidArgument("Linear integration is required")
 	}
 
 	id, err := uuid.Parse(integrationID)

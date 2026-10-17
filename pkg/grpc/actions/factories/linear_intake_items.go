@@ -18,9 +18,6 @@ func newLinearIntakeItemSource(
 	integration *models.Integration,
 ) (intakeItemSource, error) {
 	projectIDs := configurationStrings(trigger.Configuration["projects"])
-	if len(projectIDs) == 0 {
-		return nil, errIntakeNotConnected
-	}
 
 	client, err := newIntakeLinearClient(deps, tx, integration)
 	if err != nil {
@@ -35,7 +32,13 @@ func newLinearIntakeItemSource(
 }
 
 func (s *linearIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
-	issues, err := s.linear.SearchOpenProjectIssues(s.projectIDs, query, limit)
+	var issues []linear.Issue
+	var err error
+	if len(s.projectIDs) == 0 {
+		issues, err = s.linear.SearchOpenWorkspaceIssues(query, limit)
+	} else {
+		issues, err = s.linear.SearchOpenProjectIssues(s.projectIDs, query, limit)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +96,9 @@ func (s *linearIntakeItemSource) IsItemAvailable(_ context.Context, id string) (
 }
 
 func (s *linearIntakeItemSource) ownsIssue(issue linear.Issue) bool {
+	if len(s.projectIDs) == 0 {
+		return true
+	}
 	if issue.Project == nil {
 		return false
 	}

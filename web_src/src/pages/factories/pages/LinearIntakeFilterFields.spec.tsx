@@ -66,4 +66,20 @@ describe("LinearIntakeFilterFields", () => {
     await user.click(screen.getByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelAdd }));
     expect(screen.getByText("bug")).toBeInTheDocument();
   });
+
+  it("toggles the move on complete and edits the completion state", async () => {
+    const user = userEvent.setup();
+    render(<Fields />);
+
+    const toggle = screen.getByTestId("linear-move-on-complete");
+    expect(toggle).toBeChecked();
+    const input = screen.getByTestId("linear-completion-state-input");
+    expect(input).toBeEnabled();
+    await user.type(input, "In Review");
+    expect(input).toHaveValue("In Review");
+
+    await user.click(toggle);
+    expect(screen.getByTestId("linear-move-on-complete")).not.toBeChecked();
+    expect(screen.getByTestId("linear-completion-state-input")).toBeDisabled();
+  });
 });

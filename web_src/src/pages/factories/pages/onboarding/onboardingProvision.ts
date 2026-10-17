@@ -332,8 +332,8 @@ export async function provisionOnboardingIntake(args: {
     });
   }
   if (args.issuesChoice === "linear") {
-    if (!args.linear?.integrationId || args.linear.projectIds.length === 0) {
-      throw new Error("Connect Linear, then choose a project.");
+    if (!args.linear?.integrationId) {
+      throw new Error("Connect Linear to continue.");
     }
     return provisionLinearIntake({
       listIntakes: args.listIntakes,

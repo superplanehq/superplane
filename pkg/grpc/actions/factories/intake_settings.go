@@ -47,6 +47,9 @@ const (
 	intakeMetadataJiraMoveOnComplete   = "jiraMoveOnComplete"
 	intakeMetadataJiraCompletionColumn = "jiraCompletionColumn"
 
+	intakeMetadataLinearMoveOnComplete  = "linearMoveOnComplete"
+	intakeMetadataLinearCompletionState = "linearCompletionState"
+
 	intakeSentryActionCreated    = "created"
 	intakeSentryActionUnresolved = "unresolved"
 	intakeSentryActionAssigned   = "assigned"
@@ -99,6 +102,11 @@ type intakeSettings struct {
 	// Label names that still create a task. Empty means every label.
 	// Linear issue intakes only.
 	LinearLabels []string
+	// Move the originating Linear issue when the work order completes.
+	LinearMoveOnComplete bool
+	// Linear workflow state name to move the issue to. Empty means the
+	// issue team's Done state.
+	LinearCompletionState string
 }
 
 var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
@@ -198,6 +206,7 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.DatadogEnvironments = normalizeDatadogEnvironments(s.DatadogEnvironments)
 	s.LinearProjectIDs = normalizeLinearValues(s.LinearProjectIDs)
 	s.LinearLabels = normalizeLinearValues(s.LinearLabels)
+	s.LinearCompletionState = strings.TrimSpace(s.LinearCompletionState)
 
 	return s
 }
@@ -612,6 +621,7 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		case models.FactoryIntakeSourceLinearIssues:
 			settings.LinearProjectIDs = configurationStrings(trigger.Configuration["projects"])
 			settings.LinearLabels = linearLabelsFromConfiguration(trigger.Configuration["labels"])
+			settings = linearCompletionSettingsFromMetadata(trigger.Metadata, settings)
 		default:
 			if source == models.FactoryIntakeSourceDependabotAlerts {
 				break
@@ -762,6 +772,8 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 	if source == models.FactoryIntakeSourceLinearIssues {
 		serialized.LinearProjectIds = settings.LinearProjectIDs
 		serialized.LinearLabels = settings.LinearLabels
+		serialized.LinearMoveOnComplete = proto.Bool(settings.LinearMoveOnComplete)
+		serialized.LinearCompletionState = settings.LinearCompletionState
 	}
 	return serialized
 }
@@ -827,6 +839,10 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 	updated.DatadogEnvironments = requested.GetDatadogEnvironments()
 	updated.LinearProjectIDs = requested.GetLinearProjectIds()
 	updated.LinearLabels = requested.GetLinearLabels()
+	if requested.LinearMoveOnComplete != nil {
+		updated.LinearMoveOnComplete = requested.GetLinearMoveOnComplete()
+	}
+	updated.LinearCompletionState = strings.TrimSpace(requested.GetLinearCompletionState())
 
 	return updated.normalized()
 }
@@ -877,6 +893,40 @@ func mergeJiraCompletionMetadata(metadata map[string]any, settings intakeSetting
 		metadata = maps.Clone(metadata)
 	}
 	for key, value := range jiraCompletionMetadata(settings) {
+		metadata[key] = value
+	}
+	return metadata
+}
+
+func linearCompletionSettingsFromMetadata(metadata map[string]any, settings intakeSettings) intakeSettings {
+	if metadata == nil {
+		return settings
+	}
+	if value, ok := metadata[intakeMetadataLinearMoveOnComplete]; ok {
+		settings.LinearMoveOnComplete = metadataBool(value, settings.LinearMoveOnComplete)
+	}
+	if value, ok := metadata[intakeMetadataLinearCompletionState]; ok {
+		if state, ok := value.(string); ok {
+			settings.LinearCompletionState = strings.TrimSpace(state)
+		}
+	}
+	return settings
+}
+
+func linearCompletionMetadata(settings intakeSettings) map[string]any {
+	return map[string]any{
+		intakeMetadataLinearMoveOnComplete:  settings.LinearMoveOnComplete,
+		intakeMetadataLinearCompletionState: settings.LinearCompletionState,
+	}
+}
+
+func mergeLinearCompletionMetadata(metadata map[string]any, settings intakeSettings) map[string]any {
+	if metadata == nil {
+		metadata = map[string]any{}
+	} else {
+		metadata = maps.Clone(metadata)
+	}
+	for key, value := range linearCompletionMetadata(settings) {
 		metadata[key] = value
 	}
 	return metadata

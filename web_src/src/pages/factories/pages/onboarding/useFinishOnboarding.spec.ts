@@ -47,7 +47,7 @@ describe("finishOnboardingError", () => {
     ).toBe("Connect Jira, then choose a project.");
   });
 
-  it("requires a Linear connection and project when the ticket source is Linear", () => {
+  it("requires a Linear connection when the ticket source is Linear", () => {
     expect(
       finishOnboardingError({
         appRepository: "acme/web",
@@ -61,7 +61,24 @@ describe("finishOnboardingError", () => {
         linearReady: false,
         linearProjectIds: [],
       }),
-    ).toBe("Connect Linear, then choose a project.");
+    ).toBe("Connect Linear to continue.");
+  });
+
+  it("allows finish with a Linear connection and no project filter", () => {
+    expect(
+      finishOnboardingError({
+        appRepository: "acme/web",
+        backlogRepository: "acme/web",
+        workspaceName: "Web",
+        vcsReady: true,
+        remainingCreditCents: 5000,
+        hostedModelsLoading: false,
+        plan: readyPlan,
+        issuesChoice: "linear",
+        linearReady: true,
+        linearProjectIds: [],
+      }),
+    ).toBeNull();
   });
 
   it("names Bitbucket when a Bitbucket workspace has no connection", () => {

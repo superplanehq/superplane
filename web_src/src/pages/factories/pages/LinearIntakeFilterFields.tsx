@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 
 import { addIntakeLabel, toggleIntakeLabel, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
+import { LinearCompletionStateFields } from "./LinearCompletionStateFields";
 import { LinearProjectPicker } from "./LinearProjectPicker";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
@@ -45,6 +46,7 @@ export function LinearIntakeFilterFields({
     <div className="flex flex-col gap-6" data-testid="linear-intake-filters">
       <fieldset className="min-w-0">
         <legend className="workspace-section-title">{LINEAR_INTAKE_SETUP_COPY.projectsLabel}</legend>
+        <p className="workspace-body-text mt-1 text-muted-foreground">{LINEAR_INTAKE_SETUP_COPY.projectsHelper}</p>
         <div className="mt-2">
           <LinearProjectPicker
             projects={projectsQuery.data ?? []}
@@ -68,6 +70,19 @@ export function LinearIntakeFilterFields({
           />
         </div>
       </fieldset>
+      <LinearCompletionStateFields
+        value={{
+          linearMoveOnComplete: settings.linearMoveOnComplete,
+          linearCompletionState: settings.linearCompletionState,
+        }}
+        onChange={(next) =>
+          onSettingsChange((current) => ({
+            ...current,
+            linearMoveOnComplete: next.linearMoveOnComplete,
+            linearCompletionState: next.linearCompletionState,
+          }))
+        }
+      />
     </div>
   );
 }
