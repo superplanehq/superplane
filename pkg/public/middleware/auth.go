@@ -92,6 +92,37 @@ func MarkOwnerSetupCompleted() {
 	ownerSetupMu.Unlock()
 }
 
+// RefreshOwnerSetupState re-reads the owner setup state from the database
+// and updates the local cache. It returns whether setup is still required.
+// API pods use it to converge when another pod finished owner setup after
+// this pod cached "setup required". On a database error it keeps and
+// returns the cached state.
+func RefreshOwnerSetupState() bool {
+	if !ownerSetupEnabled {
+		return false
+	}
+
+	var count int64
+
+	err := database.Conn().
+		Model(&models.User{}).
+		Limit(1).
+		Count(&count).
+		Error
+
+	if err != nil {
+		return IsOwnerSetupRequired()
+	}
+
+	needed := count == 0
+
+	ownerSetupMu.Lock()
+	ownerSetupNeededCache = &needed
+	ownerSetupMu.Unlock()
+
+	return needed
+}
+
 func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

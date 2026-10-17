@@ -1,0 +1,10 @@
+{{- if and (eq .Values.api.ownerBootstrap.secretName "") (ne .Values.api.ownerBootstrap.password "") }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.ownerBootstrap.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  SUPERPLANE_OWNER_PASSWORD: {{ .Values.api.ownerBootstrap.password }}
+{{- end }}

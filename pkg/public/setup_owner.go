@@ -2,11 +2,12 @@ package public
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -48,57 +49,31 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fullName := req.FirstName + " " + req.LastName
-
 	var organization *models.Organization
 	var account *models.Account
-	var user *models.User
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-
-		account, err = models.CreateAccountInTransaction(tx, fullName, req.Email)
-		if err != nil {
-			return err
-		}
-
-		// The first account is automatically an installation admin
-		if err := tx.Model(account).Update("installation_admin", true).Error; err != nil {
-			return err
-		}
-		account.InstallationAdmin = true
-
-		// Hash and store password
-		passwordHash, err := crypto.HashPassword(req.Password)
-		if err != nil {
-			return err
-		}
-
-		_, err = models.CreateAccountPasswordAuthInTransaction(tx, account.ID, passwordHash)
-		if err != nil {
-			return err
-		}
-
-		organization, err = models.CreateOrganizationInTransaction(tx, "Demo", "")
-		if err != nil {
-			return err
-		}
-
-		user, err = models.CreateUserInTransaction(tx, organization.ID, account.ID, req.Email, fullName)
-		if err != nil {
-			return err
-		}
-
-		err = s.authService.SetupOrganization(tx, organization.ID.String(), user.ID.String())
-		if err != nil {
-			return err
-		}
-
-		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
-			return err
-		}
-		return models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+		organization, account, _, err = createOwnerAccountInTransaction(
+			tx,
+			s.authService,
+			req.Email,
+			req.FirstName,
+			req.LastName,
+			req.Password,
+			config.DefaultOwnerBootstrapOrgName,
+		)
+		return err
 	})
+
+	if errors.Is(err, errOwnerSetupAlreadyCompleted) {
+		// Another API pod (or the .env bootstrap) finished setup while this
+		// request waited on the setup lock. Sync the cached state so this
+		// pod stops redirecting requests to /setup.
+		middleware.MarkOwnerSetupCompleted()
+		http.Error(w, "Instance already initialized", http.StatusConflict)
+		return
+	}
 
 	if err != nil {
 		log.Errorf("Failed to set up owner account: %v", err)
