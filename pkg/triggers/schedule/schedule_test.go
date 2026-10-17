@@ -257,6 +257,22 @@ func TestGetNextTrigger(t *testing.T) {
 	}
 }
 
+func TestNextWeeksTriggerStartsAtWeekBoundary(t *testing.T) {
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	currentSunday := today.AddDate(0, 0, -int(today.Weekday()))
+	now := currentSunday.AddDate(0, 0, 3).Add(10 * time.Hour)
+	expected := currentSunday.AddDate(0, 0, 8).Add(15*time.Hour + 30*time.Minute)
+
+	result, err := nextWeeksTrigger(1, []string{WeekDayMonday}, 15, 30, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !result.Equal(expected) {
+		t.Errorf("expected next trigger at %v, got %v", expected, *result)
+	}
+}
+
 func TestMinutesSchedulingConsistency(t *testing.T) {
 	tests := []struct {
 		name     string
