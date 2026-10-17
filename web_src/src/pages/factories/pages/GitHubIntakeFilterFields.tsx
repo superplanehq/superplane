@@ -5,10 +5,12 @@ import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
+import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import {
   addIntakeLabel,
   INTAKE_SETTINGS_COPY,
   toggleIntakeLabel,
+  type IntakeLabelFilterMode,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
@@ -41,14 +43,18 @@ export function GitHubIntakeFilterFields({
   function toggleMainLabel() {
     onSettingsChange((current) => {
       const labels = toggleIntakeLabel(current.labels, GITHUB_INTAKE_MAIN_LABEL);
-      return { ...current, labels, filterByLabel: labels.length > 0, labelFilterMode: "include" };
+      return { ...current, labels, filterByLabel: labels.length > 0 };
     });
+  }
+
+  function setLabelFilterMode(labelFilterMode: IntakeLabelFilterMode) {
+    onSettingsChange((current) => ({ ...current, labelFilterMode }));
   }
 
   function setOtherLabels(otherLabels: string[]) {
     onSettingsChange((current) => {
       const labels = labelsForSelection(current.labels.includes(GITHUB_INTAKE_MAIN_LABEL), otherLabels);
-      return { ...current, labels, filterByLabel: labels.length > 0, labelFilterMode: "include" };
+      return { ...current, labels, filterByLabel: labels.length > 0 };
     });
   }
 
@@ -66,6 +72,24 @@ export function GitHubIntakeFilterFields({
             checked={settings.authorsWithAccess}
             onChange={() => update("authorsWithAccess", !settings.authorsWithAccess)}
           />
+          <div className="flex flex-col gap-2" role="radiogroup" aria-label={INTAKE_SETTINGS_COPY.labelFilterMode}>
+            <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.labelFilterMode}</p>
+            <IntakeSettingsRadioOption
+              name="github-intake-label-filter-mode"
+              value="include"
+              checked={settings.labelFilterMode === "include"}
+              title={INTAKE_SETTINGS_COPY.labelModeInclude}
+              onChange={() => setLabelFilterMode("include")}
+            />
+            <IntakeSettingsRadioOption
+              name="github-intake-label-filter-mode"
+              value="exclude"
+              checked={settings.labelFilterMode === "exclude"}
+              title={INTAKE_SETTINGS_COPY.labelModeExclude}
+              helper={INTAKE_SETTINGS_COPY.labelModeExcludeHelper}
+              onChange={() => setLabelFilterMode("exclude")}
+            />
+          </div>
           <div className="flex flex-col gap-2">
             <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.mainLabel}</p>
             <IntakeSettingsCheckbox
