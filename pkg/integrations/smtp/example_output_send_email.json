@@ -3,7 +3,7 @@
     "success": true,
     "to": ["recipient@example.com"],
     "cc": [],
-    "subject": "Hello from Superplane",
+    "subject": "Hello from SuperPlane",
     "sentAt": "2025-01-21T12:00:00Z",
     "fromEmail": "sender@example.com"
   },
