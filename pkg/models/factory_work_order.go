@@ -375,35 +375,39 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		return false, fmt.Errorf("%w: unknown state %q", ErrFactoryWorkOrderInvalidState, toState)
 	}
 
-	if o.State == toState {
-		if update.SkipSame {
-			return false, nil
-		}
-
-		return false, fmt.Errorf("%w: work order is already %s", ErrFactoryWorkOrderInvalidState, toState)
-	}
-
-	fromState := o.State
-	if !slices.Contains(factoryWorkOrderAllowedTransitions[fromState], toState) {
-		return false, fmt.Errorf("%w: cannot move from %s to %s", ErrFactoryWorkOrderInvalidState, fromState, toState)
-	}
-
-	nextResult := ""
-	if toState == FactoryWorkOrderStateClosed {
-		allowed := factoryWorkOrderCloseResultsByFromState[fromState]
-		if !slices.Contains(allowed, update.Result) {
-			return false, fmt.Errorf(
-				"%w: closing from %s requires result in %v (got %q)",
-				ErrFactoryWorkOrderInvalidState, fromState, allowed, update.Result,
-			)
-		}
-		nextResult = update.Result
-	}
-
-	fromResult := o.Result
-	now := time.Now()
-
+	changed := false
 	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := o.LockForStatusChange(tx); err != nil {
+			return err
+		}
+
+		if o.State == toState {
+			if update.SkipSame {
+				return nil
+			}
+			return fmt.Errorf("%w: work order is already %s", ErrFactoryWorkOrderInvalidState, toState)
+		}
+
+		fromState := o.State
+		if !slices.Contains(factoryWorkOrderAllowedTransitions[fromState], toState) {
+			return fmt.Errorf("%w: cannot move from %s to %s", ErrFactoryWorkOrderInvalidState, fromState, toState)
+		}
+
+		nextResult := ""
+		if toState == FactoryWorkOrderStateClosed {
+			allowed := factoryWorkOrderCloseResultsByFromState[fromState]
+			if !slices.Contains(allowed, update.Result) {
+				return fmt.Errorf(
+					"%w: closing from %s requires result in %v (got %q)",
+					ErrFactoryWorkOrderInvalidState, fromState, allowed, update.Result,
+				)
+			}
+			nextResult = update.Result
+		}
+
+		fromResult := o.Result
+		now := time.Now()
+
 		// Reverting `open → draft` while a line dispatch is still active would
 		// desync the FSM from the executor. Mirror the dispatch guard here.
 		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
@@ -472,7 +476,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 			}
 		}
 
-		return o.RecordStatusUpdated(tx, statusUpdatedRecord{
+		if err := o.RecordStatusUpdated(tx, statusUpdatedRecord{
 			Actor:      update.Actor,
 			Automation: update.Automation,
 			Run:        run,
@@ -481,12 +485,16 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 			ToState:    toState,
 			FromResult: fromResult,
 			ToResult:   nextResult,
-		})
+		}); err != nil {
+			return err
+		}
+		changed = true
+		return nil
 	})
 	if err != nil {
 		return false, err
 	}
-	return true, nil
+	return changed, nil
 }
 
 func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *uuid.UUID, toState string) error {
@@ -619,6 +627,26 @@ func (o *FactoryWorkOrder) LockForUpdate(tx *gorm.DB) error {
 	}
 	*o = locked
 	return nil
+}
+
+func FactoryWorkOrderLockKey(id uuid.UUID) string {
+	return "factory-work-order:" + id.String()
+}
+
+// LockForStatusChange takes the advisory lock before the row lock.
+// Callers must not hold the row lock first. A close holds this same
+// advisory lock, then updates the task. The opposite order deadlocks.
+func (o *FactoryWorkOrder) LockForStatusChange(tx *gorm.DB) error {
+	if o == nil || o.ID == uuid.Nil {
+		return ErrFactoryWorkOrderNotFound
+	}
+	if err := tx.Exec(
+		"SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
+		FactoryWorkOrderLockKey(o.ID),
+	).Error; err != nil {
+		return err
+	}
+	return o.LockForUpdate(tx)
 }
 
 // TransitionOnDispatch promotes a draft order to open; open is a no-op.
