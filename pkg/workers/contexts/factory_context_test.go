@@ -1411,6 +1411,7 @@ func TestFactoryContext_FindPullRequest_IncludesWorkOrderOrigin(t *testing.T) {
 		require.NotNil(t, match.WorkOrder.Origin)
 		assert.Equal(t, originURL, match.WorkOrder.Origin.URL)
 		assert.Equal(t, originLabel, match.WorkOrder.Origin.Label)
+		assert.Equal(t, uiBaseURL()+order.URLPath(factory.RouteSegment()), match.WorkOrder.URL)
 	})
 
 	t.Run("omits origin when the task has none", func(t *testing.T) {
