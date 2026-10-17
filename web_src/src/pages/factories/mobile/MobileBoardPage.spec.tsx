@@ -242,6 +242,30 @@ describe("MobileBoardPage", () => {
     expect(screen.getByTestId("mobile-board-column-verify")).not.toHaveAttribute("inert");
   });
 
+  it("records the selected column in the board URL and keeps other search params", async () => {
+    const user = userEvent.setup();
+    renderBoard(REFUND_FACTORY, false, `?lineId=${REFUND_LINE_HOTFIX_ID}`);
+
+    await user.click(screen.getByTestId("mobile-board-tab-verify"));
+
+    const location = screen.getByTestId("mobile-test-location");
+    expect(location).toHaveTextContent("column=verify");
+    expect(location).toHaveTextContent(`lineId=${REFUND_LINE_HOTFIX_ID}`);
+  });
+
+  it("opens the column named in the board URL", () => {
+    renderBoard(REFUND_FACTORY, false, "?column=verify");
+
+    expect(screen.getByTestId("mobile-board-tab-verify")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("opens Backlog when the column in the board URL is unknown", () => {
+    renderBoard(REFUND_FACTORY, false, "?column=not-a-column");
+
+    expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveAttribute("aria-selected", "true");
+  });
+
   it("shows repair and paused labels for backlog intakes", () => {
     factoryIntakes.mockReturnValue([
       GITHUB_ISSUES_INTAKE,
