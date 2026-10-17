@@ -113,6 +113,14 @@ OWNER_SETUP_ENABLED=yes
 BLOCK_SIGNUP=${BLOCK_SIGNUP}
 ENABLE_PASSWORD_LOGIN=yes
 
+# Optional: set all four to create the owner account at startup and skip
+# the /setup wizard. Leave empty to use the interactive wizard.
+# SUPERPLANE_OWNER_EMAIL=
+# SUPERPLANE_OWNER_PASSWORD=
+# SUPERPLANE_OWNER_FIRST_NAME=
+# SUPERPLANE_OWNER_LAST_NAME=
+# SUPERPLANE_OWNER_ORG_NAME=
+
 START_PUBLIC_API=yes
 START_CONSUMERS=yes
 START_WEB_SERVER=yes

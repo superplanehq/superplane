@@ -26,6 +26,15 @@ workers:
 api:
   ownerSetupEnabled: true
   blockSignup: false
+  # Set all four required fields to create the owner account automatically
+  # at startup and skip the /setup wizard. Empty disables the bootstrap and
+  # keeps the interactive wizard. orgName is optional (defaults to "Demo").
+  ownerBootstrap:
+    email: ""
+    password: ""
+    firstName: ""
+    lastName: ""
+    orgName: ""
   replicas: 1
   dbPoolSize: 5
   resources:
