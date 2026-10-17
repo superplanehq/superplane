@@ -29,12 +29,16 @@ api:
   # Set all four required fields to create the owner account automatically
   # at startup and skip the /setup wizard. Empty disables the bootstrap and
   # keeps the interactive wizard. orgName is optional (defaults to "Demo").
+  # password is base64-encoded and stored in a Kubernetes Secret, like the
+  # other chart secrets. Set secretName to reference an existing Secret
+  # that holds SUPERPLANE_OWNER_PASSWORD instead of creating one.
   ownerBootstrap:
     email: ""
     password: ""
     firstName: ""
     lastName: ""
     orgName: ""
+    secretName: ""
   replicas: 1
   dbPoolSize: 5
   resources:

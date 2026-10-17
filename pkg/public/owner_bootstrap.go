@@ -1,6 +1,7 @@
 package public
 
 import (
+	"errors"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -13,14 +14,54 @@ import (
 	"gorm.io/gorm"
 )
 
+// errOwnerSetupAlreadyCompleted is returned when another API pod (or a
+// concurrent interactive setup request) finished owner setup while this
+// process waited on the owner setup lock.
+var errOwnerSetupAlreadyCompleted = errors.New("owner setup already completed")
+
+// lockOwnerSetup serializes the first-owner check and creation across API
+// pods. The advisory lock is held until the transaction commits or rolls
+// back, so a second pod blocks here until the first pod finishes and then
+// sees the new user instead of failing on the accounts.email unique
+// constraint.
+func lockOwnerSetup(tx *gorm.DB) error {
+	return tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", "owner-setup").Error
+}
+
+func ownerSetupRequiredInTransaction(tx *gorm.DB) (bool, error) {
+	var count int64
+	if err := tx.Model(&models.User{}).Limit(1).Count(&count).Error; err != nil {
+		return false, err
+	}
+
+	return count == 0, nil
+}
+
 // createOwnerAccountInTransaction creates the first account, its password
 // auth, organization, and membership in a single transaction. It backs both
 // the interactive POST /api/v1/setup-owner handler and the .env bootstrap.
+//
+// The transaction takes the owner setup lock and re-checks whether setup is
+// still required before inserting anything. It returns
+// errOwnerSetupAlreadyCompleted when another process finished setup first.
 func createOwnerAccountInTransaction(
 	tx *gorm.DB,
 	authService authorization.Authorization,
 	email, firstName, lastName, password, orgName string,
 ) (*models.Organization, *models.Account, *models.User, error) {
+	if err := lockOwnerSetup(tx); err != nil {
+		return nil, nil, nil, err
+	}
+
+	setupRequired, err := ownerSetupRequiredInTransaction(tx)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	if !setupRequired {
+		return nil, nil, nil, errOwnerSetupAlreadyCompleted
+	}
+
 	fullName := strings.TrimSpace(firstName) + " " + strings.TrimSpace(lastName)
 
 	account, err := models.CreateAccountInTransaction(tx, fullName, email)
@@ -120,7 +161,24 @@ func TryBootstrapOwnerFromEnv(authService authorization.Authorization) bool {
 		return err
 	})
 
+	if errors.Is(err, errOwnerSetupAlreadyCompleted) {
+		// Another API pod created the owner while this one waited on the
+		// setup lock. Sync the cached setup state so this pod stops
+		// redirecting requests to /setup.
+		middleware.MarkOwnerSetupCompleted()
+		log.Info("Owner setup already completed by another API pod; /setup wizard skipped")
+		return true
+	}
+
 	if err != nil {
+		// Another pod may have completed setup after this transaction
+		// failed. Re-read the setup state from the database instead of
+		// trusting the local cache before falling back to the wizard.
+		if !middleware.RefreshOwnerSetupState() {
+			log.Info("Owner setup already completed by another API pod; /setup wizard skipped")
+			return true
+		}
+
 		log.Errorf("Owner bootstrap failed, falling back to /setup wizard: %v", err)
 		return false
 	}

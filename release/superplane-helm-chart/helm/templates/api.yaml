@@ -172,8 +172,13 @@ spec:
 {{- end }}
             - name: SUPERPLANE_OWNER_EMAIL
               value: {{ .Values.api.ownerBootstrap.email | quote }}
+            {{- if or (ne .Values.api.ownerBootstrap.password "") (ne .Values.api.ownerBootstrap.secretName "") }}
             - name: SUPERPLANE_OWNER_PASSWORD
-              value: {{ .Values.api.ownerBootstrap.password | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.ownerBootstrap.name" . }}
+                  key: SUPERPLANE_OWNER_PASSWORD
+            {{- end }}
             - name: SUPERPLANE_OWNER_FIRST_NAME
               value: {{ .Values.api.ownerBootstrap.firstName | quote }}
             - name: SUPERPLANE_OWNER_LAST_NAME

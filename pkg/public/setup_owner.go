@@ -2,6 +2,7 @@ package public
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
@@ -64,6 +65,15 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		)
 		return err
 	})
+
+	if errors.Is(err, errOwnerSetupAlreadyCompleted) {
+		// Another API pod (or the .env bootstrap) finished setup while this
+		// request waited on the setup lock. Sync the cached state so this
+		// pod stops redirecting requests to /setup.
+		middleware.MarkOwnerSetupCompleted()
+		http.Error(w, "Instance already initialized", http.StatusConflict)
+		return
+	}
 
 	if err != nil {
 		log.Errorf("Failed to set up owner account: %v", err)

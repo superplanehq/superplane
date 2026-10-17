@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func setBootstrapEnv(t *testing.T, email, firstName, lastName, password, orgName string) {
@@ -85,4 +86,44 @@ func TestTryBootstrapOwnerFromEnvSkipsWhenInitialized(t *testing.T) {
 	setBootstrapEnv(t, "owner@example.com", "Owner", "User", "Password1", "")
 
 	assert.False(t, TryBootstrapOwnerFromEnv(r.AuthService))
+}
+
+func TestTryBootstrapOwnerFromEnvWhenAnotherPodCompletesSetup(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, database.TruncateTables())
+	middleware.ResetOwnerSetupStateForTests()
+
+	// Cache "setup required" before another API pod completes setup, the
+	// same stale state a pod holds when api.replicas is greater than one.
+	require.True(t, middleware.IsOwnerSetupRequired())
+
+	// Another API pod creates the owner while this one waits on the setup
+	// lock. The bootstrap must recognize the completed setup instead of
+	// failing on the accounts.email unique constraint.
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, _, _, err := createOwnerAccountInTransaction(
+			tx,
+			r.AuthService,
+			"other@example.com",
+			"Other",
+			"Owner",
+			"Password1",
+			"Other Org",
+		)
+		return err
+	})
+	require.NoError(t, err)
+
+	setBootstrapEnv(t, "owner@example.com", "Owner", "User", "Password1", "")
+
+	assert.True(t, TryBootstrapOwnerFromEnv(r.AuthService))
+
+	// The local setup state is refreshed and no duplicate records appear.
+	assert.False(t, middleware.IsOwnerSetupRequired())
+
+	_, err = models.FindAccountByEmail("owner@example.com")
+	assert.Error(t, err)
+
+	_, err = models.FindOrganizationByName(config.DefaultOwnerBootstrapOrgName)
+	assert.Error(t, err)
 }

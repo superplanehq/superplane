@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
@@ -86,4 +87,71 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 		Find(&fleets).Error)
 	require.Empty(t, fleets)
 	assert.True(t, organization.HasExperimentalFeature(features.FeatureNewRunners))
+}
+
+func TestSetupOwnerConflictWhenAnotherPodCompletesSetup(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, database.TruncateTables())
+	middleware.ResetOwnerSetupStateForTests()
+
+	// Cache "setup required" before another API pod completes setup, the
+	// same stale state a pod holds when api.replicas is greater than one.
+	require.True(t, middleware.IsOwnerSetupRequired())
+
+	t.Setenv("BASE_URL", "http://localhost:8000")
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test-client-secret"),
+		support.NewOIDCProvider(),
+		"",
+		"",
+		"",
+		"test",
+		"/app/templates",
+		r.AuthService, false,
+	)
+	require.NoError(t, err)
+
+	// Another API pod creates the owner while this one waits on the setup
+	// lock. The handler must answer 409 instead of failing on the
+	// accounts.email unique constraint with a 500.
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, _, _, err := createOwnerAccountInTransaction(
+			tx,
+			r.AuthService,
+			"other@example.com",
+			"Other",
+			"Owner",
+			"Password1",
+			"Other Org",
+		)
+		return err
+	})
+	require.NoError(t, err)
+
+	body, err := json.Marshal(map[string]any{
+		"email":      "owner@example.com",
+		"first_name": "Owner",
+		"last_name":  "User",
+		"password":   "Password1",
+	})
+	require.NoError(t, err)
+
+	response := execRequest(server, requestParams{
+		method:      http.MethodPost,
+		path:        "/api/v1/setup-owner",
+		body:        body,
+		contentType: "application/json",
+	})
+
+	assert.Equal(t, http.StatusConflict, response.Code)
+
+	// The local setup state is refreshed so this pod stops redirecting
+	// requests to /setup.
+	assert.False(t, middleware.IsOwnerSetupRequired())
+
+	_, err = models.FindAccountByEmail("owner@example.com")
+	assert.Error(t, err)
 }
