@@ -230,7 +230,17 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
       }
       return response.data.intake;
     },
-    onSuccess: (_intake, variables) => {
+    onSuccess: (intake, variables) => {
+      queryClient.setQueryData(
+        factoryIntakesKey(organizationId, factoryId),
+        (current: FactoriesFactoryIntake[] | undefined) => {
+          if (!current) {
+            return current;
+          }
+          const intakeId = variables.intakeId;
+          return current.map((entry) => (entry.id === intakeId ? intake : entry));
+        },
+      );
       void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({

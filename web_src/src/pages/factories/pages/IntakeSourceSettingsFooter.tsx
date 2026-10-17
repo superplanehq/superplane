@@ -29,11 +29,13 @@ export function IntakeSourceSettingsFooter({
   deletePending,
   deleteError,
   onDelete,
+  getDraft,
   onSave,
   onClose,
 }: {
   sourceId: LineIntakeSourceId;
   draft: IntakeSourceSettings;
+  getDraft: () => IntakeSourceSettings;
   savePending?: boolean;
   saveError?: string;
   deletePending: boolean;
@@ -80,7 +82,7 @@ export function IntakeSourceSettingsFooter({
           disabled={savePending || projectsMissing}
           onClick={async () => {
             try {
-              await onSave(normalizeIntakeSourceSettings(draft, sourceId));
+              await onSave(normalizeIntakeSourceSettings(getDraft(), sourceId));
               onClose();
             } catch {
               // The parent supplies the actionable error message.
