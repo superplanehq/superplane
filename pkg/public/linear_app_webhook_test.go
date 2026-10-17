@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,11 +15,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
 
@@ -158,7 +161,14 @@ func Test__HandleLinearAppWebhook__DoesNotRepeatASuccessfulSubscription(t *testi
 	t.Setenv(config.EnvLinearOAuthClientSecret, "hosted-secret")
 	t.Setenv(config.EnvLinearOAuthWebhookSecret, appSecret)
 
+	const failingTrigger = "failing-linear-delivery"
 	r.Registry.Triggers["linear.onIssue"] = &linear.OnIssue{}
+	r.Registry.Triggers[failingTrigger] = impl.NewDummyTrigger(impl.DummyTriggerOptions{
+		Name: failingTrigger,
+		HandleWebhookFunc: func(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+			return http.StatusInternalServerError, nil, errors.New("node rejected the delivery")
+		},
+	})
 	server := linearAppWebhookServer(t, r)
 
 	integration := readyLinearIntegration(t, r, "org-1", "acme")
@@ -167,7 +177,7 @@ func Test__HandleLinearAppWebhook__DoesNotRepeatASuccessfulSubscription(t *testi
 		nodeID:       "trigger-bad",
 		teamID:       "team-1",
 		resourceType: linear.IssueResourceType,
-		triggerName:  "linear.missing",
+		triggerName:  failingTrigger,
 		configuration: map[string]any{
 			"team":    "team-1",
 			"actions": []string{"create"},
