@@ -148,19 +148,14 @@ export const INTAKE_SETTINGS_COPY = {
   newIssues: "A new issue is opened",
   reopenedIssues: "A closed issue is re-opened",
   filterByLabel: "Issue has one of these labels",
-  labelFilterMode: "Label filter",
-  labelModeInclude: "Create a task only for issues with the selected labels",
-  labelModeExclude: "Skip issues with the selected labels",
-  labelModeExcludeHelper: "SuperPlane creates a task for all other issues.",
-  mainLabel: "Default SuperPlane label",
-  otherLabels: "Other labels",
-  labelInput: "Issue label",
-  labelPlaceholder: "Type a label name",
-  labelNew: "Add label",
-  labelAdd: "Add",
-  labelCancel: "Cancel",
+  labelAddedHelper: "SuperPlane also creates a task when one of these labels is added to an open issue.",
+  labelInput: "Search or add a label",
+  labelPlaceholder: "Search labels",
+  labelNamePlaceholder: "Label name",
+  labelAdd: "Add label",
+  labelsAllSelected: "All labels selected",
+  labelsNoMatch: "No labels match the search.",
   labelsLoading: "Loading labels from the repository",
-  labelsEmpty: "No other labels in the repository. Add a label name.",
   superplaneLabelAdded: 'The "superplane" label is added to the issue',
   authorsWithAccess: "Author is a repository collaborator",
   save: "Save",
@@ -198,6 +193,22 @@ export function addIntakeLabel(labels: string[], label: string): string[] {
   }
   return [...labels, next];
 }
+
+/** Stable key for comparing intake settings from the server without reference churn. */
+export function intakeSettingsContentKey(settings: IntakeSourceSettings): string {
+  return JSON.stringify({
+    ...settings,
+    labels: [...settings.labels].sort(),
+    taskListIds: [...settings.taskListIds].sort(),
+    datadogEnvironments: [...settings.datadogEnvironments].sort(),
+    linearProjectIds: [...settings.linearProjectIds].sort(),
+    linearLabels: [...settings.linearLabels].sort(),
+    sentryProjectIds: [...settings.sentryProjectIds].sort(),
+    dependabotSeverities: [...settings.dependabotSeverities].sort(),
+    sentryLevels: [...settings.sentryLevels].sort(),
+  });
+}
+
 export function normalizeIntakeSourceSettings(
   draft: IntakeSourceSettings,
   sourceId?: LineIntakeSourceId,
@@ -213,13 +224,18 @@ export function normalizeIntakeSourceSettings(
   const linearProjectIds = normalizeLinearValues(draft.linearProjectIds);
   const linearLabels = normalizeLinearValues(draft.linearLabels);
   const sentryProjectIds = normalizeLinearValues(draft.sentryProjectIds);
-  const labels = draft.filterByLabel ? draft.labels : [];
-  const labelFilterMode = draft.filterByLabel ? draft.labelFilterMode : "include";
+  const filterByLabel =
+    sourceId === "github-issues" ? draft.filterByLabel || draft.labels.length > 0 : draft.filterByLabel;
+  const labels = filterByLabel ? draft.labels : [];
+  // GitHub intakes no longer offer an exclude mode. Force include on save so
+  // an intake that still stores exclude keeps its labels and changes only
+  // when the user saves the intake again.
+  const labelFilterMode = sourceId === "github-issues" || !filterByLabel ? "include" : draft.labelFilterMode;
   const githubListening =
     sourceId === "github-issues"
       ? {
           newIssues: true,
-          superplaneLabelAdded: draft.filterByLabel && labelFilterMode === "include" && labels.length > 0,
+          superplaneLabelAdded: filterByLabel && labels.length > 0,
         }
       : {};
   return {
@@ -227,6 +243,7 @@ export function normalizeIntakeSourceSettings(
     ...hiddenSentryTriggers,
     ...githubListening,
     confidencePct,
+    filterByLabel,
     labels,
     labelFilterMode,
     sentryLevels,
@@ -376,8 +393,19 @@ function productiveFiltersFromApi(
   };
 }
 
-export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFactoryIntakeSettings {
-  const labels = settings.filterByLabel ? settings.labels : [];
+export function githubIntakeLabelsForApi(settings: IntakeSourceSettings): string[] {
+  if (settings.filterByLabel || settings.labels.length > 0) {
+    return settings.labels;
+  }
+  return [];
+}
+
+export function intakeSettingsToApi(
+  settings: IntakeSourceSettings,
+  sourceId?: LineIntakeSourceId,
+): FactoriesFactoryIntakeSettings {
+  const labels =
+    sourceId === "github-issues" ? githubIntakeLabelsForApi(settings) : settings.filterByLabel ? settings.labels : [];
   return {
     confidencePct: settings.confidencePct,
     labels,

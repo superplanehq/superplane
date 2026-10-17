@@ -16,6 +16,7 @@ import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   INTAKE_SETTINGS_COPY,
   intakeSettingsToApi,
+  normalizeIntakeSourceSettings,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -164,7 +165,7 @@ function SourceIntakeSettings({
       automationError={automation.isError}
       onRetryAutomation={automation.refetch}
       onSave={actions.saveSettings}
-      savePending={updateIntake.isPending || automation.isLoading}
+      savePending={updateIntake.isPending}
       saveError={saveError}
       deletePending={deleteIntake.isPending}
       deleteError={actions.deleteError}
@@ -290,9 +291,10 @@ function useIntakeSettingsActions({
 
   const saveSettings = useCallback(
     async (next: IntakeSourceSettings) => {
+      const normalized = normalizeIntakeSourceSettings(next, intake.source.id);
       await updateIntake.mutateAsync({
         intakeId: intake.intakeId,
-        settings: intakeSettingsToApi(next),
+        settings: intakeSettingsToApi(normalized, intake.source.id),
         ...datadogServiceRebind(intake, next),
         ...linearProjectRebind(intake, next),
         ...sentryProjectRebind(intake, next),

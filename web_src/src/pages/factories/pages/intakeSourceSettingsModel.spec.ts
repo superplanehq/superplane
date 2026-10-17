@@ -7,6 +7,7 @@ import {
   DEFAULT_DATADOG_INTAKE_SETTINGS,
   isIntakeSettingsTab,
   intakeSettingsTabs,
+  intakeSettingsContentKey,
   intakeSettingsFromApi,
   intakeSettingsToApi,
   intakeSupportsDelete,
@@ -19,6 +20,28 @@ describe("intakeSourceSettingsModel", () => {
   it("adds and removes a label", () => {
     expect(toggleIntakeLabel([], "bug")).toEqual(["bug"]);
     expect(toggleIntakeLabel(["bug", "enhancement"], "bug")).toEqual(["enhancement"]);
+  });
+
+  it("builds the same content key for equivalent settings objects", () => {
+    const left = intakeSettingsFromApi("GitHub issues", { labels: ["bug", "docs"] });
+    const right = { ...left, labels: ["docs", "bug"] };
+
+    expect(intakeSettingsContentKey(left)).toBe(intakeSettingsContentKey(right));
+  });
+
+  it("saves GitHub labels when the user selected them without the label filter checkbox", () => {
+    const next = normalizeIntakeSourceSettings(
+      {
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+        filterByLabel: false,
+        labels: ["bug"],
+      },
+      "github-issues",
+    );
+
+    expect(next.filterByLabel).toBe(true);
+    expect(next.labels).toEqual(["bug"]);
+    expect(intakeSettingsToApi(next, "github-issues").labels).toEqual(["bug"]);
   });
 
   it("adds a typed label once and ignores blank input", () => {
@@ -81,7 +104,7 @@ describe("intakeSourceSettingsModel", () => {
       {
         ...DEFAULT_GITHUB_INTAKE_SETTINGS,
         filterByLabel: false,
-        labels: ["bug"],
+        labels: [],
         superplaneLabelAdded: true,
       },
       "github-issues",
@@ -100,7 +123,8 @@ describe("intakeSourceSettingsModel", () => {
       },
       "github-issues",
     );
-    expect(excluded.superplaneLabelAdded).toBe(false);
+    expect(excluded.labelFilterMode).toBe("include");
+    expect(excluded.superplaneLabelAdded).toBe(true);
 
     const jira = normalizeIntakeSourceSettings(
       { ...DEFAULT_GITHUB_INTAKE_SETTINGS, newIssues: false, superplaneLabelAdded: true },

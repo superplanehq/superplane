@@ -110,8 +110,48 @@ describe("IntakeSettingsHost", () => {
 
     expect(updateIntake).toHaveBeenCalledWith({
       intakeId: "intake-github",
-      settings: intakeSettingsToApi(DEFAULT_GITHUB_INTAKE_SETTINGS),
+      settings: intakeSettingsToApi(DEFAULT_GITHUB_INTAKE_SETTINGS, "github-issues"),
     });
+  });
+
+  it("saves GitHub labels the user selected", async () => {
+    const user = userEvent.setup();
+    renderHost();
+
+    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
+    await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "superplane" }));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-github",
+      settings: expect.objectContaining({
+        labels: ["superplane"],
+      }),
+    });
+  });
+
+  it("saves GitHub labels while the automation canvas is still loading", async () => {
+    useCanvas.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+    });
+    const user = userEvent.setup();
+    renderHost();
+
+    const save = screen.getByTestId("intake-source-settings-save");
+    expect(save).toBeEnabled();
+
+    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
+    await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "superplane" }));
+    await user.click(save);
+
+    expect(updateIntake).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({ labels: ["superplane"] }),
+      }),
+    );
   });
 
   it("sends the Datadog service with the settings when the service changes", async () => {
