@@ -145,19 +145,20 @@ describe("skill name sync", () => {
   it("keeps a YAML comment out of the pasted command and the saved name", async () => {
     const { result } = renderSkillEditor();
     act(() => {
-      result.current.setMarkdown("---\nname: review-copy # command name\n---\n\nCheck the diff.\n");
+      result.current.setMarkdown("---\nname: note-copy # command name\n---\n\nCheck the diff.\n");
     });
 
-    expect(result.current.name).toBe("review-copy");
-    expect(result.current.command).toBe("/review-copy");
+    expect(result.current.name).toBe("note-copy");
+    expect(result.current.command).toBe("/note-copy");
 
     await act(async () => {
       await result.current.handleSave();
     });
 
+    expect(result.current.nameError).toBe("");
     const saved = createSkill.mock.calls[0]?.[0];
-    expect(saved?.name).toBe("review-copy");
-    expect(skillFrontmatterField(saved?.markdown ?? "", "name")).toBe("review-copy");
+    expect(saved?.name).toBe("note-copy");
+    expect(skillFrontmatterField(saved?.markdown ?? "", "name")).toBe("note-copy");
   });
 
   it("saves the pasted name instead of an empty name", async () => {
