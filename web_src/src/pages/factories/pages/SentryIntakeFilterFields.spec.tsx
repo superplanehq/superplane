@@ -72,7 +72,8 @@ describe("SentryIntakeFilterFields", () => {
     expect(screen.queryByRole("checkbox", { name: "A new issue is created" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Fatal" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Error" })).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "A new issue is opened" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
   });
 
   it("shows only the new-issue trigger for a Sentry intake", () => {

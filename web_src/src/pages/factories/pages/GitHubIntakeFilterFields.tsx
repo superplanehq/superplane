@@ -5,13 +5,18 @@ import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
+import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import {
   addIntakeLabel,
   INTAKE_SETTINGS_COPY,
   toggleIntakeLabel,
+  type IntakeLabelFilterMode,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
+
+/** The GitHub label SuperPlane uses as the primary intake label. */
+export const GITHUB_INTAKE_MAIN_LABEL = "superplane";
 
 export function GitHubIntakeFilterFields({
   sourceId,
@@ -35,65 +40,96 @@ export function GitHubIntakeFilterFields({
     onSettingsChange((current) => ({ ...current, [key]: value }));
   }
 
-  function toggleFilterByLabel() {
+  function toggleMainLabel() {
     onSettingsChange((current) => {
-      const filterByLabel = !current.filterByLabel;
-      if (filterByLabel) {
-        return { ...current, filterByLabel, labelFilterMode: "include" };
-      }
-      return { ...current, filterByLabel, labels: [], labelFilterMode: "include" };
+      const labels = toggleIntakeLabel(current.labels, GITHUB_INTAKE_MAIN_LABEL);
+      return { ...current, labels, filterByLabel: labels.length > 0 };
     });
   }
+
+  function setLabelFilterMode(labelFilterMode: IntakeLabelFilterMode) {
+    onSettingsChange((current) => ({ ...current, labelFilterMode }));
+  }
+
+  function setOtherLabels(otherLabels: string[]) {
+    onSettingsChange((current) => {
+      const labels = labelsForSelection(current.labels.includes(GITHUB_INTAKE_MAIN_LABEL), otherLabels);
+      return { ...current, labels, filterByLabel: labels.length > 0 };
+    });
+  }
+
+  const mainLabelSelected = settings.labels.includes(GITHUB_INTAKE_MAIN_LABEL);
+  const otherLabels = settings.labels.filter((label) => label !== GITHUB_INTAKE_MAIN_LABEL);
+  const otherLabelOptions = labelOptions.filter((label) => label !== GITHUB_INTAKE_MAIN_LABEL);
 
   return (
     <div className="flex flex-col gap-6">
       <fieldset className="min-w-0">
-        <legend className="workspace-section-title">{INTAKE_SETTINGS_COPY.intakeSection}</legend>
-        <div className="mt-2 flex flex-col gap-2">
-          <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.newIssues}
-            checked={settings.newIssues}
-            onChange={() => update("newIssues", !settings.newIssues)}
-          />
-          <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.reopenedIssues}
-            checked={settings.reopenedIssues}
-            onChange={() => update("reopenedIssues", !settings.reopenedIssues)}
-          />
-          <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.superplaneLabelAdded}
-            checked={settings.superplaneLabelAdded}
-            onChange={() => update("superplaneLabelAdded", !settings.superplaneLabelAdded)}
-          />
-        </div>
-      </fieldset>
-      <fieldset className="min-w-0">
         <legend className="workspace-section-title">{INTAKE_SETTINGS_COPY.filtersLabel}</legend>
-        <div className="mt-2 flex flex-col gap-2">
-          <div className="flex flex-col gap-1.5">
-            <IntakeSettingsCheckbox
-              title={INTAKE_SETTINGS_COPY.filterByLabel}
-              checked={settings.filterByLabel}
-              onChange={() => toggleFilterByLabel()}
-            />
-            {settings.filterByLabel ? (
-              <IntakeLabelField
-                labels={settings.labels}
-                options={labelOptions}
-                loading={labelOptionsLoading}
-                onChange={(labels) => update("labels", labels)}
-              />
-            ) : null}
-          </div>
+        <div className="mt-2 flex flex-col gap-4">
           <IntakeSettingsCheckbox
             title={INTAKE_SETTINGS_COPY.authorsWithAccess}
             checked={settings.authorsWithAccess}
             onChange={() => update("authorsWithAccess", !settings.authorsWithAccess)}
           />
+          <div className="flex flex-col gap-2" role="radiogroup" aria-label={INTAKE_SETTINGS_COPY.labelFilterMode}>
+            <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.labelFilterMode}</p>
+            <IntakeSettingsRadioOption
+              name="github-intake-label-filter-mode"
+              value="include"
+              checked={settings.labelFilterMode === "include"}
+              title={INTAKE_SETTINGS_COPY.labelModeInclude}
+              onChange={() => setLabelFilterMode("include")}
+            />
+            <IntakeSettingsRadioOption
+              name="github-intake-label-filter-mode"
+              value="exclude"
+              checked={settings.labelFilterMode === "exclude"}
+              title={INTAKE_SETTINGS_COPY.labelModeExclude}
+              helper={INTAKE_SETTINGS_COPY.labelModeExcludeHelper}
+              onChange={() => setLabelFilterMode("exclude")}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.mainLabel}</p>
+            <IntakeSettingsCheckbox
+              title={GITHUB_INTAKE_MAIN_LABEL}
+              checked={mainLabelSelected}
+              onChange={() => toggleMainLabel()}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.otherLabels}</p>
+            <IntakeLabelField
+              labels={otherLabels}
+              options={otherLabelOptions}
+              loading={labelOptionsLoading}
+              onChange={(labels) => setOtherLabels(labels)}
+            />
+          </div>
+        </div>
+      </fieldset>
+      <fieldset className="min-w-0">
+        <legend className="workspace-section-title">{INTAKE_SETTINGS_COPY.intakeSection}</legend>
+        <div className="mt-2 flex flex-col gap-2">
+          <IntakeSettingsCheckbox
+            title={INTAKE_SETTINGS_COPY.reopenedIssues}
+            checked={settings.reopenedIssues}
+            onChange={() => update("reopenedIssues", !settings.reopenedIssues)}
+          />
         </div>
       </fieldset>
     </div>
   );
+}
+
+function labelsForSelection(mainLabelSelected: boolean, otherLabels: string[]): string[] {
+  const includeMain = mainLabelSelected || otherLabels.includes(GITHUB_INTAKE_MAIN_LABEL);
+  const others = otherLabels.filter((label) => label !== GITHUB_INTAKE_MAIN_LABEL);
+  if (!includeMain) {
+    return others;
+  }
+  return [GITHUB_INTAKE_MAIN_LABEL, ...others];
 }
 
 interface IntakeLabelFieldProps {
@@ -130,7 +166,7 @@ function IntakeLabelField({ labels, options, loading, onChange }: IntakeLabelFie
   }
 
   return (
-    <div className="mb-1 ml-6 flex flex-col gap-2" data-testid="intake-label-options">
+    <div className="flex flex-col gap-2" data-testid="intake-label-options">
       {loading ? <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.labelsLoading}</p> : null}
       {!loading && choices.length === 0 ? (
         <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.labelsEmpty}</p>

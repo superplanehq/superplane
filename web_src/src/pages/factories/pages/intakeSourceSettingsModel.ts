@@ -26,7 +26,7 @@ export interface IntakeSourceSettings {
   newIssues: boolean;
   /** Create a task when a closed GitHub issue is re-opened. */
   reopenedIssues: boolean;
-  /** Also create a task when somebody adds the "superplane" label to an open issue. */
+  /** Also create a task when the include label, or "superplane" when none is set, is added to an open issue. */
   superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
   /** Move the originating Jira issue when SuperPlane completes the task. */
@@ -72,8 +72,8 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   assignment: "any",
   newIssues: true,
   reopenedIssues: true,
-  superplaneLabelAdded: true,
-  authorsWithAccess: false,
+  superplaneLabelAdded: false,
+  authorsWithAccess: true,
   jiraMoveOnComplete: true,
   jiraCompletionColumn: "",
   sentryNewIssues: true,
@@ -148,13 +148,19 @@ export const INTAKE_SETTINGS_COPY = {
   newIssues: "A new issue is opened",
   reopenedIssues: "A closed issue is re-opened",
   filterByLabel: "Issue has one of these labels",
+  labelFilterMode: "Label filter",
+  labelModeInclude: "Create a task only for issues with the selected labels",
+  labelModeExclude: "Skip issues with the selected labels",
+  labelModeExcludeHelper: "SuperPlane creates a task for all other issues.",
+  mainLabel: "Default SuperPlane label",
+  otherLabels: "Other labels",
   labelInput: "Issue label",
   labelPlaceholder: "Type a label name",
   labelNew: "Add label",
   labelAdd: "Add",
   labelCancel: "Cancel",
   labelsLoading: "Loading labels from the repository",
-  labelsEmpty: "No labels found in the repository. Add a label name.",
+  labelsEmpty: "No other labels in the repository. Add a label name.",
   superplaneLabelAdded: 'The "superplane" label is added to the issue',
   authorsWithAccess: "Author is a repository collaborator",
   save: "Save",
@@ -207,27 +213,22 @@ export function normalizeIntakeSourceSettings(
   const linearProjectIds = normalizeLinearValues(draft.linearProjectIds);
   const linearLabels = normalizeLinearValues(draft.linearLabels);
   const sentryProjectIds = normalizeLinearValues(draft.sentryProjectIds);
-  if (!draft.filterByLabel) {
-    return {
-      ...draft,
-      ...hiddenSentryTriggers,
-      confidencePct,
-      labels: [],
-      labelFilterMode: "include",
-      sentryLevels,
-      dependabotSeverities,
-      taskListIds,
-      datadogEnvironments,
-      datadogService,
-      linearProjectIds,
-      linearLabels,
-      sentryProjectIds,
-    };
-  }
+  const labels = draft.filterByLabel ? draft.labels : [];
+  const labelFilterMode = draft.filterByLabel ? draft.labelFilterMode : "include";
+  const githubListening =
+    sourceId === "github-issues"
+      ? {
+          newIssues: true,
+          superplaneLabelAdded: draft.filterByLabel && labelFilterMode === "include" && labels.length > 0,
+        }
+      : {};
   return {
     ...draft,
     ...hiddenSentryTriggers,
+    ...githubListening,
     confidencePct,
+    labels,
+    labelFilterMode,
     sentryLevels,
     dependabotSeverities,
     taskListIds,
