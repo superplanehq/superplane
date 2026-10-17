@@ -12,18 +12,22 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { RunInspectorNodeSection } from "./types";
 
+export const canvasUpdatePermissionMessage = "You need permission to update this canvas.";
+
 export function useRunInspectorActions({
   canvasId,
   run,
   sections,
   executionsLoading,
   onRerunCreated,
+  canUpdateCanvas,
 }: {
   canvasId: string;
   run: CanvasesCanvasRun;
   sections: RunInspectorNodeSection[];
   executionsLoading: boolean;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
+  canUpdateCanvas: boolean;
 }) {
   const queryClient = useQueryClient();
   const runningExecutionIds = useMemo(() => {
@@ -70,23 +74,32 @@ export function useRunInspectorActions({
   const cancelQueuedItemMutation = useCancelQueuedItemMutation({ canvasId, refreshRunQueries });
 
   return {
-    rerun: () => rerunMutation.mutate(),
+    canUpdateCanvas,
+    rerun: () => {
+      if (!canUpdateCanvas) return;
+      rerunMutation.mutate();
+    },
     rerunPending: rerunMutation.isPending,
-    stop: () => stopMutation.mutate(),
+    rerunDisabled: !canUpdateCanvas || !run.rootEvent?.id || !run.rootEvent.nodeId,
+    stop: () => {
+      if (!canUpdateCanvas) return;
+      stopMutation.mutate();
+    },
     stopPending: stopMutation.isPending,
     stopDisabled:
+      !canUpdateCanvas ||
       stopMutation.isPending ||
       run.state === "STATE_CANCELLING" ||
       (runningExecutionIds.length === 0 &&
         queuedItems.length === 0 &&
         (executionsLoading || !run.rootEvent?.id || !hasLoadedActionSection)),
     stopNode: (section: RunInspectorNodeSection) => {
-      if (!section.execution?.id) return;
+      if (!canUpdateCanvas || !section.execution?.id) return;
       stopNodeMutation.mutate(section.execution.id);
     },
     stopNodePending: stopNodeMutation.isPending,
     cancelQueuedItem: (section: RunInspectorNodeSection) => {
-      if (!section.queueItem?.nodeId || !section.queueItem.id) return;
+      if (!canUpdateCanvas || !section.queueItem?.nodeId || !section.queueItem.id) return;
       cancelQueuedItemMutation.mutate({ nodeId: section.queueItem.nodeId, itemId: section.queueItem.id });
     },
     cancelQueuedItemPending: cancelQueuedItemMutation.isPending,
@@ -95,7 +108,7 @@ export function useRunInspectorActions({
       hookName: string,
       parameters?: Record<string, unknown> | null,
     ) => {
-      if (!section.execution?.id) return;
+      if (!canUpdateCanvas || !section.execution?.id) return;
       executionHookMutation.mutate({ executionId: section.execution.id, hookName, parameters });
     },
     nodeHookPending: executionHookMutation.isPending,

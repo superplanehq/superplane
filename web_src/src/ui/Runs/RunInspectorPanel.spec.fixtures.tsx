@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createEvent, fireEvent, render } from "@testing-library/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { vi } from "bun:test";
 import type {
   ActionsAction,
@@ -9,6 +9,7 @@ import type {
   SuperplaneComponentsNode,
 } from "@/api-client";
 import { AccountContext } from "@/contexts/accountContextState";
+import { PermissionsContext, type PermissionsContextType } from "@/contexts/permissionsContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { RunInspectorPanel } from "./RunInspectorPanel";
 
@@ -88,6 +89,7 @@ export function renderInspector({
   componentDefinitions: inspectedComponentDefinitions = componentDefinitions,
   account = null,
   passCurrentUser = true,
+  canUpdateCanvas = true,
 }: {
   selectedNodeId?: string | null;
   onSelectNode?: (nodeId: string) => void;
@@ -112,6 +114,7 @@ export function renderInspector({
     groups?: string[];
   } | null;
   passCurrentUser?: boolean;
+  canUpdateCanvas?: boolean;
 } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -124,34 +127,32 @@ export function renderInspector({
     <QueryClientProvider client={queryClient}>
       <AccountContext.Provider
         value={{
-          account: account ? { ...account, has_password: account.has_password ?? false } : null,
+          account: inspectorAccount(account),
           loading: false,
           setupRequired: false,
           refreshAccount: async () => undefined,
         }}
       >
         <ThemeProvider>
-          <RunInspectorPanel
-            canvasId="canvas-1"
-            organizationId="org-1"
-            run={inspectedRun}
-            workflowNodes={inspectedWorkflowNodes}
-            componentDefinitions={inspectedComponentDefinitions}
-            currentUser={
-              passCurrentUser && account
-                ? { id: account.id, email: account.email, roles: account.roles, groups: account.groups }
-                : undefined
-            }
-            selectedNodeId={selectedNodeId}
-            onSelectNode={onSelectNode}
-            onEditNode={onEditNode}
-            onRerunCreated={onRerunCreated}
-            runNavigation={runNavigation}
-            onNavigateRun={onNavigateRun}
-            onNavigateOlder={onNavigateOlder}
-            factoryContext={factoryContext}
-            onClose={onClose}
-          />
+          <RunInspectorPermissionsProvider canUpdateCanvas={canUpdateCanvas}>
+            <RunInspectorPanel
+              canvasId="canvas-1"
+              organizationId="org-1"
+              run={inspectedRun}
+              workflowNodes={inspectedWorkflowNodes}
+              componentDefinitions={inspectedComponentDefinitions}
+              currentUser={inspectorCurrentUser(passCurrentUser, account)}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={onSelectNode}
+              onEditNode={onEditNode}
+              onRerunCreated={onRerunCreated}
+              runNavigation={runNavigation}
+              onNavigateRun={onNavigateRun}
+              onNavigateOlder={onNavigateOlder}
+              factoryContext={factoryContext}
+              onClose={onClose}
+            />
+          </RunInspectorPermissionsProvider>
         </ThemeProvider>
       </AccountContext.Provider>
     </QueryClientProvider>,
@@ -172,23 +173,80 @@ export function renderInteractiveInspector() {
     return (
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <RunInspectorPanel
-            canvasId="canvas-1"
-            organizationId="org-1"
-            run={run}
-            workflowNodes={workflowNodes}
-            componentDefinitions={componentDefinitions}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
-            onClearSelectedNode={() => setSelectedNodeId(null)}
-            onClose={vi.fn()}
-          />
+          <RunInspectorPermissionsProvider canUpdateCanvas>
+            <RunInspectorPanel
+              canvasId="canvas-1"
+              organizationId="org-1"
+              run={run}
+              workflowNodes={workflowNodes}
+              componentDefinitions={componentDefinitions}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={setSelectedNodeId}
+              onClearSelectedNode={() => setSelectedNodeId(null)}
+              onClose={vi.fn()}
+            />
+          </RunInspectorPermissionsProvider>
         </ThemeProvider>
       </QueryClientProvider>
     );
   }
 
   return render(<InteractiveInspector />);
+}
+
+function inspectorAccount(
+  account: {
+    id: string;
+    name: string;
+    email: string;
+    avatar_url: string;
+    installation_admin: boolean;
+    has_password?: boolean;
+    roles?: string[];
+    groups?: string[];
+  } | null,
+) {
+  if (!account) return null;
+  return { ...account, has_password: account.has_password ?? false };
+}
+
+function inspectorCurrentUser(
+  passCurrentUser: boolean,
+  account: {
+    id: string;
+    email: string;
+    roles?: string[];
+    groups?: string[];
+  } | null,
+) {
+  if (!passCurrentUser || !account) return undefined;
+  return { id: account.id, email: account.email, roles: account.roles, groups: account.groups };
+}
+
+function RunInspectorPermissionsProvider({
+  canUpdateCanvas,
+  children,
+}: {
+  canUpdateCanvas: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <PermissionsContext.Provider value={runInspectorPermissions(canUpdateCanvas)}>
+      {children}
+    </PermissionsContext.Provider>
+  );
+}
+
+function runInspectorPermissions(canUpdateCanvas: boolean): PermissionsContextType {
+  return {
+    permissions: [],
+    isLoading: false,
+    canAct: (resource, action) => (resource === "canvases" && action === "update" ? canUpdateCanvas : true),
+    browserNotificationPreferences: {
+      enabled: false,
+      showWhileViewing: true,
+    },
+  };
 }
 
 export function firePointerEvent(
