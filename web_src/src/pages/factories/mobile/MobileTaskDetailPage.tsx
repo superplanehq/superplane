@@ -15,6 +15,7 @@ import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { boardColumnKeyFromSearch, withBoardColumn } from "../lib/factoryBoardColumnPaths";
 import { factoryHomePath, firstFactoryLineId, workOrderBoardLineIdFromSearch } from "../lib/factoryPagePaths";
 import { boardLineIdFromNavigationState, displayedBoardLineId } from "../lib/workOrderNumberResolution";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
@@ -71,11 +72,12 @@ export function MobileTaskDetailPage() {
   const { data: order, isLoading, isError } = useWorkOrder(organizationId, factoryId, orderNumber);
   const taskPending = isLoading && !order;
   const boardLineId = taskBackLineId(search, locationState, factory, order, taskPending);
+  const boardColumnKey = boardColumnKeyFromSearch(search);
   const backToBoard = () => {
     if (!boardLineId) {
       return;
     }
-    navigate(factoryHomePath(organizationId, routeSegment, boardLineId));
+    navigate(withBoardColumn(factoryHomePath(organizationId, routeSegment, boardLineId), boardColumnKey));
   };
 
   usePageTitle([order?.title ?? "Task", factory?.name ?? "Workspace"]);

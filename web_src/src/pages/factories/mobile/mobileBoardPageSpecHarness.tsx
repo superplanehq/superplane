@@ -26,7 +26,9 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   lineDispatches: [],
 };
 
-export function stubElementHeights(measurements: { scrollHeight: number; clientHeight: number }) {
+export function stubElementHeights(
+  measurements: Partial<Record<"scrollHeight" | "clientHeight" | "clientWidth", number>>,
+) {
   for (const [name, value] of Object.entries(measurements)) {
     Object.defineProperty(HTMLElement.prototype, name, { configurable: true, value });
   }
@@ -36,7 +38,7 @@ export function stubElementHeights(measurements: { scrollHeight: number; clientH
 }
 
 export function createMobileBoardRenderer(openCreateWorkOrder: () => void, LocationProbe: () => ReactNode) {
-  function boardElement(factory: FactoriesFactory = REFUND_FACTORY, more = false) {
+  function boardElement(factory: FactoriesFactory = REFUND_FACTORY, more = false, search = "") {
     return (
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
@@ -45,7 +47,7 @@ export function createMobileBoardRenderer(openCreateWorkOrder: () => void, Locat
               initialEntries={[
                 more
                   ? `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more?lineId=${REFUND_LINE_PLAN_ID}`
-                  : `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
+                  : `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}${search}`,
               ]}
             >
               <FactoriesLayoutContext.Provider
@@ -73,8 +75,8 @@ export function createMobileBoardRenderer(openCreateWorkOrder: () => void, Locat
     );
   }
 
-  function renderBoard(factory: FactoriesFactory = REFUND_FACTORY, more = false) {
-    return render(boardElement(factory, more));
+  function renderBoard(factory: FactoriesFactory = REFUND_FACTORY, more = false, search = "") {
+    return render(boardElement(factory, more, search));
   }
 
   return { boardElement, renderBoard };

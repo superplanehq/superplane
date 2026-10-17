@@ -103,6 +103,12 @@ export function buildMobileBoardColumns(
   ];
 }
 
+/** Index of the column with this key. Falls back to the first column when the key is missing or unknown. */
+export function columnIndexForKey(columns: Array<Pick<MobileBoardColumn, "key">>, columnKey: string | null): number {
+  const index = columns.findIndex((column) => column.key === columnKey);
+  return Math.max(index, 0);
+}
+
 /** Index of the column currently snapped into view, from the carousel scroll offset. */
 export function activeColumnIndex(scrollLeft: number, columnWidth: number, columnCount: number): number {
   if (columnWidth <= 0 || columnCount <= 0) {

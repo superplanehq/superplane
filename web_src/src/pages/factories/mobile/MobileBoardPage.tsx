@@ -21,8 +21,8 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -38,6 +38,7 @@ import {
   firstFactoryLineId,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
+import { BOARD_COLUMN_SEARCH_PARAM, boardColumnKeyFromSearch, withBoardColumn } from "../lib/factoryBoardColumnPaths";
 import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
@@ -66,7 +67,12 @@ import { MobileColumn, type ColumnPaging } from "./MobileBoardColumn";
 import { MobileBoardHeader } from "./MobileBoardHeader";
 import { MobileBoardSettings } from "./MobileBoardSettings";
 import { MobileCreateTaskButton } from "./MobileCreateTaskButton";
-import { activeColumnIndex, buildMobileBoardColumns, type MobileBoardColumn } from "./mobileBoardColumns";
+import {
+  activeColumnIndex,
+  buildMobileBoardColumns,
+  columnIndexForKey,
+  type MobileBoardColumn,
+} from "./mobileBoardColumns";
 
 function phoneBoardScope(scope: WorkOrderScope): WorkOrderScope {
   if (scope === "my" || scope === "unassigned") {
@@ -111,10 +117,10 @@ export function MobileBoardPage() {
       lineId={selectedLine.id}
       canUpdateWorkOrders={canAct("work_orders", "update")}
       currentUserId={currentUserId}
-      onOpenWorkOrder={(order) => {
+      onOpenWorkOrder={(order, columnKey) => {
         const number = canonicalWorkOrderNumber(order);
         if (number) {
-          navigate(workOrderDetailPath(organizationId, routeSegment, number), {
+          navigate(withBoardColumn(workOrderDetailPath(organizationId, routeSegment, number), columnKey), {
             state: { peekOrder: order, lineId: selectedLine.id },
           });
         }
@@ -272,13 +278,14 @@ function MobileLineBoard(props: {
   lineId: string;
   canUpdateWorkOrders: boolean;
   currentUserId?: string;
-  onOpenWorkOrder: (order: FactoriesWorkOrderSummary) => void;
+  onOpenWorkOrder: (order: FactoriesWorkOrderSummary, columnKey?: string) => void;
 }) {
   const { organizationId, factoryId, routeSegment, line, lineId, onOpenWorkOrder } = props;
   const navigate = useNavigate();
   const { factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
   const model = useMobileBoardModel(props);
+  const [, setSearchParams] = useSearchParams();
   const searchRef = useWorkOrdersHeaderShortcuts(model.listState);
   const { view: colorView } = useLineBoardColumnColorViewPreference();
   const columnColors = useMemo(() => normalizeColumnColors(line.columnColors), [line.columnColors]);
@@ -290,6 +297,25 @@ function MobileLineBoard(props: {
   const canCreateWorkOrder = canAct("work_orders", "create");
   const lines = factory?.lines ?? [];
   const { search } = useLocation();
+  const activeIndex = columnIndexForKey(model.columns, boardColumnKeyFromSearch(search));
+  const activeColumnKey = model.columns[activeIndex]?.key;
+  const selectColumnIndex = useCallback(
+    (index: number) => {
+      const columnKey = model.columns[index]?.key;
+      if (!columnKey) {
+        return;
+      }
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.set(BOARD_COLUMN_SEARCH_PARAM, columnKey);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [model.columns, setSearchParams],
+  );
   const settingsOpen =
     (isIntakeSearchOpen(search) &&
       configuredIntakes.some((intake) => intake.intakeId === intakeIdFromSearch(search))) ||
@@ -327,6 +353,8 @@ function MobileLineBoard(props: {
           />
           <MobileColumnCarousel
             columns={model.columns}
+            activeIndex={activeIndex}
+            onActiveIndexChange={selectColumnIndex}
             cardsPending={model.cardsPending}
             laneClassName={(column) =>
               lineBoardColumnLaneProps(columnColors[column.key] ?? null, colorView, { mutedFallback: true })
@@ -336,7 +364,7 @@ function MobileLineBoard(props: {
               <LineBoardWorkOrderCard
                 order={order}
                 workOrderCardContext={model.workOrderCardContext}
-                onOpen={() => onOpenWorkOrder(order)}
+                onOpen={() => onOpenWorkOrder(order, column.key)}
                 isAnalyzing={column.key === "backlog" && Boolean(order.id && model.analyzingOrderIds.has(order.id))}
                 creditLabel={order.id ? model.creditFailureLabels.get(order.id) : undefined}
                 showMergeConfidence={column.key !== "done"}
@@ -345,7 +373,10 @@ function MobileLineBoard(props: {
           />
           {canCreateWorkOrder ? (
             <div className="absolute right-4 bottom-5 z-20">
-              <MobileCreateTaskButton className="size-14 rounded-full shadow-lg" onImported={onOpenWorkOrder} />
+              <MobileCreateTaskButton
+                className="size-14 rounded-full shadow-lg"
+                onImported={(order) => onOpenWorkOrder(order, activeColumnKey)}
+              />
             </div>
           ) : null}
         </>
@@ -360,42 +391,56 @@ function MobileLineBoard(props: {
  */
 function MobileColumnCarousel({
   columns,
+  activeIndex,
+  onActiveIndexChange,
   cardsPending,
   laneClassName,
   paging,
   renderCard,
 }: {
   columns: MobileBoardColumn[];
+  activeIndex: number;
+  onActiveIndexChange: (index: number) => void;
   cardsPending: boolean;
   laneClassName: (column: MobileBoardColumn) => { className?: string; surfaceClassName?: string };
   paging: Record<MobileBoardColumn["paging"], ColumnPaging>;
   renderCard: (column: MobileBoardColumn, order: FactoriesWorkOrder) => ReactNode;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const restoredRef = useRef(false);
+
+  // Restore the saved column once, before paint. Later scrolls belong to the user.
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (!track || columns.length === 0 || restoredRef.current) {
+      return;
+    }
+    restoredRef.current = true;
+    track.scrollLeft = activeIndex * track.clientWidth;
+  }, [activeIndex, columns.length]);
 
   const syncActiveFromScroll = useCallback(() => {
     const track = trackRef.current;
     if (!track) {
       return;
     }
-    setActiveIndex(activeColumnIndex(track.scrollLeft, track.clientWidth, columns.length));
-  }, [columns.length]);
-
-  const scrollToColumn = useCallback((index: number) => {
-    const track = trackRef.current;
-    if (!track) {
-      return;
+    const index = activeColumnIndex(track.scrollLeft, track.clientWidth, columns.length);
+    if (index !== activeIndex) {
+      onActiveIndexChange(index);
     }
-    track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
-    setActiveIndex(index);
-  }, []);
+  }, [activeIndex, columns.length, onActiveIndexChange]);
 
-  useEffect(() => {
-    if (activeIndex > columns.length - 1) {
-      setActiveIndex(Math.max(columns.length - 1, 0));
-    }
-  }, [activeIndex, columns.length]);
+  const scrollToColumn = useCallback(
+    (index: number) => {
+      const track = trackRef.current;
+      if (!track) {
+        return;
+      }
+      track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
+      onActiveIndexChange(index);
+    },
+    [onActiveIndexChange],
+  );
 
   return (
     <>

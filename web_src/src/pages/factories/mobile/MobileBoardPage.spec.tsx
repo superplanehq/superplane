@@ -242,6 +242,42 @@ describe("MobileBoardPage", () => {
     expect(screen.getByTestId("mobile-board-column-verify")).not.toHaveAttribute("inert");
   });
 
+  it("opens on the column key in the URL", () => {
+    renderBoard(REFUND_FACTORY, false, "?column=verify");
+
+    expect(screen.getByTestId("mobile-board-tab-verify")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("mobile-board-column-verify")).not.toHaveAttribute("aria-hidden");
+  });
+
+  it("restores the saved column scroll position before the first paint", () => {
+    const restoreStub = stubElementHeights({ clientWidth: 390 });
+    try {
+      renderBoard(REFUND_FACTORY, false, "?column=verify");
+
+      expect(screen.getByTestId("mobile-board-track").scrollLeft).toBe(3 * 390);
+    } finally {
+      restoreStub();
+    }
+  });
+
+  it("opens on Backlog when the column key in the URL is unknown", () => {
+    renderBoard(REFUND_FACTORY, false, "?column=phase-99");
+
+    expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("writes the selected column key to the URL and keeps other params", async () => {
+    const user = userEvent.setup();
+    renderBoard(REFUND_FACTORY, false, "?intake=1");
+
+    await user.click(screen.getByTestId("mobile-board-tab-verify"));
+
+    const location = screen.getByTestId("mobile-test-location");
+    expect(location).toHaveTextContent("column=verify");
+    expect(location).toHaveTextContent("intake=1");
+  });
+
   it("shows repair and paused labels for backlog intakes", () => {
     factoryIntakes.mockReturnValue([
       GITHUB_ISSUES_INTAKE,

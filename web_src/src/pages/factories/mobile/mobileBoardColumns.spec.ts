@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import type { FactoriesWorkOrder } from "@/api-client";
 
 import { REFUND_FACTORY_APPS, REFUND_FACTORY_LINES, REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageResponses";
-import { activeColumnIndex, buildMobileBoardColumns } from "./mobileBoardColumns";
+import { activeColumnIndex, buildMobileBoardColumns, columnIndexForKey } from "./mobileBoardColumns";
 
 const PLAN_LINE = REFUND_FACTORY_LINES[0];
 
@@ -144,5 +144,20 @@ describe("activeColumnIndex", () => {
   it("falls back to the first column when there is nothing to measure", () => {
     expect(activeColumnIndex(120, 0, 5)).toBe(0);
     expect(activeColumnIndex(120, 390, 0)).toBe(0);
+  });
+});
+
+describe("columnIndexForKey", () => {
+  const columns = [{ key: "backlog" as const }, { key: "phase-0" as const }, { key: "done" as const }];
+
+  it("returns the index of the column with this key", () => {
+    expect(columnIndexForKey(columns, "phase-0")).toBe(1);
+    expect(columnIndexForKey(columns, "done")).toBe(2);
+  });
+
+  it("falls back to the first column when the key is missing or unknown", () => {
+    expect(columnIndexForKey(columns, null)).toBe(0);
+    expect(columnIndexForKey(columns, "phase-9")).toBe(0);
+    expect(columnIndexForKey([], "done")).toBe(0);
   });
 });

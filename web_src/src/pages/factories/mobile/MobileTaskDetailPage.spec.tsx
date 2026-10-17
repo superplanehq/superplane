@@ -232,6 +232,19 @@ describe("MobileTaskDetailPage back link", () => {
     );
   });
 
+  it("returns to the board column in the task URL", async () => {
+    const user = userEvent.setup();
+    renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42?lineId=${REFUND_LINE_HOTFIX_ID}&column=phase-0`,
+    );
+
+    await user.click(screen.getByTestId("mobile-task-back"));
+
+    expect(screen.getByTestId("mobile-task-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}?column=phase-0`,
+    );
+  });
+
   it("does not open the first line while a refreshed task is loading", async () => {
     const user = userEvent.setup();
     renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`);
