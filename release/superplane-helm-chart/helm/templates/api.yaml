@@ -170,6 +170,16 @@ spec:
 {{- else }}
               value: "no"
 {{- end }}
+            - name: SUPERPLANE_OWNER_EMAIL
+              value: {{ .Values.api.ownerBootstrap.email | quote }}
+            - name: SUPERPLANE_OWNER_PASSWORD
+              value: {{ .Values.api.ownerBootstrap.password | quote }}
+            - name: SUPERPLANE_OWNER_FIRST_NAME
+              value: {{ .Values.api.ownerBootstrap.firstName | quote }}
+            - name: SUPERPLANE_OWNER_LAST_NAME
+              value: {{ .Values.api.ownerBootstrap.lastName | quote }}
+            - name: SUPERPLANE_OWNER_ORG_NAME
+              value: {{ .Values.api.ownerBootstrap.orgName | quote }}
             - name: OTEL_ENABLED
               value: "yes"
             - name: SUPERPLANE_BEACON_ENABLED
