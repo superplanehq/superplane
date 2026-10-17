@@ -22,9 +22,10 @@ import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
+import { BOARD_COLUMN_SEARCH_PARAM, boardColumnKeyFromSearch } from "../lib/boardColumnSearchParam";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import {
@@ -92,6 +93,7 @@ export function MobileBoardPage() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const navigate = useNavigate();
+  const { search } = useLocation();
   const { canAct, currentUserId } = usePermissions();
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const selectedLine = lines.find((line) => line.id === routeLineId) ?? null;
@@ -115,7 +117,11 @@ export function MobileBoardPage() {
         const number = canonicalWorkOrderNumber(order);
         if (number) {
           navigate(workOrderDetailPath(organizationId, routeSegment, number), {
-            state: { peekOrder: order, lineId: selectedLine.id },
+            state: {
+              peekOrder: order,
+              lineId: selectedLine.id,
+              column: boardColumnKeyFromSearch(search) ?? undefined,
+            },
           });
         }
       }}
@@ -372,7 +378,13 @@ function MobileColumnCarousel({
   renderCard: (column: MobileBoardColumn, order: FactoriesWorkOrder) => ReactNode;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeIndex, setActiveIndex] = useState(() =>
+    Math.max(
+      columns.findIndex((column) => column.key === boardColumnKeyFromSearch(searchParams.toString())),
+      0,
+    ),
+  );
 
   const syncActiveFromScroll = useCallback(() => {
     const track = trackRef.current;
@@ -396,6 +408,35 @@ function MobileColumnCarousel({
       setActiveIndex(Math.max(columns.length - 1, 0));
     }
   }, [activeIndex, columns.length]);
+
+  const activeColumnKey = columns[activeIndex]?.key;
+  useEffect(() => {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (activeColumnKey && activeColumnKey !== "backlog") {
+          next.set(BOARD_COLUMN_SEARCH_PARAM, activeColumnKey);
+        } else {
+          next.delete(BOARD_COLUMN_SEARCH_PARAM);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }, [activeColumnKey, setSearchParams]);
+
+  const snappedRef = useRef(false);
+  useEffect(() => {
+    if (snappedRef.current) {
+      return;
+    }
+    const track = trackRef.current;
+    if (!track) {
+      return;
+    }
+    snappedRef.current = true;
+    track.scrollLeft = activeIndex * track.clientWidth;
+  }, [activeIndex]);
 
   return (
     <>
