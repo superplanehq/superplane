@@ -98,5 +98,6 @@ Contributor setup is Docker-based. Start with the repository instructions in
 - [Blog](https://superplane.com/blog/) for engineering notes and releases
 - [Community events](https://luma.com/superplane) for maintainer sessions
 - [X](https://x.com/superplanehq) for product updates
+- [Security policy](./SECURITY.md) for private vulnerability reports
 
 SuperPlane is available under the [Apache License 2.0](./LICENSE).
