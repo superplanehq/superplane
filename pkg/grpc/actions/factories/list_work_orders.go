@@ -2,9 +2,11 @@ package factories
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
@@ -31,6 +33,13 @@ func ListWorkOrders(ctx context.Context, organizationID string, req *pb.ListWork
 
 	limit := workOrderListLimit(req.GetLimit())
 	filters := listWorkOrderFilters(req)
+	if sourceURL := strings.TrimSpace(req.GetSourceUrl()); sourceURL != "" {
+		match, err := workOrderOriginMatch(sourceURL)
+		if err != nil {
+			return nil, grpcerrors.InvalidArgument(err, "source_url must be an absolute http URL")
+		}
+		filters.OriginMatch = match
+	}
 	filters.Limit = limit + 1
 
 	orders, err := factory.ListWorkOrders(db, filters)
