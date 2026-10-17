@@ -19,4 +19,12 @@ describe("JsonPayload", () => {
 
     expect(viewer).toHaveClass("json-viewer-wrap-values");
   });
+
+  it("renders long string values in full instead of truncating them", () => {
+    const longValue = "error executing request dial tcp connection blocked by policy rule policy-1234567890-abcdefghij";
+    const { container } = render(<JsonPayload value={{ error: longValue }} jsonViewStyle={{}} collapsed={false} />);
+
+    expect(container.textContent).toContain(longValue);
+    expect(container.textContent).not.toContain("...");
+  });
 });
