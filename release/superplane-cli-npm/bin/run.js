@@ -8,11 +8,13 @@ const bin = path.join(__dirname, "superplane");
 const result = spawnSync(bin, process.argv.slice(2), { stdio: "inherit" });
 
 if (result.error) {
-  if (result.error.code === "ENOENT") {
+  const code = result.error.code;
+  if (code === "ENOENT" || code === "EACCES" || code === "ENOEXEC") {
     console.error(
-      "@superplane/cli: binary not found at " +
+      "@superplane/cli: could not run the binary at " +
         bin +
-        ". Did the postinstall step fail? Try `npm rebuild @superplane/cli`."
+        " (" + code + "). Did the postinstall step fail? " +
+        "Try `npm rebuild @superplane/cli`."
     );
     process.exit(127);
   }
