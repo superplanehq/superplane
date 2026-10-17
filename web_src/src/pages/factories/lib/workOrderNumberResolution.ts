@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderLineDispatch } from "@/api-client";
+import { isColumnKey, type ColumnKey } from "./columnKeys";
 import { flattenWorkOrderExecutions } from "./workOrderExecutions";
 
 export type WorkOrderResolutionStatus = "loading" | "found" | "not-found";
@@ -152,6 +153,18 @@ export function boardLineIdFromNavigationState(state: unknown): string | undefin
   }
   const trimmed = lineId.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/** Board column key stashed on `navigate(..., { state })` when a board card opens a task. */
+export function boardColumnFromNavigationState(state: unknown): ColumnKey | undefined {
+  if (!state || typeof state !== "object" || !("column" in state)) {
+    return undefined;
+  }
+  const column = (state as { column?: unknown }).column;
+  if (typeof column !== "string") {
+    return undefined;
+  }
+  return isColumnKey(column) ? column : undefined;
 }
 
 /**

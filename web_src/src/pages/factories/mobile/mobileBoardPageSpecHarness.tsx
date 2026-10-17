@@ -36,18 +36,16 @@ export function stubElementHeights(measurements: { scrollHeight: number; clientH
 }
 
 export function createMobileBoardRenderer(openCreateWorkOrder: () => void, LocationProbe: () => ReactNode) {
-  function boardElement(factory: FactoriesFactory = REFUND_FACTORY, more = false) {
+  function boardElement(factory: FactoriesFactory = REFUND_FACTORY, more = false, search = "") {
+    const pathname = more
+      ? `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more`
+      : `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`;
+    const defaultSearch = more ? `?lineId=${REFUND_LINE_PLAN_ID}` : "";
     return (
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
           <TooltipProvider>
-            <MemoryRouter
-              initialEntries={[
-                more
-                  ? `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more?lineId=${REFUND_LINE_PLAN_ID}`
-                  : `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
-              ]}
-            >
+            <MemoryRouter initialEntries={[`${pathname}${search || defaultSearch}`]}>
               <FactoriesLayoutContext.Provider
                 value={{
                   organizationId: "org-1",
@@ -73,8 +71,8 @@ export function createMobileBoardRenderer(openCreateWorkOrder: () => void, Locat
     );
   }
 
-  function renderBoard(factory: FactoriesFactory = REFUND_FACTORY, more = false) {
-    return render(boardElement(factory, more));
+  function renderBoard(factory: FactoriesFactory = REFUND_FACTORY, more = false, search = "") {
+    return render(boardElement(factory, more, search));
   }
 
   return { boardElement, renderBoard };

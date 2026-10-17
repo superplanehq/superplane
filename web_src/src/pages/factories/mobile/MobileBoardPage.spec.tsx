@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -240,6 +240,30 @@ describe("MobileBoardPage", () => {
     expect(screen.getByTestId("mobile-board-column-backlog")).toHaveAttribute("inert");
     expect(screen.getByTestId("mobile-board-column-verify")).not.toHaveAttribute("aria-hidden");
     expect(screen.getByTestId("mobile-board-column-verify")).not.toHaveAttribute("inert");
+  });
+
+  it("writes the selected column key to the board URL", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.click(screen.getByTestId("mobile-board-tab-verify"));
+
+    await waitFor(() => expect(screen.getByTestId("mobile-test-location")).toHaveTextContent("column=verify"));
+  });
+
+  it("opens on the column from the URL and hides the first column", () => {
+    renderBoard(REFUND_FACTORY, false, "?column=verify");
+
+    expect(screen.getByTestId("mobile-board-tab-verify")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("mobile-board-column-backlog")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("mobile-board-column-verify")).not.toHaveAttribute("aria-hidden");
+  });
+
+  it("falls back to the first column when the URL column key is unknown", () => {
+    renderBoard(REFUND_FACTORY, false, "?column=nope");
+
+    expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveAttribute("aria-selected", "true");
   });
 
   it("shows repair and paused labels for backlog intakes", () => {

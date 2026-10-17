@@ -221,6 +221,36 @@ describe("MobileTaskDetailPage back link", () => {
     );
   });
 
+  it("returns to the board column from the navigation state", async () => {
+    const user = userEvent.setup();
+    renderTask({
+      pathname: `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`,
+      state: { lineId: REFUND_LINE_HOTFIX_ID, column: "verify" },
+    });
+
+    await user.click(screen.getByTestId("mobile-task-back"));
+
+    expect(screen.getByTestId("mobile-task-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}?column=verify`,
+    );
+  });
+
+  it("omits the column when the navigation state has no column", async () => {
+    const user = userEvent.setup();
+    renderTask({
+      pathname: `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`,
+      state: { lineId: REFUND_LINE_HOTFIX_ID },
+    });
+
+    await user.click(screen.getByTestId("mobile-task-back"));
+
+    const location = screen.getByTestId("mobile-task-location");
+    expect(location).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
+    );
+    expect(location).not.toHaveTextContent("column=");
+  });
+
   it("returns to the line in the task URL when that line still exists", async () => {
     const user = userEvent.setup();
     renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42?lineId=${REFUND_LINE_HOTFIX_ID}`);
