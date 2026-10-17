@@ -395,9 +395,7 @@ describe("MergeConfidenceConfigModal", () => {
     expect(within(form).queryByRole("button", { name: "Add Label" })).not.toBeInTheDocument();
     expect(within(form).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "A closed issue is re-opened" })).not.toBeChecked();
-    expect(
-      within(form).getByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
-    ).not.toBeChecked();
+    expect(within(form).getByRole("checkbox", { name: "An intake label is added to an open issue" })).not.toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "Edited" })).toBeChecked();
     expect(within(form).queryByRole("checkbox", { name: "Closed" })).not.toBeInTheDocument();
     expect(within(form).queryByText("Actions")).not.toBeInTheDocument();

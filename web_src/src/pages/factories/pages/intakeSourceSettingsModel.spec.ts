@@ -7,6 +7,7 @@ import {
   DEFAULT_DATADOG_INTAKE_SETTINGS,
   isIntakeSettingsTab,
   intakeSettingsTabs,
+  githubIntakeLabelAddedTitle,
   intakeSettingsFromApi,
   intakeSettingsToApi,
   intakeSupportsDelete,
@@ -44,6 +45,40 @@ describe("intakeSourceSettingsModel", () => {
     expect(isIntakeSettingsTab("listen")).toBe(false);
     expect(intakeSettingsTabs(false)).toEqual(["general", "automation"]);
     expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
+  });
+
+  it("names the include label that starts a task when it is added", () => {
+    expect(githubIntakeLabelAddedTitle({ labels: [], labelFilterMode: "include" })).toBe(
+      'The "superplane" label is added to the issue',
+    );
+    expect(
+      githubIntakeLabelAddedTitle({
+        labels: ["superplane-claude"],
+        labelFilterMode: "include",
+        filterByLabel: true,
+      }),
+    ).toBe('The "superplane-claude" label is added to the issue');
+    expect(
+      githubIntakeLabelAddedTitle({
+        labels: ["bug", "docs"],
+        labelFilterMode: "include",
+        filterByLabel: true,
+      }),
+    ).toBe("One of the selected labels is added to the issue");
+    expect(
+      githubIntakeLabelAddedTitle({
+        labels: ["wontfix"],
+        labelFilterMode: "exclude",
+        filterByLabel: true,
+      }),
+    ).toBe('The "superplane" label is added to the issue');
+    expect(
+      githubIntakeLabelAddedTitle({
+        labels: ["superplane-claude"],
+        labelFilterMode: "include",
+        filterByLabel: false,
+      }),
+    ).toBe('The "superplane" label is added to the issue');
   });
 
   it("defaults the authors filter to off", () => {
