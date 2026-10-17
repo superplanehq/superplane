@@ -46,9 +46,9 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
   });
 
-  it("defaults the authors filter to off", () => {
-    expect(DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess).toBe(false);
-    expect(intakeSettingsFromApi("GitHub issues", undefined).authorsWithAccess).toBe(false);
+  it("defaults the authors filter to on", () => {
+    expect(DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess).toBe(true);
+    expect(intakeSettingsFromApi("GitHub issues", undefined).authorsWithAccess).toBe(true);
   });
 
   it("round-trips the authors filter through the API shape", () => {
@@ -59,6 +59,55 @@ describe("intakeSourceSettingsModel", () => {
     const off = intakeSettingsFromApi("GitHub issues", { authorsWithAccess: false });
     expect(off.authorsWithAccess).toBe(false);
     expect(intakeSettingsToApi(off).authorsWithAccess).toBe(false);
+  });
+
+  it("listens for a selected label and for every new issue otherwise", () => {
+    const withLabels = normalizeIntakeSourceSettings(
+      {
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+        filterByLabel: true,
+        labels: ["bug"],
+        newIssues: false,
+        reopenedIssues: false,
+        superplaneLabelAdded: false,
+      },
+      "github-issues",
+    );
+    expect(withLabels.newIssues).toBe(true);
+    expect(withLabels.reopenedIssues).toBe(false);
+    expect(withLabels.superplaneLabelAdded).toBe(true);
+
+    const withoutLabels = normalizeIntakeSourceSettings(
+      {
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+        filterByLabel: false,
+        labels: ["bug"],
+        superplaneLabelAdded: true,
+      },
+      "github-issues",
+    );
+    expect(withoutLabels.newIssues).toBe(true);
+    expect(withoutLabels.superplaneLabelAdded).toBe(false);
+    expect(withoutLabels.labels).toEqual([]);
+
+    const excluded = normalizeIntakeSourceSettings(
+      {
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+        filterByLabel: true,
+        labelFilterMode: "exclude",
+        labels: ["bug"],
+        superplaneLabelAdded: true,
+      },
+      "github-issues",
+    );
+    expect(excluded.superplaneLabelAdded).toBe(false);
+
+    const jira = normalizeIntakeSourceSettings(
+      { ...DEFAULT_GITHUB_INTAKE_SETTINGS, newIssues: false, superplaneLabelAdded: true },
+      "jira-issues",
+    );
+    expect(jira.newIssues).toBe(false);
+    expect(jira.superplaneLabelAdded).toBe(true);
   });
 
   it("round-trips GitHub issue events through the API shape", () => {
@@ -113,12 +162,12 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.reopenedIssues).toBe(false);
   });
 
-  it("defaults the GitHub issue event toggles on when the API omits them", () => {
+  it("defaults a new issue and a re-opened issue on when the API omits them", () => {
     const settings = intakeSettingsFromApi("GitHub issues", {});
 
     expect(settings.newIssues).toBe(true);
     expect(settings.reopenedIssues).toBe(true);
-    expect(settings.superplaneLabelAdded).toBe(true);
+    expect(settings.superplaneLabelAdded).toBe(false);
   });
 
   it("round-trips Sentry new-issue and level fields and turns off hidden triggers", () => {
