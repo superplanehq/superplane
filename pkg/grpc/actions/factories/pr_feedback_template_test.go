@@ -7,6 +7,8 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
+	goyaml "gopkg.in/yaml.v3"
 )
 
 func TestPrFeedbackCommentActivityDescriptionExpression(t *testing.T) {
@@ -197,4 +199,85 @@ func evalRootDataExpression(t *testing.T, source string, data map[string]any) an
 	got, err := expr.Run(program, map[string]any{})
 	require.NoError(t, err)
 	return got
+}
+
+func evalBitbucketAcknowledgeBody(t *testing.T, task any) string {
+	t.Helper()
+
+	source := templateExpressionSource(t, prFeedbackBitbucketAcknowledgeBodyExpression())
+	program, err := expr.Compile(source, expr.AsAny(), expr.Function("task", func(params ...any) (any, error) {
+		return task, nil
+	}))
+	require.NoError(t, err)
+
+	got, err := expr.Run(program, map[string]any{})
+	require.NoError(t, err)
+	text, ok := got.(string)
+	require.True(t, ok)
+	return text
+}
+
+func TestPrFeedbackBitbucketAcknowledgeBodyExpression_WithTaskLinksToTheTask(t *testing.T) {
+	got := evalBitbucketAcknowledgeBody(t, map[string]any{
+		"key": "SUPER-123",
+		"url": "https://app.superplane.com/tasks/SUPER-123",
+	})
+
+	assert.Equal(t, "Sure, looking into this. Follow along: [SUPER-123](https://app.superplane.com/tasks/SUPER-123)", got)
+}
+
+func TestPrFeedbackBitbucketAcknowledgeBodyExpression_WithoutTaskHasNoLink(t *testing.T) {
+	got := evalBitbucketAcknowledgeBody(t, nil)
+
+	assert.Equal(t, "Sure, looking into this.", got)
+	assert.NotContains(t, got, "](")
+}
+
+func TestBuildBitbucketDiscussionPRFeedbackCanvasAcknowledgeBody(t *testing.T) {
+	canvas := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository:  "acme/widgets",
+		Mention:     "@ada",
+		VCSProvider: models.ProviderBitbucket,
+		Agent: &intakeAgent{
+			Component: "runnerOpenRouter",
+			Model:     "anthropic/claude-sonnet-4-6",
+		},
+	})
+
+	acknowledge := findSpecNode(t, canvas, prFeedbackAcknowledgeCommentNodeID)
+	assert.Equal(t, prFeedbackBitbucketAcknowledgeBodyExpression(), acknowledge.Configuration["body"])
+
+	// The task link exists only after the activity node ran.
+	edges := yamlEdgeChannels(canvas)
+	assert.Contains(t, edges, "default:"+prFeedbackActivityNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
+	assert.NotContains(t, edges, "default:"+prFeedbackCommentTriggerNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
+
+	encoded, err := goyaml.Marshal(canvas)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), "SuperPlane is looking into this.")
+}
+
+func TestMoveAcknowledgeAfterActivity(t *testing.T) {
+	edges := []models.Edge{
+		{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID, Channel: "default"},
+		{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackAcknowledgeCommentNodeID, Channel: "default"},
+		{SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID, Channel: "found"},
+	}
+
+	got := moveAcknowledgeAfterActivity(edges, prFeedbackActivityNodeID)
+
+	assert.ElementsMatch(t, []models.Edge{
+		{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID, Channel: "default"},
+		{SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID, Channel: "found"},
+		{SourceID: prFeedbackActivityNodeID, TargetID: prFeedbackAcknowledgeCommentNodeID, Channel: "default"},
+	}, got)
+	assert.Len(t, edges, 3, "input edges stay unchanged")
+}
+
+func TestMoveAcknowledgeAfterActivity_WithoutAcknowledgeNodeKeepsEdges(t *testing.T) {
+	edges := []models.Edge{
+		{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID, Channel: "default"},
+	}
+
+	assert.Equal(t, edges, moveAcknowledgeAfterActivity(edges, prFeedbackActivityNodeID))
 }
