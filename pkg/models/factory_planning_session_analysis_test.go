@@ -196,6 +196,10 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
+	text, err := AnalysisContinuationText(db, session)
+	require.NoError(t, err)
+	assert.Contains(t, text, "Retry refunds")
+	assert.Contains(t, text, "Stop double charges.")
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
 	_, err = order.ReportCheck(db, FactoryWorkOrderCheckParams{
 		Key:      PlanningClarityCheckKey,
@@ -220,7 +224,7 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, session.RecordAgentMessage(db, "I found the retry seam in billing/retry.go."))
 	require.NoError(t, session.SendUserMessage(db, "Keep the existing retry helper.", uuid.Nil))
 
-	text, err := AnalysisContinuationText(db, session)
+	text, err = AnalysisContinuationText(db, session)
 	require.NoError(t, err)
 	assert.Contains(t, text, "Continue this SuperPlane analysis session")
 	assert.Contains(t, text, "Follow the task prompt")

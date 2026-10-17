@@ -512,7 +512,8 @@ func (w *NodeExecutor) executeActionNode(
 			w.encryptor,
 			workflow.OrganizationID,
 		),
-		Logger: logger,
+		CodexSubscription: contexts.NewCodexSubscriptionContext(tx, workflow),
+		Logger:            logger,
 	}
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
@@ -532,6 +533,11 @@ func (w *NodeExecutor) executeActionNode(
 
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
+		var busy *models.CodexConnectionBusyError
+		if errors.As(err, &busy) {
+			// Keep the execution pending until the previous runner releases its credentials.
+			return err
+		}
 		logger = withFactoryOrder(logger, tx, execution.RunID)
 		logger = withRejectedHostedCredit(logger, workflow.OrganizationID, err)
 		logger.Errorf("failed to execute action: %v", err)

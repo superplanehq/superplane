@@ -16,8 +16,9 @@ const (
 	UsageKindModel   = "model"
 	UsageKindCompute = "compute"
 
-	UsageFundingSourceBYOK   = "byok"
-	UsageFundingSourceHosted = "hosted"
+	UsageFundingSourceBYOK         = "byok"
+	UsageFundingSourceHosted       = "hosted"
+	UsageFundingSourceSubscription = "subscription"
 
 	UsageProviderAnthropic  = "anthropic"
 	UsageProviderOpenAI     = "openai"
@@ -153,6 +154,11 @@ func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
 	}
 
 	billedMicros := providerCostMicros
+	if fundingSource == UsageFundingSourceSubscription {
+		providerCostMicros = 0
+		billedMicros = 0
+		version = pricebook.Version + "+subscription"
+	}
 	if fundingSource == UsageFundingSourceHosted {
 		markupBPS, markupErr := ResolveOrganizationMarkupBPS(tx, scope.OrganizationID)
 		if markupErr != nil {
@@ -270,10 +276,10 @@ func fundingSourceIsHosted(source string) bool {
 	return strings.TrimSpace(source) == UsageFundingSourceHosted
 }
 
-// ParseUsageFundingSource accepts hosted or byok. Empty input is an error.
+// ParseUsageFundingSource accepts hosted, byok, or subscription. Empty input is an error.
 func ParseUsageFundingSource(source string) (string, error) {
 	normalized := strings.ToLower(strings.TrimSpace(source))
-	if normalized == UsageFundingSourceHosted || normalized == UsageFundingSourceBYOK {
+	if normalized == UsageFundingSourceHosted || normalized == UsageFundingSourceBYOK || normalized == UsageFundingSourceSubscription {
 		return normalized, nil
 	}
 	return "", fmt.Errorf("unsupported usage funding source: %s", source)
@@ -823,11 +829,7 @@ func spendingScopedQuery(tx *gorm.DB, filter UsageReportFilter, joinWorkOrders b
 		query = query.Where("workspace_usage_events.machine_type = ?", filter.MachineType)
 	}
 	if filter.FundingSource != "" {
-		if filter.FundingSource == UsageFundingSourceHosted {
-			query = query.Where("workspace_usage_events.funding_source = ?", UsageFundingSourceHosted)
-		} else {
-			query = query.Where("workspace_usage_events.funding_source IS DISTINCT FROM ?", UsageFundingSourceHosted)
-		}
+		query = query.Where("workspace_usage_events.funding_source = ?", filter.FundingSource)
 	}
 	if !filter.Since.IsZero() {
 		query = query.Where("workspace_usage_events.occurred_at >= ?", filter.Since)
@@ -1011,7 +1013,7 @@ const workOrderRunUsageSelect = `
 	COALESCE(SUM(workspace_usage_events.cost_micros), 0) AS cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceHosted + `' AND workspace_usage_events.usage_kind = '` + UsageKindModel + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS byok_cost_micros,
-	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source IS DISTINCT FROM '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.model END, E'\n'), '') AS models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source = '` + UsageFundingSourceHosted + `' THEN workspace_usage_events.model END, E'\n'), '') AS models,
 	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.model END, E'\n'), '') AS byok_models,
 	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindCompute + `' AND workspace_usage_events.machine_type <> '' THEN workspace_usage_events.machine_type END, E'\n'), '') AS machine_types`
 

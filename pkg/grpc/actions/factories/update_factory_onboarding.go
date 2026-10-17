@@ -90,7 +90,11 @@ func validateFactoryOnboardingResources(
 		}
 	}
 
-	if config.AgentIntegrationID != "" {
+	if config.CodexSubscription {
+		if err := validateCodexSubscriptionOnboarding(db, organizationID, factory, config); err != nil {
+			return err
+		}
+	} else if config.AgentIntegrationID != "" {
 		integration, err := findReadyOnboardingIntegration(db, organizationID, config.AgentIntegrationID)
 		if err != nil {
 			return err
@@ -247,8 +251,75 @@ func factoryOnboardingPatchFromRequest(req *pb.UpdateFactoryOnboardingRequest) (
 		}
 		patch.AgentHarness = &harness
 	}
+	if req.CodexSubscription != nil {
+		value := req.GetCodexSubscription()
+		patch.CodexSubscription = &value
+	}
 
 	return patch, nil
+}
+
+func validateCodexSubscriptionOnboarding(
+	db *gorm.DB,
+	organizationID uuid.UUID,
+	factory *models.Factory,
+	config models.FactoryOnboardingConfig,
+) error {
+	if config.AgentHarness != models.FactoryOnboardingAgentHarnessCodex {
+		return invalidArgument("ChatGPT subscription uses Codex")
+	}
+	if config.AgentIntegrationID != "" {
+		return invalidArgument("ChatGPT subscription does not use an API key")
+	}
+	if _, err := models.SoleHumanOrganizationMember(db, organizationID); err != nil {
+		return err
+	}
+	connection, err := models.FindFactoryCodexConnection(db, organizationID, factory.ID)
+	if err != nil {
+		return invalidArgument("Connect ChatGPT before you finish setup")
+	}
+	if connection.Status != models.CodexConnectionStatusReady || connection.Reserved() {
+		return invalidArgument("Wait until the ChatGPT sign-in runner has stopped")
+	}
+	var canvases []models.Canvas
+	if err := db.Where("factory_id = ?", factory.ID).Find(&canvases).Error; err != nil {
+		return err
+	}
+	for i := range canvases {
+		nodes, err := models.FindCanvasNodesInTransaction(db, canvases[i].ID)
+		if err != nil {
+			return err
+		}
+		for _, node := range nodes {
+			if err := validateSubscriptionCodexNode(node); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateSubscriptionCodexNode(node models.CanvasNode) error {
+	name := node.ComponentName()
+	switch name {
+	case "", "runnerClaudeCode", "runnerOpenRouter", models.SuperPlaneRunnerComponent:
+		if name == "" {
+			return nil
+		}
+		return invalidArgument("This workspace must use Codex with a ChatGPT subscription")
+	case "runnerCodex":
+		configuration := node.Configuration.Data()
+		credentials, _ := configuration["credentials"].(map[string]any)
+		source, _ := credentials["source"].(string)
+		if source != "subscription" {
+			return invalidArgument("This workspace must use Codex with a ChatGPT subscription")
+		}
+		model, _ := configuration["model"].(string)
+		if strings.TrimSpace(model) != "" {
+			return invalidArgument("ChatGPT subscription keeps the Codex model unset")
+		}
+	}
+	return nil
 }
 
 func factoryOnboardingIssuesSourceFromProto(source pb.FactoryOnboarding_IssuesSource) (string, error) {

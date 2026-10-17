@@ -382,6 +382,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
+    codexSubscriptionOffered: model.codexSubscriptionOffered,
+    codexSubscriptionLoading: model.codexSubscriptionLoading,
   });
   const navigation = useFirstRunNavigation(model, agentGate, connection, {
     ready: githubReady,

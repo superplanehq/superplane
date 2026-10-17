@@ -46,6 +46,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
     expect(FACTORY_SETTINGS_NAV_GROUPS.flatMap((group) => group.items.map((item) => item.label))).toEqual([
       "Account",
       "Notifications",
+      "Codex usage",
       "General",
       "Repository",
       "MCP Server",

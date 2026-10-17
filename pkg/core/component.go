@@ -21,36 +21,49 @@ var (
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
-	ID             uuid.UUID
-	RunID          uuid.UUID
-	WorkflowID     string
-	OrganizationID string
-	CanvasName     string
-	NodeID         string
-	NodeName       string
-	SourceNodeID   string
-	BaseURL        string
-	Data           any
-	Configuration  any
-	Logger         *log.Entry
-	HTTP           HTTPContext
-	Metadata       MetadataWriter
-	NodeMetadata   MetadataReader
-	ExecutionState ExecutionStateContext
-	Requests       RequestContext
-	Auth           AuthReader
-	Integration    IntegrationContext
-	Secrets        SecretsContext
-	CanvasMemory   CanvasMemoryContext
-	Webhook        NodeWebhookContext
-	Expressions    ExpressionContext
-	OIDC           oidc.Provider
-	Apps           AppExecutionContext
-	Runs           RunExecutionContext
-	Factory        FactoryContext
-	Usage          UsageRecorder
-	HostedLLM      HostedLLMContext
-	RunnerTasks    RunnerTaskContext
+	ID                uuid.UUID
+	RunID             uuid.UUID
+	WorkflowID        string
+	OrganizationID    string
+	CanvasName        string
+	NodeID            string
+	NodeName          string
+	SourceNodeID      string
+	BaseURL           string
+	Data              any
+	Configuration     any
+	Logger            *log.Entry
+	HTTP              HTTPContext
+	Metadata          MetadataWriter
+	NodeMetadata      MetadataReader
+	ExecutionState    ExecutionStateContext
+	Requests          RequestContext
+	Auth              AuthReader
+	Integration       IntegrationContext
+	Secrets           SecretsContext
+	CanvasMemory      CanvasMemoryContext
+	Webhook           NodeWebhookContext
+	Expressions       ExpressionContext
+	OIDC              oidc.Provider
+	Apps              AppExecutionContext
+	Runs              RunExecutionContext
+	Factory           FactoryContext
+	Usage             UsageRecorder
+	HostedLLM         HostedLLMContext
+	RunnerTasks       RunnerTaskContext
+	CodexSubscription CodexSubscriptionContext
+}
+
+// CodexSubscriptionLease is one exclusive reservation of a factory ChatGPT connection.
+type CodexSubscriptionLease struct {
+	ConnectionID uuid.UUID
+	FactoryID    uuid.UUID
+	Generation   int64
+}
+
+// CodexSubscriptionContext reserves the factory ChatGPT connection before a task is created.
+type CodexSubscriptionContext interface {
+	Reserve(taskID uuid.UUID) (CodexSubscriptionLease, error)
 }
 
 type AppExecutionContext interface {

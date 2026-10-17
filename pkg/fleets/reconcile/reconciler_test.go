@@ -28,6 +28,7 @@ type fakeAdmin struct {
 	createResponse    adminclient.CreateRunnerResponse
 	createRequests    []adminclient.CreateRunnerRequest
 	deletedRunnerIDs  []string
+	providerDeleted   []string
 	capacityWaits     []int
 	events            *[]string
 }
@@ -94,6 +95,14 @@ func limitedRunners(runners []adminclient.Runner, limit int) []adminclient.Runne
 		return runners
 	}
 	return runners[:limit]
+}
+
+func (f *fakeAdmin) MarkRunnerProviderDeleted(
+	_ context.Context,
+	_, runnerID string,
+) (adminclient.Runner, error) {
+	f.providerDeleted = append(f.providerDeleted, runnerID)
+	return adminclient.Runner{ID: runnerID, State: adminclient.RunnerStateTerminated}, nil
 }
 
 func (f *fakeAdmin) DeleteRunner(

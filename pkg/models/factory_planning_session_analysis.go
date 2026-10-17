@@ -372,7 +372,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	if err != nil {
 		return "", err
 	}
-	if artifacts.spec == "" && artifacts.clarity.score == "" && artifacts.confidence.score == "" && artifacts.complexity.score == "" && artifacts.verifiability.score == "" && len(messages) == 0 {
+	if artifacts.task == "" && artifacts.spec == "" && artifacts.clarity.score == "" && artifacts.confidence.score == "" && artifacts.complexity.score == "" && artifacts.verifiability.score == "" && len(messages) == 0 {
 		return "", nil
 	}
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
@@ -381,6 +381,11 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity and Confidence rules, and specification shape. ")
 	b.WriteString(planningScoreCallSentence())
 	b.WriteString("If you write or update a specification this turn, include spec on propose_update before you stop. Do not leave a written plan unpublished. Include survey on propose_update only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
+	if artifacts.task != "" {
+		b.WriteString("\nOriginal task:\n\n")
+		b.WriteString(artifacts.task)
+		b.WriteString("\n")
+	}
 	if artifacts.spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(artifacts.spec)
@@ -504,6 +509,7 @@ type planningScoreText struct {
 }
 
 type analysisContinuationState struct {
+	task          string
 	spec          string
 	clarity       planningScoreText
 	confidence    planningScoreText
@@ -541,6 +547,9 @@ func analysisContinuationArtifacts(tx *gorm.DB, session *FactoryPlanningSession)
 	state.spec, err = planningSpecBody(tx, order)
 	if err != nil {
 		return state, err
+	}
+	if state.spec == "" {
+		state.task = fmt.Sprintf("Repository: %s\n\n# %s\n\n%s", session.Repository, order.Title, order.Description)
 	}
 	checks, err := order.ListChecks(tx)
 	if err != nil {

@@ -212,6 +212,8 @@ const (
 
 // CreateTaskParams is forwarded to the task broker POST /v1/tasks.
 type CreateTaskParams struct {
+	// TaskID, when set, is the reservation id created before the task row.
+	TaskID                  string
 	MachineType             string
 	RunMode                 string
 	Script                  string
