@@ -3,6 +3,7 @@ package public
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -116,6 +117,14 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 
 	integrations, err := models.ListSentryIntegrationsByInstallationUUID(database.DB(r.Context()), installationUUID)
 	if err != nil {
+		if isSentryWebhookLookupCanceled(r, err) {
+			fields := sentryAppWebhookFields(summary.Resource, summary.Action, installationUUID, nil, body)
+			fields["status"] = statusClientClosedRequest
+			logging.LogSentryWebhookWarn("Sentry app webhook caller disconnected", fields)
+			w.WriteHeader(statusClientClosedRequest)
+			return
+		}
+
 		logging.LogSentryWebhookError("failed to list Sentry app integrations", sentryAppWebhookFields(
 			summary.Resource,
 			summary.Action,
@@ -429,6 +438,19 @@ func sentryAppSetupStateFromRequest(r *http.Request) string {
 		return ""
 	}
 	return strings.TrimSpace(cookie.Value)
+}
+
+// isSentryWebhookLookupCanceled reports a lookup that failed because the
+// caller already closed this request. A canceled context on another call
+// is not a closed request.
+func isSentryWebhookLookupCanceled(r *http.Request, err error) bool {
+	if r == nil {
+		return false
+	}
+	if !errors.Is(err, context.Canceled) {
+		return false
+	}
+	return errors.Is(r.Context().Err(), context.Canceled)
 }
 
 func captureSentryWebhookErrorToSentry(r *http.Request, err error, tags ...string) {
