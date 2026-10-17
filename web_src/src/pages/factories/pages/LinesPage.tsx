@@ -19,7 +19,7 @@ import {
 } from "@/hooks/useFactoryData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
-import { useCreateFactoryIntake, useFactoryIntakes, useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
@@ -53,6 +53,7 @@ import { ScheduledIntakeSetupDialog } from "./ScheduledIntakeSetupDialog";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 import { IntakeWebhookFailureNotice } from "./IntakeWebhookFailureNotice";
+import { useIntakeWebhookRetry } from "./useIntakeWebhookRetry";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -65,8 +66,6 @@ import {
   workspaceNextStepsProgressCopy,
 } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
-
-const WEBHOOK_RETRY_REFETCH_MS = 8000;
 
 type BoardColumnPaging = {
   hasMore: boolean;
@@ -200,7 +199,7 @@ import {
   isLineIntakeSourceId,
   type AddIntakeTemplate,
 } from "./lineIntakeModel";
-import { intakeSettingsToApi, isIntakeSettingsTab } from "./intakeSourceSettingsModel";
+import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { isPlanningSettingsTab } from "./planningSettingsModel";
 import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
 import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
@@ -367,9 +366,9 @@ export function LinesPage() {
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
   const prFeedbackHandlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackHandlers = prFeedbackHandlersQuery.data ?? [];
-  const { data: factoryIntakes = [], refetch: refetchIntakes } = useFactoryIntakes(organizationId, factoryId);
+  const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
-  const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
+  const intakeWebhookRetry = useIntakeWebhookRetry(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
@@ -770,19 +769,8 @@ export function LinesPage() {
                 key={intake.intakeId}
                 message={intake.healthMessage}
                 repository={intake.resourceId}
-                retrying={updateIntake.isPending}
-                onRetry={() =>
-                  updateIntake.mutate(
-                    {
-                      intakeId: intake.intakeId,
-                      settings: intakeSettingsToApi(intake.settings, intake.source.id),
-                    },
-                    {
-                      // The webhook is registered in the background, so read health again after it runs.
-                      onSuccess: () => window.setTimeout(() => void refetchIntakes(), WEBHOOK_RETRY_REFETCH_MS),
-                    },
-                  )
-                }
+                retrying={intakeWebhookRetry.retrying}
+                onRetry={() => intakeWebhookRetry.retryIntake(intake)}
               />
             ))}
           <NextStepsPanel

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -75,7 +76,9 @@ func (w *Webhook) MarkFailed(tx *gorm.DB) error {
 }
 
 // Fail marks the webhook failed and stores the setup error for the factory UI.
-// An empty reason leaves metadata unchanged.
+// The error merges into the existing metadata, so registration IDs from a
+// previous ready state stay available for cleanup. An empty reason leaves
+// metadata unchanged.
 func (w *Webhook) Fail(tx *gorm.DB, reason string) error {
 	updates := map[string]any{
 		"state":      WebhookStateFailed,
@@ -86,7 +89,14 @@ func (w *Webhook) Fail(tx *gorm.DB, reason string) error {
 		if len(reason) > 500 {
 			reason = reason[:500]
 		}
-		updates["metadata"] = datatypes.NewJSONType(map[string]any{"setupError": reason})
+		setupError, err := json.Marshal(map[string]any{"setupError": reason})
+		if err != nil {
+			return err
+		}
+		updates["metadata"] = gorm.Expr(
+			"CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END || ?::jsonb",
+			string(setupError),
+		)
 	}
 	return tx.Model(w).Updates(updates).Error
 }
