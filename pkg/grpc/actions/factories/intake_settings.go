@@ -32,7 +32,8 @@ const (
 
 	intakeAuthorAccessCondition = `root().data.issue.author_association in ["COLLABORATOR", "MEMBER", "OWNER"]`
 
-	// Label that a user adds to an issue to hand it to the factory.
+	// Default label that a user adds to an issue to hand it to the factory.
+	// A factory with include labels matches those names instead.
 	intakeSuperplaneLabel = "superplane"
 
 	// Conditions are joined with `&&`, which binds tighter than `||`, so a
@@ -63,7 +64,8 @@ type intakeSettings struct {
 	AuthorsWithAccess bool
 	NewIssues         bool
 	ReopenedIssues    bool
-	// Create a task when somebody adds the "superplane" label to an open issue.
+	// Create a task when somebody adds an intake label to an open issue.
+	// Include labels use those names. Otherwise the label is superplane.
 	SuperplaneLabelAdded bool
 	// Move the originating Jira issue when the work order completes.
 	JiraMoveOnComplete bool
@@ -330,7 +332,7 @@ func intakeGitHubFilterExpression(settings intakeSettings) string {
 	}
 
 	if settings.SuperplaneLabelAdded {
-		conditions = append(conditions, intakeSuperplaneLabelCondition)
+		conditions = append(conditions, intakeGitHubLabelAddedCondition(settings))
 	}
 
 	if len(conditions) == 0 {
@@ -338,6 +340,26 @@ func intakeGitHubFilterExpression(settings intakeSettings) string {
 	}
 
 	return strings.Join(conditions, " && ")
+}
+
+// intakeGitHubLabelAddedCondition keeps an opened or reopened event, and a
+// labeled event only when the added label is an intake label on an open issue.
+// Include labels are the intake labels. Exclude labels are not. An empty
+// include list still uses the label superplane.
+func intakeGitHubLabelAddedCondition(settings intakeSettings) string {
+	if settings.LabelFilterMode != intakeLabelFilterInclude || len(settings.Labels) == 0 {
+		return intakeSuperplaneLabelCondition
+	}
+
+	encoded, err := json.Marshal(settings.Labels)
+	if err != nil {
+		return intakeSuperplaneLabelCondition
+	}
+
+	return fmt.Sprintf(
+		`(root().data.action != "labeled" || (root().data.issue.state == "open" && root().data.label.name in %s))`,
+		encoded,
+	)
 }
 
 func intakeJiraFilterExpression(settings intakeSettings) string {

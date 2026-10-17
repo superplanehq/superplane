@@ -26,7 +26,7 @@ export interface IntakeSourceSettings {
   newIssues: boolean;
   /** Create a task when a closed GitHub issue is re-opened. */
   reopenedIssues: boolean;
-  /** Also create a task when somebody adds the "superplane" label to an open issue. */
+  /** Create a task when somebody adds an intake label to an open issue. */
   superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
   /** Move the originating Jira issue when SuperPlane completes the task. */
@@ -168,6 +168,22 @@ export const INTAKE_SETTINGS_COPY = {
   deleteConfirm: "Delete intake",
   deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
+
+export function githubIntakeLabelAddedTitle(settings: {
+  labels: readonly string[];
+  labelFilterMode: IntakeLabelFilterMode;
+  filterByLabel?: boolean;
+}): string {
+  const includeLabels =
+    settings.labelFilterMode === "include" && settings.filterByLabel !== false ? settings.labels : [];
+  if (includeLabels.length === 1) {
+    return `The "${includeLabels[0]}" label is added to the issue`;
+  }
+  if (includeLabels.length > 1) {
+    return "One of the selected labels is added to the issue";
+  }
+  return INTAKE_SETTINGS_COPY.superplaneLabelAdded;
+}
 
 export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
   return (

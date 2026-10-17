@@ -251,6 +251,58 @@ func Test__intakeFilterExpressionFor_EvaluatesAgainstIssuePayloads(t *testing.T)
 			},
 		},
 	}
+	documentationLabelAdded := map[string]any{
+		"action": "labeled",
+		"label":  map[string]any{"name": "documentation"},
+		"issue": map[string]any{
+			"state":              "open",
+			"author_association": "MEMBER",
+			"assignees":          []any{},
+			"labels":             []any{map[string]any{"name": "documentation"}},
+		},
+	}
+	customLabelAdded := map[string]any{
+		"action": "labeled",
+		"label":  map[string]any{"name": "superplane-claude"},
+		"issue": map[string]any{
+			"state":              "open",
+			"author_association": "MEMBER",
+			"assignees":          []any{},
+			"labels":             []any{map[string]any{"name": "superplane-claude"}},
+		},
+	}
+	superplaneAddedToCustomIssue := map[string]any{
+		"action": "labeled",
+		"label":  map[string]any{"name": "superplane"},
+		"issue": map[string]any{
+			"state":              "open",
+			"author_association": "MEMBER",
+			"assignees":          []any{},
+			"labels": []any{
+				map[string]any{"name": "superplane-claude"},
+				map[string]any{"name": "superplane"},
+			},
+		},
+	}
+	openedWithCustomLabel := map[string]any{
+		"action": "opened",
+		"issue": map[string]any{
+			"state":              "open",
+			"author_association": "MEMBER",
+			"assignees":          []any{},
+			"labels":             []any{map[string]any{"name": "superplane-claude"}},
+		},
+	}
+	closedCustomLabelAdded := map[string]any{
+		"action": "labeled",
+		"label":  map[string]any{"name": "superplane-claude"},
+		"issue": map[string]any{
+			"state":              "closed",
+			"author_association": "MEMBER",
+			"assignees":          []any{},
+			"labels":             []any{map[string]any{"name": "superplane-claude"}},
+		},
+	}
 
 	t.Run("matches an issue that carries one of the labels", func(t *testing.T) {
 		settings := defaultIntakeSettings()
@@ -282,13 +334,35 @@ func Test__intakeFilterExpressionFor_EvaluatesAgainstIssuePayloads(t *testing.T)
 		assert.Equal(t, true, evalRootDataExpression(t, expression, openedWithLabel))
 	})
 
+	t.Run("matches an added include label and not superplane", func(t *testing.T) {
+		settings := defaultIntakeSettings()
+		settings.Labels = []string{"superplane-claude"}
+		settings.SuperplaneLabelAdded = true
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
+
+		assert.Equal(t, true, evalRootDataExpression(t, expression, customLabelAdded))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, superplaneAddedToCustomIssue))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, openedWithCustomLabel))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, closedCustomLabelAdded))
+	})
+
+	t.Run("exclude labels do not replace the superplane label", func(t *testing.T) {
+		settings := defaultIntakeSettings()
+		settings.Labels = []string{"superplane-claude"}
+		settings.LabelFilterMode = intakeLabelFilterExclude
+		settings.SuperplaneLabelAdded = true
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
+
+		assert.Equal(t, true, evalRootDataExpression(t, expression, superplaneLabelAdded))
+	})
+
 	t.Run("keeps the label filter for labeled events", func(t *testing.T) {
 		settings := defaultIntakeSettings()
 		settings.Labels = []string{"documentation"}
 		settings.SuperplaneLabelAdded = true
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
 
-		assert.Equal(t, true, evalRootDataExpression(t, expression, superplaneLabelAdded))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, superplaneLabelAdded))
 		assert.Equal(t, false, evalRootDataExpression(t, expression, otherLabelAdded))
 		assert.Equal(t, true, evalRootDataExpression(t, expression, openedWithLabel))
 		assert.Equal(t, false, evalRootDataExpression(t, expression, openedWithoutLabel))
@@ -303,7 +377,8 @@ func Test__intakeFilterExpressionFor_EvaluatesAgainstIssuePayloads(t *testing.T)
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
 
 		assert.Equal(t, true, evalRootDataExpression(t, expression, openedWithLabel))
-		assert.Equal(t, true, evalRootDataExpression(t, expression, superplaneLabelAdded))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, documentationLabelAdded))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, superplaneLabelAdded))
 		assert.Equal(t, false, evalRootDataExpression(t, expression, otherLabelAdded))
 	})
 }

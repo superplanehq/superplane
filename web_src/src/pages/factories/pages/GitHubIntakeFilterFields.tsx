@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 
 import {
   addIntakeLabel,
+  githubIntakeLabelAddedTitle,
   INTAKE_SETTINGS_COPY,
   toggleIntakeLabel,
   type IntakeSourceSettings,
@@ -61,7 +62,7 @@ export function GitHubIntakeFilterFields({
             onChange={() => update("reopenedIssues", !settings.reopenedIssues)}
           />
           <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.superplaneLabelAdded}
+            title={githubIntakeLabelAddedTitle(settings)}
             checked={settings.superplaneLabelAdded}
             onChange={() => update("superplaneLabelAdded", !settings.superplaneLabelAdded)}
           />

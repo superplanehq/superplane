@@ -36,12 +36,6 @@ const PULL_REQUEST_ACTIONS = [
   { value: "ready_for_review", label: "A pull request is ready for review" },
 ] as const;
 
-const ISSUE_ACTIONS = [
-  { value: "opened", label: INTAKE_SETTINGS_COPY.newIssues },
-  { value: "reopened", label: INTAKE_SETTINGS_COPY.reopenedIssues },
-  { value: "labeled", label: INTAKE_SETTINGS_COPY.superplaneLabelAdded },
-] as const;
-
 const NODE_CONFIG_COPY = {
   collapseStep: "Collapse step",
   loading: "Loading settings.",
@@ -50,7 +44,14 @@ const NODE_CONFIG_COPY = {
   onlyFactoryPullRequests: "Run only when this factory created the pull request",
   startRunWhen: "Start a run when:",
   filters: "Filters",
+  intakeLabelAdded: "An intake label is added to an open issue",
 } as const;
+
+const ISSUE_ACTIONS = [
+  { value: "opened", label: INTAKE_SETTINGS_COPY.newIssues },
+  { value: "reopened", label: INTAKE_SETTINGS_COPY.reopenedIssues },
+  { value: "labeled", label: NODE_CONFIG_COPY.intakeLabelAdded },
+] as const;
 
 const PULL_REQUEST_FIELD_GROUPS = [
   { label: NODE_CONFIG_COPY.startRunWhen, fieldNames: [PULL_REQUEST_ACTIONS_FIELD] },
