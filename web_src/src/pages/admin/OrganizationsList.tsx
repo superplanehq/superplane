@@ -2,7 +2,7 @@ import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
-import { Building, CircleCheck, ClipboardList, Palette, Pin, PinOff, User } from "lucide-react";
+import { Building, CircleCheck, ClipboardList, Factory, GitBranch, Palette, Pin, PinOff, User } from "lucide-react";
 import React from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Link, useNavigate } from "react-router";
@@ -39,7 +39,17 @@ function pinActionLabel(pinned: boolean): string {
   return pinned ? "Unpin organization" : "Pin organization";
 }
 
-const ORGANIZATION_COLUMN_LABELS = ["Name", "Automations", "Tasks", "Done Tasks", "Members", "Credits", "Created"];
+const ORGANIZATION_COLUMN_LABELS = [
+  "Name",
+  "Automations",
+  "Tasks",
+  "Done Tasks",
+  "Members",
+  "Workspaces",
+  "Repositories",
+  "Credits",
+  "Created",
+];
 
 function OrganizationTableHeader({
   sortable,
@@ -91,6 +101,20 @@ function OrganizationTableHeader({
       <SortableHeader
         label="Members"
         field="member_count"
+        currentSort={sortBy}
+        currentDirection={sortDirection}
+        onSort={onSort}
+      />
+      <SortableHeader
+        label="Workspaces"
+        field="workspace_count"
+        currentSort={sortBy}
+        currentDirection={sortDirection}
+        onSort={onSort}
+      />
+      <SortableHeader
+        label="Repositories"
+        field="repository_count"
         currentSort={sortBy}
         currentDirection={sortDirection}
         onSort={onSort}
@@ -190,6 +214,18 @@ function OrganizationRow({
         <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
           <User size={13} />
           {organization.member_count}
+        </span>
+      </td>
+      <td className="px-4 py-2.5">
+        <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+          <Factory size={13} />
+          {organization.workspace_count}
+        </span>
+      </td>
+      <td className="px-4 py-2.5">
+        <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+          <GitBranch size={13} />
+          {organization.repository_count}
         </span>
       </td>
       <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap dark:text-gray-400">

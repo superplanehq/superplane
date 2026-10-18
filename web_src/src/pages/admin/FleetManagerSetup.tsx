@@ -1,54 +1,160 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
+import { FleetManagerInstallCommands } from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
+import {
+  FleetManagerFleetSection,
+  FleetManagerProviderSection,
+} from "@/components/fleet-manager-setup/FleetManagerSections";
+import { FleetManagerVerificationStatus } from "@/components/fleet-manager-setup/FleetManagerWizard";
 import { Button } from "@/components/ui/button";
-import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
-import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
+import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
+import { useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
+import {
+  fleetManagerHelmCommand,
+  fleetManagerValuesFileCommand,
+  type FleetManagerDraft,
+} from "@/lib/fleetManagerSetup";
 
-export function FleetManagerSetup() {
-  const [step, setStep] = useState<FleetManagerWizardStep>("provider");
-  const [complete, setComplete] = useState(false);
-  const setup = useFleetManagerSetup();
-  const stepIndex = FLEET_MANAGER_WIZARD_STEPS.indexOf(step);
-
-  if (complete) {
-    return (
-      <div className="max-w-2xl space-y-4">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Fleet Manager setup saved</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Return to this page to update fleets or recover an incomplete installation.
-        </p>
-        <Button type="button" variant="outline" onClick={() => setComplete(false)}>
-          Configure Fleet Manager
-        </Button>
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
+        {description && <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>}
       </div>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function InstallActions({
+  draftIsValid,
+  error,
+  commands,
+  isPreparingInstallation,
+  onGenerate,
+}: {
+  draftIsValid: boolean;
+  error?: string;
+  commands: { valuesCommand: string; helmCommand: string } | null;
+  isPreparingInstallation: boolean;
+  onGenerate: () => void;
+}) {
+  if (!draftIsValid) {
+    return (
+      <>
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+        <Button type="button" disabled>
+          Generate install command
+        </Button>
+      </>
     );
   }
+  if (commands) {
+    return <FleetManagerInstallCommands valuesCommand={commands.valuesCommand} helmCommand={commands.helmCommand} />;
+  }
+  return (
+    <Button type="button" onClick={onGenerate} disabled={isPreparingInstallation}>
+      Generate install command
+    </Button>
+  );
+}
+
+export function FleetManagerSetup() {
+  const organizations = useAccountOrganizations();
+  const setup = useFleetManagerSetup(true, organizations.data?.[0]?.id ?? "");
+  const [submittedDraft, setSubmittedDraft] = useState<FleetManagerDraft | null>(null);
+  const draftIsValid = setup.validationErrors.length === 0;
+  const submittedDraftIsCurrent = submittedDraft !== null && setup.draft === submittedDraft;
+  const verification = useFleetManagerVerification(submittedDraftIsCurrent, submittedDraft, setup.metadata);
+  const commands = useMemo(() => {
+    if (!setup.metadata || !setup.draft || !setup.values) return null;
+    return {
+      valuesCommand: fleetManagerValuesFileCommand(setup.values),
+      helmCommand: fleetManagerHelmCommand(setup.metadata, setup.draft.namespace),
+    };
+  }, [setup.draft, setup.metadata, setup.values]);
 
   return (
-    <div className="max-w-3xl space-y-5">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Set up Fleet Manager</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Generate standalone chart values for your runner infrastructure.
-          </p>
-        </div>
-        <p className="text-xs text-gray-500">
-          Step {stepIndex + 1} of {FLEET_MANAGER_WIZARD_STEPS.length}
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Set up Fleet Manager</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Generate standalone chart values for your runner infrastructure.
         </p>
       </header>
-      <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <FleetManagerWizardScreen
-          step={step}
-          setup={setup}
-          showBackButton={stepIndex > 0}
-          onBack={() => setStep(FLEET_MANAGER_WIZARD_STEPS[stepIndex - 1] ?? "provider")}
-          onNext={() => setStep(FLEET_MANAGER_WIZARD_STEPS[stepIndex + 1] ?? "install")}
-          onFinish={() => setComplete(true)}
-          onFinishLater={() => setComplete(true)}
-        />
-      </section>
+
+      {setup.loadError ? (
+        <p role="alert" className="text-sm text-destructive">
+          SuperPlane could not load Fleet Manager setup. Refresh the page and try again.
+        </p>
+      ) : !setup.metadata || !setup.draft ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading Fleet Manager setup...</p>
+      ) : (
+        <div className="space-y-5">
+          <SectionCard
+            title="Choose a cloud provider"
+            description="Select the account that will run your fleet machines."
+          >
+            <FleetManagerProviderSection setup={setup} />
+          </SectionCard>
+          <SectionCard
+            title="Configure the default fleet"
+            description="Set the cloud machine type and how many machines to keep ready."
+          >
+            <FleetManagerFleetSection setup={setup} />
+          </SectionCard>
+          <SectionCard
+            title="Install Fleet Manager"
+            description={
+              draftIsValid
+                ? "Run the first command to write fleet-manager-values.yaml. Run the second command to install the chart."
+                : undefined
+            }
+          >
+            <div className="space-y-5">
+              <InstallActions
+                draftIsValid={draftIsValid}
+                error={setup.validationErrors[0]}
+                commands={
+                  commands && setup.values
+                    ? { valuesCommand: commands.valuesCommand, helmCommand: commands.helmCommand }
+                    : null
+                }
+                isPreparingInstallation={setup.isPreparingInstallation}
+                onGenerate={() => void setup.prepareInstallation()}
+              />
+              {setup.tokenError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {setup.tokenError}
+                </p>
+              )}
+              <Button
+                type="button"
+                onClick={() => {
+                  if (setup.draft && draftIsValid) setSubmittedDraft(setup.draft);
+                }}
+                disabled={!draftIsValid || !setup.values || submittedDraftIsCurrent}
+              >
+                Check installation
+              </Button>
+              {submittedDraftIsCurrent && (
+                <FleetManagerVerificationStatus status={verification.status} onRetry={verification.retry} />
+              )}
+            </div>
+          </SectionCard>
+        </div>
+      )}
     </div>
   );
 }

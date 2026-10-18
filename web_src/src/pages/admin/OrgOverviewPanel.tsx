@@ -13,6 +13,8 @@ export interface OrganizationOverview {
   task_count: number;
   done_task_count: number;
   member_count: number;
+  workspace_count: number;
+  repository_count: number;
   created_at?: string;
   updated_at?: string;
   pinned?: boolean;
@@ -75,6 +77,8 @@ export function OrgOverviewPanel({
             <OverviewField label="Automations" value={String(organization.canvas_count)} />
             <OverviewField label="Tasks" value={String(organization.task_count)} />
             <OverviewField label="Done Tasks" value={String(organization.done_task_count)} />
+            <OverviewField label="Workspaces" value={String(organization.workspace_count)} />
+            <OverviewField label="Repositories" value={String(organization.repository_count)} />
           </div>
         </div>
       ) : null}

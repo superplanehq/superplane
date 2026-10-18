@@ -91,6 +91,41 @@ div.monaco-editor .view-overlays .current-line {
   box-shadow: 0 3px 0 rgb(0 0 0 / 0.2) !important;
 }
 
+/* Fleet setup code stays on the first-run brown surface in light and dark mode. */
+.fleet-setup-code .monaco-editor,
+.dark .fleet-setup-code .monaco-editor {
+  --vscode-editor-background: #201f1a;
+  --vscode-editorGutter-background: #201f1a;
+  --vscode-editor-foreground: #eeede9;
+  --vscode-editorLineHighlightBackground: transparent;
+  --vscode-editorLineHighlightBorder: transparent;
+  --vscode-scrollbarSlider-background: #4a483f;
+  --vscode-scrollbarSlider-hoverBackground: #6b6860;
+  --vscode-scrollbarSlider-activeBackground: #9b9993;
+}
+
+.fleet-setup-code .monaco-editor .margin,
+.fleet-setup-code .monaco-editor .monaco-editor-background,
+.dark .fleet-setup-code .monaco-editor .margin,
+.dark .fleet-setup-code .monaco-editor .monaco-editor-background {
+  background-color: #201f1a !important;
+}
+
+.fleet-setup-code .monaco-editor .margin-view-overlays .current-line,
+.fleet-setup-code .monaco-editor .view-overlays .current-line,
+.dark .fleet-setup-code .monaco-editor .margin-view-overlays .current-line,
+.dark .fleet-setup-code .monaco-editor .view-overlays .current-line {
+  background-color: transparent !important;
+}
+
+.planning-review-code-editor .workbench-hover {
+  pointer-events: none;
+}
+
+.planning-review-code-editor .workbench-hover .hover-contents {
+  white-space: nowrap !important;
+}
+
 .canvas-conflict-current-line {
   background: rgb(220 252 231 / 45%);
 }

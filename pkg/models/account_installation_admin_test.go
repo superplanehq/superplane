@@ -197,6 +197,69 @@ func TestListAllOrganizations(t *testing.T) {
 		assert.Equal(t, "Low Members", orgs[2].Name)
 	})
 
+	t.Run("sorts organizations by workspace count", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		highCount, err := CreateOrganization("High Workspaces", "")
+		require.NoError(t, err)
+		midCount, err := CreateOrganization("Mid Workspaces", "")
+		require.NoError(t, err)
+		lowCount, err := CreateOrganization("Low Workspaces", "")
+		require.NoError(t, err)
+
+		db := database.DB(t.Context())
+		createTestWorkspace(t, db, highCount.ID, "Live One", "acme/api", "")
+		createTestWorkspace(t, db, highCount.ID, "Live Two", "", "")
+		deleted := createTestWorkspace(t, db, highCount.ID, "Deleted", "acme/deleted", "")
+		require.NoError(t, deleted.SoftDelete(db))
+		createTestWorkspace(t, db, midCount.ID, "Only Workspace", "", "")
+
+		orgs, total, err := ListAllOrganizations(db, "", 50, 0, "workspace_count", "desc")
+		require.NoError(t, err)
+		require.Len(t, orgs, 3)
+		assert.Equal(t, int64(3), total)
+		assert.Equal(t, "High Workspaces", orgs[0].Name)
+		assert.Equal(t, int64(2), orgs[0].WorkspaceCount)
+		assert.Equal(t, "Mid Workspaces", orgs[1].Name)
+		assert.Equal(t, int64(1), orgs[1].WorkspaceCount)
+		assert.Equal(t, "Low Workspaces", orgs[2].Name)
+		assert.Equal(t, int64(0), orgs[2].WorkspaceCount)
+		assert.Equal(t, lowCount.ID, orgs[2].ID)
+	})
+
+	t.Run("sorts organizations by main repository count", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		shared, err := CreateOrganization("Shared Repos", "")
+		require.NoError(t, err)
+		backlogOnly, err := CreateOrganization("Backlog Only", "")
+		require.NoError(t, err)
+		noRepository, err := CreateOrganization("No Repository", "")
+		require.NoError(t, err)
+
+		db := database.DB(t.Context())
+		createTestWorkspace(t, db, shared.ID, "First Shared", "acme/api", "")
+		createTestWorkspace(t, db, shared.ID, "Second Shared", "acme/api", "acme/backlog")
+		deleted := createTestWorkspace(t, db, shared.ID, "Deleted Shared", "acme/api", "")
+		require.NoError(t, deleted.SoftDelete(db))
+		createTestWorkspace(t, db, backlogOnly.ID, "Backlog Workspace", "", "acme/backlog")
+		createTestWorkspace(t, db, noRepository.ID, "Empty Workspace", "", "")
+
+		orgs, total, err := ListAllOrganizations(db, "", 50, 0, "repository_count", "desc")
+		require.NoError(t, err)
+		require.Len(t, orgs, 3)
+		assert.Equal(t, int64(3), total)
+		assert.Equal(t, "Shared Repos", orgs[0].Name)
+		assert.Equal(t, int64(2), orgs[0].RepositoryCount)
+		assert.Equal(t, int64(2), orgs[0].WorkspaceCount)
+		assert.Equal(t, "Backlog Only", orgs[1].Name)
+		assert.Equal(t, int64(0), orgs[1].RepositoryCount)
+		assert.Equal(t, int64(1), orgs[1].WorkspaceCount)
+		assert.Equal(t, "No Repository", orgs[2].Name)
+		assert.Equal(t, int64(0), orgs[2].RepositoryCount)
+		assert.Equal(t, int64(1), orgs[2].WorkspaceCount)
+	})
+
 	t.Run("excludes soft-deleted organizations", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
 
@@ -340,6 +403,26 @@ func TestFindOrganizationWithCounts(t *testing.T) {
 		assert.Equal(t, int64(0), found.DoneTaskCount)
 	})
 
+	t.Run("counts non-deleted workspaces and saved main repositories", func(t *testing.T) {
+		org, err := CreateOrganization("Workspace Counts", "")
+		require.NoError(t, err)
+		db := database.DB(t.Context())
+
+		deleted := createTestWorkspace(t, db, org.ID, "Deleted", "acme/deleted", "")
+		require.NoError(t, deleted.SoftDelete(db))
+		createTestWorkspace(t, db, org.ID, "No Main", "", "")
+		createTestWorkspace(t, db, org.ID, "Shared One", "acme/api", "")
+		createTestWorkspace(t, db, org.ID, "Shared Two", "acme/api", "")
+		createTestWorkspace(t, db, org.ID, "Backlog Only", "", "acme/backlog")
+		incomplete := createTestWorkspace(t, db, org.ID, "Still Onboarding", "acme/app", "")
+		assert.Nil(t, incomplete.OnboardingCompletedAt)
+
+		found, err := FindOrganizationWithCounts(db, org.ID)
+		require.NoError(t, err)
+		assert.Equal(t, int64(5), found.WorkspaceCount)
+		assert.Equal(t, int64(3), found.RepositoryCount)
+	})
+
 	t.Run("returns not found for deleted organization", func(t *testing.T) {
 		org, err := CreateOrganization("Soon Deleted", "")
 		require.NoError(t, err)
@@ -349,6 +432,27 @@ func TestFindOrganizationWithCounts(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
+}
+
+func createTestWorkspace(t *testing.T, tx *gorm.DB, organizationID uuid.UUID, name, appRepository, backlogRepository string) *Factory {
+	t.Helper()
+
+	factory, err := CreateFactory(tx, organizationID, name, "", "")
+	require.NoError(t, err)
+
+	patch := FactoryOnboardingPatch{}
+	if appRepository != "" {
+		patch.AppRepository = &appRepository
+	}
+	if backlogRepository != "" {
+		patch.BacklogRepository = &backlogRepository
+	}
+	if patch.AppRepository == nil && patch.BacklogRepository == nil {
+		return factory
+	}
+
+	require.NoError(t, factory.UpdateOnboarding(tx, patch))
+	return factory
 }
 
 func createTestTasks(t *testing.T, tx *gorm.DB, organizationID uuid.UUID, count int) {

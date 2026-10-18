@@ -134,7 +134,7 @@ function AgentPanel({
           skill.enabled !== false &&
           skill.name &&
           skill.name !== "superplane" &&
-          !disabledSkills.includes(skill.id ?? ""),
+          (skill.systemSkill || !disabledSkills.includes(skill.id ?? "")),
       )
     : undefined;
   const componentRef = useRef(component);

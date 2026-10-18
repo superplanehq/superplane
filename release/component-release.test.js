@@ -92,12 +92,38 @@ test("rejects build metadata and malformed prereleases", () => {
 });
 
 test("maps each component to its independent tag", () => {
+  assert.equal(componentTag("superplane", "v1.2.3"), "v1.2.3");
   assert.equal(componentTag("runner", "v1.2.3"), "runner/v1.2.3");
   assert.equal(
     componentTag("fleet-manager", "v2.0.0-rc.1"),
     "fleet-manager/v2.0.0-rc.1",
   );
   assert.throws(() => componentTag("server", "v1.2.3"), /component/);
+});
+
+test("generates SuperPlane notes from unprefixed stable tags", () => {
+  const { repository, releaseSha, runnerSha, fleetManagerSha } =
+    createReleaseHistory();
+  const output = path.join(repository, "superplane-release-notes.md");
+  let invocation;
+
+  generateReleaseNotes({
+    component: "superplane",
+    version: "v1.0.0",
+    sha: releaseSha,
+    output,
+    repository,
+    dockerExec: (command, args) => {
+      invocation = { command, args };
+      return "## v1.0.0\n\n- Add the application release.\n";
+    },
+  });
+
+  assert.equal(invocation.command, "docker");
+  assert.ok(invocation.args.includes(`v0.30.0..${releaseSha}`));
+  assert.ok(invocation.args.includes("v1.0.0"));
+  assert.ok(invocation.args.includes(runnerSha));
+  assert.ok(invocation.args.includes(fleetManagerSha));
 });
 
 test("generates stable notes from component release ranges", () => {
@@ -602,6 +628,41 @@ test("Fleet Manager releases record image and chart digests", async () => {
 
   assert.match(payload.body, /Fleet Manager image digest: `sha256:d{64}`/);
   assert.match(payload.body, /Fleet Manager chart digest: `sha256:e{64}`/);
+});
+
+test("SuperPlane releases record image and chart digests", async () => {
+  let payload;
+  const server = http.createServer((request, response) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ id: 45 }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+
+  try {
+    await publishGitHubRelease({
+      apiURL: `http://127.0.0.1:${address.port}`,
+      repository: "superplanehq/superplane",
+      token: "test-token",
+      releaseID: "45",
+      component: "superplane",
+      version: "v1.2.3",
+      sha: "f".repeat(40),
+      imageDigest: `sha256:${"a".repeat(64)}`,
+      chartDigest: `sha256:${"b".repeat(64)}`,
+      releaseNotes: "## SuperPlane changes\n\n- Publish the application.",
+    });
+  } finally {
+    server.close();
+  }
+
+  assert.match(payload.body, /SuperPlane image digest: `sha256:a{64}`/);
+  assert.match(payload.body, /SuperPlane chart digest: `sha256:b{64}`/);
 });
 
 test("release notes match the release type", async () => {

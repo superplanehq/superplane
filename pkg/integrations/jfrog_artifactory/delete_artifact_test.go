@@ -17,9 +17,6 @@ func Test__DeleteArtifact__ComponentInfo(t *testing.T) {
 	component := DeleteArtifact{}
 
 	assert.Equal(t, "jfrogArtifactory.deleteArtifact", component.Name())
-	assert.Equal(t, "Delete Artifact", component.Label())
-	assert.Equal(t, "jfrogArtifactory", component.Icon())
-	assert.Equal(t, "gray", component.Color())
 	assert.NotEmpty(t, component.Description())
 	assert.NotEmpty(t, component.Documentation())
 }

@@ -19,6 +19,7 @@ vi.mock("@/api-client", () => ({
 }));
 
 import {
+  factoryQueryKeys,
   mergeFactoryBoardWorkOrders,
   useCreateWorkOrder,
   useSelectFactoryVcsProviderRepository,
@@ -71,19 +72,28 @@ describe("mergeFactoryBoardWorkOrders", () => {
 });
 
 describe("useCreateWorkOrder", () => {
+  const createdOrderIds = ["wo-created-1", "wo-planning-on", "wo-planning-off"];
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    clearBacklogAnalysisPending("wo-created-1");
+    for (const orderId of createdOrderIds) {
+      clearBacklogAnalysisPending(orderId);
+    }
   });
 
-  it("marks the new order pending analysis and invalidates backlog-analysis-runs", async () => {
-    factoriesCreateWorkOrder.mockResolvedValue({ data: { order: { id: "wo-created-1" } } });
-    const queryClient = new QueryClient();
-    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+  function seedFactory(queryClient: QueryClient, enabled: boolean) {
+    queryClient.setQueryData(factoryQueryKeys.detail("org-1", "factory-1"), {
+      id: "factory-1",
+      planning: { enabled },
+    });
+  }
 
+  async function createOrder(queryClient: QueryClient, orderId: string) {
+    factoriesCreateWorkOrder.mockResolvedValue({ data: { order: { id: orderId } } });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useCreateWorkOrder("org-1", "factory-1"), {
       wrapper: createWrapper(queryClient),
     });
@@ -92,9 +102,47 @@ describe("useCreateWorkOrder", () => {
       await result.current.mutateAsync({ title: "New task", description: "" });
     });
 
-    await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-created-1")).toBe(true));
+    return invalidateSpy;
+  }
+
+  function expectListAndRunInvalidation(invalidateSpy: ReturnType<typeof vi.spyOn>) {
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrdersPagePrefix("org-1", "factory-1"),
+    });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["backlog-analysis-runs", "org-1"],
     });
+  }
+
+  it("marks the new order pending analysis when Planning is on", async () => {
+    const queryClient = new QueryClient();
+    seedFactory(queryClient, true);
+
+    const invalidateSpy = await createOrder(queryClient, "wo-planning-on");
+
+    await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-planning-on")).toBe(true));
+    expectListAndRunInvalidation(invalidateSpy);
+  });
+
+  it("marks the new order pending analysis when the factory cache is missing", async () => {
+    const queryClient = new QueryClient();
+
+    const invalidateSpy = await createOrder(queryClient, "wo-created-1");
+
+    await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-created-1")).toBe(true));
+    expectListAndRunInvalidation(invalidateSpy);
+  });
+
+  it("does not mark analysis pending when Planning is off", async () => {
+    const queryClient = new QueryClient();
+    seedFactory(queryClient, false);
+
+    const invalidateSpy = await createOrder(queryClient, "wo-planning-off");
+
+    expect(pendingBacklogAnalysisIds().has("wo-planning-off")).toBe(false);
+    expectListAndRunInvalidation(invalidateSpy);
   });
 });

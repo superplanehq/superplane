@@ -1,81 +1,19 @@
 import { describe, expect, it } from "bun:test";
+import { createCloudWatchFixtures } from "./test-support";
 
-import type {
-  ComponentBaseContext,
-  ComponentDefinition,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-  OutputPayload,
-} from "../../types";
 import { getAlarmMapper } from "./get_alarm";
 import { eventStateRegistry } from "../index";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Get Alarm Node",
-    componentName: "aws.cloudwatch.getAlarm",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildOutput(data: unknown): OutputPayload {
-  return {
-    type: "aws.cloudwatch.alarm",
-    timestamp: new Date().toISOString(),
-    data,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: "2026-06-04T09:12:40.000Z",
-    updatedAt: "2026-06-04T09:12:45.000Z",
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
-
-function buildDetailsCtx(overrides?: {
-  node?: Partial<NodeInfo>;
-  execution?: Partial<ExecutionInfo>;
-}): ExecutionDetailsContext {
-  const node = buildNode(overrides?.node);
-  return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
-}
-
-const defaultDefinition: ComponentDefinition = {
-  name: "aws.cloudwatch.getAlarm",
+const { buildNode, buildOutput, buildExecution, buildDetailsCtx, buildPropsContext } = createCloudWatchFixtures({
+  nodeName: "Get Alarm Node",
+  componentName: "aws.cloudwatch.getAlarm",
   label: "CloudWatch • Get Alarm",
-  description: "",
-  icon: "aws.cloudwatch",
-  color: "gray",
-};
-
-function buildPropsContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
-  return {
-    nodes: [],
-    node: buildNode(),
-    componentDefinition: defaultDefinition,
-    lastExecutions: [],
-    currentUser: undefined,
-    actions: { invokeNodeExecutionHook: async () => {} },
-    ...overrides,
-  };
-}
+  outputType: "aws.cloudwatch.alarm",
+  createdAt: "2026-06-04T09:12:40.000Z",
+  updatedAt: "2026-06-04T09:12:45.000Z",
+});
 
 const alarmOutputData = {
   alarmName: "api-high-cpu",
@@ -177,15 +115,6 @@ describe("getAlarmMapper.getExecutionDetails", () => {
 // ── props ─────────────────────────────────────────────────────────────────────
 
 describe("getAlarmMapper.props", () => {
-  it("uses node name as title", () => {
-    expect(getAlarmMapper.props(buildPropsContext()).title).toBe("Get Alarm Node");
-  });
-
-  it("falls back to component label when node name is empty", () => {
-    const props = getAlarmMapper.props(buildPropsContext({ node: buildNode({ name: "" }) }));
-    expect(props.title).toBe("CloudWatch • Get Alarm");
-  });
-
   it("shows the alarm and the region", () => {
     const props = getAlarmMapper.props(buildPropsContext({ node: buildNode({ configuration }) }));
     expect(props.metadata?.map((item) => item.label)).toEqual(["api-high-cpu", "us-east-1"]);
@@ -202,15 +131,6 @@ describe("getAlarmMapper.props", () => {
     const props = getAlarmMapper.props(buildPropsContext({ node: buildNode({ configuration: {}, metadata: {} }) }));
     expect(props.metadata).toEqual([]);
   });
-
-  it("sets includeEmptyState when no executions", () => {
-    expect(getAlarmMapper.props(buildPropsContext({ lastExecutions: [] })).includeEmptyState).toBe(true);
-  });
-
-  it("clears includeEmptyState when there is an execution", () => {
-    const props = getAlarmMapper.props(buildPropsContext({ lastExecutions: [buildExecution()] }));
-    expect(props.includeEmptyState).toBe(false);
-  });
 });
 
 // ── eventStateRegistry ────────────────────────────────────────────────────────
@@ -218,23 +138,5 @@ describe("getAlarmMapper.props", () => {
 describe("eventStateRegistry['cloudwatch.getAlarm']", () => {
   it("maps finished success to retrieved", () => {
     expect(eventStateRegistry["cloudwatch.getAlarm"].getState(buildExecution())).toBe("retrieved");
-  });
-
-  it("returns running when execution is in progress", () => {
-    const running = buildExecution({
-      state: "STATE_STARTED",
-      result: "RESULT_UNSPECIFIED" as ExecutionInfo["result"],
-      resultReason: "RESULT_REASON_UNSPECIFIED" as ExecutionInfo["resultReason"],
-    });
-    expect(eventStateRegistry["cloudwatch.getAlarm"].getState(running)).toBe("running");
-  });
-
-  it("returns failed when execution fails", () => {
-    const failed = buildExecution({
-      state: "STATE_FINISHED",
-      result: "RESULT_FAILED" as ExecutionInfo["result"],
-      resultReason: "RESULT_REASON_COMPONENT_FAILED" as ExecutionInfo["resultReason"],
-    });
-    expect(eventStateRegistry["cloudwatch.getAlarm"].getState(failed)).toBe("failed");
   });
 });

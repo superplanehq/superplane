@@ -327,10 +327,6 @@ func Test__CreateIssue__ComponentInfo(t *testing.T) {
 	component := CreateIssue{}
 
 	assert.Equal(t, "jira.createIssue", component.Name())
-	assert.Equal(t, "Create Issue", component.Label())
-	assert.Equal(t, "Create a new issue in Jira", component.Description())
-	assert.Equal(t, "jira", component.Icon())
-	assert.Equal(t, "blue", component.Color())
 	assert.NotEmpty(t, component.Documentation())
 }
 

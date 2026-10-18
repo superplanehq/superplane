@@ -13,9 +13,6 @@ export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 /** Organization experimental feature: Datadog Error Tracking intake from the Backlog column menu. */
 export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 
-/** Organization experimental feature: Bitbucket as a workspace Git host. */
-export const FEATURE_FACTORY_BITBUCKET = "factory_bitbucket";
-
 /** Organization experimental feature: SuperPlane Agent page. */
 export const FEATURE_WORKSPACE_AGENT = "workspace_agent";
 
@@ -39,3 +36,6 @@ export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
 
 /** Organization experimental feature: public workspace MCP server for Cursor and other MCP clients. */
 export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
+
+/** Organization experimental feature: scheduled task proposals in Backlog. */
+export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";

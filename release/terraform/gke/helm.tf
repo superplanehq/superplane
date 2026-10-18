@@ -81,25 +81,29 @@ locals {
   }) : ""
 
   fleet_manager_setup_values = yamlencode({
+    # The published chart still defaults both components to v0.1.0.
+    # Runner and Fleet Manager publish on separate release lines.
+    componentReleases = {
+      runnerVersion       = "v0.2.0"
+      runnerVersions      = ["v0.2.0"]
+      fleetManagerVersion = "v0.1.3"
+    }
     fleetManagerSetup = {
       enabled            = local.runners_enabled
       provider           = local.runners_enabled ? "gcp" : ""
       managerId          = var.cluster_name
       namespace          = var.superplane_namespace
       serviceAccountName = local.fleet_manager_service_account_name
-      credentials = {
-        provision      = true
-        existingSecret = "superplane-fleet-manager-token"
-        tokenKey       = "INSTALLATION_ADMIN_TOKEN"
-      }
       infrastructure = local.runners_enabled ? {
         superplaneUrl        = "https://${var.domain_name}"
         projectId            = var.project_id
         zones                = local.runner_zones
         subnetwork           = google_compute_subnetwork.runners[0].id
         networkTags          = [local.runner_network_tag]
+        imageAmd64           = var.runner_image_amd64
+        imageArm64           = var.runner_image_arm64
         fleetManagerIdentity = google_service_account.fleet_manager[0].email
-      } : {}
+      } : null
     }
   })
 
@@ -112,12 +116,17 @@ resource "helm_release" "superplane" {
   version          = local.superplane_chart_local || var.superplane_chart_version == "" ? null : var.superplane_chart_version
   namespace        = var.superplane_namespace
   create_namespace = false
-  timeout          = 900 # GCE Ingress + first-boot migrate exceed the 300s default
+  timeout          = 1200 # Match EKS and AKS. First image pull and migrate can exceed 15 minutes.
 
   lifecycle {
     precondition {
       condition     = local.superplane_chart_local || var.superplane_chart_version != ""
       error_message = "Set superplane_chart_version or superplane_chart_path. An empty version installs the latest published chart, which may lack GKE ACME and migrate fixes."
+    }
+
+    precondition {
+      condition     = !local.superplane_chart_local || var.superplane_image_tag != ""
+      error_message = "With a local chart (superplane_chart_path), set superplane_image_tag. The local Chart.yaml appVersion (0.1.0) is a placeholder, not a published image."
     }
   }
 
@@ -174,9 +183,12 @@ resource "helm_release" "superplane" {
     value = "superplane"
   }
 
-  set {
-    name  = "image.tag"
-    value = var.superplane_image_tag
+  dynamic "set" {
+    for_each = var.superplane_image_tag == "" ? [] : [var.superplane_image_tag]
+    content {
+      name  = "image.tag"
+      value = set.value
+    }
   }
 
   set {

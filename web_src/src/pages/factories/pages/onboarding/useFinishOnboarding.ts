@@ -162,7 +162,7 @@ export async function provisionWorkspace(args: {
   }
   await args.updateOnboarding({
     vcsIntegrationId: args.vcs.id,
-    ...(args.agentIntegrationId ? { agentIntegrationId: args.agentIntegrationId } : {}),
+    agentIntegrationId: args.agentIntegrationId ?? "",
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
     issuesSource: apiIssuesSource(args.issuesChoice),

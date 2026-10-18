@@ -6,7 +6,11 @@ import linearIcon from "@/assets/icons/integrations/linear.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import { FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_DATADOG_INTAKE,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_SCHEDULED_INTAKE,
+} from "@/lib/experimentalFeatures";
 
 export interface AddIntakeTemplate {
   id: string;
@@ -14,6 +18,7 @@ export interface AddIntakeTemplate {
   description: string;
   /** Optional integration icon. Letter glyph when omitted. */
   iconSrc?: string;
+  iconName?: string;
   /** True when SuperPlane does not create this intake yet. */
   soon?: boolean;
   /** Organization experimental feature that must be on for this source to be live. */
@@ -32,6 +37,13 @@ export const ADD_INTAKE_COPY = {
  * Coming-soon sources stay visible and disabled.
  */
 export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
+  {
+    id: "scheduled-intake",
+    iconName: "alarm-clock",
+    name: "Scheduled intake",
+    description: "Inspect the repository on a schedule and propose a task.",
+    featureId: FEATURE_FACTORY_SCHEDULED_INTAKE,
+  },
   {
     id: "github-issues",
     name: "GitHub issues",
@@ -97,7 +109,7 @@ export function isAddIntakeSoon(template: AddIntakeTemplate, hasFeature: (featur
 
 /** Catalog with Coming soon applied when the organization feature is off. */
 export function addIntakeTemplatesForOrg(hasFeature: (featureId: string) => boolean): AddIntakeTemplate[] {
-  return ADD_INTAKE_TEMPLATES.map((template) =>
-    isAddIntakeSoon(template, hasFeature) ? { ...template, soon: true } : template,
-  );
+  return ADD_INTAKE_TEMPLATES.filter(
+    (template) => template.id !== "scheduled-intake" || hasFeature(FEATURE_FACTORY_SCHEDULED_INTAKE),
+  ).map((template) => (isAddIntakeSoon(template, hasFeature) ? { ...template, soon: true } : template));
 }

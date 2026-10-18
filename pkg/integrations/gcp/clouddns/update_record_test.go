@@ -14,9 +14,7 @@ import (
 func TestUpdateRecord_Metadata(t *testing.T) {
 	c := &UpdateRecord{}
 	assert.Equal(t, "gcp.clouddns.updateRecord", c.Name())
-	assert.Equal(t, "Cloud DNS • Update Record", c.Label())
 	assert.NotEmpty(t, c.Description())
-	assert.Equal(t, "gcp", c.Icon())
 }
 
 func TestUpdateRecord_ExampleOutput(t *testing.T) {

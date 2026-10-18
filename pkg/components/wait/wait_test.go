@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -173,6 +174,29 @@ func TestParseDateValue(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWaitIntervalUnitOptions(t *testing.T) {
+	var unit configuration.Field
+	found := false
+	for _, field := range (&Wait{}).Configuration() {
+		if field.Name != "unit" {
+			continue
+		}
+		unit = field
+		found = true
+		break
+	}
+
+	require.True(t, found, "interval unit field")
+	require.NotNil(t, unit.TypeOptions)
+	require.NotNil(t, unit.TypeOptions.Select)
+
+	values := make([]string, 0, len(unit.TypeOptions.Select.Options))
+	for _, option := range unit.TypeOptions.Select.Options {
+		values = append(values, option.Value)
+	}
+	assert.Equal(t, []string{"seconds", "minutes", "hours"}, values)
 }
 
 func TestCalculateIntervalDuration(t *testing.T) {

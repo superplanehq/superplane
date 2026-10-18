@@ -1,103 +1,31 @@
 import { useMemo } from "react";
 
+import { FleetManagerCommandBlock } from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
+import {
+  FleetManagerFleetSection,
+  FleetManagerProviderSection,
+  type FleetManagerSetupState,
+} from "@/components/fleet-manager-setup/FleetManagerSections";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { type FleetManagerVerificationStatus, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
-import type { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
-import { fleetManagerInstallCommand, type FleetManagerProvider } from "@/lib/fleetManagerSetup";
+import {
+  FLEET_MANAGER_VALUES_FILE,
+  fleetManagerHelmCommand,
+  fleetManagerValuesFileCommand,
+} from "@/lib/fleetManagerSetup";
 import type { FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
-import { CopyButton } from "@/ui/CopyButton";
-import { CheckCircle2, Cloud, Download, LoaderCircle, TriangleAlert } from "lucide-react";
-
-type SetupState = ReturnType<typeof useFleetManagerSetup>;
+import { CheckCircle2, LoaderCircle, TriangleAlert } from "lucide-react";
 
 type WizardProps = {
   step: FleetManagerWizardStep;
-  setup: SetupState;
+  setup: FleetManagerSetupState;
   onNext: () => void;
   onBack?: () => void;
   onFinish: () => void;
   onFinishLater: () => void;
   showBackButton?: boolean;
 };
-
-type ProviderField = { key: string; label: string; placeholder: string };
-
-const providerFields: Record<FleetManagerProvider, ProviderField[]> = {
-  aws: [
-    { key: "region", label: "AWS region", placeholder: "us-east-1" },
-    { key: "subnetIds", label: "Private subnet IDs", placeholder: "subnet-a, subnet-b" },
-    { key: "securityGroupIds", label: "Runner security group IDs", placeholder: "sg-0123456789" },
-    { key: "runnerIdentity", label: "Runner instance profile", placeholder: "superplane-runner" },
-    {
-      key: "fleetManagerIdentity",
-      label: "Fleet Manager role ARN",
-      placeholder: "arn:aws:iam::123456789012:role/fleet-manager",
-    },
-  ],
-  gcp: [
-    { key: "projectId", label: "GCP project", placeholder: "my-project" },
-    { key: "zones", label: "Zones", placeholder: "us-central1-a, us-central1-b" },
-    { key: "subnetwork", label: "Runner subnetwork", placeholder: "projects/.../subnetworks/runners" },
-    { key: "networkTags", label: "Runner network tags", placeholder: "superplane-runner" },
-    {
-      key: "runnerIdentity",
-      label: "Runner service account",
-      placeholder: "runner@project.iam.gserviceaccount.com",
-    },
-    {
-      key: "fleetManagerIdentity",
-      label: "Fleet Manager service account",
-      placeholder: "fleet-manager@project.iam.gserviceaccount.com",
-    },
-  ],
-  azure: [
-    { key: "subscriptionId", label: "Azure subscription ID", placeholder: "00000000-0000-0000-0000-000000000000" },
-    { key: "resourceGroup", label: "Resource group", placeholder: "superplane" },
-    { key: "location", label: "Location", placeholder: "eastus" },
-    { key: "zones", label: "Zones", placeholder: "1, 2" },
-    { key: "subnetId", label: "Runner subnet ID", placeholder: "/subscriptions/.../subnets/runners" },
-    {
-      key: "securityGroupIds",
-      label: "Network security group ID",
-      placeholder: "/subscriptions/.../networkSecurityGroups/runners",
-    },
-    {
-      key: "runnerIdentity",
-      label: "Runner identity ID",
-      placeholder: "/subscriptions/.../userAssignedIdentities/runner",
-    },
-    {
-      key: "fleetManagerIdentity",
-      label: "Fleet Manager client ID",
-      placeholder: "00000000-0000-0000-0000-000000000000",
-    },
-  ],
-};
-
-const machineTypePlaceholder = (provider: FleetManagerProvider, architecture: "amd64" | "arm64") => {
-  if (provider === "aws") return architecture === "amd64" ? "m8a.large" : "m8g.large";
-  if (provider === "gcp") return architecture === "amd64" ? "e2-standard-4" : "t2a-standard-4";
-  return architecture === "amd64" ? "Standard_D2ds_v4" : "Standard_D2ps_v5";
-};
-
-const Field = ({
-  id,
-  label,
-  imported = false,
-  ...props
-}: { id: string; label: string; imported?: boolean } & React.ComponentProps<typeof Input>) => (
-  <div className="space-y-1.5 text-sm">
-    <div className="flex items-center justify-between gap-3">
-      <Label htmlFor={id}>{label}</Label>
-      {imported && <span className="text-[11px] text-emerald-400">Loaded from Terraform</span>}
-    </div>
-    <Input id={id} {...props} />
-  </div>
-);
 
 function WizardActions({
   primary,
@@ -135,9 +63,8 @@ function WizardActions({
   );
 }
 
-function ProviderStep({ setup, actions }: { setup: SetupState; actions: React.ReactNode }) {
+function ProviderStep({ setup, actions }: { setup: FleetManagerSetupState; actions: React.ReactNode }) {
   if (!setup.metadata || !setup.draft) return null;
-  const terraformProvider = setup.metadata.infrastructureDefaults.provider;
 
   return (
     <div data-testid="fleet-manager-provider-step">
@@ -146,217 +73,33 @@ function ProviderStep({ setup, actions }: { setup: SetupState; actions: React.Re
           Select the account that will run your fleet machines.
         </p>
       </FirstRunHeading>
-      <div className="mt-7 grid gap-3 sm:grid-cols-3">
-        {(["aws", "gcp", "azure"] as const).map((provider) => (
-          <Button
-            key={provider}
-            type="button"
-            variant={setup.draft?.provider === provider ? "default" : "outline"}
-            className="h-auto min-h-20 flex-col gap-1"
-            onClick={() => setup.setProvider(provider)}
-          >
-            <Cloud className="size-4" aria-hidden />
-            <span>{provider.toUpperCase()}</span>
-            {terraformProvider === provider && <span className="text-[10px] normal-case">Loaded from Terraform</span>}
-          </Button>
-        ))}
+      <div className="mt-7">
+        <FleetManagerProviderSection setup={setup} />
       </div>
       {actions}
     </div>
   );
 }
 
-function FleetsStep({ setup, actions }: { setup: SetupState; actions: React.ReactNode }) {
+function FleetsStep({ setup, actions }: { setup: FleetManagerSetupState; actions: React.ReactNode }) {
   if (!setup.metadata || !setup.draft) return null;
 
   return (
     <div data-testid="fleet-manager-fleets-step">
-      <FirstRunHeading headline="Choose runner fleets" size="display">
+      <FirstRunHeading headline="Configure the default fleet" size="display">
         <p className="text-[15px] leading-6 text-muted-foreground">
-          Select fleet sizes and set their initial capacity.
+          Set the cloud machine type and how many machines to keep ready.
         </p>
       </FirstRunHeading>
-      <div className="mt-6 max-h-52 space-y-2 overflow-y-auto pr-1">
-        {setup.metadata.fleetPresets.map((preset) => {
-          const id = `fleet-${preset.id}`;
-          return (
-            <div key={preset.id} className="flex items-start gap-3 rounded-md border border-border p-3">
-              <Checkbox
-                id={id}
-                checked={setup.draft?.selectedFleetIds.includes(preset.id)}
-                onChange={(event) => setup.toggleFleet(preset.id, event.target.checked)}
-              />
-              <div className="min-w-0 flex-1 space-y-3">
-                <Label htmlFor={id} className="text-sm">
-                  <span className="block font-medium">{preset.id}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {preset.spec.architecture} · {preset.spec.cpuMillicores}m CPU · {preset.spec.memoryMb} MB memory
-                  </span>
-                </Label>
-                {setup.draft?.selectedFleetIds.includes(preset.id) && (
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <Field
-                      id={`machine-type-${preset.id}`}
-                      label={`Machine type for ${preset.id}`}
-                      value={setup.draft.fields[`machineType.${preset.id}`] || ""}
-                      placeholder={machineTypePlaceholder(setup.draft.provider, preset.spec.architecture)}
-                      onChange={(event) => setup.setField(`machineType.${preset.id}`, event.target.value)}
-                    />
-                    <Field
-                      id={`warm-capacity-${preset.id}`}
-                      label={`Warm capacity for ${preset.id}`}
-                      type="number"
-                      min={0}
-                      value={setup.draft.fleetCapacities[preset.id]?.warmCapacity ?? 0}
-                      onChange={(event) =>
-                        setup.setFleetCapacity(preset.id, { warmCapacity: Number(event.target.value) })
-                      }
-                    />
-                    <Field
-                      id={`max-capacity-${preset.id}`}
-                      label={`Maximum capacity for ${preset.id}`}
-                      type="number"
-                      min={0}
-                      value={setup.draft.fleetCapacities[preset.id]?.maxCapacity ?? 1}
-                      onChange={(event) =>
-                        setup.setFleetCapacity(preset.id, { maxCapacity: Number(event.target.value) })
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-5 max-w-xs">
-        <Field
-          id="runner-version"
-          label="Runner version"
-          value={setup.draft.runnerVersion}
-          onChange={(event) => setup.setRunnerVersion(event.target.value)}
-        />
-      </div>
-      {setup.fleetErrors.length > 0 && (
-        <p role="alert" className="mt-3 text-sm text-destructive">
-          {setup.fleetErrors[0]}
-        </p>
-      )}
-      {actions}
-    </div>
-  );
-}
-
-function InfrastructureStep({ setup, actions }: { setup: SetupState; actions: React.ReactNode }) {
-  if (!setup.metadata || !setup.draft) return null;
-  const namespaceIsManaged = setup.metadata.credentials.autoProvisioned;
-
-  return (
-    <div data-testid="fleet-manager-infrastructure-step">
-      <FirstRunHeading headline="Confirm cloud infrastructure" size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          Review the values from Terraform and add missing account details.
-        </p>
-      </FirstRunHeading>
-      <div className="mt-6 max-h-[50vh] space-y-4 overflow-y-auto pr-2">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            id="manager-id"
-            label="Fleet Manager ID"
-            imported={setup.metadata.infrastructureDefaults.managerId === setup.draft.managerId}
-            value={setup.draft.managerId}
-            onChange={(event) => setup.setManagerId(event.target.value)}
-          />
-          <Field
-            id="namespace"
-            label="Kubernetes namespace"
-            imported={setup.metadata.infrastructureDefaults.namespace === setup.draft.namespace}
-            value={setup.draft.namespace}
-            disabled={namespaceIsManaged}
-            onChange={(event) => setup.setNamespace(event.target.value)}
-          />
-          <Field
-            id="service-account-name"
-            label="Fleet Manager service account"
-            imported={setup.metadata.infrastructureDefaults.serviceAccountName === setup.draft.serviceAccountName}
-            value={setup.draft.serviceAccountName}
-            onChange={(event) => setup.setServiceAccountName(event.target.value)}
-          />
-          <Field
-            id="superplane-url"
-            label="SuperPlane URL"
-            imported={setup.metadata.infrastructureDefaults.fields.superplaneUrl === setup.draft.superplaneUrl}
-            value={setup.draft.superplaneUrl}
-            placeholder="https://superplane.example.com"
-            onChange={(event) => setup.setSuperplaneUrl(event.target.value)}
-          />
-          {providerFields[setup.draft.provider].map((field) => (
-            <Field
-              key={field.key}
-              id={`provider-${field.key}`}
-              label={field.label}
-              imported={setup.importedFieldKeys.has(field.key)}
-              value={setup.draft?.fields[field.key] || ""}
-              placeholder={field.placeholder}
-              onChange={(event) => setup.setField(field.key, event.target.value)}
-            />
-          ))}
-        </div>
-        {namespaceIsManaged && (
-          <p className="text-xs text-muted-foreground">
-            The generated credential requires Fleet Manager in the SuperPlane namespace.
-          </p>
-        )}
-        {setup.infrastructureErrors.length > 0 && (
-          <p role="alert" className="text-sm text-destructive">
-            {setup.infrastructureErrors[0]}
-          </p>
-        )}
+      <div className="mt-6">
+        <FleetManagerFleetSection setup={setup} />
       </div>
       {actions}
     </div>
   );
 }
 
-function downloadValues(values: string) {
-  const url = URL.createObjectURL(new Blob([values], { type: "application/yaml;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "values.yaml";
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function ReviewStep({ setup, actions }: { setup: SetupState; actions: React.ReactNode }) {
-  return (
-    <div data-testid="fleet-manager-review-step">
-      <FirstRunHeading headline="Review Fleet Manager values" size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          Save this file before you install the standalone chart.
-        </p>
-      </FirstRunHeading>
-      <div className="mt-5 flex gap-2 rounded-md border border-amber-700/60 bg-amber-950/30 p-3 text-sm text-amber-100">
-        <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-        <p>Replace each public VM image placeholder before production use.</p>
-      </div>
-      <pre className="mt-4 max-h-72 overflow-auto rounded-md border border-border bg-muted p-4 text-left font-mono text-xs">
-        <code>{setup.values}</code>
-      </pre>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <CopyButton variant="button" text={setup.values}>
-          Copy values.yaml
-        </CopyButton>
-        <Button type="button" variant="outline" onClick={() => downloadValues(setup.values)}>
-          <Download className="size-4" aria-hidden />
-          Download values.yaml
-        </Button>
-      </div>
-      {actions}
-    </div>
-  );
-}
-
-const verificationCopy: Record<FleetManagerVerificationStatus, string> = {
+const fleetManagerVerificationCopy: Record<FleetManagerVerificationStatus, string> = {
   idle: "Verification has not started.",
   checking: "Checking Fleet Manager installation...",
   waiting: "Waiting for the selected fleets...",
@@ -366,48 +109,80 @@ const verificationCopy: Record<FleetManagerVerificationStatus, string> = {
   timeout: "Verification timed out. Check the Helm command and retry.",
 };
 
+export function FleetManagerVerificationStatus({
+  status,
+  onRetry,
+}: {
+  status: FleetManagerVerificationStatus;
+  onRetry: () => void;
+}) {
+  const failed = ["unauthorized", "error", "timeout"].includes(status);
+
+  return (
+    <div className="flex items-start gap-3 rounded-md border border-border p-4 text-sm" role="status">
+      {status === "verified" ? (
+        <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-400" aria-hidden />
+      ) : failed ? (
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-400" aria-hidden />
+      ) : (
+        <LoaderCircle className="mt-0.5 size-5 shrink-0 animate-spin" aria-hidden />
+      )}
+      <div>
+        <p>{fleetManagerVerificationCopy[status]}</p>
+        {failed && (
+          <Button type="button" variant="link" className="h-auto p-0" onClick={onRetry}>
+            Retry verification
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ValuesStep({ setup, actions }: { setup: FleetManagerSetupState; actions: React.ReactNode }) {
+  const valuesCommand = useMemo(
+    () => (setup.values ? fleetManagerValuesFileCommand(setup.values) : null),
+    [setup.values],
+  );
+
+  return (
+    <div data-testid="fleet-manager-values-step">
+      <FirstRunHeading headline="Create the chart values" size="display">
+        <p className="text-[15px] leading-6 text-muted-foreground">
+          Run this command. It writes {FLEET_MANAGER_VALUES_FILE}.
+        </p>
+      </FirstRunHeading>
+      {valuesCommand && (
+        <div className="mt-5">
+          <FleetManagerCommandBlock code={valuesCommand} language="shell" copyLabel="Copy values command" />
+        </div>
+      )}
+      {actions}
+    </div>
+  );
+}
+
 function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
   const verification = useFleetManagerVerification(true, setup.draft, setup.metadata);
-  const command = useMemo(
-    () =>
-      setup.metadata && setup.draft
-        ? fleetManagerInstallCommand(setup.metadata, setup.draft.namespace, "values.yaml")
-        : "",
-    [setup.draft, setup.metadata],
-  );
-  const failed = ["unauthorized", "error", "timeout"].includes(verification.status);
+  const helmCommand = useMemo(() => {
+    if (!setup.metadata || !setup.draft) return null;
+    return fleetManagerHelmCommand(setup.metadata, setup.draft.namespace);
+  }, [setup.draft, setup.metadata]);
 
   return (
     <div data-testid="fleet-manager-install-step">
-      <FirstRunHeading headline="Install Fleet Manager" size="display">
+      <FirstRunHeading headline="Install the chart" size="display">
         <p className="text-[15px] leading-6 text-muted-foreground">
-          Run this command where kubectl can access your cluster.
+          Run this command in the same directory. It reads {FLEET_MANAGER_VALUES_FILE}.
         </p>
       </FirstRunHeading>
-      <pre className="mt-5 max-h-40 overflow-auto rounded-md border border-border bg-muted p-4 text-left font-mono text-xs">
-        <code>{command}</code>
-      </pre>
-      <div className="mt-3">
-        <CopyButton variant="button" text={command}>
-          Copy Helm command
-        </CopyButton>
-      </div>
-      <div className="mt-5 flex items-start gap-3 rounded-md border border-border p-4 text-sm" role="status">
-        {verification.status === "verified" ? (
-          <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-400" aria-hidden />
-        ) : failed ? (
-          <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-400" aria-hidden />
-        ) : (
-          <LoaderCircle className="mt-0.5 size-5 shrink-0 animate-spin" aria-hidden />
-        )}
-        <div>
-          <p>{verificationCopy[verification.status]}</p>
-          {failed && (
-            <Button type="button" variant="link" className="h-auto p-0" onClick={verification.retry}>
-              Retry verification
-            </Button>
-          )}
+      {helmCommand && (
+        <div className="mt-5">
+          <FleetManagerCommandBlock code={helmCommand} language="shell" copyLabel="Copy install command" />
         </div>
+      )}
+      <div className="mt-5">
+        <FleetManagerVerificationStatus status={verification.status} onRetry={verification.retry} />
       </div>
       <div className="mt-7 flex flex-wrap gap-3">
         {verification.status === "verified" && (
@@ -425,22 +200,26 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
 
 export function FleetManagerWizardScreen(props: WizardProps) {
   const back = props.showBackButton ? props.onBack : undefined;
-  const stepErrors =
-    props.step === "provider"
-      ? []
-      : props.step === "fleets"
-        ? props.setup.fleetErrors
-        : props.step === "review"
-          ? props.setup.validationErrors
-          : props.setup.infrastructureErrors;
+  const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
+  const continueToNextStep = async () => {
+    if (props.step === "fleets" && !(await props.setup.prepareInstallation())) return;
+    props.onNext();
+  };
   const continueActions = (
-    <WizardActions
-      primary={props.step === "review" ? "Continue to install" : "Continue"}
-      onPrimary={props.onNext}
-      primaryDisabled={stepErrors.length > 0}
-      showBack={props.showBackButton}
-      onBack={back}
-    />
+    <>
+      <WizardActions
+        primary={props.step === "fleets" ? "Generate install command" : "Continue"}
+        onPrimary={() => void continueToNextStep()}
+        primaryDisabled={stepErrors.length > 0 || props.setup.isPreparingInstallation}
+        showBack={props.showBackButton}
+        onBack={back}
+      />
+      {props.setup.tokenError && (
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {props.setup.tokenError}
+        </p>
+      )}
+    </>
   );
 
   if (props.setup.loadError) {
@@ -456,7 +235,6 @@ export function FleetManagerWizardScreen(props: WizardProps) {
 
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;
   if (props.step === "fleets") return <FleetsStep setup={props.setup} actions={continueActions} />;
-  if (props.step === "infrastructure") return <InfrastructureStep setup={props.setup} actions={continueActions} />;
-  if (props.step === "review") return <ReviewStep setup={props.setup} actions={continueActions} />;
+  if (props.step === "values") return <ValuesStep setup={props.setup} actions={continueActions} />;
   return <InstallStep {...props} />;
 }

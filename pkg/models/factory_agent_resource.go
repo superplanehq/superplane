@@ -54,6 +54,8 @@ const (
 )
 
 var (
+	ErrFactorySystemSkillProtected               = errors.New("system skills cannot be deleted, renamed, or disabled")
+	ErrFactorySystemSkillMetadataInvalid         = errors.New("system skills require a template, a positive version, and an enabled skill")
 	ErrFactoryAgentResourceNotFound              = errors.New("factory agent resource not found")
 	ErrFactoryAgentResourceKindInvalid           = errors.New("factory agent resource kind is not valid")
 	ErrFactoryAgentResourceNameInvalid           = errors.New("factory agent resource name is not valid")
@@ -101,6 +103,7 @@ type FactoryAgentResource struct {
 }
 
 type FactoryAgentResourceConfig struct {
+	SystemSkill         *FactorySystemSkill          `json:"systemSkill,omitempty"`
 	Transport           string                       `json:"transport,omitempty"`
 	URL                 string                       `json:"url,omitempty"`
 	Auth                string                       `json:"auth,omitempty"`
@@ -116,6 +119,14 @@ type FactoryAgentResourceConfig struct {
 	ToolsDefaultApplied bool                         `json:"toolsDefaultApplied,omitempty"`
 }
 
+// FactorySystemSkill records the supplied template separately from editable content.
+// It is internal metadata; public resource mutation requests cannot set it.
+type FactorySystemSkill struct {
+	TemplateID  string `json:"templateId"`
+	Version     int32  `json:"version"`
+	ContentHash string `json:"contentHash"`
+}
+
 type FactoryAgentResourceHeader struct {
 	Name       string `json:"name"`
 	SecretName string `json:"secretName"`
@@ -129,6 +140,7 @@ type FactoryAgentResourceOAuthMetadata struct {
 	RegistrationEndpoint  string `json:"registrationEndpoint,omitempty"`
 	ClientID              string `json:"clientId,omitempty"`
 	Resource              string `json:"resource,omitempty"`
+	AccessTokenExpiresAt  string `json:"accessTokenExpiresAt,omitempty"`
 }
 
 type FactoryAgentResourceSecret struct {
@@ -146,6 +158,10 @@ func (FactoryAgentResource) TableName() string {
 
 func (FactoryAgentResourceSecret) TableName() string {
 	return "factory_agent_resource_secrets"
+}
+
+func (r *FactoryAgentResource) IsSystemSkill() bool {
+	return r.Kind == FactoryAgentResourceKindSkill && r.Config.Data().SystemSkill != nil
 }
 
 func NormalizeFactoryAgentResourceName(name string) string {
@@ -217,6 +233,10 @@ func (c FactoryAgentResourceConfig) ValidateMCP() error {
 }
 
 func (c FactoryAgentResourceConfig) ValidateSkill() error {
+	if c.SystemSkill != nil && (strings.TrimSpace(c.SystemSkill.TemplateID) == "" || c.SystemSkill.Version < 1) {
+		return ErrFactorySystemSkillMetadataInvalid
+	}
+
 	source := strings.TrimSpace(c.Source)
 	if source != "" && source != FactoryAgentResourceSourceInline {
 		return ErrFactoryAgentResourceKindNotSupported
@@ -480,6 +500,9 @@ func mapFactoryAgentResourceNameError(err error) error {
 }
 
 func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bool, config FactoryAgentResourceConfig) (*FactoryAgentResource, error) {
+	if config.SystemSkill != nil && (kind != FactoryAgentResourceKindSkill || !enabled) {
+		return nil, ErrFactorySystemSkillMetadataInvalid
+	}
 	if err := ValidateFactoryAgentResourceKind(kind); err != nil {
 		return nil, err
 	}
@@ -493,6 +516,12 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 			return nil, err
 		}
 		config = config.NormalizedSkill()
+		if config.SystemSkill != nil {
+			metadata := *config.SystemSkill
+			metadata.TemplateID = strings.TrimSpace(metadata.TemplateID)
+			metadata.ContentHash = config.SkillContentHash()
+			config.SystemSkill = &metadata
+		}
 	case FactoryAgentResourceKindSetup:
 		name = FactoryAgentResourceSetupName
 		if err := config.ValidateSetup(); err != nil {
@@ -690,6 +719,9 @@ func (f *Factory) ListEnabledContextRepos(tx *gorm.DB) ([]FactoryAgentResource, 
 }
 
 func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, config *FactoryAgentResourceConfig) error {
+	if r.IsSystemSkill() && ((name != nil && NormalizeFactoryAgentResourceName(*name) != r.Name) || (enabled != nil && !*enabled)) {
+		return ErrFactorySystemSkillProtected
+	}
 	return tx.Transaction(func(inner *gorm.DB) error {
 		updates := map[string]any{
 			"updated_at": time.Now(),
@@ -727,6 +759,10 @@ func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, 
 		}
 		if config != nil {
 			if r.Kind == FactoryAgentResourceKindSkill {
+				next := *config
+				// Content edits cannot change the template identity or its baseline.
+				next.SystemSkill = r.Config.Data().SystemSkill
+				config = &next
 				if err := config.ValidateSkill(); err != nil {
 					return err
 				}
@@ -820,6 +856,9 @@ func (r *FactoryAgentResource) oauthResetUpdates(nextAuth string) map[string]any
 }
 
 func (r *FactoryAgentResource) Delete(tx *gorm.DB) error {
+	if r.IsSystemSkill() {
+		return ErrFactorySystemSkillProtected
+	}
 	if err := tx.Where("resource_id = ?", r.ID).Delete(&FactoryAgentResourceSecret{}).Error; err != nil {
 		return err
 	}

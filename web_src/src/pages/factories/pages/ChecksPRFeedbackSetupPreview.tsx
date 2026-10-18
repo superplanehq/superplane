@@ -139,7 +139,7 @@ function ChecksPreviewRowView({ row, index }: { row: ChecksPreviewRow; index: nu
       <span
         className={cn(
           "shrink-0 text-[12px] font-medium",
-          row.selected ? "text-[#4c2a94] dark:text-[#f6a821]" : "text-muted-foreground",
+          row.selected ? "text-[#0b383a] dark:text-[#ed8e09]" : "text-muted-foreground",
         )}
       >
         {outcome}

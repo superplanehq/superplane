@@ -1,7 +1,5 @@
 import type { MeVcsProviderRepository } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
 import { startPublicGitHubAppCreate } from "@/lib/githubAppManifest";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
@@ -64,16 +62,18 @@ function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen | 
 }
 
 // A GitHub return can omit the step. Saved progress or that return must not
-// open the welcome screen. A connection saved for the account does not choose
+// open the welcome screen. An installation GitHub App that does not require
+// sign-in is that return. A connection saved for the account does not choose
 // the opening screen.
 function resumeFirstRunScreen(args: {
   savedStep: WizardStepId;
   githubPending: boolean;
   githubReturned: boolean;
+  installationAppReady: boolean;
 }): FirstRunScreen {
   if (args.savedStep !== "vcs") return SCREEN_FOR_STEP[args.savedStep];
   if (args.githubPending) return "connect";
-  if (args.githubReturned) return "choose";
+  if (args.githubReturned || args.installationAppReady) return "choose";
   return "welcome";
 }
 
@@ -90,12 +90,13 @@ function screenWithGitHubConnection(
     accountConnectionRequired: boolean;
   },
 ): FirstRunScreen {
-  if (github.pending || screen === "welcome") return screen;
+  if (github.pending) return screen;
   if (!github.accountConnectionRequired) {
     if (!github.appConfigured) return screen === "choose" ? "connect" : screen;
-    if (screen === "connect" && !github.stayOnConnect) return "choose";
+    if (screen === "welcome" || (screen === "connect" && !github.stayOnConnect)) return "choose";
     return screen;
   }
+  if (screen === "welcome") return screen;
   if (!github.identity) return "connect";
   if (screen === "connect" && github.ready && !github.stayOnConnect) return "choose";
   if (screen === "choose" && !github.ready) return "connect";
@@ -108,11 +109,9 @@ function screenWithVcsConnection(
   screen: FirstRunScreen,
   vcsHost: VcsHostId | null,
   github: Parameters<typeof screenWithGitHubConnection>[1],
-  bitbucket: { available: boolean; loading: boolean },
 ): FirstRunScreen {
   if (screen === "host") return screen;
   if (vcsHost === "bitbucket") {
-    if (!bitbucket.loading && !bitbucket.available && screen !== "welcome") return "host";
     return screen === "connect" ? "choose" : screen;
   }
   return screenWithGitHubConnection(screen, github);
@@ -151,7 +150,6 @@ function useFirstRunNavigation(
   agentGate: OnboardingAgentGate,
   connection: GitHubConnectionState,
   github: { ready: boolean; returned: boolean },
-  bitbucket: { available: boolean; loading: boolean },
 ) {
   const [searchParams] = useSearchParams();
   const [requestedScreen, setRequestedScreen] = useState<FirstRunScreen | null>(() =>
@@ -160,12 +158,14 @@ function useFirstRunNavigation(
   // Back from repository selection must not forward to it again.
   const [stayOnConnect, setStayOnConnect] = useState(false);
   const openStep = useRef(model.openSection);
+  const installationAppReady = connection.appConfigured && !connection.accountConnectionRequired;
   const openedScreen =
     requestedScreen ??
     resumeFirstRunScreen({
       savedStep: model.openSection,
       githubPending: connection.onboarding.isPending,
       githubReturned: github.returned,
+      installationAppReady,
     });
 
   useEffect(() => {
@@ -174,19 +174,14 @@ function useFirstRunNavigation(
     setRequestedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
 
-  const availableScreen = screenWithVcsConnection(
-    openedScreen,
-    model.setup.vcsHost,
-    {
-      pending: connection.onboarding.isPending,
-      identity: Boolean(connection.identity),
-      ready: github.ready,
-      stayOnConnect,
-      appConfigured: connection.appConfigured,
-      accountConnectionRequired: connection.accountConnectionRequired,
-    },
-    bitbucket,
-  );
+  const availableScreen = screenWithVcsConnection(openedScreen, model.setup.vcsHost, {
+    pending: connection.onboarding.isPending,
+    identity: Boolean(connection.identity),
+    ready: github.ready,
+    stayOnConnect,
+    appConfigured: connection.appConfigured,
+    accountConnectionRequired: connection.accountConnectionRequired,
+  });
 
   const goToScreen = (next: FirstRunScreen) => {
     const step = STEP_FOR_SCREEN[next];
@@ -277,12 +272,10 @@ function useFirstRunCommands(args: {
   connection: GitHubConnectionState;
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: FirstRunBlocking;
-  bitbucketAvailable: boolean;
   forgeConfigured: boolean;
   installScope: GitHubInstallScope;
 }) {
-  const { model, agentGate, connection, navigation, blocking, bitbucketAvailable, forgeConfigured, installScope } =
-    args;
+  const { model, agentGate, connection, navigation, blocking, forgeConfigured, installScope } = args;
   const location = useLocation();
   const saveRepository = () => saveSelectedRepository({ model, connection, forgeConfigured });
   const continueFromRepository = () =>
@@ -292,7 +285,7 @@ function useFirstRunCommands(args: {
       }
     });
   const chooseVcsHost = (host: VcsHostId) => {
-    if (host === "gitlab" || (host === "bitbucket" && !bitbucketAvailable)) return;
+    if (host === "gitlab") return;
     model.setup.selectVcsHost(host);
     navigation.goToScreen(host === "bitbucket" ? "choose" : "connect");
   };
@@ -343,7 +336,11 @@ function useFirstRunCommands(args: {
       return model.requestConnect(source);
     });
   const continueFromAgent = () => {
-    if (agentGate === "first") return navigation.goToScreen("tickets");
+    if (agentGate === "first") {
+      return blocking.run("saving-agent", async () => {
+        if (await model.saveAgent()) navigation.goToScreen("tickets");
+      });
+    }
     return blocking.run("finishing-setup", async () => {
       await model.finish();
     });
@@ -380,39 +377,41 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
   const bitbucketConnect = useFirstRunBitbucket({ organizationId, setupFinished, blocking });
-  const intakeFeatures = useExperimentalFeature(organizationId);
-  const intakeFeatureLoading = intakeFeatures.isLoading;
-  const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
-  const bitbucket = { available: bitbucketAvailable, loading: intakeFeatureLoading };
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
-  const navigation = useFirstRunNavigation(
-    model,
-    agentGate,
-    connection,
-    { ready: githubReady, returned: githubReturned },
-    bitbucket,
-  );
+  const navigation = useFirstRunNavigation(model, agentGate, connection, {
+    ready: githubReady,
+    returned: githubReturned,
+  });
   const commands = useFirstRunCommands({
     model,
     agentGate,
     connection,
     navigation,
     blocking,
-    bitbucketAvailable,
     forgeConfigured: bitbucketConnect.configured,
     installScope,
   });
+  const [bitbucketSwitchFailed, setBitbucketSwitchFailed] = useState(false);
+  const selectBitbucketIdentity = (providerUserId: string) =>
+    blocking.run("switching-bitbucket-account", async () => {
+      setBitbucketSwitchFailed(false);
+      try {
+        await bitbucketConnect.selectIdentity(providerUserId);
+        model.setup.clearRepository();
+      } catch {
+        setBitbucketSwitchFailed(true);
+      }
+    });
   return {
     ...navigation,
     ...commands,
+    selectBitbucketIdentity,
     vcsHost: model.setup.vcsHost,
-    bitbucketAvailable,
-    bitbucketFeatureLoading: intakeFeatureLoading,
     bitbucketForgeConfigured: bitbucketConnect.configured,
     bitbucketOnboardingPending: bitbucketConnect.pending,
     bitbucketRepositories: bitbucketConnect.repositories,
@@ -420,11 +419,17 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bitbucketInstallationAttemptActive: bitbucketConnect.installationAttemptActive,
     bitbucketInstallationAttemptTimedOut: bitbucketConnect.installationAttemptTimedOut,
     bitbucketIdentityLinked: bitbucketConnect.identityLinked,
+    bitbucketLogin: bitbucketConnect.login,
+    bitbucketProviderUserId: bitbucketConnect.providerUserId,
+    bitbucketIdentities: bitbucketConnect.identities,
     bitbucketLoadError: bitbucketConnect.loadError,
+    bitbucketSwitchFailed,
     bitbucketLookupFailed: bitbucketConnect.lookupFailed,
     bitbucketLookupRetrying: bitbucketConnect.lookupRetrying,
     retryBitbucketLookup: bitbucketConnect.retryLookup,
     bitbucketConnectHref: bitbucketConnect.connectHref,
+    bitbucketInstallUrl: bitbucketConnect.installUrl,
+    copyBitbucketInstallLink: bitbucketConnect.copyInstallLink,
     grantBitbucketAccess: bitbucketConnect.grantAccess,
     // The ticket screen is the last screen, so it finishes setup.
     ticketsFinishSetup: agentGate === "skip" || agentGate === "first",

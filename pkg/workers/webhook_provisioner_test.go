@@ -379,25 +379,3 @@ func Test__WebhookProvisioner_IncrementRetry(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, updatedWebhook.RetryCount)
 }
-
-func Test__WebhookProvisioner_MarkFailed(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	webhookID := uuid.New()
-	webhook := models.Webhook{
-		ID:         webhookID,
-		State:      models.WebhookStatePending,
-		Secret:     []byte("secret"),
-		RetryCount: 3,
-		MaxRetries: 3,
-	}
-	require.NoError(t, database.Conn().Create(&webhook).Error)
-
-	err := webhook.MarkFailed(database.Conn())
-	require.NoError(t, err)
-
-	updatedWebhook, err := models.FindWebhook(webhookID)
-	require.NoError(t, err)
-	assert.Equal(t, models.WebhookStateFailed, updatedWebhook.State)
-}

@@ -18,6 +18,7 @@ export type FleetManagerSetupMetadata = {
   runnerReleaseUrlTemplate: string;
   chartRepository: string;
   imageRepository: string;
+  runnerVersions: string[];
   fleetPresets: Array<{ id: string; spec: FleetSpec }>;
   infrastructureDefaults: {
     source: "terraform" | "manual";
@@ -26,11 +27,6 @@ export type FleetManagerSetupMetadata = {
     namespace: string;
     serviceAccountName: string;
     fields: Record<string, string | string[]>;
-  };
-  credentials: {
-    existingSecret: string;
-    tokenKey: string;
-    autoProvisioned: boolean;
   };
 };
 
@@ -51,6 +47,7 @@ export type FleetManagerDraft = {
   selectedFleetIds: string[];
   fleetCapacities: Record<string, FleetCapacity>;
   fields: FleetManagerProviderFields;
+  fieldsByProvider?: Partial<Record<FleetManagerProvider, FleetManagerProviderFields>>;
 };
 
 export type InstalledFleet = {
@@ -61,11 +58,14 @@ export type InstalledFleet = {
 
 type GenerateValuesInput = Omit<FleetManagerDraft, "namespace" | "serviceAccountName"> & {
   metadata: FleetManagerSetupMetadata;
+  installationAdminToken: string;
   serviceAccountName?: string;
 };
 
 export type FleetManagerConfigurationInput = Omit<FleetManagerDraft, "provider" | "fields">;
-type FleetSelectionInput = Pick<FleetManagerDraft, "runnerVersion" | "selectedFleetIds" | "fleetCapacities">;
+type FleetSelectionInput = Pick<FleetManagerDraft, "runnerVersion" | "selectedFleetIds" | "fleetCapacities"> & {
+  runnerVersions?: readonly string[];
+};
 type FleetInfrastructureInput = Pick<
   FleetManagerDraft,
   "managerId" | "namespace" | "serviceAccountName" | "superplaneUrl"
@@ -86,12 +86,79 @@ const machineType = (fleetId: string, spec: FleetSpec, fields: FleetManagerProvi
   fields[`machineType${spec.architecture === "amd64" ? "Amd64" : "Arm64"}`] ||
   fallback;
 
+export const recommendedMachineType = (
+  provider: FleetManagerProvider,
+  architecture: FleetSpec["architecture"],
+): string => {
+  if (provider === "aws") return architecture === "amd64" ? "m8a.large" : "m8g.large";
+  if (provider === "gcp") return architecture === "amd64" ? "e2-standard-4" : "t2a-standard-4";
+  return architecture === "amd64" ? "Standard_D2ds_v4" : "Standard_D2ps_v5";
+};
+
+export const DEFAULT_SETUP_FLEET_ID = "e1-large-amd64";
+
+export type CloudMachineType = {
+  id: string;
+  vcpu?: number;
+  memoryGb?: number;
+};
+
+const CLOUD_MACHINE_TYPES: Record<FleetManagerProvider, CloudMachineType[]> = {
+  aws: [
+    { id: "m8a.large", vcpu: 2, memoryGb: 8 },
+    { id: "m8a.xlarge", vcpu: 4, memoryGb: 16 },
+    { id: "m7i.large", vcpu: 2, memoryGb: 8 },
+    { id: "m7i.xlarge", vcpu: 4, memoryGb: 16 },
+  ],
+  gcp: [
+    { id: "e2-standard-2", vcpu: 2, memoryGb: 8 },
+    { id: "e2-standard-4", vcpu: 4, memoryGb: 16 },
+    { id: "n2-standard-2", vcpu: 2, memoryGb: 8 },
+    { id: "n2-standard-4", vcpu: 4, memoryGb: 16 },
+  ],
+  azure: [
+    { id: "Standard_D2ds_v4", vcpu: 2, memoryGb: 8 },
+    { id: "Standard_D4ds_v4", vcpu: 4, memoryGb: 16 },
+    { id: "Standard_D2s_v5", vcpu: 2, memoryGb: 8 },
+    { id: "Standard_D4s_v5", vcpu: 4, memoryGb: 16 },
+  ],
+};
+
+export function formatMachineTypeOption(option: CloudMachineType): string {
+  if (option.vcpu == null || option.memoryGb == null) return option.id;
+  return `${option.id} · ${option.vcpu} vCPU · ${option.memoryGb} GB memory`;
+}
+
+export function machineTypeChoices(provider: FleetManagerProvider, current: string): CloudMachineType[] {
+  const catalog = CLOUD_MACHINE_TYPES[provider];
+  const value = current.trim();
+  if (!value || catalog.some((option) => option.id === value)) return catalog;
+  return [...catalog, { id: value }];
+}
+
+export function resolveSetupMachineType(provider: FleetManagerProvider, current: string | undefined): string {
+  const value = current?.trim() ?? "";
+  if (!value) return recommendedMachineType(provider, "amd64");
+  if (CLOUD_MACHINE_TYPES[provider].some((option) => option.id === value)) return value;
+  const belongsToAnotherCloud = (["aws", "gcp", "azure"] as const).some(
+    (other) => other !== provider && CLOUD_MACHINE_TYPES[other].some((option) => option.id === value),
+  );
+  if (belongsToAnotherCloud) return recommendedMachineType(provider, "amd64");
+  return value;
+}
+
+export const fleetImage = (fields: FleetManagerProviderFields, architecture: FleetSpec["architecture"]): string =>
+  fields[architecture === "amd64" ? "imageAmd64" : "imageArm64"]?.trim() ?? "";
+
+const configuredRunnerImage = (fields: FleetManagerProviderFields, architecture: FleetSpec["architecture"]): string =>
+  fleetImage(fields, architecture) || "<RUNNER_IMAGE>";
+
 const providerConfiguration = {
   aws: (fleetId: string, spec: FleetSpec, fields: FleetManagerProviderFields) => ({
     aws: {
       region: fields.region || "<AWS_REGION>",
-      ami: "<PUBLIC_AMI_ID_FOR_REGION_AND_ARCH>",
-      instanceType: machineType(fleetId, spec, fields, "<INSTANCE_TYPE>"),
+      ami: configuredRunnerImage(fields, spec.architecture),
+      instanceType: machineType(fleetId, spec, fields, recommendedMachineType("aws", spec.architecture)),
       architecture: spec.architecture,
       subnetIds: splitList(fields.subnetIds, "<SUBNET_ID>"),
       securityGroupIds: splitList(fields.securityGroupIds, "<SECURITY_GROUP_ID>"),
@@ -103,8 +170,8 @@ const providerConfiguration = {
     gcp: {
       projectId: fields.projectId || "<GCP_PROJECT_ID>",
       zones: splitList(fields.zones, "<GCP_ZONE>"),
-      machineType: machineType(fleetId, spec, fields, "<MACHINE_TYPE>"),
-      image: "<PUBLIC_GCP_IMAGE_OR_FAMILY>",
+      machineType: machineType(fleetId, spec, fields, recommendedMachineType("gcp", spec.architecture)),
+      image: configuredRunnerImage(fields, spec.architecture),
       architecture: spec.architecture,
       subnetwork: fields.subnetwork || "<RUNNER_SUBNETWORK>",
       ...(fields.runnerIdentity ? { serviceAccountEmail: fields.runnerIdentity } : {}),
@@ -117,13 +184,13 @@ const providerConfiguration = {
       subscriptionId: fields.subscriptionId || "<AZURE_SUBSCRIPTION_ID>",
       resourceGroup: fields.resourceGroup || "<RESOURCE_GROUP>",
       location: fields.location || "<AZURE_LOCATION>",
-      imageId: "<PUBLIC_AZURE_IMAGE_VERSION_ID>",
-      vmSize: machineType(fleetId, spec, fields, "<VM_SIZE>"),
+      imageId: configuredRunnerImage(fields, spec.architecture),
+      vmSize: machineType(fleetId, spec, fields, recommendedMachineType("azure", spec.architecture)),
       architecture: spec.architecture,
       subnetId: fields.subnetId || "<RUNNER_SUBNET_ID>",
       networkSecurityGroupId: fields.securityGroupIds || "<NETWORK_SECURITY_GROUP_ID>",
       identityId: fields.runnerIdentity || "<RUNNER_IDENTITY_ID>",
-      zones: splitList(fields.zones, "<AZURE_ZONE>"),
+      zones: fields.zones?.trim() ? splitList(fields.zones, "<AZURE_ZONE>") : [],
       diskSizeGb: spec.diskGb,
     },
   }),
@@ -166,30 +233,41 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
             },
           };
 
-  return dump(
-    {
-      manager: { id: input.managerId },
-      superplane: { url: input.superplaneUrl },
-      credentials: {
-        existingSecret: input.metadata.credentials.existingSecret,
-        tokenKey: input.metadata.credentials.tokenKey,
+  return quoteReleaseBaseUrl(
+    dump(
+      {
+        manager: { id: input.managerId },
+        superplane: { url: input.superplaneUrl },
+        installationAdminToken: input.installationAdminToken,
+        runner: { releaseBaseUrl: input.metadata.runnerReleaseUrlTemplate },
+        image: {
+          repository: input.metadata.imageRepository,
+          tag: input.metadata.defaultFleetManagerVersion,
+          pullPolicy: "IfNotPresent",
+        },
+        serviceAccount: {
+          create: true,
+          name: input.serviceAccountName || "superplane-fleet-manager",
+          ...workloadIdentity,
+        },
+        podLabels: input.provider === "azure" ? { "azure.workload.identity/use": "true" } : {},
+        fleets,
       },
-      runner: { releaseBaseUrl: input.metadata.runnerReleaseUrlTemplate },
-      image: {
-        repository: input.metadata.imageRepository,
-        tag: input.metadata.defaultFleetManagerVersion,
-        pullPolicy: "IfNotPresent",
-      },
-      serviceAccount: {
-        create: true,
-        name: input.serviceAccountName || "superplane-fleet-manager",
-        ...workloadIdentity,
-      },
-      podLabels: input.provider === "azure" ? { "azure.workload.identity/use": "true" } : {},
-      fleets,
-    },
-    { noRefs: true, lineWidth: 120, quotingType: '"' },
+      { noRefs: true, lineWidth: 120, quotingType: '"' },
+    ),
   );
+}
+
+// An unquoted https value is a shell URL. zsh url-quote-magic then inserts
+// a backslash before { and }. Fleet Manager replaces only the exact text {version}.
+function quoteReleaseBaseUrl(values: string): string {
+  return values.replace(/^(\s*releaseBaseUrl:\s+)(.+?)\s*$/m, (_match, prefix: string, value: string) => {
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+      return `${prefix}${trimmed}`;
+    }
+    return `${prefix}"${trimmed.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  });
 }
 
 export function validateFleetInfrastructure(input: FleetInfrastructureInput): string[] {
@@ -212,10 +290,20 @@ export function validateFleetInfrastructure(input: FleetInfrastructureInput): st
   return errors;
 }
 
+export function installationRunnerVersion(
+  metadata: Pick<FleetManagerSetupMetadata, "defaultRunnerVersion" | "runnerVersions">,
+): string {
+  const listed = metadata.runnerVersions ?? [];
+  const preferred = metadata.defaultRunnerVersion?.trim() ?? "";
+  if (preferred && listed.includes(preferred)) return preferred;
+  return listed[0] ?? "";
+}
+
 export function validateFleetSelection(input: FleetSelectionInput): string[] {
   const errors: string[] = [];
-  if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(input.runnerVersion)) {
-    errors.push("Enter a valid immutable Runner version.");
+  const runnerVersions = input.runnerVersions ?? [];
+  if (!input.runnerVersion || !runnerVersions.includes(input.runnerVersion)) {
+    errors.push("SuperPlane could not determine a Runner version.");
   }
   if (input.selectedFleetIds.length === 0) {
     errors.push("Select at least one fleet.");
@@ -235,16 +323,52 @@ export function validateFleetSelection(input: FleetSelectionInput): string[] {
   return errors;
 }
 
-export function validateFleetManagerConfiguration(input: FleetManagerConfigurationInput): string[] {
+export function validateFleetManagerConfiguration(
+  input: FleetManagerConfigurationInput & { runnerVersions?: readonly string[] },
+): string[] {
   return [...validateFleetSelection(input), ...validateFleetInfrastructure(input)];
+}
+
+const INSTALL_PLACEHOLDER = /<[A-Z0-9_]+>/;
+
+export function terraformInstallPlaceholders(draft: FleetManagerDraft, metadata: FleetManagerSetupMetadata): string[] {
+  const defaults = metadata.infrastructureDefaults;
+  if (defaults.source !== "terraform" || defaults.provider !== draft.provider) return [];
+
+  const values = generateFleetManagerValues({
+    metadata,
+    ...draft,
+    installationAdminToken: "token",
+  });
+  if (!INSTALL_PLACEHOLDER.test(values)) return [];
+  return ["Apply Terraform again before you install Fleet Manager. A required value is missing."];
+}
+
+export const FLEET_MANAGER_VALUES_FILE = "fleet-manager-values.yaml";
+
+export function fleetManagerValuesFileCommand(values: string): string {
+  return `cat > ${FLEET_MANAGER_VALUES_FILE} <<'EOF'\n${values.trimEnd()}\nEOF\n`;
+}
+
+export function fleetManagerHelmCommand(metadata: FleetManagerSetupMetadata, namespace: string): string {
+  return [
+    "helm upgrade --install fleet-manager",
+    metadata.chartRepository,
+    `--version ${metadata.defaultChartVersion}`,
+    `--namespace ${namespace}`,
+    "--create-namespace",
+    "--wait",
+    "--timeout 10m",
+    `-f ${FLEET_MANAGER_VALUES_FILE}`,
+  ].join(" \\\n  ");
 }
 
 export function fleetManagerInstallCommand(
   metadata: FleetManagerSetupMetadata,
   namespace: string,
-  valuesFile: string,
+  values: string,
 ): string {
-  return `helm upgrade --install fleet-manager ${metadata.chartRepository} --version ${metadata.defaultChartVersion} --namespace ${namespace} --create-namespace --values ${valuesFile} --wait --timeout 10m`;
+  return `${fleetManagerValuesFileCommand(values)}\n${fleetManagerHelmCommand(metadata, namespace)}\n`;
 }
 
 export function normalizeInfrastructureFields(fields: Record<string, string | string[]>): FleetManagerProviderFields {
@@ -260,6 +384,8 @@ export function fleetsMatchConfiguration(
 ): boolean {
   const byID = new Map(installed.map((fleet) => [fleet.id, fleet]));
   const presetByID = new Map(presets.map((preset) => [preset.id, preset]));
+
+  if (draft.selectedFleetIds.length === 0) return false;
 
   return draft.selectedFleetIds.every((id) => {
     const fleet = byID.get(id);
@@ -277,9 +403,44 @@ export function fleetsMatchConfiguration(
   });
 }
 
+const FLEET_MANAGER_PROVIDERS: FleetManagerProvider[] = ["aws", "gcp", "azure"];
+
+export function mergeTerraformInfrastructure(
+  draft: FleetManagerDraft,
+  metadata: FleetManagerSetupMetadata,
+): FleetManagerDraft {
+  const defaults = metadata.infrastructureDefaults;
+  if (defaults.source !== "terraform" || defaults.provider !== draft.provider) return draft;
+
+  const { superplaneUrl, ...infrastructureFields } = normalizeInfrastructureFields(defaults.fields);
+  const machineTypes = Object.fromEntries(
+    Object.entries(draft.fields).filter(([key]) => key.startsWith("machineType.")),
+  );
+  const fields = { ...infrastructureFields, ...machineTypes };
+  return {
+    ...draft,
+    superplaneUrl: superplaneUrl || draft.superplaneUrl,
+    fields,
+    fieldsByProvider: {
+      ...draft.fieldsByProvider,
+      [draft.provider]: fields,
+    },
+  };
+}
+
+export function rememberProviderFields(draft: FleetManagerDraft): FleetManagerDraft {
+  return {
+    ...draft,
+    fieldsByProvider: {
+      ...draft.fieldsByProvider,
+      [draft.provider]: draft.fields,
+    },
+  };
+}
+
 export function saveFleetManagerDraft(draft: FleetManagerDraft): void {
   window.localStorage.removeItem(LEGACY_FLEET_MANAGER_DRAFT_KEY);
-  window.localStorage.setItem(FLEET_MANAGER_DRAFT_KEY, JSON.stringify(draft));
+  window.localStorage.setItem(FLEET_MANAGER_DRAFT_KEY, JSON.stringify(rememberProviderFields(draft)));
 }
 
 type RequiredDraftStrings = Pick<
@@ -304,7 +465,7 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       warmCapacity?: unknown;
       maxCapacity?: unknown;
     };
-    if (!draft.provider || !["aws", "gcp", "azure"].includes(draft.provider)) return null;
+    if (!draft.provider || !FLEET_MANAGER_PROVIDERS.includes(draft.provider)) return null;
     if (!hasRequiredDraftStrings(draft)) return null;
     if (!Array.isArray(draft.selectedFleetIds) || !draft.selectedFleetIds.every((id) => typeof id === "string"))
       return null;
@@ -313,6 +474,10 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       Object.entries(draft.fields).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
     );
     const fleetCapacities = storedFleetCapacities(draft);
+    const fieldsByProvider = {
+      ...storedFieldsByProvider(draft.fieldsByProvider),
+      [draft.provider]: fields,
+    };
     return {
       provider: draft.provider,
       managerId: draft.managerId,
@@ -323,10 +488,30 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       selectedFleetIds: draft.selectedFleetIds,
       fleetCapacities,
       fields,
+      fieldsByProvider,
     };
   } catch {
     return null;
   }
+}
+
+function storedFieldsByProvider(value: unknown): Partial<Record<FleetManagerProvider, FleetManagerProviderFields>> {
+  if (typeof value !== "object" || value === null) return {};
+
+  return Object.fromEntries(
+    FLEET_MANAGER_PROVIDERS.flatMap((provider) => {
+      const fields = (value as Record<string, unknown>)[provider];
+      if (typeof fields !== "object" || fields === null) return [];
+      return [
+        [
+          provider,
+          Object.fromEntries(
+            Object.entries(fields).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+          ),
+        ],
+      ];
+    }),
+  );
 }
 
 function storedFleetCapacities(

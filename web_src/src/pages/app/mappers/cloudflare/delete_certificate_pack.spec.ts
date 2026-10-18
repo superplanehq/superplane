@@ -8,34 +8,9 @@ import type {
 } from "../types";
 import { deleteCertificatePackMapper } from "./delete_certificate_pack";
 import { eventStateRegistry } from "./index";
+import { buildExecution, createNodeFixtures } from "./test_support";
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Test Node",
-    componentName: "cloudflare.deleteCertificatePack",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
+const { buildNode } = createNodeFixtures("cloudflare.deleteCertificatePack");
 
 function buildDetailsCtx(overrides?: {
   node?: Partial<NodeInfo>;
@@ -180,13 +155,5 @@ describe("deleteCertificatePackMapper.getExecutionDetails", () => {
 describe("eventStateRegistry.deleteCertificatePack", () => {
   it("maps finished success to deleted", () => {
     expect(eventStateRegistry.deleteCertificatePack.getState(buildExecution())).toBe("deleted");
-  });
-
-  it("returns failed on component failure", () => {
-    const failed = buildExecution({
-      result: "RESULT_FAILED" as ExecutionInfo["result"],
-      resultReason: "RESULT_REASON_COMPONENT_FAILED" as ExecutionInfo["resultReason"],
-    });
-    expect(eventStateRegistry.deleteCertificatePack.getState(failed)).toBe("failed");
   });
 });

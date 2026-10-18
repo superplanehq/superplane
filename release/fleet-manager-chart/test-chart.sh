@@ -30,40 +30,46 @@ grep -q 'image: "ghcr.io/superplanehq/fleet-manager:v1.2.3"' "${TMP_DIR}/package
 
 for provider in aws gcp azure; do
   render_provider "${provider}"
-  grep -q 'helm.sh/hook: pre-install,pre-upgrade' "${TMP_DIR}/${provider}.yaml"
+  grep -q 'helm.sh/hook: post-install,post-upgrade' "${TMP_DIR}/${provider}.yaml"
   grep -q 'automountServiceAccountToken: false' "${TMP_DIR}/${provider}.yaml"
   grep -q 'readOnlyRootFilesystem: true' "${TMP_DIR}/${provider}.yaml"
-  grep -q 'secretKeyRef:' "${TMP_DIR}/${provider}.yaml"
   grep -q 'checksum/config:' "${TMP_DIR}/${provider}.yaml"
   grep -q "provider: ${provider}" "${TMP_DIR}/${provider}.yaml"
-  ruby -ryaml -rbase64 -rjson -e '
-    documents = YAML.load_stream(File.read(ARGV.fetch(0)))
-    config_map = documents.find { |document| document&.dig("kind") == "ConfigMap" }
-    deployment = documents.find { |document| document&.dig("kind") == "Deployment" }
-    service_account = documents.find { |document| document&.dig("kind") == "ServiceAccount" }
-    startup_job = documents.find { |document| document&.dig("kind") == "Job" }
-    abort "missing Fleet Manager ConfigMap" unless config_map
+  ruby -ryaml -e '
+    documents = YAML.load_stream(File.read(ARGV.fetch(0))).compact
+    secrets = documents.select { |document| document["kind"] == "Secret" }
+    config_maps = documents.select { |document| document["kind"] == "ConfigMap" }
+    deployment = documents.find { |document| document["kind"] == "Deployment" }
+    service_account = documents.find { |document| document["kind"] == "ServiceAccount" }
+    startup_job = documents.find { |document| document["kind"] == "Job" }
+    abort "expected one configuration Secret" unless secrets.length == 1
+    abort "wrong configuration Secret name" unless secrets.first.dig("metadata", "name") == "fleet-manager-config"
+    abort "configuration ConfigMap still exists" unless config_maps.empty?
     abort "missing Fleet Manager Deployment" unless deployment
     abort "missing Fleet Manager ServiceAccount" unless service_account
     abort "missing startup Job" unless startup_job
     abort "startup Job mounts a service-account token" unless startup_job.dig("spec", "template", "spec", "automountServiceAccountToken") == false
     abort "Fleet Manager disables workload identity tokens" if deployment.dig("spec", "template", "spec", "automountServiceAccountToken") == false
     abort "service account disables workload identity tokens" if service_account["automountServiceAccountToken"] == false
-    job_arguments = startup_job.dig("spec", "template", "spec", "containers", 0, "args").drop(2)
-    job_arguments.each_slice(3) do |fleet_id, create_body, update_body|
-      create_request = JSON.parse(Base64.decode64(create_body))
-      update_request = JSON.parse(Base64.decode64(update_body))
-      abort "create request has the wrong fleet ID" unless create_request["fleetId"] == fleet_id
-      abort "create request is incomplete" unless create_request.key?("runnerVersion") && create_request.key?("spec")
-      abort "update request is incomplete" unless update_request.key?("runnerVersion") && update_request.key?("spec")
-      abort "update request changes enabled state" if update_request.key?("enabled")
-    end
-    config = YAML.safe_load(config_map.dig("data", "fleet-manager.yaml"))
-    abort "runtime config contains installationAdminToken" if config.key?("installationAdminToken")
+    config = YAML.safe_load(secrets.first.dig("stringData", "fleet-manager.yaml"))
+    abort "configuration token is missing" unless config["installationAdminToken"] == "fleet-manager-personal-token"
     config.fetch("fleets").each do |fleet|
-      abort "runtime fleet contains runnerVersion" if fleet.key?("runnerVersion")
-      abort "runtime fleet contains spec" if fleet.key?("spec")
+      abort "runtime fleet is missing runnerVersion" unless fleet.key?("runnerVersion")
+      abort "runtime fleet is missing spec" unless fleet.key?("spec")
     end
+    [deployment, startup_job].each do |workload|
+      pod_spec = workload.dig("spec", "template", "spec")
+      container = pod_spec.fetch("containers").first
+      env_names = container.fetch("env").map { |entry| entry.fetch("name") }
+      abort "workload uses INSTALLATION_ADMIN_TOKEN" if env_names.include?("INSTALLATION_ADMIN_TOKEN")
+      abort "workload does not set FLEET_MANAGER_CONFIG_FILE" unless env_names.include?("FLEET_MANAGER_CONFIG_FILE")
+      secret_name = pod_spec.fetch("volumes").first.dig("secret", "secretName")
+      abort "workload does not mount fleet-manager-config" unless secret_name == "fleet-manager-config"
+    end
+    job_container = startup_job.dig("spec", "template", "spec", "containers").first
+    deployment_container = deployment.dig("spec", "template", "spec", "containers").first
+    abort "startup Job uses a different image" unless job_container["image"] == deployment_container["image"]
+    abort "startup Job does not run sync-fleets" unless job_container["args"] == ["sync-fleets"]
   ' "${TMP_DIR}/${provider}.yaml"
 done
 
@@ -75,7 +81,7 @@ grep -q 'azure.workload.identity/use: "true"' "${TMP_DIR}/azure.yaml"
 if helm template fleet-manager "${CHART_DIR}" \
   --set manager.id=invalid.id \
   --set superplane.url=https://superplane.example.com \
-  --set credentials.existingSecret=token \
+  --set installationAdminToken=token \
   --set fleets[0].id=invalid.id \
   --set fleets[0].runnerVersion=v0.1.0 \
   --set fleets[0].provider=aws \

@@ -161,6 +161,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "planning session has ended")
 	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
 		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
+	case errors.Is(err, models.ErrFactorySystemSkillRequired):
+		return grpcerrors.FailedPrecondition(err, "Only system skills can be restored.")
+	case errors.Is(err, models.ErrFactorySystemSkillProtected):
+		return grpcerrors.FailedPrecondition(err, "System skills cannot be deleted, renamed, or disabled.")
 	case errors.Is(err, models.ErrFactoryAgentResourceNotFound):
 		return grpcerrors.NotFound(err, "agent resource not found")
 	case errors.Is(err, models.ErrFactoryAgentResourceKindInvalid):
@@ -241,8 +245,6 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
-	case errors.Is(err, errFactoryBitbucketDisabled):
-		return grpcerrors.FailedPrecondition(err, "Bitbucket workspaces are not enabled for this organization.")
 	case errors.Is(err, errWorkspaceMCPDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace MCP is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
@@ -269,7 +271,6 @@ var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server fi
 var errListMCPTools = errors.New("could not list MCP tools")
 var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
-var errFactoryBitbucketDisabled = errors.New("bitbucket workspaces are not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
 var errWorkspaceAgentDisabled = errors.New("workspace agent is not enabled")

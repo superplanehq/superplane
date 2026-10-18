@@ -266,4 +266,42 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
     );
     expect(onCreated).toHaveBeenCalledWith("handler-1");
   });
+
+  it("lets a Bitbucket workspace type bot names without an empty catalog", async () => {
+    const user = userEvent.setup();
+    render(
+      <DiscussionPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/app"
+        vcsProvider="bitbucket"
+        source={discussionSource}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await chooseAddressBots(user);
+    expect(screen.queryByTestId("discussion-setup-bots-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bots-missing")).not.toBeInTheDocument();
+    expect(screen.getByTestId("discussion-setup-bot-manual")).toBeInTheDocument();
+    expect(screen.getByTestId("discussion-setup-finish")).toBeEnabled();
+
+    await user.type(screen.getByTestId("discussion-setup-bot-manual"), "@coderabbitai[bot]");
+    await user.click(screen.getByTestId("discussion-setup-bot-add"));
+    expect(screen.getByRole("button", { name: "Remove coderabbitai" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("discussion-setup-finish"));
+
+    expect(mocks.createHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          discussion: expect.objectContaining({
+            ignoreBots: true,
+            allowedBots: ["coderabbitai"],
+          }),
+        }),
+      }),
+    );
+  });
 });

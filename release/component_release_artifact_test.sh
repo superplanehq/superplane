@@ -13,26 +13,32 @@ WORK_DIR="${TEST_DIR}/work"
 VERSION="v0.1.0-rc.1"
 RUNNER_DIR="${WORK_DIR}/build/runner/${VERSION}"
 FLEET_MANAGER_DIR="${WORK_DIR}/build/fleet-manager/${VERSION}"
+SUPERPLANE_DIR="${WORK_DIR}/build/superplane/${VERSION}"
 
-mkdir -p "${RUNNER_DIR}" "${FLEET_MANAGER_DIR}"
+mkdir -p "${RUNNER_DIR}" "${FLEET_MANAGER_DIR}" "${SUPERPLANE_DIR}"
 printf 'runner-checksums\n' >"${RUNNER_DIR}/checksums.txt"
 printf 'fleet-manager-checksums\n' >"${FLEET_MANAGER_DIR}/checksums.txt"
+printf 'superplane-checksums\n' >"${SUPERPLANE_DIR}/checksums.txt"
 
 cd "${WORK_DIR}"
 bash "${REPO_ROOT}/release/component-release-artifact.sh" push runner "${VERSION}" "${RUNNER_DIR}"
 bash "${REPO_ROOT}/release/component-release-artifact.sh" push fleet-manager "${VERSION}" "${FLEET_MANAGER_DIR}"
+bash "${REPO_ROOT}/release/component-release-artifact.sh" push superplane "${VERSION}" "${SUPERPLANE_DIR}"
 
 test -f "${ARTIFACT_TEST_STORE}/runner-${VERSION}.tar.gz"
 test -f "${ARTIFACT_TEST_STORE}/fleet-manager-${VERSION}.tar.gz"
+test -f "${ARTIFACT_TEST_STORE}/superplane-${VERSION}.tar.gz"
 
 mv "${WORK_DIR}/build" "${WORK_DIR}/prepared"
-mkdir -p "${WORK_DIR}/build/runner" "${WORK_DIR}/build/fleet-manager"
+mkdir -p "${WORK_DIR}/build/runner" "${WORK_DIR}/build/fleet-manager" "${WORK_DIR}/build/superplane"
 
 bash "${REPO_ROOT}/release/component-release-artifact.sh" pull runner "${VERSION}" "${RUNNER_DIR}"
 bash "${REPO_ROOT}/release/component-release-artifact.sh" pull fleet-manager "${VERSION}" "${FLEET_MANAGER_DIR}"
+bash "${REPO_ROOT}/release/component-release-artifact.sh" pull superplane "${VERSION}" "${SUPERPLANE_DIR}"
 
 cmp "${WORK_DIR}/prepared/runner/${VERSION}/checksums.txt" "${RUNNER_DIR}/checksums.txt"
 cmp "${WORK_DIR}/prepared/fleet-manager/${VERSION}/checksums.txt" "${FLEET_MANAGER_DIR}/checksums.txt"
+cmp "${WORK_DIR}/prepared/superplane/${VERSION}/checksums.txt" "${SUPERPLANE_DIR}/checksums.txt"
 
 MALICIOUS_WORK_DIR="${TEST_DIR}/malicious-work"
 MALICIOUS_VERSION="v0.1.0-rc.2"

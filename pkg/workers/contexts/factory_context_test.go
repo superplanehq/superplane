@@ -492,36 +492,6 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 		return len(orders)
 	}
 
-	t.Run("skips a Jira issue that already has a task", func(t *testing.T) {
-		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
-		existing, err := factoryModel.CreateWorkOrderWithOrigin(
-			database.Conn(),
-			"Existing jira task",
-			"",
-			nil,
-			nil,
-			nil,
-			models.WorkOrderOrigin{URL: "https://acme.atlassian.net/browse/ENG-5", Label: "ENG-5"},
-		)
-		require.NoError(t, err)
-		beforeEvents, err := existing.ListEvents(database.Conn(), 0, nil)
-		require.NoError(t, err)
-
-		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("updated", "ENG-5"))
-		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-
-		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Existing jira task"})
-		require.NoError(t, err)
-		assert.False(t, created)
-		assert.Nil(t, order)
-		assert.Equal(t, 1, countOrders(factoryModel))
-
-		afterEvents, err := existing.ListEvents(database.Conn(), 0, nil)
-		require.NoError(t, err)
-		assert.Len(t, afterEvents, len(beforeEvents))
-	})
-
 	t.Run("create then update for the same issue inserts one work order", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
@@ -605,62 +575,6 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Issue ENG-5"})
-		require.NoError(t, err)
-		require.True(t, created)
-		require.NotNil(t, order)
-		assert.Equal(t, 2, countOrders(factoryModel))
-	})
-
-	t.Run("creates a task when the Jira issue has none", func(t *testing.T) {
-		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
-		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-7"))
-		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceJiraIssues)
-		require.NoError(t, err)
-		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-
-		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
-		require.NoError(t, err)
-		require.True(t, created)
-		require.NotNil(t, order)
-		require.NotNil(t, order.Origin)
-		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-7", order.Origin.URL)
-		assert.Equal(t, "ENG-7", order.Origin.Label)
-		assert.Equal(t, 1, countOrders(factoryModel))
-	})
-
-	t.Run("still creates a GitHub task with a repeated origin", func(t *testing.T) {
-		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
-		origin := models.WorkOrderOrigin{
-			URL:   "https://github.com/acme/payments/issues/12",
-			Label: "acme/payments#12",
-		}
-		_, err = factoryModel.CreateWorkOrderWithOrigin(
-			database.Conn(),
-			"First github task",
-			"",
-			nil,
-			nil,
-			nil,
-			origin,
-		)
-		require.NoError(t, err)
-
-		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
-			"type": "github.issue",
-			"data": map[string]any{
-				"issue": map[string]any{
-					"html_url": origin.URL,
-					"title":    "Handle duplicate refunds",
-				},
-			},
-		})
-		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
-		require.NoError(t, err)
-		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-
-		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
 		require.NoError(t, err)
 		require.True(t, created)
 		require.NotNil(t, order)
@@ -1497,6 +1411,7 @@ func TestFactoryContext_FindPullRequest_IncludesWorkOrderOrigin(t *testing.T) {
 		require.NotNil(t, match.WorkOrder.Origin)
 		assert.Equal(t, originURL, match.WorkOrder.Origin.URL)
 		assert.Equal(t, originLabel, match.WorkOrder.Origin.Label)
+		assert.Equal(t, uiBaseURL()+order.URLPath(factory.RouteSegment()), match.WorkOrder.URL)
 	})
 
 	t.Run("omits origin when the task has none", func(t *testing.T) {

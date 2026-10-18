@@ -69,7 +69,12 @@ export function prFeedbackLogRunsFromPullRequests(
     const usageByRunId = new Map(
       (pullRequest.runs ?? []).flatMap((linked) =>
         linked.run?.id
-          ? [[linked.run.id, { costCents: linked.costCents, totalTokens: linked.totalTokens }] as const]
+          ? [
+              [
+                linked.run.id,
+                { costCents: linked.costCents, totalTokens: linked.totalTokens, models: linked.models },
+              ] as const,
+            ]
           : [],
       ),
     );
@@ -94,6 +99,7 @@ export function prFeedbackLogRunsFromPullRequests(
                 attemptLabel: prFeedbackActivityAttemptLabel(activity),
                 costCents: firstPositiveWorkOrderMetric(activity.costCents, usage?.costCents),
                 totalTokens: firstPositiveWorkOrderMetric(activity.totalTokens, usage?.totalTokens),
+                models: activity.models?.length ? activity.models : usage?.models,
                 kind: prFeedbackActivityKind(activity),
                 waitingForAccess: activity.access === "waiting",
                 run,
@@ -116,6 +122,7 @@ export function prFeedbackLogRunsFromPullRequests(
                 description: linked.description,
                 costCents: linked.costCents,
                 totalTokens: linked.totalTokens,
+                models: linked.models,
                 run,
               },
             ];

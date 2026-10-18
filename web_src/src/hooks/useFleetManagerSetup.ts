@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useCreateUserToken } from "@/hooks/useUserTokens";
+
 import {
   clearFleetManagerDraft,
   DEFAULT_FLEET_CAPACITY,
+  DEFAULT_SETUP_FLEET_ID,
+  fleetImage,
   fleetsMatchConfiguration,
   generateFleetManagerValues,
+  installationRunnerVersion,
   loadFleetManagerDraft,
+  mergeTerraformInfrastructure,
   normalizeInfrastructureFields,
+  rememberProviderFields,
+  resolveSetupMachineType,
   saveFleetManagerDraft,
+  terraformInstallPlaceholders,
   validateFleetInfrastructure,
   validateFleetSelection,
   type FleetManagerDraft,
@@ -21,23 +30,92 @@ const VERIFICATION_TIMEOUT_MS = 10 * 60_000;
 
 function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
   const defaults = metadata.infrastructureDefaults;
-  const { superplaneUrl, ...fields } = normalizeInfrastructureFields(defaults.fields);
+  const provider = defaults.provider ?? "aws";
+  const { superplaneUrl, ...infrastructureFields } = normalizeInfrastructureFields(defaults.fields);
+  const fields = withRecommendedMachineTypes(infrastructureFields, provider);
+  const hasDefaultFleet = metadata.fleetPresets.some((preset) => preset.id === DEFAULT_SETUP_FLEET_ID);
   return {
-    provider: defaults.provider ?? "aws",
+    provider,
     managerId: defaults.managerId || "my-cluster",
     namespace: defaults.namespace || "superplane",
     serviceAccountName: defaults.serviceAccountName || "superplane-fleet-manager",
     superplaneUrl: superplaneUrl || window.location.origin,
-    runnerVersion: metadata.defaultRunnerVersion,
-    selectedFleetIds: metadata.fleetPresets[0] ? [metadata.fleetPresets[0].id] : [],
-    fleetCapacities: Object.fromEntries(
-      metadata.fleetPresets.map((preset) => [preset.id, { ...DEFAULT_FLEET_CAPACITY }]),
-    ),
+    runnerVersion: installationRunnerVersion(metadata),
+    selectedFleetIds: hasDefaultFleet ? [DEFAULT_SETUP_FLEET_ID] : [],
+    fleetCapacities: hasDefaultFleet ? { [DEFAULT_SETUP_FLEET_ID]: { ...DEFAULT_FLEET_CAPACITY } } : {},
     fields,
   };
 }
 
-export function useFleetManagerSetup(enabled = true) {
+function withRecommendedMachineTypes(
+  fields: Record<string, string>,
+  provider: FleetManagerProvider,
+): Record<string, string> {
+  const key = `machineType.${DEFAULT_SETUP_FLEET_ID}`;
+  return { ...fields, [key]: resolveSetupMachineType(provider, fields[key]) };
+}
+
+function pinSetupFleet(draft: FleetManagerDraft, metadata: FleetManagerSetupMetadata): FleetManagerDraft {
+  const hasDefaultFleet = metadata.fleetPresets.some((preset) => preset.id === DEFAULT_SETUP_FLEET_ID);
+  if (!hasDefaultFleet) return { ...draft, selectedFleetIds: [] };
+  return {
+    ...draft,
+    selectedFleetIds: [DEFAULT_SETUP_FLEET_ID],
+    fleetCapacities: {
+      ...draft.fleetCapacities,
+      [DEFAULT_SETUP_FLEET_ID]: draft.fleetCapacities[DEFAULT_SETUP_FLEET_ID] ?? { ...DEFAULT_FLEET_CAPACITY },
+    },
+    fields: withRecommendedMachineTypes(draft.fields, draft.provider),
+  };
+}
+
+function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
+  metadata.runnerVersions = metadata.runnerVersions?.length
+    ? metadata.runnerVersions
+    : metadata.defaultRunnerVersion
+      ? [metadata.defaultRunnerVersion]
+      : [];
+  const restoredDraft = loadFleetManagerDraft();
+  const draft = restoredDraft ? mergeTerraformInfrastructure(restoredDraft, metadata) : defaultDraft(metadata);
+  return pinSetupFleet({ ...draft, runnerVersion: installationRunnerVersion(metadata) }, metadata);
+}
+
+function draftForProvider(
+  current: FleetManagerDraft,
+  provider: FleetManagerProvider,
+  metadata: FleetManagerSetupMetadata | null,
+): FleetManagerDraft {
+  const providerDefaults = normalizeInfrastructureFields(metadata?.infrastructureDefaults.fields ?? {});
+  delete providerDefaults.superplaneUrl;
+  const defaults = metadata?.infrastructureDefaults.provider === provider ? providerDefaults : {};
+  const remembered = rememberProviderFields(current);
+  const base = remembered.fieldsByProvider?.[provider] ?? defaults;
+  const fields = withRecommendedMachineTypes(base, provider);
+  return {
+    ...remembered,
+    provider,
+    fields,
+    fieldsByProvider: { ...remembered.fieldsByProvider, [provider]: fields },
+  };
+}
+
+function missingImageErrors(draft: FleetManagerDraft, metadata: FleetManagerSetupMetadata): string[] {
+  if (metadata.infrastructureDefaults.source !== "terraform") return [];
+  return draft.selectedFleetIds.flatMap((fleetId) => {
+    const preset = metadata.fleetPresets.find((candidate) => candidate.id === fleetId);
+    if (!preset || fleetImage(draft.fields, preset.spec.architecture)) return [];
+    return [`Add the ${preset.spec.architecture} runner image through Terraform before you select ${fleetId}.`];
+  });
+}
+
+function fleetSelectionErrors(draft: FleetManagerDraft | null, metadata: FleetManagerSetupMetadata | null): string[] {
+  if (!draft) return [];
+  const errors = validateFleetSelection({ ...draft, runnerVersions: metadata?.runnerVersions ?? [] });
+  if (!metadata) return errors;
+  return [...errors, ...missingImageErrors(draft, metadata), ...terraformInstallPlaceholders(draft, metadata)];
+}
+
+function useFleetManagerDraft(enabled: boolean) {
   const [metadata, setMetadata] = useState<FleetManagerSetupMetadata | null>(null);
   const [draft, setDraft] = useState<FleetManagerDraft | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -56,7 +134,7 @@ export function useFleetManagerSetup(enabled = true) {
         return (await response.json()) as FleetManagerSetupMetadata;
       })
       .then((body) => {
-        const initialDraft = loadFleetManagerDraft() ?? defaultDraft(body);
+        const initialDraft = draftFromMetadata(body);
         setMetadata(body);
         saveFleetManagerDraft(initialDraft);
         setDraft(initialDraft);
@@ -77,16 +155,49 @@ export function useFleetManagerSetup(enabled = true) {
     });
   }, []);
 
+  return { metadata, draft, loadError, updateDraft };
+}
+
+function useFleetManagerToken(organizationId: string) {
+  const [tokenState, setTokenState] = useState<{ organizationId: string; plaintext: string } | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const createToken = useCreateUserToken(organizationId);
+  const plaintext = tokenState?.organizationId === organizationId ? tokenState.plaintext : "";
+
+  const prepareInstallation = useCallback(async (): Promise<boolean> => {
+    if (plaintext) return true;
+    if (!organizationId) {
+      setTokenError("SuperPlane could not identify the organization for this personal token.");
+      return false;
+    }
+
+    setTokenError(null);
+    try {
+      const response = await createToken.mutateAsync({ name: "Fleet Manager" });
+      const created = response?.plaintext?.trim();
+      if (!created) throw new Error("Personal token response did not include plaintext");
+      setTokenState({ organizationId, plaintext: created });
+      return true;
+    } catch {
+      setTokenError("SuperPlane could not create the Fleet Manager personal token. Try again.");
+      return false;
+    }
+  }, [createToken, organizationId, plaintext]);
+
+  return {
+    plaintext,
+    tokenError,
+    isPreparingInstallation: createToken.isPending,
+    prepareInstallation,
+  };
+}
+
+export function useFleetManagerSetup(enabled = true, organizationId = "") {
+  const { metadata, draft, loadError, updateDraft } = useFleetManagerDraft(enabled);
+  const token = useFleetManagerToken(organizationId);
+
   const setProvider = useCallback(
-    (provider: FleetManagerProvider) => {
-      const providerDefaults = normalizeInfrastructureFields(metadata?.infrastructureDefaults.fields ?? {});
-      delete providerDefaults.superplaneUrl;
-      updateDraft((current) => ({
-        ...current,
-        provider,
-        fields: metadata?.infrastructureDefaults.provider === provider ? providerDefaults : {},
-      }));
-    },
+    (provider: FleetManagerProvider) => updateDraft((current) => draftForProvider(current, provider, metadata)),
     [metadata, updateDraft],
   );
 
@@ -123,10 +234,13 @@ export function useFleetManagerSetup(enabled = true) {
   );
 
   const values = useMemo(
-    () => (metadata && draft ? generateFleetManagerValues({ metadata, ...draft }) : ""),
-    [draft, metadata],
+    () =>
+      metadata && draft && token.plaintext
+        ? generateFleetManagerValues({ metadata, ...draft, installationAdminToken: token.plaintext })
+        : "",
+    [draft, metadata, token.plaintext],
   );
-  const fleetErrors = draft ? validateFleetSelection(draft) : [];
+  const fleetErrors = fleetSelectionErrors(draft, metadata);
   const infrastructureErrors = draft ? validateFleetInfrastructure(draft) : [];
   const validationErrors = [...fleetErrors, ...infrastructureErrors];
   const importedFieldKeys = useMemo(() => {
@@ -140,10 +254,14 @@ export function useFleetManagerSetup(enabled = true) {
     draft,
     loadError,
     values,
+    tokenError: token.tokenError,
+    isPreparingInstallation: token.isPreparingInstallation,
     validationErrors,
     fleetErrors,
     infrastructureErrors,
     importedFieldKeys,
+    prepareInstallation: token.prepareInstallation,
+    hasFleetImage: (architecture: "amd64" | "arm64") => Boolean(draft && fleetImage(draft.fields, architecture)),
     setProvider,
     toggleFleet,
     setFleetCapacity,
@@ -152,7 +270,6 @@ export function useFleetManagerSetup(enabled = true) {
     setNamespace: (value: string) => updateDraft((current) => ({ ...current, namespace: value })),
     setServiceAccountName: (value: string) => updateDraft((current) => ({ ...current, serviceAccountName: value })),
     setSuperplaneUrl: (value: string) => updateDraft((current) => ({ ...current, superplaneUrl: value })),
-    setRunnerVersion: (value: string) => updateDraft((current) => ({ ...current, runnerVersion: value })),
   };
 }
 

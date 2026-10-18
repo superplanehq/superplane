@@ -1424,6 +1424,7 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun, columnApps: SplitRunColum
     runId: entry.run.id,
     costCents: entry.costCents,
     totalTokens: entry.totalTokens,
+    model: joinRunnerModels(entry.models ?? []) || undefined,
     columnKey: consoleColumnForAppKey(columnAppForCanvas(columnApps, entry.canvasId)?.columnKey),
     pullRequestActivity: {
       pullRequest: prFeedbackAttachedPullRequest(entry),

@@ -195,32 +195,40 @@ after_pipeline:
 promotions:
   - name: Prepare Runner Release
     pipeline_file: prepare-runner-release.yml
+    deployment_target: release
     parameters:
       env_vars:
         - name: RELEASE_VERSION
           required: true
-          default_value: RELEASE_VERSION_REQUIRED
-          description: Runner version in vMAJOR.MINOR.PATCH format
+          default_value: vX.Y.Z
+          description: Runner version in vMAJOR.MINOR.PATCH[-PRERELEASE] format
 
   - name: Prepare Fleet Manager Release
     pipeline_file: prepare-fleet-manager-release.yml
+    deployment_target: release
     parameters:
       env_vars:
         - name: RELEASE_VERSION
           required: true
-          default_value: RELEASE_VERSION_REQUIRED
-          description: Fleet Manager version in vMAJOR.MINOR.PATCH format
+          default_value: vX.Y.Z
+          description: Fleet Manager version in vMAJOR.MINOR.PATCH[-PRERELEASE] format
+
+  - name: Prepare SuperPlane Release
+    pipeline_file: prepare-superplane-release.yml
+    deployment_target: release
+    parameters:
+      env_vars:
+        - name: RELEASE_VERSION
+          required: true
+          default_value: vX.Y.Z
+          description: SuperPlane version in vMAJOR.MINOR.PATCH[-PRERELEASE] format
 
   - name: Publish Fleet Manager Image
     pipeline_file: release-fleet-manager-image.yml
     deployment_target: ghcr
 
-  - name: Publish Helm Chart
-    pipeline_file: release-helm-chart.yml
-    deployment_target: ghcr
-
-  - name: Deploy to Production
-    pipeline_file: deploy-to-production.yml
+  - name: Promote
+    pipeline_file: promote.yml
     deployment_target: production
     auto_promote:
       when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"

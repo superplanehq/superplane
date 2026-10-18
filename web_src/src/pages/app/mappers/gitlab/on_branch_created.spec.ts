@@ -1,43 +1,18 @@
 import { describe, expect, it } from "bun:test";
+import { createGitLabTriggerBuilders } from "./test_support";
 
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
-import type { NodeInfo, TriggerEventContext, TriggerRendererContext, ComponentDefinition, EventInfo } from "../types";
+import type { TriggerEventContext, TriggerRendererContext } from "../types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "On Branch Created",
-    componentName: "gitlab.onBranchCreated",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildDefinition(overrides?: Partial<ComponentDefinition>): ComponentDefinition {
-  return {
-    name: "onBranchCreated",
-    label: "On Branch Created",
-    description: "",
-    icon: "gitlab",
-    color: "orange",
-    ...overrides,
-  };
-}
-
-function buildEvent(overrides?: Partial<NonNullable<EventInfo>>): EventInfo {
-  return {
-    id: "evt-1",
-    createdAt: new Date().toISOString(),
-    data: {},
-    nodeId: "node-1",
-    type: "gitlab.branchCreated",
-    ...overrides,
-  };
-}
+const { buildNode, buildDefinition, buildEvent } = createGitLabTriggerBuilders({
+  name: "On Branch Created",
+  componentName: "gitlab.onBranchCreated",
+  definitionName: "onBranchCreated",
+  label: "On Branch Created",
+  eventType: "gitlab.branchCreated",
+});
 
 function buildEventData() {
   return {
@@ -82,6 +57,9 @@ describe("onBranchCreatedTriggerRenderer.getRootEventValues", () => {
   it("extracts branch details from event data", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
     const values = onBranchCreatedTriggerRenderer.getRootEventValues(ctx);
+    expect(Object.keys(values)[0]).toBe("Received At");
+    expect(values["Received At"]).toBe(new Date(ctx.event!.createdAt!).toLocaleString());
+    expect(Object.keys(values).length).toBeLessThanOrEqual(6);
     expect(values["Branch"]).toBe("feature/new-feature");
     expect(values["Project"]).toBe("jsmith/example");
     expect(values["Author"]).toBe("John Smith");
@@ -95,18 +73,6 @@ describe("onBranchCreatedTriggerRenderer.getRootEventValues", () => {
     const values = onBranchCreatedTriggerRenderer.getRootEventValues(ctx);
     expect(values["Branch"]).toBe("fix#42");
     expect(values["Branch URL"]).toBe("https://gitlab.example.com/jsmith/example/-/tree/fix%2342");
-  });
-
-  it("includes received at as the first value", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    const values = onBranchCreatedTriggerRenderer.getRootEventValues(ctx);
-    expect(Object.keys(values)[0]).toBe("Received At");
-    expect(values["Received At"]).not.toBe("-");
-  });
-
-  it("returns at most 6 values", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    expect(Object.keys(onBranchCreatedTriggerRenderer.getRootEventValues(ctx)).length).toBeLessThanOrEqual(6);
   });
 
   it("returns placeholders when event data is missing", () => {

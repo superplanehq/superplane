@@ -11,47 +11,28 @@ export type PhaseAgentUsageEntry = {
   telemetry: AgentRunTelemetry;
 };
 
-type NodeUsageReport = {
-  entries: PhaseAgentUsageEntry[];
-  loading: boolean;
-};
-
 type PhaseAgentUsageContextValue = {
-  report: (nodeId: string, entries: PhaseAgentUsageEntry[], loading?: boolean) => void;
+  report: (nodeId: string, entries: PhaseAgentUsageEntry[]) => void;
   agents: PhaseAgentUsageEntry[];
-  isLoading: boolean;
 };
 
 const PhaseAgentUsageContext = createContext<PhaseAgentUsageContextValue>({
   report: () => undefined,
   agents: [],
-  isLoading: false,
 });
 
-export function PhaseAgentUsageProvider({
-  children,
-  streamLoading = false,
-  expectUsage = false,
-}: {
-  children: ReactNode;
-  streamLoading?: boolean;
-  expectUsage?: boolean;
-}) {
-  const [byNode, setByNode] = useState<Record<string, NodeUsageReport>>({});
-  const report = useCallback((nodeId: string, entries: PhaseAgentUsageEntry[], loading = false) => {
+export function PhaseAgentUsageProvider({ children }: { children: ReactNode }) {
+  const [byNode, setByNode] = useState<Record<string, PhaseAgentUsageEntry[]>>({});
+  const report = useCallback((nodeId: string, entries: PhaseAgentUsageEntry[]) => {
     setByNode((prev) => {
-      const current = prev[nodeId];
-      if (current && current.loading === loading && sameUsageEntries(current.entries, entries)) {
+      if (sameUsageEntries(prev[nodeId], entries)) {
         return prev;
       }
-      return { ...prev, [nodeId]: { entries, loading } };
+      return { ...prev, [nodeId]: entries };
     });
   }, []);
-  const agents = useMemo(() => Object.values(byNode).flatMap((node) => node.entries), [byNode]);
-  const nodeLoading = Object.values(byNode).some((node) => node.loading);
-  const hasReport = Object.keys(byNode).length > 0;
-  const isLoading = streamLoading || nodeLoading || (expectUsage && !hasReport);
-  const value = useMemo(() => ({ report, agents, isLoading }), [report, agents, isLoading]);
+  const agents = useMemo(() => Object.values(byNode).flat(), [byNode]);
+  const value = useMemo(() => ({ report, agents }), [report, agents]);
 
   return <PhaseAgentUsageContext.Provider value={value}>{children}</PhaseAgentUsageContext.Provider>;
 }
@@ -60,27 +41,16 @@ export function usePhaseAgentUsageAgents(): PhaseAgentUsageEntry[] {
   return useContext(PhaseAgentUsageContext).agents;
 }
 
-export function usePhaseAgentUsageLoading(): boolean {
-  return useContext(PhaseAgentUsageContext).isLoading;
-}
-
-export function useReportPhaseAgentUsage(nodeId: string, name: string, telemetry: AgentRunTelemetry, enabled: boolean) {
-  const series = useMemo(() => [{ name, telemetry }], [name, telemetry]);
-  useReportPhaseAgentUsageSeries({ nodeId, fallbackName: name, series, enabled });
-}
-
 export function useReportPhaseAgentUsageSeries({
   nodeId,
   fallbackName,
   series,
   enabled,
-  loading = false,
 }: {
   nodeId: string;
   fallbackName: string;
   series: AgentPromptUsageSeries[];
   enabled: boolean;
-  loading?: boolean;
 }) {
   const { report } = useContext(PhaseAgentUsageContext);
   useEffect(() => {
@@ -88,7 +58,7 @@ export function useReportPhaseAgentUsageSeries({
       return;
     }
     if (series.length === 0) {
-      report(nodeId, loading ? [] : [{ nodeId, name: fallbackName, telemetry: EMPTY_TELEMETRY }], loading);
+      report(nodeId, [{ nodeId, name: fallbackName, telemetry: EMPTY_TELEMETRY }]);
       return;
     }
     report(
@@ -98,9 +68,8 @@ export function useReportPhaseAgentUsageSeries({
         name: item.name || fallbackName,
         telemetry: item.telemetry,
       })),
-      loading,
     );
-  }, [enabled, fallbackName, loading, nodeId, report, series]);
+  }, [enabled, fallbackName, nodeId, report, series]);
 }
 
 function sameUsageEntries(current: PhaseAgentUsageEntry[] | undefined, next: PhaseAgentUsageEntry[]): boolean {

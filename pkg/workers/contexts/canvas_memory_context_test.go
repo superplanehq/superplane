@@ -7,9 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-	"gorm.io/datatypes"
 )
 
 func Test__CanvasMemoryContext(t *testing.T) {
@@ -116,19 +114,4 @@ func Test__CanvasMemoryContext__RejectsBlankNamespace(t *testing.T) {
 	_, err = ctx.UpdateNamespaceRecords(" ", map[string]any{"status": "running"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "namespace is required")
-}
-
-func Test__CanvasMemoryContext__RecordConversionHelpers(t *testing.T) {
-	id := uuid.New()
-	record := models.CanvasMemory{
-		ID:     id,
-		Values: datatypes.NewJSONType[any](map[string]any{"service": "api"}),
-	}
-
-	converted := canvasMemoryRecord(record)
-	assert.Equal(t, id, converted.ID)
-	assert.Equal(t, map[string]any{"service": "api"}, converted.Values)
-
-	records := canvasMemoryRecords([]models.CanvasMemory{record})
-	assert.Equal(t, []any{map[string]any{"service": "api"}}, canvasMemoryRecordValues(records))
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { buildComponentCtx, buildDetailsCtx, buildOutput } from "./common";
+import { buildComponentCtx, buildDetailsCtx, buildOutput } from "./test-support";
 import { getRuleGroupNamespaceMapper } from "./get_rule_group_namespace";
 
 describe("getRuleGroupNamespaceMapper.props", () => {

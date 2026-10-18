@@ -62,6 +62,8 @@ describe("OrganizationDetail pin control", () => {
           task_count: 4,
           done_task_count: 6,
           member_count: 3,
+          workspace_count: 7,
+          repository_count: 8,
           pinned: false,
         });
       }
@@ -232,6 +234,8 @@ function organizationDetail(id: string, pinned: boolean) {
     task_count: 4,
     done_task_count: 6,
     member_count: 3,
+    workspace_count: 7,
+    repository_count: 8,
     pinned,
   };
 }

@@ -125,13 +125,13 @@ variable "superplane_namespace" {
 }
 
 variable "superplane_image_tag" {
-  description = "SuperPlane image tag. Empty uses the chart's <git-sha>-selfhosted image. The plain <git-sha> and stable images load UI files from the hosted CDN and fail CORS on a customer domain. A local build can use a local- tag."
+  description = "SuperPlane image tag override. Empty uses the chart appVersion. Versioned, legacy selfhosted, and local tags are supported."
   type        = string
   default     = ""
 
   validation {
-    condition     = var.superplane_image_tag == "" || strcontains(var.superplane_image_tag, "selfhosted") || startswith(var.superplane_image_tag, "local-")
-    error_message = "Set superplane_image_tag to a tag that contains selfhosted, for example <git-sha>-selfhosted, or leave it empty. A local image can use a local- tag."
+    condition     = var.superplane_image_tag == "" || can(regex("^v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$", var.superplane_image_tag)) || strcontains(var.superplane_image_tag, "selfhosted") || startswith(var.superplane_image_tag, "local-")
+    error_message = "Use a vMAJOR.MINOR.PATCH release tag, a legacy selfhosted tag, a local- tag, or leave the value empty."
   }
 }
 
@@ -165,13 +165,21 @@ variable "helm_chart_path" {
   default     = ""
 }
 
-# This chart does not include templates/_security.tpl.
-# podSecurityContext and securityContext values have no effect until
-# maintainers publish a chart from the merge that adds those templates.
 variable "superplane_chart_version" {
-  description = "Published SuperPlane Helm chart version with a matching self-hosted image. Ignored when helm_chart_path is set."
+  description = "Published SuperPlane Helm chart version with a matching versioned image. Ignored when helm_chart_path is set."
   type        = string
-  default     = "0.0.0-77688495d9ae8bdb1dcb3252998b5850bc032b69"
+  default     = "1.0.0-rc1"
+}
+
+variable "fleet_manager_version" {
+  description = "Fleet Manager release the owner-setup wizard installs. Use v0.1.3 or later with this chart. The Fleet Manager binary syncs fleets."
+  type        = string
+  default     = "v0.1.3"
+
+  validation {
+    condition     = can(regex("^v\\d+\\.\\d+\\.\\d+$", var.fleet_manager_version))
+    error_message = "Set fleet_manager_version to vMAJOR.MINOR.PATCH, for example v0.1.3."
+  }
 }
 
 # Latest stable chart on https://charts.jetstack.io as of 2026-10-14.
@@ -204,6 +212,18 @@ variable "runner_zones" {
   description = "Availability zones that Fleet Manager can use for runner VMs."
   type        = list(string)
   default     = ["1"]
+}
+
+variable "runner_image_amd64" {
+  description = "linux/amd64 image version ID. Use a /CommunityGalleries/... ID published by SuperPlane, or a customer gallery version ID. The image version is independent of the runner version."
+  type        = string
+  default     = "/CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/1.14623.0"
+}
+
+variable "runner_image_arm64" {
+  description = "linux/arm64 image version ID. Use a /CommunityGalleries/... ID published by SuperPlane, or a customer gallery version ID. The image version is independent of the runner version."
+  type        = string
+  default     = "/CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-arm64/Versions/1.14623.0"
 }
 
 # -----------------------------------------------------------------------------

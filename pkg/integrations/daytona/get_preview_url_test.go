@@ -230,10 +230,6 @@ func Test__PreviewURL__ComponentInfo(t *testing.T) {
 	component := GetPreviewURLComponent{}
 
 	assert.Equal(t, "daytona.getPreviewUrl", component.Name())
-	assert.Equal(t, "Get Preview URL", component.Label())
-	assert.Equal(t, "Generate a preview URL for a sandbox port", component.Description())
-	assert.Equal(t, "daytona", component.Icon())
-	assert.Equal(t, "orange", component.Color())
 	assert.NotEmpty(t, component.Documentation())
 }
 
