@@ -488,6 +488,14 @@ func TestUpdateBitbucketDiscussionHandlerRefreshesRunnerCheckout(t *testing.T) {
 				step["command"] = "echo stale-push"
 			}
 		}
+		// New templates omit the checkout step. Old canvases still have it,
+		// and a settings save refreshes that saved command.
+		if !stale {
+			steps = append([]any{
+				map[string]any{"name": "Checkout Pull Request", "type": "bash", "command": "echo stale-checkout"},
+			}, steps...)
+			stale = true
+		}
 		nodes[i].Configuration["steps"] = steps
 	}
 	require.True(t, stale, "runner checkout step not found")

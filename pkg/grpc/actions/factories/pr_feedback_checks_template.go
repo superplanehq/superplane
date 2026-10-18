@@ -243,29 +243,12 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 }
 
 func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
-	steps := []any{
-		map[string]any{
-			"name": "Set Up Git User",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"git config --global user.email \"" + runner.FactoryAgentEmail + "\"",
-				"git config --global user.name \"" + runner.FactoryAgentName + "\"",
-			}, "\n"),
-		},
+	steps := []any{}
+	if !request.OmitCommitIdentity {
+		steps = append(steps, prFeedbackCommitIdentitySteps()...)
 	}
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return append(steps,
-			map[string]any{
-				"name":    "Checkout Pull Request",
-				"type":    "bash",
-				"command": bitbucketCheckoutCommand(),
-			},
-			map[string]any{
-				"name":             "Set Up DCO Signing",
-				"type":             "bash",
-				"workingDirectory": "repo",
-				"command":          runner.FactoryRepoCommitSetup(),
-			},
 			map[string]any{
 				"name":             "Fix Failed Builds",
 				"type":             "prompt",
@@ -276,31 +259,6 @@ func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
 		)
 	}
 	return append(steps,
-		map[string]any{
-			"name": "Checkout Pull Request",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"set -euo pipefail",
-				"gh auth setup-git --hostname github.com --force",
-				`git clone --depth 1 "https://github.com/${REPO}.git" repo`,
-				"cd repo",
-				`if [ -z "${PR_HEAD:-}" ]; then`,
-				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)`,
-				"fi",
-				`if [ -z "${PR_HEAD}" ] || [ "${PR_HEAD}" = "null" ]; then`,
-				`  echo "Could not resolve the pull request head branch." >&2`,
-				"  exit 1",
-				"fi",
-				`git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`,
-				`git checkout "${PR_HEAD}"`,
-			}, "\n"),
-		},
-		map[string]any{
-			"name":             "Set Up DCO Signing",
-			"type":             "bash",
-			"workingDirectory": "repo",
-			"command":          runner.FactoryRepoCommitSetup(),
-		},
 		map[string]any{
 			"name":             "Fix Failed Checks",
 			"type":             "prompt",
