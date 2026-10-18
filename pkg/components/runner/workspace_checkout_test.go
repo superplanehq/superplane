@@ -510,7 +510,7 @@ func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
 		Content: "{\"commands\":[\"npm ci\",\"echo ready\"]}\n",
 	}}
 	out := runner.InsertFactoryCheckoutCommand(commands, steps, files)
-	require.Len(t, out, 5)
+	require.Len(t, out, 4)
 	assert.Equal(t, "Auth", out[0].Name)
 	assert.Equal(t, "Checkout", out[1].Name)
 	assert.Equal(t, runner.LiveLogKindBash, out[1].Kind)
@@ -518,12 +518,10 @@ func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
 	assert.Equal(t, runner.LiveLogText("Checkout"), out[1].Preview)
 	assert.Equal(t, "Setup", out[2].Name)
 	assert.Equal(t, runner.LiveLogKindBash, out[2].Kind)
-	assert.Equal(t, "npm ci", out[2].Preview)
+	assert.Equal(t, "npm ci\necho ready", out[2].Preview)
 	assert.Contains(t, out[2].Command, `cd "$_sp_root"/'repo' || exit 1`)
-	assert.Contains(t, out[2].Command, "npm ci")
-	assert.Equal(t, "Setup", out[3].Name)
-	assert.Equal(t, "echo ready", out[3].Preview)
-	assert.Equal(t, "Prompt", out[4].Name)
+	assert.Contains(t, out[2].Command, "set -e\nnpm ci\necho ready")
+	assert.Equal(t, "Prompt", out[3].Name)
 }
 
 func TestInsertFactoryCheckoutCommandSkipsExistingClone(t *testing.T) {
@@ -563,7 +561,7 @@ func TestApplyFactoryCheckoutMarksInstructionsDone(t *testing.T) {
 	require.Len(t, out, 2)
 	assert.Equal(t, "Checkout", out[0].Name)
 	assert.Contains(t, files[0].Content, "Setup commands already ran in repo/ after checkout, in order: npm ci")
-	assert.Contains(t, files[0].Content, "Context repositories are already checked out: acme/extra")
+	assert.Contains(t, files[0].Content, "Context repositories are already checked out next to repo/. From repo/, read: acme/extra (../context/acme/extra)")
 	assert.NotContains(t, files[0].Content, "run `checkout`")
 }
 
@@ -573,7 +571,7 @@ func checkoutHintFiles() []runner.BrokerTaskFile {
 			Path: "prompts/implement.txt",
 			Content: "Implement.\nYou can use these resources." +
 				"\nSetup commands (run in repo/ after clone, in order): npm ci" +
-				"\nCheckout: run `checkout` to check out repo/ and context repositories. Extra repositories (already checked out when the automation runs it): acme/extra (context/acme/extra)\n",
+				"\nCheckout: run `checkout` to check out repo/ and the context repositories. From repo/, read: acme/extra (../context/acme/extra)\n",
 		},
 		{Path: runner.WorkspaceCheckoutScriptPath, Content: "#!/bin/bash\n"},
 	}

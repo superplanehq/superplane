@@ -671,8 +671,8 @@ func taskShipsCheckout(files []BrokerTaskFile) bool {
 const (
 	setupHintPending   = "\nSetup commands (run in repo/ after clone, in order): "
 	setupHintDone      = "\nSetup commands already ran in repo/ after checkout, in order: "
-	contextHintPending = "\nCheckout: run `checkout` to check out repo/ and context repositories. Extra repositories (already checked out when the automation runs it): "
-	contextHintDone    = "\nContext repositories are already checked out: "
+	contextHintPending = "\nCheckout: run `checkout` to check out repo/ and the context repositories. From repo/, read: "
+	contextHintDone    = "\nContext repositories are already checked out next to repo/. From repo/, read: "
 )
 
 // ApplyFactoryCheckout inserts the checkout command after setup and before
@@ -688,10 +688,10 @@ func ApplyFactoryCheckout(files []BrokerTaskFile, commands []BrokerCommand, step
 }
 
 // InsertFactoryCheckoutCommand inserts checkout before the first canvas
-// step, then one bash step per workspace setup command. Both are regular
-// commands so the task log shows them apart. Steps that already run git
-// clone, or the checkout helper, are left unchanged so saved automations
-// keep their own clone and run setup themselves.
+// step, then one Setup step for every workspace setup command. Both are
+// regular commands so the task log shows them apart. Steps that already
+// run git clone, or the checkout helper, are left unchanged so saved
+// automations keep their own clone and run setup themselves.
 func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, files []BrokerTaskFile) []BrokerCommand {
 	if stepsAlreadyCheckout(steps) {
 		return commands
@@ -717,15 +717,22 @@ func factoryCheckoutCommands(files []BrokerTaskFile) []BrokerCommand {
 		Kind:    LiveLogKindBash,
 		Preview: LiveLogText("Checkout"),
 	}}
-	for _, command := range setupCommandsFromFiles(files) {
+	if setup := setupCommandScript(setupCommandsFromFiles(files)); setup != "" {
 		commands = append(commands, BrokerCommand{
 			Name:    "Setup",
-			Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory("repo", command)),
+			Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory("repo", "set -e\n"+setup)),
 			Kind:    LiveLogKindBash,
-			Preview: LiveLogText(command),
+			Preview: LiveLogText(setup),
 		})
 	}
 	return commands
+}
+
+func setupCommandScript(commands []string) string {
+	if len(commands) == 0 {
+		return ""
+	}
+	return strings.Join(commands, "\n")
 }
 
 func setupCommandsFromFiles(files []BrokerTaskFile) []string {
@@ -1020,7 +1027,7 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 			if repository == "" {
 				repository = contextRepos[i].Name
 			}
-			names = append(names, repository+" ("+WorkspaceContextRepoDirectory(repository)+")")
+			names = append(names, repository+" (../"+WorkspaceContextRepoDirectory(repository)+")")
 		}
 		builder.WriteString(contextHintPending)
 		builder.WriteString(strings.Join(names, ", "))

@@ -670,7 +670,7 @@ func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
 	assert.Equal(t, "https://github.com/superplanehq/suss.git", contextFile.Repositories[0].URL)
 	assert.Equal(t, "context/superplanehq/suss", contextFile.Repositories[0].Directory)
 	assert.Contains(t, paths["prompts/implement.txt"], "Setup commands")
-	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss")
+	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss (../context/superplanehq/suss)")
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsSetupAndContextWhenFlagOff(t *testing.T) {
