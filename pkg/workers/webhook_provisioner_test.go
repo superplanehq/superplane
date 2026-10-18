@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -128,6 +129,7 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 		AppInstallationID: &integration.ID,
 		RetryCount:        3,
 		MaxRetries:        3,
+		Metadata:          datatypes.NewJSONType[any](map[string]any{"webhookId": "wh-123"}),
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
@@ -138,6 +140,10 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.WebhookStateFailed, updatedWebhook.State)
 	assert.Equal(t, 3, updatedWebhook.RetryCount)
+	metadata, ok := updatedWebhook.Metadata.Data().(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "wh-123", metadata["webhookId"])
+	assert.Contains(t, metadata["setupError"], "oops")
 }
 
 func Test__WebhookProvisioner_PersistsIntegrationMetadataWrittenBySetup(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -466,6 +467,37 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.Len(t, response.GetIntakes(), 1)
 		assert.False(t, response.GetIntakes()[0].GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_INTEGRATION_NOT_READY, response.GetIntakes()[0].GetHealth())
+	})
+
+	t.Run("a failed GitHub webhook reports the repository hook limit", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		attachFailedGitHubWebhook(t, uuid.MustParse(intake.GetCanvasId()), `The "issues" event cannot have more than 20 hooks`)
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.False(t, response.GetIntakes()[0].GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_FAILED, response.GetIntakes()[0].GetHealth())
+		assert.Contains(t, response.GetIntakes()[0].GetHealthMessage(), "20 webhooks")
+	})
+
+	t.Run("saving intake settings retries a failed GitHub webhook", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		webhookID := attachFailedGitHubWebhook(t, uuid.MustParse(intake.GetCanvasId()), "cannot have more than 20 hooks")
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings:  intake.GetSettings(),
+		})
+		require.NoError(t, err)
+
+		webhook, err := models.FindWebhookInTransaction(database.DB(t.Context()), webhookID)
+		require.NoError(t, err)
+		assert.Equal(t, models.WebhookStatePending, webhook.State)
+		assert.Equal(t, 0, webhook.RetryCount)
 	})
 
 	t.Run("an unbound GitHub intake stays healthy when listed", func(t *testing.T) {
@@ -1545,6 +1577,26 @@ func nodeErrorMessage(node models.Node) string {
 		return ""
 	}
 	return *node.ErrorMessage
+}
+
+func attachFailedGitHubWebhook(t *testing.T, canvasID uuid.UUID, reason string) uuid.UUID {
+	t.Helper()
+
+	node, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, intakeTriggerNodeID)
+	require.NoError(t, err)
+
+	now := time.Now()
+	webhook := models.Webhook{
+		ID:        uuid.New(),
+		State:     models.WebhookStatePending,
+		Secret:    []byte("secret"),
+		CreatedAt: &now,
+		UpdatedAt: &now,
+	}
+	require.NoError(t, database.DB(t.Context()).Create(&webhook).Error)
+	require.NoError(t, webhook.Fail(database.DB(t.Context()), reason))
+	require.NoError(t, database.DB(t.Context()).Model(node).Update("webhook_id", webhook.ID).Error)
+	return webhook.ID
 }
 
 func liveIntakeNodes(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryIntake) []models.Node {
