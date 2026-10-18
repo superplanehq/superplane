@@ -946,7 +946,8 @@ On a match, emits `pullRequest.found` with the pull request and its task on the 
       "origin": {
         "label": "acme/app#42",
         "url": "https://github.com/acme/app/issues/42"
-      }
+      },
+      "url": "https://app.superplane.com/3ee1aa47-3a60-4c1f-b645-0b9859ab91f8/workspaces/sp-k7m2xqab/work-order/123"
     }
   },
   "timestamp": "2026-01-01T00:00:00Z",
@@ -1800,7 +1801,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
-SuperPlane keeps the selected OpenRouter model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. After 4 failed attempts, the prompt step fails. The live log shows each wait and retry.
+SuperPlane keeps the selected OpenRouter model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. Every 2 successful model calls set the attempt count back to 1. After 4 failed attempts without that reset, the prompt step fails. The live log shows each wait and retry.
 
 Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
@@ -1907,7 +1908,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
-When this agent uses OpenRouter, SuperPlane keeps the selected model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. After 4 failed attempts, the prompt step fails. The live log shows each wait and retry.
+When this agent uses OpenRouter, SuperPlane keeps the selected model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. Every 2 successful model calls set the attempt count back to 1. After 4 failed attempts without that reset, the prompt step fails. The live log shows each wait and retry.
 
 ### Output
 Prompt steps stream agent activity to **View logs**. The finished event includes the latest agent result.

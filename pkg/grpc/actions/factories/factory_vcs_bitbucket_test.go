@@ -245,6 +245,97 @@ func TestCreateBitbucketChecksHandlerWaitsForBuilds(t *testing.T) {
 	assert.True(t, foundWait)
 }
 
+func TestUpdateBitbucketChecksHandlerWritesCheckTitles(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	deps := IntakeDependencies{
+		Registry:       r.Registry,
+		Encryptor:      r.Encryptor,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "http://localhost:8000",
+	}
+
+	factory := bitbucketFactory(t, r)
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
+	appRepo := "acme/widgets"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider:      &provider,
+		VCSIntegrationID: &integrationID,
+		AppRepository:    &appRepo,
+	}))
+
+	created, err := CreateFactoryPRFeedbackHandler(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryPRFeedbackHandlerRequest{
+		FactoryId: factory.ID.String(),
+		Source:    pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS,
+		Settings: &pb.FactoryPRFeedbackHandler_Settings{
+			Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
+				Names: []string{"build-a"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(created.GetHandler().GetCanvasId()))
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	nodes := append([]models.Node(nil), version.Nodes...)
+	seeded := 0
+	for i := range nodes {
+		switch nodes[i].ID {
+		case prFeedbackActivityNodeID, prFeedbackMarkPassedNodeID, prFeedbackStartRepairNodeID:
+			if nodes[i].Configuration == nil {
+				nodes[i].Configuration = map[string]any{}
+			}
+			nodes[i].Configuration["title"] = "Waiting for builds on old"
+			if nodes[i].ID == prFeedbackStartRepairNodeID {
+				nodes[i].Configuration["description"] = "Failed builds\n· pipeline"
+			}
+			seeded++
+		}
+	}
+	require.Equal(t, 3, seeded)
+	require.NoError(t, db.Model(version).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+
+	_, err = UpdateFactoryPRFeedbackHandler(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryPRFeedbackHandlerRequest{
+		FactoryId: factory.ID.String(),
+		HandlerId: created.GetHandler().GetId(),
+		Settings: &pb.FactoryPRFeedbackHandler_Settings{
+			Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+				Repository: appRepo,
+			},
+			Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
+				Names: []string{"build-a", "build-b"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+	updated, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
+	require.NoError(t, err)
+	found := 0
+	for _, node := range updated.Nodes {
+		switch node.ID {
+		case prFeedbackActivityNodeID:
+			found++
+			assert.Equal(t, prFeedbackChecksWaitingTitleExpressionFor(models.ProviderBitbucket), node.Configuration["title"])
+		case prFeedbackMarkPassedNodeID:
+			found++
+			assert.Equal(t, prFeedbackChecksPassedTitleExpressionFor(models.ProviderBitbucket), node.Configuration["title"])
+			assert.Equal(t, prFeedbackChecksPassedDescriptionExpressionFor(models.ProviderBitbucket), node.Configuration["description"])
+		case prFeedbackStartRepairNodeID:
+			found++
+			assert.Equal(t, prFeedbackChecksRepairTitleExpressionFor(models.ProviderBitbucket), node.Configuration["title"])
+			assert.Equal(t, prFeedbackChecksRepairDescriptionExpressionFor(models.ProviderBitbucket), node.Configuration["description"])
+		}
+	}
+	assert.Equal(t, 3, found)
+}
+
 func TestCreateBitbucketDiscussionHandlerListensForComments(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

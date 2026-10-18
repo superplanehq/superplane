@@ -3,7 +3,9 @@ package cli
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -146,26 +148,96 @@ func buildUpdateNotice(currentVersion string, release *releaseInfo, goos, goarch
 // isNewerVersion returns true if latest is a newer semver than current.
 // Both may optionally have a "v" prefix.
 func isNewerVersion(current, latest string) bool {
-	current = strings.TrimPrefix(current, "v")
-	latest = strings.TrimPrefix(latest, "v")
-
-	if current == latest {
+	currentVersion, currentOK := parseSemanticVersion(current)
+	latestVersion, latestOK := parseSemanticVersion(latest)
+	if !currentOK || !latestOK {
 		return false
 	}
 
-	var cMajor, cMinor, cPatch int
-	var lMajor, lMinor, lPatch int
+	for index := range latestVersion.numbers {
+		if latestVersion.numbers[index] != currentVersion.numbers[index] {
+			return latestVersion.numbers[index] > currentVersion.numbers[index]
+		}
+	}
+	return comparePrerelease(latestVersion.prerelease, currentVersion.prerelease) > 0
+}
 
-	fmt.Sscanf(current, "%d.%d.%d", &cMajor, &cMinor, &cPatch)
-	fmt.Sscanf(latest, "%d.%d.%d", &lMajor, &lMinor, &lPatch)
+type semanticVersion struct {
+	numbers    [3]int
+	prerelease []string
+}
 
-	if lMajor != cMajor {
-		return lMajor > cMajor
+var semanticVersionPattern = regexp.MustCompile(`^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$`)
+
+func parseSemanticVersion(value string) (semanticVersion, bool) {
+	match := semanticVersionPattern.FindStringSubmatch(value)
+	if match == nil {
+		return semanticVersion{}, false
 	}
 
-	if lMinor != cMinor {
-		return lMinor > cMinor
+	version := semanticVersion{}
+	for index := range version.numbers {
+		number, err := strconv.Atoi(match[index+1])
+		if err != nil {
+			return semanticVersion{}, false
+		}
+		version.numbers[index] = number
+	}
+	if match[4] != "" {
+		version.prerelease = strings.Split(match[4], ".")
+	}
+	return version, true
+}
+
+func comparePrerelease(left, right []string) int {
+	if len(left) == 0 && len(right) == 0 {
+		return 0
+	}
+	if len(left) == 0 {
+		return 1
+	}
+	if len(right) == 0 {
+		return -1
 	}
 
-	return lPatch > cPatch
+	for index := 0; index < min(len(left), len(right)); index++ {
+		comparison := comparePrereleaseIdentifier(left[index], right[index])
+		if comparison != 0 {
+			return comparison
+		}
+	}
+	return compare(len(left), len(right))
+}
+
+func comparePrereleaseIdentifier(left, right string) int {
+	leftNumber, leftNumeric := numericIdentifier(left)
+	rightNumber, rightNumeric := numericIdentifier(right)
+	if leftNumeric && rightNumeric {
+		return compare(leftNumber, rightNumber)
+	}
+	if leftNumeric {
+		return -1
+	}
+	if rightNumeric {
+		return 1
+	}
+	return strings.Compare(left, right)
+}
+
+func numericIdentifier(value string) (int, bool) {
+	if value == "" || (len(value) > 1 && value[0] == '0') {
+		return 0, false
+	}
+	number, err := strconv.Atoi(value)
+	return number, err == nil
+}
+
+func compare[T ~int](left, right T) int {
+	if left < right {
+		return -1
+	}
+	if left > right {
+		return 1
+	}
+	return 0
 }

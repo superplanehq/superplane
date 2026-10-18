@@ -15,8 +15,13 @@ import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryHomePath, firstFactoryLineId, workOrderBoardLineIdFromSearch } from "../lib/factoryPagePaths";
-import { boardLineIdFromNavigationState, displayedBoardLineId } from "../lib/workOrderNumberResolution";
+import { firstFactoryLineId, workOrderBoardLineIdFromSearch } from "../lib/factoryPagePaths";
+import { factoryHomeColumnPath } from "../lib/boardColumnSearch";
+import {
+  boardColumnKeyFromNavigationState,
+  boardLineIdFromNavigationState,
+  displayedBoardLineId,
+} from "../lib/workOrderNumberResolution";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { formatWorkOrderIdentifier } from "../lib/workspaceKey";
 import { OwnerTimeCostRow } from "../pages/work-order-popup-redesign/popupShared";
@@ -71,11 +76,12 @@ export function MobileTaskDetailPage() {
   const { data: order, isLoading, isError } = useWorkOrder(organizationId, factoryId, orderNumber);
   const taskPending = isLoading && !order;
   const boardLineId = taskBackLineId(search, locationState, factory, order, taskPending);
+  const boardColumnKey = boardColumnKeyFromNavigationState(locationState);
   const backToBoard = () => {
     if (!boardLineId) {
       return;
     }
-    navigate(factoryHomePath(organizationId, routeSegment, boardLineId));
+    navigate(factoryHomeColumnPath(organizationId, routeSegment, boardLineId, boardColumnKey));
   };
 
   usePageTitle([order?.title ?? "Task", factory?.name ?? "Workspace"]);

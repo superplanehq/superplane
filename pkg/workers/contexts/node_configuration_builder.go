@@ -1121,7 +1121,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
 	}
 	if usesURL {
-		payload["url"] = uiBaseURL() + order.URLPath(owningFactory.RouteSegment())
+		payload["url"] = workOrderPermalink(order, owningFactory.RouteSegment())
 	}
 	if usesKey {
 		payload["key"] = owningFactory.WorkOrderKey(order.Number)
@@ -1499,6 +1499,10 @@ func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, e
 		b.workflowID.String(),
 		run.ID.String(),
 	), nil
+}
+
+func workOrderPermalink(order *models.FactoryWorkOrder, routeSegment string) string {
+	return uiBaseURL() + order.URLPath(routeSegment)
 }
 
 // uiBaseURL mirrors the server's base URL resolution so app()/run() URLs

@@ -52,6 +52,7 @@ function createDisabledActivityStream() {
 }
 const MAX_ATTEMPTS = 4;
 const RETRY_WAIT_MS = [30_000, 45_000, 60_000];
+const SUCCESSFUL_ROUNDTRIPS_TO_RESET = 2;
 
 function loadAnalysisProtocolModule() {
   const candidates = [
@@ -378,6 +379,17 @@ function stoppedAfterAttemptsLine(kind, model) {
   return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Stopped after ${MAX_ATTEMPTS} attempts.`;
 }
 
+function retryResetLine() {
+  return "Successful model calls reset the retry count to 1.";
+}
+
+function isSuccessfulRoundtrip(part) {
+  const reason = String((part && part.reason) || "")
+    .trim()
+    .toLowerCase();
+  return reason !== "error";
+}
+
 function waitExceededTimeoutLine(kind) {
   return `${errorKindLabel(kind)} wait exceeded the execution timeout`;
 }
@@ -480,7 +492,7 @@ function buildOpenCodeConfig({
         },
         options: {
           provider: {
-            allow_fallbacks: false,
+            allow_fallbacks: true,
             sort: "throughput",
           },
         },
@@ -788,6 +800,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let exitCode = 0;
   let lastErrorText = "";
   let attempt = 1;
+  let pendingSuccessfulRoundtrips = 0;
 
   while (true) {
     printLiveLogLine(callingOpenCodeLine(currentModel, attempt, env));
@@ -823,6 +836,13 @@ async function runPrompt(promptFile, model, helpers = {}) {
     }
     lastErrorText = spawnResult.errorText || "";
     const spawnFailed = spawnTurnFailed(spawnResult, formatter, planning);
+    pendingSuccessfulRoundtrips += Number(spawnResult.successfulRoundtrips) || 0;
+    const resetHappened =
+      pendingSuccessfulRoundtrips >= SUCCESSFUL_ROUNDTRIPS_TO_RESET;
+    if (resetHappened) {
+      attempt = 1;
+      pendingSuccessfulRoundtrips %= SUCCESSFUL_ROUNDTRIPS_TO_RESET;
+    }
     if (!spawnFailed) {
       failed = false;
       exitCode = 0;
@@ -857,13 +877,19 @@ async function runPrompt(promptFile, model, helpers = {}) {
       printRetryOutcome(lastErrorText, waitExceededTimeoutLine(classKind));
       break;
     }
-    printRetryOutcome(
-      lastErrorText,
-      retryWaitLine(classKind, currentModel, waitMs, attempt + 1),
+    const nextAttempt = resetHappened ? attempt : attempt + 1;
+    printRetryOutcome(lastErrorText);
+    if (resetHappened) {
+      printLiveLogLine(retryResetLine());
+    }
+    printLiveLogLine(
+      retryWaitLine(classKind, currentModel, waitMs, nextAttempt),
     );
-    activity.notice("retry", `OpenRouter request retry ${attempt + 1}`);
+    activity.notice("retry", `OpenRouter request retry ${nextAttempt}`);
     await sleep(waitMs);
-    attempt += 1;
+    if (!resetHappened) {
+      attempt += 1;
+    }
   }
 
   formatter.flush(failed);
@@ -1063,6 +1089,7 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
     cost: snapshot.cost,
     lastEvent: snapshot.lastEvent,
     roundOpen: Boolean(snapshot.roundOpen),
+    successfulRoundtrips: Number(snapshot.successfulRoundtrips) || 0,
   };
 }
 
@@ -1683,6 +1710,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
   let cost = 0;
   let roundOpen = false;
   let announcedStart = false;
+  let successfulRoundtrips = 0;
 
   function rememberSession(event) {
     const id = String(
@@ -1714,6 +1742,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
       cost = 0;
       roundOpen = false;
       sessionID = "";
+      successfulRoundtrips = 0;
     },
     handleLine(raw) {
       const line = String(raw || "").trim();
@@ -1808,6 +1837,9 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
           } else {
             tracker.mergeCurrentUsage(stepUsage);
           }
+          if (isSuccessfulRoundtrip(part)) {
+            successfulRoundtrips += 1;
+          }
           roundOpen = false;
           break;
         }
@@ -1838,6 +1870,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
         cost,
         lastEvent,
         roundOpen,
+        successfulRoundtrips,
       };
     },
     lastText() {
