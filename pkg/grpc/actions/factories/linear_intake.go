@@ -11,6 +11,7 @@ import (
 
 func defaultLinearIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
+	settings.AuthorsWithAccess = false
 	settings.LinearProjectIDs = []string{}
 	settings.LinearLabels = []string{}
 	return settings

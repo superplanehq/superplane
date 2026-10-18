@@ -202,7 +202,7 @@ function intakeAutomations(intakes: FactoriesFactoryIntake[], workOrders: Factor
         action: source.accept.label,
         iconSrc: source.iconSrc,
         iconAlt: source.iconAlt,
-        health: "healthy",
+        health: intake.health === "HEALTH_WEBHOOK_FAILED" ? "needs-repair" : "healthy",
         runningCount: runningCountForApp(intake.canvasId, workOrders),
         catalogId: source.id,
         canvasId: intake.canvasId?.trim() || undefined,

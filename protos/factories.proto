@@ -1395,6 +1395,8 @@ message FactoryIntake {
   // Live trigger resource, such as a Jira project key.
   string resource_id = 15;
   Health health = 16;
+  // Why the intake cannot receive items. Empty when health is HEALTH_OK.
+  string health_message = 17;
 }
 
 message FactoryIntakeRun {

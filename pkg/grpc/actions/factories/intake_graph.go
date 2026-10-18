@@ -108,8 +108,60 @@ func intakeHealth(
 			return health
 		}
 	}
+	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+		if health, _ := githubIntakeWebhookFailure(tx, intake.CanvasID, graph.TriggerNodeID); health != pb.FactoryIntake_HEALTH_OK {
+			return health
+		}
+	}
 
 	return pb.FactoryIntake_HEALTH_OK
+}
+
+// githubIntakeWebhookFailure reports a GitHub webhook that stopped retrying.
+// A pending webhook stays healthy here: registration is still in progress.
+// A failed webhook is the case the factory must show, because new issues
+// never arrive and waiting does not repair it.
+func githubIntakeWebhookFailure(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) (pb.FactoryIntake_Health, string) {
+	webhook := intakeTriggerWebhook(tx, canvasID, triggerNodeID)
+	if webhook == nil || webhook.State != models.WebhookStateFailed {
+		return pb.FactoryIntake_HEALTH_OK, ""
+	}
+
+	return pb.FactoryIntake_HEALTH_WEBHOOK_FAILED, githubWebhookFailureMessage(webhookSetupError(webhook.Metadata.Data()))
+}
+
+func intakeTriggerWebhook(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) *models.Webhook {
+	if tx == nil || triggerNodeID == "" {
+		return nil
+	}
+
+	node, err := models.FindCanvasNode(tx, canvasID, triggerNodeID)
+	if err != nil || node.WebhookID == nil {
+		return nil
+	}
+
+	webhook, err := models.FindWebhookInTransaction(tx, *node.WebhookID)
+	if err != nil {
+		return nil
+	}
+
+	return webhook
+}
+
+func webhookSetupError(metadata any) string {
+	asMap, ok := metadata.(map[string]any)
+	if !ok || asMap == nil {
+		return ""
+	}
+	reason, _ := asMap["setupError"].(string)
+	return strings.TrimSpace(reason)
+}
+
+func githubWebhookFailureMessage(setupError string) string {
+	if strings.Contains(setupError, "cannot have more than 20 hooks") {
+		return "GitHub did not create the webhook. This repository already has 20 webhooks for issues. Remove unused webhooks in the repository settings, then try again."
+	}
+	return "GitHub did not create the webhook. SuperPlane cannot receive new issues. Try again."
 }
 
 func intakeSourceAllowsRebind(source string) bool {
