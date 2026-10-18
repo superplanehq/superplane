@@ -104,7 +104,8 @@ func configureScheduledIntake(canvas *yaml.Canvas, provider string, params map[s
 			map[string]any{"name": "BASE", "value": params["defaultBranch"], "valueSource": "literal"},
 		}
 		steps := node.Configuration["steps"].([]any)
-		steps[0].(map[string]any)["command"] = "set -euo pipefail\nrm -f /tmp/proposal.json\n" + cloneRepositoryCommand()
+		// Checkout is inserted by the runner. This step only clears a proposal from an earlier run.
+		steps[0].(map[string]any)["command"] = "set -euo pipefail\nrm -f /tmp/proposal.json"
 		steps[1].(map[string]any)["prompt"] = prompt + scheduledIntakeOutputInstructions
 	}
 	return nil
