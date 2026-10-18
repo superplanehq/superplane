@@ -69,20 +69,13 @@ spec:
         steps:
           - name: Checkout Pull Request
             type: bash
+            workingDirectory: repo
             command: |-
               set -euo pipefail
               if [ -z "${PR_REVISION:-}" ]; then
                 echo "The pull request revision is missing." >&2
                 exit 1
               fi
-              gh auth setup-git --hostname github.com --force
-              git clone --depth 1 --branch "${BASE}" "https://github.com/${REPO}.git" repo
-              cd repo
-              if ! git fetch --depth 1 origin "${PR_REVISION}:refs/remotes/origin/pr-revision"; then
-                echo "Could not fetch pull request revision ${PR_REVISION}." >&2
-                exit 1
-              fi
-              git checkout --detach "${PR_REVISION}"
               revision="$(git rev-parse HEAD)"
               if [ "${revision}" != "${PR_REVISION}" ]; then
                 echo "Checked out ${revision}. Expected ${PR_REVISION}." >&2

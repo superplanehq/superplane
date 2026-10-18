@@ -65,27 +65,18 @@ spec:
         steps:
           - name: Checkout Pull Request
             type: bash
+            workingDirectory: repo
             command: |-
               set -euo pipefail
-              if [ -z "${SOURCE_REPO:-}" ] || [ -z "${PR_SOURCE:-}" ] || [ -z "${PR_REVISION:-}" ]; then
-                echo "Could not resolve the pull request source repository." >&2
-                exit 1
-              fi
-              git clone --no-checkout "https://bitbucket.org/${REPO}.git" repo
-              cd repo
-              git fetch origin "${BASE}:${BASE}"
-              if [ "${SOURCE_REPO}" != "${REPO}" ]; then
-                git fetch "https://bitbucket.org/${SOURCE_REPO}.git" "${PR_SOURCE}"
-              else
-                git fetch origin "${PR_SOURCE}"
-              fi
-              git cat-file -e "${PR_REVISION}^{commit}"
-              git checkout --detach "${PR_REVISION}"
-              if [ "$(git rev-parse HEAD)" != "${PR_REVISION}" ]; then
-                echo "Checked out the wrong revision." >&2
+              if [ -z "${PR_REVISION:-}" ]; then
+                echo "The pull request revision is missing." >&2
                 exit 1
               fi
               revision="$(git rev-parse HEAD)"
+              if [ "${revision}" != "${PR_REVISION}" ]; then
+                echo "Checked out the wrong revision." >&2
+                exit 1
+              fi
               git diff "$(git merge-base "${BASE}" "${revision}")" "${revision}" > /tmp/pr.diff
           - name: Blast radius
             type: prompt
