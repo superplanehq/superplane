@@ -12,18 +12,7 @@ export function activityFromAgentStep(step: AgentStep): AgentActivity | undefine
 
   const command = bashCommandFromStep(step);
   if (command) {
-    items.push({
-      type: "tool",
-      id: `${step.id}-output`,
-      kind: "bash",
-      name: step.title,
-      input: command.script,
-      output: command.stdout,
-      outputStreams: [],
-      status: commandStatus,
-      durationMs: stepDurationMs(step.duration),
-      truncated: false,
-    });
+    items.push(...bashToolsFromStep(step, command, commandStatus));
   }
 
   for (const event of step.events) {
@@ -93,6 +82,49 @@ export function activityFromTranscript(activities: AgentActivity[]): AgentActivi
     items: withItems.flatMap((activity) => activity.items),
     sequence: last.sequence,
     status: withItems.some((activity) => activity.status === "running") ? "running" : last.status,
+  };
+}
+
+function bashToolsFromStep(
+  step: AgentStep,
+  command: { script: string; stdout: string },
+  status: AgentActivityStatus,
+): AgentActivityItem[] {
+  const lines = step.title === "Setup" ? command.script.split(/\r?\n/).filter((line) => line.trim()) : [];
+  if (lines.length <= 1) {
+    return [bashTool(step, command.script, command.stdout, status, stepDurationMs(step.duration))];
+  }
+  return lines.map((line, index) =>
+    bashTool(
+      step,
+      line,
+      index === lines.length - 1 ? command.stdout : "",
+      status,
+      index === 0 ? stepDurationMs(step.duration) : undefined,
+      index,
+    ),
+  );
+}
+
+function bashTool(
+  step: AgentStep,
+  script: string,
+  stdout: string,
+  status: AgentActivityStatus,
+  durationMs: number | undefined,
+  index?: number,
+): AgentActivityItem {
+  return {
+    type: "tool",
+    id: index === undefined ? `${step.id}-output` : `${step.id}-output-${index}`,
+    kind: "bash",
+    name: step.title,
+    input: script,
+    output: stdout,
+    outputStreams: [],
+    status,
+    durationMs,
+    truncated: false,
   };
 }
 

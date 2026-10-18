@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -127,6 +128,11 @@ func createPRFeedbackCanvas(
 		Agent:                  resolveIntakeAgent(db, factory),
 		VCSProvider:            factory.OnboardingConfigValue().EffectiveVCSProvider(),
 	}
+	omitIdentity, err := models.HasExperimentalFeature(factory.OrganizationID, features.FeatureWorkspaceAgent)
+	if err != nil {
+		return uuid.Nil, factoryErrorToStatus(err, "failed to build PR feedback automation")
+	}
+	request.OmitCommitIdentity = omitIdentity
 	var canvasDoc *yaml.Canvas
 	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
 		canvasDoc = buildChecksPRFeedbackCanvas(request)
