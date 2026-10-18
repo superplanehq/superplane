@@ -12,30 +12,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/runner"
-	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
-	analysis := intakeAnalysisCloneCommand("")
-	implementation := implementationCloneCommand(t)
-
-	// Both steps delegate the checkout to the command shipped on every
-	// factory task, so the step stays a single word.
-	assert.Equal(t, "checkout", implementation)
-	analysisLines := strings.Split(strings.TrimSpace(analysis), "\n")
-	assert.Equal(t, "checkout", analysisLines[len(analysisLines)-1])
-	rewriteAt := strings.Index(analysis, "insteadOf")
-	checkoutAt := strings.Index(analysis, "checkout")
-	require.GreaterOrEqual(t, rewriteAt, 0)
-	require.GreaterOrEqual(t, checkoutAt, 0)
-	assert.Less(t, rewriteAt, checkoutAt)
-
+	// The runner inserts checkout. Analysis leaves commit setup off.
+	// Implement turns it on through the task environment.
 	scripts := []struct {
 		name   string
 		script string
 	}{
-		{name: "analysis", script: analysis},
-		{name: "implementation", script: implementation},
+		{name: "analysis", script: "checkout"},
+		{name: "implementation", script: "checkout"},
 	}
 	for _, script := range scripts {
 		t.Run(script.name, func(t *testing.T) {
@@ -92,7 +79,7 @@ func TestEmptyRepositoryUsesBranchFromLostInitRace(t *testing.T) {
 	remote := bareRepository(t)
 	result := runCloneScriptWithPushShim(
 		t,
-		implementationCloneCommand(t),
+		"checkout",
 		fileURL(remote),
 		"develop",
 		seedRemoteBranchScript(t, "develop"),
@@ -113,7 +100,7 @@ func TestEmptyRepositoryFailsWhenInitPushFails(t *testing.T) {
 	remote := bareRepository(t)
 	result := runCloneScriptWithPushShim(
 		t,
-		implementationCloneCommand(t),
+		"checkout",
 		fileURL(remote),
 		"develop",
 		"#!/bin/sh\nexit 1\n",
@@ -129,7 +116,7 @@ func TestEmptyRepositoryFailsWhenInitPushFails(t *testing.T) {
 
 func TestEmptyRepositoryCreatesNamedBaseBranch(t *testing.T) {
 	remote := bareRepository(t)
-	result := runCloneScript(t, implementationCloneCommand(t), fileURL(remote), "develop", true)
+	result := runCloneScript(t, "checkout", fileURL(remote), "develop", true)
 
 	require.NoError(t, result.err, result.stderr)
 	heads := gitOutput(t, remote, "ls-remote", "--heads", fileURL(remote))
@@ -149,41 +136,12 @@ func TestEmptyRepositoryCreatesNamedBaseBranch(t *testing.T) {
 func TestCloneRepositoryUsesMainWhenBranchIsEmpty(t *testing.T) {
 	remote := bareRepository(t)
 	commitRemoteBranch(t, remote, "main")
-	result := runCloneScript(t, intakeAnalysisCloneCommand(""), fileURL(remote), "", false)
+	result := runCloneScript(t, "checkout", fileURL(remote), "", false)
 
 	require.NoError(t, result.err, result.stderr)
 	cloneLine := cloneInvocation(result.gitArgs)
 	assert.Contains(t, cloneLine, "--depth 1")
 	assert.Contains(t, cloneLine, "--branch main")
-}
-
-func implementationCloneCommand(t *testing.T) string {
-	t.Helper()
-
-	result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
-		appID:   "app-1",
-		appName: "Implement refunds",
-		installParams: map[string]string{
-			"appRepository": "acme/refunds",
-			"defaultBranch": "develop",
-		},
-		integrations: map[string]factoryTemplateIntegration{
-			"github": {id: "github-1", name: "acme-github"},
-		},
-		agent: &factoryTemplateAgent{
-			component:                 "runnerOpenRouter",
-			model:                     "anthropic/claude-sonnet-4-6",
-			credentialSource:          "integration",
-			credentialIntegrationName: "acme-openrouter",
-		},
-	})
-	require.NoError(t, err)
-
-	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
-	require.NoError(t, err)
-	command, ok := implementationStep(t, findYAMLNode(t, canvas, "implementation-agent-no-issue"), "Clone Repo")["command"].(string)
-	require.True(t, ok)
-	return command
 }
 
 type cloneScriptResult struct {

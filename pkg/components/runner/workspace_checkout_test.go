@@ -62,7 +62,10 @@ type checkoutScriptOptions struct {
 	home        string
 	// workDir overrides the process working directory. Production Clone
 	// steps run at the task root, but prompt steps run inside repo/.
-	workDir string
+	workDir     string
+	extraEnv    []string
+	omitRepoURL bool
+	setup       string
 }
 
 func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkoutScriptOptions) (string, error) {
@@ -76,6 +79,9 @@ func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkou
 	if opts.context != "" {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "workspace_context.json"), []byte(opts.context), 0o644))
 	}
+	if opts.setup != "" {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "workspace_setup.json"), []byte(opts.setup), 0o644))
+	}
 	home := opts.home
 	if home == "" {
 		home = t.TempDir()
@@ -88,11 +94,14 @@ func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkou
 		"PATH=" + binDir + string(os.PathListSeparator) + pathEnv,
 		"HOME=" + home,
 		"SUPERPLANE_TASK_DIR=" + dir,
-		"REPO_URL=" + repoURL,
 		"BASE=" + base,
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_TERMINAL_PROMPT=0",
 	}
+	if !opts.omitRepoURL {
+		env = append(env, "REPO_URL="+repoURL)
+	}
+	env = append(env, opts.extraEnv...)
 	if opts.commitSetup != "" {
 		env = append(env, runner.WorkspaceCheckoutCommitSetupEnv+"="+opts.commitSetup)
 	}
@@ -276,4 +285,165 @@ func TestWorkspaceCheckoutScriptCommitSetupSkipsBranchCreationOnReadonlyCheckout
 	assert.DirExists(t, filepath.Join(dir, "repo", ".git"))
 	heads := runGitQuiet(t, "", "", "ls-remote", "--heads", "file://"+remote)
 	assert.Empty(t, strings.TrimSpace(heads), "read-only checkout must not push branches")
+}
+
+func pushCommit(t *testing.T, remote, ref, filename, content string) string {
+	t.Helper()
+	git := requireGitAndNode(t)
+	work := t.TempDir()
+	cmd := exec.Command(git, "clone", remote, work)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+	require.NoError(t, os.WriteFile(filepath.Join(work, filename), []byte(content), 0o644))
+	for _, args := range [][]string{
+		{"-C", work, "add", filename},
+		{"-C", work, "-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", filename},
+	} {
+		cmd = exec.Command(git, args...)
+		output, err = cmd.CombinedOutput()
+		require.NoError(t, err, string(output))
+	}
+	cmd = exec.Command(git, "-C", work, "rev-parse", "HEAD")
+	sha, err := cmd.Output()
+	require.NoError(t, err)
+	cmd = exec.Command(git, "-C", work, "push", "origin", "HEAD:"+ref)
+	output, err = cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+	return strings.TrimSpace(string(sha))
+}
+
+func TestWorkspaceCheckoutScriptExitsWhenRepositoryIsUnset(t *testing.T) {
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, "", "", checkoutScriptOptions{omitRepoURL: true})
+	require.NoError(t, err, output)
+	assert.Contains(t, output, "No repository to check out.")
+	assert.NoDirExists(t, filepath.Join(dir, "repo"))
+}
+
+func TestWorkspaceCheckoutScriptDetachesAtPullRequestRevision(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	sha := pushCommit(t, remote, "refs/pull/9/head", "change", "pr\n")
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
+		commitSetup: "1",
+		extraEnv:    []string{"PR_NUMBER=9", "PR_REVISION=" + sha},
+	})
+	require.NoError(t, err, output)
+	repo := filepath.Join(dir, "repo")
+	assert.Equal(t, sha, runGitQuiet(t, "", repo, "rev-parse", "HEAD"))
+	assert.Equal(t, "HEAD", runGitQuiet(t, "", repo, "rev-parse", "--abbrev-ref", "HEAD"))
+	assert.NoFileExists(t, filepath.Join(repo, ".git", "hooks", "prepare-commit-msg"))
+}
+
+func TestWorkspaceCheckoutScriptChecksOutPullRequestBranch(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	sha := pushCommit(t, remote, "refs/pull/4/head", "feature", "branch\n")
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
+		commitSetup: "1",
+		extraEnv: []string{
+			"PR_NUMBER=4",
+			"PR_HEAD=feature",
+			"PR_REVISION=" + sha,
+		},
+	})
+	require.NoError(t, err, output)
+	repo := filepath.Join(dir, "repo")
+	assert.Equal(t, "feature", runGitQuiet(t, "", repo, "rev-parse", "--abbrev-ref", "HEAD"))
+	assert.Equal(t, sha, runGitQuiet(t, "", repo, "rev-parse", "HEAD"))
+	assert.NoFileExists(t, filepath.Join(repo, ".git", "hooks", "prepare-commit-msg"))
+}
+
+func TestWorkspaceCheckoutScriptDetachesBitbucketSourceRevision(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	sha := pushCommit(t, remote, "refs/heads/feature", "bb", "bb\n")
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
+		extraEnv: []string{
+			"REPO=acme/widgets",
+			"SOURCE_REPO=acme/widgets",
+			"PR_SOURCE=feature",
+			"PR_REVISION=" + sha,
+			"BITBUCKET_TOKEN=present",
+		},
+	})
+	require.NoError(t, err, output)
+	repo := filepath.Join(dir, "repo")
+	assert.Equal(t, sha, runGitQuiet(t, "", repo, "rev-parse", "HEAD"))
+	assert.Equal(t, "HEAD", runGitQuiet(t, "", repo, "rev-parse", "--abbrev-ref", "HEAD"))
+	assert.NoDirExists(t, filepath.Join(dir, ".superplane"))
+}
+
+func TestWorkspaceCheckoutScriptRunsSetupCommandsInRepo(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
+		setup: `{"commands":["pwd > setup-pwd","touch from-setup"]}`,
+	})
+	require.NoError(t, err, output)
+	assert.FileExists(t, filepath.Join(dir, "repo", "from-setup"))
+	assert.NoFileExists(t, filepath.Join(dir, "from-setup"))
+	pwd, err := os.ReadFile(filepath.Join(dir, "repo", "setup-pwd"))
+	require.NoError(t, err)
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(string(pwd)), string(os.PathSeparator)+"repo"))
+}
+
+func TestWorkspaceCheckoutScriptFailsWhenSetupCommandFails(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
+		setup: `{"commands":["echo setup-failed >&2","exit 1"]}`,
+	})
+	require.Error(t, err)
+	assert.Contains(t, output, "setup-failed")
+}
+
+func commandPtr(command string) *string {
+	return &command
+}
+
+func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
+	commands := []runner.BrokerCommand{
+		{Name: "Auth", Kind: runner.LiveLogKindSetup, Command: "gh auth"},
+		{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"},
+	}
+	steps := []runner.AgentStep{
+		{Name: "Score", Type: runner.AgentStepPrompt, Prompt: commandPtr("review the checkout")},
+		{Name: "Diff", Type: runner.AgentStepBash, Command: commandPtr("git rev-parse HEAD > /tmp/pr.diff")},
+	}
+	out := runner.InsertFactoryCheckoutCommand(commands, steps)
+	require.Len(t, out, 3)
+	assert.Equal(t, "Auth", out[0].Name)
+	assert.Equal(t, "Checkout", out[1].Name)
+	assert.Equal(t, runner.LiveLogKindSetup, out[1].Kind)
+	assert.Equal(t, runner.WrapAgentStepCommand("checkout"), out[1].Command)
+	assert.Equal(t, runner.LiveLogText("Checkout"), out[1].Preview)
+	assert.Equal(t, "Prompt", out[2].Name)
+}
+
+func TestInsertFactoryCheckoutCommandSkipsExistingClone(t *testing.T) {
+	commands := []runner.BrokerCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
+	cases := []runner.AgentStep{
+		{Name: "Clone", Type: runner.AgentStepBash, Command: commandPtr("git clone https://example.com/repo.git repo")},
+		{Name: "Helper", Type: runner.AgentStepBash, Command: commandPtr("set -euo pipefail\ncheckout\n")},
+	}
+	for _, step := range cases {
+		out := runner.InsertFactoryCheckoutCommand(commands, []runner.AgentStep{step})
+		assert.Equal(t, commands, out, step.Name)
+	}
+}
+
+func TestApplyFactoryCheckoutRequiresHelperFile(t *testing.T) {
+	commands := []runner.BrokerCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
+	out := runner.ApplyFactoryCheckout(nil, commands, nil)
+	assert.Equal(t, commands, out)
+
+	out = runner.ApplyFactoryCheckout(
+		[]runner.BrokerTaskFile{{Path: runner.WorkspaceCheckoutScriptPath}},
+		commands,
+		nil,
+	)
+	require.Len(t, out, 2)
+	assert.Equal(t, "Checkout", out[0].Name)
+	assert.Equal(t, "Prompt", out[1].Name)
 }

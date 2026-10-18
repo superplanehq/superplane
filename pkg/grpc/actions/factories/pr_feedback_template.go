@@ -615,25 +615,6 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 			}, "\n"),
 		},
 		map[string]any{
-			"name": "Checkout Pull Request",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"set -euo pipefail",
-				"gh auth setup-git --hostname github.com --force",
-				`git clone --depth 1 "https://github.com/${REPO}.git" repo`,
-				"cd repo",
-				`if [ -z "${PR_HEAD:-}" ]; then`,
-				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)`,
-				"fi",
-				`if [ -z "${PR_HEAD}" ] || [ "${PR_HEAD}" = "null" ]; then`,
-				`  echo "Could not resolve the pull request head branch." >&2`,
-				"  exit 1",
-				"fi",
-				`git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`,
-				`git checkout "${PR_HEAD}"`,
-			}, "\n"),
-		},
-		map[string]any{
 			"name":             "Set Up DCO Signing",
 			"type":             "bash",
 			"workingDirectory": "repo",
@@ -661,8 +642,9 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 	}
 }
 
-// prFeedbackBitbucketRunnerSteps checks out the pull request source
-// repository. A same-named branch on the destination is not a push target.
+// prFeedbackBitbucketRunnerSteps pushes to the pull request source
+// branch. The runner checks that branch out before these steps. A
+// same-named branch on the destination is not a push target.
 func prFeedbackBitbucketRunnerSteps(request prFeedbackBuildRequest) []any {
 	return []any{
 		map[string]any{
@@ -672,11 +654,6 @@ func prFeedbackBitbucketRunnerSteps(request prFeedbackBuildRequest) []any {
 				"git config --global user.email \"" + runner.FactoryAgentEmail + "\"",
 				"git config --global user.name \"" + runner.FactoryAgentName + "\"",
 			}, "\n"),
-		},
-		map[string]any{
-			"name":    "Checkout Pull Request",
-			"type":    "bash",
-			"command": bitbucketCheckoutCommand(),
 		},
 		map[string]any{
 			"name":             "Set Up DCO Signing",

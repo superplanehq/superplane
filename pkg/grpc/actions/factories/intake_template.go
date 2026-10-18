@@ -508,14 +508,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	return defaultIntakeSettings()
 }
 
-func intakeRefinementConfiguration(agent *intakeAgent, vcsName, vcsProvider string) map[string]any {
+func intakeRefinementConfiguration(agent *intakeAgent, vcsName string) map[string]any {
 	configuration := intakeRunnerConfiguration(agent, vcsName)
 	configuration["steps"] = []any{
-		map[string]any{
-			"name":    "Clone repository",
-			"type":    runner.AgentStepBash,
-			"command": intakeAnalysisCloneCommand(vcsProvider),
-		},
 		map[string]any{
 			"name":             "Refine Task",
 			"type":             "prompt",
@@ -572,27 +567,6 @@ func intakeRunnerConfiguration(agent *intakeAgent, vcsName string) map[string]an
 // is left unchanged.
 func intakeRefinementPrompt() string {
 	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
-}
-
-func intakeAnalysisCloneCommand(vcsProvider string) string {
-	lines := []string{
-		"set -euo pipefail",
-		`if [ -z "${REPO_URL:-}" ]; then`,
-		`  echo "This workspace has no repository to analyze." >&2`,
-		"  exit 1",
-		"fi",
-	}
-	// ponytail: GitHub-only auth rewrite; Bitbucket uses the credential helper
-	if !strings.EqualFold(strings.TrimSpace(vcsProvider), models.ProviderBitbucket) {
-		lines = append(lines, `git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`)
-	}
-	// Every factory task ships the checkout command on PATH, so the clone
-	// stays a single line. Stored canvases without the new template keep
-	// their inline clone, so existing automations are never rewritten.
-	// The commit setup flag stays off here: analysis never mutates the
-	// remote.
-	lines = append(lines, "checkout")
-	return strings.Join(lines, "\n")
 }
 
 var intakeThresholdPattern = regexp.MustCompile(`>=\s*(\d+)`)

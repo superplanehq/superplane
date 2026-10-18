@@ -75,9 +75,13 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	require.True(t, ok)
 	assert.Contains(t, implementationPrompt, runner.FactoryCommitIdentityPrompt)
 	assert.Contains(t, implementationPrompt, runner.FactoryImaginedLimitPrompt)
-	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
-	require.True(t, ok)
-	assert.Equal(t, "checkout", cloneCommand)
+	for _, step := range agent.Configuration["steps"].([]any) {
+		item := step.(map[string]any)
+		assert.NotEqual(t, "Clone Repo", item["name"])
+		command, _ := item["command"].(string)
+		assert.NotContains(t, command, "git clone")
+		assert.NotEqual(t, "checkout", strings.TrimSpace(command))
+	}
 	environment, ok := agent.Configuration["environment"].([]any)
 	require.True(t, ok, "expected the agent to declare step environment")
 	assert.Contains(t, environment, map[string]any{
@@ -228,7 +232,7 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	prompt := agentPrompt(t, agent)
 	assert.Contains(t, prompt, "Merge check: risk.")
 	assert.Contains(t, prompt, "Description: {{ root().data.pull_request.description }}")
-	assert.Contains(t, result.canvasYAML, "git clone --no-checkout")
+	assert.NotContains(t, result.canvasYAML, "git clone")
 	assert.Contains(t, result.canvasYAML, "git merge-base")
 	assert.Contains(t, result.canvasYAML, "SOURCE_REPO")
 	assert.Contains(t, result.canvasYAML, "source?.repository?.full_name")
@@ -341,10 +345,10 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	}, agent.Configuration["credentials"])
 	checkout, ok := implementationStep(t, agent, "Checkout Pull Request")["command"].(string)
 	require.True(t, ok)
-	assert.Contains(t, checkout, `git fetch --depth 1 origin "${PR_REVISION}:refs/remotes/origin/pr-revision"`)
-	assert.Contains(t, checkout, `git checkout --detach "${PR_REVISION}"`)
+	assert.NotContains(t, checkout, "git clone")
 	assert.Contains(t, checkout, `Checked out ${revision}. Expected ${PR_REVISION}.`)
-	assert.NotContains(t, checkout, "FETCH_HEAD")
+	assert.Contains(t, checkout, `gh api -H "Accept: application/vnd.github.v3.diff"`)
+	assert.Equal(t, "repo", implementationStep(t, agent, "Checkout Pull Request")["workingDirectory"])
 	prompt, ok := implementationStep(t, agent, "Capture Visual Evidence")["prompt"].(string)
 	require.True(t, ok)
 	assert.Contains(t, prompt, "Do not implement the task.")
@@ -762,9 +766,12 @@ func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "visualEvidence")
 	assert.NotContains(t, result.canvasYAML, "bitbucket.createPullRequestComment")
 	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
-	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
-	require.True(t, ok)
-	assert.Equal(t, "checkout", cloneCommand)
+	for _, step := range agent.Configuration["steps"].([]any) {
+		item := step.(map[string]any)
+		assert.NotEqual(t, "Clone Repo", item["name"])
+		command, _ := item["command"].(string)
+		assert.NotContains(t, command, "git clone")
+	}
 }
 
 func TestMaterializeFactoryTemplateBitbucketPRClosure(t *testing.T) {

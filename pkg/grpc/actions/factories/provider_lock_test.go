@@ -3,20 +3,10 @@ package factories
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 )
-
-func TestIntakeAnalysisCloneCommandProvider(t *testing.T) {
-	github := intakeAnalysisCloneCommand("")
-	assert.Contains(t, github, "GITHUB_TOKEN")
-
-	bitbucket := intakeAnalysisCloneCommand(models.ProviderBitbucket)
-	assert.NotContains(t, bitbucket, "GITHUB_TOKEN")
-	assert.Contains(t, bitbucket, "checkout")
-}
 
 func TestRejectVCSProviderChange(t *testing.T) {
 	github := "github"

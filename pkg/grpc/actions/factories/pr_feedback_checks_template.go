@@ -256,11 +256,6 @@ func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return append(steps,
 			map[string]any{
-				"name":    "Checkout Pull Request",
-				"type":    "bash",
-				"command": bitbucketCheckoutCommand(),
-			},
-			map[string]any{
 				"name":             "Set Up DCO Signing",
 				"type":             "bash",
 				"workingDirectory": "repo",
@@ -276,25 +271,6 @@ func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
 		)
 	}
 	return append(steps,
-		map[string]any{
-			"name": "Checkout Pull Request",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"set -euo pipefail",
-				"gh auth setup-git --hostname github.com --force",
-				`git clone --depth 1 "https://github.com/${REPO}.git" repo`,
-				"cd repo",
-				`if [ -z "${PR_HEAD:-}" ]; then`,
-				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)`,
-				"fi",
-				`if [ -z "${PR_HEAD}" ] || [ "${PR_HEAD}" = "null" ]; then`,
-				`  echo "Could not resolve the pull request head branch." >&2`,
-				"  exit 1",
-				"fi",
-				`git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`,
-				`git checkout "${PR_HEAD}"`,
-			}, "\n"),
-		},
 		map[string]any{
 			"name":             "Set Up DCO Signing",
 			"type":             "bash",

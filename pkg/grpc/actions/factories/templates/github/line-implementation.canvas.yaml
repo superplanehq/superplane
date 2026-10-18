@@ -71,9 +71,6 @@ spec:
         machineType: e1-large-amd64
         model: claude-opus-5-5
         steps:
-          - name: Clone Repo
-            type: bash
-            command: checkout
           - name: Implementation
             type: prompt
             workingDirectory: repo

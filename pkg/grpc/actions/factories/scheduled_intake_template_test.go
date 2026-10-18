@@ -74,7 +74,7 @@ func TestScheduledIntakeCreation(t *testing.T) {
 				if node.ID == "scheduled-agent" {
 					require.Equal(t, component, node.ComponentName())
 					steps := node.Configuration["steps"].([]any)
-					require.Equal(t, "set -euo pipefail\nrm -f /tmp/proposal.json\ncheckout", steps[0].(map[string]any)["command"])
+					require.Equal(t, "set -euo pipefail\nrm -f /tmp/proposal.json", steps[0].(map[string]any)["command"])
 					require.Contains(t, steps[1].(map[string]any)["prompt"], request.InstallParams["prompt"])
 					env := node.Configuration["environment"].([]any)
 					require.Equal(t, "https://github.com/acme/app.git", env[0].(map[string]any)["value"])

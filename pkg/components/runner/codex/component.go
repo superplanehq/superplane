@@ -163,6 +163,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	task.Files = runner.AppendMergeConfidenceMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
+	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps)
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
 	taskID, err := client.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
