@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import { REACT_DOM_CHUNK_NAME, editorCancelCodeSplittingGroups } from "./lib/editorCancelChunks";
 import {
   IGNORED_CONSOLE_MESSAGES,
   Sentry,
@@ -101,6 +102,25 @@ describe("isMonacoCanceledEvent", () => {
     expect(filterSentryEvent(event)).toBeNull();
   });
 
+  it("drops a Canceled rejection from the production editor and react-dom chunks", () => {
+    const release = "https://assets.superplane.com/releases/c7405227a17b25b04c8f274ab779ff93bb719ba4/assets";
+    const event = buildEvent("Canceled", [
+      `${release}/monaco-editor-BOw9VJCf.js`,
+      `${release}/${REACT_DOM_CHUNK_NAME}-k3Lm9pQ2.js`,
+    ]);
+
+    expect(isMonacoCanceledEvent(event)).toBe(true);
+    expect(filterSentryEvent(event)).toBeNull();
+  });
+
+  it("keeps a Canceled rejection that includes the production application chunk", () => {
+    const release = "https://assets.superplane.com/releases/c7405227a17b25b04c8f274ab779ff93bb719ba4/assets";
+    const event = buildEvent("Canceled", [`${release}/monaco-editor-BOw9VJCf.js`, `${release}/index-DNo0LgV2.js`]);
+
+    expect(isMonacoCanceledEvent(event)).toBe(false);
+    expect(filterSentryEvent(event)).not.toBeNull();
+  });
+
   it("keeps a Canceled rejection that includes an application frame", () => {
     const event = buildEvent("Canceled", [
       "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/esm/vs/base/common/async.js",
@@ -123,6 +143,18 @@ describe("isMonacoCanceledEvent", () => {
     ]);
 
     expect(isMonacoCanceledEvent(event)).toBe(false);
+  });
+});
+
+describe("editorCancelCodeSplittingGroups", () => {
+  it("names a react-dom chunk and leaves application modules in the entry chunk", () => {
+    const reactDomGroup = editorCancelCodeSplittingGroups.find((group) => group.name === REACT_DOM_CHUNK_NAME);
+
+    expect(reactDomGroup?.test.test("/app/web_src/node_modules/react-dom/cjs/react-dom-client.production.js")).toBe(
+      true,
+    );
+    expect(reactDomGroup?.test.test("/app/web_src/node_modules/react/cjs/react.production.js")).toBe(false);
+    expect(reactDomGroup?.test.test("/app/web_src/src/pages/app/index.tsx")).toBe(false);
   });
 });
 

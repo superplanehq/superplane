@@ -1,5 +1,7 @@
 import * as Sentry from "@sentry/react";
 
+import { isEditorCancelFrame } from "./lib/editorCancelChunks";
+
 interface SentryWindow extends Window {
   SUPERPLANE_SENTRY_DSN?: string;
   SUPERPLANE_SENTRY_ENVIRONMENT?: string;
@@ -31,7 +33,10 @@ export function isIgnoredConsoleMessage(message: unknown): boolean {
 // .catch() when a WebKit clipboard-write is superseded by a new copy action.
 // The same cancel also fires from word-highlighter dispose during model
 // dispose on React unmount. React and editor-wrapper frames are not
-// application code. A cancel that includes an application frame still reports.
+// application code. Production beforeSend frames are hashed chunk URLs.
+// The build names a react-dom chunk so those frames stay distinct from
+// the application entry chunk. A cancel that includes an application
+// frame still reports.
 export function isMonacoCanceledEvent(event: Sentry.ErrorEvent): boolean {
   const exception = event.exception?.values?.[0];
   if (exception?.value !== "Canceled") {
@@ -44,14 +49,6 @@ export function isMonacoCanceledEvent(event: Sentry.ErrorEvent): boolean {
   }
 
   return frames.every((frame) => isEditorCancelFrame(frame.filename));
-}
-
-function isEditorCancelFrame(filename: string | undefined): boolean {
-  if (!filename) {
-    return false;
-  }
-
-  return filename.includes("monaco-editor") || filename.includes("@sentry") || filename.includes("react-dom");
 }
 
 const USER_AGENT_PERMISSION_DENIAL =
