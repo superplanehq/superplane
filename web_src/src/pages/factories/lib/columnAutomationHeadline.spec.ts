@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
-import { columnAutomationHeaderRowCount, columnAutomationHeadline } from "./columnAutomationHeadline";
+import {
+  columnAutomationHeaderRowCount,
+  columnAutomationHeadline,
+  columnAutomationUsesSplitConfig,
+} from "./columnAutomationHeadline";
 import type { ColumnAutomation } from "./columnAutomations";
 
 function automation(overrides: Partial<ColumnAutomation>): ColumnAutomation {
@@ -55,6 +59,9 @@ describe("columnAutomationHeadline", () => {
     expect(columnAutomationHeadline(automation({ kind: "pr-checks" }))).toBe("Fixes failing status checks");
     expect(columnAutomationHeadline(automation({ kind: "pr-closure" }))).toBe("Closes tasks when pull requests merge");
     expect(columnAutomationHeadline(automation({ kind: "risk-score" }))).toBe("Scores merge confidence");
+    expect(columnAutomationHeadline(automation({ kind: "visual-evidence" }))).toBe(
+      "Captures screenshots or a short video",
+    );
   });
 });
 
@@ -67,5 +74,16 @@ describe("columnAutomationHeaderRowCount", () => {
 
   it("keeps one row when no column has an automation", () => {
     expect(columnAutomationHeaderRowCount([[], []])).toBe(1);
+  });
+});
+
+describe("columnAutomationUsesSplitConfig", () => {
+  it("opens the split settings panel for merge confidence, visual evidence, pull-request closure, and the Implement agent", () => {
+    expect(columnAutomationUsesSplitConfig(["on-pr-risk"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["on-pr-visual-evidence", "capture-visual-evidence"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["onrun-implement", "implementation-agent-no-issue"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["implementation-agent"])).toBe(false);
+    expect(columnAutomationUsesSplitConfig(["on-pr-closed"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["on-run"])).toBe(false);
   });
 });

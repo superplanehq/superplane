@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -13,11 +14,11 @@ import (
 	gh "github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	appcatalog "github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"gorm.io/gorm"
 )
 
@@ -60,7 +61,11 @@ var hasGitHubAppInstallationRequest = func(ctx context.Context, installationID i
 		return false, fmt.Errorf("find GitHub App installation %d: %w", installationID, err)
 	}
 
-	catalog, err := appcatalog.NewCatalog(db, config.LoadGitHubHostedAppConfig())
+	cfg, resolveErr := appcatalog.ResolveProcess(ctx)
+	if resolveErr != nil {
+		return false, resolveErr
+	}
+	catalog, err := appcatalog.NewCatalog(db, cfg)
 	if err != nil {
 		return false, err
 	}
@@ -80,12 +85,12 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing installation id", http.StatusBadRequest)
 		return
 	}
-	organizationID := githubAppSetupOrganizationID(query.Get("state"))
+	organizationID := githubAppSetupOrganizationIDAt(r.Context(), query.Get("state"))
 
 	switch query.Get("setup_action") {
-	case "install":
-		redirectPath := "/"
-		if strings.TrimSpace(query.Get("state")) == "" {
+	case "install", "update":
+		redirectPath := s.githubAppSetupRedirect(r, organizationID, query.Get("state"))
+		if query.Get("setup_action") == "install" && strings.TrimSpace(query.Get("state")) == "" {
 			requested, requestErr := hasGitHubAppInstallationRequest(r.Context(), installationID)
 			if requestErr != nil {
 				log.WithError(requestErr).WithField("installation_id", installationID).Warn(
@@ -100,15 +105,118 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Redirect(w, r, redirectPath, http.StatusFound)
-	case "update":
-		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, organizationID, time.Now()); err != nil {
-			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, r, "/", http.StatusFound)
 	default:
 		http.Error(w, "invalid setup action", http.StatusBadRequest)
 	}
+}
+
+// githubAppSetupRedirect opens Choose organization for one unfinished workspace.
+// A signed install state names the organization, not the workspace. Without
+// state, the signed-in session can name a workspace only when that session has
+// one unfinished workspace. Two unfinished workspaces return home so install
+// does not open the wrong one. This does not create a workspace.
+func (s *Server) githubAppSetupRedirect(r *http.Request, organizationID uuid.UUID, state string) string {
+	if strings.TrimSpace(state) != "" {
+		path, err := incompleteOrganizationSetupPath(r.Context(), organizationID)
+		if err != nil {
+			log.WithError(err).WithField("organization_id", organizationID).Warn(
+				"failed to resolve GitHub App setup return",
+			)
+			return "/"
+		}
+		return path
+	}
+
+	account, ok := middleware.AccountFromRequest(r, s.jwt)
+	if !ok {
+		return "/"
+	}
+	path, err := singleIncompleteSessionSetupPath(r.Context(), account)
+	if err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Warn(
+			"failed to resolve GitHub App setup return",
+		)
+		return "/"
+	}
+	return path
+}
+
+func incompleteOrganizationSetupPath(ctx context.Context, organizationID uuid.UUID) (string, error) {
+	if organizationID == uuid.Nil {
+		return "/", nil
+	}
+	db := database.DB(ctx)
+	factories, err := models.ListFactories(db, organizationID)
+	if err != nil {
+		return "", err
+	}
+	factory := onlyIncompleteFactory(factories)
+	if factory == nil {
+		return "/", nil
+	}
+	organization, err := models.FindOrganizationByIDInTransaction(db, organizationID.String())
+	if err != nil {
+		return "", err
+	}
+	return workspaceSetupRepoPath(organization.Slug, factory.RouteSegment()), nil
+}
+
+func singleIncompleteSessionSetupPath(ctx context.Context, account *models.Account) (string, error) {
+	if account == nil {
+		return "/", nil
+	}
+	organizations, err := models.FindOrganizationsForAccount(account.Email)
+	if err != nil {
+		return "", err
+	}
+	db := database.DB(ctx)
+	var path string
+	for _, organization := range organizations {
+		factories, err := models.ListFactories(db, organization.ID)
+		if err != nil {
+			return "", err
+		}
+		for _, factory := range factories {
+			if factory.IsOnboardingComplete() {
+				continue
+			}
+			if path != "" {
+				return "/", nil
+			}
+			path = workspaceSetupRepoPath(organization.Slug, factory.RouteSegment())
+		}
+	}
+	if path == "" {
+		return "/", nil
+	}
+	return path, nil
+}
+
+func onlyIncompleteFactory(factories []models.Factory) *models.Factory {
+	var incomplete *models.Factory
+	for index := range factories {
+		if factories[index].IsOnboardingComplete() {
+			continue
+		}
+		if incomplete != nil {
+			return nil
+		}
+		incomplete = &factories[index]
+	}
+	return incomplete
+}
+
+func workspaceSetupRepoPath(slug, segment string) string {
+	slug = strings.TrimSpace(slug)
+	segment = strings.TrimSpace(segment)
+	if slug == "" || segment == "" || strings.ContainsAny(slug, "/?#") || strings.ContainsAny(segment, "/?#") {
+		return "/"
+	}
+	target := url.URL{Path: "/" + slug + "/workspaces/" + segment + "/setup"}
+	query := url.Values{}
+	query.Set("step", "repo")
+	target.RawQuery = query.Encode()
+	return target.String()
 }
 
 // Anyone can open this redirect, so it must not call GitHub. It only asks the
@@ -123,7 +231,14 @@ func (s *Server) handleGitHubAppInstallRequest(w http.ResponseWriter, r *http.Re
 }
 
 func githubAppSetupOrganizationID(state string) uuid.UUID {
-	cfg := config.LoadGitHubHostedAppConfig()
+	return githubAppSetupOrganizationIDAt(context.Background(), state)
+}
+
+func githubAppSetupOrganizationIDAt(ctx context.Context, state string) uuid.UUID {
+	cfg, err := appcatalog.ResolveProcess(ctx)
+	if err != nil || !cfg.Enabled() {
+		return uuid.Nil
+	}
 	organizationID, err := common.VerifyHostedAppInstallState(cfg.WebhookSecret, state)
 	if err != nil {
 		return uuid.Nil
@@ -136,7 +251,7 @@ func githubAppSetupOrganizationID(state string) uuid.UUID {
 // that WebhookProvisioner registers for each webhook, so this endpoint does
 // not deliver them.
 func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) {
-	app, ok := common.HostedAppFromEnv()
+	app, ok := common.ResolveHostedApp(r.Context())
 	if !ok {
 		http.Error(w, "not found", http.StatusNotFound)
 		return

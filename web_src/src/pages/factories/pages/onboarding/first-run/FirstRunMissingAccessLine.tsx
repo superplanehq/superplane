@@ -2,21 +2,25 @@ import { LoadingButton } from "@/components/ui/loading-button";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 
-/** A short hint and question, with an inline GitHub action right after it. */
+/** A short hint and question, with an inline install action right after it. */
 export function FirstRunMissingAccessLine({
   hint,
   question,
   action,
   disabled,
   loading,
+  loadingText = FIRST_RUN_COPY.choose.openingGitHub,
   onClick,
+  testId = "first-run-grant-access",
 }: {
   hint: string;
   question: string;
   action: string;
   disabled: boolean;
   loading: boolean;
+  loadingText?: string;
   onClick: () => void;
+  testId?: string;
 }) {
   return (
     <div className="space-y-1 text-[13px] text-muted-foreground">
@@ -30,8 +34,8 @@ export function FirstRunMissingAccessLine({
           onClick={onClick}
           disabled={disabled}
           loading={loading}
-          loadingText={FIRST_RUN_COPY.choose.openingGitHub}
-          data-testid="first-run-grant-access"
+          loadingText={loadingText}
+          data-testid={testId}
         >
           {action}
         </LoadingButton>

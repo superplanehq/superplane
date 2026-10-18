@@ -185,13 +185,13 @@ describe("useSplitRunFooterActions", () => {
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
   });
 
-  it("archives a draft as rejected", async () => {
+  it("saves Archive separately from Reject", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
     const archived = await result.current.handleArchive();
 
     expect(archived).toBe(true);
-    expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
+    expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_ARCHIVED" });
     expect(showSuccessToast).toHaveBeenCalledWith("Task archived.");
   });
 

@@ -26,7 +26,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
+var expressionRegex = regexp.MustCompile(`(?s)\{\{(.*?)\}\}`)
 
 type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB
@@ -1057,11 +1057,12 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 }
 
 // resolveOrderPayload exposes the work order driving this run via order()
-// and its task() alias. Returns nil when the run is not attached to a
-// factory work-order execution. The url, key, artifacts, comments,
-// assignees, and spec are loaded only when the expression AST references
-// those fields on order() or task(). Origin is attached whenever the work
-// order has one.
+// and its task() alias. A line-step execution is used first. When that
+// execution is absent, the run's pull request link is used if the task
+// belongs to this canvas. Returns nil when neither path matches. The url,
+// key, artifacts, comments, assignees, and spec are loaded only when the
+// expression AST references those fields on order() or task(). Origin is
+// attached whenever the work order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1075,21 +1076,19 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		return nil, fmt.Errorf("order() could not resolve the current run: %w", err)
 	}
 
-	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
-	if err != nil {
-		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("order() could not resolve the work order execution: %w", err)
-	}
-
-	order, err := models.FindUnscopedWorkOrder(b.tx, execution.WorkOrderID)
-	if err != nil {
-		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
-	}
-	repository, defaultBranch, err := b.resolveOrderRepository(order)
-	if err != nil {
+	order, err := b.workOrderForRun(run)
+	if err != nil || order == nil {
 		return nil, err
+	}
+	owningFactory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the workspace: %w", err)
+	}
+	config := owningFactory.OnboardingConfigValue()
+	repository, defaultBranch, repositoryFromOrder := resolveOrderRepository(order, config)
+	provider := config.EffectiveVCSProvider()
+	if repositoryFromOrder {
+		provider = orderRepositoryProvider(order)
 	}
 	payload := map[string]any{
 		"id":             order.ID.String(),
@@ -1099,7 +1098,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"state":          order.State,
 		"result":         order.Result,
 		"repository":     repository,
-		"repository_url": githubRepositoryURL(repository),
+		"repository_url": models.VCSRepositoryCloneURL(provider, repository),
 		"default_branch": defaultBranch,
 		// Keep this compatibility value until stored canvases no longer reference it.
 		"visual_evidence_enabled": false,
@@ -1121,17 +1120,11 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err != nil {
 		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
 	}
-	if usesURL || usesKey {
-		owningFactory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
-		if err != nil {
-			return nil, fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
-		}
-		if usesURL {
-			payload["url"] = uiBaseURL() + order.URLPath(owningFactory.RouteSegment())
-		}
-		if usesKey {
-			payload["key"] = owningFactory.WorkOrderKey(order.Number)
-		}
+	if usesURL {
+		payload["url"] = workOrderPermalink(order, owningFactory.RouteSegment())
+	}
+	if usesKey {
+		payload["key"] = owningFactory.WorkOrderKey(order.Number)
 	}
 
 	usesArtifacts, err := expressionvalidation.ExpressionUsesOrderArtifacts(expression)
@@ -1181,11 +1174,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
 	}
 	if usesPullRequests {
-		factoryModel, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
-		if err != nil {
-			return nil, fmt.Errorf("order() could not load pull requests: %w", err)
-		}
-		pullRequests, err := factoryModel.ListPullRequests(b.tx, models.FactoryPullRequestFilter{WorkOrderID: &order.ID})
+		pullRequests, err := owningFactory.ListPullRequests(b.tx, models.FactoryPullRequestFilter{WorkOrderID: &order.ID})
 		if err != nil {
 			return nil, fmt.Errorf("order() could not load pull requests: %w", err)
 		}
@@ -1227,6 +1216,68 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	}
 
 	return payload, nil
+}
+
+func (b *NodeConfigurationBuilder) workOrderForRun(run *models.CanvasRun) (*models.FactoryWorkOrder, error) {
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err == nil {
+		return loadExpressionWorkOrder(b.tx, execution.WorkOrderID)
+	}
+	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+		return nil, fmt.Errorf("order() could not resolve the work order execution: %w", err)
+	}
+	return b.workOrderFromPullRequestLink(run.ID)
+}
+
+func (b *NodeConfigurationBuilder) workOrderFromPullRequestLink(runID uuid.UUID) (*models.FactoryWorkOrder, error) {
+	workOrderID, err := workOrderIDFromPullRequestLink(b.tx, runID)
+	if err != nil || workOrderID == nil {
+		return nil, err
+	}
+
+	order, err := loadExpressionWorkOrder(b.tx, *workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	matches, err := b.workOrderMatchesCanvas(order)
+	if err != nil || !matches {
+		return nil, err
+	}
+	return order, nil
+}
+
+func workOrderIDFromPullRequestLink(tx *gorm.DB, runID uuid.UUID) (*uuid.UUID, error) {
+	linked, err := models.FindWorkOrderIDsByLinkedRunIDs(tx, []uuid.UUID{runID})
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
+	}
+	workOrderID, ok := linked[runID]
+	if !ok {
+		return nil, nil
+	}
+	return &workOrderID, nil
+}
+
+func loadExpressionWorkOrder(tx *gorm.DB, id uuid.UUID) (*models.FactoryWorkOrder, error) {
+	order, err := models.FindUnscopedWorkOrder(tx, id)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
+	}
+	return order, nil
+}
+
+func (b *NodeConfigurationBuilder) workOrderMatchesCanvas(order *models.FactoryWorkOrder) (bool, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return false, fmt.Errorf("order() could not resolve the canvas: %w", err)
+	}
+	if order.OrganizationID != canvas.OrganizationID {
+		return false, nil
+	}
+	if canvas.FactoryID == nil || *canvas.FactoryID != order.FactoryID {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrder) (string, error) {
@@ -1280,18 +1331,13 @@ func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[s
 
 // resolveOrderRepository keeps orders created before repository snapshots
 // compatible with workflow templates that use order().repository.
-func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryWorkOrder) (string, string, error) {
+func resolveOrderRepository(order *models.FactoryWorkOrder, config models.FactoryOnboardingConfig) (string, string, bool) {
 	repository := stringValue(order.Repository)
 	defaultBranch := stringValue(order.DefaultBranch)
 	if repository != "" && defaultBranch != "" {
-		return repository, defaultBranch, nil
+		return repository, defaultBranch, true
 	}
 
-	factory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
-	if err != nil {
-		return "", "", fmt.Errorf("order() could not resolve the workspace: %w", err)
-	}
-	config := factory.OnboardingConfigValue()
 	// Repository and branch are one snapshot. Do not combine a saved value
 	// with current workspace settings when a legacy row contains only one.
 	repository = config.AppRepository
@@ -1300,11 +1346,7 @@ func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryW
 		defaultBranch = "main"
 	}
 
-	return repository, defaultBranch, nil
-}
-
-func githubRepositoryURL(repository string) string {
-	return "https://github.com/" + strings.TrimSuffix(repository, ".git") + ".git"
+	return repository, defaultBranch, false
 }
 
 func attachOrderOrigin(order *models.FactoryWorkOrder, payload map[string]any) {
@@ -1457,6 +1499,10 @@ func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, e
 		b.workflowID.String(),
 		run.ID.String(),
 	), nil
+}
+
+func workOrderPermalink(order *models.FactoryWorkOrder, routeSegment string) string {
+	return uiBaseURL() + order.URLPath(routeSegment)
 }
 
 // uiBaseURL mirrors the server's base URL resolution so app()/run() URLs

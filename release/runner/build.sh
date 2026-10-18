@@ -13,12 +13,18 @@ if [ "${1-}" = "" ]; then
 fi
 
 VERSION="$1"
-semver_pattern='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
 git_sha_pattern='^sha:([0-9a-f]{40})$'
-if [[ ! "${VERSION}" =~ ${semver_pattern} ]] &&
-  [[ ! "${VERSION}" =~ ${git_sha_pattern} ]]; then
+is_git_sha_release=false
+if [[ "${VERSION}" == v* ]]; then
+  if ! node "$(dirname "${BASH_SOURCE[0]}")/../component-release.js" \
+    validate-version "${VERSION}" >/dev/null; then
+    exit 1
+  fi
+elif [[ ! "${VERSION}" =~ ${git_sha_pattern} ]]; then
   echo "Error: version must be v<semantic-version> or sha:<40-character-lowercase-git-sha>" >&2
   exit 1
+else
+  is_git_sha_release=true
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -53,6 +59,7 @@ if [[ "${VERSION}" =~ ${git_sha_pattern} ]]; then
 fi
 OUTPUT_DIR="${RUNNER_RELEASE_OUTPUT_DIR:-${REPO_ROOT}/build/runner/${VERSION}}"
 STAGING_DIR="${OUTPUT_DIR}/.staging"
+SBOM_INPUT_DIR="${STAGING_DIR}/sbom-input"
 ARCHITECTURES=(amd64 arm64)
 
 # shellcheck source=../lib/image-build-prerequisites.sh
@@ -68,18 +75,50 @@ trap 'rm -rf "${STAGING_DIR}"' EXIT
 for architecture in "${ARCHITECTURES[@]}"; do
   archive="runner-linux-${architecture}.tar.gz"
   architecture_staging_dir="${STAGING_DIR}/${architecture}"
+  image="superplane-runner-release:${VERSION#v}-${architecture}"
 
   echo "* Building runner ${VERSION} for linux/${architecture}"
   mkdir -p "${architecture_staging_dir}"
-  docker buildx build \
-    --platform "linux/${architecture}" \
-    --progress=plain \
-    --provenance=false \
-    --build-arg "RUNNER_VERSION=${VERSION}" \
-    --target artifact \
-    --output "type=local,dest=${architecture_staging_dir}" \
-    -f release/runner/Dockerfile \
-    .
+  if [ "${is_git_sha_release}" = "true" ]; then
+    docker buildx build \
+      --platform "linux/${architecture}" \
+      --progress=plain \
+      --provenance=false \
+      --build-arg "RUNNER_VERSION=${VERSION}" \
+      --target artifact \
+      --output "type=local,dest=${architecture_staging_dir}" \
+      -f release/runner/Dockerfile \
+      .
+  else
+    docker buildx build \
+      --platform "linux/${architecture}" \
+      --progress=plain \
+      --provenance=false \
+      --build-arg "RUNNER_VERSION=${VERSION}" \
+      --target runtime \
+      --load \
+      --tag "${image}" \
+      -f release/runner/Dockerfile \
+      .
+
+    container="$(docker create "${image}")"
+    docker cp "${container}:/usr/local/bin/runner" "${architecture_staging_dir}/runner"
+    docker rm "${container}" >/dev/null
+
+    reported_version="$(
+      docker run --rm \
+        --platform "linux/${architecture}" \
+        "${image}" \
+        --version
+    )"
+    if [ "${reported_version}" != "runner ${VERSION}" ]; then
+      echo "Error: linux/${architecture} runner reported ${reported_version}" >&2
+      exit 1
+    fi
+
+    mkdir -p "${SBOM_INPUT_DIR}"
+    cp "${architecture_staging_dir}/runner" "${SBOM_INPUT_DIR}/runner-linux-${architecture}"
+  fi
 
   cp "${SCRIPT_DIR}/install.sh" "${architecture_staging_dir}/install.sh"
   chmod 0755 \
@@ -92,10 +131,21 @@ for architecture in "${ARCHITECTURES[@]}"; do
     runner
 done
 
+if [ "${is_git_sha_release}" = "false" ]; then
+  echo "* Creating runner.spdx.json"
+  bash "${REPO_ROOT}/release/generate-component-sbom.sh" \
+    runner \
+    "${SBOM_INPUT_DIR}" \
+    "${OUTPUT_DIR}/runner.spdx.json"
+fi
+
 echo "* Creating checksums.txt"
 (
   cd "${OUTPUT_DIR}"
   archives=(runner-linux-amd64.tar.gz runner-linux-arm64.tar.gz)
+  if [ "${is_git_sha_release}" = "false" ]; then
+    archives+=(runner.spdx.json)
+  fi
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "${archives[@]}" > checksums.txt
   else
@@ -110,4 +160,7 @@ echo ""
 echo "Runner release ${VERSION} is ready in ${OUTPUT_DIR}:"
 echo "  runner-linux-amd64.tar.gz"
 echo "  runner-linux-arm64.tar.gz"
+if [ "${is_git_sha_release}" = "false" ]; then
+  echo "  runner.spdx.json"
+fi
 echo "  checksums.txt"

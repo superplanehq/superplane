@@ -68,7 +68,12 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		event.CustomName = customName
 	}
 
-	err = s.tx.Create(&event).Error
+	created := true
+	if payloadType == "github.pullRequest" && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.Ref.Data().Trigger != nil && s.node.Ref.Data().Trigger.Name == "github.onPullRequest" {
+		created, err = s.node.CreateGitHubChecksEvent(s.tx, &event)
+	} else {
+		err = s.tx.Create(&event).Error
+	}
 	if err != nil {
 		if s.run == nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			canvas, findErr := models.FindUnscopedCanvasInTransaction(s.tx, s.node.WorkflowID)
@@ -81,6 +86,10 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		}
 
 		return err
+	}
+
+	if !created {
+		return nil
 	}
 
 	if s.onNewEvents != nil {

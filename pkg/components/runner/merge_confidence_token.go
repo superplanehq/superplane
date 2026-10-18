@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -35,9 +36,24 @@ type MergeConfidenceScope struct {
 	CanvasRunID     uuid.UUID
 	NodeExecutionID uuid.UUID
 	EnabledChecks   []string
+	// CheckLabels maps a check id to the step name. Built-in checks use their
+	// own names when this map has no entry.
+	CheckLabels map[string]string
 }
 
-var mergeConfidenceChecksLine = regexp.MustCompile(`(?m)^Enabled checks: (none|(?:risk|performance|security|drift|reversibility)(?:, (?:risk|performance|security|drift|reversibility))*)\.$`)
+var (
+	mergeConfidenceChecksLine = regexp.MustCompile(`(?m)^Enabled checks: (none|(?:risk|performance|security|drift|reversibility)(?:, (?:risk|performance|security|drift|reversibility))*)\.$`)
+	mergeCheckIDLine          = regexp.MustCompile(`(?m)^Merge check: ([a-z][a-z0-9-]{0,40})\.$`)
+)
+
+// MergeCheckID reads the check id from a step prompt. An empty string means the step is not a check.
+func MergeCheckID(prompt string) string {
+	match := mergeCheckIDLine.FindStringSubmatch(prompt)
+	if match == nil {
+		return ""
+	}
+	return match[1]
+}
 
 // ParseMergeConfidenceChecks reads the enabled-checks line from agent prompts.
 // A missing line or "none" enables nothing.
@@ -53,6 +69,36 @@ func ParseMergeConfidenceChecks(prompts []string) []string {
 		return uniqueMergeConfidenceChecks(strings.Split(match[1], ", "))
 	}
 	return []string{}
+}
+
+// MergeConfidenceChecksFromSteps reads one check from each step that starts
+// with a Merge check line. When no step has that line, it reads the older
+// Enabled checks line and returns no labels.
+func MergeConfidenceChecksFromSteps(steps []AgentStep) ([]string, map[string]string) {
+	ids := make([]string, 0)
+	labels := map[string]string{}
+	for _, step := range steps {
+		if step.Prompt == nil {
+			continue
+		}
+		id := MergeCheckID(*step.Prompt)
+		if id == "" {
+			continue
+		}
+		if _, seen := labels[id]; seen {
+			continue
+		}
+		ids = append(ids, id)
+		label := strings.TrimSpace(step.Name)
+		if label == "" {
+			label = id
+		}
+		labels[id] = label
+	}
+	if len(ids) > 0 {
+		return ids, labels
+	}
+	return ParseMergeConfidenceChecks(agentStepPrompts(steps)), nil
 }
 
 func uniqueMergeConfidenceChecks(names []string) []string {
@@ -78,7 +124,7 @@ func MintMergeConfidenceToken(signer *jwt.Signer, scope MergeConfidenceScope, tt
 	if scope.OrganizationID == uuid.Nil || scope.FactoryID == uuid.Nil || scope.WorkOrderID == uuid.Nil || scope.CanvasRunID == uuid.Nil || scope.NodeExecutionID == uuid.Nil {
 		return "", fmt.Errorf("merge confidence scope is incomplete")
 	}
-	return signer.GenerateWithClaims(ttl, map[string]string{
+	claims := map[string]string{
 		"purpose":           MergeConfidenceTokenPurpose,
 		"org_id":            scope.OrganizationID.String(),
 		"factory_id":        scope.FactoryID.String(),
@@ -86,7 +132,15 @@ func MintMergeConfidenceToken(signer *jwt.Signer, scope MergeConfidenceScope, tt
 		"canvas_run_id":     scope.CanvasRunID.String(),
 		"node_execution_id": scope.NodeExecutionID.String(),
 		"enabled_checks":    strings.Join(scope.EnabledChecks, ","),
-	})
+	}
+	if len(scope.CheckLabels) > 0 {
+		encoded, err := json.Marshal(scope.CheckLabels)
+		if err != nil {
+			return "", fmt.Errorf("merge confidence check names: %w", err)
+		}
+		claims["check_labels"] = string(encoded)
+	}
+	return signer.GenerateWithClaims(ttl, claims)
 }
 
 func ParseMergeConfidenceToken(signer *jwt.Signer, token string) (*MergeConfidenceScope, error) {
@@ -124,7 +178,21 @@ func ParseMergeConfidenceToken(signer *jwt.Signer, token string) (*MergeConfiden
 	}
 	raw, _ := claims["enabled_checks"].(string)
 	scope.EnabledChecks = parseMergeConfidenceChecksClaim(raw)
+	labels, _ := claims["check_labels"].(string)
+	scope.CheckLabels = parseMergeConfidenceCheckLabels(labels)
 	return &scope, nil
+}
+
+func parseMergeConfidenceCheckLabels(raw string) map[string]string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var labels map[string]string
+	if err := json.Unmarshal([]byte(raw), &labels); err != nil {
+		return nil
+	}
+	return labels
 }
 
 func parseMergeConfidenceChecksClaim(raw string) []string {
@@ -192,13 +260,15 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []BrokerEnv
 		return nil, fmt.Errorf("merge confidence requires JWT_SECRET")
 	}
 
+	enabled, labels := MergeConfidenceChecksFromSteps(steps)
 	token, err := MintMergeConfidenceToken(jwt.NewSigner(secret), MergeConfidenceScope{
 		OrganizationID:  orgID,
 		FactoryID:       *canvas.FactoryID,
 		WorkOrderID:     workOrderID,
 		CanvasRunID:     ctx.RunID,
 		NodeExecutionID: ctx.ID,
-		EnabledChecks:   ParseMergeConfidenceChecks(agentStepPrompts(steps)),
+		EnabledChecks:   enabled,
+		CheckLabels:     labels,
 	}, time.Duration(timeoutSeconds)*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("mint merge confidence token: %w", err)

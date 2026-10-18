@@ -3,16 +3,20 @@ package models
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+const OrganizationSortRemainingCreditCents = "remaining_credit_cents"
 
 type Organization struct {
 	ID uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
@@ -52,13 +56,23 @@ func (o *Organization) HasExperimentalFeature(id string) bool {
 
 type OrganizationWithCounts struct {
 	Organization
-	CanvasCount   int64 `gorm:"column:canvas_count"`
-	TaskCount     int64 `gorm:"column:task_count"`
-	DoneTaskCount int64 `gorm:"column:done_task_count"`
-	MemberCount   int64 `gorm:"column:member_count"`
+	CanvasCount           int64  `gorm:"column:canvas_count"`
+	TaskCount             int64  `gorm:"column:task_count"`
+	DoneTaskCount         int64  `gorm:"column:done_task_count"`
+	MemberCount           int64  `gorm:"column:member_count"`
+	WorkspaceCount        int64  `gorm:"column:workspace_count"`
+	RepositoryCount       int64  `gorm:"column:repository_count"`
+	RemainingCreditMicros *int64 `gorm:"-"`
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
+	if sortBy == OrganizationSortRemainingCreditCents {
+		return listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection)
+	}
+	return listOrganizations(tx, search, limit, offset, sortBy, sortDirection)
+}
+
+func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
 	query := tx.
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
@@ -96,6 +110,58 @@ func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy,
 	}
 
 	return organizations, total, nil
+}
+
+func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offset int, sortDirection string) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc")
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(organizations) == 0 {
+		return []OrganizationWithCounts{}, total, nil
+	}
+
+	ids := make([]uuid.UUID, len(organizations))
+	for i, organization := range organizations {
+		ids[i] = organization.ID
+	}
+	remaining, err := RemainingHostedCreditMicros(tx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	descending := sortDirection != "asc"
+	sort.SliceStable(organizations, func(i, j int) bool {
+		left := pricebook.MicrosToCents(remaining[organizations[i].ID])
+		right := pricebook.MicrosToCents(remaining[organizations[j].ID])
+		if left != right {
+			if descending {
+				return left > right
+			}
+			return left < right
+		}
+		return organizations[i].Name < organizations[j].Name
+	})
+
+	page := sliceOrganizations(organizations, limit, offset)
+	for i := range page {
+		micros := remaining[page[i].ID]
+		page[i].RemainingCreditMicros = &micros
+	}
+	return page, total, nil
+}
+
+func sliceOrganizations(organizations []OrganizationWithCounts, limit, offset int) []OrganizationWithCounts {
+	if offset >= len(organizations) {
+		return []OrganizationWithCounts{}
+	}
+	if offset > 0 {
+		organizations = organizations[offset:]
+	}
+	if limit > 0 && len(organizations) > limit {
+		organizations = organizations[:limit]
+	}
+	return organizations
 }
 
 func FindOrganizationWithCounts(tx *gorm.DB, id uuid.UUID) (*OrganizationWithCounts, error) {
@@ -141,18 +207,35 @@ func withOrganizationCounts(tx *gorm.DB, query *gorm.DB) *gorm.DB {
 		Where("type = ?", UserTypeHuman).
 		Group("organization_id")
 
+	workspaceCountsQuery := tx.
+		Table("factories").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Group("organization_id")
+
+	repositoryCountsQuery := tx.
+		Table("factories").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Where("BTRIM(COALESCE(onboarding_config->>'app_repository', '')) <> ''").
+		Group("organization_id")
+
 	return query.
 		Select(`
 			organizations.*,
 			COALESCE(canvas_counts.count, 0) AS canvas_count,
 			COALESCE(task_counts.count, 0) AS task_count,
 			COALESCE(done_task_counts.count, 0) AS done_task_count,
-			COALESCE(member_counts.count, 0) AS member_count
+			COALESCE(member_counts.count, 0) AS member_count,
+			COALESCE(workspace_counts.count, 0) AS workspace_count,
+			COALESCE(repository_counts.count, 0) AS repository_count
 		`).
 		Joins("LEFT JOIN (?) AS canvas_counts ON canvas_counts.organization_id = organizations.id", canvasCountsQuery).
 		Joins("LEFT JOIN (?) AS task_counts ON task_counts.organization_id = organizations.id", taskCountsQuery).
 		Joins("LEFT JOIN (?) AS done_task_counts ON done_task_counts.organization_id = organizations.id", doneTaskCountsQuery).
-		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery)
+		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery).
+		Joins("LEFT JOIN (?) AS workspace_counts ON workspace_counts.organization_id = organizations.id", workspaceCountsQuery).
+		Joins("LEFT JOIN (?) AS repository_counts ON repository_counts.organization_id = organizations.id", repositoryCountsQuery)
 }
 
 func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
@@ -174,6 +257,12 @@ func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
 		return "COALESCE(done_task_counts.count, 0) " + direction + ", organizations.name ASC"
 	case "member_count":
 		return "COALESCE(member_counts.count, 0) " + direction + ", organizations.name ASC"
+	case "workspace_count":
+		return "COALESCE(workspace_counts.count, 0) " + direction + ", organizations.name ASC"
+	case "repository_count":
+		return "COALESCE(repository_counts.count, 0) " + direction + ", organizations.name ASC"
+	case OrganizationSortRemainingCreditCents:
+		return "organizations.name ASC"
 	default:
 		return "organizations.created_at DESC"
 	}

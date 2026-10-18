@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -60,6 +61,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "invalid provisioned app id")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidLineID):
 		return grpcerrors.InvalidArgument(err, "invalid provisioned line id")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidVCSProvider):
+		return grpcerrors.InvalidArgument(err, "invalid version control provider")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidRepository):
 		return grpcerrors.InvalidArgument(err, "repository must use the owner/name format")
 	case errors.Is(err, models.ErrFactoryOnboardingVCSIntegrationRequired):
@@ -130,14 +133,18 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
 	case errors.Is(err, errFactoryGitHubNotConnected):
 		return grpcerrors.FailedPrecondition(err, "GitHub is not connected.")
+	case errors.Is(err, errFactoryBitbucketNotConnected):
+		return grpcerrors.FailedPrecondition(err, "Bitbucket is not connected.")
 	case errors.Is(err, errCannotCloseBitbucketPullRequest):
 		return grpcerrors.FailedPrecondition(err, "SuperPlane cannot close a Bitbucket pull request.")
+	case errors.Is(err, vcs.ErrNotSupported):
+		return grpcerrors.FailedPrecondition(err, "SuperPlane does not support this for Bitbucket.")
 	case errors.Is(err, errCannotClosePullRequest):
 		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "SuperPlane could not close a previous pull request."))
 	case errors.Is(err, errWorkOrderNotClosedForBacklog):
 		return grpcerrors.FailedPrecondition(err, "Only a closed task can move to the Backlog.")
 	case errors.Is(err, errFactoryPullRequestNotGitHub):
-		return grpcerrors.FailedPrecondition(err, "Only GitHub pull requests can merge from SuperPlane.")
+		return grpcerrors.FailedPrecondition(err, "Only pull requests on the workspace Git host can merge from SuperPlane.")
 	case errors.Is(err, errFactoryPullRequestNotOpen):
 		return grpcerrors.FailedPrecondition(err, "The pull request is not open.")
 	case errors.Is(err, errFactoryPullRequestNotMergeable):
@@ -154,6 +161,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "planning session has ended")
 	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
 		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
+	case errors.Is(err, models.ErrFactorySystemSkillRequired):
+		return grpcerrors.FailedPrecondition(err, "Only system skills can be restored.")
+	case errors.Is(err, models.ErrFactorySystemSkillProtected):
+		return grpcerrors.FailedPrecondition(err, "System skills cannot be deleted, renamed, or disabled.")
 	case errors.Is(err, models.ErrFactoryAgentResourceNotFound):
 		return grpcerrors.NotFound(err, "agent resource not found")
 	case errors.Is(err, models.ErrFactoryAgentResourceKindInvalid):
@@ -162,6 +173,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "name must be lowercase letters, digits, and dashes")
 	case errors.Is(err, models.ErrFactoryAgentResourceNameReserved):
 		return grpcerrors.InvalidArgument(err, "the name superplane is reserved")
+	case errors.Is(err, models.ErrFactoryAgentResourceNameSetupReserved):
+		return grpcerrors.InvalidArgument(err, "the name setup is reserved for setup commands")
 	case errors.Is(err, models.ErrFactoryAgentResourceNameTaken):
 		return grpcerrors.AlreadyExists(err, "an agent resource with this name already exists")
 	case errors.Is(err, models.ErrFactoryAgentResourceURLTaken):
@@ -180,6 +193,20 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "SKILL.md must be 64 KiB or smaller")
 	case errors.Is(err, models.ErrFactoryAgentResourceMCPCapReached):
 		return grpcerrors.FailedPrecondition(err, "this workspace already has 20 enabled MCP connections")
+	case errors.Is(err, models.ErrFactoryAgentResourceCommandsRequired):
+		return grpcerrors.InvalidArgument(err, "setup commands are required")
+	case errors.Is(err, models.ErrFactoryAgentResourceCommandTooLarge):
+		return grpcerrors.InvalidArgument(err, "setup commands must be 32 KiB or smaller")
+	case errors.Is(err, models.ErrFactoryAgentResourceTooManyCommands):
+		return grpcerrors.InvalidArgument(err, "use at most 100 setup commands")
+	case errors.Is(err, models.ErrFactoryAgentResourceRepositoryRequired):
+		return grpcerrors.InvalidArgument(err, "repository is required")
+	case errors.Is(err, models.ErrFactoryAgentResourceRepositoryInvalid):
+		return grpcerrors.InvalidArgument(err, "repository must use the owner/name format")
+	case errors.Is(err, models.ErrFactoryAgentResourceRepositoryTaken):
+		return grpcerrors.AlreadyExists(err, "this repository is already added")
+	case errors.Is(err, models.ErrFactoryAgentResourceContextRepoCapReached):
+		return grpcerrors.FailedPrecondition(err, "this workspace already has 20 context repositories")
 	case errors.Is(err, errFactoryAgentResourceNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this MCP server first.")
 	case errors.Is(err, errListMCPTools):
@@ -218,12 +245,12 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
-	case errors.Is(err, errRiskScoreDisabled):
-		return grpcerrors.FailedPrecondition(err, "Merge confidence is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceMCPDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace MCP is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
+	case errors.Is(err, errWorkspaceAgentDisabled):
+		return grpcerrors.FailedPrecondition(err, "SuperPlane Agent is not enabled for this organization.")
 	case errors.Is(err, errSuperPlaneMCPServerDisabled):
 		return grpcerrors.FailedPrecondition(err, "MCP Server is not enabled for this organization.")
 	case errors.Is(err, models.ErrMCPOAuthRefreshNotFound):
@@ -244,9 +271,9 @@ var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server fi
 var errListMCPTools = errors.New("could not list MCP tools")
 var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
-var errRiskScoreDisabled = errors.New("risk score is not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
+var errWorkspaceAgentDisabled = errors.New("workspace agent is not enabled")
 var errSuperPlaneMCPServerDisabled = errors.New("superplane MCP server is not enabled")
 var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")
 var errCannotClosePullRequest = errors.New("could not close a previous pull request")

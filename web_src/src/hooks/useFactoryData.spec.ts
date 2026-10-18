@@ -5,21 +5,62 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { clearBacklogAnalysisPending, pendingBacklogAnalysisIds } from "@/pages/factories/lib/backlogAnalysis";
 
-const { factoriesCreateWorkOrder } = vi.hoisted(() => ({
-  factoriesCreateWorkOrder: vi.fn(),
-}));
+const { factoriesCreateWorkOrder, factoriesSelectFactoryVcsProviderRepository, organizationsListIntegrations } =
+  vi.hoisted(() => ({
+    factoriesCreateWorkOrder: vi.fn(),
+    factoriesSelectFactoryVcsProviderRepository: vi.fn(),
+    organizationsListIntegrations: vi.fn(),
+  }));
 
 vi.mock("@/api-client", () => ({
   factoriesCreateWorkOrder,
+  factoriesSelectFactoryVcsProviderRepository,
+  organizationsListIntegrations,
 }));
 
-import { mergeFactoryBoardWorkOrders, useCreateWorkOrder } from "./useFactoryData";
+import {
+  factoryQueryKeys,
+  mergeFactoryBoardWorkOrders,
+  useCreateWorkOrder,
+  useSelectFactoryVcsProviderRepository,
+} from "./useFactoryData";
+import { useConnectedIntegrations } from "./useIntegrations";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return createElement(QueryClientProvider, { client: queryClient }, children);
   };
 }
+
+describe("useSelectFactoryVcsProviderRepository", () => {
+  it("refreshes connections created by repository selection before the save completes", async () => {
+    const integration = {
+      metadata: { id: "bitbucket-1", name: "acme-bitbucket", integrationName: "bitbucket" },
+      status: { state: "ready" },
+    };
+    organizationsListIntegrations.mockResolvedValueOnce({ data: { integrations: [] } });
+    organizationsListIntegrations.mockResolvedValue({ data: { integrations: [integration] } });
+    factoriesSelectFactoryVcsProviderRepository.mockResolvedValue({
+      data: { factory: { id: "factory-1", onboarding: { vcsIntegrationId: "bitbucket-1" } } },
+    });
+    const queryClient = new QueryClient();
+    const { result } = renderHook(
+      () => ({
+        connections: useConnectedIntegrations("org-1"),
+        selectRepository: useSelectFactoryVcsProviderRepository("org-1", "factory-1", "bitbucket"),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.connections.isSuccess).toBe(true));
+    expect(result.current.connections.data).toEqual([]);
+
+    await act(async () => {
+      await result.current.selectRepository.mutateAsync({ repository: "acme/api" });
+      expect(queryClient.getQueryData(["integrations", "connected", "org-1"])).toEqual([integration]);
+    });
+  });
+});
 
 describe("mergeFactoryBoardWorkOrders", () => {
   it("keeps one row when backlog, open, and done share an id", () => {
@@ -31,19 +72,28 @@ describe("mergeFactoryBoardWorkOrders", () => {
 });
 
 describe("useCreateWorkOrder", () => {
+  const createdOrderIds = ["wo-created-1", "wo-planning-on", "wo-planning-off"];
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    clearBacklogAnalysisPending("wo-created-1");
+    for (const orderId of createdOrderIds) {
+      clearBacklogAnalysisPending(orderId);
+    }
   });
 
-  it("marks the new order pending analysis and invalidates backlog-analysis-runs", async () => {
-    factoriesCreateWorkOrder.mockResolvedValue({ data: { order: { id: "wo-created-1" } } });
-    const queryClient = new QueryClient();
-    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+  function seedFactory(queryClient: QueryClient, enabled: boolean) {
+    queryClient.setQueryData(factoryQueryKeys.detail("org-1", "factory-1"), {
+      id: "factory-1",
+      planning: { enabled },
+    });
+  }
 
+  async function createOrder(queryClient: QueryClient, orderId: string) {
+    factoriesCreateWorkOrder.mockResolvedValue({ data: { order: { id: orderId } } });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useCreateWorkOrder("org-1", "factory-1"), {
       wrapper: createWrapper(queryClient),
     });
@@ -52,9 +102,47 @@ describe("useCreateWorkOrder", () => {
       await result.current.mutateAsync({ title: "New task", description: "" });
     });
 
-    await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-created-1")).toBe(true));
+    return invalidateSpy;
+  }
+
+  function expectListAndRunInvalidation(invalidateSpy: ReturnType<typeof vi.spyOn>) {
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrdersPagePrefix("org-1", "factory-1"),
+    });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["backlog-analysis-runs", "org-1"],
     });
+  }
+
+  it("marks the new order pending analysis when Planning is on", async () => {
+    const queryClient = new QueryClient();
+    seedFactory(queryClient, true);
+
+    const invalidateSpy = await createOrder(queryClient, "wo-planning-on");
+
+    await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-planning-on")).toBe(true));
+    expectListAndRunInvalidation(invalidateSpy);
+  });
+
+  it("marks the new order pending analysis when the factory cache is missing", async () => {
+    const queryClient = new QueryClient();
+
+    const invalidateSpy = await createOrder(queryClient, "wo-created-1");
+
+    await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-created-1")).toBe(true));
+    expectListAndRunInvalidation(invalidateSpy);
+  });
+
+  it("does not mark analysis pending when Planning is off", async () => {
+    const queryClient = new QueryClient();
+    seedFactory(queryClient, false);
+
+    const invalidateSpy = await createOrder(queryClient, "wo-planning-off");
+
+    expect(pendingBacklogAnalysisIds().has("wo-planning-off")).toBe(false);
+    expectListAndRunInvalidation(invalidateSpy);
   });
 });

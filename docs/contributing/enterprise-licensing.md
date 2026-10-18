@@ -14,6 +14,60 @@ without them.
 2. Otherwise, the license that an administrator installs in the UI is the
    source.
 
+## Installing a license
+
+Installation administrators manage the license on the **Installation Admin >
+License** page. During owner setup, Community is the default. The owner adds
+an Enterprise license only if they have one, and can add it later. SuperPlane
+accepts only a license that is valid now. To renew a license or add features,
+install the new license.
+
+Installation administrators see a banner when the license is expired or expires
+within 30 days. `SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER` hides that banner when
+it is `yes` or `true`. The default is `no`. Hosted SuperPlane sets it to `yes`.
+
+## Enterprise code
+
+Code in the `ee/` directory is subject to the SuperPlane Enterprise Edition
+License in `ee/LICENSE`. All other code is licensed under the Apache License,
+Version 2.0. To add an Enterprise feature, follow
+[`ee/README.md`](../../ee/README.md).
+
+The Enterprise features are:
+
+| Feature        | Operations that require the license                    |
+| -------------- | ------------------------------------------------------ |
+| `custom_roles` | Create or update a custom role. Assign a custom role.  |
+| `groups`       | Create or update a group. Add a user to a group.       |
+
+When a license expires, existing custom roles and groups continue to work,
+and administrators can still remove them.
+
+## Feature registry
+
+`licensing.Service` answers whether the current license grants a feature such
+as `custom_roles` or `groups`. `enterprise.Registry` answers which code runs
+that feature. The two stay separate. The component registry in
+`pkg/registry/registry.go` uses the same lookup: register an implementation
+under a name, then ask for that name and receive the interface.
+
+```go
+rbac, err := enterprise.Get[enterprise.Rbac](registry, enterprise.RBAC)
+```
+
+Go has no generic methods, so `Get` is a function. A missing key or a value of
+the wrong type is an error. `NewRegistry` registers a Community `Rbac` that
+refuses every operation, so a server with no Enterprise registration fails
+closed.
+
+One registry key can cover more than one license feature. `custom_roles` and
+`groups` are two license features and one `Rbac` implementation. A new feature
+registers a new interface under a new key. It does not add methods to `Rbac`.
+
+`pkg/server` is the only registration site, because it is the only core
+package that may import `ee/`. The steps for adding a feature are in
+[`ee/README.md`](../../ee/README.md).
+
 ## Local development
 
 `make dev.server` enables every Enterprise feature when no license is

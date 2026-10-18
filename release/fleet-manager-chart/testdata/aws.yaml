@@ -1,0 +1,30 @@
+manager:
+  id: test-aws
+superplane:
+  url: https://superplane.example.com
+installationAdminToken: fleet-manager-personal-token
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/fleet-manager
+fleets:
+  - id: e1-large-amd64
+    runnerVersion: v0.1.0
+    warmCapacity: 0
+    maxCapacity: 1
+    spec:
+      operatingSystem: linux
+      architecture: amd64
+      cpuMillicores: 2000
+      memoryMb: 8192
+      diskGb: 30
+      capabilities: [docker]
+    provider: aws
+    aws:
+      region: us-east-1
+      ami: ami-test
+      instanceType: m8a.large
+      architecture: amd64
+      subnetIds: [subnet-test]
+      securityGroupIds: [sg-test]
+      iamInstanceProfile: runner
+      volumeSizeGb: 30

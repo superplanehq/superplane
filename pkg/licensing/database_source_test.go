@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -91,6 +92,31 @@ func TestDatabaseKeyListCache(t *testing.T) {
 	newer := verified(3)
 	require.NoError(t, cache.Save(ctx, newer))
 	require.NoError(t, cache.Save(ctx, verified(2)))
+
+	document, err = cache.Load(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, newer.Document, document, "an older list never replaces a newer one")
+}
+
+func TestDatabaseRevocationListCache(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	ctx := context.Background()
+	cache := licensing.DatabaseRevocationListCache{}
+	root := licensingtest.NewIssuer("root-2026")
+	verified := func(version int64, ids ...uuid.UUID) *licensing.RevocationList {
+		list, err := licensing.VerifyRevocationList(root.RevocationList(version, ids...), licensingtest.KeySet(root))
+		require.NoError(t, err)
+		return list
+	}
+
+	document, err := cache.Load(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, document)
+
+	newer := verified(3, uuid.New())
+	require.NoError(t, cache.Save(ctx, newer))
+	require.NoError(t, cache.Save(ctx, verified(2, uuid.New())))
 
 	document, err = cache.Load(ctx)
 	require.NoError(t, err)

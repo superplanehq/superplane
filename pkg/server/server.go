@@ -18,17 +18,21 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/ee/rbac"
 	"github.com/superplanehq/superplane/pkg/agents"
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/blob"
+	blobazure "github.com/superplanehq/superplane/pkg/blob/azure"
 	blobfilesystem "github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/blob/gcs"
 	s3blob "github.com/superplanehq/superplane/pkg/blob/s3"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
@@ -76,6 +80,32 @@ func getAgentProviderOverride() agents.Provider {
 	agentProviderOverride.Lock()
 	defer agentProviderOverride.Unlock()
 	return agentProviderOverride.provider
+}
+
+var licenseServiceOverride = struct {
+	sync.Mutex
+	service *licensing.Service
+}{}
+
+// SetLicenseServiceForTests replaces the license service that Start creates.
+// End-to-end tests use it with licenses signed by ephemeral test keys.
+func SetLicenseServiceForTests(service *licensing.Service) func() {
+	licenseServiceOverride.Lock()
+	previous := licenseServiceOverride.service
+	licenseServiceOverride.service = service
+	licenseServiceOverride.Unlock()
+
+	return func() {
+		licenseServiceOverride.Lock()
+		licenseServiceOverride.service = previous
+		licenseServiceOverride.Unlock()
+	}
+}
+
+func getLicenseServiceOverride() *licensing.Service {
+	licenseServiceOverride.Lock()
+	defer licenseServiceOverride.Unlock()
+	return licenseServiceOverride.service
 }
 
 func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
@@ -126,6 +156,38 @@ func buildAgentService(authService authorization.Authorization) (agents.Provider
 	return provider, service
 }
 
+// Cloud has the GitHub App in the process environment at boot. A self-hosted
+// installation stores the app after the first workspace setup, so this waits
+// until that app exists and then starts the catalog worker.
+func startGitHubAppCatalogWorker(ctx context.Context) {
+	loggedWait := false
+	for {
+		cfg, err := githubapp.ResolveProcess(ctx)
+		switch {
+		case err != nil:
+			log.WithError(err).Error("Failed to load the GitHub App for the catalog")
+		case cfg.Enabled():
+			catalog, catalogErr := githubapp.NewCatalog(database.Conn(), cfg)
+			if catalogErr != nil {
+				log.WithError(catalogErr).Error("Failed to initialize the GitHub App catalog")
+				break
+			}
+			log.Println("Starting GitHub App Catalog Worker")
+			workers.NewVCSProviderCatalogWorker(models.ProviderGitHub, catalog).Start(ctx)
+			return
+		case !loggedWait:
+			log.Println("GitHub App catalog waits until the app is configured")
+			loggedWait = true
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(15 * time.Second):
+		}
+	}
+}
+
 func startWorkers(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
@@ -171,16 +233,7 @@ func startWorkers(
 		panic(err)
 	}
 
-	githubAppConfig := config.LoadGitHubHostedAppConfig()
-	if githubAppConfig.Enabled() {
-		catalog, err := githubapp.NewCatalog(database.Conn(), githubAppConfig)
-		if err != nil {
-			log.WithError(err).Error("Failed to initialize the GitHub App catalog")
-		} else {
-			log.Println("Starting GitHub App Catalog Worker")
-			go workers.NewVCSProviderCatalogWorker(models.ProviderGitHub, catalog).Start(context.Background())
-		}
-	}
+	go startGitHubAppCatalogWorker(context.Background())
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
@@ -426,7 +479,11 @@ func buildGRPCServices(
 	oidcProvider oidc.Provider,
 	agentService agentsActions.AgentsService,
 	jwtSigner *jwt.Signer,
+	licenseService *licensing.Service,
 ) (*grpc.Services, error) {
+	features := enterprise.NewRegistry()
+	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
+
 	return grpc.NewServices(grpc.ServicesConfig{
 		BaseURL:          baseURL,
 		WebhooksBaseURL:  webhooksBaseURL,
@@ -437,6 +494,8 @@ func buildGRPCServices(
 		OIDCProvider:     oidcProvider,
 		AgentService:     agentService,
 		JWTSigner:        jwtSigner,
+		Entitlements:     licenseService,
+		Enterprise:       features,
 	})
 }
 
@@ -699,6 +758,10 @@ func Start() {
 		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
 	}
 
+	bitbucketapp.SetSystemTokenSource(func(installationID string) (string, time.Time, error) {
+		return bitbucketapp.LoadSystemToken(context.Background(), database.Conn(), encryptorInstance, installationID, time.Now())
+	})
+
 	if err := llm.SeedDevHostedOpenRouterFromEnv(context.Background(), database.Conn(), encryptorInstance); err != nil {
 		log.WithError(err).Error("development hosted OpenRouter seed skipped")
 	}
@@ -812,6 +875,7 @@ func Start() {
 			oidcProvider,
 			agentService,
 			jwtSigner,
+			licenseService,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)
@@ -849,6 +913,10 @@ func Start() {
 }
 
 func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
+	if override := getLicenseServiceOverride(); override != nil {
+		return override
+	}
+
 	extraKeys, source := developmentLicense(licensing.SourceFromEnvironment(encryptor))
 	keys, err := licensing.TrustedKeyStore(extraKeys)
 	if err != nil {
@@ -861,7 +929,13 @@ func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
 	}
 
 	keySync := licensing.NewKeySync(keys, licensing.DatabaseKeyListCache{}, keysURL)
-	service := licensing.NewService(licensing.NewVerifier(keys), source, licensing.WithKeySync(keySync))
+	revocations := licensing.NewRevocationSync(keys.Roots(), licensing.DatabaseRevocationListCache{}, licensing.RevocationsURL(keysURL))
+	service := licensing.NewService(
+		licensing.NewVerifier(keys),
+		source,
+		licensing.WithKeySync(keySync),
+		licensing.WithRevocationSync(revocations),
+	)
 	service.Start(context.Background())
 	return service
 }
@@ -899,6 +973,9 @@ func newBlobProvider() (blob.Provider, error) {
 	case blob.ProviderS3:
 		log.Println("Creating S3 blob storage provider")
 		return s3blob.NewProvider()
+	case blob.ProviderAzure:
+		log.Println("Creating Azure blob storage provider")
+		return blobazure.NewProvider()
 	case blob.ProviderFilesystem:
 		log.Println("Creating filesystem blob storage provider")
 		return blobfilesystem.NewProvider()

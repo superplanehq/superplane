@@ -2,23 +2,15 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import {
-  FEATURE_ORGANIZATION_BYOK,
-  FEATURE_SUPERPLANE_MCP_SERVER,
-  FEATURE_WORKSPACE_MCP,
-  FEATURE_WORKSPACE_SKILLS,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsGeneralPage,
-  FactorySettingsAgentPage,
   FactorySettingsConnectPage,
   FactorySettingsMCPPage,
-  FactorySettingsMCPConnectionPage,
   FactorySettingsSkillsPage,
-  FactorySettingsSkillEditorPage,
   FactorySettingsRepositoryPage,
   OrganizationSettingsOverviewPage,
 } from "@/pages/factories";
@@ -40,16 +32,19 @@ import {
 } from "@/pages/factories/pages/settings/FactoryOrganizationSettingsPages";
 import {
   AccountLinkedAccountsRedirect,
-  LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
   OrganizationUsageRedirect,
+  WorkspaceAgentMcpConnectionRedirect,
+  WorkspaceAgentSettingsRedirect,
+  WorkspaceAgentSkillRedirect,
   WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
+import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
 
 export const factorySettingsSectionRoutes = [
-  <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
+  <Route key="factory-settings-index" index element={<FactorySettingsIndexRoute />} />,
   <Route
     key="factory-settings-account-general"
     path="account/general"
@@ -101,13 +96,7 @@ export const factorySettingsSectionRoutes = [
   <Route
     key="factory-settings-workspace-mcp-connection"
     path="workspace/mcp/:resourceId"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MCP}>
-          <FactorySettingsMCPConnectionPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
+    element={<WorkspaceAgentMcpConnectionRedirect />}
   />,
   <Route
     key="factory-settings-workspace-mcp-legacy"
@@ -118,17 +107,7 @@ export const factorySettingsSectionRoutes = [
       </RequirePermission>
     }
   />,
-  <Route
-    key="factory-settings-workspace-agent"
-    path="workspace/agent"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}>
-          <FactorySettingsAgentPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
-  />,
+  <Route key="factory-settings-workspace-agent" path="workspace/agent" element={<WorkspaceAgentSettingsRedirect />} />,
   <Route
     key="factory-settings-workspace-superplane-mcp-server"
     path="workspace/superplane-mcp-server"
@@ -148,24 +127,12 @@ export const factorySettingsSectionRoutes = [
   <Route
     key="factory-settings-workspace-skills-new"
     path="workspace/skills/new"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_SKILLS}>
-          <FactorySettingsSkillEditorPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
+    element={<WorkspaceAgentSkillRedirect />}
   />,
   <Route
     key="factory-settings-workspace-skills-edit"
     path="workspace/skills/:resourceId"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_SKILLS}>
-          <FactorySettingsSkillEditorPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
+    element={<WorkspaceAgentSkillRedirect />}
   />,
   <Route
     key="factory-settings-workspace-skills-legacy"

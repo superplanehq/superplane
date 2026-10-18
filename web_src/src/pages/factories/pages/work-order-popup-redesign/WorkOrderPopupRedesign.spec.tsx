@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFactoriesFixture";
+import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
 import { WorkOrderPopupRedesignPlayground } from "./WorkOrderPopupRedesignPlayground";
 import { AGENT_WORK_POPUP_RUNNING } from "./workOrderPopupMocks";
 
@@ -152,7 +153,8 @@ describe("Line board job popup", () => {
     expect(cardVerdict("wo-review-pay-844")).toContain("Confidence score 4 of 5");
     expect(cardVerdict("wo-review-pay-845")).toContain("Confidence score 3 of 5");
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-845")).toHaveAttribute("data-tone", "caution");
-    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).toHaveTextContent("Confidence3/5");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).toHaveTextContent("Confidence");
+    expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).not.toHaveTextContent(/\d/);
     expect(screen.queryByLabelText("Plan phase")).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("Implement phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(3);
     expect(
@@ -191,7 +193,7 @@ describe("Line board job popup", () => {
         name: "Open Add refund reason enum to schema",
       }),
     ).toBeInTheDocument();
-    expect(within(screen.getByTestId("lines-done-column")).getAllByRole("button", { name: /^Open / })).toHaveLength(2);
+    expect(within(screen.getByTestId("lines-done-column")).getAllByRole("button", { name: /^Open / })).toHaveLength(4);
     expect(
       within(screen.getByTestId("lines-done-column")).getByRole("button", {
         name: "Open Send refund receipts after provider confirm",
@@ -203,15 +205,15 @@ describe("Line board job popup", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("lines-done-column")).queryByRole("button", {
+      within(screen.getByTestId("lines-done-column")).getByRole("button", {
         name: "Open Replace the refund batch exporter",
       }),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("lines-done-column")).queryByRole("button", {
+      within(screen.getByTestId("lines-done-column")).getByRole("button", {
         name: "Open Migrate refunds to the v2 provider API",
       }),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
     await user.click(card);
 
     const dialog = await screen.findByTestId("work-order-split-run");
@@ -354,12 +356,23 @@ describe("Line board job popup", () => {
   it("dispatches a draft task to the open line", async () => {
     const user = userEvent.setup();
     const line = REFUND_FACTORY_LINES[0];
+    const orderId = "wo-review-pay-842";
+    const fixture = {
+      ...lineMetricsFactoriesFixture,
+      artifactsByOrderId: {
+        ...lineMetricsFactoriesFixture.artifactsByOrderId,
+        [orderId]: [
+          {
+            id: "plan-review-pay-842",
+            type: "TYPE_MARKDOWN" as const,
+            data: { name: SPEC_ARTIFACT_NAME, title: SPEC_ARTIFACT_NAME, body: "# Plan\n\nImplement the retry." },
+          },
+        ],
+      },
+    };
 
     render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
-        factoriesFixture={lineMetricsFactoriesFixture}
-      />,
+      <FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`} factoriesFixture={fixture} />,
     );
 
     const card = await screen.findByTestId("work-order-card-wo-review-pay-842", {}, { timeout: 8000 });

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { INLINE_SKILL, UI_UX_PRO_MAX_SKILL } from "../../__fixtures__/agentResourceFixtures";
@@ -22,15 +22,17 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 
-function skillsHarness(pathSuffix: string, resources: (typeof INLINE_SKILL)[]) {
+function skillsHarness(pathSuffix: string, resources: (typeof INLINE_SKILL)[], failSkillUsage = false) {
   return (
     <FactoriesHarness
       pathSuffix={pathSuffix}
-      experimentalFeatures={[FEATURE_WORKSPACE_SKILLS]}
+      experimentalFeatures={[FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
+        skillUsageByName: { [INLINE_SKILL.name!]: [{ id: "implementation", name: "Implement changes" }] },
+        failSkillUsage,
         agentResourcesByFactoryId: {
           [PRIMARY_FACTORY_ID]: resources,
         },
@@ -52,5 +54,18 @@ export const GitHubSkill: Story = {
 };
 
 export const EditorNew: Story = {
-  render: () => skillsHarness(`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills/new`, [INLINE_SKILL]),
+  render: () => skillsHarness(`${agentPath}/skills/new`, [INLINE_SKILL]),
+};
+
+export const InUseSkill: Story = {
+  render: () => skillsHarness(`${agentPath}/skills/${INLINE_SKILL.id}`, [INLINE_SKILL]),
+};
+export const InUseSystemSkill: Story = {
+  render: () =>
+    skillsHarness(`${agentPath}/skills/${INLINE_SKILL.id}`, [
+      { ...INLINE_SKILL, systemSkill: { templateId: "refine-task", version: 1 } },
+    ]),
+};
+export const UsageCheckError: Story = {
+  render: () => skillsHarness(`${agentPath}/skills/${INLINE_SKILL.id}`, [INLINE_SKILL], true),
 };

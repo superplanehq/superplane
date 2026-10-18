@@ -7,7 +7,6 @@ import { useLocation } from "react-router";
 
 import { IntakeSetupWizard } from "./IntakeSetupWizard";
 import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
-import { LinearLabelField } from "./LinearIntakeFilterFields";
 import { LinearProjectPicker } from "./LinearProjectPicker";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 import { useLinearIntakeSetup, type LinearIntakeSetupModel } from "./useLinearIntakeSetup";
@@ -46,26 +45,14 @@ export function LinearIntakeSetupDialog(props: LinearIntakeSetupDialogProps) {
         resourceStepCaption="Awaiting projects"
         stepAction={
           showConnectAction ? (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                disabled={setup.connecting}
-                onClick={() => void setup.connectLinear()}
-                data-testid="linear-setup-connect"
-              >
-                {setup.connecting ? LINEAR_INTAKE_SETUP_COPY.wizardConnecting : LINEAR_INTAKE_SETUP_COPY.wizardConnect}
-              </Button>
-              {setup.hosted ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setup.setConnectOpen(true)}
-                  data-testid="linear-setup-own-app"
-                >
-                  {LINEAR_INTAKE_SETUP_COPY.wizardOwnApp}
-                </Button>
-              ) : null}
-            </div>
+            <Button
+              type="button"
+              disabled={setup.connecting}
+              onClick={() => void setup.connectLinear()}
+              data-testid="linear-setup-connect"
+            >
+              {setup.connecting ? LINEAR_INTAKE_SETUP_COPY.wizardConnecting : LINEAR_INTAKE_SETUP_COPY.wizardConnect}
+            </Button>
           ) : undefined
         }
         footer={<SetupFooter setup={setup} onCreated={props.onCreated} />}
@@ -120,23 +107,14 @@ function SetupStepBody({ setup }: { setup: LinearIntakeSetupModel }) {
   }
 
   return (
-    <div className="space-y-6">
-      <LinearProjectPicker
-        projects={setup.projectsQuery.data ?? []}
-        selectedIds={setup.projectIds}
-        loading={setup.projectsQuery.isLoading}
-        error={setup.projectsQuery.isError}
-        onToggle={setup.toggleProject}
-        onRetry={() => void setup.projectsQuery.refetch()}
-      />
-      <div>
-        <p className="text-[13px] font-medium">{LINEAR_INTAKE_SETUP_COPY.labelsLabel}</p>
-        <p className="workspace-body-text mt-1 text-muted-foreground">{LINEAR_INTAKE_SETUP_COPY.labelsHelper}</p>
-        <div className="mt-2">
-          <LinearLabelField labels={setup.labels} onChange={setup.setLabels} />
-        </div>
-      </div>
-    </div>
+    <LinearProjectPicker
+      projects={setup.projectsQuery.data ?? []}
+      selectedIds={setup.projectIds}
+      loading={setup.projectsQuery.isLoading}
+      error={setup.projectsQuery.isError}
+      onToggle={setup.toggleProject}
+      onRetry={() => void setup.projectsQuery.refetch()}
+    />
   );
 }
 

@@ -1,0 +1,69 @@
+version: v1.0
+name: "Prepare Runner Release"
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: DOCKER_BUILDKIT
+      value: "1"
+  prologue:
+    commands:
+      - checkout
+      - test -n "$RELEASE_VERSION"
+      - test -n "$SEMAPHORE_GIT_SHA"
+      - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
+
+blocks:
+  - name: "Build and Verify"
+    task:
+      jobs:
+        - name: "Prepare immutable artifacts"
+          commands:
+            - bash release/verify-component-release-source.sh runner "$RELEASE_VERSION"
+            - make dev.up
+            - make dev.setup
+            - make test PKG_TEST_PACKAGES='./cmd/runner ./pkg/runners/...'
+            - make test.release
+            - sudo apt-get update
+            - sudo apt-get install -y qemu-user-static
+            - docker buildx create --driver docker-container --use --name "component-release-$SEMAPHORE_JOB_ID"
+            - docker buildx inspect --bootstrap
+            - bash release/runner/build.sh "$RELEASE_VERSION"
+            - bash release/fetch-component-release-history.sh
+            - |
+              set -euo pipefail
+              release_dir="build/runner/$RELEASE_VERSION"
+              node release/component-release.js generate-release-notes \
+                --component runner \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --output "$release_dir/release-notes.md"
+              node release/component-release.js create-manifest \
+                --component runner \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
+                --pipeline-id "$SEMAPHORE_PIPELINE_ID" \
+                --directory "$release_dir" \
+                --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
+                --output "$release_dir/release-manifest.json"
+              (cd "$release_dir" && sha256sum release-manifest.json >release-manifest.sha256)
+              bash release/component-release-artifact.sh \
+                push runner "$RELEASE_VERSION" "$release_dir"
+
+promotions:
+  - name: Publish Runner Release
+    pipeline_file: publish-runner-release.yml
+    deployment_target: release
+    auto_promote:
+      when: "branch = 'main' AND result = 'passed'"
+    parameters:
+      env_vars:
+        - name: RELEASE_VERSION
+          required: true
+          default_value: "${{parameters.RELEASE_VERSION}}"
+          description: Prepared Runner version

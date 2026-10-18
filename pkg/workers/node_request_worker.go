@@ -69,6 +69,12 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
+			checksRequests, checksErr := models.ListDuePullRequestChecksStartRequests(database.DB(ctx))
+			if checksErr != nil {
+				w.logger.WithError(checksErr).Error("Error finding checks startup requests")
+			}
+			requests = append(requests, checksRequests...)
+
 			telemetry.RecordNodeRequestWorkerRequestsCount(context.Background(), len(requests))
 
 			for _, request := range requests {
@@ -98,6 +104,22 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 }
 
 func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeRequest) error {
+	if request.Type == models.NodeRequestTypePullRequestChecksStart {
+		events, err := factoryactions.ProcessPullRequestChecksStartRequest(context.Background(), w.factoryIntakeDeps(), request.ID)
+		if err != nil {
+			return err
+		}
+		for i := range events {
+			if err := messages.PublishCanvasEventCreatedMessage(&events[i]); err != nil {
+				w.logger.WithError(err).Warnf("checks: failed to publish event %s", events[i].ID)
+			}
+		}
+		return nil
+	}
+	if request.Type == models.NodeRequestTypeVisualEvidenceCapture {
+		return w.processVisualEvidenceCapture(request)
+	}
+
 	logger := w.logger.WithFields(log.Fields{"request": request.ID})
 
 	logger.Infof("Locking and processing request")
@@ -181,10 +203,35 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 			recorded.factoryID,
 			recorded.pullRequestID,
 		)
+		factoryactions.StartPullRequestChecks(context.Background(), w.factoryIntakeDeps(), recorded.pullRequestID)
+		factoryactions.StartVisualEvidenceCapture(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			recorded.organizationID,
+			recorded.factoryID,
+			recorded.pullRequestID,
+		)
 	}
 
 	runCancellations.Publish()
 
+	return nil
+}
+
+func (w *NodeRequestWorker) processVisualEvidenceCapture(request models.CanvasNodeRequest) error {
+	events, err := factoryactions.ProcessVisualEvidenceCaptureRequest(
+		context.Background(),
+		w.factoryIntakeDeps(),
+		request.ID,
+	)
+	if err != nil {
+		return err
+	}
+	for i := range events {
+		if err := messages.PublishCanvasEventCreatedMessage(&events[i]); err != nil {
+			w.logger.WithError(err).Warnf("visual evidence: failed to publish event %s", events[i].ID)
+		}
+	}
 	return nil
 }
 
@@ -482,6 +529,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
+			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
 			WithRemoteImageIngest(w.encryptor, w.registry),

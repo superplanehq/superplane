@@ -29,7 +29,7 @@ func TestMergeConfidenceCheckParams(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.check, func(t *testing.T) {
-			params, err := mergeConfidenceCheckParams(tc.check, tc.score, "One sentence.", enabled)
+			params, err := mergeConfidenceCheckParams(tc.check, tc.score, "One sentence.", enabled, nil)
 			require.NoError(t, err)
 			assert.Equal(t, tc.key, params.Key)
 			assert.Equal(t, tc.name, params.Name)
@@ -42,18 +42,31 @@ func TestMergeConfidenceCheckParams(t *testing.T) {
 }
 
 func TestMergeConfidenceCheckParamsRejectsDisabledAndInvalidScores(t *testing.T) {
-	_, err := mergeConfidenceCheckParams("performance", 5, "One sentence.", []string{"risk"})
+	_, err := mergeConfidenceCheckParams("performance", 5, "One sentence.", []string{"risk"}, nil)
 	assert.ErrorIs(t, err, ErrMergeConfidenceDisabled)
 
-	_, err = mergeConfidenceCheckParams("risk", 6, "One sentence.", []string{"risk"})
+	_, err = mergeConfidenceCheckParams("risk", 6, "One sentence.", []string{"risk"}, nil)
 	assert.ErrorIs(t, err, ErrMergeConfidenceInvalid)
 
-	_, err = mergeConfidenceCheckParams("risk", 1.5, "One sentence.", []string{"risk"})
+	_, err = mergeConfidenceCheckParams("risk", 1.5, "One sentence.", []string{"risk"}, nil)
 	assert.ErrorIs(t, err, ErrMergeConfidenceInvalid)
 
-	_, err = mergeConfidenceCheckParams("unknown", 1, "One sentence.", []string{"risk"})
+	_, err = mergeConfidenceCheckParams("not a check", 1, "One sentence.", []string{"not a check"}, nil)
 	assert.ErrorIs(t, err, ErrMergeConfidenceInvalid)
 
-	_, err = mergeConfidenceCheckParams("risk", 1, "  ", []string{"risk"})
+	_, err = mergeConfidenceCheckParams("risk", 1, "  ", []string{"risk"}, nil)
 	assert.ErrorIs(t, err, ErrMergeConfidenceInvalid)
+}
+
+func TestMergeConfidenceCustomCheckUsesTheStepName(t *testing.T) {
+	params, err := mergeConfidenceCheckParams("api-latency", 4, "The new query scans the whole table.", []string{"api-latency"}, map[string]string{
+		"api-latency": "API latency",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "api-latency-review", params.Key)
+	assert.Equal(t, "API latency", params.Name)
+	assert.Equal(t, checkfactory.CheckLevelCritical, params.Level)
+
+	_, err = mergeConfidenceCheckParams("api-latency", 4, "The new query scans the whole table.", []string{"risk"}, nil)
+	assert.ErrorIs(t, err, ErrMergeConfidenceDisabled)
 }

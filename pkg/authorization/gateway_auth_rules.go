@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -827,7 +828,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryCustomAutomations},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/scheduled-intake/preview"}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryScheduledIntake},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/intakes"}: {
 			Resource:                     "factories",
@@ -871,6 +876,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/restore"}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceSkills},
+		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/oauth:start"}: {
 			Resource:                     "factories",
 			Action:                       "update",
@@ -884,14 +893,16 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
 		},
 		{Method: "POST", Pattern: "/api/v1/groups"}: {
-			Resource:   "groups",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "groups",
+			Action:                  "create",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureGroups},
 		},
 		{Method: "POST", Pattern: "/api/v1/groups/{group_name}/users"}: {
-			Resource:   "groups",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "groups",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureGroups},
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/integrations"}: {
 			Resource:   "integrations",
@@ -934,9 +945,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "POST", Pattern: "/api/v1/roles"}: {
-			Resource:   "roles",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "roles",
+			Action:                  "create",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureCustomRoles},
 		},
 		{Method: "POST", Pattern: "/api/v1/roles/{role_name}/users"}: {
 			Resource:   "members",
@@ -1013,9 +1025,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			ResourcePathParams: []string{IDPathParam},
 		},
 		{Method: "PUT", Pattern: "/api/v1/groups/{group_name}"}: {
-			Resource:   "groups",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "groups",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureGroups},
 		},
 		{Method: "PUT", Pattern: "/api/v1/organizations/{id}/integrations/{integration_id}/capabilities"}: {
 			Resource:   "integrations",
@@ -1033,9 +1046,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "PUT", Pattern: "/api/v1/roles/{role_name}"}: {
-			Resource:   "roles",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "roles",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureCustomRoles},
 		},
 		{Method: "PUT", Pattern: "/api/v1/secrets/{id_or_name}/keys/{key_name}"}: {
 			Resource:   "secrets",

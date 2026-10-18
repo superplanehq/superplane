@@ -127,7 +127,33 @@ func intakeAgentFromSetup(tx *gorm.DB, factory *models.Factory, integrationID st
 		return nil
 	}
 
-	return intakeAgentFromIntegration(integration)
+	agent := intakeAgentFromIntegration(integration)
+	if agent == nil {
+		return nil
+	}
+	appID, err := uuid.Parse(factory.OnboardingConfigValue().ProvisionedAppID)
+	if err != nil {
+		return agent
+	}
+	app, err := models.FindCanvasInTransaction(tx, factory.OrganizationID, appID)
+	if err != nil || app.FactoryID == nil || *app.FactoryID != factory.ID || app.LiveVersionID == nil {
+		return agent
+	}
+	version, err := models.FindLiveCanvasVersionInTransaction(tx, appID)
+	if err != nil {
+		log.WithError(err).Warnf("factory %s: intake cannot read the provisioned agent model", factory.ID)
+		return agent
+	}
+	provisioned := intakeAgentFromCanvasNodes(version.Nodes)
+	if provisioned == nil || provisioned.Component != agent.Component || provisioned.Model == "" {
+		return agent
+	}
+	credentials := provisioned.Credentials
+	ref, _ := credentials["integration"].(map[string]any)
+	if credentials["source"] == runner.CredentialsSourceIntegration && ref["name"] == integration.InstallationName {
+		agent.Model = provisioned.Model
+	}
+	return agent
 }
 
 // intakeAgentFromInstallations takes the first ready agent installation.
@@ -172,9 +198,24 @@ func intakeAgentFromHostedProvider(tx *gorm.DB, factory *models.Factory) *intake
 	}
 }
 
-func resolveGitHubInstallationName(tx *gorm.DB, factory *models.Factory) string {
+// factoryVCSProviderOrDefault returns the workspace Git host for clone
+// generation. A nil factory means GitHub, matching resolveVCSInstallationName.
+func factoryVCSProviderOrDefault(factory *models.Factory) string {
+	if factory == nil {
+		return ""
+	}
+	return factory.OnboardingConfigValue().EffectiveVCSProvider()
+}
+
+// resolveVCSInstallationName returns the integration name that runner steps
+// read repository credentials from.
+func resolveVCSInstallationName(tx *gorm.DB, factory *models.Factory) string {
 	if tx == nil || factory == nil {
 		return intakeGitHubAppName
+	}
+
+	if factory.OnboardingConfigValue().EffectiveVCSProvider() == models.ProviderBitbucket {
+		return bitbucketInstallationNameFromVCS(tx, factory)
 	}
 
 	if strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID) != "" {
@@ -217,6 +258,21 @@ func githubInstallationNameFromVCS(tx *gorm.DB, factory *models.Factory) string 
 	}
 
 	return strings.TrimSpace(integration.InstallationName)
+}
+
+func bitbucketInstallationNameFromVCS(tx *gorm.DB, factory *models.Factory) string {
+	id, err := uuid.Parse(strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID))
+	if err != nil {
+		return models.ProviderBitbucket
+	}
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil || integration.AppName != models.ProviderBitbucket {
+		return models.ProviderBitbucket
+	}
+	if name := strings.TrimSpace(integration.InstallationName); name != "" {
+		return name
+	}
+	return models.ProviderBitbucket
 }
 
 func intakeAgentFromIntegration(integration *models.Integration) *intakeAgent {

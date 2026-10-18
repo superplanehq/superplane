@@ -276,6 +276,9 @@ func applyIntakeSettingsToGraph(
 	if source == models.FactoryIntakeSourceLinearIssues && len(updated.LinearProjectIDs) == 0 {
 		return nil, nil, invalidArgument("at least one Linear project is required")
 	}
+	if source == models.FactoryIntakeSourceSentryExceptions && len(updated.SentryProjectIDs) == 0 {
+		return nil, nil, invalidArgument("at least one Sentry project is required")
+	}
 	if intakeSourceHasFilterNode(source) &&
 		intakeSettingsChangeTrigger(source, current, updated) &&
 		graph.TriggerNodeID == "" {
@@ -304,6 +307,7 @@ func applyIntakeSettingsToGraph(
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceSentryExceptions:
 				configuration["actions"] = intakeSentryActionsFor(updated)
+				applySentryProjectConfiguration(configuration, updated.SentryProjectIDs)
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceProductiveTasks:
 				configuration["actions"] = intakeProductiveTriggerActions(updated)

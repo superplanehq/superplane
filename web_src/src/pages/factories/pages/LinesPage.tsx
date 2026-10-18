@@ -49,6 +49,7 @@ import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
+import { ScheduledIntakeSetupDialog } from "./ScheduledIntakeSetupDialog";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
@@ -98,6 +99,7 @@ import {
 import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExecutions";
 import {
   latestDispatchForLine,
+  boardLineIdFromNavigationState,
   canonicalWorkOrderNumber,
   displayedBoardLineId,
   peekOrderFromNavigationState,
@@ -109,9 +111,9 @@ import {
   applyWorkOrderFilters,
   applyWorkOrderScope,
   applyWorkOrderSearch,
+  boardWorkOrderScopeQuery,
   buildWorkOrderListEntries,
   countWorkOrderFilters,
-  UNASSIGNED_FILTER_VALUE,
   visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
   type WorkOrderScope,
@@ -125,7 +127,6 @@ import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { ScopePills, type ScopePillOption } from "../workOrders/header/ScopePills";
 import { SearchField } from "../workOrders/header/SearchField";
-import { WorkOrderClosedStatusDialog } from "../workOrders/WorkOrderClosedStatusDialog";
 import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
@@ -137,10 +138,12 @@ import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { columnAppsFromFactoryApps, splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
+import { useColumnAppCheckRuns } from "./work-order-split-run/useColumnAppCheckRuns";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
   factoryAppConfigurePath,
   factoryAppRunPath,
+  factoryColumnAutomationViewPath,
   factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
@@ -154,7 +157,6 @@ import {
   factorySentryIntakeSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
-  factoryRouteSegment,
   workOrderDetailPath,
   workOrderBoardLineIdFromSearch,
   intakeIdFromSearch,
@@ -208,13 +210,13 @@ import {
   isPRFeedbackSetupAvailable,
   isPRFeedbackSettingsTab,
   prFeedbackListenTitle,
+  prFeedbackVCSIcon,
   takenPRFeedbackSourceIds,
   type PRFeedbackSource,
   type PRFeedbackSourceId,
 } from "./prFeedbackSettingsModel";
 import { isFactoryOnboardingComplete } from "./onboarding/onboardingStatus";
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
-import githubIcon from "@/assets/icons/integrations/github.svg";
 import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
 import {
   normalizeColumnColors,
@@ -223,14 +225,18 @@ import {
   type LineBoardColumnColorId,
 } from "./lineBoardColumnColors";
 
-type LineBoardScope = Extract<WorkOrderScope, "all" | "my">;
+type LineBoardScope = Extract<WorkOrderScope, "all" | "my" | "unassigned">;
 
 const LINE_BOARD_SCOPES: ReadonlyArray<ScopePillOption<LineBoardScope>> = WORK_ORDER_SCOPES.filter(
-  (scope): scope is ScopePillOption<LineBoardScope> => scope.id === "all" || scope.id === "my",
+  (scope): scope is ScopePillOption<LineBoardScope> =>
+    scope.id === "all" || scope.id === "my" || scope.id === "unassigned",
 );
 
 function lineBoardWorkOrderScope(scope: WorkOrderScope): LineBoardScope {
-  return scope === "my" ? "my" : "all";
+  if (scope === "my" || scope === "unassigned") {
+    return scope;
+  }
+  return "all";
 }
 
 function boardWorkOrdersPageOptions(
@@ -238,12 +244,8 @@ function boardWorkOrdersPageOptions(
   lineId: string | undefined,
   currentUserId?: string,
 ): FactoryBoardWorkOrdersOptions {
-  const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
-  const scope = lineBoardWorkOrderScope(state.scope);
   return {
-    userId: ownerIds.length === 1 ? ownerIds[0] : scope === "my" ? currentUserId : undefined,
-    unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
-    requireUser: scope === "my" && ownerIds.length !== 1,
+    ...boardWorkOrderScopeQuery(lineBoardWorkOrderScope(state.scope), state.filters.assigneeIds, currentUserId),
     done: {
       lineId,
       results: boardDoneResultsForStatuses(state.filters.statuses),
@@ -328,21 +330,21 @@ export function LinesPage() {
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
-  const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
-  const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
+  const navigationLineId = boardLineIdFromNavigationState(locationState);
+  const lineSources = { routeLineId, queryLineId: boardLineId, navigationLineId, lines };
+  const knownBoardLineId = displayedBoardLineId(lineSources);
+  const taskLineOrderId = !knownBoardLineId && routeOrderNumber ? routeOrderNumber : "";
   const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
     organizationId,
     factoryId,
     taskLineOrderId,
   );
   const taskLinePending = Boolean(taskLineOrderId) && taskLineLoading && !taskForBoardLine;
-  const selectedLineId = displayedBoardLineId(
-    routeLineId,
-    boardLineId,
-    lines,
-    taskForBoardLine,
-    taskLinePending ? undefined : firstFactoryLineId(factory),
-  );
+  const selectedLineId = displayedBoardLineId({
+    ...lineSources,
+    order: taskForBoardLine,
+    fallbackLineId: taskLinePending ? undefined : firstFactoryLineId(factory),
+  });
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -374,15 +376,18 @@ export function LinesPage() {
   );
   const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
+  const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const vcsProvider = factory?.onboarding?.vcsProvider;
+  const supportsReviewBots = vcsProvider !== "bitbucket";
   const catalogParameters = appRepository ? { repository: appRepository } : undefined;
   useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters, {
     enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
   });
   useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
-    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
+    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId) && supportsReviewBots,
   });
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -508,6 +513,7 @@ export function LinesPage() {
         onAddIntake: () => setAddIntakeOpen(true),
       };
 
+  const verifyIcon = prFeedbackVCSIcon(vcsProvider);
   const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
     if (!handler.id) {
       return [];
@@ -516,8 +522,8 @@ export function LinesPage() {
       {
         id: handler.id,
         title: prFeedbackListenTitle(handler.source),
-        iconSrc: githubIcon,
-        iconAlt: "GitHub",
+        iconSrc: verifyIcon.iconSrc,
+        iconAlt: verifyIcon.iconAlt,
         healthy: handler.healthy !== false,
         needsRepairLabel: "Needs repair",
         settingsLabel: "Open PR feedback settings",
@@ -543,6 +549,10 @@ export function LinesPage() {
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
     if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
+      return;
+    }
+    if (template.id === "scheduled-intake") {
+      setScheduledIntakeOpen(true);
       return;
     }
     if (template.id === "github-issues") {
@@ -616,8 +626,8 @@ export function LinesPage() {
       setPeekHint(target);
       return;
     }
-    navigate(workOrderDetailPath(organizationId, routeSegment, number, selectedLine.id), {
-      state: { peekOrder: target },
+    navigate(workOrderDetailPath(organizationId, routeSegment, number), {
+      state: { peekOrder: target, lineId: selectedLine.id },
     });
   };
 
@@ -628,7 +638,10 @@ export function LinesPage() {
 
   const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
   const canDeleteViewedCustom =
-    canUpdate && (viewedAutomation?.columnKey === "verify" || viewedAutomation?.columnKey === "done");
+    canUpdate &&
+    (viewedAutomation?.columnKey === "backlog" ||
+      viewedAutomation?.columnKey === "verify" ||
+      viewedAutomation?.columnKey === "done");
   const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id));
   const deleteViewedCustomAutomation = async () => {
     if (!automationViewCanvasId) {
@@ -660,6 +673,17 @@ export function LinesPage() {
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
+      {scheduledIntakeOpen ? (
+        <ScheduledIntakeSetupDialog
+          organizationId={organizationId}
+          factoryId={factoryId}
+          onClose={() => setScheduledIntakeOpen(false)}
+          onCreated={(canvasId) => {
+            setScheduledIntakeOpen(false);
+            navigate(factoryColumnAutomationViewPath(organizationId, routeSegment, selectedLine.id, canvasId));
+          }}
+        />
+      ) : null}
       <AddIntakePicker
         open={addIntakeOpen}
         onClose={() => setAddIntakeOpen(false)}
@@ -672,6 +696,7 @@ export function LinesPage() {
         onClose={() => setAddPRFeedbackOpen(false)}
         onSelect={createPRFeedbackFromSource}
         takenSourceIds={takenPRFeedbackSources}
+        vcsProvider={vcsProvider}
       />
       {automationViewCanvasId ? (
         <ColumnAutomationViewHost
@@ -702,6 +727,7 @@ export function LinesPage() {
           factoryId={factoryId}
           factoryKey={routeSegment}
           githubIntegrationId={githubIntegrationId}
+          vcsProvider={vcsProvider}
           repository={appRepository}
           lineId={selectedLine.id}
           canUpdate={canUpdate}
@@ -714,12 +740,9 @@ export function LinesPage() {
         <div className="shrink-0">
           <LineDetailHeader
             organizationId={organizationId}
-            factoryId={factoryId}
-            line={selectedLine}
             workOrders={workOrders}
             factory={factory}
             state={listState}
-            canUpdate={canUpdate}
             hostedCreditHeaderKicker={hostedCreditHeaderKicker}
             nextStepsRestore={
               nextStepsCollapsed && nextStepBanner ? (
@@ -780,6 +803,7 @@ export function LinesPage() {
             backlogRepository={factory?.onboarding?.backlogRepository?.trim() ?? ""}
             defaultBranch={factory?.onboarding?.defaultBranch?.trim() ?? ""}
             githubIntegrationId={githubIntegrationId}
+            vcsProvider={vcsProvider}
             showColumnAutomations={showColumnAutomations}
             showAutomationRows={showAutomationRows}
             colorView={columnColorView}
@@ -830,12 +854,9 @@ export function LinesPage() {
 
 function LineDetailHeader({
   organizationId,
-  factoryId,
-  line,
   workOrders,
   factory,
   state,
-  canUpdate,
   hostedCreditHeaderKicker,
   nextStepsRestore,
   intakes,
@@ -845,12 +866,9 @@ function LineDetailHeader({
   onColorViewChange,
 }: {
   organizationId: string;
-  factoryId: string;
-  line: FactoriesFactoryLine;
   workOrders: FactoriesWorkOrder[];
   factory: FactoriesFactory | null;
   state: WorkOrderListState;
-  canUpdate: boolean;
   hostedCreditHeaderKicker?: ReactNode;
   nextStepsRestore?: ReactNode;
   intakes: FactoriesFactoryIntake[];
@@ -877,8 +895,6 @@ function LineDetailHeader({
   );
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
-  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
-  const factoryKey = factoryRouteSegment(factory);
 
   return (
     <>
@@ -907,7 +923,6 @@ function LineDetailHeader({
               sourceOptions={sourceOptions}
               assigneeOptions={assigneeOptions}
               showPullRequestMerge={showPullRequestMerge}
-              onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
             />
             <SearchField
               inputRef={searchRef}
@@ -936,21 +951,6 @@ function LineDetailHeader({
           ) : undefined
         }
       />
-      {closedStatusDialogOpen ? (
-        <WorkOrderClosedStatusDialog
-          open
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          lineId={line.id}
-          canManage={canUpdate}
-          onOpenChange={(open) => {
-            if (!open) {
-              setClosedStatusDialogOpen(false);
-            }
-          }}
-        />
-      ) : null}
     </>
   );
 }
@@ -976,6 +976,7 @@ function LineDetail({
   backlogRepository,
   defaultBranch,
   githubIntegrationId,
+  vcsProvider,
   showColumnAutomations,
   showAutomationRows,
   colorView,
@@ -1006,6 +1007,7 @@ function LineDetail({
   backlogRepository: string;
   defaultBranch: string;
   githubIntegrationId: string;
+  vcsProvider?: string;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
@@ -1018,7 +1020,7 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
-  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
+  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard, workOrders ?? []), [fullBoard, workOrders]);
   const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const doneOrders = useMemo(
@@ -1047,10 +1049,11 @@ function LineDetail({
         apps,
         workOrders,
         planningEnabled,
+        vcsProvider,
       });
       return applyColumnAutomationsOverlay(base, undefined, overlay.disabledIds, overlay.removedIds);
     },
-    [apps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, workOrders],
+    [apps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, vcsProvider, workOrders],
   );
 
   const addAutomation = useAddColumnAutomation({
@@ -1062,6 +1065,7 @@ function LineDetail({
     backlogRepository,
     defaultBranch,
     githubIntegrationId,
+    vcsProvider,
     automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
   });
   const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
@@ -1214,40 +1218,46 @@ function LineBoardSplitRunPopup({
   const closer = useSplitRunFooterCloser(organizationId, factoryId, popupOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
+  const columnApps = columnAppsFromFactoryApps(factoryApps);
+  const columnAppCheckRuns = useColumnAppCheckRuns(describedOrder?.checks, columnApps, peekPullRequests);
   return (
-    <WorkOrderSplitRunPopup
-      key={peekOrderId}
-      organizationId={organizationId}
-      factoryId={factoryId}
-      factoryKey={factoryKey}
-      orderId={peekOrderId}
-      orderNumber={popupOrder.number}
-      lineId={lineId}
-      fixture={splitRunFixtureForWorkOrder(popupOrder, {
-        checks: describedOrder?.checks,
-        artifacts: peekArtifacts,
-        lineId,
-        lineName: resolvedLineName,
-        demoArtifacts: false,
-        prFeedbackRuns,
-        analysisRuns,
-        columnApps: columnAppsFromFactoryApps(factoryApps),
-        isAnalyzing,
-        stoppedBy: closer.actor,
-        closer,
-        resolveUser,
-      })}
-      canDispatch={canDispatch && Boolean(resolvedLineName)}
-      canUpdate={canUpdate}
-      isDispatching={isDispatching}
-      onDispatch={
-        resolvedLineName
-          ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
-          : undefined
-      }
-      onClose={onClose}
-      fixed
-    />
+    <>
+      {columnAppCheckRuns.queries}
+      <WorkOrderSplitRunPopup
+        key={peekOrderId}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        orderId={peekOrderId}
+        orderNumber={popupOrder.number}
+        lineId={lineId}
+        fixture={splitRunFixtureForWorkOrder(popupOrder, {
+          checks: describedOrder?.checks,
+          artifacts: peekArtifacts,
+          lineId,
+          lineName: resolvedLineName,
+          demoArtifacts: false,
+          prFeedbackRuns,
+          analysisRuns,
+          columnApps,
+          isAnalyzing,
+          stoppedBy: closer.actor,
+          closer,
+          resolveUser,
+          columnAppRuns: columnAppCheckRuns.lookup,
+        })}
+        canDispatch={canDispatch && Boolean(resolvedLineName)}
+        canUpdate={canUpdate}
+        isDispatching={isDispatching}
+        onDispatch={
+          resolvedLineName
+            ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
+            : undefined
+        }
+        onClose={onClose}
+        fixed
+      />
+    </>
   );
 }
 
@@ -1859,6 +1869,7 @@ function DoneColumn({
               order={order}
               workOrderCardContext={workOrderCardContext}
               onOpenWorkOrder={onOpenWorkOrder}
+              showMergeConfidence={false}
             />
           </li>
         ))}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { eventStateRegistry } from "..";
-import { buildComponentCtx, buildDetailsCtx, buildExecution, buildOutput } from "./common";
+import { buildComponentCtx, buildDetailsCtx, buildExecution, buildOutput } from "./test-support";
 import { queryRangeMapper } from "./query_range";
 
 describe("queryRangeMapper.props", () => {

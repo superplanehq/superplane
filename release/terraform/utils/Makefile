@@ -14,3 +14,10 @@ eks.shell: build
 	  -v $(shell cd .. && pwd):/workspace \
 	  -w /workspace \
 		terraform-utils:latest /bin/bash
+
+aks.shell: build
+	@docker run -it --rm \
+	  -v azure-config:/root/.azure \
+	  -v $(shell cd ../.. && pwd):/workspace \
+	  -w /workspace/terraform \
+		terraform-utils:latest /bin/bash

@@ -18,6 +18,7 @@ import {
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 export function IntakeSourceSettingsFooter({
@@ -44,10 +45,13 @@ export function IntakeSourceSettingsFooter({
   const deleteControls = intakeSupportsDelete(sourceId);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const linearProjectsMissing = sourceId === "linear-issues" && draft.linearProjectIds.length === 0;
+  const sentryProjectsMissing = sourceId === "sentry-exceptions" && draft.sentryProjectIds.length === 0;
+  const projectsMissing = linearProjectsMissing || sentryProjectsMissing;
   const footerError =
     saveError ??
     (deleteOpen ? undefined : deleteError) ??
-    (linearProjectsMissing ? LINEAR_INTAKE_SETUP_COPY.projectsRequired : undefined);
+    (linearProjectsMissing ? LINEAR_INTAKE_SETUP_COPY.projectsRequired : undefined) ??
+    (sentryProjectsMissing ? SENTRY_INTAKE_SETUP_COPY.projectsRequired : undefined);
 
   return (
     <>
@@ -73,7 +77,7 @@ export function IntakeSourceSettingsFooter({
         </div>
         <Button
           type="button"
-          disabled={savePending || linearProjectsMissing}
+          disabled={savePending || projectsMissing}
           onClick={async () => {
             try {
               await onSave(normalizeIntakeSourceSettings(draft, sourceId));

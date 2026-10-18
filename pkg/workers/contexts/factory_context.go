@@ -47,6 +47,7 @@ type FactoryContext struct {
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
+	onRunsCancelled         func([]*models.RunCancellationResult)
 	onFileBindCleanup       func(FileBindCleanup)
 
 	encryptor crypto.Encryptor
@@ -99,6 +100,11 @@ func (c *FactoryContext) WithWorkOrderNotification(
 	callback func(messages.FactoryWorkOrderNotificationMessage),
 ) *FactoryContext {
 	c.onWorkOrderNotification = callback
+	return c
+}
+
+func (c *FactoryContext) WithRunsCancelled(callback func([]*models.RunCancellationResult)) *FactoryContext {
+	c.onRunsCancelled = callback
 	return c
 }
 
@@ -589,13 +595,20 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	}
 
 	fromState := order.State
+	// Legacy archives share the rejected result. A new automation rejection
+	// must stay visible in Done, so store it as a manual rejection.
+	result := params.Result
+	if params.State == models.FactoryWorkOrderStateClosed && result == models.FactoryWorkOrderResultRejected {
+		result = models.FactoryWorkOrderResultManualRejected
+	}
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
-		ToState:    params.State,
-		Result:     params.Result,
-		Automation: c.automationRef(),
-		Run:        c.runRef(),
-		App:        c.appRef(),
-		SkipSame:   true,
+		ToState:         params.State,
+		Result:          result,
+		Automation:      c.automationRef(),
+		Run:             c.runRef(),
+		App:             c.appRef(),
+		SkipSame:        true,
+		OnRunsCancelled: c.onRunsCancelled,
 	})
 	if err != nil {
 		return nil, false, err
@@ -658,13 +671,23 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	artifact, created, err := order.UpsertArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
+	artifactParams := models.FactoryWorkOrderArtifactParams{
 		Type:       params.Type,
 		Data:       params.Data,
-		Key:        params.Key,
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
-	})
+	}
+
+	var (
+		artifact *models.FactoryWorkOrderArtifact
+		created  bool
+	)
+	if params.UpdateByTitle {
+		artifact, created, err = order.UpsertArtifactByTypeAndTitle(c.tx, artifactParams)
+	} else {
+		artifactParams.Key = params.Key
+		artifact, created, err = order.UpsertArtifact(c.tx, artifactParams)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -983,6 +1006,7 @@ func (c *FactoryContext) pullRequestMatch(pullRequest *models.FactoryPullRequest
 	}
 	workOrder := workOrderToCore(order)
 	workOrder.Key = factoryModel.WorkOrderKey(order.Number)
+	workOrder.URL = workOrderPermalink(order, factoryModel.RouteSegment())
 	return &core.PullRequestMatch{
 		PullRequest: pullRequestToCore(pullRequest),
 		WorkOrder:   workOrder,
@@ -994,6 +1018,19 @@ func (c *FactoryContext) currentFactory() (*models.Factory, error) {
 		return nil, errors.New("app is not owned by a factory")
 	}
 	return models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+}
+
+// VCSProvider returns the stored Git host. An empty value means GitHub.
+// A canvas that is not owned by a factory has no provider.
+func (c *FactoryContext) VCSProvider() (string, error) {
+	if c.canvas == nil || c.canvas.FactoryID == nil {
+		return "", nil
+	}
+	factory, err := c.currentFactory()
+	if err != nil {
+		return "", err
+	}
+	return factory.OnboardingConfigValue().VCSProvider, nil
 }
 
 func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {

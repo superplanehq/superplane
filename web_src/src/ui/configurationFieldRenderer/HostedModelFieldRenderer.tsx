@@ -18,6 +18,7 @@ import {
 } from "@/lib/selectableLLMModels";
 import { toTestId } from "@/lib/testID";
 import { THINKING_LEVEL_KEY, THINKING_LEVELS, normalizeThinkingLevel } from "@/lib/thinkingLevel";
+import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 import type { FieldRendererProps } from "./types";
@@ -43,6 +44,7 @@ function SuperPlaneModelField({
   organizationId,
   factoryId,
   readOnly = false,
+  triggerClassName,
 }: FieldRendererProps) {
   const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_HOSTED], factoryId);
   const usage = useOrganizationWorkspaceUsage(organizationId ?? "");
@@ -75,6 +77,7 @@ function SuperPlaneModelField({
       placeholder={field.placeholder || "Instance SuperPlane agent model"}
       readOnly={readOnly}
       options={options}
+      triggerClassName={triggerClassName}
       onCommit={(nextModel, nextThinking) =>
         commitModelAndThinking(field.name, nextModel, nextThinking, onChange, onValuesChange)
       }
@@ -101,6 +104,7 @@ function ProviderBYOKModelField({
   organizationId,
   factoryId,
   readOnly = false,
+  triggerClassName,
 }: FieldRendererProps) {
   const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_BYOK], factoryId);
   const status = modelFieldStatus(organizationId, selection.isLoading, selection.isError);
@@ -139,6 +143,7 @@ function ProviderBYOKModelField({
       placeholder={field.placeholder || "Select a model"}
       readOnly={readOnly}
       options={options}
+      triggerClassName={triggerClassName}
       onCommit={(nextModel, nextThinking) =>
         commitModelAndThinking(field.name, nextModel, nextThinking, onChange, onValuesChange)
       }
@@ -170,6 +175,7 @@ function ModelThinkingSelect({
   placeholder,
   readOnly,
   options,
+  triggerClassName,
   onCommit,
 }: {
   fieldName?: string;
@@ -179,6 +185,7 @@ function ModelThinkingSelect({
   placeholder: string;
   readOnly?: boolean;
   options: Array<{ value: string; label: string }>;
+  triggerClassName?: string;
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
   const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
@@ -194,7 +201,10 @@ function ModelThinkingSelect({
           variant="outline"
           disabled={readOnly}
           data-testid={fieldName ? toTestId(`field-${fieldName}-hosted-model`) : undefined}
-          className="h-8 w-full justify-between !rounded-md border-gray-300 bg-white px-2.5 font-normal shadow-xs dark:border-gray-600/70 dark:bg-gray-800"
+          className={cn(
+            "h-8 w-full justify-between !rounded-md border-gray-300 bg-white px-2.5 font-normal shadow-xs dark:border-gray-600/70 dark:bg-gray-800",
+            triggerClassName,
+          )}
         >
           <span className="min-w-0 truncate">{selectedLabel}</span>
           <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{thinkingLabel}</span>

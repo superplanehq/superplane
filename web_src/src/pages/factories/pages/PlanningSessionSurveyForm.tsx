@@ -1,31 +1,62 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, type KeyboardEvent } from "react";
+import { ArrowUp, Check, ChevronLeft, ChevronRight, CircleHelp } from "lucide-react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentSurvey } from "./createWithAgentTypes";
 import { formatPlanningSurveyReply } from "./planningSessionSurvey";
 
+const SKIPPED_ANSWER = Symbol("skipped answer");
+type SurveyAnswer = string | typeof SKIPPED_ANSWER | null;
+
 export function PlanningSessionSurveyForm({
   survey,
   onSubmit,
-  nextVariant = "ghost",
 }: {
   survey: CreateWithAgentSurvey;
   onSubmit: (text: string) => void;
-  nextVariant?: "default" | "ghost";
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Array<string | null>>(() => survey.questions.map(() => null));
+  const [answers, setAnswers] = useState<SurveyAnswer[]>(() => survey.questions.map(() => null));
   const [customInputs, setCustomInputs] = useState<string[]>(() => survey.questions.map(() => ""));
+  const questionRef = useRef<HTMLParagraphElement>(null);
+  const previousIndex = useRef(currentIndex);
+  useEffect(() => {
+    if (previousIndex.current !== currentIndex) questionRef.current?.focus();
+    previousIndex.current = currentIndex;
+  }, [currentIndex]);
   const question = survey.questions[currentIndex];
   const questionCount = survey.questions.length;
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === questionCount - 1;
-  const hasCurrentAnswer = Boolean(answers[currentIndex]?.trim());
-  const sendReply = () => onSubmit(formatPlanningSurveyReply(survey.questions, answers));
+  const hasCurrentAnswer = Boolean(answers[currentIndex]);
+  const submitAnswers = (selectedAnswers: SurveyAnswer[]) =>
+    onSubmit(
+      formatPlanningSurveyReply(
+        survey.questions,
+        selectedAnswers.map((answer) => (answer === SKIPPED_ANSWER ? null : answer)),
+      ),
+    );
+  const sendReply = () => submitAnswers(answers);
+  const selectAnswer = (answer: Exclude<SurveyAnswer, null>) => {
+    const alreadySelected = answers[currentIndex] === answer;
+    if (questionCount === 1 && alreadySelected) {
+      return;
+    }
+    const nextAnswers = replaceAtIndex(answers, currentIndex, alreadySelected ? null : answer);
+    setAnswers(nextAnswers);
+    setCustomInputs((current) => replaceAtIndex(current, currentIndex, ""));
+    if (questionCount === 1) {
+      submitAnswers(nextAnswers);
+      return;
+    }
+    if (!alreadySelected && !isLast) {
+      setCurrentIndex((index) => index + 1);
+    }
+  };
 
   if (!question) {
     return null;
@@ -33,109 +64,175 @@ export function PlanningSessionSurveyForm({
 
   return (
     <div className="sp-survey-enter mt-3 mb-1" data-testid="create-with-agent-survey">
-      <div className="rounded-2xl border bg-card px-3.5 py-3 shadow-xs" data-testid="create-with-agent-survey-card">
-        <div className="flex items-center justify-between gap-3 text-[11px] leading-4 text-muted-foreground">
-          <p className="font-medium">{CREATE_WITH_AGENT_COPY.surveyHeader}</p>
-          {questionCount > 1 ? (
-            <span className="shrink-0 tabular-nums">
-              {currentIndex + 1} of {questionCount}
-            </span>
-          ) : null}
-        </div>
+      <div className="rounded-xl border bg-card p-3.5 shadow-xs" data-testid="create-with-agent-survey-card">
+        {questionCount > 1 ? (
+          <p className="text-xs font-medium text-muted-foreground">
+            Question {currentIndex + 1} of {questionCount}
+          </p>
+        ) : null}
         <div key={question.prompt} className="sp-survey-page">
-          <p className="mt-2 text-[14px] font-medium leading-5 text-foreground">{question.prompt}</p>
-          <div className="mt-3 flex flex-col gap-1.5">
-            {question.options.map((option, optionIndex) => {
-              const selected = answers[currentIndex] === option;
-              const keyLabel = String.fromCharCode(65 + optionIndex);
-              return (
-                <Button
-                  key={option}
-                  type="button"
-                  variant={selected ? "default" : "ghost"}
-                  size="sm"
-                  aria-pressed={selected}
-                  className={cn(
-                    "h-auto justify-start gap-2.5 whitespace-normal rounded-xl border px-2.5 py-2 text-left text-[13px] leading-5 shadow-none",
-                    selected
-                      ? "border-primary bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
-                      : "border-border bg-background text-foreground hover:bg-muted",
-                  )}
-                  onClick={() => {
-                    setAnswers((current) => replaceAtIndex(current, currentIndex, selected ? null : option));
-                  }}
-                >
-                  <span
-                    className={cn(
-                      "inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
-                      selected ? "bg-primary-foreground/15 text-primary-foreground" : "bg-muted text-muted-foreground",
-                    )}
-                    aria-hidden
-                  >
-                    {selected ? <SurveyOptionCheck /> : keyLabel}
-                  </span>
-                  {option}
-                </Button>
-              );
-            })}
-            <Input
-              type="text"
-              value={customInputs[currentIndex] ?? ""}
-              placeholder={CREATE_WITH_AGENT_COPY.otherAnswer}
-              aria-label={`${question.prompt} ${CREATE_WITH_AGENT_COPY.otherAnswer}`}
-              className="mt-0.5 h-9 rounded-xl border-dashed bg-background text-[13px] shadow-none"
-              onChange={(event) => {
-                const value = event.target.value;
-                setCustomInputs((current) => replaceAtIndex(current, currentIndex, value));
-                setAnswers((current) => replaceAtIndex(current, currentIndex, value.trim() || null));
-              }}
-              onKeyDown={(event) =>
-                handleSurveyEnter(
-                  event,
-                  isLast,
-                  hasCurrentAnswer,
-                  () => setCurrentIndex((index) => index + 1),
-                  sendReply,
-                )
-              }
+          <p
+            ref={questionRef}
+            tabIndex={-1}
+            className={cn(
+              "flex items-start gap-2 text-sm font-semibold text-foreground",
+              questionCount > 1 && "mt-1.5",
+            )}
+          >
+            <CircleHelp className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+            {question.prompt}
+          </p>
+          <div className="mt-3 divide-y divide-border/70 overflow-hidden rounded-lg border border-border">
+            {question.options.map((option, index) => (
+              <SurveyOptionButton
+                key={option}
+                badge={String.fromCharCode(65 + index)}
+                option={option}
+                selected={answers[currentIndex] === option}
+                onSelect={() => selectAnswer(option)}
+              />
+            ))}
+            <SurveyOptionButton
+              badge={String.fromCharCode(65 + question.options.length)}
+              option={CREATE_WITH_AGENT_COPY.skipSurvey}
+              selected={answers[currentIndex] === SKIPPED_ANSWER}
+              onSelect={() => selectAnswer(SKIPPED_ANSWER)}
             />
           </div>
+          <SurveyAnswerComposer
+            prompt={question.prompt}
+            value={customInputs[currentIndex] ?? ""}
+            hasCurrentAnswer={hasCurrentAnswer}
+            showSend={questionCount === 1}
+            onChange={(value) => {
+              setCustomInputs((current) => replaceAtIndex(current, currentIndex, value));
+              setAnswers((current) => replaceAtIndex(current, currentIndex, value.trim() || null));
+            }}
+            onKeyDown={(event) =>
+              handleSurveyEnter(event, isLast, hasCurrentAnswer, () => setCurrentIndex((index) => index + 1), sendReply)
+            }
+            onSend={sendReply}
+          />
         </div>
-        <SurveyFormPager
-          nextVariant={nextVariant}
-          questionCount={questionCount}
-          isFirst={isFirst}
-          isLast={isLast}
-          hasCurrentAnswer={hasCurrentAnswer}
-          onPrevious={() => setCurrentIndex((index) => index - 1)}
-          onNext={() => setCurrentIndex((index) => index + 1)}
-          onSend={sendReply}
-        />
+        {questionCount > 1 ? (
+          <SurveyFormPager
+            questionCount={questionCount}
+            isFirst={isFirst}
+            isLast={isLast}
+            canSend={hasCurrentAnswer}
+            onPrevious={() => setCurrentIndex((index) => index - 1)}
+            onNext={() => setCurrentIndex((index) => index + 1)}
+            onSend={sendReply}
+          />
+        ) : null}
       </div>
     </div>
   );
 }
 
-function SurveyOptionCheck() {
+function SurveyAnswerComposer({
+  prompt,
+  value,
+  hasCurrentAnswer,
+  showSend,
+  onChange,
+  onKeyDown,
+  onSend,
+}: {
+  prompt: string;
+  value: string;
+  hasCurrentAnswer: boolean;
+  showSend: boolean;
+  onChange: (value: string) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onSend: () => void;
+}) {
+  const inputId = useId();
+
   return (
-    <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden>
-      <path
-        className="sp-survey-check"
-        d="M3.5 8.5 L6.5 11.5 L12.5 4.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <div className="mt-3">
+      <Label htmlFor={inputId} className="sr-only">
+        {CREATE_WITH_AGENT_COPY.otherAnswer}
+      </Label>
+      <InputGroup className="h-10 rounded-lg border-border bg-background shadow-none dark:bg-background">
+        <InputGroupInput
+          id={inputId}
+          name="planning-survey-answer"
+          type="text"
+          value={value}
+          placeholder={CREATE_WITH_AGENT_COPY.otherAnswer}
+          aria-label={`${prompt} ${CREATE_WITH_AGENT_COPY.otherAnswer}`}
+          className="h-10 min-w-0 px-3 text-sm text-foreground placeholder:text-muted-foreground"
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        {showSend ? (
+          <InputGroupAddon align="inline-end" className="pr-1">
+            <InputGroupButton
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              className="rounded-md"
+              aria-label={CREATE_WITH_AGENT_COPY.sendAnswer}
+              disabled={!hasCurrentAnswer}
+              onClick={onSend}
+            >
+              <ArrowUp className="size-4" aria-hidden />
+            </InputGroupButton>
+          </InputGroupAddon>
+        ) : null}
+      </InputGroup>
+    </div>
+  );
+}
+
+function SurveyOptionButton({
+  badge,
+  option,
+  selected,
+  onSelect,
+}: {
+  badge: string;
+  option: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      aria-pressed={selected}
+      className={cn(
+        "h-auto min-h-10 w-full justify-between gap-2 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal shadow-none",
+        selected ? "bg-muted/70 text-foreground hover:bg-muted/70" : "bg-background text-foreground hover:bg-muted/50",
+      )}
+      onClick={onSelect}
+    >
+      <span className="flex min-w-0 items-center gap-2.5">
+        <SurveyChoiceBadge label={badge} />
+        <span>{option}</span>
+      </span>
+      {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+    </Button>
+  );
+}
+
+function SurveyChoiceBadge({ label }: { label: string }) {
+  return (
+    <span
+      aria-hidden
+      className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[13px] font-bold text-foreground"
+    >
+      {label}
+    </span>
   );
 }
 
 function handleSurveyEnter(
   event: KeyboardEvent<HTMLInputElement>,
   isLast: boolean,
-  hasCurrentAnswer: boolean,
+  canSend: boolean,
   onNext: () => void,
   onSend: () => void,
 ) {
@@ -147,26 +244,26 @@ function handleSurveyEnter(
     onNext();
     return;
   }
-  if (hasCurrentAnswer) {
+  if (canSend) {
     onSend();
   }
 }
 
+const quietActionClassName = "h-8 text-sm text-foreground/75";
+
 function SurveyFormPager({
-  nextVariant,
   questionCount,
   isFirst,
   isLast,
-  hasCurrentAnswer,
+  canSend,
   onPrevious,
   onNext,
   onSend,
 }: {
-  nextVariant: "default" | "ghost";
   questionCount: number;
   isFirst: boolean;
   isLast: boolean;
-  hasCurrentAnswer: boolean;
+  canSend: boolean;
   onPrevious: () => void;
   onNext: () => void;
   onSend: () => void;
@@ -178,7 +275,7 @@ function SurveyFormPager({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-8 text-[13px] text-muted-foreground"
+          className={quietActionClassName}
           disabled={isFirst}
           onClick={onPrevious}
         >
@@ -189,43 +286,37 @@ function SurveyFormPager({
         <span />
       )}
       {isLast ? (
-        <div className="flex items-center gap-2">
-          {questionCount > 1 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 text-[13px] text-muted-foreground"
-              onClick={onSend}
-            >
-              {CREATE_WITH_AGENT_COPY.skipSurvey}
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            size="sm"
-            className="h-8 text-[13px]"
-            disabled={questionCount > 1 && !hasCurrentAnswer}
-            onClick={onSend}
-          >
-            {hasCurrentAnswer || questionCount > 1
-              ? CREATE_WITH_AGENT_COPY.sendAnswers
-              : CREATE_WITH_AGENT_COPY.skipSurvey}
-          </Button>
-        </div>
+        <LastPageActionButton questionCount={questionCount} canSend={canSend} onSend={onSend} />
       ) : (
-        <Button
-          type="button"
-          variant={nextVariant}
-          size="sm"
-          className={cn("h-8 text-[13px]", nextVariant === "ghost" && "text-muted-foreground")}
-          onClick={onNext}
-        >
+        <Button type="button" variant="ghost" size="sm" className={quietActionClassName} onClick={onNext}>
           {CREATE_WITH_AGENT_COPY.nextQuestion}
           <ChevronRight size={12} className="ml-1" />
         </Button>
       )}
     </div>
+  );
+}
+
+function LastPageActionButton({
+  questionCount,
+  canSend,
+  onSend,
+}: {
+  questionCount: number;
+  canSend: boolean;
+  onSend: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="default"
+      size="sm"
+      className="h-8 shrink-0 text-sm"
+      disabled={!canSend}
+      onClick={onSend}
+    >
+      {questionCount === 1 ? CREATE_WITH_AGENT_COPY.sendAnswer : CREATE_WITH_AGENT_COPY.sendAnswers}
+    </Button>
   );
 }
 

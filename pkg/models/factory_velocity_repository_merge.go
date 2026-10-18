@@ -29,14 +29,20 @@ const factoryVelocityRepositoryMergeBatchSize = 200
 //
 // MergedAt keeps the exact merge instant, so the velocity chart buckets a merge
 // into the correct day whatever timezone it is rendered in.
+//
+// Provider qualifies the merge by Git host. Rows written before provider
+// tracking backfilled as github. AuthorUUID carries the Bitbucket account
+// UUID for identity matching; GitHub rows match on login and leave it empty.
 type FactoryVelocityRepositoryMerge struct {
 	ID              uuid.UUID
 	OrganizationID  uuid.UUID
 	FactoryID       uuid.UUID
+	Provider        string
 	Repository      string
 	Number          int64
 	Source          string
 	AuthorLogin     string
+	AuthorUUID      string
 	AuthorName      string
 	AuthorAvatarURL string
 	MergedAt        time.Time
@@ -45,7 +51,8 @@ type FactoryVelocityRepositoryMerge struct {
 }
 
 // NewFactoryVelocityRepositoryMerge normalizes the repository so the unique
-// index matches whatever case the provider reported.
+// index matches whatever case the provider reported. An empty provider means
+// github, so existing callers keep writing GitHub rows.
 func NewFactoryVelocityRepositoryMerge(
 	organizationID, factoryID uuid.UUID,
 	repository string,
@@ -58,6 +65,7 @@ func NewFactoryVelocityRepositoryMerge(
 		ID:             uuid.New(),
 		OrganizationID: organizationID,
 		FactoryID:      factoryID,
+		Provider:       ProviderGitHub,
 		Repository:     strings.ToLower(strings.TrimSpace(repository)),
 		Number:         number,
 		Source:         source,
@@ -82,14 +90,25 @@ func (m FactoryVelocityRepositoryMerge) IsAgent() bool {
 // The sync recomputes a whole window rather than adding to it, so a pull request
 // that SuperPlane recorded after the merge was first seen, or a merge that
 // changed source, stops counting the old way on the next tick.
+//
+// The delete scopes to the given provider so one host never wipes the other.
 func ReplaceFactoryVelocityRepositoryMerges(
 	tx *gorm.DB,
 	factoryID uuid.UUID,
+	provider string,
 	from, to time.Time,
 	merges []FactoryVelocityRepositoryMerge,
 ) error {
+	if strings.TrimSpace(provider) == "" {
+		provider = ProviderGitHub
+	}
+	for i := range merges {
+		if strings.TrimSpace(merges[i].Provider) == "" {
+			merges[i].Provider = provider
+		}
+	}
 	err := tx.
-		Where("factory_id = ? AND merged_at >= ? AND merged_at < ?", factoryID, from, to).
+		Where("factory_id = ? AND provider = ? AND merged_at >= ? AND merged_at < ?", factoryID, provider, from, to).
 		Delete(&FactoryVelocityRepositoryMerge{}).Error
 	if err != nil {
 		return err
@@ -104,12 +123,14 @@ func ReplaceFactoryVelocityRepositoryMerges(
 	return tx.Clauses(clause.OnConflict{
 		Columns: []clause.Column{
 			{Name: "factory_id"},
+			{Name: "provider"},
 			{Name: "repository"},
 			{Name: "number"},
 		},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"source",
 			"author_login",
+			"author_uuid",
 			"author_name",
 			"author_avatar_url",
 			"merged_at",

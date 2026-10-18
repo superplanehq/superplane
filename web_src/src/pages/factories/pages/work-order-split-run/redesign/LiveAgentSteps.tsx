@@ -19,7 +19,7 @@ import { activityFromTranscript } from "./activityFromAgentStep";
 import { AgentStepMarkers } from "./AgentStepList";
 import { agentStepsFromNotes, settleStoppedSteps, type AutomationStage } from "./automationsViewModel";
 import { FailedNodeAlerts } from "./failedNodeAlerts";
-import { failedNonRunnerErrors, type FailedNodeError } from "./failedNodeErrors";
+import { failedNodeErrors, type FailedNodeError } from "./failedNodeErrors";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
 
 const WAITING_FOR_LOGS_NOTE = "Waiting for logs…";
@@ -51,7 +51,7 @@ export function LiveAgentSteps({
   emptyNote?: string;
   /** When false, skip the usage chart. The card footer only charts the latest run. */
   reportUsage?: boolean;
-  /** Canvas run page for a failed node that is not a runner. */
+  /** Canvas run page for a failed node. */
   runHref?: string | null;
 }) {
   const run = useLiveAgentRun(stage, phase, organizationId);
@@ -75,6 +75,7 @@ export function LiveAgentSteps({
           line={line}
           organizationId={organizationId}
           canvasId={phase.appId ?? ""}
+          analysisStatus={phase.status}
           spendPhaseId={phase.id}
           reportUsage={reportUsage}
           onLive={run.reportLive}
@@ -136,7 +137,7 @@ function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefine
     () => settleStoppedSteps(agentStepsFromNotes(transcriptNotes, runStatus, stream), stoppedStatus),
     [runStatus, stream, transcriptNotes, stoppedStatus],
   );
-  const failedNodes = useMemo(() => failedNonRunnerErrors(stream), [stream]);
+  const failedNodes = useMemo(() => failedNodeErrors(stream, phase?.status), [phase?.status, stream]);
   const runningRunner = [...runners].reverse().find((line) => line.status === "running" && Boolean(line.executionId));
   const running = Boolean(runningRunner);
   const liveActivity = activityFromTranscript(runningRunner ? (liveByLine[runningRunner.id]?.activities ?? []) : []);
@@ -281,6 +282,7 @@ function RunnerNotes({
   line,
   organizationId,
   canvasId,
+  analysisStatus,
   spendPhaseId,
   reportUsage,
   onLive,
@@ -288,6 +290,7 @@ function RunnerNotes({
   line: SplitRunStreamLine;
   organizationId: string;
   canvasId: string;
+  analysisStatus: SplitRunPhaseStatus;
   spendPhaseId: string;
   reportUsage: boolean;
   onLive: (lineId: string, live: RunnerLive) => void;
@@ -296,6 +299,7 @@ function RunnerNotes({
     line,
     organizationId,
     canvasId,
+    analysisStatus,
   );
   useReportLiveHeaderSpend(`${spendPhaseId}:${line.id}`, spend.tokens, spend.cents);
   useReportPhaseAgentUsageSeries({
@@ -314,6 +318,7 @@ function useRunnerLiveNotes(
   line: SplitRunStreamLine,
   organizationId: string,
   canvasId: string,
+  analysisStatus: SplitRunPhaseStatus,
 ): {
   notes: SplitRunStreamLine[];
   activities: AgentActivity[];
@@ -352,9 +357,10 @@ function useRunnerLiveNotes(
         error,
         isStreaming,
         nodeStatus: line.status,
+        analysisStatus,
       }) ?? []
     );
-  }, [canStream, error, isStreaming, line.id, line.nodeId, line.status, orphanLines, sections]);
+  }, [analysisStatus, canStream, error, isStreaming, line.id, line.nodeId, line.status, orphanLines, sections]);
   const activities = useMemo(() => {
     const recorded = mergeAgentActivities(
       sections.flatMap((section) => section.activities ?? []),

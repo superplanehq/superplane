@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type FirstRunBlockingAction =
   | "opening-github"
+  | "opening-bitbucket"
   | "switching-github-account"
+  | "switching-bitbucket-account"
   | "saving-repository"
+  | "saving-agent"
   | "saving-ticket-source"
   | "connecting-jira"
   | "connecting-linear"

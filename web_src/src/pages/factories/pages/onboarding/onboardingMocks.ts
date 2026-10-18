@@ -1,4 +1,4 @@
-export type GitProvider = "github" | "gitlab";
+export type GitProvider = "github" | "bitbucket" | "gitlab";
 
 export type OnboardingRepo = {
   id: string;

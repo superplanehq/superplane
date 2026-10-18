@@ -9,6 +9,8 @@ import {
   REFUND_FACTORY_LINES,
 } from "../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFactoriesFixture";
+import { prReadyFactoriesFixture } from "../../__fixtures__/prReadyFactoriesFixture";
+import { LINE_BOARD_VERIFY_PR_REVIEW_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { refineChatBoardFixture } from "../../__fixtures__/refineChatBoardFixture";
 
 /**
@@ -68,4 +70,29 @@ function refineChatOnBoard() {
 export const RefineChatOnBoard: Story = {
   name: "Refine chat on the board",
   render: () => refineChatOnBoard(),
+};
+
+function prReadyTask(assessment: "ready" | "review" | "partial") {
+  return (
+    <FactoriesHarness
+      mode="app"
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/${LINE_BOARD_VERIFY_PR_REVIEW_ORDER.number}?lineId=${REFUND_FACTORY_LINES[0].id}`}
+      factoriesFixture={prReadyFactoriesFixture(assessment)}
+    />
+  );
+}
+
+export const PullRequestReady: Story = {
+  name: "PR ready",
+  render: () => prReadyTask("ready"),
+};
+
+export const PullRequestNeedsReview: Story = {
+  name: "PR ready — checks need review",
+  render: () => prReadyTask("review"),
+};
+
+export const PullRequestPartialChecks: Story = {
+  name: "PR ready — partial checks",
+  render: () => prReadyTask("partial"),
 };

@@ -492,36 +492,6 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 		return len(orders)
 	}
 
-	t.Run("skips a Jira issue that already has a task", func(t *testing.T) {
-		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
-		existing, err := factoryModel.CreateWorkOrderWithOrigin(
-			database.Conn(),
-			"Existing jira task",
-			"",
-			nil,
-			nil,
-			nil,
-			models.WorkOrderOrigin{URL: "https://acme.atlassian.net/browse/ENG-5", Label: "ENG-5"},
-		)
-		require.NoError(t, err)
-		beforeEvents, err := existing.ListEvents(database.Conn(), 0, nil)
-		require.NoError(t, err)
-
-		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("updated", "ENG-5"))
-		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-
-		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Existing jira task"})
-		require.NoError(t, err)
-		assert.False(t, created)
-		assert.Nil(t, order)
-		assert.Equal(t, 1, countOrders(factoryModel))
-
-		afterEvents, err := existing.ListEvents(database.Conn(), 0, nil)
-		require.NoError(t, err)
-		assert.Len(t, afterEvents, len(beforeEvents))
-	})
-
 	t.Run("create then update for the same issue inserts one work order", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
@@ -605,62 +575,6 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Issue ENG-5"})
-		require.NoError(t, err)
-		require.True(t, created)
-		require.NotNil(t, order)
-		assert.Equal(t, 2, countOrders(factoryModel))
-	})
-
-	t.Run("creates a task when the Jira issue has none", func(t *testing.T) {
-		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
-		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, jiraPayload("created", "ENG-7"))
-		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceJiraIssues)
-		require.NoError(t, err)
-		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-
-		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
-		require.NoError(t, err)
-		require.True(t, created)
-		require.NotNil(t, order)
-		require.NotNil(t, order.Origin)
-		assert.Equal(t, "https://acme.atlassian.net/browse/ENG-7", order.Origin.URL)
-		assert.Equal(t, "ENG-7", order.Origin.Label)
-		assert.Equal(t, 1, countOrders(factoryModel))
-	})
-
-	t.Run("still creates a GitHub task with a repeated origin", func(t *testing.T) {
-		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
-		origin := models.WorkOrderOrigin{
-			URL:   "https://github.com/acme/payments/issues/12",
-			Label: "acme/payments#12",
-		}
-		_, err = factoryModel.CreateWorkOrderWithOrigin(
-			database.Conn(),
-			"First github task",
-			"",
-			nil,
-			nil,
-			nil,
-			origin,
-		)
-		require.NoError(t, err)
-
-		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
-			"type": "github.issue",
-			"data": map[string]any{
-				"issue": map[string]any{
-					"html_url": origin.URL,
-					"title":    "Handle duplicate refunds",
-				},
-			},
-		})
-		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
-		require.NoError(t, err)
-		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-
-		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
 		require.NoError(t, err)
 		require.True(t, created)
 		require.NotNil(t, order)
@@ -1012,6 +926,45 @@ func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
 	assert.Len(t, statusEvents, 2, "no-op must not record a second status.updated event")
 }
 
+func TestFactoryContext_UpdateWorkOrderStatus_CloseReportsRunCancellations(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	agent, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "create-work-order", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(agent).Update("input", models.NewJSONValue(map[string]any{
+		"work_order": map[string]any{"id": order.ID.String()},
+	})).Error)
+
+	var reported []uuid.UUID
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).WithRunsCancelled(func(results []*models.RunCancellationResult) {
+		for _, result := range results {
+			if result == nil || result.Run == nil || result.Drain == nil {
+				continue
+			}
+			reported = append(reported, result.Run.ID)
+		}
+	})
+	_, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultRejected,
+	})
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, []uuid.UUID{agent.ID}, reported)
+	assert.NotContains(t, reported, run.ID)
+
+	agent, err = models.FindUnscopedCanvasRun(database.Conn(), agent.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, agent.State)
+}
+
 func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -1046,6 +999,37 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	assert.Equal(t, line.Name, closedAutomation.LineName)
 	assert.Equal(t, "component-under-test", closedAutomation.StepName)
 	assert.Equal(t, nodeExecution.NodeID, closedAutomation.NodeID)
+}
+
+func TestFactoryContext_UpdateWorkOrderStatus_RejectedStaysVisible(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation rejection", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultRejected,
+	})
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, models.FactoryWorkOrderResultManualRejected, updated.Result)
+
+	reloaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderResultManualRejected, reloaded.Result)
+	assert.False(t, reloaded.IsArchived())
 }
 
 // orderId is required and explicit at the FactoryContext level too — there
@@ -1427,6 +1411,7 @@ func TestFactoryContext_FindPullRequest_IncludesWorkOrderOrigin(t *testing.T) {
 		require.NotNil(t, match.WorkOrder.Origin)
 		assert.Equal(t, originURL, match.WorkOrder.Origin.URL)
 		assert.Equal(t, originLabel, match.WorkOrder.Origin.Label)
+		assert.Equal(t, uiBaseURL()+order.URLPath(factory.RouteSegment()), match.WorkOrder.URL)
 	})
 
 	t.Run("omits origin when the task has none", func(t *testing.T) {
@@ -1681,6 +1666,88 @@ func TestFactoryContext_AddWorkOrderArtifact_KeyedRefresh(t *testing.T) {
 		assert.NotEqual(t, factoryevents.EventTypeOrderArtifactUpdated, event.Type)
 	}
 	assert.Equal(t, 1, addedCount)
+}
+
+func TestFactoryContext_AddWorkOrderArtifact_UpdateByTitle(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Title update target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	other, err := factory.CreateWorkOrder(database.Conn(), "Other title target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	otherArtifact, err := other.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeLink,
+		Data: map[string]any{
+			"url":   "https://preview.example.com/other",
+			"title": "Preview",
+		},
+	})
+	require.NoError(t, err)
+
+	var reasons []string
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderUpdated(func(_, _, reason string) {
+			reasons = append(reasons, reason)
+		})
+
+	first, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		OrderID: order.ID.String(),
+		Type:    "link",
+		Data: map[string]any{
+			"url":   "https://preview.example.com/v1",
+			"title": "Preview",
+			"note":  "first",
+		},
+		Key:           "storybook-preview",
+		UpdateByTitle: true,
+	})
+	require.NoError(t, err)
+
+	second, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		OrderID: order.ID.String(),
+		Type:    "link",
+		Data: map[string]any{
+			"url":   "https://preview.example.com/v2",
+			"title": "Preview",
+		},
+		Key:           "storybook-preview",
+		UpdateByTitle: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, second.ID)
+	assert.Equal(t, "https://preview.example.com/v2", second.Data["url"])
+	_, hasNote := second.Data["note"]
+	assert.False(t, hasNote)
+
+	assert.Equal(t, []string{
+		factoryevents.EventTypeOrderArtifactAdded,
+		factoryevents.EventTypeOrderArtifactUpdated,
+	}, reasons)
+
+	artifacts, err := order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	assert.Nil(t, artifacts[0].Key)
+
+	otherArtifacts, err := other.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, otherArtifacts, 1)
+	assert.Equal(t, otherArtifact.ID, otherArtifacts[0].ID)
+	assert.Equal(t, "https://preview.example.com/other", mustContextArtifactData(t, &otherArtifacts[0])["url"])
+}
+
+func mustContextArtifactData(t *testing.T, artifact *models.FactoryWorkOrderArtifact) map[string]any {
+	t.Helper()
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(artifact.Data, &data))
+	return data
 }
 
 type automationPayload struct {

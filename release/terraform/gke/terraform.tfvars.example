@@ -29,7 +29,7 @@ letsencrypt_email = "admin@example.com"
 # cluster_name    = "superplane"
 # cluster_version = "1.36"
 # node_count      = 2
-# machine_type    = "e2-medium"
+# machine_type    = "e2-standard-2"
 
 # Set to false and apply before terraform destroy
 # gke_deletion_protection = true
@@ -54,7 +54,52 @@ letsencrypt_email = "admin@example.com"
 # -----------------------------------------------------------------------------
 
 # superplane_namespace = "superplane"
-# superplane_image_tag = "stable"  # Options: stable, beta, or specific version like v0.4
+
+# Published application images are available from GitHub Container Registry.
+# superplane_image_registry = "ghcr.io/superplanehq"
+
+# Set this when the standalone Fleet Manager image is in a private GCP registry.
+# fleet_manager_image_registry = "ghcr.io/superplanehq"
+
+# Optional. Empty uses the image version in the published chart.
+superplane_image_tag = ""
+
+# Set both before the first apply. The variable defaults stay false so an
+# existing install that omitted them keeps local blob files.
+enable_gcs_blob_storage = true
+enable_runners          = true
+
+# Required unless you set superplane_chart_path. Terraform downloads published
+# charts from oci://ghcr.io/superplanehq/superplane-chart.
+superplane_chart_version = "1.0.0-rc1"
+
+# Install the chart from this repository to test changes that are not published.
+# superplane_chart_path = "../../superplane-helm-chart/helm"
+
+# -----------------------------------------------------------------------------
+# Optional Variables - Blob Storage
+# -----------------------------------------------------------------------------
+
+# Set enable_gcs_blob_storage to false only for a short app-only evaluation.
+# enable_gcs_blob_storage = false
+# blob_bucket_name        = ""     # Default: <project_id>-superplane-blobs
+# blob_bucket_force_destroy = false
+
+# -----------------------------------------------------------------------------
+# Optional Variables - Runners
+# -----------------------------------------------------------------------------
+
+# Set enable_runners to false only for a short app-only evaluation.
+# enable_runners = false
+
+# runner_zones       = ["us-central1-a", "us-central1-b"]
+# runner_subnet_cidr = "172.20.0.0/24"
+# runner_image_amd64 = "projects/example/global/images/superplane-runner-amd64"
+# runner_image_arm64 = "projects/example/global/images/superplane-runner-arm64"
+
+# After owner setup, use /admin/fleet-manager-setup. The page maps Terraform
+# outputs to the standalone chart at
+# oci://ghcr.io/superplanehq/fleet-manager-chart.
 
 # -----------------------------------------------------------------------------
 # Optional Variables - Network

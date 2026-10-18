@@ -117,14 +117,22 @@ func CreateIntegration(
 		return nil, grpcerrors.Internal(err, "failed to encrypt sensitive configuration")
 	}
 
-	newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, configuration)
-	if err != nil {
-		integrationLogger.WithError(err).Error("failed to create integration")
-		return nil, grpcerrors.Internal(err, "failed to create integration")
+	newIntegration := models.NewIntegration(integrationID, org, integrationName, name, configuration)
+	if !requiresVerifiedAPIKey(integrationName) {
+		newIntegration, err = models.CreateIntegration(integrationID, org, integrationName, name, configuration)
+		if err != nil {
+			integrationLogger.WithError(err).Error("failed to create integration")
+			return nil, grpcerrors.Internal(err, "failed to create integration")
+		}
 	}
 
 	userID, _ := authentication.GetUserIdFromMetadata(ctx)
 	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration, userID)
+}
+
+// These providers verify credentials without writing setup state or secrets.
+func requiresVerifiedAPIKey(integrationName string) bool {
+	return integrationName == "claude" || integrationName == "openai"
 }
 
 func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName string, config map[string]any) bool {
@@ -214,6 +222,9 @@ func syncIntegration(
 		ActorUserID:     actorUserID,
 		OIDC:            oidcProvider,
 	})
+	if syncErr != nil && requiresVerifiedAPIKey(newIntegration.AppName) {
+		return nil, grpcerrors.InvalidArgument(syncErr, "Unable to verify the API key. Check the key and try again.")
+	}
 
 	err := database.Conn().Save(newIntegration).Error
 	if err != nil {
@@ -340,6 +351,8 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 			Editable:    secret.Editable,
 		})
 	}
+
+	appendHostedGitHubInstallationURL(instance, proto)
 
 	return proto, nil
 }

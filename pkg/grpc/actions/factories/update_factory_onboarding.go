@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -30,6 +31,11 @@ func UpdateFactoryOnboarding(
 
 	patch, err := factoryOnboardingPatchFromRequest(req)
 	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+	setOnboardingVCSProvider(db, orgID, &patch)
+
+	if err := rejectVCSProviderChange(factory, patch); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 
@@ -79,8 +85,8 @@ func validateFactoryOnboardingResources(
 		if err != nil {
 			return err
 		}
-		if integration.AppName != "github" && integration.AppName != "gitlab" {
-			return invalidArgument("version control integration must be GitHub or GitLab")
+		if integration.AppName != models.ProviderGitHub && integration.AppName != "gitlab" && integration.AppName != models.ProviderBitbucket {
+			return invalidArgument("version control integration must be GitHub, GitLab, or Bitbucket")
 		}
 	}
 
@@ -150,6 +156,50 @@ func validateFactoryOnboardingResources(
 	}
 
 	return nil
+}
+
+// rejectVCSProviderChange locks the provider at the first saved VCS binding.
+// Clearing the integration keeps the lock; switching hosts is rejected.
+func rejectVCSProviderChange(factory *models.Factory, patch models.FactoryOnboardingPatch) error {
+	if patch.VCSProvider == nil {
+		return nil
+	}
+	next := strings.TrimSpace(*patch.VCSProvider)
+	if next == "" {
+		return nil
+	}
+	current := factory.OnboardingConfigValue()
+	if strings.TrimSpace(current.VCSIntegrationID) == "" && strings.TrimSpace(current.VCSProvider) == "" {
+		return nil
+	}
+	if !strings.EqualFold(next, current.EffectiveVCSProvider()) {
+		return invalidArgument("version control provider cannot be changed")
+	}
+	return nil
+}
+
+func setOnboardingVCSProvider(db *gorm.DB, organizationID uuid.UUID, patch *models.FactoryOnboardingPatch) {
+	if patch.VCSIntegrationID == nil {
+		return
+	}
+	integrationID := strings.TrimSpace(*patch.VCSIntegrationID)
+	if integrationID == "" {
+		// ponytail: clearing the integration keeps the provider lock
+		return
+	}
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return
+	}
+	integration, err := models.FindIntegrationInTransaction(db, organizationID, id)
+	if err != nil {
+		return
+	}
+	provider, ok := models.VCSProviderForIntegrationApp(integration.AppName)
+	if !ok {
+		return
+	}
+	patch.VCSProvider = &provider
 }
 
 func findReadyOnboardingIntegration(

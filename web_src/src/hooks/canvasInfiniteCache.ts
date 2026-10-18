@@ -153,7 +153,35 @@ function mergeCanvasRunFields(existing: CanvasesCanvasRun, incoming: CanvasesCan
     finishedAt: incoming.finishedAt ?? existing.finishedAt,
     versionId: incoming.versionId ?? existing.versionId,
     parent: incoming.parent ?? existing.parent,
+    totalTokens: keepRecordedMetric(existing.totalTokens, incoming.totalTokens),
+    costCents: keepRecordedMetric(existing.costCents, incoming.costCents),
+    models: keepRecordedModels(existing.models, incoming.models),
   };
+}
+
+function keepRecordedMetric(existing: string | undefined, incoming: string | undefined): string | undefined {
+  if (isPositiveMetric(incoming)) {
+    return incoming;
+  }
+  if (isPositiveMetric(existing)) {
+    return existing;
+  }
+  return incoming ?? existing;
+}
+
+function isPositiveMetric(value: string | undefined): value is string {
+  if (!value) {
+    return false;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0;
+}
+
+function keepRecordedModels(existing: string[] | undefined, incoming: string[] | undefined): string[] | undefined {
+  if (incoming?.some((model) => model.trim() !== "")) {
+    return incoming;
+  }
+  return existing ?? incoming;
 }
 
 export function mergeCanvasRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): CanvasesCanvasRun {

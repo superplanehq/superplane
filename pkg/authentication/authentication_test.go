@@ -14,8 +14,10 @@ import (
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -76,7 +78,7 @@ func TestUseRealProviderAuthInDevelopment(t *testing.T) {
 	})
 }
 
-func TestHandler_handleAuth_GitHubAccountPicker(t *testing.T) {
+func TestHandler_handleAuth_AccountPicker(t *testing.T) {
 	handler, r := setupAuthHandler(t, false)
 	handler.InitializeProviders(map[string]ProviderConfig{
 		models.ProviderGitHub: {
@@ -84,12 +86,17 @@ func TestHandler_handleAuth_GitHubAccountPicker(t *testing.T) {
 			Secret:      "client-secret",
 			CallbackURL: "https://app.example/auth/github/callback",
 		},
+		models.ProviderBitbucket: {
+			Key:         "bitbucket-client-id",
+			Secret:      "bitbucket-client-secret",
+			CallbackURL: "https://app.example/auth/bitbucket/callback",
+		},
 	})
 
-	authorizeQuery := func(t *testing.T, target string, withSession bool) url.Values {
+	authorizeURL := func(t *testing.T, provider, target string, withSession bool) *url.URL {
 		request := mux.SetURLVars(
 			httptest.NewRequest(http.MethodGet, target, nil),
-			map[string]string{"provider": models.ProviderGitHub},
+			map[string]string{"provider": provider},
 		)
 		if withSession {
 			token, err := handler.jwtSigner.GenerateWithClaims(time.Hour, map[string]string{
@@ -106,23 +113,108 @@ func TestHandler_handleAuth_GitHubAccountPicker(t *testing.T) {
 		require.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
 		location, err := url.Parse(recorder.Header().Get("Location"))
 		require.NoError(t, err)
-		assert.Equal(t, "github.com", location.Host)
-		return location.Query()
+		return location
 	}
 
 	t.Run("asks GitHub to show the account picker when connecting an account", func(t *testing.T) {
-		query := authorizeQuery(t, "/auth/github?intent=connect&redirect=/onboarding", true)
+		location := authorizeURL(t, models.ProviderGitHub, "/auth/github?intent=connect&redirect=/onboarding", true)
+		query := location.Query()
 
+		assert.Equal(t, "github.com", location.Host)
 		assert.Equal(t, "select_account", query.Get("prompt"))
 		assert.Equal(t, "user:email", query.Get("scope"))
 		assert.NotEmpty(t, query.Get("state"))
 	})
 
-	t.Run("keeps sign-in on the active GitHub account", func(t *testing.T) {
-		query := authorizeQuery(t, "/auth/github", false)
+	t.Run("asks Bitbucket to show the account picker when connecting an account", func(t *testing.T) {
+		location := authorizeURL(t, models.ProviderBitbucket, "/auth/bitbucket?intent=connect&redirect=/onboarding", true)
+		query := location.Query()
 
-		assert.Empty(t, query.Get("prompt"))
+		assert.Equal(t, "bitbucket.org", location.Host)
+		assert.Equal(t, "/site/oauth2/authorize", location.Path)
+		assert.Equal(t, "select_account", query.Get("prompt"))
+		assert.Equal(t, "bitbucket-client-id", query.Get("client_id"))
+		assert.NotEmpty(t, query.Get("state"))
 	})
+
+	t.Run("keeps sign-in on the active GitHub account", func(t *testing.T) {
+		location := authorizeURL(t, models.ProviderGitHub, "/auth/github", false)
+
+		assert.Equal(t, "github.com", location.Host)
+		assert.Empty(t, location.Query().Get("prompt"))
+	})
+}
+
+func TestHandler_handleAuth_UsesEnvironmentGitHubClient(t *testing.T) {
+	handler, r := setupAuthHandler(t, false)
+	t.Setenv("GITHUB_CLIENT_ID", "Iv1.env")
+	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
+	t.Setenv("BASE_URL", "https://azure.example")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	goth.ClearProviders()
+	t.Cleanup(func() { goth.ClearProviders() })
+	handler.InitializeProviders(map[string]ProviderConfig{
+		models.ProviderGitHub: {
+			Key:         "Iv1.env",
+			Secret:      "env-secret",
+			CallbackURL: "https://azure.example/auth/github/callback",
+		},
+	})
+
+	token, err := handler.jwtSigner.GenerateWithClaims(time.Hour, map[string]string{
+		"sub":             r.Account.ID.String(),
+		sessionStartClaim: strconv.FormatInt(time.Now().Unix(), 10),
+	})
+	require.NoError(t, err)
+	request := mux.SetURLVars(
+		httptest.NewRequest(http.MethodGet, "/auth/github?intent=connect&redirect=/demo/workspaces/new/setup", nil),
+		map[string]string{"provider": models.ProviderGitHub},
+	)
+	request.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	recorder := httptest.NewRecorder()
+
+	handler.handleAuth(recorder, request)
+
+	require.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
+	location, err := url.Parse(recorder.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, "github.com", location.Host)
+	assert.Equal(t, "Iv1.env", location.Query().Get("client_id"))
+	assert.Equal(t, "https://azure.example/auth/github/callback", location.Query().Get("redirect_uri"))
+}
+
+func TestHandler_handleAuthConfig_IgnoresInstallationGitHubApp(t *testing.T) {
+	goth.ClearProviders()
+	t.Cleanup(func() { goth.ClearProviders() })
+
+	r := support.Setup(t)
+	t.Cleanup(func() { r.Close() })
+	handler := NewHandler(jwt.NewSigner("test-secret"), r.Encryptor, r.AuthService, "development", "/templates", false, false, false)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	t.Setenv("BASE_URL", "https://azure.example")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+		ID:            44,
+		Slug:          "superplane-self",
+		PrivateKey:    "pem",
+		WebhookSecret: "whsec",
+	}))
+
+	recorder := httptest.NewRecorder()
+	handler.handleAuthConfig(recorder, httptest.NewRequest(http.MethodGet, "/auth/config", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var body struct {
+		Providers []string `json:"providers"`
+	}
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&body))
+	assert.NotContains(t, body.Providers, models.ProviderGitHub)
 }
 
 func TestHandler_handleAuthConfig(t *testing.T) {
@@ -381,13 +473,12 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 func attachGitHubIdentity(t *testing.T, account *models.Account, providerID string) {
 	t.Helper()
 	require.NoError(t, database.Conn().Create(&models.AccountProvider{
-		AccountID:   account.ID,
-		Provider:    models.ProviderGitHub,
-		ProviderID:  providerID,
-		Email:       account.Email,
-		Name:        account.Name,
-		AvatarURL:   "https://avatars.example/" + providerID + ".png",
-		AccessToken: "token-" + account.ID.String(),
+		AccountID:  account.ID,
+		Provider:   models.ProviderGitHub,
+		ProviderID: providerID,
+		Email:      account.Email,
+		Name:       account.Name,
+		AvatarURL:  "https://avatars.example/" + providerID + ".png",
 	}).Error)
 }
 
@@ -493,12 +584,11 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 	t.Run("should create the account when signup intent is missing", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
 		googleUser := goth.User{
-			UserID:      "google-login-no-account",
-			Email:       "google-login-no-account@example.com",
-			Name:        "Google Login User",
-			NickName:    "googlelogin",
-			Provider:    "google",
-			AccessToken: "google-access-token",
+			UserID:   "google-login-no-account",
+			Email:    "google-login-no-account@example.com",
+			Name:     "Google Login User",
+			NickName: "googlelogin",
+			Provider: "google",
 		}
 		req := mux.SetURLVars(
 			httptest.NewRequest(http.MethodGet, "/auth/google", nil),
@@ -593,12 +683,11 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		attachGitHubIdentity(t, account, "10001")
 
 		githubUser := goth.User{
-			UserID:      "10001",
-			Email:       account.Email,
-			Name:        account.Name,
-			NickName:    "solo",
-			Provider:    models.ProviderGitHub,
-			AccessToken: "solo-token",
+			UserID:   "10001",
+			Email:    account.Email,
+			Name:     account.Name,
+			NickName: "solo",
+			Provider: models.ProviderGitHub,
 		}
 		req := mux.SetURLVars(
 			httptest.NewRequest(http.MethodGet, "/auth/github", nil),
@@ -645,6 +734,28 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
 		assert.Equal(t, identityAccount.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
 	})
+}
+
+func TestLinkProviderToAccountUpdatesIdentityProfile(t *testing.T) {
+	_, registry := setupAuthHandler(t, false)
+	user := goth.User{
+		Provider: models.ProviderGoogle,
+		UserID:   "google-linked",
+		Email:    "linked@example.com",
+		Name:     "Linked User",
+		NickName: "linked",
+	}
+
+	require.NoError(t, LinkProviderToAccount(database.Conn(), registry.Account, user))
+
+	user.Name = "Updated Linked User"
+	require.NoError(t, LinkProviderToAccount(database.Conn(), registry.Account, user))
+
+	provider, err := registry.Account.GetAccountProvider(user.Provider)
+	require.NoError(t, err)
+	assert.Equal(t, user.UserID, provider.ProviderID)
+	assert.Equal(t, user.Email, provider.Email)
+	assert.Equal(t, user.Name, provider.Name)
 }
 
 func sessionAccountID(t *testing.T, recorder *httptest.ResponseRecorder, signer *jwt.Signer) string {

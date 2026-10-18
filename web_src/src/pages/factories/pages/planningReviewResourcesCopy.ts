@@ -2,7 +2,7 @@ export const PLANNING_REVIEW_RESOURCES_COPY = {
   title: "Resources",
   kindMcp: "MCP server",
   kindSkill: "Skill",
-  settingsLink: "workspace settings page",
+  settingsLink: "Agent page",
   manage: "Manage",
   offForWorkspace: "Off for the workspace.",
   loading: "Loading resources…",

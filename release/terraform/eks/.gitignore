@@ -7,6 +7,9 @@
 # Terraform variables file (may contain secrets)
 terraform.tfvars
 
+# Saved deployment plan (may contain secrets)
+tfplan
+
 # Crash log files
 crash.log
 crash.*.log

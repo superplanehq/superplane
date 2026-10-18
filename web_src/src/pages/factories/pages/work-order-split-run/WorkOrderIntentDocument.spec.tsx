@@ -39,6 +39,24 @@ const GITHUB_SOURCE: SplitRunSource = {
 };
 
 describe("WorkOrderIntentDocument", () => {
+  it("shows only the original request time on hover", async () => {
+    const user = userEvent.setup();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[]}
+        analysis={analysisChat({ requestCreatedAt: new Date(2026, 9, 13, 14, 20, 15).toISOString() })}
+      />,
+    );
+    const time = screen.getByText("14:20");
+    expect(time).not.toBeVisible();
+    await user.hover(screen.getByTestId("split-run-description"));
+    expect(time).toBeVisible();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await user.unhover(screen.getByTestId("split-run-description"));
+    expect(time).not.toBeVisible();
+  });
+
   beforeEach(() => {
     window.localStorage.clear();
     vi.stubGlobal("ResizeObserver", IntentDocumentResizeObserver);
@@ -427,7 +445,6 @@ describe("WorkOrderIntentDocument", () => {
       within(screen.getByTestId("split-run-intent-chat-log")).getByTestId("create-with-agent-survey"),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /High/ }));
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
 
     expect(onSubmitSurvey).not.toHaveBeenCalled();

@@ -168,7 +168,7 @@ const SUPERPLANE_AGENT_MODEL_FIELD: ConfigurationField = {
 };
 
 function withModelUsedLabel(field: ConfigurationField): ConfigurationField {
-  return { ...field, label: "Model used", description: "" };
+  return { ...field, label: "Model", description: "" };
 }
 
 /** Model picker for the agent editor. SuperPlane agents use the hosted allowlist. */

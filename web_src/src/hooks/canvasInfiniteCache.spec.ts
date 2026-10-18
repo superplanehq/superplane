@@ -136,6 +136,57 @@ describe("upsertRunIntoInfiniteData", () => {
     expect(updatedRun?.queueItems?.map((queueItem) => queueItem.id)).toEqual(["queue-item-1"]);
   });
 
+  it("keeps recorded spend and model when a newer run update omits them", () => {
+    const old = makeInfiniteRunsData([
+      makeRun({
+        totalTokens: "46200",
+        costCents: "18",
+        models: ["anthropic/claude-sonnet-4-6"],
+        updatedAt: "2026-06-01T12:00:00.000Z",
+      }),
+    ]);
+    const incoming = makeRun({
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      totalTokens: "0",
+      costCents: "0",
+      models: [],
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    const next = upsertRunIntoInfiniteData(old, incoming, {})!;
+    const updatedRun = next.pages[0]?.runs?.[0];
+
+    expect(updatedRun?.state).toBe("STATE_FINISHED");
+    expect(updatedRun?.totalTokens).toBe("46200");
+    expect(updatedRun?.costCents).toBe("18");
+    expect(updatedRun?.models).toEqual(["anthropic/claude-sonnet-4-6"]);
+  });
+
+  it("replaces recorded spend and model when a newer update carries them", () => {
+    const old = makeInfiniteRunsData([
+      makeRun({
+        totalTokens: "1000",
+        costCents: "18",
+        models: ["anthropic/claude-sonnet-4-6"],
+        updatedAt: "2026-06-01T12:00:00.000Z",
+      }),
+    ]);
+    const incoming = makeRun({
+      totalTokens: "2000",
+      costCents: "25",
+      models: ["openai/gpt-5"],
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    const next = upsertRunIntoInfiniteData(old, incoming, {})!;
+    const updatedRun = next.pages[0]?.runs?.[0];
+
+    expect(updatedRun?.totalTokens).toBe("2000");
+    expect(updatedRun?.costCents).toBe("25");
+    expect(updatedRun?.models).toEqual(["openai/gpt-5"]);
+  });
+
   it("clears existing queue items when a refreshed run has none", () => {
     const old = makeInfiniteRunsData([
       makeRun({

@@ -1,13 +1,107 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
+import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
+import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
+import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 import { posthog, isPostHogEnabled } from "@/posthog";
+import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
+import type { FirstRunSphereProps } from "@/pages/factories/pages/onboarding/first-run/FirstRunSpherePane";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
+import { FleetManagerStep } from "./ownerSetup/FleetManagerStep";
+import { LicenseStep } from "./ownerSetup/LicenseStep";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
+import { SmtpStep } from "./ownerSetup/SmtpStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
+const OWNER_SETUP_STEPS = 8;
+const OWNER_SETUP_PREVIEW: FirstRunSphereProps = {
+  level: 0,
+  art: {
+    mode: "globe",
+    background: "#b09532",
+    arrowColor: "#eeede9",
+    count: 400,
+  },
+};
+
+type OwnerSetupStep = "owner" | "license" | "smtp" | "fleet-intro" | `fleet-${FleetManagerWizardStep}` | "survey";
+
+function ownerSetupStepNumber(step: OwnerSetupStep) {
+  if (step === "owner") return 1;
+  if (step === "license") return 2;
+  if (step === "smtp") return 3;
+  if (step === "fleet-intro") return 4;
+  if (step === "fleet-provider") return 5;
+  if (step === "fleet-fleets") return 6;
+  if (step === "fleet-values") return 7;
+  if (step === "fleet-install") return 8;
+  return OWNER_SETUP_STEPS;
+}
+
+function fleetManagerOrganizationId(slug: string | null) {
+  return slug ?? "";
+}
+
+function fleetWizardStep(step: OwnerSetupStep): FleetManagerWizardStep | null {
+  if (!step.startsWith("fleet-") || step === "fleet-intro") return null;
+  return step.slice("fleet-".length) as FleetManagerWizardStep;
+}
+
+function fleetStepBefore(step: OwnerSetupStep): OwnerSetupStep {
+  const active = fleetWizardStep(step);
+  if (!active) return "fleet-intro";
+  const index = FLEET_MANAGER_WIZARD_STEPS.indexOf(active);
+  if (index <= 0) return "fleet-intro";
+  return `fleet-${FLEET_MANAGER_WIZARD_STEPS[index - 1]}`;
+}
+
+function ownerSetupBackTarget(step: OwnerSetupStep): OwnerSetupStep | null {
+  if (fleetWizardStep(step)) return fleetStepBefore(step);
+  if (step === "fleet-intro") return "smtp";
+  if (step === "smtp") return "license";
+  return null;
+}
+
+function OwnerFleetSetupSteps({
+  step,
+  pendingOrganizationSlug,
+  activeFleetStep,
+  fleetStepIndex,
+  fleetSetup,
+  previousFleetStep,
+  finishInstallation,
+  setStep,
+}: {
+  step: OwnerSetupStep;
+  pendingOrganizationSlug: string | null;
+  activeFleetStep: FleetManagerWizardStep | null;
+  fleetStepIndex: number;
+  fleetSetup: ReturnType<typeof useFleetManagerSetup>;
+  previousFleetStep: () => void;
+  finishInstallation: () => void;
+  setStep: (step: OwnerSetupStep) => void;
+}) {
+  if (!pendingOrganizationSlug) return null;
+  if (step === "fleet-intro") {
+    return <FleetManagerStep onContinue={() => setStep("fleet-provider")} onSkip={finishInstallation} />;
+  }
+  if (!activeFleetStep) return null;
+
+  return (
+    <FleetManagerWizardScreen
+      step={activeFleetStep}
+      setup={fleetSetup}
+      onBack={previousFleetStep}
+      onNext={() => {
+        const next = FLEET_MANAGER_WIZARD_STEPS[fleetStepIndex + 1];
+        if (next) setStep(`fleet-${next}`);
+      }}
+      onFinish={finishInstallation}
+      onFinishLater={finishInstallation}
+    />
+  );
+}
 
 function isEmailValid(email: string) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,8 +161,7 @@ async function submitOwnerSetup(args: {
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
   setPendingOrganizationSlug: (slug: string | null) => void;
-  setActiveSurvey: (survey: PostHogSurvey | null) => void;
-  setStep: (step: "owner" | "survey") => void;
+  setStep: (step: OwnerSetupStep) => void;
 }) {
   args.setError(null);
   args.setLoading(true);
@@ -103,35 +196,40 @@ async function submitOwnerSetup(args: {
     }
 
     const data: { organization_id: string; organization_slug: string } = await response.json();
-    const orgSlug = data.organization_slug;
-
-    if (!isPostHogEnabled) {
-      window.location.href = newOrganizationLandingPath(orgSlug);
-      return;
-    }
-
-    args.setPendingOrganizationSlug(orgSlug);
-    posthog.getActiveMatchingSurveys((surveys) => {
-      const usableSurveys = (surveys as PostHogSurvey[]).filter(
-        (survey) => Array.isArray(survey.questions) && survey.questions.length > 0,
-      );
-
-      const selectedSurvey =
-        usableSurveys.find((survey) => survey.name === OWNER_SETUP_SURVEY_NAME) ?? usableSurveys[0];
-
-      if (!selectedSurvey) {
-        window.location.href = newOrganizationLandingPath(orgSlug);
-        return;
-      }
-
-      args.setActiveSurvey(selectedSurvey);
-      args.setStep("survey");
-    });
+    args.setPendingOrganizationSlug(data.organization_slug);
+    args.setStep("license");
   } catch {
     args.setError("Network error occurred");
   } finally {
     args.setLoading(false);
   }
+}
+
+function continueAfterOwnerSetup(args: {
+  orgSlug: string;
+  setActiveSurvey: (survey: PostHogSurvey | null) => void;
+  setStep: (step: OwnerSetupStep) => void;
+}) {
+  if (!isPostHogEnabled()) {
+    window.location.href = newOrganizationLandingPath(args.orgSlug);
+    return;
+  }
+
+  posthog.getActiveMatchingSurveys((surveys) => {
+    const usableSurveys = (surveys as PostHogSurvey[]).filter(
+      (survey) => Array.isArray(survey.questions) && survey.questions.length > 0,
+    );
+
+    const selectedSurvey = usableSurveys.find((survey) => survey.name === OWNER_SETUP_SURVEY_NAME) ?? usableSurveys[0];
+
+    if (!selectedSurvey) {
+      window.location.href = newOrganizationLandingPath(args.orgSlug);
+      return;
+    }
+
+    args.setActiveSurvey(selectedSurvey);
+    args.setStep("survey");
+  });
 }
 
 const OwnerSetup: React.FC = () => {
@@ -140,12 +238,17 @@ const OwnerSetup: React.FC = () => {
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [step, setStep] = useState<"owner" | "survey">("owner");
+  const [step, setStep] = useState<OwnerSetupStep>("owner");
   const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
   const [activeSurvey, setActiveSurvey] = useState<PostHogSurvey | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const activeFleetStep = fleetWizardStep(step);
+  const fleetSetup = useFleetManagerSetup(
+    activeFleetStep !== null,
+    fleetManagerOrganizationId(pendingOrganizationSlug),
+  );
 
   useReportPageReady(true);
 
@@ -164,46 +267,82 @@ const OwnerSetup: React.FC = () => {
       setError,
       setLoading,
       setPendingOrganizationSlug,
-      setActiveSurvey,
       setStep,
     });
   };
 
-  return (
-    <div
-      className={cn("min-h-screen flex items-center justify-center bg-slate-100 px-4 py-8", appDarkModeClasses.surface)}
-    >
-      <div
-        className={cn(
-          "max-w-md w-full rounded-lg bg-white p-8 shadow-sm",
-          appDarkModeClasses.modalEdge,
-          appDarkModeClasses.surfaceRaised,
-        )}
-      >
-        {step === "owner" && (
-          <OwnerStep
-            email={email}
-            firstName={firstName}
-            lastName={lastName}
-            password={password}
-            confirmPassword={confirmPassword}
-            loading={loading}
-            error={error}
-            fieldErrors={fieldErrors}
-            onEmailChange={setEmail}
-            onFirstNameChange={setFirstName}
-            onLastNameChange={setLastName}
-            onPasswordChange={setPassword}
-            onConfirmPasswordChange={setConfirmPassword}
-            onSubmit={handleOwnerSubmit}
-          />
-        )}
+  const finishInstallation = useCallback(() => {
+    if (pendingOrganizationSlug) {
+      continueAfterOwnerSetup({ orgSlug: pendingOrganizationSlug, setActiveSurvey, setStep });
+    }
+  }, [pendingOrganizationSlug]);
 
-        {step === "survey" && activeSurvey && pendingOrganizationSlug && (
-          <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationSlug)} />
-        )}
-      </div>
-    </div>
+  const afterOwner = step !== "owner" && step !== "survey";
+  const fleetStepIndex = activeFleetStep ? FLEET_MANAGER_WIZARD_STEPS.indexOf(activeFleetStep) : -1;
+  const previousFleetStep = () => setStep(fleetStepBefore(step));
+  const goBack = () => {
+    const target = ownerSetupBackTarget(step);
+    if (target) setStep(target);
+  };
+
+  return (
+    <FirstRunShell
+      testId="owner-setup"
+      contentSpacing="compact"
+      visual="preview"
+      sphere={OWNER_SETUP_PREVIEW}
+      chrome={
+        step === "survey"
+          ? undefined
+          : {
+              stepIndex: ownerSetupStepNumber(step) - 1,
+              stepCount: OWNER_SETUP_STEPS,
+              email: afterOwner ? email : undefined,
+              onLogOut: afterOwner ? () => (window.location.href = "/logout") : undefined,
+              onBack: ownerSetupBackTarget(step) ? goBack : undefined,
+            }
+      }
+    >
+      {step === "owner" && (
+        <OwnerStep
+          email={email}
+          firstName={firstName}
+          lastName={lastName}
+          password={password}
+          confirmPassword={confirmPassword}
+          loading={loading}
+          error={error}
+          fieldErrors={fieldErrors}
+          onEmailChange={setEmail}
+          onFirstNameChange={setFirstName}
+          onLastNameChange={setLastName}
+          onPasswordChange={setPassword}
+          onConfirmPasswordChange={setConfirmPassword}
+          onSubmit={handleOwnerSubmit}
+        />
+      )}
+
+      {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={() => setStep("smtp")} />}
+
+      {step === "smtp" && pendingOrganizationSlug && (
+        <SmtpStep onContinue={() => setStep("fleet-intro")} onSkip={() => setStep("fleet-intro")} />
+      )}
+
+      <OwnerFleetSetupSteps
+        step={step}
+        pendingOrganizationSlug={pendingOrganizationSlug}
+        activeFleetStep={activeFleetStep}
+        fleetStepIndex={fleetStepIndex}
+        fleetSetup={fleetSetup}
+        previousFleetStep={previousFleetStep}
+        finishInstallation={finishInstallation}
+        setStep={setStep}
+      />
+
+      {step === "survey" && activeSurvey && pendingOrganizationSlug && (
+        <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationSlug)} />
+      )}
+    </FirstRunShell>
   );
 };
 

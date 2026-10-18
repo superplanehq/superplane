@@ -4,16 +4,22 @@ import {
   IGNORED_CONSOLE_MESSAGES,
   Sentry,
   isIgnoredConsoleMessage,
+  filterSentryEvent,
   isMonacoCanceledEvent,
+  isMonacoClipboardDeniedEvent,
   normalizeApiRouteTemplate,
   normalizeSentryFingerprint,
 } from "./sentry";
 
-function buildEvent(value: string | undefined, filenames: string[]): Sentry.ErrorEvent {
+const USER_AGENT_PERMISSION_DENIAL =
+  "The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.";
+
+function buildEvent(value: string | undefined, filenames: string[], type?: string): Sentry.ErrorEvent {
   return {
     exception: {
       values: [
         {
+          type,
           value,
           stacktrace: {
             frames: filenames.map((filename) => ({ filename })),
@@ -108,6 +114,54 @@ describe("isMonacoCanceledEvent", () => {
   });
 });
 
+describe("isMonacoClipboardDeniedEvent", () => {
+  it("drops a Safari clipboard denial whose stack mixes the editor with telemetry frames", () => {
+    const event = buildEvent(
+      USER_AGENT_PERMISSION_DENIAL,
+      [
+        "../../../../../web_src/node_modules/monaco-editor/esm/vs/platform/clipboard/browser/clipboardService.js",
+        "../../../../../web_src/node_modules/@dash0/sdk-web/dist/dash0.js",
+        "../../../../../web_src/node_modules/@sentry/browser/build/npm/esm/helpers.js",
+      ],
+      "NotAllowedError",
+    );
+
+    expect(isMonacoClipboardDeniedEvent(event)).toBe(true);
+  });
+
+  it("drops a Safari clipboard denial from a hashed monaco-editor asset", () => {
+    const event = buildEvent(
+      USER_AGENT_PERMISSION_DENIAL,
+      [
+        "https://assets.superplane.com/releases/2980385e0d934a8f0426c201cbd547dc6961b80a/assets/monaco-editor-Cai9_Aq9.js",
+      ],
+      "NotAllowedError",
+    );
+
+    expect(isMonacoClipboardDeniedEvent(event)).toBe(true);
+  });
+
+  it("keeps a permission denial whose stack has no editor frame", () => {
+    const event = buildEvent(
+      USER_AGENT_PERMISSION_DENIAL,
+      ["web_src/src/components/CopyButton.tsx"],
+      "NotAllowedError",
+    );
+
+    expect(isMonacoClipboardDeniedEvent(event)).toBe(false);
+  });
+
+  it("keeps a non-permission error from the editor", () => {
+    const event = buildEvent(
+      "Failed to read clipboard",
+      ["https://assets.superplane.com/releases/abc/assets/monaco-editor-Cai9_Aq9.js"],
+      "Error",
+    );
+
+    expect(isMonacoClipboardDeniedEvent(event)).toBe(false);
+  });
+});
+
 function buildMessageEvent(message: string, requestUrl?: string): Sentry.Event {
   return {
     message,
@@ -189,9 +243,63 @@ describe("normalizeSentryFingerprint", () => {
   });
 });
 
+function loggedPermissionDenial(filenames: string[]): DOMException {
+  const error = new DOMException(USER_AGENT_PERMISSION_DENIAL, "NotAllowedError");
+  error.stack = [
+    `NotAllowedError: ${USER_AGENT_PERMISSION_DENIAL}`,
+    ...filenames.map((filename) => `    at writeText (${filename}:10:20)`),
+  ].join("\n");
+  return error;
+}
+
 function unknownTouch(): object {
   return Object.defineProperty({}, Symbol.toStringTag, { value: "Touch" });
 }
+
+describe("captureConsole editor clipboard denials", () => {
+  it("drops the denial Sentry builds from a logged editor error", async () => {
+    const kept: string[][] = [];
+    const client = Sentry.init({
+      dsn: "https://public@o0.ingest.sentry.io/0",
+      autoSessionTracking: false,
+      sendClientReports: false,
+      beforeSend(event) {
+        const filtered = filterSentryEvent(event);
+        if (!filtered) {
+          return null;
+        }
+
+        const frames = filtered.exception?.values?.[0]?.stacktrace?.frames ?? [];
+        kept.push(frames.map((frame) => frame.filename ?? ""));
+        return null;
+      },
+      integrations: [
+        Sentry.captureConsoleIntegration({
+          levels: ["warn", "error"],
+        }),
+      ],
+    });
+
+    expect(client).toBeDefined();
+
+    try {
+      console.error(
+        loggedPermissionDenial([
+          "../../../../../web_src/node_modules/monaco-editor/esm/vs/platform/clipboard/browser/clipboardService.js",
+          "../../../../../web_src/node_modules/@dash0/sdk-web/dist/dash0.js",
+          "../../../../../web_src/node_modules/@sentry/browser/build/npm/esm/helpers.js",
+        ]),
+      );
+      console.error(loggedPermissionDenial(["web_src/src/components/CopyButton.tsx"]));
+
+      await Sentry.flush(2000);
+
+      expect(kept).toEqual([["web_src/src/components/CopyButton.tsx"]]);
+    } finally {
+      await client?.close(0);
+    }
+  });
+});
 
 describe("captureConsole unknown-touch warnings", () => {
   it("drops the warning Sentry builds from a two-argument console call", async () => {

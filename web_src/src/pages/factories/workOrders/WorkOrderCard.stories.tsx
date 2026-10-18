@@ -235,7 +235,7 @@ export const DraftAnalyzingWithScore: Story = {
 
 /** Refine finished with a mid Confidence: the card says Review. */
 export const DraftScoredPair: Story = {
-  name: "Draft with Clarity and Confidence (Review)",
+  name: "Planning checks — needs review",
   args: {
     entry: buildWorkOrderListEntry(
       waitingOrder({
@@ -249,14 +249,18 @@ export const DraftScoredPair: Story = {
       factory,
     ),
     pullRequests: [],
-    clarityScore: 5,
-    confidenceScore: 3,
+    confidenceScore: 2,
+    reviewMetrics: [
+      { key: "clarity", name: "Clarity", score: 3 },
+      { key: "complexity", name: "Complexity", score: 2 },
+      { key: "verifiability", name: "Verifiability", score: 3 },
+    ],
   },
 };
 
 /** Both scores high: the card says Ready. */
 export const DraftScoredReady: Story = {
-  name: "Draft ready to start",
+  name: "Planning checks — ready",
   args: {
     entry: buildWorkOrderListEntry(
       waitingOrder({
@@ -270,14 +274,18 @@ export const DraftScoredReady: Story = {
       factory,
     ),
     pullRequests: [],
-    clarityScore: 5,
-    confidenceScore: 4,
+    confidenceScore: 3,
+    reviewMetrics: [
+      { key: "clarity", name: "Clarity", score: 3 },
+      { key: "complexity", name: "Complexity", score: 3 },
+      { key: "verifiability", name: "Verifiability", score: 3 },
+    ],
   },
 };
 
 /** Low Clarity: the card says Not ready. */
 export const DraftScoredBlocked: Story = {
-  name: "Draft not ready",
+  name: "Planning checks — critical",
   args: {
     entry: buildWorkOrderListEntry(
       waitingOrder({
@@ -291,14 +299,18 @@ export const DraftScoredBlocked: Story = {
       factory,
     ),
     pullRequests: [],
-    clarityScore: 2,
-    confidenceScore: 4,
+    confidenceScore: 1,
+    reviewMetrics: [
+      { key: "clarity", name: "Clarity", score: 1 },
+      { key: "complexity", name: "Complexity", score: 3 },
+      { key: "verifiability", name: "Verifiability", score: 2 },
+    ],
   },
 };
 
 /** Intake only: the verdict uses Confidence alone until a refine session scores Clarity. */
 export const DraftScoredIntakeOnly: Story = {
-  name: "Draft with Confidence only",
+  name: "Legacy draft with Confidence only",
   args: {
     entry: buildWorkOrderListEntry(
       waitingOrder({
@@ -313,6 +325,33 @@ export const DraftScoredIntakeOnly: Story = {
     ),
     pullRequests: [],
     confidenceScore: 4,
+  },
+};
+
+/** Verify wrote merge confidence. The meter sits on the right of the footer. */
+export const MergeConfidence: Story = {
+  name: "Merge confidence",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-verify",
+        title: "Ship idempotent refund retries",
+        statusNotes: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    mergeConfidence: {
+      score: 5,
+      maxScore: 5,
+      checks: [
+        { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+        { key: "performance-review", name: "Performance", score: 5, maxScore: 5 },
+        { key: "security-review", name: "Security", score: 5, maxScore: 5 },
+        { key: "drift-review", name: "Drift from Specification", score: 1, maxScore: 5 },
+        { key: "reversibility-review", name: "Reversibility", score: 5, maxScore: 5 },
+      ],
+    },
   },
 };
 
@@ -355,7 +394,7 @@ export const OpenOwned: Story = {
 };
 
 /**
- * GitHub origin on the card. The source icon sits in the title row
+ * GitHub origin on the card. The source icon sits in the footer
  * and opens the issue in a new tab.
  */
 export const GitHubOrigin: Story = {
@@ -374,7 +413,7 @@ export const GitHubOrigin: Story = {
 };
 
 /**
- * Manual origin on the card. The product logo sits in the title row
+ * Manual origin on the card. The product logo sits in the footer
  * and is not a link.
  */
 export const ManualOrigin: Story = {

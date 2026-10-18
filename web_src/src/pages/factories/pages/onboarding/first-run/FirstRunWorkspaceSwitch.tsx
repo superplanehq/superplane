@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Check, Triangle } from "lucide-react";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router";
 
 import { factoriesRailControlClassName, initialsForName } from "../../../layout/factoriesRail";
@@ -16,20 +16,28 @@ function workspaceLabel(factory: FirstRunWorkspaceOption): string {
 export function FirstRunWorkspaceSwitch({
   switcher,
   disabled,
+  inline = false,
+  menuStyle,
 }: {
   switcher: NonNullable<FirstRunChrome["workspaceSwitch"]> | undefined;
   disabled?: boolean;
+  inline?: boolean;
+  menuStyle?: CSSProperties;
 }) {
   if (!switcher) return null;
-  return <FirstRunWorkspaceSwitchMenu switcher={switcher} disabled={disabled} />;
+  return <FirstRunWorkspaceSwitchMenu switcher={switcher} disabled={disabled} inline={inline} menuStyle={menuStyle} />;
 }
 
 function FirstRunWorkspaceSwitchMenu({
   switcher,
   disabled,
+  inline,
+  menuStyle,
 }: {
   switcher: NonNullable<FirstRunChrome["workspaceSwitch"]>;
   disabled?: boolean;
+  inline: boolean;
+  menuStyle?: CSSProperties;
 }) {
   const navigate = useNavigate();
   const copy = FIRST_RUN_COPY.chrome;
@@ -38,7 +46,7 @@ function FirstRunWorkspaceSwitchMenu({
   const currentName = current ? workspaceLabel(current) : "Workspace";
 
   return (
-    <div className="pointer-events-auto absolute bottom-0 left-0 z-10 px-6 pb-6">
+    <div className={inline ? undefined : "pointer-events-auto absolute bottom-0 left-0 z-10 px-6 pb-6"}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
@@ -55,7 +63,14 @@ function FirstRunWorkspaceSwitchMenu({
             {initialsForName(currentName)}
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" side="top" sideOffset={8} className="w-64 p-1">
+        <PopoverContent
+          align="start"
+          side="top"
+          sideOffset={8}
+          className="w-64 p-1"
+          style={menuStyle}
+          data-testid="first-run-workspace-menu"
+        >
           <p className="px-2 py-1.5 text-sm font-medium">{copy.switchWorkspace}</p>
           {switcher.factories.map((factory) => {
             if (!factory.id) return null;

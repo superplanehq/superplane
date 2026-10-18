@@ -42,7 +42,7 @@ variable "cluster_name" {
 variable "cluster_version" {
   description = "Kubernetes version for the EKS cluster"
   type        = string
-  default     = "1.36"
+  default     = "1.37"
 }
 
 variable "node_count" {
@@ -120,10 +120,45 @@ variable "superplane_namespace" {
   default     = "superplane"
 }
 
-variable "superplane_image_tag" {
-  description = "SuperPlane image tag (e.g., stable, beta, v0.4)"
+variable "superplane_chart_version" {
+  description = "Published SuperPlane Helm chart version with a matching versioned image"
   type        = string
-  default     = "stable"
+  default     = "1.0.0-rc1"
+}
+
+variable "superplane_image_tag" {
+  description = "SuperPlane image tag override. Empty uses the chart appVersion. Versioned, legacy selfhosted, and local tags are supported."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.superplane_image_tag == "" || can(regex("^v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$", var.superplane_image_tag)) || strcontains(var.superplane_image_tag, "selfhosted") || startswith(var.superplane_image_tag, "local-")
+    error_message = "Use a vMAJOR.MINOR.PATCH release tag, a legacy selfhosted tag, a local- tag, or leave the value empty."
+  }
+}
+
+variable "runner_active_log_volume_capacity" {
+  description = "Nominal Kubernetes PV/PVC capacity for runner active logs. EFS grows elastically and does not reserve this capacity."
+  type        = string
+  default     = "1Gi"
+}
+
+variable "enable_runners" {
+  description = "Enable the runner API and create infrastructure for standalone Fleet Manager runner VMs."
+  type        = bool
+  default     = true
+}
+
+variable "runner_image_amd64" {
+  description = "Packer-built AMI ID for linux/amd64 runner VMs."
+  type        = string
+  default     = ""
+}
+
+variable "runner_image_arm64" {
+  description = "Packer-built AMI ID for linux/arm64 runner VMs."
+  type        = string
+  default     = ""
 }
 
 # -----------------------------------------------------------------------------

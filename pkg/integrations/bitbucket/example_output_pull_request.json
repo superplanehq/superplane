@@ -1,0 +1,31 @@
+{
+  "data": {
+    "id": 42,
+    "type": "pullrequest",
+    "title": "feat: Add retry handling",
+    "description": "Adds retry handling to the worker.",
+    "state": "OPEN",
+    "draft": false,
+    "created_on": "2026-04-22T10:00:00.000000+00:00",
+    "updated_on": "2026-04-22T10:00:00.000000+00:00",
+    "author": {
+      "display_name": "SuperPlane Agent",
+      "uuid": "{c3a8f1d2-0000-4000-8000-000000000001}"
+    },
+    "source": {
+      "branch": { "name": "feat/retry-handling" },
+      "commit": { "hash": "a1b2c3d4e5f6" },
+      "repository": { "full_name": "acme/widgets" }
+    },
+    "destination": {
+      "branch": { "name": "main" },
+      "commit": { "hash": "f6e5d4c3b2a1" },
+      "repository": { "full_name": "acme/widgets" }
+    },
+    "links": {
+      "html": { "href": "https://bitbucket.org/acme/widgets/pull-requests/42" }
+    }
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "bitbucket.pullRequest"
+}

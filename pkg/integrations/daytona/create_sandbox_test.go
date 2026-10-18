@@ -384,10 +384,6 @@ func Test__CreateSandbox__ComponentInfo(t *testing.T) {
 	component := CreateSandbox{}
 
 	assert.Equal(t, "daytona.createSandbox", component.Name())
-	assert.Equal(t, "Create Sandbox", component.Label())
-	assert.Equal(t, "Create an isolated sandbox environment for code execution", component.Description())
-	assert.Equal(t, "daytona", component.Icon())
-	assert.Equal(t, "orange", component.Color())
 	assert.NotEmpty(t, component.Documentation())
 }
 

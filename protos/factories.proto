@@ -196,6 +196,18 @@ service Factories {
     };
   }
 
+  rpc PreviewFactorySchedule(PreviewFactoryScheduleRequest) returns (PreviewFactoryScheduleResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/scheduled-intake/preview"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Preview a scheduled intake";
+      description: "Validate schedule settings and return the next run without creating an automation";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactoryAutomation(DeleteFactoryAutomationRequest) returns (DeleteFactoryAutomationResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{factory_id}/automations/{automation_id}"
@@ -739,6 +751,17 @@ service Factories {
     };
   }
 
+  rpc RestoreFactorySystemSkill(RestoreFactorySystemSkillRequest) returns (RestoreFactorySystemSkillResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/restore"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Restore a system skill to the latest SuperPlane version";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactoryAgentResource(DeleteFactoryAgentResourceRequest) returns (DeleteFactoryAgentResourceResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"
@@ -990,6 +1013,8 @@ message SelectFactoryVCSProviderRepositoryRequest {
   string id = 1;
   string provider = 2;
   int64 repository_id = 3;
+  // Bitbucket repository as workspace/slug. GitHub uses repository_id.
+  string repository = 4;
 }
 
 message SelectFactoryVCSProviderRepositoryResponse {
@@ -1034,6 +1059,22 @@ message FactoryOnboarding {
   bool initial = 11;
   int64 app_repository_id = 12;
   int64 backlog_repository_id = 13;
+  // Git host for this workspace. Empty means GitHub.
+  string vcs_provider = 14;
+  // Bitbucket repository UUID. GitHub leaves this empty.
+  string app_repository_external_id = 15;
+}
+
+// Automations the workspace Git host can run. Computed from vcs_provider.
+message FactoryVCSCapabilities {
+  bool pr_closure = 1;
+  bool pr_feedback = 2;
+  bool pr_checks = 3;
+  bool merge_confidence = 4;
+  bool velocity = 5;
+  bool board_merge = 6;
+  bool board_close = 7;
+  bool vcs_issue_intake = 8;
 }
 
 message Factory {
@@ -1044,8 +1085,8 @@ message Factory {
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
     // Board column this event automation is shown on. Empty when the
-    // automation is not attached to Verify or Done. Allowed values:
-    // "verify", "done".
+    // automation is not attached to a board column. Allowed values:
+    // "backlog", "verify", "done".
     string column_key = 6;
   }
 
@@ -1067,6 +1108,7 @@ message Factory {
   string public_badge_token = 12;
   // Stable id in workspace URLs. Does not change when the workspace key changes.
   string url_id = 13;
+  FactoryVCSCapabilities vcs_capabilities = 14;
 }
 
 // Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
@@ -1134,6 +1176,8 @@ message UpdateFactoryLineResponse {
 
 message ListFactoryAutomationsRequest {
   string factory_id = 1;
+  // When set, list only automations whose saved prompts mention this skill command.
+  string skill_name = 2;
 }
 
 message ListFactoryAutomationsResponse {
@@ -1146,10 +1190,23 @@ message CreateFactoryAutomationRequest {
   string name = 2;
   // Attach the canvas to Verify or Done. Empty leaves it off the board.
   string column_key = 3;
+  // Optional bundled template. Currently supports scheduled-intake.
+  string template_id = 4;
+  // Template configuration: type, hour, minute, timezone (UTC offset), cronExpression, and prompt.
+  map<string, string> install_params = 5;
 }
 
 message CreateFactoryAutomationResponse {
   Factory.Automation automation = 1;
+}
+
+message PreviewFactoryScheduleRequest {
+  string factory_id = 1;
+  map<string, string> install_params = 2;
+}
+
+message PreviewFactoryScheduleResponse {
+  google.protobuf.Timestamp next_run = 1;
 }
 
 message DeleteFactoryAutomationRequest {
@@ -1309,6 +1366,9 @@ message FactoryIntake {
     // Label names that still create a task. Empty means every label.
     // Linear issue intakes only.
     repeated string linear_labels = 22;
+    // Projects that still create a task. Required for a Sentry intake.
+    // Sentry exception intakes only. Values are project slugs.
+    repeated string sentry_project_ids = 23;
   }
 
   string id = 1;
@@ -1529,6 +1589,7 @@ message FactoryPullRequestRun {
   int64 total_tokens = 3;
   int64 cost_cents = 4;
   Superplane.Canvases.CanvasRunRef run = 5;
+  repeated string models = 6;
 }
 
 message FactoryPullRequestRevision {
@@ -1548,6 +1609,7 @@ message FactoryPullRequestActivity {
   optional int32 attempt_limit = 8;
   int64 total_tokens = 9;
   int64 cost_cents = 10;
+  repeated string models = 11;
 }
 
 message FactoryPullRequest {
@@ -1741,6 +1803,7 @@ message ListWorkOrdersRequest {
 message ListWorkOrdersResponse {
   repeated WorkOrderSummary orders = 1;
   bool has_next_page = 2;
+  uint32 total_count = 3;
 }
 
 message CreateWorkOrderRequest {
@@ -1777,6 +1840,8 @@ message WorkOrder {
     RESULT_COMPLETED = 1;
     RESULT_REJECTED = 2;
     RESULT_FAILED = 3;
+    RESULT_ARCHIVED = 4;
+    RESULT_PR_CLOSED = 5;
   }
 
   string id = 1;
@@ -1920,6 +1985,8 @@ message WorkOrderCreator {
 message UserRef {
   string id = 1;
   string name = 2;
+  bool deleted = 3;
+  bool former_member = 4;
 }
 
 // LineRef identifies a factory line as it was at the time it was
@@ -2381,17 +2448,16 @@ message DescribeFactoryVelocityDay {
   int32 waste = 5;
   // Merged SuperPlane pull requests grouped by intake source.
   repeated DescribeFactoryVelocityIntakeCount intake = 6;
-  // Tracked spend of the work orders that closed on this day. A work order
-  // counts on the day its pull request merged, or on the day its last pull
-  // request closed when none merged.
+  // Ledger spend that occurred on this local day, in cents.
   int64 cost_cents = 7;
+  // Ledger tokens that occurred on this local day.
   int64 tokens = 8;
-  // Part of `cost_cents` spent on work orders that closed without a merge.
+  // Spend of work orders that closed without a merge, on the close day.
+  // This is not the ledger spend above.
   int64 waste_cost_cents = 9;
-  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
-  // together with `compute_cost_cents`.
+  // Part of the day's ledger spend on model tokens.
   int64 model_cost_cents = 10;
-  // Part of `cost_cents` spent on runner compute.
+  // Part of the day's ledger spend on runner compute.
   int64 compute_cost_cents = 11;
   // Median model spend of one work order reported on this day. Medians of the
   // two bands do not add up to the median of the total, so these two describe
@@ -2469,10 +2535,12 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
-  // Tracked spend of the work orders that closed in the window.
+  // Ledger spend that occurred in the window, in cents.
   int64 cost_cents = 6;
+  // Ledger tokens that occurred in the window.
   int64 tokens = 7;
-  // Part of `cost_cents` spent on work orders that closed without a merge.
+  // Spend of work orders that closed without a merge, on the close day.
+  // This is not the ledger spend above.
   int64 waste_cost_cents = 8;
   // Work orders (tasks) that closed in the window. A work order counts once,
   // even when it opened several pull requests, which is why this differs from
@@ -2480,10 +2548,9 @@ message DescribeFactoryVelocityTotals {
   int32 tasks_closed = 9;
   // Part of `tasks_closed` whose pull requests all closed without a merge.
   int32 tasks_waste = 10;
-  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
-  // together with `compute_cost_cents`.
+  // Part of the window ledger spend on model tokens.
   int64 model_cost_cents = 11;
-  // Part of `cost_cents` spent on runner compute.
+  // Part of the window ledger spend on runner compute.
   int64 compute_cost_cents = 12;
 }
 
@@ -2627,6 +2694,8 @@ message FactoryAgentResource {
     KIND_UNSPECIFIED = 0;
     KIND_MCP_SERVER = 1;
     KIND_SKILL = 2;
+    KIND_SETUP_COMMAND = 3;
+    KIND_CONTEXT_REPO = 4;
   }
 
   enum Auth {
@@ -2649,6 +2718,21 @@ message FactoryAgentResource {
     string secret_key = 3;
   }
 
+  // Read-only metadata supplied by SuperPlane.
+  message SystemSkill {
+    enum State {
+      STATE_UNSPECIFIED = 0;
+      STATE_LATEST = 1;
+      STATE_CUSTOM = 2;
+      STATE_UPDATE_AVAILABLE = 3;
+      STATE_UNAVAILABLE = 4;
+    }
+    string template_id = 1;
+    int32 version = 2;
+    State state = 3;
+    int32 latest_version = 4;
+  }
+
   string id = 1;
   string factory_id = 2;
   Kind kind = 3;
@@ -2668,6 +2752,9 @@ message FactoryAgentResource {
   string path = 17;
   string markdown = 18;
   repeated string disabled_tools = 19;
+  repeated string commands = 20;
+  string vcs_provider = 21;
+  SystemSkill system_skill = 22;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -2688,6 +2775,9 @@ message CreateFactoryAgentResourceRequest {
   FactoryAgentResource.Auth auth = 6;
   repeated FactoryAgentResource.Header headers = 7;
   string markdown = 8;
+  string repository = 9;
+  repeated string commands = 10;
+  string vcs_provider = 11;
 }
 
 message CreateFactoryAgentResourceResponse {
@@ -2705,9 +2795,22 @@ message UpdateFactoryAgentResourceRequest {
   optional string markdown = 8;
   repeated string disabled_tools = 9;
   optional bool replace_disabled_tools = 10;
+  optional string repository = 11;
+  repeated string commands = 12;
+  optional bool replace_commands = 13;
+  optional string vcs_provider = 14;
 }
 
 message UpdateFactoryAgentResourceResponse {
+  FactoryAgentResource resource = 1;
+}
+
+message RestoreFactorySystemSkillRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message RestoreFactorySystemSkillResponse {
   FactoryAgentResource resource = 1;
 }
 

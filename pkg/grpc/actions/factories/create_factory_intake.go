@@ -82,6 +82,11 @@ func CreateFactoryIntake(
 	}
 	factoryID := factory.ID
 
+	if factory.OnboardingConfigValue().EffectiveVCSProvider() == models.ProviderBitbucket &&
+		(source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceDependabotAlerts) {
+		return nil, factoryErrorToStatus(invalidArgument("this intake source is not supported for Bitbucket workspaces"), "failed to create factory intake")
+	}
+
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
 		name = intakeDefaultName(source)
@@ -119,10 +124,16 @@ func CreateFactoryIntake(
 	if source == models.FactoryIntakeSourceLinearIssues && len(settings.LinearProjectIDs) == 0 {
 		settings.LinearProjectIDs = linearProjectIDsFromResource(req.GetResourceId())
 	}
+	if source == models.FactoryIntakeSourceSentryExceptions && len(settings.SentryProjectIDs) == 0 {
+		settings.SentryProjectIDs = sentryProjectIDsFromResource(req.GetResourceId())
+	}
 
 	resourceID := req.GetResourceId()
 	if source == models.FactoryIntakeSourceLinearIssues && len(settings.LinearProjectIDs) > 0 {
 		resourceID = strings.Join(settings.LinearProjectIDs, ",")
+	}
+	if source == models.FactoryIntakeSourceSentryExceptions && len(settings.SentryProjectIDs) > 0 {
+		resourceID = strings.Join(settings.SentryProjectIDs, ",")
 	}
 
 	binding, err := resolveIntakeBinding(db, factory, source, req.GetIntegrationId(), resourceID)

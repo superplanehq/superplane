@@ -30,6 +30,7 @@ const publicBoardPageSize = 100
 const publicBoardMaxPages = 10
 
 var riskScoreCanvasName = regexp.MustCompile(`^(?:Merge confidence|Risk score) \(\d+\)$`)
+var visualEvidenceCanvasName = regexp.MustCompile(`^Visual Evidence \(\d+\)$`)
 
 var errPublicBoardNotFound = errors.New("public board not found")
 
@@ -350,14 +351,14 @@ func assemblePublicBoard(
 			Key:         "verify",
 			Title:       "Verify",
 			Color:       line.ColumnColorsValue()["verify"],
-			Automations: verifyAutomations(canvases, handlers),
+			Automations: verifyAutomations(canvases, handlers, factory.OnboardingConfigValue().EffectiveVCSProvider()),
 			Cards:       []publicCard{},
 		},
 		publicColumn{
 			Key:         "done",
 			Title:       "Done",
 			Color:       line.ColumnColorsValue()["done"],
-			Automations: doneAutomations(canvases),
+			Automations: doneAutomations(canvases, factory.OnboardingConfigValue().EffectiveVCSProvider()),
 			Cards:       []publicCard{},
 		},
 	)
@@ -418,10 +419,13 @@ func publicCardColumn(
 	case models.FactoryWorkOrderStateDraft:
 		return "backlog"
 	case models.FactoryWorkOrderStateClosed:
-		if order.Result != models.FactoryWorkOrderResultCompleted && order.Result != models.FactoryWorkOrderResultFailed {
+		switch order.Result {
+		case models.FactoryWorkOrderResultCompleted, models.FactoryWorkOrderResultFailed,
+			models.FactoryWorkOrderResultManualRejected, models.FactoryWorkOrderResultPRClosed:
+			return "done"
+		default:
 			return ""
 		}
-		return "done"
 	}
 
 	dispatch := newestDispatch(dispatches, lineID)
@@ -577,10 +581,14 @@ func uiWorkOrderResult(result string) string {
 	switch result {
 	case models.FactoryWorkOrderResultCompleted:
 		return "RESULT_COMPLETED"
-	case models.FactoryWorkOrderResultRejected:
+	case models.FactoryWorkOrderResultRejected, models.FactoryWorkOrderResultManualRejected:
 		return "RESULT_REJECTED"
 	case models.FactoryWorkOrderResultFailed:
 		return "RESULT_FAILED"
+	case models.FactoryWorkOrderResultArchived:
+		return "RESULT_ARCHIVED"
+	case models.FactoryWorkOrderResultPRClosed:
+		return "RESULT_PR_CLOSED"
 	default:
 		return ""
 	}
@@ -789,8 +797,8 @@ func agentStepAutomation(index int, title string) publicAutomation {
 	}
 }
 
-func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeedbackHandler) []publicAutomation {
-	rows := prFeedbackAutomations(handlers)
+func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeedbackHandler, vcsProvider string) []publicAutomation {
+	rows := prFeedbackAutomations(handlers, vcsProvider)
 	skip := map[uuid.UUID]struct{}{}
 	for _, canvas := range canvases {
 		if !isRiskScoreCanvas(canvas) {
@@ -805,10 +813,23 @@ func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeed
 			Health:    "healthy",
 		})
 	}
+	for _, canvas := range canvases {
+		if !isVisualEvidenceCanvas(canvas) {
+			continue
+		}
+		skip[canvas.ID] = struct{}{}
+		rows = append(rows, publicAutomation{
+			ID:        "visual-evidence-" + strconv.Itoa(len(rows)),
+			Kind:      "visual-evidence",
+			Name:      strings.TrimSpace(canvas.Name),
+			CatalogID: "visual-evidence",
+			Health:    "healthy",
+		})
+	}
 	return append(rows, customColumnAutomations(canvases, models.CanvasColumnKeyVerify, skip)...)
 }
 
-func doneAutomations(canvases []models.Canvas) []publicAutomation {
+func doneAutomations(canvases []models.Canvas, vcsProvider string) []publicAutomation {
 	rows := []publicAutomation{}
 	skip := map[uuid.UUID]struct{}{}
 	if canvas := closureCanvas(canvases); canvas != nil {
@@ -818,14 +839,14 @@ func doneAutomations(canvases []models.Canvas) []publicAutomation {
 			Kind:      "pr-closure",
 			Name:      "PR Closure",
 			CatalogID: "pr-closure",
-			Icon:      publicIconGitHub,
+			Icon:      publicVCSIcon(vcsProvider),
 			Health:    "healthy",
 		})
 	}
 	return append(rows, customColumnAutomations(canvases, models.CanvasColumnKeyDone, skip)...)
 }
 
-func prFeedbackAutomations(handlers []models.FactoryPRFeedbackHandler) []publicAutomation {
+func prFeedbackAutomations(handlers []models.FactoryPRFeedbackHandler, vcsProvider string) []publicAutomation {
 	rows := make([]publicAutomation, 0, len(handlers))
 	for index, handler := range handlers {
 		kind := "pr-discussion"
@@ -842,7 +863,7 @@ func prFeedbackAutomations(handlers []models.FactoryPRFeedbackHandler) []publicA
 			Kind:      kind,
 			Name:      name,
 			CatalogID: kind,
-			Icon:      publicIconGitHub,
+			Icon:      publicVCSIcon(vcsProvider),
 			Health:    "healthy",
 		})
 	}
@@ -900,6 +921,14 @@ func isRiskScoreCanvas(canvas models.Canvas) bool {
 	return name == "Merge confidence" || name == "Risk score" || riskScoreCanvasName.MatchString(name)
 }
 
+func isVisualEvidenceCanvas(canvas models.Canvas) bool {
+	if canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyVerify {
+		return false
+	}
+	name := strings.TrimSpace(canvas.Name)
+	return name == "Visual Evidence" || visualEvidenceCanvasName.MatchString(name)
+}
+
 func intakeSourceName(source string) string {
 	switch source {
 	case models.FactoryIntakeSourceGitHubIssues:
@@ -923,6 +952,7 @@ func intakeSourceName(source string) string {
 
 const (
 	publicIconGitHub     = "github"
+	publicIconBitbucket  = "bitbucket"
 	publicIconDependabot = "dependabot"
 	publicIconSentry     = "sentry"
 	publicIconJira       = "jira"
@@ -930,6 +960,13 @@ const (
 	publicIconProductive = "productive"
 	publicIconDatadog    = "datadog"
 )
+
+func publicVCSIcon(vcsProvider string) string {
+	if vcsProvider == models.ProviderBitbucket {
+		return publicIconBitbucket
+	}
+	return publicIconGitHub
+}
 
 func intakeIcon(source string) string {
 	switch source {

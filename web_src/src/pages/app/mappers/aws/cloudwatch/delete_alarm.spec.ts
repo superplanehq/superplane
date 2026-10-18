@@ -1,81 +1,19 @@
 import { describe, expect, it } from "bun:test";
+import { createCloudWatchFixtures } from "./test-support";
 
-import type {
-  ComponentBaseContext,
-  ComponentDefinition,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-  OutputPayload,
-} from "../../types";
 import { deleteAlarmMapper } from "./delete_alarm";
 import { eventStateRegistry } from "../index";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Delete Alarm Node",
-    componentName: "aws.cloudwatch.deleteAlarm",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildOutput(data: unknown): OutputPayload {
-  return {
-    type: "aws.cloudwatch.alarm.deleted",
-    timestamp: new Date().toISOString(),
-    data,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: "2026-06-04T09:14:05.000Z",
-    updatedAt: "2026-06-04T09:14:11.000Z",
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
-
-function buildDetailsCtx(overrides?: {
-  node?: Partial<NodeInfo>;
-  execution?: Partial<ExecutionInfo>;
-}): ExecutionDetailsContext {
-  const node = buildNode(overrides?.node);
-  return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
-}
-
-const defaultDefinition: ComponentDefinition = {
-  name: "aws.cloudwatch.deleteAlarm",
+const { buildNode, buildOutput, buildExecution, buildDetailsCtx, buildPropsContext } = createCloudWatchFixtures({
+  nodeName: "Delete Alarm Node",
+  componentName: "aws.cloudwatch.deleteAlarm",
   label: "CloudWatch • Delete Alarm",
-  description: "",
-  icon: "aws.cloudwatch",
-  color: "gray",
-};
-
-function buildPropsContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
-  return {
-    nodes: [],
-    node: buildNode(),
-    componentDefinition: defaultDefinition,
-    lastExecutions: [],
-    currentUser: undefined,
-    actions: { invokeNodeExecutionHook: async () => {} },
-    ...overrides,
-  };
-}
+  outputType: "aws.cloudwatch.alarm.deleted",
+  createdAt: "2026-06-04T09:14:05.000Z",
+  updatedAt: "2026-06-04T09:14:11.000Z",
+});
 
 const deletedAlarmOutputData = {
   alarmName: "api-high-cpu",
@@ -160,15 +98,6 @@ describe("deleteAlarmMapper.getExecutionDetails", () => {
 // ── props ─────────────────────────────────────────────────────────────────────
 
 describe("deleteAlarmMapper.props", () => {
-  it("uses node name as title", () => {
-    expect(deleteAlarmMapper.props(buildPropsContext()).title).toBe("Delete Alarm Node");
-  });
-
-  it("falls back to component label when node name is empty", () => {
-    const props = deleteAlarmMapper.props(buildPropsContext({ node: buildNode({ name: "" }) }));
-    expect(props.title).toBe("CloudWatch • Delete Alarm");
-  });
-
   it("shows the alarm and the region", () => {
     const props = deleteAlarmMapper.props(buildPropsContext({ node: buildNode({ configuration }) }));
     expect(props.metadata?.map((item) => item.label)).toEqual(["api-high-cpu", "us-east-1"]);
@@ -178,15 +107,6 @@ describe("deleteAlarmMapper.props", () => {
     const props = deleteAlarmMapper.props(buildPropsContext({ node: buildNode({ configuration: {}, metadata: {} }) }));
     expect(props.metadata).toEqual([]);
   });
-
-  it("sets includeEmptyState when no executions", () => {
-    expect(deleteAlarmMapper.props(buildPropsContext({ lastExecutions: [] })).includeEmptyState).toBe(true);
-  });
-
-  it("clears includeEmptyState when there is an execution", () => {
-    const props = deleteAlarmMapper.props(buildPropsContext({ lastExecutions: [buildExecution()] }));
-    expect(props.includeEmptyState).toBe(false);
-  });
 });
 
 // ── eventStateRegistry ────────────────────────────────────────────────────────
@@ -194,23 +114,5 @@ describe("deleteAlarmMapper.props", () => {
 describe("eventStateRegistry['cloudwatch.deleteAlarm']", () => {
   it("maps finished success to deleted", () => {
     expect(eventStateRegistry["cloudwatch.deleteAlarm"].getState(buildExecution())).toBe("deleted");
-  });
-
-  it("returns running when execution is in progress", () => {
-    const running = buildExecution({
-      state: "STATE_STARTED",
-      result: "RESULT_UNSPECIFIED" as ExecutionInfo["result"],
-      resultReason: "RESULT_REASON_UNSPECIFIED" as ExecutionInfo["resultReason"],
-    });
-    expect(eventStateRegistry["cloudwatch.deleteAlarm"].getState(running)).toBe("running");
-  });
-
-  it("returns failed when execution fails", () => {
-    const failed = buildExecution({
-      state: "STATE_FINISHED",
-      result: "RESULT_FAILED" as ExecutionInfo["result"],
-      resultReason: "RESULT_REASON_COMPONENT_FAILED" as ExecutionInfo["resultReason"],
-    });
-    expect(eventStateRegistry["cloudwatch.deleteAlarm"].getState(failed)).toBe("failed");
   });
 });

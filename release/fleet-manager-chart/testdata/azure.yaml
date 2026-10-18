@@ -1,0 +1,35 @@
+manager:
+  id: test-azure
+superplane:
+  url: https://superplane.example.com
+installationAdminToken: fleet-manager-personal-token
+serviceAccount:
+  annotations:
+    azure.workload.identity/client-id: 00000000-0000-0000-0000-000000000001
+podLabels:
+  azure.workload.identity/use: "true"
+fleets:
+  - id: e1-large-amd64
+    runnerVersion: v0.1.0
+    warmCapacity: 0
+    maxCapacity: 1
+    spec:
+      operatingSystem: linux
+      architecture: amd64
+      cpuMillicores: 2000
+      memoryMb: 8192
+      diskGb: 30
+      capabilities: [docker]
+    provider: azure
+    azure:
+      subscriptionId: 00000000-0000-0000-0000-000000000002
+      resourceGroup: superplane
+      location: eastus
+      imageId: /subscriptions/example/resourceGroups/example/providers/Microsoft.Compute/galleries/example/images/runner/versions/0.1.0
+      vmSize: Standard_D2ds_v4
+      architecture: amd64
+      subnetId: /subscriptions/example/subnets/runners
+      networkSecurityGroupId: /subscriptions/example/networkSecurityGroups/runners
+      identityId: /subscriptions/example/userAssignedIdentities/runner
+      zones: ["1"]
+      diskSizeGb: 30

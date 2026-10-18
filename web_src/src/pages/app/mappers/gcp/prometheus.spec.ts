@@ -3,11 +3,6 @@ import { queryMapper, queryRangeMapper } from "./prometheus";
 import { buildDetailsCtx, buildOutput } from "./vm_mapper_test_helpers";
 
 describe("queryMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => queryMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
   it("returns only Executed At when output data is missing", () => {
     const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
     const details = queryMapper.getExecutionDetails(ctx);

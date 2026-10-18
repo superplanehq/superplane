@@ -17,8 +17,8 @@ import { useFollowLogScroll } from "./useFollowLogScroll";
  */
 export function FactoryAppSplitRunPage() {
   const model = useFactoryAppSplitRunPage();
-  if (!model.fixture || model.liveError) {
-    return (
+  const page =
+    !model.fixture || model.liveError ? (
       <SplitRunMissingPage
         back={model.back}
         editHref={model.editHref}
@@ -26,9 +26,15 @@ export function FactoryAppSplitRunPage() {
         isLoading={model.isLoading}
         subtitle={model.subtitle}
       />
+    ) : (
+      <SplitRunLoadedPage model={model} />
     );
-  }
-  return <SplitRunLoadedPage model={model} />;
+  return (
+    <>
+      {model.columnAppRunQueries}
+      {page}
+    </>
+  );
 }
 
 function SplitRunMissingPage({
@@ -111,7 +117,6 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                   markdownName
                   showMarkdownDescription
                   stream={model.stream}
-                  streamLoading={model.streamLoading}
                   selectedNodeId={model.nodeId}
                   onSelectNode={model.setNodeId}
                   organizationId={model.organizationId}

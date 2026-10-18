@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -145,6 +146,15 @@ func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			var automation *CanvasRun
+			if test.state == FactoryWorkOrderStateClosed {
+				automation, err = CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
+				require.NoError(t, err)
+				event := analysisWorkOrderCreatedEvent(canvas.ID, automation.ID, order.ID, true)
+				event.ID = uuid.New()
+				require.NoError(t, db.Create(event).Error)
+			}
+
 			changed, err := order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 				ToState: test.state,
 				Result:  test.result,
@@ -160,6 +170,11 @@ func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, CanvasRunStateCancelling, run.State)
 			assert.Equal(t, test.expectedRunResult, run.Result)
+			if automation != nil {
+				automation, err = FindUnscopedCanvasRun(db, automation.ID)
+				require.NoError(t, err)
+				assert.Equal(t, CanvasRunStateCancelling, automation.State)
+			}
 		})
 	}
 }
@@ -182,8 +197,26 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeClarity(db, 4, "One decision is still open."))
-	require.NoError(t, session.ProposeConfidence(db, 3, "This issue is a mixed fit for an agent."))
+	_, err = order.ReportCheck(db, FactoryWorkOrderCheckParams{
+		Key:      PlanningClarityCheckKey,
+		Name:     PlanningClarityCheckName,
+		Score:    4,
+		MaxScore: PlanningScoreMax,
+		Format:   FactoryWorkOrderCheckFormatFraction,
+		Level:    planningScoreLevel(4, PlanningScoreMax),
+		Summary:  "One decision is still open.",
+	})
+	require.NoError(t, err)
+	_, err = order.ReportCheck(db, FactoryWorkOrderCheckParams{
+		Key:      PlanningConfidenceCheckKey,
+		Name:     PlanningConfidenceCheckName,
+		Score:    3,
+		MaxScore: PlanningScoreMax,
+		Format:   FactoryWorkOrderCheckFormatFraction,
+		Level:    planningScoreLevel(3, PlanningScoreMax),
+		Summary:  "This issue is a mixed fit for an agent.",
+	})
+	require.NoError(t, err)
 	require.NoError(t, session.RecordAgentMessage(db, "I found the retry seam in billing/retry.go."))
 	require.NoError(t, session.SendUserMessage(db, "Keep the existing retry helper.", uuid.Nil))
 
@@ -195,12 +228,13 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	assert.Contains(t, text, "Publish the required scores before you ask or stop")
 	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
 	assert.Contains(t, text, "Publish the scores when the plan changes, a score would change, or the user asks to update a score")
-	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
+	assert.Contains(t, text, "When every required score is 3, publish each required score on that plan turn")
 	assert.Contains(t, text, "You may update a score without rewriting the specification")
 	assert.NotContains(t, text, "Publish the specification and the scores only when this turn updates the plan")
 	assert.Contains(t, text, "End an answer, and the first plan, with how to update the plan or the scores")
 	assert.NotContains(t, text, "every turn")
-	assert.Contains(t, text, "Do not leave a written plan unpublished")
+	assert.Contains(t, text, "include spec on propose_update")
+	assert.NotContains(t, text, "propose_spec")
 	assert.NotContains(t, text, "If Clarity is still 1 or 2")
 	assert.Contains(t, text, "Stop double charges.")
 	assert.Contains(t, text, "Current Clarity: 4/5\nOne decision is still open.")
@@ -212,15 +246,9 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: false}))
 	text, err = AnalysisContinuationText(db, session)
 	require.NoError(t, err)
-	assert.Contains(t, text, "If no score is published yet, this turn is a plan turn")
-	assert.Contains(t, text, "Publish the required scores before you ask or stop")
-	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
-	assert.Contains(t, text, "Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score")
-	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
-	assert.NotContains(t, text, "Publish the specification and the Clarity score only when this turn updates the plan")
-	assert.Contains(t, text, "End an answer, and the first plan, with how to update the plan or the scores")
-	assert.NotContains(t, text, "propose_confidence")
-	assert.Contains(t, text, "Stop double charges.")
+	assert.Contains(t, text, "Call propose_update with scores, spec, and survey in one call")
+	assert.Contains(t, text, "When every required score is 3, publish each required score on that plan turn")
+	assert.NotContains(t, text, "Publish the Clarity score when the plan changes")
 	assert.Contains(t, text, "Current Confidence: 3/5\nThis issue is a mixed fit for an agent.")
 }
 
@@ -354,20 +382,13 @@ func TestFactoryPlanningSession_ProposeConfidenceWithoutSpec(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, session.ProposeClarity(db, 2, "The request is still missing the failing path."))
-
-	artifacts, err := order.ListArtifacts(db)
-	require.NoError(t, err)
-	assert.Empty(t, artifacts)
+	err = session.ProposeConfidence(db, 5, "The plan is ready.")
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	assert.Contains(t, err.Error(), "confidence")
 
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
-	require.Len(t, checks, 1)
-	assert.Equal(t, PlanningClarityCheckKey, checks[0].Key)
-	assert.Equal(t, PlanningClarityCheckName, checks[0].Name)
-	assert.Equal(t, 2.0, checks[0].Score)
-	assert.Equal(t, FactoryWorkOrderCheckLevelCritical, checks[0].Level)
-	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
+	assert.Empty(t, checks)
 }
 
 func TestFactoryPlanningSession_ProposeClarityAndConfidenceAreSeparateChecks(t *testing.T) {
@@ -388,22 +409,14 @@ func TestFactoryPlanningSession_ProposeClarityAndConfidenceAreSeparateChecks(t *
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
-	require.NoError(t, session.ProposeConfidence(db, 2, "The change touches billing and has no test to prove it."))
-	require.NoError(t, session.ProposeConfidence(db, 3, "A split into two tasks would help."))
+	err = session.ProposeClarity(db, 5, "The plan is ready.")
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	err = session.ProposeConfidence(db, 5, "The plan is ready.")
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
 
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
-	require.Len(t, checks, 2)
-	byKey := map[string]FactoryWorkOrderCheck{}
-	for _, check := range checks {
-		byKey[check.Key] = check
-	}
-	assert.Equal(t, 5.0, byKey[PlanningClarityCheckKey].Score)
-	assert.Equal(t, "The plan is ready.", byKey[PlanningClarityCheckKey].Summary)
-	assert.Equal(t, 3.0, byKey[PlanningConfidenceCheckKey].Score)
-	assert.Equal(t, PlanningConfidenceCheckName, byKey[PlanningConfidenceCheckKey].Name)
-	assert.Equal(t, FactoryWorkOrderCheckLevelCaution, byKey[PlanningConfidenceCheckKey].Level)
+	assert.Empty(t, checks)
 }
 
 func TestFactoryPlanningSession_RejectsDisabledScores(t *testing.T) {
@@ -426,12 +439,14 @@ func TestFactoryPlanningSession_RejectsDisabledScores(t *testing.T) {
 
 	err = session.ProposeClarity(db, 4, "The path is mapped.")
 	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
-	require.NoError(t, session.ProposeConfidence(db, 3, "The change is a mixed fit."))
+	err = session.ProposeConfidence(db, 3, "The change is a mixed fit.")
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
 
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: false}))
 	err = session.ProposeConfidence(db, 2, "The change still needs a test.")
 	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
-	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
+	err = session.ProposeClarity(db, 5, "The plan is ready.")
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
 }
 
 func TestValidatePlanningScoreRejectsZero(t *testing.T) {
@@ -479,12 +494,17 @@ func TestFactoryPlanningSession_ProposeSpecAndConfidence(t *testing.T) {
 
 	body := "# Retry refunds\n\n## Executive summary\n\nStop double charges.\n"
 	require.NoError(t, session.ProposeSpec(db, body))
-	require.NoError(t, session.ProposeConfidence(db, 4, "This issue is a good fit for an agent."))
+	err = session.ProposeConfidence(db, 4, "This issue is a good fit for an agent.")
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
 
 	artifacts, err := order.ListArtifacts(db)
 	require.NoError(t, err)
 	require.Len(t, artifacts, 1)
 	assert.Equal(t, planningSpecArtifactKey(order.ID), *artifacts[0].Key)
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(artifacts[0].Data, &data))
+	assert.Equal(t, "plan.md", data["name"])
+	assert.Equal(t, "plan.md", data["title"])
 	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
 
 	require.NoError(t, session.ProposeSpec(db, body+"\n## Problem\n\nThe retry is missing.\n"))
@@ -495,11 +515,7 @@ func TestFactoryPlanningSession_ProposeSpecAndConfidence(t *testing.T) {
 
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
-	require.Len(t, checks, 1)
-	assert.Equal(t, PlanningConfidenceCheckKey, checks[0].Key)
-	assert.Equal(t, 4.0, checks[0].Score)
-	assert.Equal(t, FactoryWorkOrderCheckLevelPositive, checks[0].Level)
-	assert.Equal(t, "This issue is a good fit for an agent.", checks[0].Summary)
+	assert.Empty(t, checks)
 
 	found, err := FindPlanningSessionByDraftWorkOrder(db, org.ID, factoryModel.ID, order.ID)
 	require.NoError(t, err)
@@ -811,19 +827,21 @@ func TestWorkOrderReadyForAutoStart(t *testing.T) {
 	line, err := factoryModel.CreateLine(db, "ship", nil)
 	require.NoError(t, err)
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 3, 3),
+		Spec:   "# Retry refunds\n\nStop double charges.\n",
+	}))
 
 	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.True(t, ready)
 
-	require.NoError(t, session.ProposeConfidence(db, 4, "One risk remains."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 2)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.False(t, ready)
 
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	order.State = FactoryWorkOrderStateOpen
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
@@ -847,21 +865,17 @@ func TestWorkOrderReadyForAutoStartIgnoresEarlierScore(t *testing.T) {
 	line, err := factoryModel.CreateLine(db, "ship", nil)
 	require.NoError(t, err)
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
-	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 3, 3),
+		Spec:   "# Retry refunds\n\nStop double charges.\n",
+	}))
 
 	require.NoError(t, session.SendUserMessage(db, "The refund path changed.", userID))
 	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.False(t, ready)
 
-	require.NoError(t, session.ProposeConfidence(db, 5, "The new path is covered."))
-	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
-	require.NoError(t, err)
-	assert.False(t, ready)
-
-	require.NoError(t, session.ProposeClarity(db, 5, "The new path is covered."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.True(t, ready)
@@ -873,8 +887,7 @@ func TestWorkOrderReadyForAutoStartIgnoresEarlierScore(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, ready)
 
-	require.NoError(t, session.ProposeConfidence(db, 5, "The new run is ready."))
-	require.NoError(t, session.ProposeClarity(db, 5, "The new run is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.True(t, ready)
@@ -889,7 +902,7 @@ func TestWorkOrderReadyForAutoStartRequiresSpec(t *testing.T) {
 	line, err := factoryModel.CreateLine(db, "ship", nil)
 	require.NoError(t, err)
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 
 	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
@@ -905,18 +918,54 @@ func TestWorkOrderReadyForAutoStartRequiresClarityWhenEnabled(t *testing.T) {
 	line, err := factoryModel.CreateLine(db, "ship", nil)
 	require.NoError(t, err)
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
-	require.NoError(t, session.ProposeClarity(db, 4, "One decision is still open."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 2, 3),
+		Spec:   "# Retry refunds\n\nStop double charges.\n",
+	}))
 
 	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.False(t, ready)
 
-	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
-	assert.True(t, ready)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartBlocksWhenFirstScoreFallsOffRecentScores(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-first-score-history")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 3, 2),
+		Spec:   "# Retry refunds\n\nStop double charges.\n",
+	}))
+	for range MaxFactoryWorkOrderCheckRecentScores {
+		require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+	}
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	var verifiability *FactoryWorkOrderCheck
+	for i := range checks {
+		if checks[i].Key == PlanningVerifiabilityCheckKey {
+			verifiability = &checks[i]
+			break
+		}
+	}
+	require.NotNil(t, verifiability)
+	assert.Equal(t, float64(PlanningReviewScoreMax), verifiability.Score)
+	assert.NotContains(t, []float64(verifiability.RecentScores), float64(2))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
 }
 
 func mustAnalysisOrder(

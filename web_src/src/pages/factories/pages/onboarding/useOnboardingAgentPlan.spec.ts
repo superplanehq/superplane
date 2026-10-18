@@ -1,35 +1,64 @@
-import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "bun:test";
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { anthropicKeyModelIds, useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
+import { byokModelIds, agentUsableModelIds, useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
+import { useOnboardingAgentModel } from "./onboardingAgentModel";
+import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
 
-vi.mock("@/hooks/useHostedLLMModels", () => ({
-  useHostedLLMModels: () => ({ data: { models: [] }, isFetched: true }),
-}));
+const keyModels = { ids: ["claude-sonnet-4-6", "claude-opus-5-5"], fetched: true, error: false };
 
 vi.mock("@/hooks/useLLMModelAllowlists", () => ({
   useBYOKLLMModels: () => ({
-    data: { candidates: [{ id: "claude-sonnet-4-6" }, { id: "claude-opus-5-5" }] },
-    isFetched: true,
+    data: { candidates: keyModels.ids.map((id) => ({ id })) },
+    isFetched: keyModels.fetched,
+    isError: keyModels.error,
+    refetch: vi.fn(),
   }),
 }));
 
-describe("anthropicKeyModelIds", () => {
-  it("uses the selected models when the organization has a selection", () => {
+describe("agentUsableModelIds", () => {
+  it("drops embedding, audio, and image models a coding agent cannot run", () => {
     expect(
-      anthropicKeyModelIds({ selected: [{ id: "claude-sonnet-4-6" }], candidates: [{ id: "claude-opus-5-5" }] }),
-    ).toEqual(["claude-sonnet-4-6"]);
+      agentUsableModelIds([
+        "gpt-5",
+        "text-embedding-3-small",
+        "whisper-1",
+        "gpt-image-1",
+        "gpt-4o-mini-tts",
+        "dall-e-3",
+        "o3",
+        "openai/text-embedding-3-small",
+      ]),
+    ).toEqual(["gpt-5", "o3"]);
+  });
+});
+
+describe("byokModelIds", () => {
+  it.each([
+    { candidates: ["claude-sonnet-4-6", "claude-opus-5-5"], expected: ["claude-sonnet-4-6"] },
+    { candidates: ["claude-opus-5-5"], expected: [] },
+  ])("keeps only selected models available on the key (%j)", ({ candidates, expected }) => {
+    expect(
+      byokModelIds({
+        selected: [{ id: "claude-sonnet-4-6" }],
+        candidates: candidates.map((id) => ({ id })),
+      }),
+    ).toEqual(expected);
   });
 
   it("uses every model on the key when nothing is selected", () => {
-    expect(anthropicKeyModelIds({ selected: [], candidates: [{ id: "claude-opus-5-5" }] })).toEqual([
-      "claude-opus-5-5",
-    ]);
-    expect(anthropicKeyModelIds(undefined)).toEqual([]);
+    expect(byokModelIds({ selected: [], candidates: [{ id: "claude-opus-5-5" }] })).toEqual(["claude-opus-5-5"]);
+    expect(byokModelIds(undefined)).toEqual([]);
   });
 });
 
 describe("useOnboardingAgentPlan", () => {
+  beforeEach(() => {
+    keyModels.ids = ["claude-sonnet-4-6", "claude-opus-5-5"];
+    keyModels.fetched = true;
+    keyModels.error = false;
+    localStorage.clear();
+  });
   it("uses the hosted agent when credit is empty", () => {
     const { result } = renderHook(() =>
       useOnboardingAgentPlan("org-1", new Set(), 0, {
@@ -61,7 +90,7 @@ describe("useOnboardingAgentPlan", () => {
       providerId: "claude",
       credentialsSource: "integration",
       model: "claude-sonnet-4-6",
-      planningModel: "claude-opus-5-5",
+      planningModel: "claude-sonnet-4-6",
     });
   });
 
@@ -69,5 +98,69 @@ describe("useOnboardingAgentPlan", () => {
     const { result } = renderHook(() => useOnboardingAgentPlan("org-1", new Set(), 0));
 
     expect(result.current.plan).toBeUndefined();
+  });
+
+  it("keeps the selected key model through a reload and applies it to every agent", () => {
+    function useSetupModel() {
+      const [selectedModel, selectModel] = useOnboardingAgentModel("factory-1");
+      return {
+        selectModel,
+        ...useOnboardingAgentPlan("org-1", new Set(["claude"]), 5000, {
+          preferOwnKey: true,
+          selectedModel,
+          provider: "openrouter",
+          model: "hosted-only-model",
+        }),
+      };
+    }
+    const first = renderHook(useSetupModel);
+    expect(first.result.current.modelPicker?.models).toEqual(keyModels.ids);
+    act(() => first.result.current.selectModel("claude-opus-5-5"));
+    first.unmount();
+    const { result } = renderHook(useSetupModel);
+
+    expect(result.current.modelPicker?.value).toBe("claude-opus-5-5");
+    expect(
+      agentRewriteFromPlan(result.current.plan!, {
+        claude: { id: "key-1", name: "my-key", ready: true },
+      }),
+    ).toEqual({
+      component: "runnerClaudeCode",
+      model: "claude-opus-5-5",
+      planningModel: "claude-opus-5-5",
+      credentials: { source: "integration", name: "my-key" },
+    });
+  });
+
+  it("does not offer models Codex cannot run", () => {
+    keyModels.ids = ["gpt-5", "text-embedding-3-small", "whisper-1", "gpt-image-1", "o3"];
+    const { result } = renderHook(() =>
+      useOnboardingAgentPlan("org-1", new Set(["openai"]), 0, {
+        preferOwnKey: true,
+        selectedModel: "text-embedding-3-small",
+      }),
+    );
+
+    expect(result.current.modelPicker?.models).toEqual(["gpt-5", "o3"]);
+    expect(result.current.plan).toMatchObject({
+      component: "runnerCodex",
+      model: "gpt-5",
+      planningModel: "gpt-5",
+    });
+  });
+
+  it.each(["loading", "error", "empty", "unavailable"] as const)("blocks setup when the key models are %s", (state) => {
+    keyModels.fetched = state !== "loading";
+    keyModels.error = state === "error";
+    if (state === "empty") keyModels.ids = [];
+    const { result } = renderHook(() =>
+      useOnboardingAgentPlan("org-1", new Set(["claude"]), 5000, {
+        preferOwnKey: true,
+        selectedModel: state === "unavailable" ? "not-on-this-key" : undefined,
+      }),
+    );
+
+    expect(result.current.plan).toBeUndefined();
+    expect(result.current.modelPicker?.value).toBe("");
   });
 });

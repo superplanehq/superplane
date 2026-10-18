@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -134,6 +135,55 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "payments", intake.GetResourceId())
 		assert.True(t, intake.GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, intake.GetHealth())
+		assert.Equal(t, []string{"payments"}, intake.GetSettings().GetSentryProjectIds())
+	})
+
+	t.Run("a Sentry intake listens only to the selected projects", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments,growth",
+			Settings: &pb.FactoryIntake_Settings{
+				SentryProjectIds: []string{"payments", "growth"},
+			},
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Equal(t, "", trigger.Configuration["project"])
+		assert.Equal(t, []any{"payments", "growth"}, trigger.Configuration["projects"])
+		assert.Equal(t, "payments,growth", intake.GetResourceId())
+		assert.Equal(t, []string{"payments", "growth"}, intake.GetSettings().GetSentryProjectIds())
+	})
+
+	t.Run("update saves one or more Linear projects and labels", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "linear")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "project-1",
+		})
+		for _, projects := range [][]string{{"project-1", "project-2"}, {"project-2"}} {
+			resourceID := strings.Join(projects, ",")
+			response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+				FactoryId:     factory.ID.String(),
+				IntakeId:      intake.GetId(),
+				IntegrationId: &integrationID,
+				ResourceId:    &resourceID,
+				Settings:      &pb.FactoryIntake_Settings{LinearProjectIds: projects, LinearLabels: []string{"bug"}},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, resourceID, response.GetIntake().GetResourceId())
+			assert.Equal(t, projects, response.GetIntake().GetSettings().GetLinearProjectIds())
+			assert.Equal(t, []string{"bug"}, response.GetIntake().GetSettings().GetLinearLabels())
+			listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+			require.NoError(t, err)
+			require.Len(t, listed.GetIntakes(), 1)
+			assert.Equal(t, projects, listed.GetIntakes()[0].GetSettings().GetLinearProjectIds())
+		}
 	})
 
 	t.Run("a Linear intake rejects a connection without a project", func(t *testing.T) {

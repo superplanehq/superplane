@@ -12,7 +12,7 @@ describe("AddColumnAutomationPicker", () => {
         open
         onClose={vi.fn()}
         onSelect={vi.fn()}
-        catalog={catalogForColumn("verify", { allowCustom: true, allowRiskScore: true })}
+        catalog={catalogForColumn("verify", { allowCustom: true })}
       />,
     );
 
@@ -24,6 +24,10 @@ describe("AddColumnAutomationPicker", () => {
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent("Merge confidence");
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent(
       "Score risk, performance, security, and drift on a pull request.",
+    );
+    expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toHaveTextContent("Visual Evidence");
+    expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toHaveTextContent(
+      "Capture screenshots or a short video when a pull request changes the user interface.",
     );
   });
 

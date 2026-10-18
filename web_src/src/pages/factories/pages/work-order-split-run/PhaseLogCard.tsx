@@ -46,7 +46,6 @@ import {
   useReportPhaseAgentUsageSeries,
   type PhaseAgentUsageEntry,
 } from "./phaseAgentUsageContext";
-import { PhaseUsageSpendButton } from "./PhaseUsageChartButton";
 import { useReportLiveHeaderSpend } from "./liveHeaderSpendContext";
 import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./streamNotesFromLiveLog";
 
@@ -340,15 +339,13 @@ type PhaseLogCardProps = {
   canvasId?: string;
   /** Collapse setup noise and bash in the planning session log. */
   compactSessionLog?: boolean;
-  /** Live canvas or run details are still loading for this phase. */
-  streamLoading?: boolean;
+  /**
+   * Off when the host row already shows the phase name. The stream then
+   * renders on its own, and its node and step rows do not stick.
+   */
+  showHeader?: boolean;
   files?: FilesFile[];
-  onUsageOpenChange?: (open: boolean) => void;
 };
-
-function phaseExpectsUsage(groups: StreamNodeGroup[]): boolean {
-  return groups.some((group) => isRunnerComponent(group.line.component) && Boolean(group.line.executionId));
-}
 
 function useScrollSelectedStreamNode(selectedNodeId?: string) {
   useEffect(() => {
@@ -437,9 +434,8 @@ export function PhaseLogCard({
   organizationId,
   canvasId,
   compactSessionLog = false,
-  streamLoading = false,
+  showHeader = true,
   files,
-  onUsageOpenChange,
 }: PhaseLogCardProps) {
   const groups = groupSplitRunStream(stream ?? phase.stream);
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
@@ -459,7 +455,7 @@ export function PhaseLogCard({
 
   return (
     <div ref={rootRef} className="min-w-0" data-testid={`split-run-phase-${phase.id}`} aria-current={layout.current}>
-      <PhaseAgentUsageProvider streamLoading={streamLoading} expectUsage={phaseExpectsUsage(groups)}>
+      <PhaseAgentUsageProvider>
         <PhaseCollapsedUsageCollectors
           groups={groups}
           expanded={expanded}
@@ -468,7 +464,7 @@ export function PhaseLogCard({
           canvasId={canvasId ?? phase.appId}
         />
         <div className={layout.className} data-testid={layout.expandTestId} onClick={layout.onExpandClick}>
-          {compactSessionLog ? null : (
+          {compactSessionLog || !showHeader ? null : (
             <AutomationHeader
               phase={phase}
               expanded={expanded}
@@ -482,7 +478,6 @@ export function PhaseLogCard({
               onRerun={onRerun}
               runHref={runHref}
               actionBusy={actionBusy}
-              onUsageOpenChange={onUsageOpenChange}
               files={files}
               showExpandedStream={showExpandedStream}
               description={phaseMarkdownDescription(phase, files, layout.showDescription)}
@@ -497,6 +492,7 @@ export function PhaseLogCard({
               organizationId={organizationId}
               canvasId={canvasId}
               compactSessionLog={compactSessionLog}
+              stickyRows={showHeader}
               files={files}
             />
           ) : null}
@@ -514,6 +510,7 @@ function PhaseLogCardStream({
   organizationId,
   canvasId,
   compactSessionLog,
+  stickyRows,
   files,
 }: {
   phase: SplitRunPhase;
@@ -523,6 +520,7 @@ function PhaseLogCardStream({
   organizationId?: string;
   canvasId?: string;
   compactSessionLog: boolean;
+  stickyRows: boolean;
   files?: FilesFile[];
 }) {
   return (
@@ -539,7 +537,9 @@ function PhaseLogCardStream({
           onSelect={onSelectNode}
           organizationId={organizationId}
           canvasId={canvasId ?? phase.appId}
+          analysisStatus={phase.status}
           compactSessionLog={compactSessionLog}
+          stickyRows={stickyRows}
           files={files}
         />
       ))}
@@ -610,7 +610,6 @@ function AutomationHeaderActions({
   phase,
   producedArtifacts,
   producedPullRequests,
-  onUsageOpenChange,
   expanded,
   collapsible,
   runHref,
@@ -618,7 +617,6 @@ function AutomationHeaderActions({
   phase: SplitRunPhase;
   producedArtifacts: FactoriesWorkOrderArtifact[];
   producedPullRequests: FactoriesFactoryPullRequest[];
-  onUsageOpenChange?: (open: boolean) => void;
   expanded: boolean;
   collapsible: boolean;
   runHref?: string;
@@ -643,7 +641,7 @@ function AutomationHeaderActions({
           ))}
         </span>
       ) : null}
-      <PhaseMetrics phase={phase} onUsageOpenChange={onUsageOpenChange} />
+      <PhaseMetrics phase={phase} />
       {expanded || !collapsible ? <PhaseActionPills phase={phase} runHref={runHref} /> : null}
     </span>
   );
@@ -662,7 +660,6 @@ function AutomationHeader({
   onRerun,
   runHref,
   actionBusy,
-  onUsageOpenChange,
   files,
   showExpandedStream,
   description,
@@ -679,7 +676,6 @@ function AutomationHeader({
   onRerun?: () => void;
   runHref?: string;
   actionBusy: boolean;
-  onUsageOpenChange?: (open: boolean) => void;
   files?: FilesFile[];
   showExpandedStream: boolean;
   description?: ReactNode;
@@ -705,7 +701,6 @@ function AutomationHeader({
         phase={phase}
         producedArtifacts={producedArtifacts}
         producedPullRequests={producedPullRequests}
-        onUsageOpenChange={onUsageOpenChange}
         expanded={expanded}
         collapsible={collapsible}
         runHref={runHref}
@@ -903,14 +898,17 @@ function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
 function livePhaseSpend(agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
   let tokens = 0;
   let cents = 0;
+  let hostedMicros = 0;
   for (const agent of agents) {
     tokens += agentRunNewTokenCount(agent.telemetry);
-    const usd = agent.telemetry.usage.total_cost_usd;
-    if (usd != null && Number.isFinite(usd)) {
-      cents += Math.round(usd * 100);
+    const { hosted_cost_usd: hostedUsd, total_cost_usd: reportedUsd } = agent.telemetry.usage;
+    if (hostedUsd != null && Number.isFinite(hostedUsd)) {
+      hostedMicros += Math.round(hostedUsd * 1_000_000);
+    } else if (reportedUsd != null && Number.isFinite(reportedUsd)) {
+      cents += Math.round(reportedUsd * 100);
     }
   }
-  return { tokens, cents };
+  return { tokens, cents: cents + Math.floor(hostedMicros / 10_000) };
 }
 
 function displayedPhaseSpend(phase: SplitRunPhase, agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
@@ -921,23 +919,7 @@ function displayedPhaseSpend(phase: SplitRunPhase, agents: PhaseAgentUsageEntry[
   };
 }
 
-function PhaseMetrics({
-  phase,
-  onUsageOpenChange,
-}: {
-  phase: SplitRunPhase;
-  onUsageOpenChange?: (open: boolean) => void;
-}) {
-  const running = phase.durationRunning ?? phase.status === "running";
-  const { now, sampledAt } = useRunningLogClock(running, phase.duration);
-  const clock = running
-    ? formatGoDuration(durationLabelMs(phase.duration ?? "") + Math.max(0, Math.floor((now - sampledAt) / 1000) * 1000))
-    : formatGoDurationLabel(phase.duration ?? "");
-  const agents = usePhaseAgentUsageAgents();
-  const { tokens, cents } = displayedPhaseSpend(phase, agents);
-  useReportLiveHeaderSpend(phase.id, tokens, cents);
-  const modelIds = useSpecificModelIds();
-  const model = modelNameWithThinking(displayRunnerModel(phase.model ?? "", modelIds), phase.thinkingLevel);
+function phaseMetricParts(cents: number, tokens: number, model: string, clock: string) {
   const spendParts: string[] = [];
   if (cents > 0) {
     spendParts.push(formatUsdCents(cents));
@@ -952,6 +934,21 @@ function PhaseMetrics({
   if (clock) {
     restParts.push(clock);
   }
+  return { spendParts, restParts };
+}
+
+function PhaseMetrics({ phase }: { phase: SplitRunPhase }) {
+  const running = phase.durationRunning ?? phase.status === "running";
+  const { now, sampledAt } = useRunningLogClock(running, phase.duration);
+  const clock = running
+    ? formatGoDuration(durationLabelMs(phase.duration ?? "") + Math.max(0, Math.floor((now - sampledAt) / 1000) * 1000))
+    : formatGoDurationLabel(phase.duration ?? "");
+  const agents = usePhaseAgentUsageAgents();
+  const { tokens, cents } = displayedPhaseSpend(phase, agents);
+  useReportLiveHeaderSpend(phase.id, tokens, cents);
+  const modelIds = useSpecificModelIds();
+  const model = modelNameWithThinking(displayRunnerModel(phase.model ?? "", modelIds), phase.thinkingLevel);
+  const { spendParts, restParts } = phaseMetricParts(cents, tokens, model, clock);
   if (spendParts.length === 0 && restParts.length === 0) {
     return null;
   }
@@ -960,15 +957,7 @@ function PhaseMetrics({
       data-testid={`split-run-phase-duration-${phase.id}`}
       className={cn(PHASE_META_FACE, "inline-flex items-center gap-1")}
     >
-      {spendParts.length > 0 ? (
-        <PhaseUsageSpendButton
-          phaseId={phase.id}
-          spendLabel={spendParts.join(" · ")}
-          live={running}
-          className={cn(PHASE_META_FACE, ACTIVITY_MARKDOWN_LINK)}
-          onOpenChange={onUsageOpenChange}
-        />
-      ) : null}
+      {spendParts.length > 0 ? <span>{spendParts.join(" · ")}</span> : null}
       {spendParts.length > 0 && restParts.length > 0 ? <span aria-hidden> · </span> : null}
       {restParts.length > 0 ? <span>{restParts.join(" · ")}</span> : null}
     </span>
@@ -997,7 +986,9 @@ function StreamNode({
   onSelect,
   organizationId,
   canvasId,
+  analysisStatus,
   compactSessionLog,
+  stickyRows,
   files,
 }: {
   group: StreamNodeGroup;
@@ -1005,17 +996,18 @@ function StreamNode({
   onSelect?: (nodeId: string) => void;
   organizationId?: string;
   canvasId?: string;
+  analysisStatus?: SplitRunPhaseStatus;
   compactSessionLog: boolean;
+  stickyRows: boolean;
   files?: FilesFile[];
 }) {
   const { line, notes, artifact, pullRequest } = group;
-  const { notes: liveNotes, usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  const { notes: liveNotes, usageSeries } = useRunnerNodeLiveNotes(line, organizationId, canvasId, analysisStatus);
   useReportPhaseAgentUsageSeries({
     nodeId: line.nodeId ?? line.id,
     fallbackName: line.componentName,
     series: usageSeries,
     enabled: isRunnerComponent(line.component),
-    loading: usageLoading,
   });
   const merged = compactSessionLog
     ? mergePlanningSessionNotes(liveNotes, notes)
@@ -1028,7 +1020,7 @@ function StreamNode({
       {compactSessionLog ? null : (
         <StreamNodeHeader
           line={line}
-          hasChildren={hasChildren}
+          sticky={stickyRows && hasChildren}
           highlighted={highlighted}
           artifact={artifact}
           pullRequest={pullRequest}
@@ -1042,7 +1034,7 @@ function StreamNode({
               key={step.line.id}
               step={step}
               highlightUserTalk={compactSessionLog}
-              stickyHeader={!compactSessionLog}
+              stickyHeader={stickyRows && !compactSessionLog}
               files={files}
             />
           ))}
@@ -1054,14 +1046,14 @@ function StreamNode({
 
 function StreamNodeHeader({
   line,
-  hasChildren,
+  sticky,
   highlighted,
   artifact,
   pullRequest,
   onSelect,
 }: {
   line: SplitRunStreamLine;
-  hasChildren: boolean;
+  sticky: boolean;
   highlighted: boolean;
   artifact?: FactoriesWorkOrderArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
@@ -1092,7 +1084,7 @@ function StreamNodeHeader({
         LOG_ROW_H,
         STREAM_SECTION,
         LAST_RUNNING_LINE_PULSE,
-        hasChildren && STICKY_NODE,
+        sticky && STICKY_NODE,
         highlighted && "ring-1 ring-foreground/15",
       )}
     >
@@ -1424,13 +1416,12 @@ function PhaseAgentUsageCollector({
   organizationId?: string;
   canvasId?: string;
 }) {
-  const { usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  const { usageSeries } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
   useReportPhaseAgentUsageSeries({
     nodeId: line.nodeId ?? line.id,
     fallbackName: line.componentName,
     series: usageSeries,
     enabled: true,
-    loading: usageLoading,
   });
   return null;
 }
@@ -1455,24 +1446,15 @@ function resolvedUsageSeries(
   return fallbackSeries;
 }
 
-function isAgentUsageLoading(
-  canStream: boolean,
-  hasTurns: boolean,
-  isStreaming: boolean,
-  nodeRunning: boolean,
-): boolean {
-  return canStream && !hasTurns && (isStreaming || nodeRunning);
-}
-
 function useRunnerNodeLiveNotes(
   line: SplitRunStreamLine,
   organizationId?: string,
   canvasId?: string,
+  analysisStatus?: SplitRunPhaseStatus,
 ): {
   notes: SplitRunStreamLine[] | undefined;
   telemetry: AgentRunTelemetry;
   usageSeries: AgentPromptUsageSeries[];
-  usageLoading: boolean;
 } {
   const canStream = Boolean(organizationId && canvasId && line.executionId && isRunnerComponent(line.component));
   const { sections, orphanLines, error, isStreaming, telemetry, usageSeries } = useLiveLogStream(
@@ -1488,10 +1470,8 @@ function useRunnerNodeLiveNotes(
     [nextTelemetry],
   );
   const nextSeries = resolvedUsageSeries(usageSeries, fallbackSeries);
-  const hasTurns = nextSeries.some((item) => item.telemetry.turns.length > 0);
-  const usageLoading = isAgentUsageLoading(canStream, hasTurns, isStreaming, line.status === "running");
   if (!canStream) {
-    return { notes: undefined, telemetry: nextTelemetry, usageSeries: nextSeries, usageLoading: false };
+    return { notes: undefined, telemetry: nextTelemetry, usageSeries: nextSeries };
   }
   return {
     notes: notesForLiveStream({
@@ -1501,9 +1481,9 @@ function useRunnerNodeLiveNotes(
       error,
       isStreaming,
       nodeStatus: line.status,
+      analysisStatus,
     }),
     telemetry: nextTelemetry,
     usageSeries: nextSeries,
-    usageLoading,
   };
 }

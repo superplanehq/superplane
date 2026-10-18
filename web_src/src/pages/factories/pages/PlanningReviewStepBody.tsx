@@ -1,3 +1,5 @@
+import type { FactoriesFactoryAgentResource } from "@/api-client";
+import { SkillPromptTextarea } from "./SkillPromptTextarea";
 import { Editor } from "@monaco-editor/react";
 
 import { Textarea } from "@/components/ui/textarea";
@@ -16,9 +18,8 @@ function editorHeight(value: string): number {
 }
 
 /**
- * Bash steps get a real editor with shell highlighting. Prompt steps stay a
- * plain textarea, because a prompt is prose and highlighting would only add
- * noise to it.
+ * Bash steps use shell highlighting. Prompts offer skill commands when the
+ * workspace skills feature is enabled, and otherwise use a plain textarea.
  *
  * Monaco pads vertically only, so the wrapper supplies the horizontal gutter.
  */
@@ -28,7 +29,11 @@ export function PlanningReviewStepBody({
   onChange,
   label,
   testId,
+  skills,
+  skillHref,
 }: {
+  skills?: FactoriesFactoryAgentResource[];
+  skillHref?: (skill: FactoriesFactoryAgentResource) => string | undefined;
   kind: PlanningReviewStepKind;
   value: string;
   onChange: (value: string) => void;
@@ -36,6 +41,19 @@ export function PlanningReviewStepBody({
   testId: string;
 }) {
   const { resolvedTheme } = useTheme();
+
+  if (kind === "prompt" && skills) {
+    return (
+      <SkillPromptTextarea
+        skillHref={skillHref}
+        value={value}
+        onChange={onChange}
+        skills={skills}
+        label={label}
+        testId={testId}
+      />
+    );
+  }
 
   if (kind === "prompt") {
     return (
@@ -52,7 +70,7 @@ export function PlanningReviewStepBody({
 
   return (
     <div
-      className="relative overflow-hidden rounded-lg border border-border bg-card px-3 py-2"
+      className="planning-review-code-editor relative rounded-lg border border-border bg-card px-3 py-2"
       data-testid={`${testId}-editor`}
     >
       <Editor

@@ -32,16 +32,6 @@ func TestAdminDashboard(t *testing.T) {
 		steps.assertOrganizationVisible("e2e-org")
 	})
 
-	t.Run("admin user can view organization details", func(t *testing.T) {
-		steps := &adminSteps{t: t}
-		steps.start()
-		steps.promoteToAdmin()
-		steps.session.Login()
-		steps.session.Visit("/admin")
-		steps.clickOrganization("e2e-org")
-		steps.assertUserVisible("E2E User")
-	})
-
 	t.Run("admin user can start and end impersonation", func(t *testing.T) {
 		steps := &adminSteps{t: t}
 		steps.start()
@@ -93,6 +83,17 @@ func TestAdminDashboard(t *testing.T) {
 		steps.saveSMTPSettings()
 		steps.assertSMTPSettingsEnabled()
 	})
+
+	t.Run("admin user can view the installation license", func(t *testing.T) {
+		steps := &adminSteps{t: t}
+		steps.start()
+		steps.promoteToAdmin()
+		steps.session.Login()
+		steps.session.Visit("/admin/license")
+		steps.session.AssertText("SuperPlane Enterprise")
+		steps.session.AssertText("Managed license")
+		steps.session.AssertVisible(q.TestID("license-features"))
+	})
 }
 
 func TestAdminOwnerSetupPromotion(t *testing.T) {
@@ -142,15 +143,6 @@ func (s *adminSteps) assertNotOnAdminPage() {
 }
 
 func (s *adminSteps) assertOrganizationVisible(name string) {
-	s.session.AssertText(name)
-}
-
-func (s *adminSteps) clickOrganization(name string) {
-	s.session.Click(q.Text(name))
-	s.session.Sleep(500)
-}
-
-func (s *adminSteps) assertUserVisible(name string) {
 	s.session.AssertText(name)
 }
 
@@ -249,8 +241,9 @@ func (s *adminSetupSteps) fillInOwnerDetailsAndSubmit() {
 	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), "User")
 	s.session.FillIn(q.Locator(`input[placeholder="Password"]`), "Password1")
 	s.session.FillIn(q.Locator(`input[placeholder="Confirm password"]`), "Password1")
-	s.session.Click(q.Text("Finish setup"))
+	s.session.Click(q.Text("Continue"))
 	s.waitForSetupToComplete()
+	skipRemainingOwnerSetupSteps(s.t, s.session)
 }
 
 func (s *adminSetupSteps) waitForSetupToComplete() {

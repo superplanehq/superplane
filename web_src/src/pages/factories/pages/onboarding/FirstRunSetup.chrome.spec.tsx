@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
 import { useState } from "react";
@@ -44,10 +44,20 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
+vi.mock("./useBitbucketOnboarding", () => ({
+  useBitbucketOnboarding: () => ({
+    data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
+    isPending: false,
+    error: null,
+    startInstallation: { mutateAsync: vi.fn() },
+  }),
+}));
+
 vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: () => ({
     data: {
-      appConfigured: true,
+      providerConfigured: true,
+      accountConnectionRequired: true,
       identity: { userId: "42", login: "octocat" },
       repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
       pendingRequests: [],
@@ -84,7 +94,13 @@ vi.mock("./AgentStep", () => ({
 }));
 
 function setupState(): OnboardingSetupApi {
-  const { result } = renderHook(() => useOnboardingSetupState("Payments Service", { simulateDiscovery: false }));
+  const { result } = renderHook(() =>
+    useOnboardingSetupState("Payments Service", {
+      simulateDiscovery: false,
+      connected: new Set(["github"]),
+      initial: { vcsHost: "github" },
+    }),
+  );
   return result.current;
 }
 
@@ -100,14 +116,19 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
+    agentModelPicker: undefined,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
+    bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
     saving: false,
     saveName: vi.fn().mockResolvedValue(true),
+    saveAgent: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
     provisionedDestination: null,
@@ -253,7 +274,13 @@ describe("FirstRunSetup chrome", () => {
     );
 
     expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.sphere.captionSetup)).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-logo")).toBeInTheDocument();
+    const art = screen.getByTestId("first-run-art-pane");
+    expect(art).toHaveAttribute("data-art-mode", "school");
+    expect(art).toHaveAttribute("data-art-background", "#87ae9d");
+    expect(art).toHaveAttribute("data-art-arrow-color", "#eeede9");
+    expect(art).toHaveAttribute("data-art-count", "");
+    expect(screen.getByTestId("first-run-art-stage")).toContainElement(screen.getByTestId("first-run-signed-in"));
   });
 
   it("shows the model source before the backlog for a bring-your-own-key organization", async () => {
@@ -293,6 +320,10 @@ describe("FirstRunSetup chrome", () => {
 
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /GitHub Issues/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /^Jira/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /^Linear/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   });
 
   it("shows provider keys when the organization chooses its own key", async () => {
@@ -304,6 +335,33 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyBody)).toBeInTheDocument();
     expect(screen.getByTestId("agent-step")).toHaveAttribute("data-custom-provider", "no");
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+  });
+
+  it.each([true, false])("saves the agent before opening the backlog (saved: %s)", async (saved) => {
+    const user = userEvent.setup();
+    let completeSave!: (saved: boolean) => void;
+    const saveAgent = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          completeSave = resolve;
+        }),
+    );
+    const model = pageModel({
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      agentCredentialChoice: "own-key",
+      openSection: "agent",
+      setup: { ...withRepository(), connected: new Set(["github", "claude"]) },
+      saveAgent,
+    });
+    renderSetup(model, "/org-1/workspaces/PAY/setup?step=agent");
+
+    await user.click(screen.getByTestId("first-run-finish-setup"));
+
+    expect(saveAgent).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("first-run-tickets")).not.toBeInTheDocument();
+    await act(async () => completeSave(saved));
+    expect(Boolean(screen.queryByTestId("first-run-tickets"))).toBe(saved);
   });
 
   it("offers a custom provider on the agent card when that flag is on", async () => {
@@ -335,6 +393,7 @@ describe("FirstRunSetup chrome", () => {
       hostedModelsAvailable: true,
       bringYourOwnKey: true,
       agentCredentialChoice: "hosted",
+      setup: { ...setupState(), issuesChoice: "vcs" },
     });
 
     renderSetup(model);
@@ -349,7 +408,7 @@ describe("FirstRunSetup chrome", () => {
       hostedAgentReady: true,
       hostedModelsAvailable: true,
       openSection: "repo",
-      setup: withRepository(),
+      setup: { ...withRepository(), issuesChoice: "vcs" },
     });
 
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=repo");

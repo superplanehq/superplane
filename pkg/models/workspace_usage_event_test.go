@@ -378,6 +378,79 @@ func Test__SumUsageForWorkOrdersByKind__ReportsNothingForNoOrders(t *testing.T) 
 	assert.Empty(t, sums)
 }
 
+func Test__SummarizeUsageByLocalDay__UsesExactBoundsAcrossDST(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	loc, err := time.LoadLocation("America/New_York")
+	require.NoError(t, err)
+	shortDay := secondSundayOfMarch(time.Now().In(loc).Year(), loc)
+	dayBefore := shortDay.AddDate(0, 0, -1)
+	dayAfter := shortDay.AddDate(0, 0, 1)
+	exclusiveEnd := shortDay.AddDate(0, 0, 2)
+	require.Equal(t, 23*time.Hour, dayAfter.Sub(shortDay), "US spring-forward is a 23-hour local day")
+	bounds := []time.Time{dayBefore, shortDay, dayAfter, exclusiveEnd}
+
+	insertUsageAt(t, factory, models.UsageKindModel, dayAfter.Add(-30*time.Minute), 15_000, 5)
+	insertUsageAt(t, factory, models.UsageKindModel, dayAfter.Add(-time.Minute), 1_000, 2)
+	insertUsageAt(t, factory, models.UsageKindCompute, dayAfter.Add(time.Second), 25_000, 0)
+	insertUsageAt(t, factory, models.UsageKindModel, exclusiveEnd, 90_000, 9)
+	insertUsageAt(t, factory, models.UsageKindModel, dayBefore.Add(-time.Second), 80_000, 8)
+
+	days, err := models.SummarizeUsageByLocalDay(db, models.UsageReportFilter{
+		OrganizationID: factory.OrganizationID,
+		FactoryID:      &factory.ID,
+	}, bounds)
+	require.NoError(t, err)
+	require.Len(t, days, 3)
+
+	assert.Equal(t, int64(16_000), days[1].Model.CostMicros, "events before local midnight stay on the short day")
+	assert.Equal(t, int64(7), days[1].Model.TotalTokens)
+	assert.Zero(t, days[1].Compute.CostMicros)
+	assert.Equal(t, int64(25_000), days[2].Compute.CostMicros, "just after local midnight lands on the next day")
+	assert.Equal(t, int64(60), days[2].Compute.DurationSeconds)
+	assert.Zero(t, days[0].Total().CostMicros)
+	assert.Zero(t, days[2].Model.CostMicros, "an event at the exclusive end is ignored")
+}
+
+func secondSundayOfMarch(year int, loc *time.Location) time.Time {
+	march1 := time.Date(year, time.March, 1, 0, 0, 0, 0, loc)
+	offset := (int(time.Sunday) - int(march1.Weekday()) + 7) % 7
+	return march1.AddDate(0, 0, offset+7)
+}
+
+func insertUsageAt(t *testing.T, factory *models.Factory, kind string, at time.Time, micros, tokens int64) {
+	t.Helper()
+	event := models.WorkspaceUsageEvent{
+		ID:               uuid.New(),
+		OrganizationID:   factory.OrganizationID,
+		FactoryID:        &factory.ID,
+		CanvasRunID:      uuid.New(),
+		NodeExecutionID:  uuid.New(),
+		NodeID:           "prompt",
+		Provider:         models.UsageProviderAnthropic,
+		Model:            "claude-sonnet-4-6",
+		UsageKind:        kind,
+		TotalTokens:      tokens,
+		CostMicros:       micros,
+		FundingSource:    models.UsageFundingSourceBYOK,
+		Currency:         "usd",
+		PriceBookVersion: "test",
+		IdempotencyKey:   uuid.NewString(),
+		OccurredAt:       at,
+	}
+	if kind == models.UsageKindCompute {
+		event.Provider = models.UsageProviderRunner
+		event.Model = "e1-large-amd64"
+		event.MachineType = "e1-large-amd64"
+		event.DurationSeconds = 60
+		event.FundingSource = models.UsageFundingSourceHosted
+	}
+	require.NoError(t, database.DB(t.Context()).Create(&event).Error)
+}
+
 func Test__RecordUsage__SameIdempotencyKeyRecordsOnce(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

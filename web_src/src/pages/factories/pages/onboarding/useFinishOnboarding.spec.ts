@@ -22,7 +22,7 @@ describe("finishOnboardingError", () => {
         appRepository: "acme/web",
         backlogRepository: "acme/web",
         workspaceName: "Web",
-        githubReady: true,
+        vcsReady: true,
         remainingCreditCents: 5000,
         hostedModelsLoading: false,
         plan: readyPlan,
@@ -36,7 +36,7 @@ describe("finishOnboardingError", () => {
         appRepository: "acme/web",
         backlogRepository: "acme/web",
         workspaceName: "Web",
-        githubReady: true,
+        vcsReady: true,
         remainingCreditCents: 5000,
         hostedModelsLoading: false,
         plan: readyPlan,
@@ -53,7 +53,7 @@ describe("finishOnboardingError", () => {
         appRepository: "acme/web",
         backlogRepository: "acme/web",
         workspaceName: "Web",
-        githubReady: true,
+        vcsReady: true,
         remainingCreditCents: 5000,
         hostedModelsLoading: false,
         plan: readyPlan,
@@ -62,6 +62,35 @@ describe("finishOnboardingError", () => {
         linearProjectIds: [],
       }),
     ).toBe("Connect Linear, then choose a project.");
+  });
+
+  it("names Bitbucket when a Bitbucket workspace has no connection", () => {
+    expect(
+      finishOnboardingError({
+        appRepository: "acme/web",
+        backlogRepository: "acme/web",
+        workspaceName: "Web",
+        vcsReady: false,
+        vcsHost: "bitbucket",
+        remainingCreditCents: 5000,
+        hostedModelsLoading: false,
+        plan: readyPlan,
+      }),
+    ).toBe("Connect Bitbucket before you continue.");
+  });
+
+  it("asks for repositories when GitHub is connected and a repository is missing", () => {
+    expect(
+      finishOnboardingError({
+        appRepository: "acme/web",
+        backlogRepository: null,
+        workspaceName: "Web",
+        vcsReady: true,
+        remainingCreditCents: 5000,
+        hostedModelsLoading: false,
+        plan: readyPlan,
+      }),
+    ).toBe("Select the code repository and the backlog repository.");
   });
 });
 
@@ -93,7 +122,7 @@ describe("provisionWorkspace", () => {
       backlogRepository: "acme/payments-service",
       issuesChoice: "vcs" as const,
       resolveDefaultBranch: vi.fn().mockResolvedValue("main"),
-      github: { id: "github-1" },
+      vcs: { id: "github-1", provider: "github" as const },
       agentPlan: readyPlan,
       agentRewrite: {
         component: "runnerSuperPlane",
@@ -199,6 +228,27 @@ describe("provisionWorkspace", () => {
       .map(([input]) => input.issuesSource)
       .filter((value) => value !== undefined);
     expect(issuesSourceCalls).toEqual(["ISSUES_SOURCE_LINEAR"]);
+  });
+
+  it("provisions the Bitbucket Implement app and no GitHub intake for a Bitbucket workspace", async () => {
+    const createIntake = vi.fn();
+    const installFactory = vi.fn().mockResolvedValue({ canvasId: "canvas-1", canvasName: "canvas-1" });
+    const listApps = vi.fn().mockResolvedValue([]);
+
+    await provisionWorkspace(
+      provisionArgs({
+        vcs: { id: "bitbucket-1", provider: "bitbucket" },
+        createIntake,
+        installFactory,
+        listApps,
+      }),
+    );
+
+    expect(createIntake).not.toHaveBeenCalled();
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["line-implementation", "pr-closure"]);
+    for (const [input] of installFactory.mock.calls) {
+      expect(input.vcsProvider).toBe("bitbucket");
+    }
   });
 
   it("does not create a comments handler during workspace setup", async () => {

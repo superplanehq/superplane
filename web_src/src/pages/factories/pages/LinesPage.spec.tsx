@@ -10,14 +10,15 @@ import type {
   FactoryAutomation,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_JIRA_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_RISK_SCORE,
+  FEATURE_FACTORY_SCHEDULED_INTAKE,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -115,7 +116,7 @@ const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
-const useFactoryBoardWorkOrders = vi.fn(() => ({
+const useFactoryBoardWorkOrders = vi.fn((_organizationId?: string, _factoryId?: string, _options?: unknown) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
   isPlaceholderData: false,
@@ -181,7 +182,8 @@ vi.mock("@/hooks/useFactoryData", () => ({
   }),
   useUpdateFactory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
+  useFactoryBoardWorkOrders: (organizationId: string, factoryId: string, options?: unknown) =>
+    useFactoryBoardWorkOrders(organizationId, factoryId, options),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({
@@ -194,6 +196,15 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useCreateFactoryAutomation: () => ({ mutateAsync: createFactoryAutomationMutateAsync, isPending: false }),
+  useFactorySchedulePreview: () => ({
+    data: new Date(Date.now() + 86_400_000).toISOString(),
+    isFuture: true,
+    isSuccess: true,
+    isFetching: false,
+    isPending: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
   useDeleteFactoryAutomation: () => ({ mutateAsync: deleteFactoryAutomationMutateAsync, isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -291,6 +302,30 @@ vi.mock("@/hooks/useCanvasData", () => {
     useUpdateCanvasVersion: () => ({ mutateAsync: updateCanvasVersionMutateAsync, isPending: false }),
     useCommitCanvasStaging: () => ({ mutateAsync: commitCanvasStagingMutateAsync, isPending: false }),
     useDiscardCanvasStaging: () => ({ mutateAsync: discardCanvasStagingMutateAsync, isPending: false }),
+    useTriggers: () => ({ data: [], isLoading: false, isPending: false }),
+    useWidgets: () => ({ data: [], isLoading: false, isPending: false }),
+  };
+});
+
+vi.mock("@/hooks/useComponentData", () => ({
+  useComponents: () => ({
+    data: [{ name: "runnerClaudeCode", label: "Run Claude Code", configuration: [] }],
+    isLoading: false,
+    isPending: false,
+  }),
+  useComponent: () => ({
+    data: { name: "runnerClaudeCode", configuration: [] },
+    isLoading: false,
+    isPending: false,
+  }),
+}));
+
+vi.mock("@/hooks/useIntegrations", () => {
+  const actual = unmockedSrc<typeof integrationsData>("hooks/useIntegrations");
+  return {
+    ...actual,
+    useAvailableIntegrations: () => ({ data: [], isLoading: false, isPending: false }),
+    useConnectedIntegrations: () => ({ data: [], isLoading: false, isPending: false }),
   };
 });
 
@@ -457,7 +492,8 @@ describe("LinesPage board", () => {
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
     expect(cardScore).toHaveAttribute("data-tone", "ready");
-    expect(cardScore).toHaveTextContent("Clarity5/5Confidence5/5");
+    expect(cardScore).toHaveTextContent("Clarity5/5Confidence");
+    expect(within(card).getByTestId("work-order-card-score-wo-review-pay-842-confidence")).not.toHaveTextContent(/\d/);
     expect(cardScore).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
@@ -478,9 +514,9 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByTestId("split-run-intent-document")).toBeInTheDocument();
     expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842`);
+    expect(location).not.toHaveTextContent("lineId=");
     expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -515,7 +551,6 @@ describe("LinesPage board", () => {
       expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
       expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
-      expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
     } finally {
       clearBacklogAnalysisPending(analyzingOrderId);
     }
@@ -549,9 +584,9 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
-    );
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842`);
+    expect(location).not.toHaveTextContent("lineId=");
 
     await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
     await waitFor(() => {
@@ -665,7 +700,9 @@ describe("LinesPage board", () => {
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
   });
 
-  it("opens an existing phase automation in the board view popup", async () => {
+  it("opens an existing phase automation on the split config screen", async () => {
+    enabledExperimentalFeatures.add(FEATURE_WORKSPACE_MCP);
+    enabledExperimentalFeatures.add(FEATURE_WORKSPACE_SKILLS);
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
@@ -684,22 +721,25 @@ describe("LinesPage board", () => {
     );
     expect(location).not.toHaveTextContent("/apps/");
     expect(location).not.toHaveTextContent("configure=1");
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
-    expect(screen.queryByTestId("column-automation-view-delete")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("column-automation-view")).getByRole("heading", { name: "Implement" }),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-view-tab-agent")).toHaveAttribute("data-state", "active");
-    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
-
-    await user.click(screen.getByTestId("column-automation-view-tab-automation"));
-    expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
-      "href",
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, "app-refund-implementer", {
-        from: "lines",
-        lineId: REFUND_LINE_PLAN_ID,
-      }),
+    expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-tab-agent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-tab-general")).not.toBeInTheDocument();
+    const dialog = screen.getByTestId("merge-confidence-config");
+    expect(within(dialog).getByRole("heading", { name: "Implement" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
+    expect(within(dialog).getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("merge-confidence-config-tab-automation")).toHaveAttribute(
+      "data-state",
+      "active",
     );
+    expect(within(dialog).getByTestId("merge-confidence-config-tab-runs")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Concurrency")).toHaveValue(5);
+    expect(within(dialog).getByText("MCP servers")).toBeInTheDocument();
+    expect(within(dialog).getByText("Skills")).toBeInTheDocument();
   });
 
   it("opens Planning settings from the Task analysis row", async () => {
@@ -743,7 +783,8 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.getByTestId("merge-confidence-config")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
   });
 
   it("hides Add automation on step column menus", async () => {
@@ -1046,12 +1087,12 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-column-automation-template-risk-score")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-risk-score")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toBeInTheDocument();
     expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
   });
 
   it("opens the risk score setup page from the Verify catalog", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1066,7 +1107,6 @@ describe("LinesPage board extras", () => {
 
   it("opens the name dialog when Verify only has custom automation left", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
@@ -1075,7 +1115,10 @@ describe("LinesPage board extras", () => {
       isPending: false,
     });
     useFactoryAutomations.mockReturnValue({
-      data: [{ id: "app-risk", name: "Risk score", columnKey: "verify" }],
+      data: [
+        { id: "app-risk", name: "Risk score", columnKey: "verify" },
+        { id: "app-evidence", name: "Visual Evidence", columnKey: "verify" },
+      ],
     });
     const user = userEvent.setup();
     renderLinesBoard();
@@ -1110,6 +1153,31 @@ describe("LinesPage board extras", () => {
         `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/automations/canvas-custom`,
       );
     });
+  });
+
+  it("opens the created scheduled intake in the board automation view", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_SCHEDULED_INTAKE);
+    createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "canvas-scheduled", name: "Scheduled intake" });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+    await user.click(screen.getByTestId("add-intake-template-scheduled-intake"));
+    await user.click(screen.getByRole("button", { name: "Create intake" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+        factoryColumnAutomationViewPath(
+          "org-1",
+          PRIMARY_FACTORY_ROUTE_SEGMENT,
+          REFUND_LINE_PLAN_ID,
+          "canvas-scheduled",
+        ),
+      );
+    });
+    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.queryByLabelText("What should the agent look for?")).not.toBeInTheDocument();
   });
 
   it("deletes a custom Verify automation from the view modal", async () => {
@@ -1205,20 +1273,20 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-dependabot-alerts")).not.toHaveTextContent(
       ADD_INTAKE_COPY.comingSoon,
     );
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).not.toHaveTextContent(
       ADD_INTAKE_COPY.comingSoon,
     );
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-linear-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
-    await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     await user.click(screen.getByTestId("add-intake-template-datadog"));
-    await user.click(screen.getByTestId("add-intake-template-linear-issues"));
 
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
@@ -1247,7 +1315,6 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Linear setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_LINEAR_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1276,9 +1343,10 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
@@ -1328,7 +1396,6 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Jira setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1358,7 +1425,8 @@ describe("LinesPage board extras", () => {
 
     const productive = screen.getByTestId("add-intake-template-productive-tasks");
     expect(productive).toBeEnabled();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(productive);
 
@@ -1561,33 +1629,30 @@ describe("LinesPage board editing", () => {
 
     await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.getByTestId("merge-confidence-config")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Edit Agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Edit Automation" })).not.toBeInTheDocument();
   });
 
-  it("stages and commits the canvas agent on Save Agent", async () => {
+  it("saves the Implement agent when a choice changes", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
-    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
-    const stepName = screen.getByTestId("planning-review-step-name-0");
-    await user.clear(stepName);
-    await user.type(stepName, "Clone repository");
-    await user.click(screen.getByTestId("planning-review-save"));
+    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
+    expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
+    expect(await screen.findByRole("heading", { name: "Implement From Task Description" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add step" }));
 
     await waitFor(() => {
-      expect(updateCanvasVersionMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          versionId: "version-live",
-          canvasYaml: expect.stringContaining("Clone repository"),
-        }),
-      );
+      expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step");
     });
-    expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update agent");
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    const saved = updateCanvasVersionMutateAsync.mock.calls.at(-1)?.[0] as { canvasYaml?: string };
+    expect(saved.canvasYaml).toContain("implementation-agent-no-issue");
+    expect(saved.canvasYaml?.match(/type: bash/g)).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
   });
 
   it("keeps Backlog Edit as the only edit action", async () => {
@@ -1750,7 +1815,12 @@ describe("LinesPage board editing", () => {
     const search = within(actions).getByTestId("work-orders-search-trigger");
     expect(within(actions).queryByTestId("work-orders-scope-active")).not.toBeInTheDocument();
     expect(scopeAll).toHaveTextContent("All");
-    expect(within(actions).getByTestId("work-orders-scope-my")).toHaveTextContent("My");
+    const scopeMy = within(actions).getByTestId("work-orders-scope-my");
+    const scopeUnassigned = within(actions).getByTestId("work-orders-scope-unassigned");
+    expect(scopeMy).toHaveTextContent("My");
+    expect(scopeUnassigned).toHaveTextContent("Unassigned");
+    expect(scopeAll.compareDocumentPosition(scopeMy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(scopeMy.compareDocumentPosition(scopeUnassigned) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(scopeAll.className).toMatch(/rounded-full/);
     expect(filter).toHaveAccessibleName("Filter");
     expect(filter).not.toHaveTextContent("Filter");
@@ -1774,7 +1844,7 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
   });
 
-  it("opens closed tasks from the Status filter", async () => {
+  it("filters Rejected on the board without opening a dialog", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1782,11 +1852,8 @@ describe("LinesPage board editing", () => {
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
     fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-rejected"));
 
-    expect(await screen.findByTestId("work-order-closed-status-dialog")).toBeInTheDocument();
-    expect(
-      screen.getByText("Rejected and Canceled tasks. Send a task to Backlog to work on it again."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-closed-status-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-chips")).toHaveTextContent("Rejected");
   });
 
   it("treats a leftover Active scope as All and keeps every card", () => {
@@ -1803,6 +1870,53 @@ describe("LinesPage board editing", () => {
     expect(screen.getByText("Draft: rework refund telemetry")).toBeInTheDocument();
     expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
     expect(window.localStorage.getItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`)).toBe("active");
+  });
+
+  it("keeps Unassigned pressed and requests only tasks with no owner", async () => {
+    const user = userEvent.setup();
+    const closedUnassigned: FactoriesWorkOrder = {
+      id: "wo-closed-unassigned",
+      title: "Close stale refund draft",
+      state: "STATE_CLOSED",
+      result: "RESULT_COMPLETED",
+      assignees: [],
+      lineDispatches: [{ id: "dispatch-closed", line: { id: REFUND_LINE_PLAN_ID } }],
+    };
+    useFactoryWorkOrders.mockReturnValue({
+      data: [DRAFT_WORK_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER, closedUnassigned],
+    });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-scope-unassigned"));
+
+    const actions = within(screen.getByTestId("lines-detail-header")).getByTestId("workspace-page-header-actions");
+    expect(within(actions).getByTestId("work-orders-scope-unassigned")).toHaveAttribute("aria-pressed", "true");
+    expect(within(actions).getByTestId("work-orders-scope-all")).toHaveAttribute("aria-pressed", "false");
+    expect(within(actions).getByTestId("work-orders-scope-my")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Draft: rework refund telemetry")).toBeInTheDocument();
+    expect(screen.getByText("Close stale refund draft")).toBeInTheDocument();
+    expect(screen.queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
+
+    const options = useFactoryBoardWorkOrders.mock.calls.at(-1)?.[2] as { userId?: string; unassigned?: boolean };
+    expect(options.unassigned).toBe(true);
+    expect(options.userId).toBeUndefined();
+  });
+
+  it("restores a saved Unassigned choice and does not add a selected owner to the request", () => {
+    window.localStorage.setItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`, "unassigned");
+    window.localStorage.setItem(
+      `sp:work-orders:filters:${PRIMARY_FACTORY_ID}`,
+      JSON.stringify({ assigneeIds: ["storybook-user"] }),
+    );
+    renderLinesBoard();
+
+    const actions = within(screen.getByTestId("lines-detail-header")).getByTestId("workspace-page-header-actions");
+    expect(within(actions).getByTestId("work-orders-scope-unassigned")).toHaveAttribute("aria-pressed", "true");
+    expect(within(actions).getByTestId("work-orders-scope-all")).toHaveAttribute("aria-pressed", "false");
+
+    const options = useFactoryBoardWorkOrders.mock.calls.at(-1)?.[2] as { userId?: string; unassigned?: boolean };
+    expect(options.unassigned).toBe(true);
+    expect(options.userId).toBeUndefined();
   });
 
   it("lists Source in the filter menu from configured intakes", async () => {

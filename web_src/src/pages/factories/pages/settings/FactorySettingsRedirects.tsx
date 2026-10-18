@@ -2,6 +2,9 @@ import { useAccount } from "@/contexts/useAccount";
 import { useFactories } from "@/hooks/useFactoryData";
 import {
   automationsPath,
+  factoryAgentMcpConnectionPath,
+  factoryAgentPath,
+  factoryAgentSkillEditorPath,
   factoryRouteSegment,
   factorySettingsSectionPath,
   factorySettingsWorkspaceGeneralPath,
@@ -112,6 +115,57 @@ export function WorkspaceAutomationsSettingsRedirect() {
   }
 
   return <Navigate to={`${automationsPath(organizationId, factoryKey)}${location.search}`} replace />;
+}
+
+/** Old `/settings/workspace/agent` URLs. Send the user to the workspace Agent page. */
+export function WorkspaceAgentSettingsRedirect() {
+  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
+  const location = useLocation();
+
+  if (!organizationId || !factoryKey) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Navigate to={`${factoryAgentPath(organizationId, factoryKey)}${location.search}`} replace />;
+}
+
+/** Old `/settings/workspace/mcp/:resourceId` URLs. Send the user to the Agent MCP page. */
+export function WorkspaceAgentMcpConnectionRedirect() {
+  const { organizationId, factoryKey, resourceId } = useParams<{
+    organizationId: string;
+    factoryKey: string;
+    resourceId: string;
+  }>();
+  const location = useLocation();
+
+  if (!organizationId || !factoryKey || !resourceId) {
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <Navigate
+      to={`${factoryAgentMcpConnectionPath(organizationId, factoryKey, resourceId)}${location.search}`}
+      replace
+    />
+  );
+}
+
+/** Old `/settings/workspace/skills/:resourceId` URLs. Send the user to the Agent skill editor. */
+export function WorkspaceAgentSkillRedirect() {
+  const { organizationId, factoryKey, resourceId } = useParams<{
+    organizationId: string;
+    factoryKey: string;
+    resourceId?: string;
+  }>();
+  const location = useLocation();
+
+  if (!organizationId || !factoryKey) {
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <Navigate to={`${factoryAgentSkillEditorPath(organizationId, factoryKey, resourceId)}${location.search}`} replace />
+  );
 }
 
 export function LegacyFactoryOrganizationSettingsRedirect() {

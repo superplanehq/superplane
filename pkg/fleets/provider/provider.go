@@ -21,6 +21,7 @@ type RunnerBootstrap struct {
 	RunnerAPIURL      string
 	RegistrationToken string
 	Artifact          artifact.Artifact
+	Tags              map[string]string
 }
 
 type CreateRequest struct {

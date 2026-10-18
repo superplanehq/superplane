@@ -492,6 +492,15 @@ func (s *Schedule) emitEvent(ctx core.TriggerHookContext) error {
 	})
 }
 
+// NextTrigger previews the same timing rules used when the trigger is activated.
+func NextTrigger(config Configuration, now time.Time) (*time.Time, error) {
+	next, err := getNextTrigger(config, now, nil)
+	if err == nil && (next == nil || next.IsZero()) {
+		return nil, fmt.Errorf("schedule has no future run")
+	}
+	return next, err
+}
+
 func getNextTrigger(config Configuration, now time.Time, referenceTime *string) (*time.Time, error) {
 	timezone := parseTimezone(config.Timezone)
 	nowInTZ := now.In(timezone)

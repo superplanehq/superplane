@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -14,6 +15,9 @@ import (
 )
 
 const mergeConfidenceMaxScore = 5
+
+// A custom check uses the same bands as blast radius: a higher score is worse.
+var mergeConfidenceCheckID = regexp.MustCompile(`^[a-z][a-z0-9-]{0,40}$`)
 
 var (
 	ErrMergeConfidenceInvalid  = errors.New("merge confidence check is invalid")
@@ -50,8 +54,9 @@ func ReportMergeConfidenceCheck(
 	score float64,
 	summary string,
 	enabled []string,
+	labels map[string]string,
 ) (*models.FactoryWorkOrderCheck, error) {
-	params, err := mergeConfidenceCheckParams(check, score, summary, enabled)
+	params, err := mergeConfidenceCheckParams(check, score, summary, enabled, labels)
 	if err != nil {
 		return nil, err
 	}
@@ -66,14 +71,19 @@ func ReportMergeConfidenceCheck(
 	return order.ReportCheck(tx, params)
 }
 
-func mergeConfidenceCheckParams(check string, score float64, summary string, enabled []string) (models.FactoryWorkOrderCheckParams, error) {
+func mergeConfidenceCheckParams(check string, score float64, summary string, enabled []string, labels map[string]string) (models.FactoryWorkOrderCheckParams, error) {
 	name := strings.ToLower(strings.TrimSpace(check))
-	spec, ok := mergeConfidenceCheckByName(name)
-	if !ok {
+	if !mergeConfidenceCheckID.MatchString(name) {
 		return models.FactoryWorkOrderCheckParams{}, fmt.Errorf("%w: unknown check %q", ErrMergeConfidenceInvalid, check)
 	}
-	if !slices.Contains(enabled, spec.name) {
-		return models.FactoryWorkOrderCheckParams{}, fmt.Errorf("%w: %s", ErrMergeConfidenceDisabled, spec.name)
+	if !slices.Contains(enabled, name) {
+		return models.FactoryWorkOrderCheckParams{}, fmt.Errorf("%w: %s", ErrMergeConfidenceDisabled, name)
+	}
+	spec, ok := mergeConfidenceCheckByName(name)
+	if !ok {
+		spec = customMergeConfidenceCheck(name, labels)
+	} else if label := strings.TrimSpace(labels[name]); label != "" {
+		spec.label = label
 	}
 	if err := validateMergeConfidenceScore(score); err != nil {
 		return models.FactoryWorkOrderCheckParams{}, err
@@ -100,6 +110,21 @@ func mergeConfidenceCheckParams(check string, score float64, summary string, ena
 		Level:    level,
 		Summary:  summary,
 	}, nil
+}
+
+func customMergeConfidenceCheck(name string, labels map[string]string) mergeConfidenceCheck {
+	label := strings.TrimSpace(labels[name])
+	if label == "" {
+		label = name
+	}
+	return mergeConfidenceCheck{
+		name:       name,
+		key:        name + "-review",
+		label:      label,
+		direction:  CheckDirectionLowerIsBetter,
+		cautionAt:  3,
+		criticalAt: 4,
+	}
 }
 
 func mergeConfidenceCheckByName(name string) (mergeConfidenceCheck, bool) {

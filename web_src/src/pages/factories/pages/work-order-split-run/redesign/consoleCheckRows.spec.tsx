@@ -1,114 +1,73 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "bun:test";
 
 import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { ConsoleCheckRows } from "./consoleCheckRows";
 
-function filledBars(id: string) {
-  return screen.getByTestId(`split-run-check-${id}`).querySelectorAll("[data-bar-filled='true']");
-}
-
-function check(
-  overrides: Partial<WorkOrderCheckPresentation> & Pick<WorkOrderCheckPresentation, "id" | "name">,
-): WorkOrderCheckPresentation {
-  return {
-    score: 4,
+const checks: WorkOrderCheckPresentation[] = [
+  { id: "risk", key: "risk-review", name: "Blast radius", score: 1, maxScore: 5, level: "positive" },
+  { id: "performance", key: "performance-review", name: "Performance", score: 3, maxScore: 5, level: "caution" },
+  {
+    id: "security",
+    key: "security-review",
+    name: "Security",
+    score: 2,
     maxScore: 5,
-    level: "positive",
-    ...overrides,
-  };
-}
-
-function mergeConfidenceHeader() {
-  return screen.getByRole("button", { name: "Merge confidence" });
-}
-
-function openChecks() {
-  fireEvent.click(mergeConfidenceHeader());
-}
+    level: "critical",
+    summary: "The retry endpoint does not check workspace membership.",
+  },
+  { id: "drift", key: "drift-review", name: "Drift", score: 1, maxScore: 5, level: "positive" },
+  { id: "reversibility", key: "reversibility-review", name: "Reversibility", score: 5, maxScore: 5, level: "positive" },
+];
 
 describe("ConsoleCheckRows", () => {
-  it("lists each check with its score and status", () => {
-    render(
-      <ConsoleCheckRows
-        checks={[
-          check({ id: "confidence", key: "confidence", name: "Confidence score", level: "positive" }),
-          check({ id: "risk", key: "risk-review", name: "Risk score", level: "critical" }),
-        ]}
-      />,
-    );
-
-    const header = mergeConfidenceHeader();
-    expect(header).toHaveAttribute("aria-expanded", "false");
-    expect(header.querySelectorAll("[data-bar-filled='true']")).toHaveLength(1);
-    expect(screen.getByText("1 of 2 indicates high caution")).toBeInTheDocument();
-    expect(screen.queryByText("A check failed")).not.toBeInTheDocument();
-    expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-check-confidence")).not.toBeInTheDocument();
-
-    openChecks();
-
-    expect(header).toHaveAttribute("aria-expanded", "true");
-    expect(filledBars("confidence")).toHaveLength(3);
-    expect(filledBars("risk")).toHaveLength(1);
-    expect(screen.getByText("Blast radius")).toBeInTheDocument();
-    expect(screen.queryByText("High")).not.toBeInTheDocument();
-    expect(screen.queryByText("4/5")).not.toBeInTheDocument();
-
-    openChecks();
-
-    expect(header).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
-  });
-
-  it("starts closed again after the section leaves the page", () => {
-    const checks = [check({ id: "risk", key: "risk-review", name: "Risk score", level: "critical" })];
-    const view = render(<ConsoleCheckRows checks={checks} />);
-    openChecks();
-    expect(screen.getByText("Blast radius")).toBeInTheDocument();
-
-    view.unmount();
+  it("colors each summary bar independently and expands status icons with evidence", async () => {
+    const user = userEvent.setup();
     render(<ConsoleCheckRows checks={checks} />);
 
-    expect(mergeConfidenceHeader()).toHaveAttribute("aria-expanded", "false");
+    const header = screen.getByRole("button", { name: "Merge confidence" });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    const bars = screen.getByTestId("redesign-console-checks-meter").children;
+    expect(bars).toHaveLength(5);
+    expect(bars[0]).toHaveClass("bg-emerald-500");
+    expect(bars[1]).toHaveClass("bg-amber-500");
+    expect(bars[2]).toHaveClass("bg-red-500");
+    expect(bars[3]).toHaveClass("bg-emerald-500");
+    expect(bars[4]).toHaveClass("bg-emerald-500");
+    expect(screen.getByText("2 checks need review")).toBeInTheDocument();
+    expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
+
+    await user.click(header);
+
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    expect(within(screen.getByTestId("split-run-check-risk")).getByRole("img", { name: "Passed" })).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-check-performance")).getByRole("img", { name: "Needs review" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-check-security")).getByRole("img", { name: "Needs attention" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("The retry endpoint does not check workspace membership.")).toBeInTheDocument();
+    expect(screen.getByText("Drift from Specification")).toBeInTheDocument();
+    expect(screen.queryByText("Missed")).not.toBeInTheDocument();
+    expect(screen.queryByText("2/5")).not.toBeInTheDocument();
+
+    await user.click(header);
     expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
   });
 
-  it("uses a result word for drift, performance, and security", () => {
-    render(
-      <ConsoleCheckRows
-        checks={[
-          check({ id: "drift", key: "drift-review", name: "Drift", score: 2, level: "positive" }),
-          check({ id: "performance", key: "performance-review", name: "Performance", level: "positive" }),
-          check({ id: "security", key: "security-review", name: "Security", level: "caution" }),
-        ]}
-      />,
-    );
-
-    openChecks();
-
-    expect(filledBars("drift")).toHaveLength(3);
-    expect(filledBars("performance")).toHaveLength(3);
-    expect(filledBars("security")).toHaveLength(2);
-    expect(screen.getByText("1 of 3 indicates higher caution")).toBeInTheDocument();
-    expect(screen.queryByText("Close")).not.toBeInTheDocument();
-    expect(screen.queryByText("Met")).not.toBeInTheDocument();
-    expect(screen.queryByText("Partial")).not.toBeInTheDocument();
+  it("does not describe a neutral check as passed", () => {
+    render(<ConsoleCheckRows checks={[{ ...checks[0], level: "neutral" }]} defaultOpen />);
+    expect(screen.getByRole("img", { name: "Not assessed" })).toBeInTheDocument();
+    expect(screen.queryByText("All checks passed")).not.toBeInTheDocument();
   });
 
-  it("describes a calm result as low caution", () => {
-    render(
-      <ConsoleCheckRows
-        checks={[
-          check({ id: "drift", key: "drift-review", name: "Drift", level: "positive" }),
-          check({ id: "performance", key: "performance-review", name: "Performance", level: "positive" }),
-          check({ id: "security", key: "security-review", name: "Security", level: "positive" }),
-          check({ id: "reversibility", key: "reversibility-review", name: "Reversibility", level: "positive" }),
-        ]}
-      />,
-    );
-
-    expect(screen.getByText("All checks indicate high confidence")).toBeInTheDocument();
-    expect(screen.queryByText(/successful/)).not.toBeInTheDocument();
+  it("shows only reported checks and hides an empty section", () => {
+    const view = render(<ConsoleCheckRows checks={[checks[0]]} />);
+    expect(screen.getByTestId("redesign-console-checks-meter").children).toHaveLength(1);
+    expect(screen.getByText("All checks passed")).toBeInTheDocument();
+    view.rerender(<ConsoleCheckRows checks={[]} />);
+    expect(screen.queryByRole("button", { name: "Merge confidence" })).not.toBeInTheDocument();
   });
 });

@@ -53,8 +53,8 @@ export const VELOCITY_COST_MODE_OPTIONS: { value: VelocityCostMode; label: strin
 ];
 
 export const VELOCITY_COST_MODE_COPY: Record<VelocityCostMode, string> = {
-  daily: "Spend of the tasks that closed each day, split between tokens and compute.",
-  cumulative: "Spend of the tasks that closed, added up over the period, split between tokens and compute.",
+  daily: "Spend by the day it occurred, split between tokens and compute.",
+  cumulative: "Spend by the day it occurred, added up over the period, split between tokens and compute.",
 };
 
 /** Spend of one thing, split by what the money paid for. */
@@ -72,10 +72,11 @@ export interface VelocityPoint {
   /** People plus SuperPlane merges of the day. */
   merged: number;
   waste: number;
+  /** Ledger spend that occurred on this day. */
   costUsd: number;
   wasteCostUsd: number;
   tokens: number;
-  /** Spend of the day, which adds up to `costUsd`. */
+  /** Ledger spend that occurred on this day, split by what it paid for. */
   cost: VelocityCostSplit;
   /** Median spend of one task that closed on this day. */
   medianTaskCost: VelocityCostSplit;
@@ -88,6 +89,7 @@ export interface VelocityTotals {
   peopleMerged: number;
   superplaneMerged: number;
   waste: number;
+  /** Ledger spend that occurred in the window. */
   costUsd: number;
   wasteCostUsd: number;
   tokens: number;
@@ -105,7 +107,7 @@ export interface VelocityTotals {
   tasksWaste: number;
   /** Waste as a share of closed tasks, 0-100. */
   taskWasteRate: number;
-  /** Tracked model spend divided by the tasks that closed. */
+  /** Ledger spend in the window divided by the tasks that closed. */
   costPerTask: number;
 }
 

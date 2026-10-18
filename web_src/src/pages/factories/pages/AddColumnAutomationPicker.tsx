@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
-import { Sparkles, Workflow } from "lucide-react";
+import { Camera, Sparkles, Workflow } from "lucide-react";
 
 import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomationCatalogEntry } from "../lib/columnAutomations";
 
@@ -82,6 +82,9 @@ function CatalogGlyph({ entry }: { entry: ColumnAutomationCatalogEntry }) {
   }
   if (entry.kind === "analysis" || entry.kind === "risk-score") {
     return <Sparkles className="size-5 shrink-0 text-muted-foreground" aria-hidden />;
+  }
+  if (entry.kind === "visual-evidence") {
+    return <Camera className="size-5 shrink-0 text-muted-foreground" aria-hidden />;
   }
   return <Workflow className="size-5 shrink-0 text-muted-foreground" aria-hidden />;
 }

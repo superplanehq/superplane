@@ -1,6 +1,7 @@
 package linear
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -134,6 +135,28 @@ func Test__ListResources__Labels(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resources, 1)
 	assert.Equal(t, "bug", resources[0].Name)
+}
+
+func Test__ListResources__WorkspaceLabels(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":{"issueLabels":{"nodes":[{"id":"l1","name":"bug"}],"pageInfo":{"hasNextPage":true,"endCursor":"cursor-1"}}}}`),
+		jsonResponse(`{"data":{"issueLabels":{"nodes":[{"id":"l2","name":"feature"}],"pageInfo":{"hasNextPage":false}}}}`),
+	}}
+	resources, err := (&Linear{}).ListResources(ResourceTypeLabel, core.ListResourcesContext{
+		HTTP:        httpContext,
+		Integration: integrationWithTeam(),
+		Parameters:  map[string]string{"scope": "workspace"},
+	})
+	require.NoError(t, err)
+	require.Len(t, resources, 2)
+	assert.Equal(t, "bug", resources[0].Name)
+	assert.Equal(t, "feature", resources[1].Name)
+	require.Len(t, httpContext.Requests, 2)
+	request := struct {
+		Variables map[string]any `json:"variables"`
+	}{}
+	require.NoError(t, json.NewDecoder(httpContext.Requests[1].Body).Decode(&request))
+	assert.Equal(t, "cursor-1", request.Variables["after"])
 }
 
 func Test__ListResources__Comments(t *testing.T) {

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -640,8 +641,9 @@ func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 	}
 
 	var result struct {
-		HasFailed    bool
-		HasCancelled bool
+		HasFailed                bool
+		HasCancelled             bool
+		HasUnconsumedFailedEvent bool
 	}
 
 	err := tx.Raw(`
@@ -657,18 +659,39 @@ func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 				FROM workflow_node_executions
 				WHERE run_id = ?
 				AND result = ?
-			) AS has_cancelled
+			) AS has_cancelled,
+			EXISTS (
+				SELECT 1
+				FROM workflow_events
+				WHERE run_id = ?
+				AND channel = ?
+				AND NOT EXISTS (
+					SELECT 1
+					FROM workflow_node_executions
+					WHERE run_id = ?
+					AND (
+						event_id = workflow_events.id
+						OR (
+							jsonb_typeof(metadata->'eventIDs') = 'array'
+							AND metadata->'eventIDs' @> to_jsonb(workflow_events.id::text)
+						)
+					)
+				)
+			) AS has_unconsumed_failed_event
 	`,
 		r.ID,
 		CanvasNodeExecutionResultFailed,
 		r.ID,
 		CanvasNodeExecutionResultCancelled,
+		r.ID,
+		core.FailedOutputChannel,
+		r.ID,
 	).Scan(&result).Error
 	if err != nil {
 		return "", err
 	}
 
-	if result.HasFailed {
+	if result.HasFailed || result.HasUnconsumedFailedEvent {
 		return CanvasRunResultFailed, nil
 	}
 
@@ -895,6 +918,7 @@ type RunCancellationDrainResult struct {
 	RequestedExecutionIDs []uuid.UUID
 	DeletedQueueItems     []CanvasNodeQueueItem
 	SupersededEvents      []CanvasEvent
+	ChildRuns             []*RunCancellationResult
 }
 
 type RunCancellationResult struct {
@@ -913,6 +937,65 @@ func (r *CanvasRun) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*R
 }
 
 func (r *CanvasRun) requestTermination(tx *gorm.DB, stoppedBy *uuid.UUID, requestedResult string) (*RunCancellationResult, error) {
+	descendants, err := listDescendantRuns(tx, r.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	runs := make([]*CanvasRun, 0, 1+len(descendants))
+	runs = append(runs, r)
+	for i := range descendants {
+		runs = append(runs, &descendants[i])
+	}
+	slices.SortFunc(runs, func(a, b *CanvasRun) int {
+		return bytes.Compare(a.ID[:], b.ID[:])
+	})
+
+	var result *RunCancellationResult
+	children := make([]*RunCancellationResult, 0, len(descendants))
+	for _, run := range runs {
+		requested := ""
+		if run.ID == r.ID {
+			requested = requestedResult
+		}
+		terminated, err := run.requestRunTermination(tx, stoppedBy, requested)
+		if err != nil {
+			return nil, err
+		}
+		if run.ID == r.ID {
+			result = terminated
+			continue
+		}
+		if terminated.Drain == nil {
+			continue
+		}
+		children = append(children, terminated)
+	}
+	if len(children) == 0 {
+		return result, nil
+	}
+	if result.Drain == nil {
+		result.Drain = &RunCancellationDrainResult{}
+	}
+	result.Drain.ChildRuns = append(result.Drain.ChildRuns, children...)
+	return result, nil
+}
+
+func listDescendantRuns(tx *gorm.DB, runID uuid.UUID) ([]CanvasRun, error) {
+	var descendants []CanvasRun
+	err := tx.Raw(`
+		WITH RECURSIVE descendants AS (
+			SELECT id FROM workflow_runs WHERE parent_run_id = ?
+			UNION
+			SELECT r.id FROM workflow_runs r JOIN descendants d ON r.parent_run_id = d.id
+		)
+		SELECT r.* FROM workflow_runs r JOIN descendants d ON r.id = d.id
+		WHERE r.id <> ? ORDER BY r.id
+	`, runID, runID).Scan(&descendants).Error
+	return descendants, err
+}
+
+func (r *CanvasRun) requestRunTermination(tx *gorm.DB, stoppedBy *uuid.UUID, requestedResult string) (*RunCancellationResult, error) {
 	locked, err := LockCanvasRunInTransaction(tx, r.ID)
 	if err != nil {
 		return nil, err

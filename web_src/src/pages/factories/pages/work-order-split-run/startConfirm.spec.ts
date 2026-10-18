@@ -52,4 +52,29 @@ describe("startConfirm", () => {
     expect(needsStartConfirm({ clarity: 1 })).toBe(false);
     expect(needsStartConfirm({ clarity: 3, confidence: 3 })).toBe(false);
   });
+
+  it("skips the dialog on the review scale when every known score is above 2", () => {
+    expect(startConfirmTone({ clarity: 3, confidence: 3, scoreMax: 3 })).toBeUndefined();
+    expect(startConfirmBody({ clarity: 3, confidence: 3, scoreMax: 3 })).toBeUndefined();
+    expect(needsStartConfirm({ clarity: 3, confidence: 3, scoreMax: 3 })).toBe(false);
+  });
+
+  it("warns on the review scale when Clarity is 1", () => {
+    expect(startConfirmTone({ clarity: 1, confidence: 3, scoreMax: 3 })).toBe("low");
+    expect(startConfirmBody({ clarity: 1, confidence: 3, scoreMax: 3 })).toBe(START_CONFIRM_COPY.low);
+    expect(needsStartConfirm({ clarity: 1, confidence: 3, scoreMax: 3 })).toBe(true);
+  });
+
+  it("warns on the review scale when Confidence is 1 or either score is 2", () => {
+    expect(startConfirmTone({ clarity: 3, confidence: 1, scoreMax: 3 })).toBe("mid");
+    expect(startConfirmTone({ clarity: 2, confidence: 3, scoreMax: 3 })).toBe("mid");
+    expect(startConfirmTone({ clarity: 3, confidence: 2, scoreMax: 3 })).toBe("mid");
+    expect(startConfirmBody({ clarity: 3, confidence: 2, scoreMax: 3 })).toBe(START_CONFIRM_COPY.mid);
+    expect(needsStartConfirm({ clarity: 3, confidence: 2, scoreMax: 3 })).toBe(true);
+  });
+
+  it("still asks on the review scale when a score is missing", () => {
+    expect(startConfirmTone({ scoreMax: 3 })).toBe("missing");
+    expect(startConfirmBody({ scoreMax: 3 })).toBe(START_CONFIRM_COPY.missing);
+  });
 });

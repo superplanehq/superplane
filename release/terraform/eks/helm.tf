@@ -360,36 +360,36 @@ resource "helm_release" "cert_manager" {
 }
 
 # -----------------------------------------------------------------------------
-# NGINX Ingress Controller with NLB and Static IP
+# Traefik Ingress Controller with NLB
 # -----------------------------------------------------------------------------
 
-resource "helm_release" "nginx_ingress" {
-  name             = "ingress-nginx"
-  repository       = "https://kubernetes.github.io/ingress-nginx"
-  chart            = "ingress-nginx"
-  namespace        = "ingress-nginx"
+resource "helm_release" "traefik" {
+  name             = "traefik"
+  repository       = "https://traefik.github.io/charts"
+  chart            = "traefik"
+  version          = "41.7.0"
+  namespace        = "traefik"
   create_namespace = true
   timeout          = 1200 # 20 minutes - NLB deletion can take longer than creation
 
-  set {
-    name  = "controller.service.type"
-    value = "LoadBalancer"
-  }
-
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-type"
-    value = "external"
-  }
-
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-nlb-target-type"
-    value = "ip"
-  }
-
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-scheme"
-    value = "internet-facing"
-  }
+  values = [yamlencode({
+    ingressClass = {
+      isDefaultClass = false
+    }
+    providers = {
+      kubernetesIngress = {
+        ingressClass = "traefik"
+      }
+    }
+    service = {
+      type = "LoadBalancer"
+      annotations = {
+        "service.beta.kubernetes.io/aws-load-balancer-type"            = "external"
+        "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type" = "ip"
+        "service.beta.kubernetes.io/aws-load-balancer-scheme"          = "internet-facing"
+      }
+    }
+  })]
 
   depends_on = [
     time_sleep.wait_for_alb_controller
@@ -400,12 +400,45 @@ resource "helm_release" "nginx_ingress" {
 # SuperPlane Helm Release
 # -----------------------------------------------------------------------------
 
+locals {
+  fleet_manager_setup_values = yamlencode({
+    # The published chart still defaults both components to v0.1.0.
+    # Runner and Fleet Manager publish on separate release lines.
+    componentReleases = {
+      runnerVersion       = "v0.2.0"
+      runnerVersions      = ["v0.2.0"]
+      fleetManagerVersion = "v0.1.3"
+    }
+    fleetManagerSetup = {
+      enabled            = var.enable_runners
+      provider           = var.enable_runners ? "aws" : ""
+      managerId          = var.cluster_name
+      namespace          = var.superplane_namespace
+      serviceAccountName = "superplane-fleet-manager"
+      infrastructure = var.enable_runners ? {
+        superplaneUrl        = "https://${var.domain_name}"
+        region               = var.region
+        subnetIds            = aws_subnet.private[*].id
+        securityGroupIds     = [aws_security_group.runners[0].id]
+        imageAmd64           = var.runner_image_amd64
+        imageArm64           = var.runner_image_arm64
+        fleetManagerIdentity = aws_iam_role.fleet_manager[0].arn
+        runnerIdentity       = aws_iam_instance_profile.runner[0].name
+      } : null
+    }
+  })
+}
+
 resource "helm_release" "superplane" {
   name             = "superplane"
   repository       = "oci://ghcr.io/superplanehq"
   chart            = "superplane-chart"
+  version          = var.superplane_chart_version
   namespace        = var.superplane_namespace
   create_namespace = false
+  timeout          = 1200
+
+  values = [local.fleet_manager_setup_values]
 
   # Database configuration
   set {
@@ -454,14 +487,54 @@ resource "helm_release" "superplane" {
     value = "superplane"
   }
 
-  set {
-    name  = "image.tag"
-    value = var.superplane_image_tag
+  dynamic "set" {
+    for_each = var.superplane_image_tag == "" ? [] : [var.superplane_image_tag]
+    content {
+      name  = "image.tag"
+      value = set.value
+    }
   }
 
   set {
     name  = "image.pullPolicy"
     value = "IfNotPresent"
+  }
+
+  # Share blobs across the API, workers, and runner pods.
+  set {
+    name  = "blobStorage.provider"
+    value = "s3"
+  }
+
+  set {
+    name  = "blobStorage.bucket"
+    value = aws_s3_bucket.blobs.id
+  }
+
+  set {
+    name  = "blobStorage.region"
+    value = var.region
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = "true"
+  }
+
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.blob_storage.arn
+  }
+
+  # Integrated Runner API and workers share active logs through EFS.
+  set {
+    name  = "runner.api.enabled"
+    value = var.enable_runners ? "true" : "false"
+  }
+
+  set {
+    name  = "runner.activeLogs.existingClaim"
+    value = kubernetes_persistent_volume_claim_v1.runner_active_logs.metadata[0].name
   }
 
   # Domain configuration
@@ -470,7 +543,7 @@ resource "helm_release" "superplane" {
     value = var.domain_name
   }
 
-  # Ingress configuration for NGINX
+  # Ingress configuration for Traefik
   set {
     name  = "ingress.enabled"
     value = "true"
@@ -478,7 +551,7 @@ resource "helm_release" "superplane" {
 
   set {
     name  = "ingress.className"
-    value = "nginx"
+    value = "traefik"
   }
 
   # SSL configuration with cert-manager
@@ -608,7 +681,10 @@ resource "helm_release" "superplane" {
     kubernetes_secret.encryption,
     kubernetes_secret.oidc,
     helm_release.cert_manager,
-    helm_release.nginx_ingress,
+    helm_release.traefik,
+    aws_iam_role_policy.blob_storage,
+    aws_s3_bucket_public_access_block.blobs,
+    aws_s3_bucket_server_side_encryption_configuration.blobs,
     aws_db_instance.superplane
   ]
 }

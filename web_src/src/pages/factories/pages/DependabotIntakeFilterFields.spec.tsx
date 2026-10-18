@@ -55,6 +55,7 @@ describe("DependabotIntakeFilterFields", () => {
       />,
     );
 
+    expect(screen.getByText("Create a task for these severities:")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Critical" })).toBeChecked();
     expect(screen.queryByText(/Turn on Dependabot alerts/)).not.toBeInTheDocument();
 

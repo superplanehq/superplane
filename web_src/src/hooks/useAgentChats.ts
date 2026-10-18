@@ -140,9 +140,6 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
       return { optimisticMessageId: optimisticMessage.id, submittedAt };
     },
     onSuccess: (data, variables, context) => {
-      if (context?.optimisticMessageId) {
-        removeAgentMessageFromCache(queryClient, variables.chatId, context.optimisticMessageId);
-      }
       if (context?.submittedAt) {
         analytics.agentMessageSendAcknowledged(
           variables.chatId,
@@ -151,7 +148,22 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
           Date.now() - context.submittedAt,
         );
       }
-      if (data) upsertAgentMessageInCache(queryClient, variables.chatId, data);
+      if (!data) {
+        if (context?.optimisticMessageId) {
+          removeAgentMessageFromCache(queryClient, variables.chatId, context.optimisticMessageId);
+        }
+        return;
+      }
+
+      const replaced = context?.optimisticMessageId
+        ? replaceOptimisticAgentMessage(queryClient, variables.chatId, context.optimisticMessageId, data)
+        : false;
+      if (replaced) return;
+
+      if (context?.optimisticMessageId) {
+        removeAgentMessageFromCache(queryClient, variables.chatId, context.optimisticMessageId);
+      }
+      upsertAgentMessageInCache(queryClient, variables.chatId, data);
     },
     onError: (_error, variables, context) => {
       if (context?.optimisticMessageId) {
@@ -257,6 +269,34 @@ export function useResetCanvasAgentChat(organizationId: string | undefined, canv
 // Mutate the messages cache directly instead of invalidating. Invalidation
 // triggers a full server refetch that races with live WS upserts and makes
 // tool rows flicker mid-stream.
+function replaceOptimisticAgentMessage(
+  queryClient: QueryClient,
+  chatId: string,
+  optimisticMessageId: string,
+  message: AgentMessage,
+): boolean {
+  let replaced = false;
+  queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(chatId), (prev) => {
+    if (!prev) return prev;
+    if (prev.pages.some((page) => page.messages.some((entry) => entry.id === message.id))) {
+      return prev;
+    }
+
+    let found = false;
+    const pages = prev.pages.map((page) => {
+      const index = page.messages.findIndex((entry) => entry.id === optimisticMessageId);
+      if (index === -1) return page;
+      found = true;
+      const messages = page.messages.slice();
+      messages[index] = message;
+      return { ...page, messages };
+    });
+    replaced = found;
+    return found ? { ...prev, pages } : prev;
+  });
+  return replaced;
+}
+
 export function upsertAgentMessageInCache(queryClient: QueryClient, chatId: string, message: AgentMessage): void {
   queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(chatId), (prev) => {
     if (!prev) return prev;

@@ -146,11 +146,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         json: {
           features: [
             {
-              id: "task_planning_review",
-              label: "Task Planning Review",
-              description: "Show the new plan card, focused questions, and implementation controls",
-            },
-            {
               id: "claude_managed_agents",
               label: "Managed agents",
               description: "Canvas agent chat",
@@ -177,6 +172,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Add a custom model provider with a URL, token, and API type",
             },
             {
+              id: "workspace_agent",
+              label: "SuperPlane Agent",
+              description: "Show the SuperPlane Agent page",
+            },
+            {
               id: "workspace_mcp",
               label: "Workspace MCP",
               description: "Add MCP servers for workspace agents",
@@ -190,6 +190,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               id: "superplane_mcp_server",
               label: "MCP Server",
               description: "Allow Cursor and other MCP clients to connect to workspaces in this organization",
+              released: true,
             },
           ],
         },
@@ -342,6 +343,20 @@ const STORYBOOK_GITHUB_REPOSITORIES = [
   { id: "repo_acme_docs", name: "acme/docs", type: "repository" },
 ];
 
+function storybookBranchResources(resourceType: string): FixtureResult {
+  if (resourceType === "default_branch") {
+    return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+  }
+  return {
+    json: {
+      resources: [
+        { id: "main", name: "main", type: "branch" },
+        { id: "develop", name: "develop", type: "branch" },
+      ],
+    },
+  };
+}
+
 /** Storybook definitions aligned with real integration Configuration() fields. */
 function storybookApiKeyField(description: string): StorybookConfigField {
   return {
@@ -467,8 +482,8 @@ export async function matchFactorySetupFixture(
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
     const resourceType = url.searchParams.get("type");
-    if (resourceType === "default_branch") {
-      return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+    if (resourceType === "default_branch" || resourceType === "branch") {
+      return storybookBranchResources(resourceType);
     }
     if (resourceType === "status_check") {
       return {

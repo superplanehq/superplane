@@ -1,0 +1,100 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap");
+
+.brand-surface {
+  --background: #f3f3ea;
+  --foreground: #08090a;
+  --card: #f9f9f3;
+  --card-foreground: #08090a;
+  --muted: #e4e4da;
+  --muted-foreground: #545955;
+  --border: #cecec4;
+  --input: #cecec4;
+  --primary: #0b383a;
+  --primary-foreground: #f3f3ea;
+  --accent: #e4e4da;
+  --accent-foreground: #08090a;
+  --ring: #ed8e09;
+  --font-sans: "Instrument Sans", sans-serif;
+  --font-mono: "Roboto Mono", monospace;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  background: var(--background);
+}
+.dark .brand-surface {
+  --background: #08090a;
+  --foreground: #f3f3ea;
+  --card: #242425;
+  --card-foreground: #f3f3ea;
+  --muted: #242425;
+  --muted-foreground: #aeb6b1;
+  --border: #414744;
+  --input: #414744;
+  --primary: #ed8e09;
+  --primary-foreground: #08090a;
+  --accent: #242425;
+  --accent-foreground: #f3f3ea;
+}
+.brand-surface :is(h1, h2, h3, button, input, a) {
+  font-family: inherit;
+}
+.brand-arrow-art {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.brand-arrow-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: invert(1);
+  mix-blend-mode: multiply;
+}
+.dark .brand-arrow-art:has(+ .configure-preview-content) .brand-arrow-fallback {
+  filter: none;
+  mix-blend-mode: screen;
+}
+.brand-configure h1 {
+  font-size: clamp(26px, 2.5vw, 36px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+.brand-configure .workspace-body-text {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.brand-configure [data-slot="button"] {
+  border-radius: 6px;
+  min-height: 42px;
+}
+.brand-configure :is(button, input, a):focus-visible {
+  outline: 2px solid #ed8e09;
+  outline-offset: 4px;
+}
+.brand-configure .review-bot-manual-add input {
+  height: 42px;
+}
+.brand-configure .review-bot-manual-add :is(input, [data-slot="button"]):focus-visible {
+  outline-offset: -2px;
+}
+.brand-configure .configure-preview-content {
+  color: #08090a;
+  --foreground: #08090a;
+  --muted-foreground: #545955;
+  --card: #f9f9f3;
+  --border: #647f72;
+}
+.dark .brand-configure .configure-preview-content {
+  color: #f3f3ea;
+  --foreground: #f3f3ea;
+  --muted-foreground: #b8ccc3;
+  --card: #242425;
+  --border: #52746a;
+}
+.configure-preview-caption {
+  color: #08090a;
+}
+.dark .configure-preview-caption {
+  color: #f3f3ea;
+}

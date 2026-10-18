@@ -12,7 +12,12 @@ import (
 type listCommand struct{}
 
 func (c *listCommand) Execute(ctx core.CommandContext) error {
-	response, _, err := ctx.API.CanvasAPI.CanvasesListCanvases(ctx.Context).Execute()
+	request := ctx.API.CanvasAPI.CanvasesListCanvases(ctx.Context)
+	if !ctx.Renderer.IsText() {
+		request = request.IncludeGraph(true)
+	}
+
+	response, _, err := request.Execute()
 	if err != nil {
 		return err
 	}

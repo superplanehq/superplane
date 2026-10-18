@@ -70,7 +70,7 @@ func loadFactoryPullRequestForMerge(
 	if err != nil {
 		return nil, nil, err
 	}
-	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+	if !strings.EqualFold(pullRequest.Provider, factory.OnboardingConfigValue().EffectiveVCSProvider()) {
 		return nil, nil, errFactoryPullRequestNotGitHub
 	}
 	if pullRequest.State != models.FactoryPullRequestStateOpen {
@@ -157,8 +157,15 @@ func recoverFactoryPullRequestMergeability(
 	if !isRecoverableGitHubMergeabilityError(ctx, err) {
 		return nil, err
 	}
-	recordFactoryPullRequestMergeabilityError(ctx, factory.ID.String(), result.PullRequest.ID.String(), result.PullRequest.Repository, err)
-	result.canRetry = isRetryableGitHubMergeabilityError(err)
+	factoryID := factory.ID.String()
+	pullRequestID := result.PullRequest.ID.String()
+	repository := result.PullRequest.Repository
+	logFactoryPullRequestMergeabilityLookupFailure(factoryID, pullRequestID, repository, err)
+	retryable := isRetryableGitHubMergeabilityError(err)
+	if !retryable {
+		captureFactoryPullRequestMergeabilityException(ctx, factoryID, pullRequestID, repository, err)
+	}
+	result.canRetry = retryable
 	return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE, mergeBlockedUnavailable), nil
 }
 
@@ -249,14 +256,7 @@ func syncFactoryPullRequestMergeability(
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
 ) (*factoryPullRequestMergeability, error) {
-	result, err := evaluateFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
-	if err != nil {
-		return nil, err
-	}
-	if err := persistFactoryPullRequestMergeability(db, pullRequest, result); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return readFactoryPullRequestMergeability(ctx, db, openFactoryVCS(db, deps, factory), pullRequest)
 }
 
 func mergeabilityFromCache(

@@ -2,6 +2,7 @@ package factories
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -314,6 +315,108 @@ func TestSentryIntakeItemSource_StaysInsideItsProject(t *testing.T) {
 	assert.False(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{}}))
 	assert.False(t, source.ownsIssue(&sentry.Issue{}))
 	assert.False(t, source.ownsIssue(nil))
+}
+
+func TestSentryIntakeItemSource_StaysInsideSelectedProjects(t *testing.T) {
+	source := &sentryIntakeItemSource{projects: []string{"payments", "growth"}}
+
+	assert.True(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{Slug: "growth"}}))
+	assert.False(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{Slug: "billing"}}))
+}
+
+func TestSentryIntakeItemSource_SearchMergesProjectsWithinTheLimit(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(fmt.Sprintf(
+					`[{"id":"1","title":"payments","lastSeen":"%s"},{"id":"2","title":"payments older","lastSeen":"%s"}]`,
+					now.Format(time.RFC3339),
+					now.Add(-time.Hour).Format(time.RFC3339),
+				))),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(fmt.Sprintf(
+					`[{"id":"3","title":"growth","lastSeen":"%s"}]`,
+					now.Add(-time.Minute).Format(time.RFC3339),
+				))),
+			},
+		},
+	}
+	client, err := sentry.NewClient(httpContext, &contexts.IntegrationContext{
+		Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "token"},
+		Metadata:      sentry.Metadata{Organization: &sentry.OrganizationSummary{Slug: "example"}},
+	})
+	require.NoError(t, err)
+
+	source := &sentryIntakeItemSource{sentry: client, projects: []string{"payments", "growth"}}
+	items, err := source.Search(t.Context(), "timeout", 2)
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	assert.Equal(t, "1", items[0].ID)
+	assert.Equal(t, "3", items[1].ID)
+	require.Len(t, httpContext.Requests, 2)
+	assert.Contains(t, httpContext.Requests[0].URL.Path, "/projects/example/payments/issues/")
+	assert.Contains(t, httpContext.Requests[1].URL.Path, "/projects/example/growth/issues/")
+}
+
+func TestSentryIntakeItemSource_SearchKeepsResultsWhenOneProjectFails(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(fmt.Sprintf(
+					`[{"id":"1","title":"payments","lastSeen":"%s"}]`,
+					now.Format(time.RFC3339),
+				))),
+			},
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`{"detail":"Project not found"}`)),
+			},
+		},
+	}
+	client, err := sentry.NewClient(httpContext, &contexts.IntegrationContext{
+		Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "token"},
+		Metadata:      sentry.Metadata{Organization: &sentry.OrganizationSummary{Slug: "example"}},
+	})
+	require.NoError(t, err)
+
+	source := &sentryIntakeItemSource{sentry: client, projects: []string{"payments", "growth"}}
+	items, err := source.Search(t.Context(), "timeout", 2)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "1", items[0].ID)
+	require.Len(t, httpContext.Requests, 2)
+}
+
+func TestSentryIntakeItemSource_SearchFailsWhenEveryProjectFails(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`{"detail":"Project not found"}`)),
+			},
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`{"detail":"Project not found"}`)),
+			},
+		},
+	}
+	client, err := sentry.NewClient(httpContext, &contexts.IntegrationContext{
+		Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "token"},
+		Metadata:      sentry.Metadata{Organization: &sentry.OrganizationSummary{Slug: "example"}},
+	})
+	require.NoError(t, err)
+
+	source := &sentryIntakeItemSource{sentry: client, projects: []string{"payments", "growth"}}
+	items, err := source.Search(t.Context(), "timeout", 2)
+	require.Error(t, err)
+	assert.Empty(t, items)
+	require.Len(t, httpContext.Requests, 2)
 }
 
 func TestDatadogIntakeItemSource_StaysInsideItsService(t *testing.T) {

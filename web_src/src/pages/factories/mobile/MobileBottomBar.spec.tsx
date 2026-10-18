@@ -15,7 +15,7 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
-import { factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factorySettingsPath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { MobileBottomBar } from "./MobileBottomBar";
 
 vi.mock("@/contexts/useAccount", () => ({
@@ -52,7 +52,7 @@ function renderBar(initialPath: string) {
                 path="/org-1/workspaces/:factoryKey/*"
                 element={
                   <>
-                    <MobileBottomBar canCreateWorkOrder={false} />
+                    <MobileBottomBar />
                     <Outlet />
                   </>
                 }
@@ -103,5 +103,19 @@ describe("MobileBottomBar", () => {
       "href",
       `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
     );
+  });
+
+  it("opens More and stays active on settings pages", () => {
+    const settingsIndex = factorySettingsPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT);
+    renderBar(`${settingsIndex}/organization/members`);
+
+    const settingsTab = screen.getByRole("link", { name: "More" });
+    expect(settingsTab).toHaveAttribute(
+      "href",
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+    expect(screen.queryByTestId("factories-sidebar-user-menu-trigger")).not.toBeInTheDocument();
+    expect(settingsTab).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("mobile-tab-velocity")).not.toHaveAttribute("aria-current");
   });
 });

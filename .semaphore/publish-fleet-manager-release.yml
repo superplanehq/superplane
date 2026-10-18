@@ -1,0 +1,127 @@
+version: v1.0
+name: "Publish Fleet Manager Release"
+
+queue:
+  name: component-releases
+  scope: project
+  processing: serialized
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: FLEET_MANAGER_IMAGE_REPO
+      value: ghcr.io/superplanehq/fleet-manager
+    - name: FLEET_MANAGER_CHART_REPO
+      value: oci://ghcr.io/superplanehq/fleet-manager-chart
+    # Quay republished v1.22.3 and removed the old digest. Pin the immutable tag.
+    - name: SKOPEO_CONTAINER_IMAGE
+      value: quay.io/skopeo/stable:v1.22.3-immutable@sha256:c0ee1f4edca5c01cb8d5611124f92f3cc47196ecab68aee5d0f90834e00574d5
+  prologue:
+    commands:
+      - checkout
+      - test "$SEMAPHORE_GIT_BRANCH" = main
+      - test "$SEMAPHORE_PIPELINE_PROMOTION" = true
+      - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
+
+blocks:
+  - name: "Publish"
+    task:
+      secrets:
+        - name: ghcr-push-token
+      epilogue:
+        always:
+          commands:
+            - rm -rf -- /tmp/ghcr-auth
+      jobs:
+        - name: "Publish immutable Fleet Manager release"
+          commands:
+            - bash release/component-release-artifact.sh pull fleet-manager "$RELEASE_VERSION" "build/fleet-manager/$RELEASE_VERSION"
+            - |
+              set -euo pipefail
+              release_dir="build/fleet-manager/$RELEASE_VERSION"
+              (cd "$release_dir" && sha256sum --check release-manifest.sha256)
+              node release/component-release.js verify-manifest \
+                --component fleet-manager \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
+                --directory "$release_dir" \
+                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,fleet-manager-chart-${RELEASE_VERSION#v}.tgz,checksums.txt,fleet-manager.oci.tar \
+                --manifest "$release_dir/release-manifest.json"
+              (cd "$release_dir" && sha256sum --check checksums.txt)
+              test -n "${GITHUB_TOKEN:-}"
+            - bash release/fetch-component-release-history.sh
+            - |
+              set -euo pipefail
+              node release/component-release.js generate-release-notes \
+                --component fleet-manager \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --output /tmp/fleet-manager-release-notes.md \
+                --github-authors
+            - |
+              set -euo pipefail
+              release_dir="build/fleet-manager/$RELEASE_VERSION"
+              node release/component-release.js stage-github-release \
+                --component fleet-manager \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --directory "$release_dir" \
+                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,fleet-manager-chart-${RELEASE_VERSION#v}.tgz,checksums.txt \
+                --release-id-file /tmp/github-release-id
+            - docker pull "$SKOPEO_CONTAINER_IMAGE"
+            - mkdir -m 700 /tmp/ghcr-auth
+            - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/fleet-manager/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
+            - printf '%s' "$GHCR_PUSH_TOKEN" | HELM_REGISTRY_CONFIG=/tmp/ghcr-auth/helm.json helm registry login ghcr.io --username superplanehq --password-stdin
+            - |
+              set -euo pipefail
+              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json
+              export FLEET_MANAGER_DIGEST_OUTPUT=/tmp/fleet-manager-image-digest
+              bash release/fleet-manager/publish-image.sh \
+                "$RELEASE_VERSION" \
+                "build/fleet-manager/$RELEASE_VERSION/fleet-manager.oci.tar"
+            - |
+              set -euo pipefail
+              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json
+              image_digest="$(cat /tmp/fleet-manager-image-digest)"
+              bash release/fleet-manager/verify-image.sh \
+                "$FLEET_MANAGER_IMAGE_REPO:$RELEASE_VERSION" \
+                "$image_digest" \
+                "$RELEASE_VERSION" \
+                "$SEMAPHORE_GIT_SHA"
+            - |
+              set -euo pipefail
+              export HELM_REGISTRY_CONFIG=/tmp/ghcr-auth/helm.json
+              export FLEET_MANAGER_CHART_DIGEST_OUTPUT=/tmp/fleet-manager-chart-digest
+              bash release/fleet-manager/publish-chart.sh \
+                "$RELEASE_VERSION" \
+                "build/fleet-manager/$RELEASE_VERSION/fleet-manager-chart-${RELEASE_VERSION#v}.tgz"
+            - |
+              set -euo pipefail
+              release_notes_args=()
+              if [ -f /tmp/fleet-manager-release-notes.md ]; then
+                release_notes_args=(--release-notes /tmp/fleet-manager-release-notes.md)
+              fi
+              export FLEET_MANAGER_IMAGE_DIGEST="$(cat /tmp/fleet-manager-image-digest)"
+              export FLEET_MANAGER_CHART_DIGEST="$(cat /tmp/fleet-manager-chart-digest)"
+              node release/component-release.js publish-github-release \
+                --release-id "$(cat /tmp/github-release-id)" \
+                --component fleet-manager \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                "${release_notes_args[@]}"
+            - |
+              set -euo pipefail
+              encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "fleet-manager/$RELEASE_VERSION")"
+              bash release/verify-public-assets.sh \
+                "https://github.com/superplanehq/superplane/releases/download/$encoded_tag" \
+                "build/fleet-manager/$RELEASE_VERSION" \
+                fleet-manager-linux-amd64.tar.gz \
+                fleet-manager-linux-arm64.tar.gz \
+                fleet-manager.spdx.json \
+                "fleet-manager-chart-${RELEASE_VERSION#v}.tgz" \
+                checksums.txt

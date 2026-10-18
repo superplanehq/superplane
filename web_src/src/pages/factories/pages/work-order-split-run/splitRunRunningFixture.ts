@@ -44,8 +44,8 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
     kind: "running",
     note: {
       key: "running-step",
-      headline: "Implement is running",
-      text: "Implementation works on this step now. The log shows live progress.",
+      headline: "Implementation in progress",
+      text: "View the log for live progress.",
     },
     run: { appId: "app-refund-implementer", runId: LINE_RUN_IMPLEMENT_ID },
   }),

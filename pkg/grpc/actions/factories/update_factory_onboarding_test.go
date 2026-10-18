@@ -30,6 +30,8 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		assert.Nil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Equal(t, pb.FactoryOnboarding_ISSUES_SOURCE_UNSPECIFIED, response.Factory.Onboarding.IssuesSource)
 		assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED, response.Factory.Onboarding.AgentHarness)
+		assert.Empty(t, response.Factory.Onboarding.VcsProvider)
+		assertGitHubVCSCapabilities(t, response.Factory.GetVcsCapabilities())
 	})
 
 	t.Run("partial update persists and returns merged config", func(t *testing.T) {
@@ -65,6 +67,26 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		assert.Equal(t, "acme/api", response.Factory.Onboarding.AppRepository)
 		assert.Equal(t, "acme/backlog", response.Factory.Onboarding.BacklogRepository)
 		assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_CLAUDE_CODE, response.Factory.Onboarding.AgentHarness)
+	})
+
+	t.Run("bitbucket integration stores the provider and keeps automations off", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
+
+		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+			Id:               factory.ID.String(),
+			VcsIntegrationId: &vcsID,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, models.ProviderBitbucket, response.Factory.Onboarding.VcsProvider)
+		assertBitbucketVCSCapabilities(t, response.Factory.GetVcsCapabilities())
+
+		reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.ProviderBitbucket, reloaded.OnboardingConfigValue().VCSProvider)
+		assert.Equal(t, models.ProviderBitbucket, reloaded.OnboardingConfigValue().EffectiveVCSProvider())
+		assert.Equal(t, models.ProviderGitHub, models.FactoryOnboardingConfig{}.EffectiveVCSProvider())
 	})
 
 	t.Run("complete succeeds when ready and is idempotent", func(t *testing.T) {
@@ -298,6 +320,32 @@ func createOnboardingResources(
 	})
 	require.NoError(t, err)
 	return app.ID.String(), line.ID.String()
+}
+
+func assertGitHubVCSCapabilities(t *testing.T, capabilities *pb.FactoryVCSCapabilities) {
+	t.Helper()
+	require.NotNil(t, capabilities)
+	assert.True(t, capabilities.PrClosure)
+	assert.True(t, capabilities.PrFeedback)
+	assert.True(t, capabilities.PrChecks)
+	assert.True(t, capabilities.MergeConfidence)
+	assert.True(t, capabilities.Velocity)
+	assert.True(t, capabilities.BoardMerge)
+	assert.True(t, capabilities.BoardClose)
+	assert.True(t, capabilities.VcsIssueIntake)
+}
+
+func assertBitbucketVCSCapabilities(t *testing.T, capabilities *pb.FactoryVCSCapabilities) {
+	t.Helper()
+	require.NotNil(t, capabilities)
+	assert.True(t, capabilities.PrClosure)
+	assert.True(t, capabilities.PrFeedback)
+	assert.True(t, capabilities.PrChecks)
+	assert.True(t, capabilities.MergeConfidence)
+	assert.True(t, capabilities.Velocity)
+	assert.True(t, capabilities.BoardMerge)
+	assert.True(t, capabilities.BoardClose)
+	assert.False(t, capabilities.VcsIssueIntake)
 }
 
 func createReadyOnboardingIntegration(t *testing.T, organizationID uuid.UUID, appName string) string {

@@ -80,6 +80,7 @@ import {
   CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS,
   LIVE_CANVAS_FIT_VIEW_OPTIONS,
   RUN_CANVAS_FIT_VIEW_OPTIONS,
+  nativeZoomViewport,
   resolveInitialCanvasFitViewOptions,
   resolveInitialFitViewDuration,
 } from "@/ui/CanvasPage/canvasFitOptions";
@@ -151,6 +152,8 @@ interface FocusRequest {
   requestId: number;
   targetMode: "live" | "runs";
   tab?: "latest" | "settings";
+  /** When false, select the node and leave the viewport unchanged. */
+  fit?: boolean;
 }
 
 export interface NodeEditData {
@@ -273,6 +276,8 @@ export interface CanvasPageProps {
   /** When true, enables inline rename and app settings in the project switcher. */
   showCanvasSettingsMenu?: boolean;
   showBottomStatusControls?: boolean;
+  /** Fit-view and command search on the zoom bar. Hidden on read-only previews. */
+  showCanvasFindControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
   /** Hide the Agent / Versions left panel toggle (templates only). */
@@ -1620,6 +1625,7 @@ function CanvasPage(props: CanvasPageProps) {
                 workflowNodes={props.workflowNodes}
                 setCurrentTab={setCurrentTab}
                 showBottomStatusControls={props.showBottomStatusControls}
+                showCanvasFindControls={props.showCanvasFindControls}
                 isRunInspectionMode={props.isRunInspectionMode}
                 runNodeDetailRun={props.runNodeDetailRun}
                 isEditing={props.isEditing}
@@ -2252,6 +2258,7 @@ function CanvasContent({
   workflowNodes,
   setCurrentTab,
   showBottomStatusControls = true,
+  showCanvasFindControls = true,
   isRunInspectionMode = false,
   runNodeDetailRun = null,
   isEditing = false,
@@ -2317,6 +2324,7 @@ function CanvasContent({
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
+  showCanvasFindControls?: boolean;
   isRunInspectionMode?: boolean;
   runNodeDetailRun?: CanvasesCanvasRun | null;
   isEditing?: boolean;
@@ -2345,6 +2353,7 @@ function CanvasContent({
   canCreateIntegrations?: boolean;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
+  const nativeZoomPaneRef = useRef<HTMLDivElement>(null);
   const factoryAutoLayout = isFactoryAutoLayout(layoutMode);
   const { zoom } = useViewport();
   const { resolvedTheme } = useTheme();
@@ -2664,7 +2673,9 @@ function CanvasContent({
     // Auto-focus toggle: when disabled, still record the focus request as handled
     // (so re-enabling later does not replay a stale request) and let the sidebar/
     // selection update above stand, but keep the viewport where the user left it.
-    if (!isAutoFocusEnabled) {
+    // fit: false does the same. A later fit would pan the graph after the
+    // settings panel has already changed the canvas size.
+    if (!isAutoFocusEnabled || focusRequest.fit === false) {
       return;
     }
     void fitView({ nodes: [targetNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS }).then(
@@ -2687,6 +2698,44 @@ function CanvasContent({
     runCanvasNodeIdsKey,
     viewportRef,
   ]);
+
+  // The settings panel changes the canvas size before the next paint. Recenter
+  // here, while ResizeObserver still runs before paint, so the graph does not
+  // jump and then slide back.
+  useEffect(() => {
+    if (!lockNativeZoom || !hasReactFlowInitialized) return;
+    const pane = nativeZoomPaneRef.current?.querySelector(".react-flow");
+    if (!(pane instanceof HTMLElement)) return;
+
+    const center = () => {
+      const width = pane.clientWidth;
+      const height = pane.clientHeight;
+      if (width < 2 || height < 2) return;
+      const next = nativeZoomViewport(getNodes(), width, height);
+      if (!next) return;
+      const current = getViewport();
+      if (
+        Math.abs(current.x - next.x) < 0.5 &&
+        Math.abs(current.y - next.y) < 0.5 &&
+        Math.abs(current.zoom - next.zoom) < 0.001
+      ) {
+        return;
+      }
+      const viewportEl = pane.querySelector(".react-flow__viewport");
+      if (viewportEl instanceof HTMLElement) {
+        viewportEl.style.transform = `translate(${next.x}px, ${next.y}px) scale(${next.zoom})`;
+      }
+      viewportRef.current = next;
+      reportZoom(next.zoom);
+      void setViewport(next, { duration: 0 });
+    };
+
+    const observer = new ResizeObserver(() => {
+      center();
+    });
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, [getNodes, getViewport, hasReactFlowInitialized, lockNativeZoom, reportZoom, setViewport, viewportRef]);
 
   useEffect(() => {
     if (!isRunInspectionMode) {
@@ -2882,14 +2931,14 @@ function CanvasContent({
       return;
     }
     const timeoutId = window.setTimeout(() => {
-      void fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 0 }).then(() => {
+      void fitView({ ...resolveInitialCanvasFitViewOptions(lockNativeZoom), duration: 0 }).then(() => {
         const nextViewport = getViewport();
         viewportRef.current = nextViewport;
         reportZoom(nextViewport.zoom);
       });
     }, 50);
     return () => window.clearTimeout(timeoutId);
-  }, [factoryDisplayLayout, fitView, getViewport, hasReactFlowInitialized, reportZoom, viewportRef]);
+  }, [factoryDisplayLayout, fitView, getViewport, hasReactFlowInitialized, lockNativeZoom, reportZoom, viewportRef]);
 
   const { ready: factoryConfigureEnterReady } = useFactoryConfigureFitView({
     factoryConfigure,
@@ -2920,7 +2969,9 @@ function CanvasContent({
     // Consume the nonce so re-enabling auto-focus later does not retroactively
     // replay this run's participant fit. The viewport stays where the user is.
     lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
-    if (!isAutoFocusEnabled) return;
+    // Native zoom recenters from the canvas size. An animated fit here slides
+    // the graph after the settings panel opens or closes.
+    if (!isAutoFocusEnabled || lockNativeZoom) return;
     let timeoutId: number | null = null;
     const runFit = (attempt: number) => {
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
@@ -2965,6 +3016,7 @@ function CanvasContent({
     hasReactFlowInitialized,
     isAutoFocusEnabled,
     isRunInspectionMode,
+    lockNativeZoom,
     reportZoom,
     viewportRef,
   ]);
@@ -3383,7 +3435,7 @@ function CanvasContent({
   return (
     <div className="h-full w-full relative">
       <div className="h-full">
-        <div className="h-full w-full">
+        <div ref={nativeZoomPaneRef} className="h-full w-full">
           <ReactFlow
             colorMode={flowColorMode}
             nodes={culledNodes}
@@ -3452,6 +3504,7 @@ function CanvasContent({
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
+                  showFitView={showCanvasFindControls}
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
                   isAutoLayoutOnUpdateEnabled={
@@ -3465,7 +3518,7 @@ function CanvasContent({
                   isAutoFocusEnabled={isAutoFocusEnabled}
                   onAutoFocusToggle={onToggleAutoFocus}
                 >
-                  {zoomSliderContent}
+                  {showCanvasFindControls ? zoomSliderContent : null}
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
                   <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex h-7 items-center gap-1 rounded-md p-0.5 dark:bg-gray-800 dark:text-gray-100 dark:outline-gray-600/70 [&_[data-slot=button]]:dark:hover:bg-gray-700">
@@ -3478,6 +3531,7 @@ function CanvasContent({
                             "h-7 items-center text-xs font-medium",
                             unacknowledgedErrorCount > 0 && "text-red-500",
                           )}
+                          aria-label="Errors"
                           onClick={() => handleLogButtonClick("errors")}
                         >
                           <CircleX
@@ -3506,6 +3560,7 @@ function CanvasContent({
                           variant="ghost"
                           size="sm"
                           className="h-7 items-center text-xs font-medium"
+                          aria-label="Warnings"
                           onClick={() => handleLogButtonClick("warnings")}
                         >
                           <CircleAlert

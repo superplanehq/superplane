@@ -103,11 +103,13 @@ Run these three steps once, in order:
    setup and creates its local development token. Use `make dev.server.fg` for
    foreground logs.
 
-Factory workspace onboarding needs a public SuperPlane GitHub App on a
-stable tunnel. Without `SUPERPLANE_GITHUB_APP_*` in `.env`, local factory
-onboarding is blocked. Factory Sentry intake uses a public SuperPlane
-Sentry app. Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks
-for a personal token. See
+Factory workspace onboarding needs a GitHub App on a
+stable tunnel. Cloud holds `SUPERPLANE_GITHUB_APP_*`. Self-host and local
+development can create a public GitHub App from workspace Connect. Other
+GitHub accounts can install that app. It is not listed in GitHub
+Marketplace. Factory Sentry intake uses a public SuperPlane Sentry app.
+Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks for a personal
+token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
 `make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
@@ -115,7 +117,7 @@ runner API and Docker Fleet Manager. Set `TASK_BROKER_*` in `.env` only while
 testing legacy or remote broker routing (see `.env.example`).
 
 The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
-`jq`, ffmpeg, ffprobe, whisper-cli, and the Whisper tiny model. Factory
+`jq`, ffmpeg, ffprobe, whisper-cli, yt-dlp, and the Whisper tiny model. Factory
 line apps run on that worker. Do not install those CLIs on the host.
 Connect GitHub and Claude integrations in the organization before you
 dispatch a factory line. Factory nodes use those integrations, not `.env`
@@ -123,7 +125,7 @@ dispatch a factory line. Factory nodes use those integrations, not `.env`
 dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
 SuperPlane does not download OpenCode in the prompt prepare step.
 Video and audio task files need ffmpeg, ffprobe, whisper-cli, and the baked
-Whisper model. Missing media tools fail the setup step. Do not download
+Whisper model. Hosted video links also need the pinned yt-dlp. Missing media tools fail the setup step. Do not download
 models during a task.
 
 Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
@@ -201,6 +203,14 @@ Further reading:
   handling useful. Load
   [.agents/skills/test-audit/SKILL.md](.agents/skills/test-audit/SKILL.md)
   when you write, change, review, or sweep tests.
+- Before adding a test, identify the observable behavior and a credible
+  regression that existing coverage does not catch.
+- Do not pin cosmetic CSS classes, wrapper structure, or copied display
+  constants without an explicit product contract. Preserve checks for
+  visibility, accessibility, theme behavior, and other functional requirements.
+- Prefer tests that execute the real behavior over duplicate private-helper
+  or generated-source assertions. Before removing overlapping coverage,
+  confirm that the retained test exercises the same regression and runs in CI.
 - Tests end with `_test.go`.
 - Always prefer early returns over else blocks when possible.
 - Go: prefer `any` over `interface{}`.
@@ -246,9 +256,9 @@ contractions, slang, or idioms).
   imperative, capitalized summary with no trailing period
   (e.g. `feat: Add empty-state copy for integrations`).
 - PR descriptions must explain **why** the change exists (problem, motivation,
-  user/system impact), not narrate the diff. Use a short STE Summary plus a
-  concrete STE Test plan checklist. Avoid empty or placeholder bodies when
-  context matters.
+  user/system impact), not narrate the diff. Use a short STE Summary only.
+  Do not add a Test plan or other checklist of checks that the author already ran.
+  Avoid empty or placeholder bodies when context matters.
 - Commit subjects use the same imperative style; put motivation and trade-offs
   in the body. Separate subject and body with a blank line; wrap the body at
   72 characters.

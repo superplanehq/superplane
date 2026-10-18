@@ -28,6 +28,20 @@ func TestFileAccessURLRoundTrip(t *testing.T) {
 	require.Error(t, VerifyFileAccess(fileID, time.Now().Add(-time.Minute).Unix(), sig, key))
 }
 
+func TestSigningKeyRequiresDedicatedKey(t *testing.T) {
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "")
+	t.Setenv("ENCRYPTION_KEY", "encryption-key")
+	t.Setenv("JWT_SECRET", "jwt-secret")
+
+	_, err := SigningKey()
+	require.ErrorContains(t, err, "BLOB_STORAGE_SIGNING_KEY")
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "file-signing-key")
+	key, err := SigningKey()
+	require.NoError(t, err)
+	assert.Equal(t, []byte("file-signing-key"), key)
+}
+
 func TestFileAccessURLStaysStableInsideExpiryBucket(t *testing.T) {
 	fileID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
 	key := []byte("signing-secret")
@@ -78,6 +92,11 @@ func TestFileIDFromSignedURLReadsHMACAndGCSPaths(t *testing.T) {
 
 	pathStyle := "https://s3.us-west-2.amazonaws.com/superplane-files/install/" + fileID.String() + "?sp_file=1"
 	id, ok = FileIDFromSignedURL(pathStyle)
+	require.True(t, ok)
+	assert.Equal(t, fileID, id)
+
+	azureURL := "https://superplanefiles.blob.core.windows.net/superplane/install/orgs/org/workspaces/ws/tasks/" + workOrderID.String() + "/" + fileID.String() + "?sv=2024-11-04&sp_file=1"
+	id, ok = FileIDFromSignedURL(azureURL)
 	require.True(t, ok)
 	assert.Equal(t, fileID, id)
 }

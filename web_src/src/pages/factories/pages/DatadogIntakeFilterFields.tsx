@@ -12,6 +12,44 @@ import { addIntakeEnvironment, removeIntakeEnvironment, type IntakeSourceSetting
 import { DATADOG_INTAKE_SETUP_COPY } from "./datadogIntakeSetupCopy";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
+function useDatadogIntakeFilterQueries({
+  sourceId,
+  settings,
+  organizationId,
+  integrationId,
+  resourceId,
+}: {
+  sourceId: LineIntakeSourceId;
+  settings: IntakeSourceSettings;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
+}) {
+  const servicesQuery = useIntegrationResources(organizationId ?? "", integrationId ?? "", "service", undefined, {
+    enabled: sourceId === "datadog" && Boolean(organizationId && integrationId),
+  });
+  const serviceName = settings.datadogService || resourceId || "";
+  const environmentsQuery = useIntegrationResources(
+    organizationId ?? "",
+    integrationId ?? "",
+    "environment",
+    serviceName ? { service: serviceName } : undefined,
+    { enabled: sourceId === "datadog" && Boolean(organizationId && integrationId && serviceName) },
+  );
+
+  return {
+    serviceName,
+    services: servicesQuery.data ?? [],
+    environmentResources: environmentsQuery.data ?? [],
+    servicesLoading: servicesQuery.isLoading,
+    servicesError: servicesQuery.isError,
+    refetchServices: servicesQuery.refetch,
+    environmentsLoading: environmentsQuery.isLoading,
+    environmentsError: environmentsQuery.isError,
+    refetchEnvironments: environmentsQuery.refetch,
+  };
+}
+
 export function DatadogIntakeFilterFields({
   sourceId,
   settings,
@@ -28,17 +66,17 @@ export function DatadogIntakeFilterFields({
   resourceId?: string;
 }) {
   const idPrefix = useId();
-  const servicesQuery = useIntegrationResources(organizationId ?? "", integrationId ?? "", "service", undefined, {
-    enabled: sourceId === "datadog" && Boolean(organizationId && integrationId),
-  });
-  const serviceName = settings.datadogService || resourceId || "";
-  const environmentsQuery = useIntegrationResources(
-    organizationId ?? "",
-    integrationId ?? "",
-    "environment",
-    serviceName ? { service: serviceName } : undefined,
-    { enabled: sourceId === "datadog" && Boolean(organizationId && integrationId && serviceName) },
-  );
+  const {
+    serviceName,
+    services,
+    environmentResources,
+    servicesLoading,
+    servicesError,
+    refetchServices,
+    environmentsLoading,
+    environmentsError,
+    refetchEnvironments,
+  } = useDatadogIntakeFilterQueries({ sourceId, settings, organizationId, integrationId, resourceId });
   if (sourceId !== "datadog") {
     return null;
   }
@@ -53,12 +91,12 @@ export function DatadogIntakeFilterFields({
         <legend className="workspace-section-title">{DATADOG_INTAKE_SETTINGS_COPY.serviceLabel}</legend>
         <div className="mt-2">
           <DatadogServicePicker
-            services={servicesQuery.data ?? []}
+            services={services}
             serviceName={serviceName}
-            loading={servicesQuery.isLoading}
-            error={servicesQuery.isError}
+            loading={servicesLoading}
+            error={servicesError}
             onChange={(name) => update("datadogService", name)}
-            onRetry={() => void servicesQuery.refetch()}
+            onRetry={() => void refetchServices()}
             showNameField={false}
           />
         </div>
@@ -85,14 +123,14 @@ export function DatadogIntakeFilterFields({
         <p className="mt-1 text-[12px] text-muted-foreground">{DATADOG_INTAKE_SETTINGS_COPY.environmentsHelper}</p>
         <div className="mt-2">
           <EnvironmentPicker
-            environments={environmentOptions(environmentsQuery.data ?? [], settings.datadogEnvironments)}
+            environments={environmentOptions(environmentResources, settings.datadogEnvironments)}
             selected={settings.datadogEnvironments}
-            loading={environmentsQuery.isLoading}
-            error={environmentsQuery.isError}
+            loading={environmentsLoading}
+            error={environmentsError}
             onToggle={(name) =>
               update("datadogEnvironments", toggleIntakeEnvironment(settings.datadogEnvironments, name))
             }
-            onRetry={() => void environmentsQuery.refetch()}
+            onRetry={() => void refetchEnvironments()}
           />
         </div>
       </fieldset>

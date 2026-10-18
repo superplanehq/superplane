@@ -58,7 +58,18 @@ function VelocityDayAxis({ ticks }: { ticks: string[] }) {
   );
 }
 
-/** Row of the delivery chart: one day, one value per visible band. */
+function deliverySeries(
+  breakdown: VelocityBreakdown,
+  intakeSeries: VelocityIntakeSeries[],
+  includePeople: boolean,
+): VelocityBreakdownSeries[] {
+  const series = velocityBreakdownSeries(breakdown, intakeSeries);
+  if (includePeople || breakdown !== "origin") {
+    return series;
+  }
+  return series.filter((item) => item.key !== "people");
+}
+
 type DeliveryRow = Record<string, string | number>;
 
 function deliveryValue(point: VelocityPoint, key: string, breakdown: VelocityBreakdown): number {
@@ -73,12 +84,15 @@ export function DeliveryChart({
   points,
   breakdown,
   intakeSeries,
+  includePeople = true,
 }: {
   points: VelocityPoint[];
   breakdown: VelocityBreakdown;
   intakeSeries: VelocityIntakeSeries[];
+  /** False hides the people series so a missing cohort does not draw a zero bar. */
+  includePeople?: boolean;
 }) {
-  const series = velocityBreakdownSeries(breakdown, intakeSeries);
+  const series = deliverySeries(breakdown, intakeSeries, includePeople);
   const rows = deliveryRows(points, series, breakdown);
   const config = deliveryChartConfig(series, legendShares(rows, series));
 

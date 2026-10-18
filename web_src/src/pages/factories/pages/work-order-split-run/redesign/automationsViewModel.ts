@@ -58,7 +58,11 @@ export interface AgentStep {
   id: string;
   title: string;
   type: "prompt" | "bash" | "node";
-  status: SplitRunPhaseStatus;
+  /**
+   * `stopped` is an unfinished command on a finished failed run. It is not
+   * still running, and it is not Failed: the failure can belong to a later step.
+   */
+  status: SplitRunPhaseStatus | "stopped";
   promptStatus?: SplitRunPhaseStatus;
   duration?: string;
   summary: string;
@@ -333,7 +337,8 @@ function plumbingNodeFromGroup({ line }: StreamNodeGroup): PlumbingNode {
  * its transcript steps in its place. Any other node is one `node` step.
  */
 function runSteps(nodes: StreamNodeGroup[], runStatus?: SplitRunPhaseStatus): AgentStep[] {
-  return applyPromptStepRunStatus(flattenRunSteps(nodes), runStatus);
+  const steps = applyPromptStepRunStatus(flattenRunSteps(nodes), runStatus);
+  return runStatus === "cancelled" ? settleStoppedSteps(steps, runStatus) : steps;
 }
 
 function flattenRunSteps(nodes: StreamNodeGroup[]): AgentStep[] {
@@ -364,7 +369,8 @@ export function agentStepsFromNotes(
   canvasLines?: SplitRunStreamLine[],
 ): AgentStep[] {
   const steps = groupClaudeSteps(notes.filter((line) => line.note)).map(agentStepFromGroup);
-  return applyPromptStepRunStatus(steps, runStatus, stoppingIndexForTranscript(notes, steps, canvasLines));
+  const shown = applyPromptStepRunStatus(steps, runStatus, stoppingIndexForTranscript(notes, steps, canvasLines));
+  return runStatus === "cancelled" ? settleStoppedSteps(shown, runStatus) : shown;
 }
 
 function applyPromptStepRunStatus(
@@ -430,12 +436,20 @@ function stoppingStepIndex(steps: AgentStep[]): number {
   return -1;
 }
 
-/** A canceled or failed stage no longer has a step in progress. */
+/** A cancelled stage overrides failed child steps. A failed stage stops an open command without marking it Failed. */
 export function settleStoppedSteps(steps: AgentStep[], status?: SplitRunPhaseStatus): AgentStep[] {
   if (status !== "cancelled" && status !== "failed") {
     return steps;
   }
-  return steps.map((step) => (step.status === "running" ? { ...step, status } : step));
+  return steps.map((step) => {
+    if (step.status !== "running" && !(status === "cancelled" && step.status === "failed")) {
+      return step;
+    }
+    if (status === "failed" && step.type === "bash") {
+      return { ...step, status: "stopped" };
+    }
+    return { ...step, status };
+  });
 }
 
 function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {

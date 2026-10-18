@@ -8,7 +8,7 @@ import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   applyWorkOrderFilters,
   applyWorkOrderOrdering,
@@ -17,6 +17,7 @@ import {
   buildWorkOrderListEntries,
   countWorkOrderFilters,
   visibleWorkOrderFilters,
+  type WorkOrderScope,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
@@ -30,7 +31,16 @@ import {
 import { WorkOrdersHeader } from "./header/WorkOrdersHeader";
 import { WorkOrdersListView } from "./WorkOrdersListView";
 import { WorkOrdersTableView } from "./WorkOrdersTableView";
-import { WorkOrderClosedStatusDialog } from "./WorkOrderClosedStatusDialog";
+
+function scopedEmptyLabel(scope: WorkOrderScope): string {
+  if (scope === "my") {
+    return "your work";
+  }
+  if (scope === "unassigned") {
+    return "unassigned work";
+  }
+  return "active work";
+}
 
 interface WorkOrdersLoadedViewProps {
   organizationId: string;
@@ -63,7 +73,6 @@ interface WorkOrdersLoadedViewProps {
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const { organizationId, workOrders, factory, state, currentUserId, pullRequests = [] } = props;
-  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
   const {
     addressingFeedbackOrderIds,
     addressingFeedbackLabels,
@@ -105,7 +114,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
       if (state.scope !== "all" && visibleFilterCount === 0 && state.search.trim().length === 0) {
         return (
           <WorkOrdersScopedEmptyState
-            scopeLabel={state.scope === "my" ? "your work" : "active work"}
+            scopeLabel={scopedEmptyLabel(state.scope)}
             onResetScope={() => state.setScope("all")}
           />
         );
@@ -161,25 +170,10 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           hostedCreditHeaderKicker={props.hostedCreditHeaderKicker}
           brokenIntegrationsBanner={props.brokenIntegrationsBanner}
           showPullRequestMerge={showPullRequestMerge}
-          onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
         />
       </div>
 
       <div className={cn(factoryWorkOrdersBodyClassName, "flex flex-col gap-4")}>{body()}</div>
-      {closedStatusDialogOpen && factory.id ? (
-        <WorkOrderClosedStatusDialog
-          open
-          organizationId={organizationId}
-          factoryId={factory.id}
-          factoryKey={props.factoryKey}
-          canManage={props.canDispatch}
-          onOpenChange={(open) => {
-            if (!open) {
-              setClosedStatusDialogOpen(false);
-            }
-          }}
-        />
-      ) : null}
     </div>
   );
 }

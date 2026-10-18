@@ -3,11 +3,9 @@ import { describe, expect, it } from "bun:test";
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
 
 import {
-  applyColumnAutomationsOverlay,
   buildColumnAutomations,
   catalogForColumn,
   columnAutomationOpenPath,
-  columnAutomationViewTabs,
   columnAutomationsEmptyCopy,
   columnAutomationsNeedRepair,
   columnTitleForKey,
@@ -249,6 +247,8 @@ describe("buildColumnAutomations", () => {
         { id: "app-risk-2", name: "Risk score (2)", columnKey: "verify" },
         { id: "app-merge", name: "Merge confidence", columnKey: "verify" },
         { id: "app-merge-2", name: "Merge confidence (2)", columnKey: "verify" },
+        { id: "app-evidence", name: "Visual Evidence", columnKey: "verify" },
+        { id: "app-evidence-2", name: "Visual Evidence (2)", columnKey: "verify" },
         { id: "app-create-env", name: "Create env", columnKey: "verify" },
         { id: "app-risk-payments", name: "Risk score payments", columnKey: "verify" },
         { id: "app-merge-payments", name: "Merge confidence payments", columnKey: "verify" },
@@ -261,6 +261,8 @@ describe("buildColumnAutomations", () => {
       "risk-score",
       "risk-score",
       "risk-score",
+      "visual-evidence",
+      "visual-evidence",
       "custom",
       "custom",
       "custom",
@@ -276,9 +278,18 @@ describe("buildColumnAutomations", () => {
     expect(automations[1]).toMatchObject({ canvasId: "app-risk-2" });
     expect(automations[2]).toMatchObject({ canvasId: "app-merge", name: "Merge confidence" });
     expect(automations[3]).toMatchObject({ canvasId: "app-merge-2" });
-    expect(automations[4]).toMatchObject({ kind: "custom", canvasId: "app-create-env" });
-    expect(automations[5]).toMatchObject({ kind: "custom", canvasId: "app-risk-payments" });
-    expect(automations[6]).toMatchObject({ kind: "custom", canvasId: "app-merge-payments" });
+    expect(automations[4]).toMatchObject({
+      kind: "visual-evidence",
+      catalogId: "visual-evidence",
+      name: "Visual Evidence",
+      trigger: "On pull request opened or updated",
+      action: "Capture screenshots or a short video",
+      canvasId: "app-evidence",
+    });
+    expect(automations[5]).toMatchObject({ canvasId: "app-evidence-2" });
+    expect(automations[6]).toMatchObject({ kind: "custom", canvasId: "app-create-env" });
+    expect(automations[7]).toMatchObject({ kind: "custom", canvasId: "app-risk-payments" });
+    expect(automations[8]).toMatchObject({ kind: "custom", canvasId: "app-merge-payments" });
   });
 
   it("appends custom canvases attached to Verify or Done", () => {
@@ -335,23 +346,21 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
-  it("offers discussion and status-check setup in the verify catalog", () => {
-    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
-  });
-
-  it("offers risk score in the verify catalog when the feature is on", () => {
-    expect(catalogForColumn("verify", { allowRiskScore: true }).map((entry) => entry.id)).toEqual([
+  it("offers discussion, status-check, merge confidence, and visual evidence in the verify catalog", () => {
+    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual([
       "discussion",
       "checks",
       "risk-score",
+      "visual-evidence",
     ]);
   });
 
   it("offers a custom canvas in the verify catalog when the feature is on", () => {
-    expect(catalogForColumn("verify", { allowCustom: true, allowRiskScore: true }).map((entry) => entry.id)).toEqual([
+    expect(catalogForColumn("verify", { allowCustom: true }).map((entry) => entry.id)).toEqual([
       "discussion",
       "checks",
       "risk-score",
+      "visual-evidence",
       "custom",
     ]);
   });
@@ -385,12 +394,12 @@ describe("catalogForColumn", () => {
 
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true, allowRiskScore: true });
-    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score"])).toBe(true);
+    const catalog = catalogForColumn("verify", { allowCustom: true });
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score", "visual-evidence"])).toBe(true);
   });
 
   it("is false when risk score is still available", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true, allowRiskScore: true });
+    const catalog = catalogForColumn("verify", { allowCustom: true });
     expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(false);
   });
 
@@ -499,41 +508,16 @@ describe("columnAutomationOpenPath", () => {
   });
 });
 
-describe("columnAutomationViewTabs", () => {
-  it("shows only Automation when the canvas has no form and no agent", () => {
-    expect(columnAutomationViewTabs({ hasGeneral: false, hasAgent: false })).toEqual(["automation"]);
+it("keeps a renamed scheduled intake visible and opens its saved automation", () => {
+  const rows = buildColumnAutomations("backlog", {
+    columnTitle: "Backlog",
+    planningEnabled: false,
+    apps: [{ id: "scheduled-app", name: "Review documentation", columnKey: "backlog" }],
   });
-
-  it("shows Agent then Automation when the canvas has an agent", () => {
-    expect(columnAutomationViewTabs({ hasGeneral: false, hasAgent: true })).toEqual(["agent", "automation"]);
-  });
-
-  it("shows General, Agent, then Automation when a form and an agent exist", () => {
-    expect(columnAutomationViewTabs({ hasGeneral: true, hasAgent: true })).toEqual(["general", "agent", "automation"]);
-  });
-
-  it("shows General then Automation when a form exists without an agent", () => {
-    expect(columnAutomationViewTabs({ hasGeneral: true, hasAgent: false })).toEqual(["general", "automation"]);
-  });
-});
-
-describe("applyColumnAutomationsOverlay", () => {
-  it("adds extra rows and applies disable and remove", () => {
-    const base = buildColumnAutomations("done", {
-      columnTitle: "Done",
-      apps: [{ id: "app-pr-closure", name: "PR Closure" }],
-    });
-    const extra = [
-      {
-        ...base[0]!,
-        id: "extra-1",
-        name: "Extra",
-      },
-    ];
-
-    const next = applyColumnAutomationsOverlay(base, extra, [`closure-app-pr-closure`], ["extra-1"]);
-
-    expect(next).toHaveLength(1);
-    expect(next[0]?.health).toBe("disabled");
-  });
+  expect(rows).toHaveLength(1);
+  expect(rows[0].name).toBe("Review documentation");
+  expect(rows[0].trigger).toBe("On schedule");
+  expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
+    factoryColumnAutomationViewPath("org", "workspace", undefined, "scheduled-app"),
+  );
 });

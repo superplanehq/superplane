@@ -64,6 +64,14 @@ func CreateFactoryPullRequest(
 			factory.ID,
 			pullRequest.ID,
 		)
+		StartPullRequestChecks(ctx, deps, pullRequest.ID)
+		StartVisualEvidenceCapture(
+			ctx,
+			deps,
+			factory.OrganizationID,
+			factory.ID,
+			pullRequest.ID,
+		)
 	}
 
 	serialized, err := serializeFactoryPullRequests(ctx, db, []models.FactoryPullRequest{*pullRequest}, nil)

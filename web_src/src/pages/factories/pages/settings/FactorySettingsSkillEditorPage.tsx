@@ -1,3 +1,5 @@
+import { SystemSkillBadge } from "./SystemSkillBadge";
+import { RestoreSystemSkillDialog } from "./RestoreSystemSkillDialog";
 import { Editor } from "@monaco-editor/react";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -9,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/useTheme";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
-import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
+import { SkillDeleteDialog } from "./SkillDeleteDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useSkillEditorPage } from "./useSkillEditorPage";
@@ -20,7 +22,7 @@ export function FactorySettingsSkillEditorPage() {
   usePageTitle([
     editor.isCreate ? AGENT_RESOURCES_COPY.addSkill : editor.name || AGENT_RESOURCES_COPY.editSkill,
     AGENT_RESOURCES_COPY.agentTitle,
-    editor.factory.name ?? "Workspace",
+    editor.factory?.name ?? "Workspace",
   ]);
 
   if (!editor.isCreate && !editor.skillsLoading && !editor.resource) {
@@ -31,8 +33,6 @@ export function FactorySettingsSkillEditorPage() {
     );
   }
 
-  const displayName = editor.name.trim() || AGENT_RESOURCES_COPY.unnamedSkill;
-
   return (
     <FactorySettingsPageFrame
       title={editor.isCreate ? AGENT_RESOURCES_COPY.addSkill : AGENT_RESOURCES_COPY.editSkill}
@@ -40,7 +40,14 @@ export function FactorySettingsSkillEditorPage() {
       wide
       actions={<SkillEditorActions editor={editor} />}
     >
+      {editor.resource?.systemSkill ? (
+        <div className="mb-4 flex items-center gap-2">
+          <SystemSkillBadge state={editor.resource.systemSkill.state} />
+          <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.systemSkillProtected}</p>
+        </div>
+      ) : null}
       <SkillEditorFields
+        systemSkill={Boolean(editor.resource?.systemSkill)}
         name={editor.name}
         markdown={editor.markdown}
         command={editor.command}
@@ -51,16 +58,21 @@ export function FactorySettingsSkillEditorPage() {
         onNameChange={editor.setName}
         onMarkdownChange={editor.setMarkdown}
       />
-      <FactoryDeleteDialog
-        open={editor.pendingDelete}
-        factoryName={displayName}
-        title={`Delete "${displayName}"?`}
-        description={AGENT_RESOURCES_COPY.deleteSkillDescription}
-        canDelete={editor.canUpdate}
-        isDeleting={editor.isDeleting}
-        onClose={() => editor.setPendingDelete(false)}
-        onConfirm={editor.confirmDelete}
+      <RestoreSystemSkillDialog
+        open={editor.pendingRestore}
+        isRestoring={editor.isRestoring}
+        onClose={() => editor.setPendingRestore(false)}
+        onConfirm={editor.confirmRestore}
       />
+      {editor.pendingDelete && editor.resource ? (
+        <SkillDeleteDialog
+          resource={editor.resource}
+          canDelete={editor.canUpdate}
+          isDeleting={editor.isDeleting}
+          onClose={() => editor.setPendingDelete(false)}
+          onConfirm={editor.confirmDelete}
+        />
+      ) : null}
     </FactorySettingsPageFrame>
   );
 }
@@ -68,13 +80,23 @@ export function FactorySettingsSkillEditorPage() {
 function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEditorPage> }) {
   const displayName = editor.name.trim() || AGENT_RESOURCES_COPY.unnamedSkill;
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {editor.canRestore ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!editor.canUpdate || editor.isSaving || editor.isRestoring}
+          onClick={() => editor.setPendingRestore(true)}
+        >
+          {AGENT_RESOURCES_COPY.restoreSkill}
+        </Button>
+      ) : null}
       {!editor.isCreate && editor.resource ? (
         <div className="mr-1 flex items-center gap-3">
           <span className="text-[12px] text-muted-foreground">Enabled</span>
           <Switch
             checked={editor.resource.enabled !== false}
-            disabled={!editor.canUpdate}
+            disabled={!editor.canUpdate || Boolean(editor.resource?.systemSkill)}
             onCheckedChange={editor.toggleEnabled}
             aria-label={`Enable ${displayName}`}
             data-testid="skill-editor-enabled"
@@ -99,7 +121,7 @@ function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEdit
           type="button"
           onClick={() => void editor.handleSave()}
           loading={editor.isSaving}
-          disabled={!editor.canUpdate}
+          disabled={!editor.canUpdate || editor.isRestoring}
           data-testid="agent-resource-skill-save"
         >
           {editor.isCreate ? AGENT_RESOURCES_COPY.addSkill : AGENT_RESOURCES_COPY.saveSkill}
@@ -110,6 +132,7 @@ function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEdit
 }
 
 function SkillEditorFields({
+  systemSkill,
   name,
   markdown,
   command,
@@ -120,6 +143,7 @@ function SkillEditorFields({
   onNameChange,
   onMarkdownChange,
 }: {
+  systemSkill: boolean;
   name: string;
   markdown: string;
   command: string;
@@ -131,18 +155,19 @@ function SkillEditorFields({
   onMarkdownChange: (value: string) => void;
 }) {
   return (
-    <div className="flex min-h-[70vh] flex-col gap-4" data-testid="factory-settings-skill-editor">
+    <div className="flex flex-col gap-4" data-testid="factory-settings-skill-editor">
       <SkillNameFields
+        systemSkill={systemSkill}
         name={name}
         command={command}
         commandName={commandName}
         nameError={nameError}
         onNameChange={onNameChange}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5">
         <Label>{AGENT_RESOURCES_COPY.markdownLabel}</Label>
         <div
-          className="min-h-[480px] flex-1 overflow-hidden rounded-lg border border-border"
+          className="h-[70vh] min-h-[480px] overflow-hidden rounded-lg border border-border"
           data-testid="agent-resource-skill-markdown"
         >
           <Editor
@@ -169,12 +194,14 @@ function SkillEditorFields({
 }
 
 function SkillNameFields({
+  systemSkill,
   name,
   command,
   commandName,
   nameError,
   onNameChange,
 }: {
+  systemSkill: boolean;
   name: string;
   command: string;
   commandName: string;
@@ -187,6 +214,7 @@ function SkillNameFields({
         <Label htmlFor="skill-editor-name">{AGENT_RESOURCES_COPY.nameLabel}</Label>
         <Input
           id="skill-editor-name"
+          disabled={systemSkill}
           data-testid="agent-resource-skill-name"
           value={name}
           onChange={(event) => onNameChange(event.target.value)}

@@ -6,6 +6,7 @@ import {
   selectWorkOrderCardPullRequest,
   visibleWorkOrderCardAttentionReasons,
   workOrderCardPullRequestAriaLabel,
+  workOrderCardPullRequestShowsMergeable,
   workOrderCardPullRequestVisibleLabel,
 } from "./workOrderCardPullRequest";
 
@@ -71,6 +72,49 @@ describe("workOrderCardPullRequestVisibleLabel", () => {
   });
 });
 
+describe("workOrderCardPullRequestShowsMergeable", () => {
+  const open = pr({ mergeable: true });
+
+  it("hides the badge when any scored merge confidence metric is critical", () => {
+    expect(workOrderCardPullRequestShowsMergeable(open, [{ key: "risk-review", score: 4 }])).toBe(false);
+    expect(workOrderCardPullRequestShowsMergeable(open, [{ key: "drift-review", score: 5 }])).toBe(false);
+    expect(workOrderCardPullRequestShowsMergeable(open, [{ key: "performance-review", score: 2 }])).toBe(false);
+    expect(workOrderCardPullRequestShowsMergeable(open, [{ key: "security-review", score: 1 }])).toBe(false);
+    expect(workOrderCardPullRequestShowsMergeable(open, [{ key: "reversibility-review", score: 2 }])).toBe(false);
+    expect(
+      workOrderCardPullRequestShowsMergeable(open, [
+        { key: "security-review", score: 5 },
+        { key: "risk-review", score: 4 },
+      ]),
+    ).toBe(false);
+  });
+
+  it("keeps the badge when scored merge confidence metrics are caution or better", () => {
+    expect(
+      workOrderCardPullRequestShowsMergeable(open, [
+        { key: "risk-review", score: 3 },
+        { key: "drift-review", score: 3 },
+        { key: "performance-review", score: 3 },
+        { key: "security-review", score: 5 },
+        { key: "reversibility-review", score: 4 },
+      ]),
+    ).toBe(true);
+  });
+
+  it("keeps the badge when no scored merge confidence metric exists", () => {
+    expect(workOrderCardPullRequestShowsMergeable(open, undefined)).toBe(true);
+    expect(workOrderCardPullRequestShowsMergeable(open, [])).toBe(true);
+    expect(workOrderCardPullRequestShowsMergeable(open, [{ key: "risk-review" }])).toBe(true);
+    expect(workOrderCardPullRequestShowsMergeable(open, [{ key: "planning-review", score: 1 }])).toBe(true);
+    expect(workOrderCardPullRequestShowsMergeable(open, [{ key: "api-latency-review", score: 5 }])).toBe(true);
+  });
+
+  it("stays hidden when the pull request is not open and mergeable", () => {
+    expect(workOrderCardPullRequestShowsMergeable(pr(), [{ key: "risk-review", score: 1 }])).toBe(false);
+    expect(workOrderCardPullRequestShowsMergeable(undefined, [])).toBe(false);
+  });
+});
+
 describe("visibleWorkOrderCardAttentionReasons", () => {
   it("hides Status checks passed when the pull request is mergeable and the flag is on", () => {
     expect(
@@ -105,6 +149,28 @@ describe("visibleWorkOrderCardAttentionReasons", () => {
         extraCount: 0,
       }),
     ).toEqual(["checksPassed"]);
+  });
+
+  it("keeps Status checks passed when a merge confidence check is critical", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(
+        ["checksPassed"],
+        { pullRequest: pr({ mergeable: true }), extraCount: 0 },
+        true,
+        [{ key: "security-review", score: 2 }],
+      ),
+    ).toEqual(["checksPassed"]);
+  });
+
+  it("hides Status checks passed when merge confidence checks are only caution", () => {
+    expect(
+      visibleWorkOrderCardAttentionReasons(
+        ["checksPassed"],
+        { pullRequest: pr({ mergeable: true }), extraCount: 0 },
+        true,
+        [{ key: "risk-review", score: 3 }],
+      ),
+    ).toEqual([]);
   });
 
   it("hides Waiting for user review when the shown pull request is open", () => {

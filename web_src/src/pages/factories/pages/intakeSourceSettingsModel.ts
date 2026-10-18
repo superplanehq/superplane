@@ -41,6 +41,8 @@ export interface IntakeSourceSettings {
   sentryAssignedIssues: boolean;
   /** Issue levels that still create a task. Empty means every level. */
   sentryLevels: string[];
+  /** Sentry projects that still create a task. At least one is required. */
+  sentryProjectIds: string[];
   /** Skip Productive.io key tasks (milestones). Productive task intakes only. */
   excludeKeyTasks: boolean;
   /** Productive.io task list ids that still create a task. Empty means every task list. */
@@ -78,6 +80,7 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   sentryRegressedIssues: false,
   sentryAssignedIssues: false,
   sentryLevels: [],
+  sentryProjectIds: [],
   excludeKeyTasks: true,
   taskListIds: [],
   dependabotSeverities: [],
@@ -203,6 +206,7 @@ export function normalizeIntakeSourceSettings(
   const datadogService = draft.datadogService.trim();
   const linearProjectIds = normalizeLinearValues(draft.linearProjectIds);
   const linearLabels = normalizeLinearValues(draft.linearLabels);
+  const sentryProjectIds = normalizeLinearValues(draft.sentryProjectIds);
   if (!draft.filterByLabel) {
     return {
       ...draft,
@@ -217,6 +221,7 @@ export function normalizeIntakeSourceSettings(
       datadogService,
       linearProjectIds,
       linearLabels,
+      sentryProjectIds,
     };
   }
   return {
@@ -230,6 +235,7 @@ export function normalizeIntakeSourceSettings(
     datadogService,
     linearProjectIds,
     linearLabels,
+    sentryProjectIds,
   };
 }
 
@@ -291,6 +297,10 @@ export function linearProjectIdsFromResource(resourceId: string | undefined): st
   return normalizeLinearValues((resourceId ?? "").split(","));
 }
 
+export function sentryProjectIdsFromResource(resourceId: string | undefined): string[] {
+  return normalizeLinearValues((resourceId ?? "").split(","));
+}
+
 function normalizeDatadogEnvironments(environments: string[]): string[] {
   const normalized: string[] = [];
   for (const environment of environments) {
@@ -343,6 +353,7 @@ export function intakeSettingsFromApi(
     jiraMoveOnComplete: settings?.jiraMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.jiraMoveOnComplete,
     jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
+    sentryProjectIds: normalizeLinearValues(settings?.sentryProjectIds ?? []),
     dependabotSeverities: normalizeDependabotSeverities(settings?.dependabotSeverities ?? []),
     datadogTriggeredAlerts: settings?.datadogTriggeredAlerts ?? DEFAULT_DATADOG_INTAKE_SETTINGS.datadogTriggeredAlerts,
     datadogRetriggeredAlerts:
@@ -386,6 +397,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     sentryRegressedIssues: false,
     sentryAssignedIssues: false,
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => settings.sentryLevels.includes(level)),
+    sentryProjectIds: normalizeLinearValues(settings.sentryProjectIds),
     dependabotSeverities: normalizeDependabotSeverities(settings.dependabotSeverities),
     excludeKeyTasks: settings.excludeKeyTasks,
     taskListIds: normalizeTaskListIds(settings.taskListIds),

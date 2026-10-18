@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -100,9 +101,9 @@ func DescribeFactoryVelocity(
 			PeopleMerged:               int32(b.peopleMerged),
 			Waste:                      int32(b.waste),
 			Intake:                     serializeVelocityIntakeCounts(b.intake),
-			CostCents:                  b.costCents,
-			ModelCostCents:             b.modelCostCents,
-			ComputeCostCents:           b.computeCostCents,
+			CostCents:                  ledgerCents(b.costMicros),
+			ModelCostCents:             ledgerCents(b.modelCostMicros),
+			ComputeCostCents:           ledgerCents(b.computeCostMicros),
 			Tokens:                     b.tokens,
 			WasteCostCents:             b.wasteCostCents,
 			MedianTaskModelCostCents:   medianCents(b.taskModelCostCents),
@@ -226,7 +227,10 @@ func loadMergeCohort(
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return mergeCohort{}, err
 	}
-	if sync == nil || sync.SyncedAt == nil {
+	// A bounded rebuild stores the newest-slice time in SyncedAt so a later
+	// read can catch merges made after that slice. The report stays pending
+	// until that read finishes.
+	if sync == nil || sync.SyncedAt == nil || sync.SyncInProgress() {
 		return mergeCohort{pending: true}, nil
 	}
 
@@ -390,12 +394,15 @@ type dayBucket struct {
 	peopleMerged     int
 	waste            int
 	// Merged SuperPlane pull requests of the day, keyed by intake source.
-	intake           map[string]int
-	costCents        int64
-	modelCostCents   int64
-	computeCostCents int64
-	tokens           int64
-	wasteCostCents   int64
+	intake map[string]int
+	// Ledger spend that occurred on this local day, in millionths of a dollar.
+	// Cents are rounded only when the report is serialized.
+	costMicros        int64
+	modelCostMicros   int64
+	computeCostMicros int64
+	tokens            int64
+	// Spend of work orders that closed without a merge, on the close day.
+	wasteCostCents int64
 	// Work orders reported on the day. A work order counts once here, however
 	// many pull requests it opened.
 	tasksClosed int
@@ -506,8 +513,10 @@ func joinOwnerRepo(owner, repo string) string {
 }
 
 // fillBuckets counts a window into its day buckets. Pull request counts come
-// from the pull requests themselves, while cost comes from the work orders
-// behind them, so an order that opened several pull requests is charged once.
+// from the pull requests themselves. Task counts, waste cost, and the per-task
+// median come from the work orders behind them, so an order that opened
+// several pull requests is counted once. Ledger spend is applied separately,
+// by the day each event occurred.
 func fillBuckets(
 	buckets []dayBucket,
 	rows []models.FactoryVelocityPullRequest,
@@ -559,10 +568,6 @@ func fillBuckets(
 		if idx < 0 {
 			continue
 		}
-		buckets[idx].costCents += order.costCents
-		buckets[idx].modelCostCents += order.modelCostCents
-		buckets[idx].computeCostCents += order.computeCostCents
-		buckets[idx].tokens += order.tokens
 		buckets[idx].tasksClosed++
 		buckets[idx].taskModelCostCents = append(buckets[idx].taskModelCostCents, order.modelCostCents)
 		buckets[idx].taskComputeCostCents = append(buckets[idx].taskComputeCostCents, order.computeCostCents)
@@ -591,19 +596,25 @@ func fillBuckets(
 	}
 }
 
+// ledgerCents rounds summed micros the way Spending does. Round a window
+// total, or one day, from its own micros. Do not sum already rounded days.
+func ledgerCents(micros int64) int64 {
+	return pricebook.MicrosToCents(micros)
+}
+
 func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVelocityTotals {
 	sp, people, waste := 0, 0, 0
 	tasksClosed, tasksWaste := 0, 0
-	var costCents, modelCostCents, computeCostCents, tokens, wasteCostCents int64
+	var costMicros, modelCostMicros, computeCostMicros, tokens, wasteCostCents int64
 	for _, b := range buckets {
 		sp += b.superplaneMerged
 		if hasPeople {
 			people += b.peopleMerged
 		}
 		waste += b.waste
-		costCents += b.costCents
-		modelCostCents += b.modelCostCents
-		computeCostCents += b.computeCostCents
+		costMicros += b.costMicros
+		modelCostMicros += b.modelCostMicros
+		computeCostMicros += b.computeCostMicros
 		tokens += b.tokens
 		wasteCostCents += b.wasteCostCents
 		tasksClosed += b.tasksClosed
@@ -614,9 +625,9 @@ func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVel
 		SuperplaneMerged: int32(sp),
 		PeopleMerged:     int32(people),
 		Waste:            int32(waste),
-		CostCents:        costCents,
-		ModelCostCents:   modelCostCents,
-		ComputeCostCents: computeCostCents,
+		CostCents:        ledgerCents(costMicros),
+		ModelCostCents:   ledgerCents(modelCostMicros),
+		ComputeCostCents: ledgerCents(computeCostMicros),
 		Tokens:           tokens,
 		WasteCostCents:   wasteCostCents,
 		TasksClosed:      int32(tasksClosed),

@@ -19,7 +19,7 @@ export function FirstRunWelcomeScreen({
   const copy = FIRST_RUN_COPY.welcome;
 
   return (
-    <FirstRunShell testId="first-run-welcome" chrome={chrome} sphere={sphere}>
+    <FirstRunShell testId="first-run-welcome" chrome={chrome} sphere={sphere} visual="preview">
       <FirstRunHeading
         greeting={firstName ? copy.greeting(firstName) : undefined}
         headline={copy.headline}
@@ -28,7 +28,7 @@ export function FirstRunWelcomeScreen({
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.intro}</p>
       </FirstRunHeading>
 
-      <div className="mt-10">
+      <div className="mt-8">
         <Button type="button" className="min-w-40" onClick={onGetStarted} data-testid="first-run-get-started">
           {copy.getStarted}
         </Button>

@@ -21,25 +21,33 @@ import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
-import { describeGitHubInstallationName, githubIntegrationSelection } from "./githubIntegrationSelection";
-import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
+import {
+  describeInstallationName,
+  githubIntegrationSelection,
+  selectionsWithSavedVcsInstallation,
+} from "./githubIntegrationSelection";
+import { isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
+import { useOnboardingAgentPageState } from "./useOnboardingAgentPageState";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
   apiIssuesSource,
-  initialOnboardingSelections,
   initialWizardStep,
   isWizardStepId,
   localIssuesSource,
+  ONBOARDING_CONNECTION_NAMES,
+  ONBOARDING_MANUAL_CONNECTION_NAMES,
+  onboardingVcsHost,
 } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
-import { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
+import type { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
 import { useOnboardingJiraBinding } from "./useOnboardingJiraBinding";
 import { useOnboardingLinearBinding } from "./useOnboardingLinearBinding";
 import {
@@ -47,12 +55,6 @@ import {
   type InitialOnboardingSetupState,
   type OnboardingSetupApi,
 } from "./useOnboardingSetupState";
-
-const ONBOARDING_INTEGRATIONS = ["jira", "linear", ...AGENT_PROVIDER_IDS];
-
-// Agent keys stay unselected so a new workspace can use the canonical
-// SuperPlane template when hosted credit is available.
-const ONBOARDING_MANUAL_SELECTIONS = [...AGENT_PROVIDER_IDS] as const;
 
 /**
  * Setup only needs the keys that make an agent run. The Anthropic admin key
@@ -62,25 +64,10 @@ const ONBOARDING_HIDDEN_CONFIGURATION_FIELDS: Record<string, string[]> = {
   claude: ["adminKey"],
 };
 
-function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
-  const [selections, setSelections] = useState<IntegrationSelections>(() => initialOnboardingSelections(onboarding));
-  const connected = useMemo(() => {
-    const ready = new Set<IntegrationId>();
-    if (selections.github?.ready) ready.add("github");
-    if (selections.jira?.ready) ready.add("jira");
-    if (selections.linear?.ready) ready.add("linear");
-    for (const name of AGENT_PROVIDER_IDS) {
-      if (selections[name]?.ready) ready.add(name);
-    }
-    return ready;
-  }, [selections]);
-  return { selections, connected, setSelections };
-}
-
 function initialSetupState(onboarding: FactoriesFactory["onboarding"]): InitialOnboardingSetupState {
   const appRepository = onboarding?.appRepository || null;
   return {
-    vcsHost: onboarding?.vcsIntegrationId ? "github" : null,
+    vcsHost: onboardingVcsHost(onboarding),
     selectedRepo: appRepository,
     issuesRepo: onboarding?.backlogRepository || appRepository,
     issuesChoice: localIssuesSource(onboarding?.issuesSource),
@@ -89,8 +76,9 @@ function initialSetupState(onboarding: FactoriesFactory["onboarding"]): InitialO
 
 function useRestoreIntegrationReadiness(setup: OnboardingSetupApi, selections: IntegrationSelections) {
   const { vcsHost, selectVcsHost, setAgent } = setup;
+  // A ready GitHub connection must not replace a Bitbucket host the user chose.
   useEffect(() => {
-    if (selections.github?.ready && vcsHost !== "github") selectVcsHost("github");
+    if (selections.github?.ready && vcsHost === null) selectVcsHost("github");
   }, [selections.github?.ready, selectVcsHost, vcsHost]);
   useEffect(() => {
     if (!selections.claude?.ready) return;
@@ -119,6 +107,7 @@ function useSectionSaves(args: {
   takenNames: string[];
   updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
+  agentPlan: OnboardingAgentPlan | undefined;
 }) {
   const saveName = () => {
     const workspaceName = args.setup.workspaceName.trim();
@@ -144,7 +133,21 @@ function useSectionSaves(args: {
       }),
     );
   };
-  return { saveName, saveIssues };
+  const saveAgent = () => {
+    const plan = args.agentPlan;
+    if (!plan) return Promise.resolve(false);
+    const integration = plan.integrationName ? args.selections[plan.integrationName] : undefined;
+    if (plan.credentialsSource === "integration" && (!integration?.id || !integration.ready)) {
+      return Promise.resolve(false);
+    }
+    return runSave(args.setSaving, () =>
+      args.updateOnboarding({
+        agentHarness: plan.harness,
+        agentIntegrationId: plan.credentialsSource === "integration" ? integration?.id : "",
+      }),
+    );
+  };
+  return { saveName, saveIssues, saveAgent };
 }
 
 /** Names held by the other workspaces of the organization. */
@@ -169,6 +172,7 @@ function useOnboardingMutations(organizationId: string, factoryId: string) {
   return {
     updateFactory: useUpdateFactory(organizationId, factoryId),
     selectGitHubRepository: useSelectFactoryVcsProviderRepository(organizationId, factoryId, "github"),
+    selectBitbucketForgeRepository: useSelectFactoryVcsProviderRepository(organizationId, factoryId, "bitbucket"),
     updateOnboarding: useFactoryOnboarding(organizationId, factoryId),
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),
@@ -187,7 +191,7 @@ type OnboardingGithubSavesAndFinishArgs = {
   onboardingEntryPath?: string | null;
   reresolveWorkspace: OnboardingWorkspaceResolution | null;
   setup: OnboardingSetupApi;
-  integrations: ReturnType<typeof useIntegrationSelections>;
+  integrations: ReturnType<typeof useOnboardingIntegrationSelections>;
   connect: ReturnType<typeof useIntegrationConnectDialog>;
   searchParams: URLSearchParams;
   openSection: WizardStepId;
@@ -198,10 +202,35 @@ type OnboardingGithubSavesAndFinishArgs = {
   agent: ReturnType<typeof useOnboardingAgentContext>;
 };
 
+async function rememberBitbucketInstallation(
+  organizationId: string,
+  integrationId: string,
+  setSelections: (update: (current: IntegrationSelections) => IntegrationSelections) => void,
+) {
+  const installationName = await describeInstallationName(organizationId, integrationId);
+  if (!installationName.trim() || installationName.trim() === integrationId.trim()) {
+    throw new Error("Bitbucket integration name is missing");
+  }
+  setSelections((current) =>
+    selectionsWithSavedVcsInstallation(
+      { vcsIntegrationId: integrationId, vcsProvider: "bitbucket" },
+      current,
+      installationName,
+    ),
+  );
+}
+
 function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishArgs) {
   const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, deleteIntake, installer } =
     args.mutations;
   const githubIntegrationId = args.integrations.selections.github?.ready ? args.integrations.selections.github.id : "";
+  const bitbucketIntegrationId = args.integrations.selections.bitbucket?.ready
+    ? args.integrations.selections.bitbucket.id
+    : "";
+  const branchIntegrationId =
+    args.setup.vcsHost === "bitbucket"
+      ? (args.integrations.selections.bitbucket?.id ?? "")
+      : (args.integrations.selections.github?.id ?? "");
   const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, args.integrations.selections.jira);
   const linear = useOnboardingLinearBinding(args.organizationId, args.factoryId, args.integrations.selections.linear);
   const takenNames = useMemo(
@@ -216,6 +245,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     takenNames,
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
+    agentPlan: args.agent.plan,
   });
   const githubOwner = args.setup.selectedRepo?.split("/")[0];
   const finish = useFinishOnboarding({
@@ -232,7 +262,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     deleteIntake: deleteIntake.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
-      resolveGithubDefaultBranch(args.organizationId, githubIntegrationId, repository),
+      resolveGithubDefaultBranch(args.organizationId, branchIntegrationId, repository),
     remainingCreditCents: args.agent.remainingCreditCents,
     hostedModelsLoading: args.agent.hostedModelsLoading,
     plan: args.agent.plan,
@@ -258,7 +288,9 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       const factory = await args.mutations.selectGitHubRepository.mutateAsync(repositoryId);
       const integrationId = factory.onboarding?.vcsIntegrationId;
       if (!integrationId) throw new Error("GitHub repository selection returned no integration");
-      const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
+      const installationName = await describeInstallationName(args.organizationId, integrationId);
+      args.connect.rememberPreferredInstance("github", integrationId);
+      await args.connect.refetchConnections();
       args.integrations.setSelections((current) => ({
         ...current,
         github: githubIntegrationSelection(integrationId, installationName),
@@ -267,17 +299,63 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       args.setup.selectRepo(fullName);
     });
   };
+  // The backend reads the provider from the integration, so the workspace
+  // becomes a Bitbucket workspace when this save completes.
+  const selectBitbucketForgeRepository = async (fullName: string): Promise<boolean> => {
+    if (!fullName) return false;
+    return runSave(args.setSaving, async () => {
+      const factory = await args.mutations.selectBitbucketForgeRepository.mutateAsync({ repository: fullName });
+      const integrationId = factory.onboarding?.vcsIntegrationId;
+      if (!integrationId) throw new Error("Bitbucket repository selection returned no integration");
+      args.connect.rememberPreferredInstance("bitbucket", integrationId);
+      await args.connect.refetchConnections();
+      await rememberBitbucketInstallation(args.organizationId, integrationId, args.integrations.setSelections);
+      args.setup.selectVcsHost("bitbucket");
+      args.setup.selectRepo(fullName);
+    });
+  };
+  const selectBitbucketRepository = async (fullName: string): Promise<boolean> => {
+    if (!bitbucketIntegrationId || !fullName) return false;
+    return runSave(args.setSaving, async () => {
+      await updateOnboarding.mutateAsync({
+        vcsIntegrationId: bitbucketIntegrationId,
+        appRepository: fullName,
+        backlogRepository: fullName,
+      });
+      args.setup.selectVcsHost("bitbucket");
+      args.setup.selectRepo(fullName);
+    });
+  };
 
   return {
     githubIntegrationId,
+    bitbucketIntegrationId,
     saves,
     githubOwner,
     finishSetup,
     selectCatalogRepository,
+    selectBitbucketRepository,
+    selectBitbucketForgeRepository,
     jira,
     linear,
     installer,
     createIntake,
+  };
+}
+
+function onboardingSetupOptions(
+  factoryId: string,
+  onboarding: FactoriesFactory["onboarding"],
+  connected: Set<IntegrationId>,
+  remainingCreditCents: number,
+) {
+  return {
+    connected,
+    remainingCreditCents,
+    simulateDiscovery: false,
+    initial: initialSetupState(onboarding),
+    persistVcsHostKey: factoryId,
+    persistRepoKey: factoryId,
   };
 }
 
@@ -296,46 +374,44 @@ export function useOnboardingPageModel(args: {
     bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER);
   const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
-  const integrations = useIntegrationSelections(onboarding);
-  const preferOwnKey = bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && agentCredentialChoice !== "hosted";
-  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected, preferOwnKey, customProvider);
+  const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(args.organizationId, {
     enabled: Boolean(args.organizationId),
   });
-  const existingIntegrationNames = useMemo(
-    () =>
-      new Set(
-        connectedIntegrations
-          .map((item) => item.metadata?.name?.trim())
-          .filter((name): name is string => Boolean(name)),
-      ),
-    [connectedIntegrations],
+  const { agent, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    connected: integrations.connected,
+    customProvider,
+    agentCredentialChoice,
+    setSelections: integrations.setSelections,
+    connectedIntegrations,
+    agentIntegrationId: onboarding?.agentIntegrationId,
+  });
+  const existingIntegrationNames = new Set(
+    connectedIntegrations.map((item) => item.metadata?.name?.trim()).filter((name): name is string => Boolean(name)),
   );
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
-  const setup = useOnboardingSetupState(args.factory?.name ?? "", {
-    connected: integrations.connected,
-    remainingCreditCents: agent.remainingCreditCents,
-    simulateDiscovery: false,
-    initial: initialSetupState(onboarding),
-  });
+  const setup = useOnboardingSetupState(
+    args.factory?.name ?? "",
+    onboardingSetupOptions(args.factoryId, onboarding, integrations.connected, agent.remainingCreditCents),
+  );
   useRestoreIntegrationReadiness(setup, integrations.selections);
   const [searchParams] = useSearchParams();
   const [openSection, setOpenSection] = useState<WizardStepId>(() => {
     const requestedStep = searchParams.get("step");
     return isWizardStepId(requestedStep) ? requestedStep : initialWizardStep(onboarding);
   });
+  const onboardingPath = args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey);
   const connect = useIntegrationConnectDialog({
     organizationId: args.organizationId,
     // Return to this step after the provider round trip.
-    returnTo: onboardingStepPath(
-      args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey),
-      openSection,
-    ),
-    integrationNames: ONBOARDING_INTEGRATIONS,
+    returnTo: onboardingStepPath(onboardingPath, openSection),
+    integrationNames: [...ONBOARDING_CONNECTION_NAMES],
     selections: integrations.selections,
-    onSelectionsChange: integrations.setSelections,
+    onSelectionsChange,
     hiddenConfigurationFields: ONBOARDING_HIDDEN_CONFIGURATION_FIELDS,
-    manualSelectionNames: ONBOARDING_MANUAL_SELECTIONS,
+    manualSelectionNames: ONBOARDING_MANUAL_CONNECTION_NAMES,
   });
   const [saving, setSaving] = useState(false);
   const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
@@ -360,7 +436,8 @@ export function useOnboardingPageModel(args: {
     const existing = selectReadyIntegrationInstance(connectedIntegrations, integrations.selections, "customLlm");
     if (existing) {
       integrations.setSelections(existing);
-      return true;
+      // True means the browser left this page. A saved connection stays here.
+      return false;
     }
     setCustomProviderDialogOpen(true);
     return false;
@@ -377,10 +454,14 @@ export function useOnboardingPageModel(args: {
     agentCredentialChoice,
     setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,
+    agentModelPicker: agent.modelPicker ? { ...agent.modelPicker, onChange: selectModel } : undefined,
     openSection,
     setOpenSection,
     requestConnect,
     selectCatalogRepository: wired.selectCatalogRepository,
+    selectBitbucketRepository: wired.selectBitbucketRepository,
+    selectBitbucketForgeRepository: wired.selectBitbucketForgeRepository,
+    bitbucketIntegrationId: wired.bitbucketIntegrationId,
     integrationDialogs: createElement(OnboardingConnectDialogs, {
       connectDialogs: connect.dialogs,
       customProviderOpen: customProviderDialogOpen,

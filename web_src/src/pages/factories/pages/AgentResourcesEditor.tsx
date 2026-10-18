@@ -1,3 +1,4 @@
+import { SystemSkillBadge } from "./settings/SystemSkillBadge";
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
+import { factoryAgentPath } from "../lib/factoryPagePaths";
 import { ConnectionStatusDot } from "./settings/ConnectionStatusDot";
 import { connectionIsEstablished } from "./settings/agentResourceDisplay";
 import { AGENT_RESOURCES_COPY } from "./settings/agentResourceCopy";
@@ -35,6 +36,7 @@ export function AgentResourcesEditor({
   onDisabledToolsChange,
   onEnabledToolsChange,
   compact = false,
+  flat = false,
 }: {
   organizationId?: string;
   factoryId?: string;
@@ -46,6 +48,7 @@ export function AgentResourcesEditor({
   onDisabledToolsChange: (tools: Record<string, string[]>) => void;
   onEnabledToolsChange: (tools: Record<string, string[]>) => void;
   compact?: boolean;
+  flat?: boolean;
 }) {
   const features = useExperimentalFeature(organizationId);
   const showMcp = Boolean(organizationId && factoryId && factoryKey && features.has(FEATURE_WORKSPACE_MCP));
@@ -55,7 +58,7 @@ export function AgentResourcesEditor({
   }
 
   return (
-    <div className="flex flex-col gap-4" data-testid="planning-review-resources">
+    <div className={flat ? "flex flex-col gap-8" : "flex flex-col gap-4"} data-testid="planning-review-resources">
       {showMcp ? (
         <MCPAutomationSection
           organizationId={organizationId!}
@@ -68,6 +71,7 @@ export function AgentResourcesEditor({
           onDisabledToolsChange={onDisabledToolsChange}
           onEnabledToolsChange={onEnabledToolsChange}
           compact={compact}
+          flat={flat}
         />
       ) : null}
       {showSkills ? (
@@ -78,6 +82,7 @@ export function AgentResourcesEditor({
           disabledIds={disabledIds}
           onDisabledIdsChange={onDisabledIdsChange}
           compact={compact}
+          flat={flat}
         />
       ) : null}
     </div>
@@ -95,6 +100,7 @@ function MCPAutomationSection({
   onDisabledToolsChange,
   onEnabledToolsChange,
   compact,
+  flat,
 }: {
   organizationId: string;
   factoryId: string;
@@ -106,23 +112,27 @@ function MCPAutomationSection({
   onDisabledToolsChange: (tools: Record<string, string[]>) => void;
   onEnabledToolsChange: (tools: Record<string, string[]>) => void;
   compact: boolean;
+  flat: boolean;
 }) {
   const connections = useFactoryAgentResources(organizationId, factoryId, "KIND_MCP_SERVER");
-  const settingsHref = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "agent");
+  const settingsHref = factoryAgentPath(organizationId, factoryKey);
   const resources = connections.data ?? [];
   return (
-    <section
-      className={cn("overflow-hidden rounded-xl border border-border bg-card shadow-sm", compact && "shadow-none")}
-    >
-      <SectionHeader title={AGENT_RESOURCES_COPY.mcpTitle} count={resources.length} settingsHref={settingsHref} />
+    <section className={resourceSectionClass(flat, compact)}>
+      <SectionHeader
+        title={AGENT_RESOURCES_COPY.mcpTitle}
+        count={resources.length}
+        settingsHref={settingsHref}
+        flat={flat}
+      />
       {connections.isLoading ? (
-        <p className="px-5 py-6 text-sm text-muted-foreground">{PLANNING_REVIEW_RESOURCES_COPY.loading}</p>
+        <p className={cn(statusTextClass(flat), "text-muted-foreground")}>{PLANNING_REVIEW_RESOURCES_COPY.loading}</p>
       ) : connections.isError ? (
-        <p className="px-5 py-6 text-sm text-destructive">{PLANNING_REVIEW_RESOURCES_COPY.loadError}</p>
+        <p className={cn(statusTextClass(flat), "text-destructive")}>{PLANNING_REVIEW_RESOURCES_COPY.loadError}</p>
       ) : resources.length === 0 ? (
-        <EmptySettingsNote settingsHref={settingsHref} kind="mcp" />
+        <EmptySettingsNote settingsHref={settingsHref} kind="mcp" flat={flat} />
       ) : (
-        <ul className="divide-y divide-border">
+        <ul className={resourceListClass(flat)}>
           {resources.map((resource) => (
             <MCPAutomationRow
               key={resource.id || resource.name}
@@ -135,6 +145,7 @@ function MCPAutomationSection({
               onDisabledIdsChange={onDisabledIdsChange}
               onDisabledToolsChange={onDisabledToolsChange}
               onEnabledToolsChange={onEnabledToolsChange}
+              flat={flat}
             />
           ))}
         </ul>
@@ -153,6 +164,7 @@ function MCPAutomationRow({
   onDisabledIdsChange,
   onDisabledToolsChange,
   onEnabledToolsChange,
+  flat,
 }: {
   organizationId: string;
   factoryId: string;
@@ -163,6 +175,7 @@ function MCPAutomationRow({
   onDisabledIdsChange: (ids: string[]) => void;
   onDisabledToolsChange: (tools: Record<string, string[]>) => void;
   onEnabledToolsChange: (tools: Record<string, string[]>) => void;
+  flat: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const id = resource.id ?? "";
@@ -182,7 +195,7 @@ function MCPAutomationRow({
       : null;
 
   return (
-    <li>
+    <li className={resourceRowClass(flat)}>
       <div className="flex flex-wrap items-center gap-3 px-5 py-3">
         <ConnectionStatusDot resource={resource} />
         <div className="min-w-0 flex-1">
@@ -251,6 +264,7 @@ function SkillsAutomationSection({
   disabledIds,
   onDisabledIdsChange,
   compact,
+  flat,
 }: {
   organizationId: string;
   factoryId: string;
@@ -258,29 +272,34 @@ function SkillsAutomationSection({
   disabledIds: string[];
   onDisabledIdsChange: (ids: string[]) => void;
   compact: boolean;
+  flat: boolean;
 }) {
   const skills = useFactoryAgentResources(organizationId, factoryId, "KIND_SKILL");
-  const settingsHref = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "agent");
+  const settingsHref = factoryAgentPath(organizationId, factoryKey);
   const resources = skills.data ?? [];
   return (
-    <section
-      className={cn("overflow-hidden rounded-xl border border-border bg-card shadow-sm", compact && "shadow-none")}
-    >
-      <SectionHeader title={AGENT_RESOURCES_COPY.skillsTitle} count={resources.length} settingsHref={settingsHref} />
+    <section className={resourceSectionClass(flat, compact)}>
+      <SectionHeader
+        title={AGENT_RESOURCES_COPY.skillsTitle}
+        count={resources.length}
+        settingsHref={settingsHref}
+        flat={flat}
+      />
       {skills.isLoading ? (
-        <p className="px-5 py-6 text-sm text-muted-foreground">{PLANNING_REVIEW_RESOURCES_COPY.loading}</p>
+        <p className={cn(statusTextClass(flat), "text-muted-foreground")}>{PLANNING_REVIEW_RESOURCES_COPY.loading}</p>
       ) : skills.isError ? (
-        <p className="px-5 py-6 text-sm text-destructive">{PLANNING_REVIEW_RESOURCES_COPY.loadError}</p>
+        <p className={cn(statusTextClass(flat), "text-destructive")}>{PLANNING_REVIEW_RESOURCES_COPY.loadError}</p>
       ) : resources.length === 0 ? (
-        <EmptySettingsNote settingsHref={settingsHref} kind="skills" />
+        <EmptySettingsNote settingsHref={settingsHref} kind="skills" flat={flat} />
       ) : (
-        <ul className="divide-y divide-border">
+        <ul className={resourceListClass(flat)}>
           {resources.map((resource) => (
             <SkillAutomationRow
               key={resource.id || resource.name}
               resource={resource}
               disabledIds={disabledIds}
               onDisabledIdsChange={onDisabledIdsChange}
+              flat={flat}
             />
           ))}
         </ul>
@@ -293,28 +312,37 @@ function SkillAutomationRow({
   resource,
   disabledIds,
   onDisabledIdsChange,
+  flat,
 }: {
   resource: FactoriesFactoryAgentResource;
   disabledIds: string[];
   onDisabledIdsChange: (ids: string[]) => void;
+  flat: boolean;
 }) {
   const id = resource.id ?? "";
   const name = skillDisplayTitle(resource) || AGENT_RESOURCES_COPY.unnamedSkill;
   const description = skillListDescription(resource);
   const workspaceOff = resource.enabled === false;
-  const checked = !workspaceOff && !disabledIds.includes(id);
+  const systemSkill = Boolean(resource.systemSkill);
+  const checked = systemSkill || (!workspaceOff && !disabledIds.includes(id));
   return (
-    <li className="flex flex-wrap items-center gap-3 px-5 py-3">
+    <li className={cn("flex flex-wrap items-center gap-3 px-5 py-3", resourceRowClass(flat))}>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+          {systemSkill ? <SystemSkillBadge state={resource.systemSkill?.state} /> : null}
+        </div>
         {description ? <p className="truncate text-[12px] text-muted-foreground">{description}</p> : null}
+        {systemSkill ? (
+          <p className="text-[12px] text-muted-foreground">{AGENT_RESOURCES_COPY.systemSkillEnabled}</p>
+        ) : null}
         {workspaceOff ? (
           <p className="truncate text-[12px] text-muted-foreground">{PLANNING_REVIEW_RESOURCES_COPY.offForWorkspace}</p>
         ) : null}
       </div>
       <Switch
         checked={checked}
-        disabled={workspaceOff || !id}
+        disabled={systemSkill || workspaceOff || !id}
         onCheckedChange={(next) => onDisabledIdsChange(nextDisabledIds(disabledIds, id, next))}
         aria-label={PLANNING_REVIEW_RESOURCES_COPY.enableLabel(name)}
         data-testid={`planning-review-resource-${id}`}
@@ -323,12 +351,30 @@ function SkillAutomationRow({
   );
 }
 
-function SectionHeader({ title, count, settingsHref }: { title: string; count: number; settingsHref: string }) {
+function SectionHeader({
+  title,
+  count,
+  settingsHref,
+  flat,
+}: {
+  title: string;
+  count: number;
+  settingsHref: string;
+  flat: boolean;
+}) {
   return (
-    <header className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+    <header
+      className={flat ? "flex items-center gap-2" : "flex items-center gap-2.5 border-b border-border px-5 py-3.5"}
+    >
+      <h3 className={flat ? "workspace-section-title" : "text-sm font-semibold text-foreground"}>{title}</h3>
       {count > 0 ? (
-        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+        <span
+          className={
+            flat
+              ? "text-sm tabular-nums text-muted-foreground"
+              : "rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground"
+          }
+        >
           {count}
         </span>
       ) : null}
@@ -344,10 +390,18 @@ function SectionHeader({ title, count, settingsHref }: { title: string; count: n
   );
 }
 
-function EmptySettingsNote({ settingsHref, kind }: { settingsHref: string; kind: "mcp" | "skills" }) {
+function EmptySettingsNote({
+  settingsHref,
+  kind,
+  flat,
+}: {
+  settingsHref: string;
+  kind: "mcp" | "skills";
+  flat: boolean;
+}) {
   return (
     <p
-      className="px-5 py-10 text-center text-sm text-muted-foreground"
+      className={flat ? "text-sm text-muted-foreground" : "px-5 py-10 text-center text-sm text-muted-foreground"}
       data-testid={`planning-review-resources-empty-${kind}`}
     >
       Add {kind === "mcp" ? "MCP servers" : "skills"} on the{" "}
@@ -361,6 +415,25 @@ function EmptySettingsNote({ settingsHref, kind }: { settingsHref: string; kind:
       .
     </p>
   );
+}
+
+function resourceSectionClass(flat: boolean, compact: boolean) {
+  if (flat) {
+    return "flex flex-col gap-2";
+  }
+  return cn("overflow-hidden rounded-xl border border-border bg-card shadow-sm", compact && "shadow-none");
+}
+
+function resourceListClass(flat: boolean) {
+  return flat ? "flex flex-col gap-2" : "divide-y divide-border";
+}
+
+function resourceRowClass(flat: boolean) {
+  return flat ? "overflow-hidden rounded-lg border border-border bg-card" : undefined;
+}
+
+function statusTextClass(flat: boolean) {
+  return flat ? "text-sm" : "px-5 py-6 text-sm";
 }
 
 function nextDisabledIds(disabledIds: string[], id: string, enabled: boolean): string[] {

@@ -1,0 +1,24 @@
+{{- if .Values.fleetManagerSetup.enabled }}
+{{- $provider := .Values.fleetManagerSetup.provider | default "" -}}
+{{- $source := "manual" -}}
+{{- if and $provider (not (empty .Values.fleetManagerSetup.infrastructure)) -}}
+{{- $source = "terraform" -}}
+{{- end -}}
+{{- $config := dict
+  "source" $source
+  "managerId" (.Values.fleetManagerSetup.managerId | default "my-cluster")
+  "namespace" (.Values.fleetManagerSetup.namespace | default .Release.Namespace)
+  "serviceAccountName" (.Values.fleetManagerSetup.serviceAccountName | default "superplane-fleet-manager")
+  "infrastructure" .Values.fleetManagerSetup.infrastructure -}}
+{{- if $provider -}}
+{{- $_ := set $config "provider" $provider -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-fleet-manager-setup
+  namespace: {{ .Release.Namespace }}
+data:
+  setup.json: |
+    {{- $config | toJson | nindent 4 }}
+{{- end }}

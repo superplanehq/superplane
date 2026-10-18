@@ -3,13 +3,13 @@ package authentication
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -33,6 +34,8 @@ import (
 )
 
 const SignupDisabledError = "signup is currently disabled"
+
+var errGitHubSignInNotConfigured = errors.New("sign-in with GitHub is not configured: create the GitHub App again")
 
 const (
 	magicCodeLength            = 6
@@ -99,6 +102,9 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 		case models.ProviderGitHub:
 			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, "user:email"))
 			log.Infof("GitHub OAuth provider initialized")
+		case models.ProviderBitbucket:
+			gothProviders = append(gothProviders, newBitbucketProvider(config.Key, config.Secret, config.CallbackURL))
+			log.Infof("Bitbucket OAuth provider initialized")
 		case models.ProviderGoogle:
 			gothProviders = append(gothProviders, google.New(config.Key, config.Secret, config.CallbackURL, "email", "profile"))
 			log.Infof("Google OAuth provider initialized")
@@ -144,6 +150,9 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 }
 
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
+	if rejectBitbucketSignIn(w, r) {
+		return
+	}
 	if !isConnectIntent(r) {
 		gothUser, err := gothic.CompleteUserAuth(w, r)
 		if err == nil {
@@ -171,7 +180,13 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
-	if !requestsGitHubAccountPicker(r) {
+	if mux.Vars(r)["provider"] == models.ProviderGitHub {
+		if err := a.ensureGitHubOAuth(r.Context()); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if !requestsAccountPicker(r) {
 		gothic.BeginAuthHandler(w, r)
 		return
 	}
@@ -182,16 +197,56 @@ func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, withGitHubAccountPicker(authURL), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, withAccountPicker(authURL), http.StatusTemporaryRedirect)
 }
 
-// GitHub otherwise authorizes the active browser account, so a user with
-// several signed-in GitHub accounts cannot choose which one to connect.
-func requestsGitHubAccountPicker(r *http.Request) bool {
-	return mux.Vars(r)["provider"] == models.ProviderGitHub && isConnectIntent(r)
+// Cloud registers GitHub at startup from GITHUB_CLIENT_ID and
+// GITHUB_CLIENT_SECRET. A self-hosted installation does not store a login
+// client, so those variables are the only way Sign in with GitHub starts.
+func (a *Handler) ensureGitHubOAuth(ctx context.Context) error {
+	if strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID")) != "" && strings.TrimSpace(os.Getenv("GITHUB_CLIENT_SECRET")) != "" {
+		return nil
+	}
+	if a.encryptor == nil {
+		return errGitHubSignInNotConfigured
+	}
+	cfg, err := githubapp.Resolve(ctx, database.DB(ctx), a.encryptor)
+	if err != nil {
+		return err
+	}
+	if cfg.ClientID == "" || cfg.ClientSecret == "" {
+		if _, err := goth.GetProvider(models.ProviderGitHub); err == nil {
+			return nil
+		}
+		return errGitHubSignInNotConfigured
+	}
+	goth.UseProviders(github.New(cfg.ClientID, cfg.ClientSecret, githubOAuthCallbackURL(), "user:email"))
+	return nil
 }
 
-func withGitHubAccountPicker(authURL string) string {
+func githubOAuthCallbackURL() string {
+	baseURL := strings.TrimSpace(os.Getenv("BASE_URL"))
+	if baseURL == "" {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8000"
+		}
+		baseURL = "http://localhost:" + port
+	}
+	return githubapp.OAuthCallbackURL(baseURL)
+}
+
+// GitHub and Bitbucket otherwise authorize the active browser account, so a
+// user with several signed-in accounts cannot choose which one to connect.
+func requestsAccountPicker(r *http.Request) bool {
+	provider := mux.Vars(r)["provider"]
+	if provider != models.ProviderGitHub && provider != models.ProviderBitbucket {
+		return false
+	}
+	return isConnectIntent(r)
+}
+
+func withAccountPicker(authURL string) string {
 	parsed, err := url.Parse(authURL)
 	if err != nil {
 		return authURL
@@ -204,7 +259,11 @@ func withGitHubAccountPicker(authURL string) string {
 }
 
 func useRealProviderAuthInDevelopment(r *http.Request) bool {
-	return mux.Vars(r)["provider"] == models.ProviderGitHub && isConnectIntent(r)
+	if !isConnectIntent(r) {
+		return false
+	}
+	provider := mux.Vars(r)["provider"]
+	return provider == models.ProviderGitHub || provider == models.ProviderBitbucket
 }
 
 func (a *Handler) handleDevelopmentAuth(w http.ResponseWriter, r *http.Request) {
@@ -269,6 +328,14 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	a.completeProviderAuth(w, r, mockUser)
 }
 
+func rejectBitbucketSignIn(w http.ResponseWriter, r *http.Request) bool {
+	if mux.Vars(r)["provider"] != models.ProviderBitbucket || isConnectIntent(r) {
+		return false
+	}
+	http.Error(w, "Bitbucket does not support sign-in", http.StatusBadRequest)
+	return true
+}
+
 func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
 	if isConnectIntent(r) {
 		a.finishAccountConnection(w, r, gothUser)
@@ -300,8 +367,22 @@ func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, got
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	// Login starts on one pod and the callback can land on another. Load the
+	// saved GitHub client before gothic reads it, the same way login does.
+	if mux.Vars(r)["provider"] == models.ProviderGitHub {
+		if err := a.ensureGitHubOAuth(r.Context()); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
+		log.WithError(err).Warn("provider authentication failed")
+		if a.isDev {
+			http.Error(w, "Authentication failed: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
 		http.Error(w, "Authentication failed", http.StatusUnauthorized)
 		return
 	}
@@ -331,13 +412,18 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
+	if strings.EqualFold(gothUser.Provider, models.ProviderBitbucket) {
+		http.Error(w, "Bitbucket does not support sign-in", http.StatusBadRequest)
+		return
+	}
+
 	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.canCreateAccountFromRequest(r))
 	if err != nil {
 		a.handleProviderAuthError(w, r, gothUser, err)
 		return
 	}
 
-	err = updateAccountProviders(a.encryptor, account, gothUser)
+	err = updateAccountProviders(account, gothUser)
 	if err != nil {
 		log.Errorf("Error updating account providers for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -406,6 +492,12 @@ func getPostLogoutRedirectURL(r *http.Request) string {
 }
 
 func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
+	// The login page lists only providers already registered in this process.
+	// Load the saved self-hosted client first, so a restart does not hide GitHub.
+	if err := a.ensureGitHubOAuth(r.Context()); err != nil && !errors.Is(err, errGitHubSignInNotConfigured) {
+		log.Errorf("failed to load GitHub sign-in: %v", err)
+	}
+
 	providers := goth.GetProviders()
 	providerNames := make([]string, 0, len(providers))
 	for name := range providers {
@@ -1228,28 +1320,17 @@ func getAuthState(r *http.Request) string {
 	return redirectURL
 }
 
-func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
-	accessToken, err := encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
-	if err != nil {
-		return err
-	}
-
+func updateAccountProviders(account *models.Account, gothUser goth.User) error {
 	accountProvider, err := account.FindAccountProviderByID(gothUser.Provider, gothUser.UserID)
 
 	//
 	// If we already have an account provider for this provider and provider ID, we just update it.
 	//
 	if err == nil {
-		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(accessToken)
 		accountProvider.Username = gothUser.NickName
 		accountProvider.Email = utils.NormalizeEmail(gothUser.Email)
 		accountProvider.Name = gothUser.Name
 		accountProvider.AvatarURL = gothUser.AvatarURL
-		accountProvider.RefreshToken = gothUser.RefreshToken
-		if !gothUser.ExpiresAt.IsZero() {
-			accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
-		}
-
 		return database.Conn().Save(accountProvider).Error
 	}
 
@@ -1257,16 +1338,13 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 	// Otherwise, we create a new account provider.
 	//
 	accountProvider = &models.AccountProvider{
-		AccountID:      account.ID,
-		Provider:       gothUser.Provider,
-		ProviderID:     gothUser.UserID,
-		Username:       gothUser.NickName,
-		Email:          utils.NormalizeEmail(gothUser.Email),
-		Name:           gothUser.Name,
-		AvatarURL:      gothUser.AvatarURL,
-		AccessToken:    base64.StdEncoding.EncodeToString(accessToken),
-		RefreshToken:   gothUser.RefreshToken,
-		TokenExpiresAt: &gothUser.ExpiresAt,
+		AccountID:  account.ID,
+		Provider:   gothUser.Provider,
+		ProviderID: gothUser.UserID,
+		Username:   gothUser.NickName,
+		Email:      utils.NormalizeEmail(gothUser.Email),
+		Name:       gothUser.Name,
+		AvatarURL:  gothUser.AvatarURL,
 	}
 
 	return database.Conn().Create(accountProvider).Error

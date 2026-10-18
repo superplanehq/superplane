@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { HEADER_MCP_RESOURCE, INLINE_SKILL } from "../__fixtures__/agentResourceFixtures";
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
+import { factoryAgentPath } from "../lib/factoryPagePaths";
 import { disabledAgentResourceIds } from "./disabledAgentResourceIds";
 import { PlanningReviewResourcesCard } from "./PlanningReviewResourcesCard";
 
@@ -75,11 +76,11 @@ describe("PlanningReviewResourcesCard", () => {
     renderCard();
 
     expect(screen.getByTestId("planning-review-resources-empty-mcp")).toHaveTextContent(
-      "Add MCP servers on the workspace settings page.",
+      "Add MCP servers on the Agent page.",
     );
     expect(screen.getAllByTestId("planning-review-resources-settings")[0]).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/agent`,
+      factoryAgentPath("org-1", PRIMARY_FACTORY_KEY),
     );
   });
 
@@ -94,7 +95,7 @@ describe("PlanningReviewResourcesCard", () => {
     expect(screen.getByText("Review UI copy.")).toBeInTheDocument();
     expect(screen.getAllByTestId("planning-review-resources-manage")[0]).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/agent`,
+      factoryAgentPath("org-1", PRIMARY_FACTORY_KEY),
     );
 
     await user.click(screen.getByTestId(`planning-review-resource-${HEADER_MCP_RESOURCE.id}`));
@@ -130,6 +131,22 @@ describe("PlanningReviewResourcesCard", () => {
 
     expect(screen.getByText("Off for the workspace.")).toBeInTheDocument();
     expect(screen.getByTestId(`planning-review-resource-${HEADER_MCP_RESOURCE.id}`)).toBeDisabled();
+  });
+
+  it("keeps system skills enabled even with a saved disabled ID", async () => {
+    const user = userEvent.setup();
+    const onDisabledIdsChange = vi.fn();
+    useFactoryAgentResources.mockImplementation((_org: string, _factory: string, kind: string) => ({
+      data: kind === "KIND_SKILL" ? [{ ...INLINE_SKILL, systemSkill: { templateId: "review-copy", version: 1 } }] : [],
+      isLoading: false,
+      isError: false,
+    }));
+    renderCard({ disabledIds: [INLINE_SKILL.id!], onDisabledIdsChange });
+    const toggle = screen.getByTestId(`planning-review-resource-${INLINE_SKILL.id}`);
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+    await user.click(toggle);
+    expect(onDisabledIdsChange).not.toHaveBeenCalled();
   });
 
   it("lets an automation turn a workspace-disabled tool on", async () => {

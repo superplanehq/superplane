@@ -233,18 +233,28 @@ func TestMCPBlockedAccountReturns401(t *testing.T) {
 	assert.Contains(t, rec.Header().Get("WWW-Authenticate"), "http://localhost:8000/.well-known/oauth-protected-resource/mcp")
 }
 
-func TestMCPAuthenticatedWithoutFeatureFlagReturns404(t *testing.T) {
+func TestMCPToolsListSucceedsWithoutMCPServerFlag(t *testing.T) {
 	r, server, signer := mcpEnabledServer(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 
-	token, err := mcpserver.MintAccessToken(signer, mcpAccessClaims(r, uuid.New()), time.Hour)
+	claims := mcpAccessClaims(r, uuid.New())
+	insertMCPAccessGrant(t, claims)
+	token, err := mcpserver.MintAccessToken(signer, claims, time.Hour)
 	require.NoError(t, err)
 
 	req := mcpRequest(http.MethodPost, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	server.Router.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusNotFound, rec.Code)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Nil(t, body["error"])
+	result, ok := body["result"].(map[string]any)
+	require.True(t, ok)
+	tools, ok := result["tools"].([]any)
+	require.True(t, ok)
+	assert.NotEmpty(t, tools)
 }
 
 func TestMCPDiscoveryListsAreEmpty(t *testing.T) {
@@ -459,6 +469,31 @@ func TestMCPEphemeralLoopbackAuthorizeAndExchange(t *testing.T) {
 	require.NoError(t, json.Unmarshal(accepted.Body.Bytes(), &tokenBody))
 	require.NotEmpty(t, tokenBody["access_token"])
 	require.NotEmpty(t, tokenBody["refresh_token"])
+}
+
+func TestMCPAuthorizeConsentDoesNotShowCodexMetadataURL(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
+	const codexID = "https://chatgpt.com/oauth/codex/example/client.json"
+	_, err := models.CreateMCPOAuthClient(database.DB(t.Context()), codexID, codexID, []string{mcpserver.CursorRedirectURIs[0]})
+	require.NoError(t, err)
+
+	query := url.Values{}
+	query.Set("client_id", codexID)
+	query.Set("redirect_uri", mcpserver.CursorRedirectURIs[0])
+	query.Set("response_type", "code")
+	query.Set("code_challenge", mcp.S256Challenge(mcpTestPKCEVerifier))
+	query.Set("code_challenge_method", "S256")
+	query.Set("state", "state-1")
+	authReq := httptest.NewRequest(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil)
+	authReq.Host = "localhost:8000"
+	authReq.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	authRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(authRec, authReq)
+	require.Equal(t, http.StatusOK, authRec.Code)
+	body := authRec.Body.String()
+	assert.Contains(t, body, "Choose the workspace Codex can use")
+	assert.NotContains(t, body, "Choose the workspace "+codexID)
 }
 
 func exchangeMCPCode(server *Server, code, clientID, redirectURI string) *httptest.ResponseRecorder {

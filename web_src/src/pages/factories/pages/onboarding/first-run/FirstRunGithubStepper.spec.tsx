@@ -10,7 +10,9 @@ describe("FirstRunGithubStepper", () => {
     expect(screen.getByText("Connect GitHub")).toBeInTheDocument();
     expect(screen.getByText("Choose organization")).toBeInTheDocument();
     expect(screen.getByText("Choose repository")).toBeInTheDocument();
-    expect(screen.queryByText("Grant access")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-step-connect")).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("first-run-step-organization")).toHaveAttribute("data-state", "upcoming");
+    expect(screen.getByTestId("first-run-step-repository")).toHaveAttribute("data-state", "upcoming");
   });
 
   it("marks connect complete on organization selection", () => {
@@ -20,7 +22,9 @@ describe("FirstRunGithubStepper", () => {
       </FirstRunGithubStepper>,
     );
 
-    expect(screen.getAllByTestId("first-run-step-done")).toHaveLength(1);
+    expect(screen.getByTestId("first-run-step-connect")).toHaveAttribute("data-state", "done");
+    expect(screen.getByTestId("first-run-step-organization")).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("first-run-step-repository")).toHaveAttribute("data-state", "upcoming");
     expect(
       within(screen.getByTestId("first-run-step-organization")).getByText("organization content"),
     ).toBeInTheDocument();
@@ -34,6 +38,7 @@ describe("FirstRunGithubStepper", () => {
     );
 
     expect(screen.getAllByTestId("first-run-step-done")).toHaveLength(2);
+    expect(screen.getByTestId("first-run-step-repository")).toHaveAttribute("data-state", "active");
     expect(screen.getByText("Organization: acme")).toBeInTheDocument();
     expect(within(screen.getByTestId("first-run-step-repository")).getByText("repository content")).toBeInTheDocument();
   });

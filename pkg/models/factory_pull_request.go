@@ -243,7 +243,10 @@ func (o *FactoryWorkOrder) CreatePullRequest(
 		if createErr := inner.Clauses(clause.Returning{}).Create(pullRequest).Error; createErr != nil {
 			return mapFactoryPullRequestConstraintError(createErr)
 		}
-		return o.RecordPullRequestAdded(inner, pullRequest.Ref(), params.Automation, params.Run)
+		if err := o.RecordPullRequestAdded(inner, pullRequest.Ref(), params.Automation, params.Run); err != nil {
+			return err
+		}
+		return pullRequest.enqueueChecksStart(inner)
 	})
 	if err != nil {
 		return nil, err

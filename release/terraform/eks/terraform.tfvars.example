@@ -12,8 +12,22 @@ letsencrypt_email = "admin@example.com"
 # SuperPlane
 # -----------------------------------------------------------------------------
 
-# superplane_image_tag = "stable"  # Options: stable, beta, or specific version like v0.4
+# Terraform downloads the chart from
+# oci://ghcr.io/superplanehq/superplane-chart. The chart uses the application
+# image at ghcr.io/superplanehq/superplane.
+# superplane_chart_version = "1.0.0-rc1"
+# superplane_image_tag    = ""  # Empty uses the chart's matching image.
 # superplane_namespace = "superplane"
+
+# Nominal PV/PVC capacity. EFS grows elastically and does not reserve this size.
+# runner_active_log_volume_capacity = "1Gi"
+
+# Create the runner security group, IAM roles, instance profile, and enable the
+# integrated Runner API. Install the standalone Fleet Manager chart after owner
+# setup with /admin/fleet-manager-setup.
+# enable_runners = true
+# runner_image_amd64 = "ami-0123456789abcdef0"
+# runner_image_arm64 = "ami-0fedcba9876543210"
 
 # -----------------------------------------------------------------------------
 # Optional Variables - AWS Region
@@ -29,7 +43,7 @@ letsencrypt_email = "admin@example.com"
 # -----------------------------------------------------------------------------
 
 # cluster_name    = "superplane"
-# cluster_version = "1.36"
+# cluster_version = "1.37"
 # node_count      = 2
 # instance_type   = "t3.medium"
 

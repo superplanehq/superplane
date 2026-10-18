@@ -53,6 +53,59 @@ output "superplane_url" {
 }
 
 # -----------------------------------------------------------------------------
+# Blob Storage Outputs
+# -----------------------------------------------------------------------------
+
+output "blob_bucket_name" {
+  description = "GCS bucket for SuperPlane blobs"
+  value       = local.gcs_blob_storage_enabled ? google_storage_bucket.blobs[0].name : null
+}
+
+output "app_service_account_email" {
+  description = "GCP service account that SuperPlane pods use through Workload Identity"
+  value       = local.gcs_blob_storage_enabled ? google_service_account.app[0].email : null
+}
+
+# -----------------------------------------------------------------------------
+# Runner Outputs
+# -----------------------------------------------------------------------------
+
+output "runner_subnetwork" {
+  description = "Subnetwork for runner VMs"
+  value       = local.runners_enabled ? google_compute_subnetwork.runners[0].id : null
+}
+
+output "runner_project" {
+  description = "GCP project for runner VMs"
+  value       = local.runners_enabled ? var.project_id : null
+}
+
+output "runner_zones" {
+  description = "Zones for runner VMs"
+  value       = local.runners_enabled ? local.runner_zones : null
+}
+
+output "runner_network_tag" {
+  description = "Network tag on runner VMs"
+  value       = local.runners_enabled ? local.runner_network_tag : null
+}
+
+output "runner_image_amd64" {
+  description = "Packer-built image configured for linux/amd64 runner VMs"
+  value       = local.runners_enabled ? var.runner_image_amd64 : null
+}
+
+output "runner_image_arm64" {
+  description = "Packer-built image configured for linux/arm64 runner VMs"
+  value       = local.runners_enabled ? var.runner_image_arm64 : null
+}
+
+output "fleet_manager_service_account_email" {
+  description = "GCP service account that Fleet Manager uses through Workload Identity"
+  value       = local.runners_enabled ? google_service_account.fleet_manager[0].email : null
+}
+
+# -----------------------------------------------------------------------------
 # kubectl Configuration Command
 # -----------------------------------------------------------------------------
 

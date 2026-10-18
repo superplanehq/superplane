@@ -9,6 +9,7 @@ import {
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
   factoriesCreateFactoryAutomation,
+  factoriesPreviewFactorySchedule,
   factoriesDeleteFactoryAutomation,
   factoriesListFactories,
   factoriesListFactoryAutomations,
@@ -38,6 +39,7 @@ import type {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
 import { buildOptimisticDispatchedOrder } from "@/pages/factories/lib/dispatchOptimistic";
+import { factoryPlanningEnabled } from "@/pages/factories/pages/planningSettingsModel";
 import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
@@ -62,7 +64,9 @@ import {
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
+import { integrationKeys } from "./useIntegrations";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
@@ -276,13 +280,16 @@ export function useFactoryWorkOrdersPage(
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     isFetchNextPageError: query.isFetchNextPageError,
+    totalCount: query.data?.pages[0]?.totalCount,
   };
 }
 
 export type FactoryBoardColumnPage = {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
+  isFetchNextPageError: boolean;
   fetchNextPage: () => void;
+  totalCount?: number;
 };
 
 export type FactoryBoardWorkOrders = {
@@ -298,9 +305,11 @@ function boardColumnPage(page: ReturnType<typeof useFactoryWorkOrdersPage>): Fac
   return {
     hasNextPage: page.hasNextPage,
     isFetchingNextPage: page.isFetchingNextPage,
+    isFetchNextPageError: page.isFetchNextPageError,
     fetchNextPage: () => {
       void page.fetchNextPage();
     },
+    totalCount: page.totalCount,
   };
 }
 
@@ -513,20 +522,28 @@ export function useSelectFactoryVcsProviderRepository(organizationId: string, fa
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (repositoryId: string) => {
+    mutationFn: async (selection: string | { repositoryId?: string; repository?: string }) => {
+      const repositoryId = typeof selection === "string" ? selection : selection.repositoryId;
+      const repository = typeof selection === "string" ? undefined : selection.repository;
       const response = await factoriesSelectFactoryVcsProviderRepository(
         withOrganizationHeader({
           organizationId,
           path: { id: factoryId },
-          body: { provider, repositoryId },
+          body: {
+            provider,
+            ...(repositoryId ? { repositoryId } : {}),
+            ...(repository ? { repository } : {}),
+          },
         }),
       );
       if (!response.data?.factory) throw new Error("Failed to select the repository");
       return response.data.factory;
     },
-    onSuccess: (factory) => {
+    onSuccess: async (factory) => {
       queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
       void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
+      // Repository selection can create the connection that onboarding reads next.
+      await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
     },
   });
 }
@@ -577,9 +594,12 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     },
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      // The Backlog run for this order is created asynchronously after this
-      // RPC returns. Show "Analyzing" until the canvas WebSocket delivers it.
-      markBacklogAnalysisPending(order.id);
+      // A Backlog run starts only when Planning is on. Show Analyzing until
+      // that run arrives. Missing factory data defaults to Planning on.
+      const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
+      if (factoryPlanningEnabled(factory)) {
+        markBacklogAnalysisPending(order.id);
+      }
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {
         void queryClient.invalidateQueries({
@@ -644,11 +664,12 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
       }
       return response.data.order;
     },
-    onSuccess: (_data, variables) => {
-      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      void queryClient.invalidateQueries({
-        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
-      });
+    onSuccess: (order, variables) => {
+      // Assignee saves bump updated_at on the server, so a ListWorkOrders
+      // refetch would resort the backlog and jump the card. Patch in place
+      // instead and keep the column order the user was looking at.
+      applyWorkOrderToListCaches(queryClient, organizationId, factoryId, variables.orderId, order);
+      queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, variables.orderId), order);
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });
@@ -909,7 +930,12 @@ export function useCreateFactoryAutomation(organizationId: string, factoryId: st
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name?: string; columnKey?: string }) => {
+    mutationFn: async (input: {
+      name?: string;
+      columnKey?: string;
+      templateId?: string;
+      installParams?: Record<string, string>;
+    }) => {
       const response = await factoriesCreateFactoryAutomation(
         withOrganizationHeader({
           organizationId,
@@ -917,6 +943,8 @@ export function useCreateFactoryAutomation(organizationId: string, factoryId: st
           body: {
             name: input.name,
             columnKey: input.columnKey,
+            templateId: input.templateId,
+            installParams: input.installParams,
           },
         }),
       );
@@ -1017,3 +1045,45 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
 }
 
 export type { FactoryAutomation, FactoriesFactoryLine, FactoryLineStep };
+
+export function useFactorySchedulePreview(
+  organizationId: string,
+  factoryId: string,
+  params: Record<string, string>,
+  enabled: boolean,
+) {
+  const [now, setNow] = useState(() => Date.now());
+  const preview = useQuery({
+    queryKey: ["factory-schedule-preview", organizationId, factoryId, params],
+    enabled: enabled && Boolean(organizationId && factoryId),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+    queryFn: async () => {
+      const response = await factoriesPreviewFactorySchedule(
+        withOrganizationHeader({ organizationId, path: { factoryId }, body: { installParams: params } }),
+      );
+      const nextRun = response.data?.nextRun;
+      const timestamp = Date.parse(nextRun ?? "");
+      if (!nextRun || !Number.isFinite(timestamp) || timestamp <= Date.now()) {
+        throw new Error("Could not calculate a future run. Try again.");
+      }
+      return nextRun;
+    },
+  });
+  const nextRunAt = Date.parse(preview.data ?? "");
+  const { refetch } = preview;
+  useEffect(() => {
+    const remaining = nextRunAt - Date.now();
+    if (!enabled || !Number.isFinite(remaining) || remaining <= 0) return;
+    const timer = setTimeout(
+      () => {
+        setNow(Date.now());
+        void refetch();
+      },
+      Math.min(remaining, 60_000),
+    );
+    return () => clearTimeout(timer);
+  }, [enabled, nextRunAt, now, refetch]);
+  return { ...preview, isFuture: nextRunAt > Math.max(now, Date.now()) };
+}

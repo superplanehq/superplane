@@ -61,9 +61,9 @@ variable "node_count" {
 }
 
 variable "machine_type" {
-  description = "Machine type for GKE nodes"
+  description = "Machine type for GKE nodes. Use e2-standard-2 or a larger type. The API and the runner pods share one log disk, so they run on one node. e2-medium does not have enough CPU for that node."
   type        = string
-  default     = "e2-medium"
+  default     = "e2-standard-2"
 }
 
 # -----------------------------------------------------------------------------
@@ -111,10 +111,95 @@ variable "superplane_namespace" {
   default     = "superplane"
 }
 
-variable "superplane_image_tag" {
-  description = "SuperPlane image tag (e.g., stable, beta, v0.4)"
+variable "superplane_image_registry" {
+  description = "Registry that hosts the SuperPlane image, without the image name."
   type        = string
-  default     = "stable"
+  default     = "ghcr.io/superplanehq"
+}
+
+variable "fleet_manager_image_registry" {
+  description = "Registry that hosts the standalone Fleet Manager image. Terraform uses this value only to grant GKE node pull access for a private GCP registry."
+  type        = string
+  default     = "ghcr.io/superplanehq"
+}
+
+variable "superplane_image_tag" {
+  description = "SuperPlane image tag. Empty uses the chart appVersion. Versioned releases use vMAJOR.MINOR.PATCH with an optional prerelease. Legacy selfhosted and local tags remain supported."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.superplane_image_tag == "" || can(regex("^v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$", var.superplane_image_tag)) || strcontains(var.superplane_image_tag, "selfhosted") || startswith(var.superplane_image_tag, "local-")
+    error_message = "Use a vMAJOR.MINOR.PATCH release tag, a legacy selfhosted tag, a local- tag, or leave the value empty."
+  }
+}
+
+variable "superplane_chart_path" {
+  description = "Path to a local SuperPlane Helm chart, for example ../../superplane-helm-chart/helm. Leave empty to install the published chart from oci://ghcr.io/superplanehq."
+  type        = string
+  default     = ""
+}
+
+variable "superplane_chart_version" {
+  description = "Published SuperPlane Helm chart version, for example 1.0.0-rc1. Required when superplane_chart_path is empty. Chart versions 0.30.0 and lower are the previous chart line."
+  type        = string
+  default     = "1.0.0-rc1"
+}
+
+# -----------------------------------------------------------------------------
+# Optional Variables - Blob Storage
+# -----------------------------------------------------------------------------
+
+variable "enable_gcs_blob_storage" {
+  description = "Store blobs (task logs and files) in a GCS bucket. SuperPlane uses Workload Identity to access the bucket. Runners require this."
+  type        = bool
+  default     = false
+}
+
+variable "blob_bucket_name" {
+  description = "Name of the GCS bucket for blobs. Leave empty to use <project_id>-superplane-blobs."
+  type        = string
+  default     = ""
+}
+
+variable "blob_bucket_force_destroy" {
+  description = "Delete all objects in the blob bucket on terraform destroy."
+  type        = bool
+  default     = false
+}
+
+# -----------------------------------------------------------------------------
+# Optional Variables - Runners
+# -----------------------------------------------------------------------------
+
+variable "enable_runners" {
+  description = "Enable the runner API and create the runner network and the Fleet Manager service account. Requires enable_gcs_blob_storage."
+  type        = bool
+  default     = false
+}
+
+variable "runner_subnet_cidr" {
+  description = "CIDR range of the runner subnetwork. It must not overlap other subnetworks or GKE ranges in the network."
+  type        = string
+  default     = "172.20.0.0/24"
+}
+
+variable "runner_zones" {
+  description = "Zones for runner VMs. Fleet Manager tries the next zone when a zone has no capacity. Leave empty to use var.zone."
+  type        = list(string)
+  default     = []
+}
+
+variable "runner_image_amd64" {
+  description = "Packer-built GCP image resource for linux/amd64 runner VMs."
+  type        = string
+  default     = ""
+}
+
+variable "runner_image_arm64" {
+  description = "Packer-built GCP image resource for linux/arm64 runner VMs."
+  type        = string
+  default     = ""
 }
 
 # -----------------------------------------------------------------------------

@@ -163,7 +163,7 @@ func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
 }
 
 func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
-	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol_review.md"))
 	require.NoError(t, err)
 	config := jsBuildConfigWithPrompt(t, "/task", map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
@@ -262,7 +262,7 @@ func TestBuildOpenCodeConfigAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	assert.Equal(t, true, superplane["enabled"])
 }
 
-func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
+func TestBuildOpenCodeConfigAllowsFallbacksForSelectedModel(t *testing.T) {
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
 	payload, err := json.Marshal(map[string]any{
@@ -284,7 +284,7 @@ func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	grok, _ := models["x-ai/grok-4.6"].(map[string]any)
 	options, _ := grok["options"].(map[string]any)
 	routing, _ := options["provider"].(map[string]any)
-	assert.Equal(t, false, routing["allow_fallbacks"])
+	assert.Equal(t, true, routing["allow_fallbacks"])
 	assert.Equal(t, "throughput", routing["sort"])
 	assert.Equal(t, true, grok["attachment"])
 	modalities, _ := grok["modalities"].(map[string]any)
@@ -496,16 +496,18 @@ func TestFormatOpenCodeJsonLinesEmitsUsageForEachFinishedStep(t *testing.T) {
 	output := runOpenCodeFormatter(t, []string{
 		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
 		`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"First reply"}}`,
-		`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":100,"output":20,"reasoning":3,"cache":{"read":40,"write":5}}}}`,
+		`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","cost":0.12,"tokens":{"input":100,"output":20,"reasoning":3,"cache":{"read":40,"write":5}}}}`,
 		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
 		`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"Second reply"}}`,
-		`{"type":"step-finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":80,"output":10,"reasoning":2,"cache":{"read":30,"write":4}}}}`,
+		`{"type":"step-finish","sessionID":"ses_1","part":{"type":"step-finish","cost":0.08,"tokens":{"input":80,"output":10,"reasoning":2,"cache":{"read":30,"write":4}}}}`,
 	})
 
 	turns := latestTurnRecords(t, output)
 	require.Len(t, turns, 2)
 	assertTurnRecordUsage(t, turns[1], 100, 20, 40, 5, 3)
 	assertTurnRecordUsage(t, turns[2], 80, 10, 30, 4, 2)
+	assert.InDelta(t, 0.12, turns[1]["usage"].(map[string]any)["total_cost_usd"], 1e-9)
+	assert.InDelta(t, 0.08, turns[2]["usage"].(map[string]any)["total_cost_usd"], 1e-9)
 }
 
 func TestFormatOpenCodeJsonLinesMarksFailedTools(t *testing.T) {
@@ -698,6 +700,56 @@ func TestRunPromptStopsAfterFourRateLimitAttempts(t *testing.T) {
 	requireNoTypedLiveLogLine(t, result.output, "Stopped after 4 attempts")
 	assert.NotContains(t, result.output, "attempt 5")
 	assert.Regexp(t, `✗ failed`, result.output)
+}
+
+func TestRunPromptResetsRetryAfterTwoSuccessfulRoundtrips(t *testing.T) {
+	message := "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			rateLimitSpawnWithSuccessfulRoundtrip(message),
+			rateLimitSpawnWithSuccessfulRoundtrip(message),
+			successSpawn("ok"),
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 3)
+	assert.Equal(t, []float64{30000, 30000}, result.sleeps)
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 1 of 4)")
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 2 of 4)")
+	requireStdoutLine(t, result.output, "Successful model calls reset the retry count to 1.")
+	requireStdoutLine(t, result.output, "Waiting 30 seconds, then retrying (attempt 1 of 4).")
+	requireNoTypedLiveLogLine(t, result.output, "Waiting 45 seconds")
+	assert.NotContains(t, result.output, "attempt 3")
+}
+
+func TestRunPromptDoesNotResetRetryOnFailedRoundtrip(t *testing.T) {
+	message := "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."
+	failedRoundtrip := spawnScript{
+		ExitCode: 1,
+		Stderr:   message,
+		Stdout: []string{
+			`{"type":"step_start","sessionID":"ses_fail","part":{"type":"step-start"}}`,
+			`{"type":"step_finish","sessionID":"ses_fail","part":{"type":"step-finish","reason":"error","tokens":{"input":1,"output":1}}}`,
+			fmt.Sprintf(`{"type":"error","error":{"data":{"message":%q}}}`, message),
+		},
+	}
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			failedRoundtrip,
+			failedRoundtrip,
+			failedRoundtrip,
+			failedRoundtrip,
+		},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 4)
+	assert.Equal(t, []float64{30000, 45000, 60000}, result.sleeps)
+	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/x-ai/grok-4.6 (attempt 4 of 4)")
+	requireStdoutLine(t, result.output, "Rate limit on x-ai/grok-4.6. Stopped after 4 attempts.")
+	assert.NotContains(t, result.output, "Successful model calls reset the retry count to 1.")
+	assert.NotContains(t, result.output, "attempt 5")
 }
 
 func TestRunPromptSucceedsWhenOpenCodeExitsNonZeroAfterReply(t *testing.T) {
@@ -1271,6 +1323,19 @@ func rateLimitSpawn(message string) spawnScript {
 		ExitCode: 1,
 		Stderr:   message,
 		Stdout:   []string{fmt.Sprintf(`{"type":"error","error":{"data":{"message":%q}}}`, message)},
+	}
+}
+
+func rateLimitSpawnWithSuccessfulRoundtrip(message string) spawnScript {
+	return spawnScript{
+		ExitCode: 1,
+		Stderr:   message,
+		Stdout: []string{
+			`{"type":"step_start","sessionID":"ses_work","part":{"type":"step-start"}}`,
+			`{"type":"text","sessionID":"ses_work","part":{"type":"text","text":"working"}}`,
+			`{"type":"step_finish","sessionID":"ses_work","part":{"type":"step-finish","reason":"stop","tokens":{"input":1,"output":1}}}`,
+			fmt.Sprintf(`{"type":"error","error":{"data":{"message":%q}}}`, message),
+		},
 	}
 }
 

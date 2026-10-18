@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { Icon } from "@/components/Icon";
 import { cn } from "@/lib/utils";
 import { settingsModalClassName } from "./settingsPageStyles";
+import { GitHubAppInstallationLink } from "./GitHubAppInstallationLink";
 import { GitHubConnectControls } from "./GitHubConnectControls";
 import { usesHostedGitHubAppInstall } from "@/lib/integrations";
 import { useIntegrationCatalog } from "@/hooks/useIntegrationCatalog";
@@ -235,7 +236,8 @@ function CatalogInstanceRow({
       <Plug className={`size-4 shrink-0 ${instancePlugClass(state, styles)}`} />
       <span className={instanceStatusLabelClass(appearance, state, styles)}>{integrationStatusLabel(state)}</span>
       <p className={styles.instanceName}>{integration.metadata?.name}</p>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
+        <GitHubAppInstallationLink integration={integration} />
         <PermissionTooltip
           allowed={catalog.canUpdateIntegrations || catalog.permissionsLoading}
           message="You don't have permission to update integrations."

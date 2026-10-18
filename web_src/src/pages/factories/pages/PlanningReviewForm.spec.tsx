@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ConfigurationField } from "@/api-client";
@@ -12,7 +13,7 @@ import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 
-import { HEADER_MCP_RESOURCE } from "../__fixtures__/agentResourceFixtures";
+import { HEADER_MCP_RESOURCE, INLINE_SKILL } from "../__fixtures__/agentResourceFixtures";
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import { PLANNING_REVIEW_DRAFT, type PlanningReviewDraft } from "./planningReviewMockup";
@@ -126,14 +127,16 @@ function renderForm(
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
-        <PlanningReviewForm
-          draft={draft}
-          onChange={props.onChange ?? vi.fn()}
-          organizationId="org-1"
-          factoryId={props.factoryId}
-          factoryKey={props.factoryKey}
-          showVisualEvidenceSetting={props.showVisualEvidenceSetting}
-        />
+        <ThemeProvider>
+          <PlanningReviewForm
+            draft={draft}
+            onChange={props.onChange ?? vi.fn()}
+            organizationId="org-1"
+            factoryId={props.factoryId}
+            factoryKey={props.factoryKey}
+            showVisualEvidenceSetting={props.showVisualEvidenceSetting}
+          />
+        </ThemeProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -206,7 +209,7 @@ describe("PlanningReviewForm model options", () => {
 
     renderForm(superPlaneDraft());
 
-    expect(screen.getByText("Model used")).toBeInTheDocument();
+    expect(screen.getByText("Model")).toBeInTheDocument();
     await user.click(screen.getByTestId("field-model-hosted-model"));
     await user.hover(screen.getByTestId("field-model-hosted-model-list"));
     expect(await screen.findByRole("menuitem", { name: "qwen/qwen3.7-max" })).toBeInTheDocument();
@@ -401,5 +404,55 @@ describe("PlanningReviewForm model options", () => {
         ],
       }),
     );
+  });
+  it("keeps prompt skill autocomplete behind the workspace skills flag", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useExperimentalFeature).mockReturnValue({
+      has: () => false,
+      isLoading: false,
+      enabledExperimentalFeatures: [],
+      organizationReady: true,
+    } as ReturnType<typeof useExperimentalFeature>);
+    vi.mocked(useFactoryAgentResources).mockReturnValue({ data: [INLINE_SKILL], isLoading: false } as ReturnType<
+      typeof useFactoryAgentResources
+    >);
+    renderForm(PLANNING_REVIEW_DRAFT, { factoryId: PRIMARY_FACTORY_ID, factoryKey: PRIMARY_FACTORY_KEY });
+    await user.click(screen.getByTestId("planning-review-step-toggle-1"));
+    expect(screen.queryByTestId("planning-review-step-body-1-skills")).not.toBeInTheDocument();
+  });
+
+  it("suggests only workspace skills enabled for this agent", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useExperimentalFeature).mockReturnValue({
+      has: (flag: string) => flag === FEATURE_WORKSPACE_SKILLS,
+      isLoading: false,
+      enabledExperimentalFeatures: [FEATURE_WORKSPACE_SKILLS],
+      organizationReady: true,
+    } as ReturnType<typeof useExperimentalFeature>);
+    vi.mocked(useFactoryAgentResources).mockReturnValue({
+      data: [
+        INLINE_SKILL,
+        { ...INLINE_SKILL, id: "workspace-off", name: "workspace-off", enabled: false },
+        { ...INLINE_SKILL, id: "agent-off", name: "agent-off" },
+      ],
+      isLoading: false,
+    } as ReturnType<typeof useFactoryAgentResources>);
+    const draft = {
+      ...PLANNING_REVIEW_DRAFT,
+      components: PLANNING_REVIEW_DRAFT.components.map((component) => ({
+        ...component,
+        configuration: {
+          ...component.configuration,
+          disabledAgentResourceIds: ["agent-off"],
+          steps: [{ name: "Refine", type: "prompt", prompt: "/" }],
+        },
+      })),
+    };
+    renderForm(draft, { factoryId: PRIMARY_FACTORY_ID, factoryKey: PRIMARY_FACTORY_KEY });
+    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
+    const field = screen.getByTestId("planning-review-step-body-0");
+    await user.click(field);
+    await user.keyboard("{End}");
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["/review-copyReview UI copy."]);
   });
 });

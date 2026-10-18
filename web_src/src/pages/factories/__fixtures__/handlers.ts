@@ -316,7 +316,7 @@ function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/automations"),
-      resolve: (match, method, body) => {
+      resolve: (match, method, body, url) => {
         const factoryId = match[1];
         if (method === "POST") {
           const request = (body ?? {}) as { name?: string; columnKey?: string };
@@ -328,6 +328,11 @@ function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           };
           fixture.appsByFactoryId[factoryId] = [...(fixture.appsByFactoryId[factoryId] ?? []), automation];
           return { json: { automation } };
+        }
+        const skillName = url.searchParams.get("skillName");
+        if (skillName) {
+          if (fixture.failSkillUsage) return { status: 503, json: { message: "Usage unavailable" } };
+          return { json: { automations: fixture.skillUsageByName?.[skillName] ?? [] } };
         }
         return { json: { automations: fixture.appsByFactoryId[factoryId] ?? [] } };
       },
@@ -491,7 +496,16 @@ function ensureAgentResources(fixture: FactoriesFixture, factoryId: string): Fac
 }
 
 function requestedAgentResourceKind(url: URL): FactoriesFactoryAgentResource["kind"] {
-  return url.searchParams.get("kind") === "KIND_SKILL" ? "KIND_SKILL" : "KIND_MCP_SERVER";
+  const kind = url.searchParams.get("kind");
+  if (
+    kind === "KIND_SKILL" ||
+    kind === "KIND_SETUP_COMMAND" ||
+    kind === "KIND_CONTEXT_REPO" ||
+    kind === "KIND_MCP_SERVER"
+  ) {
+    return kind;
+  }
+  return "KIND_MCP_SERVER";
 }
 
 const DEFAULT_MCP_TOOLS = [
@@ -506,11 +520,16 @@ function toolsForAgentResource(
   return fixture.agentResourceToolsById?.[resourceId] ?? DEFAULT_MCP_TOOLS;
 }
 
-function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unknown): FactoriesFactoryAgentResource {
-  const request = (body ?? {}) as FactoriesFactoryAgentResource & {
-    disabledTools?: string[];
-    replaceDisabledTools?: boolean;
-  };
+type AgentResourcePatchRequest = FactoriesFactoryAgentResource & {
+  disabledTools?: string[];
+  replaceDisabledTools?: boolean;
+  commands?: string[];
+  replaceCommands?: boolean;
+  repository?: string;
+  vcsProvider?: string;
+};
+
+function patchAgentResourceBase(resource: FactoriesFactoryAgentResource, request: AgentResourcePatchRequest) {
   if (typeof request.name === "string" && request.name.trim()) {
     resource.name = request.name.trim();
   }
@@ -529,6 +548,24 @@ function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unkno
   if (typeof request.markdown === "string") {
     resource.markdown = request.markdown;
   }
+}
+
+function patchAgentResourceSetupContext(resource: FactoriesFactoryAgentResource, request: AgentResourcePatchRequest) {
+  if (typeof request.repository === "string") {
+    resource.repository = request.repository;
+  }
+  if (typeof request.vcsProvider === "string") {
+    resource.vcsProvider = request.vcsProvider;
+  }
+  if (request.replaceCommands || Array.isArray(request.commands)) {
+    resource.commands = Array.isArray(request.commands) ? request.commands : [];
+  }
+}
+
+function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unknown): FactoriesFactoryAgentResource {
+  const request = (body ?? {}) as AgentResourcePatchRequest;
+  patchAgentResourceBase(resource, request);
+  patchAgentResourceSetupContext(resource, request);
   if (request.replaceDisabledTools) {
     resource.disabledTools = Array.isArray(request.disabledTools) ? request.disabledTools : [];
   }
@@ -579,6 +616,23 @@ function factoryAgentResourceOAuthDisconnectRoute(fixture: FactoriesFixture): Fa
   };
 }
 
+function factorySystemSkillRestoreRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/restore"),
+    resolve: (match, method) => {
+      if (method !== "POST") return { json: {} };
+      if (fixture.failAgentResourceRestoreForIds?.includes(match[2]))
+        return { status: 503, json: { message: "Could not restore skill." } };
+      const restored = fixture.restoredAgentResourcesById?.[match[2]];
+      const resources = ensureAgentResources(fixture, match[1]);
+      const index = resources.findIndex((entry) => entry.id === match[2]);
+      if (!restored || index < 0) return { status: 404, json: { message: "Skill not found." } };
+      resources[index] = { ...restored };
+      return { json: { resource: resources[index] } };
+    },
+  };
+}
+
 function factoryAgentResourceItemRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)"),
@@ -601,19 +655,65 @@ function factoryAgentResourceItemRoute(fixture: FactoriesFixture): FactoriesRout
   };
 }
 
+function createPostedSkillResource(factoryId: string, id: string, request: FactoriesFactoryAgentResource, now: string) {
+  return {
+    id,
+    factoryId,
+    kind: "KIND_SKILL" as const,
+    name: typeof request.name === "string" ? request.name.trim() : "skill",
+    enabled: request.enabled !== false,
+    markdown: typeof request.markdown === "string" ? request.markdown : "",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function createPostedSetupResource(factoryId: string, id: string, request: FactoriesFactoryAgentResource, now: string) {
+  return {
+    id,
+    factoryId,
+    kind: "KIND_SETUP_COMMAND" as const,
+    name: "setup",
+    enabled: request.enabled !== false,
+    commands: Array.isArray(request.commands) ? request.commands : [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function createPostedContextRepoResource(
+  factoryId: string,
+  id: string,
+  request: FactoriesFactoryAgentResource,
+  now: string,
+) {
+  const repository = typeof request.repository === "string" ? request.repository.trim() : "";
+  return {
+    id,
+    factoryId,
+    kind: "KIND_CONTEXT_REPO" as const,
+    name:
+      typeof request.name === "string" && request.name.trim()
+        ? request.name.trim()
+        : repository.toLowerCase().replace("/", "-") || "repo",
+    enabled: request.enabled !== false,
+    repository,
+    vcsProvider: typeof request.vcsProvider === "string" ? request.vcsProvider : "github",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function createPostedAgentResource(factoryId: string, id: string, request: FactoriesFactoryAgentResource) {
   const now = new Date().toISOString();
   if (request.kind === "KIND_SKILL") {
-    return {
-      id,
-      factoryId,
-      kind: "KIND_SKILL" as const,
-      name: typeof request.name === "string" ? request.name.trim() : "skill",
-      enabled: request.enabled !== false,
-      markdown: typeof request.markdown === "string" ? request.markdown : "",
-      createdAt: now,
-      updatedAt: now,
-    };
+    return createPostedSkillResource(factoryId, id, request, now);
+  }
+  if (request.kind === "KIND_SETUP_COMMAND") {
+    return createPostedSetupResource(factoryId, id, request, now);
+  }
+  if (request.kind === "KIND_CONTEXT_REPO") {
+    return createPostedContextRepoResource(factoryId, id, request, now);
   }
   return {
     id,
@@ -658,6 +758,7 @@ function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[]
     factoryAgentResourceToolsRoute(fixture),
     factoryAgentResourceOAuthStartRoute(fixture),
     factoryAgentResourceOAuthDisconnectRoute(fixture),
+    factorySystemSkillRestoreRoute(fixture),
     factoryAgentResourceItemRoute(fixture),
     factoryAgentResourceListRoute(fixture),
   ];
@@ -1031,7 +1132,7 @@ function listWorkOrdersFixture(
   fixture: FactoriesFixture,
   orders: FactoriesWorkOrder[],
   url: URL,
-): { orders: FactoriesWorkOrder[]; hasNextPage: boolean } {
+): { orders: FactoriesWorkOrder[]; hasNextPage: boolean; totalCount?: number } {
   const states = url.searchParams.getAll("states");
   const results = url.searchParams.getAll("results");
   const userId = url.searchParams.get("userId");
@@ -1079,10 +1180,11 @@ function listWorkOrdersFixture(
     }
     return (right.id ?? "").localeCompare(left.id ?? "");
   });
+  const totalCount = filtered.length;
   if (beforeId) {
     const cursor = filtered.find((order) => order.id === beforeId);
     if (!cursor) {
-      return { orders: [], hasNextPage: false };
+      return { orders: [], hasNextPage: false, totalCount };
     }
     const cursorTime = Date.parse(cursor.updatedAt ?? cursor.createdAt ?? "") || 0;
     filtered = filtered.filter((order) => {
@@ -1096,6 +1198,7 @@ function listWorkOrdersFixture(
   return {
     orders: filtered.slice(0, limit).map((order) => orderWithListChecks(fixture, order)),
     hasNextPage: filtered.length > limit,
+    totalCount,
   };
 }
 
@@ -1468,6 +1571,7 @@ function githubOnboardingRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   const onboarding = (): MeDescribeVcsProviderOnboardingResponse =>
     fixture.githubOnboarding ?? {
       providerConfigured: true,
+      accountConnectionRequired: true,
       repositories: [],
       pendingRequests: [],
       synchronizing: false,

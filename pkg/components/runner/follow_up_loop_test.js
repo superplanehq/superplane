@@ -2,11 +2,14 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 const {
   FOLLOW_UP_CMD_INDEX_BASE,
+  IDLE_TIMEOUT_MS,
   MAX_ATTACHMENT_BYTES,
   interpretWaitResponse,
   isAllowedSignedDownloadURL,
@@ -209,6 +212,43 @@ test("prepareIncomingAttachments processes audio follow-ups", () => {
   assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
 });
 
+test("prepareIncomingAttachments merges a hosted video and does not curl it", { skip: spawnSync("python3", ["--version"]).status !== 0 }, async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-hosted-"));
+  const hits = [];
+  const server = http.createServer((req, res) => {
+    hits.push(req.url);
+    res.end("<html>page</html>");
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const url = `http://127.0.0.1:${address.port}/watch`;
+  fs.copyFileSync(path.join(__dirname, "fetch_task_attachments.sh"), path.join(taskDir, "fetch_task_attachments.sh"));
+  fs.writeFileSync(path.join(taskDir, "process_video_attachments.sh"), "#!/bin/bash\nexit 0\n");
+  const previousTaskDir = process.env.SUPERPLANE_TASK_DIR;
+  process.env.SUPERPLANE_TASK_DIR = taskDir;
+  try {
+    prepareIncomingAttachments(taskDir, [
+      {
+        filename: "youtube-dQw4w9WgXcQ",
+        url,
+        kind: "hosted_video",
+      },
+    ]);
+  } finally {
+    if (previousTaskDir == null) {
+      delete process.env.SUPERPLANE_TASK_DIR;
+    } else {
+      process.env.SUPERPLANE_TASK_DIR = previousTaskDir;
+    }
+  }
+  await new Promise((resolve) => server.close(resolve));
+  const manifest = JSON.parse(fs.readFileSync(path.join(taskDir, "attachments", "manifest.json"), "utf8"));
+  assert.equal(manifest.files[0].kind, "hosted_video");
+  assert.equal(manifest.files[0].url, url);
+  assert.equal(hits.length, 0);
+  assert.equal(fs.existsSync(path.join(taskDir, "attachments", manifest.files[0].dest)), false);
+});
+
 test("ignores an empty user message", () => {
   assert.deepEqual(nextAction({ status: "message", text: "   " }), { type: "wait" });
 });
@@ -227,6 +267,72 @@ test("runLoop runs the user prompt then exits on ended", async () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
+});
+
+function fakeClock(start = 0) {
+  let current = start;
+  return {
+    now: () => current,
+    advance: (ms) => {
+      current += ms;
+    },
+  };
+}
+
+test("runLoop exits after five minutes with no user message", async () => {
+  const clock = fakeClock();
+  const logs = [];
+  let waits = 0;
+  const code = await runLoop({
+    waitOnce: async () => {
+      waits += 1;
+      clock.advance(45_000);
+      return { status: "pending" };
+    },
+    runPrompt: async () => {
+      throw new Error("no prompt expected");
+    },
+    sleep: async (ms) => clock.advance(ms),
+    log: (msg) => logs.push(msg),
+    now: clock.now,
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  // Each wait holds 45s plus a 1s retry; the seventh hold passes 300s.
+  assert.equal(waits, 7);
+  assert.ok(clock.now() < IDLE_TIMEOUT_MS + 46_000);
+  assert.match(logs[0], /no user message for 300 seconds/);
+});
+
+test("runLoop runs a message before the deadline on the same task and resets the clock", async () => {
+  const clock = fakeClock();
+  const prompts = [];
+  let waits = 0;
+  const code = await runLoop({
+    waitOnce: async () => {
+      waits += 1;
+      if (waits === 1) {
+        clock.advance(IDLE_TIMEOUT_MS - 1_000);
+        return { status: "message", text: "Add color" };
+      }
+      clock.advance(60_000);
+      return { status: "pending" };
+    },
+    runPrompt: async (text) => {
+      prompts.push(text);
+      // Agent work time does not count toward the idle wait.
+      clock.advance(20 * 60 * 1000);
+      return 0;
+    },
+    sleep: async () => {},
+    log: () => {},
+    now: clock.now,
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(prompts, ["Add color"]);
+  // After the prompt, five pending minutes pass before the loop exits.
+  assert.equal(waits, 1 + 5);
 });
 
 test("runLoop retries attachment preparation before running the prompt", async () => {
@@ -577,7 +683,8 @@ test("runLoop stays alive when waitOnce returns pending after a fetch throw", as
 
 test("runLoop emits cmd_start then cmd_end for each follow-up prompt", async () => {
   const records = [];
-  const nowValues = [5_000, 5_250, 6_000, 6_400];
+  // Loop start, then cmd start, cmd end, and idle clock reset per prompt.
+  const nowValues = [4_000, 5_000, 5_250, 5_250, 6_000, 6_400, 6_400];
   const results = [
     { status: "message", text: "Add color" },
     { status: "message", text: "Use the existing form" },
@@ -709,6 +816,11 @@ test("signedFileURLs keeps HMAC and object-storage image URLs", () => {
   const hmac = hmacSignedURL();
   const text = `See ![shot.png](${gcs}) and ![other](${hmac})`;
   assert.deepEqual(signedFileURLs(text), [gcs, hmac]);
+});
+
+test("signedFileURLs keeps Azure Blob image URLs", () => {
+  const azure = `https://account.blob.core.windows.net/runner/orgs/x/workspaces/y/tasks/z/${FILE_ID}?sp_file=1`;
+  assert.deepEqual(signedFileURLs(`See ![shot.png](${azure})`), [azure]);
 });
 
 test("signedFileURLs ignores unsigned URLs", () => {

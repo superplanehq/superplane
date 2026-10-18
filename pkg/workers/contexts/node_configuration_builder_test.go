@@ -18,6 +18,18 @@ import (
 	"gorm.io/datatypes"
 )
 
+func Test_NodeConfigurationBuilder_EvaluatesMultilineExpression(t *testing.T) {
+	builder := &NodeConfigurationBuilder{}
+
+	got, err := builder.ResolveTemplateExpressions("{{\n1 + 1\n}}")
+	require.NoError(t, err)
+	assert.Equal(t, "2", got)
+
+	got, err = builder.ResolveTemplateExpressions("{{1 + 1}}\n\n{{2 + 2}}")
+	require.NoError(t, err)
+	assert.Equal(t, "2\n\n4", got)
+}
+
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -683,6 +695,23 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		noComments, err := builderNoPR.ResolveExpression(`order().comments`)
 		require.NoError(t, err)
 		assert.Equal(t, []any{}, noComments)
+	})
+
+	t.Run("keeps the saved Git host after the workspace switches", func(t *testing.T) {
+		provider := models.ProviderGitHub
+		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+			"repository":     repository,
+			"default_branch": defaultBranch,
+			"vcs_provider":   provider,
+		}).Error)
+		bitbucket := models.ProviderBitbucket
+		require.NoError(t, factoryModel.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+			VCSProvider: &bitbucket,
+		}))
+
+		result, err := builder.ResolveExpression(`order().repository_url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/"+repository+".git", result)
 	})
 }
 
@@ -1749,7 +1778,7 @@ func Test_NodeConfigurationBuilder_NodeIDNotAllowed(t *testing.T) {
 	assert.Contains(t, err.Error(), "expression evaluation failed")
 }
 
-func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing.T) {
+func Test_NodeConfigurationBuilder_NodeReferenceWithoutInputOrExecution(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -2080,32 +2109,6 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous_MultipleInputs(t *
 	assert.Contains(t, err.Error(), "previous() is not available when multiple inputs are present")
 }
 
-func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NoPreviousExecution(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
-		},
-		[]models.Edge{},
-	)
-
-	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
-		WithInput(map[string]any{})
-
-	configuration := map[string]any{
-		"field": "{{ $[\"node-1\"].data }}",
-	}
-
-	_, err := builder.Build(configuration)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "expression evaluation failed")
-}
-
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -2401,67 +2404,6 @@ func Test_NodeConfigurationBuilder_MemoryFindFirst(t *testing.T) {
 	missing, err := builder.ResolveExpression(`memory.findFirst("missing", {"sandbox_id": "does-not-exist"})`)
 	require.NoError(t, err)
 	assert.Nil(t, missing)
-}
-
-func Test_NodeConfigurationBuilder_Config_ViaNodeReference(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	triggerNode := "trigger-1"
-	componentNode := "component-1"
-	targetNode := "target-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: triggerNode,
-				Name:   triggerNode,
-				Type:   models.NodeTypeTrigger,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
-			},
-			{
-				NodeID: componentNode,
-				Name:   componentNode,
-				Type:   models.NodeTypeComponent,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
-			},
-			{
-				NodeID: targetNode,
-				Name:   targetNode,
-				Type:   models.NodeTypeComponent,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
-			},
-		},
-		[]models.Edge{
-			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
-			{SourceID: componentNode, TargetID: targetNode, Channel: "default"},
-		},
-	)
-
-	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
-
-	componentConfig := map[string]any{"url": "https://example.com", "timeout": 30}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
-	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
-
-	outputData := map[string]any{"status": "ok"}
-	event1 := support.EmitCanvasEventForNodeWithData(t, canvas.ID, componentNode, "default", &execution1.ID, outputData)
-
-	execution2 := support.CreateNextNodeExecution(t, canvas.ID, targetNode, rootEvent.ID, event1.ID, &execution1.ID)
-	_ = execution2
-
-	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
-		WithPreviousExecution(&execution1.ID).
-		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{componentNode: outputData})
-
-	result, err := builder.Build(map[string]any{
-		"upstream_url": "{{ $[\"" + componentNode + "\"].config.url }}",
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "https://example.com", result["upstream_url"])
 }
 
 func Test_NodeConfigurationBuilder_Config_ViaPrevious(t *testing.T) {

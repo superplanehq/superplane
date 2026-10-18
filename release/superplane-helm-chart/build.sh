@@ -3,49 +3,55 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-if [ "${1-}" = "" ]; then
-  echo "Usage: release/superplane-helm-chart/build.sh <version>"
+if [ "$#" -ne 2 ]; then
+  echo "Usage: release/superplane-helm-chart/build.sh <version> <output-directory>"
   echo ""
-  echo "Example:"
-  echo "  release/superplane-helm-chart/build.sh v1.2.3"
+  echo "Examples:"
+  echo "  release/superplane-helm-chart/build.sh v1.2.3 build/superplane/v1.2.3"
   exit 1
 fi
 
 VERSION="$1"
+OUTPUT_DIR="$2"
 
-# Remove 'v' prefix if present for chart version
+# Chart version drops the leading v. appVersion stays the image tag.
 CHART_VERSION="${VERSION#v}"
+APP_VERSION="${VERSION}"
 
 echo "* Packaging Helm chart for version ${VERSION}"
 
 CHART_DIR="release/superplane-helm-chart/helm"
 CHART_NAME="superplane-chart"
-REGISTRY="oci://ghcr.io/superplanehq"
+mkdir -p "${OUTPUT_DIR}"
 
 # Update Helm dependencies
 echo "* Updating Helm dependencies"
 helm dependency update "${CHART_DIR}"
 
+echo "* Resolving component release defaults"
+node release/superplane-helm-chart/update-component-release-defaults.js
+
 # Package the chart with the specified version
-helm package "${CHART_DIR}" --version "${CHART_VERSION}" --app-version "${CHART_VERSION}"
+helm package "${CHART_DIR}" \
+  --version "${CHART_VERSION}" \
+  --app-version "${APP_VERSION}" \
+  --destination "${OUTPUT_DIR}" >/dev/null
 
 # Get the generated chart filename (Helm uses the chart name from Chart.yaml)
 CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
+RELEASE_FILE="superplane-${CHART_VERSION}.tgz"
 
-if [ ! -f "${CHART_FILE}" ]; then
+if [ ! -f "${OUTPUT_DIR}/${CHART_FILE}" ]; then
   echo "Error: Chart file ${CHART_FILE} was not created"
   exit 1
 fi
 
-echo "* Chart packaged: ${CHART_FILE}"
+test "$(helm show chart "${OUTPUT_DIR}/${CHART_FILE}" | awk '$1 == "version:" {print $2}')" = "${CHART_VERSION}"
+test "$(helm show chart "${OUTPUT_DIR}/${CHART_FILE}" | awk '$1 == "appVersion:" {print $2}')" = "${APP_VERSION}"
+mv "${OUTPUT_DIR}/${CHART_FILE}" "${OUTPUT_DIR}/${RELEASE_FILE}"
 
-echo "* Pushing chart to ${REGISTRY}"
-helm push "${CHART_FILE}" "${REGISTRY}"
-
-echo "* Cleaning up local chart file"
-rm -f "${CHART_FILE}"
+echo "* Chart packaged: ${OUTPUT_DIR}/${RELEASE_FILE}"
 
 echo ""
 echo "Done."
-echo "Chart pushed to: ${REGISTRY}/${CHART_NAME}:${CHART_VERSION}"
-
+echo "Chart: ${OUTPUT_DIR}/${RELEASE_FILE}"

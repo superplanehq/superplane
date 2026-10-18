@@ -106,6 +106,11 @@ func (s *FactoryService) CreateFactoryAutomation(ctx context.Context, req *pb.Cr
 	return actions.CreateFactoryAutomation(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) PreviewFactorySchedule(ctx context.Context, req *pb.PreviewFactoryScheduleRequest) (*pb.PreviewFactoryScheduleResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.PreviewFactorySchedule(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DeleteFactoryAutomation(ctx context.Context, req *pb.DeleteFactoryAutomationRequest) (*pb.DeleteFactoryAutomationResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DeleteFactoryAutomation(ctx, organizationID, req)
@@ -360,6 +365,11 @@ func (s *FactoryService) CreateFactoryAgentResource(ctx context.Context, req *pb
 func (s *FactoryService) UpdateFactoryAgentResource(ctx context.Context, req *pb.UpdateFactoryAgentResourceRequest) (*pb.UpdateFactoryAgentResourceResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryAgentResource(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) RestoreFactorySystemSkill(ctx context.Context, req *pb.RestoreFactorySystemSkillRequest) (*pb.RestoreFactorySystemSkillResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RestoreFactorySystemSkill(ctx, organizationID, req)
 }
 
 func (s *FactoryService) DeleteFactoryAgentResource(ctx context.Context, req *pb.DeleteFactoryAgentResourceRequest) (*pb.DeleteFactoryAgentResourceResponse, error) {

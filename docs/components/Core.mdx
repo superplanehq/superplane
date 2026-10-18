@@ -619,9 +619,13 @@ Supported types:
 
 Use the Add Pull Request component to attach a pull request to a task.
 
+Choose **Add new** or **Update existing**. Add new inserts another artifact. Update existing replaces the newest unkeyed artifact on this task with the same type and title. Artifacts with a key stay unchanged. When no unkeyed match exists, Update existing creates an unkeyed artifact.
+
+Update existing needs a stable title. A changed title adds a new artifact and leaves the old one. A duplicate title updates only the newest unkeyed match. Do not use Update existing for a branch. A branch has no title.
+
 Markdown and link types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
 
-Set `artifactKey` to tag the artifact with a queryable key so a later `findWorkOrder` (`by: artifactKey`) step can resolve this task. Keys are unique per factory.
+Set `artifactKey` to tag the artifact with a queryable key so a later `findWorkOrder` (`by: artifactKey`) step can resolve this task. Keys are unique per factory. The artifact key applies to Add new. Update existing does not use the artifact key.
 
 If you set a key, later runs update that artifact when `orderId` identifies the task that owns it. A run that targets another task with the same key fails. The update replaces the artifact data, so values that you leave blank are cleared. The first run sets the type. A later run with a different type fails.
 
@@ -942,7 +946,8 @@ On a match, emits `pullRequest.found` with the pull request and its task on the 
       "origin": {
         "label": "acme/app#42",
         "url": "https://github.com/acme/app/issues/42"
-      }
+      },
+      "url": "https://app.superplane.com/3ee1aa47-3a60-4c1f-b645-0b9859ab91f8/workspaces/sp-k7m2xqab/work-order/123"
     }
   },
   "timestamp": "2026-01-01T00:00:00Z",
@@ -1796,7 +1801,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
-SuperPlane keeps the selected OpenRouter model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. After 4 failed attempts, the prompt step fails. The live log shows each wait and retry.
+SuperPlane keeps the selected OpenRouter model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. Every 2 successful model calls set the attempt count back to 1. After 4 failed attempts without that reset, the prompt step fails. The live log shows each wait and retry.
 
 Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
@@ -1903,7 +1908,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
-When this agent uses OpenRouter, SuperPlane keeps the selected model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. After 4 failed attempts, the prompt step fails. The live log shows each wait and retry.
+When this agent uses OpenRouter, SuperPlane keeps the selected model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. Every 2 successful model calls set the attempt count back to 1. After 4 failed attempts without that reset, the prompt step fails. The live log shows each wait and retry.
 
 ### Output
 Prompt steps stream agent activity to **View logs**. The finished event includes the latest agent result.
@@ -2153,7 +2158,7 @@ This component can only be used in factory-owned apps.
 
 **Component key:** `updateWorkOrderStatus`
 
-The Update Task Status component transitions a task through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened task never ran).
+The Update Task Status component transitions a task through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open completed / rejected / failed / pr_closed / archived is valid, from draft rejected / archived is valid. A task whose pull request closes without a merge uses pr_closed. Archived tasks are hidden from the UI.
 
 `orderId` explicitly targets the task — it defaults to `{{ order().id }}`, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as `github.onPullRequest`, replace it with `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 

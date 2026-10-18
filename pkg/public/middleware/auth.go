@@ -625,7 +625,7 @@ func isOwnerSetupAllowedPath(path string) bool {
 	}
 
 	switch path {
-	case "/favicon.ico", "/robots.txt", "/manifest.webmanifest":
+	case "/favicon.ico", "/robots.txt", "/manifest.webmanifest", "/sw.js":
 		return true
 	}
 
@@ -673,6 +673,19 @@ func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, int64
 	iat, _ := claims["iat"].(float64)
 
 	return accountID, int64(iat), nil
+}
+
+// AccountFromRequest returns the signed-in account when the session cookie is
+// valid. A missing or invalid cookie is not an error.
+func AccountFromRequest(r *http.Request, jwtSigner *jwt.Signer) (*models.Account, bool) {
+	if r == nil || jwtSigner == nil {
+		return nil, false
+	}
+	account, err := getValidatedAccountFromCookie(r, jwtSigner)
+	if err != nil {
+		return nil, false
+	}
+	return account, true
 }
 
 // getValidatedAccountFromCookie reads the account_token cookie, loads the

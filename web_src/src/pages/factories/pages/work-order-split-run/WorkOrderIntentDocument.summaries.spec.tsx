@@ -49,41 +49,29 @@ describe("WorkOrderIntentDocument score evidence", () => {
     resetStreamMemoryForTests();
   });
 
-  it.each([2, 4])("keeps the original controls when the flag is off at confidence %s", async (score) => {
-    const onStart = vi.fn();
+  it.each([2, 4])("shows the review controls for a stored confidence %s", (score) => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
-        planningReviewEnabled={false}
         artifacts={[INTENT]}
         confidence={{ ...HIGH_CONFIDENCE, score }}
-        resultFooter={
-          <SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} onStart={onStart} compact />
-        }
         analysis={analysisChat({
-          modelSelect: <button type="button">Model: Auto</button>,
           view: {
             machineStatus: "waiting",
             messages: [{ id: "agent-1", kind: "text", role: "agent", text: "I need one detail." }],
-            survey: { id: "survey-1", questions: [{ prompt: "Which customers?", options: ["Existing customers"] }] },
           },
         })}
       />,
     );
-    expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toBeVisible();
-    expect(screen.getByText("Which customers?")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeVisible();
-    expect(screen.queryByRole("region", { name: "Plan" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Override" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Start" }));
-    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Open plan" })).toBeVisible();
+    expect(screen.getByRole("button", { name: `Confidence ${score}/5` })).toBeVisible();
   });
 
   it.each([
-    { score: 2, clarity: 4, discouraged: true },
-    { score: 4, clarity: 4, discouraged: false },
-    { score: 4, clarity: 2, discouraged: true },
-  ])("shows pending questions with confidence $score and clarity $clarity", async ({ score, clarity, discouraged }) => {
+    { score: 2, clarity: 4 },
+    { score: 4, clarity: 4 },
+    { score: 4, clarity: 2 },
+  ])("shows pending questions with confidence $score and clarity $clarity", async ({ score, clarity }) => {
     const user = userEvent.setup();
     const onSubmitSurvey = vi.fn();
     const onStart = vi.fn();
@@ -116,30 +104,19 @@ describe("WorkOrderIntentDocument score evidence", () => {
       plan.compareDocumentPosition(screen.getByText("Which customers?")) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(screen.queryByRole("textbox", { name: "Tell the agent more about this task" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Review before you start")).not.toBeInTheDocument();
     const implementation = screen.getByRole("region", { name: "Implementation" });
-    expect(screen.getByTestId("split-run-intent-chat-log")).not.toContainElement(implementation);
-    expect(within(plan).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(within(implementation).getByRole("button", { name: "Model: Auto" })).toBeVisible();
+    const start = within(implementation).getByRole("button", { name: "Start" });
+    expect(start).toBeEnabled();
+    if (score < 3 || clarity < 3) {
+      expect(implementation).toHaveTextContent("Review the plan before you start");
+    }
     expect(screen.queryByRole("button", { name: "Suggest changes" })).not.toBeInTheDocument();
-    if (!discouraged) {
-      expect(within(implementation).getByRole("button", { name: "Model: Auto" })).toBeVisible();
-      expect(within(implementation).queryByRole("button", { name: "Override" })).not.toBeInTheDocument();
-      expect(implementation).not.toHaveTextContent("Starting not recommended");
-      await user.click(within(implementation).getByRole("button", { name: "Start" }));
-      expect(onStart).toHaveBeenCalledTimes(1);
-    }
-    if (discouraged) {
-      expect(within(implementation).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-      expect(within(implementation).queryByRole("button", { name: "Model: Auto" })).not.toBeInTheDocument();
-      expect(within(implementation).getByRole("button", { name: "Override" })).toHaveAttribute(
-        "aria-expanded",
-        "false",
-      );
-      expect(implementation).toHaveTextContent("Starting not recommended");
-    }
     await user.type(screen.getByRole("textbox", { name: /Which customers/ }), "Only paying customers");
-    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswer }));
     expect(onSubmitSurvey).toHaveBeenCalledWith(expect.stringContaining("Only paying customers"));
+    await user.click(start);
+    expect(onStart).toHaveBeenCalledTimes(1);
   });
 
   it("keeps survey answers and errors visible without a plan, then restores the composer", async () => {
@@ -161,6 +138,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
       <WorkOrderIntentDocument {...INTENT_DOC} artifacts={[]} analysis={analysis} />,
     );
     expect(screen.queryByRole("region", { name: "Plan" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Implementation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open plan" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Tell the agent more about this task" })).not.toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: /Which customers/ }), "Paying customers");
@@ -170,7 +148,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
     rerender(document({ ...analysis, composerError: "The answer did not send. Try again." }));
     expect(screen.getByRole("alert")).toHaveTextContent("The answer did not send. Try again.");
     expect(screen.getByRole("textbox", { name: /Which customers/ })).toHaveValue("Paying customers");
-    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toBeEnabled();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswer })).toBeEnabled();
 
     rerender(
       document({
@@ -190,7 +168,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
     );
   });
 
-  it("shows the plan title and keeps both scores as evidence", () => {
+  it("uses the plan title as the open action and keeps both scores as evidence", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -204,8 +182,8 @@ describe("WorkOrderIntentDocument score evidence", () => {
     const card = screen.getByTestId("split-run-intent-status-card");
     expect(card).toHaveAttribute("data-slot", "frame");
     const verdict = within(card).getByTestId("split-run-intent-verdict");
-    expect(verdict).toHaveTextContent("Clearer empty state");
-    expect(verdict).toHaveTextContent("Draft plan");
+    expect(within(verdict).getByRole("button", { name: "Open plan" })).toHaveTextContent("Clearer empty state");
+    expect(verdict).not.toHaveTextContent("Draft plan");
     const clarity = within(card).getByTestId("split-run-intent-composer-score");
     const confidence = within(card).getByTestId("split-run-intent-composer-confidence");
     expect(clarity).toHaveAccessibleName("Clarity 4/5");
@@ -218,8 +196,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(screen.queryByTestId("split-run-intent-summary-drawer")).not.toBeInTheDocument();
   });
 
-  it("keeps ready Start below the conversation and opens the composer above it", async () => {
-    const user = userEvent.setup();
+  it("keeps ready Start below the visible composer", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -236,8 +213,9 @@ describe("WorkOrderIntentDocument score evidence", () => {
 
     const card = screen.getByTestId("split-run-intent-status-card");
     const verdict = within(card).getByTestId("split-run-intent-verdict");
-    expect(within(verdict).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(verdict).getByRole("button", { name: "Open plan" })).toBeInTheDocument();
     const settings = screen.getByRole("region", { name: "Implementation" });
+    expect(within(settings).getByText("Implementation")).toBeVisible();
     const plan = within(card).getByRole("button", { name: "Open plan" });
     const model = within(settings).getByRole("button", { name: "Model: Auto" });
     const start = within(settings).getByRole("button", { name: "Start" });
@@ -248,10 +226,9 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(settings).not.toHaveTextContent("Starting not recommended");
     expect(within(settings).getByTestId("split-run-draft-action-group")).not.toHaveClass("border");
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Tell the agent more about this task" })).not.toBeInTheDocument();
-    await user.click(within(settings).getByRole("button", { name: "Suggest changes" }));
     const composer = screen.getByRole("textbox", { name: "Tell the agent more about this task" });
-    expect(composer).toHaveFocus();
+    expect(composer).toBeVisible();
+    expect(within(settings).queryByRole("button", { name: "Suggest changes" })).not.toBeInTheDocument();
     expect(composer.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByTestId("split-run-intent-chat-log")).not.toContainElement(
       screen.getByRole("region", { name: "Implementation" }),
@@ -263,6 +240,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
     { name: "low clarity", clarity: 2 },
     { name: "active analysis", machineStatus: "running" as const },
     { name: "missing plan", noPlan: true },
+    { name: "active analysis without a plan", machineStatus: "running" as const, noPlan: true },
     { name: "existing draft", composer: "Keep this draft" },
     { name: "send error", composerError: "The message did not send. Try again." },
   ])("keeps the composer visible with high confidence and $name", (state) => {
@@ -284,9 +262,12 @@ describe("WorkOrderIntentDocument score evidence", () => {
       state.composer ?? "",
     );
     expect(screen.queryByRole("button", { name: "Suggest changes" })).not.toBeInTheDocument();
+    if (state.noPlan) {
+      expect(screen.queryByRole("region", { name: "Implementation" })).not.toBeInTheDocument();
+    }
   });
 
-  it("reveals discouraged implementation options without starting and can hide them again", async () => {
+  it.each([1, 2])("keeps secondary Start available with one warning at confidence %s", async (score) => {
     const user = userEvent.setup();
     const onStart = vi.fn();
     renderIntentDocument(
@@ -294,7 +275,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
         {...INTENT_DOC}
         artifacts={[INTENT]}
         clarity={HIGH_CLARITY}
-        confidence={{ ...HIGH_CONFIDENCE, score: 2 }}
+        confidence={{ ...HIGH_CONFIDENCE, score }}
         resultFooter={
           <SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} onStart={onStart} compact />
         }
@@ -302,28 +283,22 @@ describe("WorkOrderIntentDocument score evidence", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Model: Auto" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Override" }));
     expect(onStart).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Model: Auto" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Hide options" })).toHaveAttribute("aria-expanded", "true");
     const start = screen.getByRole("button", { name: "Start" });
     expect(start).not.toHaveClass("bg-primary");
     expect(start).toHaveClass("border");
     expect(screen.getByTestId("split-run-intent-chat-log")).not.toContainElement(
       screen.getByRole("region", { name: "Implementation" }),
     );
-    expect(screen.getByRole("region", { name: "Implementation" })).toHaveTextContent("Starting not recommended");
+    expect(screen.getByRole("region", { name: "Implementation" })).toHaveTextContent(
+      "Review the plan before you start",
+    );
     expect(start).toBeEnabled();
     expect(screen.queryByTestId("split-run-intent-settings")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Suggest changes" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Hide options" }));
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Model: Auto" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Override" }));
-    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.click(start);
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
@@ -416,5 +391,58 @@ describe("WorkOrderIntentDocument score evidence", () => {
 
     expect(screen.queryByRole("button", { name: /^(Open|Hide) plan$/ })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-plan-open")).toBe(false);
+  });
+});
+
+describe("WorkOrderIntentDocument narrow implementation controls", () => {
+  const desktopWidth = window.innerWidth;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.stubGlobal("ResizeObserver", IntentDocumentResizeObserver);
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 });
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+    vi.unstubAllGlobals();
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: desktopWidth });
+    resetStreamMemoryForTests();
+  });
+
+  function renderDiscouragedDraft(onStart = vi.fn()) {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={HIGH_CLARITY}
+        confidence={{ ...HIGH_CONFIDENCE, score: 3 }}
+        resultFooter={
+          <SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} onStart={onStart} compact />
+        }
+        analysis={analysisChat({ view: WAITING_WITH_PLAN, modelSelect: <button type="button">Model: Auto</button> })}
+      />,
+    );
+    return onStart;
+  }
+
+  it("shows the plan warning and secondary Start without another step", async () => {
+    const user = userEvent.setup();
+    const onStart = renderDiscouragedDraft();
+
+    expect(onStart).not.toHaveBeenCalled();
+    const implementation = screen.getByRole("region", { name: "Implementation" });
+    const headline = within(implementation).getByText("Review the plan before you start");
+    expect(headline).toBeVisible();
+
+    const actions = screen.getByTestId("split-run-intent-settings");
+    expect(actions).toContainElement(screen.getByRole("button", { name: "Model: Auto" }));
+    expect(actions).toContainElement(screen.getByRole("button", { name: "Start" }));
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).not.toHaveClass("bg-primary");
+    expect(start).toHaveClass("border");
+
+    await user.click(start);
+    expect(onStart).toHaveBeenCalledTimes(1);
   });
 });

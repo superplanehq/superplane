@@ -1,0 +1,83 @@
+version: v1.0
+name: "Publish Runner Release"
+
+queue:
+  name: component-releases
+  scope: project
+  processing: serialized
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+      - test "$SEMAPHORE_GIT_BRANCH" = main
+      - test "$SEMAPHORE_PIPELINE_PROMOTION" = true
+      - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
+
+blocks:
+  - name: "Publish"
+    task:
+      jobs:
+        - name: "Publish immutable Runner release"
+          commands:
+            - bash release/component-release-artifact.sh pull runner "$RELEASE_VERSION" "build/runner/$RELEASE_VERSION"
+            - |
+              set -euo pipefail
+              release_dir="build/runner/$RELEASE_VERSION"
+              (cd "$release_dir" && sha256sum --check release-manifest.sha256)
+              node release/component-release.js verify-manifest \
+                --component runner \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
+                --directory "$release_dir" \
+                --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
+                --manifest "$release_dir/release-manifest.json"
+              (cd "$release_dir" && sha256sum --check checksums.txt)
+              test -n "${GITHUB_TOKEN:-}"
+            - bash release/fetch-component-release-history.sh
+            - |
+              set -euo pipefail
+              node release/component-release.js generate-release-notes \
+                --component runner \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --output /tmp/runner-release-notes.md \
+                --github-authors
+            - |
+              set -euo pipefail
+              release_dir="build/runner/$RELEASE_VERSION"
+              node release/component-release.js stage-github-release \
+                --component runner \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --directory "$release_dir" \
+                --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
+                --release-id-file /tmp/github-release-id
+            - |
+              set -euo pipefail
+              release_notes_args=()
+              if [ -f /tmp/runner-release-notes.md ]; then
+                release_notes_args=(--release-notes /tmp/runner-release-notes.md)
+              fi
+              node release/component-release.js publish-github-release \
+                --release-id "$(cat /tmp/github-release-id)" \
+                --component runner \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                "${release_notes_args[@]}"
+            - |
+              set -euo pipefail
+              encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "runner/$RELEASE_VERSION")"
+              bash release/verify-public-assets.sh \
+                "https://github.com/superplanehq/superplane/releases/download/$encoded_tag" \
+                "build/runner/$RELEASE_VERSION" \
+                runner-linux-amd64.tar.gz \
+                runner-linux-arm64.tar.gz \
+                runner.spdx.json \
+                checksums.txt

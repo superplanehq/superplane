@@ -11,6 +11,16 @@ import {
   factorySettingsWideSectionHeaderClassName,
 } from "../factoryPageLayoutStyles";
 
+function hasSettingsCardBody(children: ReactNode): boolean {
+  return children != null && children !== false;
+}
+
+function settingsCardHeaderClassName(attachedList: boolean, hasBody: boolean, hasAction: boolean): string {
+  const spacing = attachedList ? "pb-2" : hasBody && "mb-3";
+  const alignment = hasAction && hasBody ? "items-start" : "items-center";
+  return cn("flex flex-wrap justify-between gap-3", spacing, alignment);
+}
+
 export function FactorySettingsPageFrame({
   title,
   subtitle,
@@ -72,6 +82,8 @@ export function FactorySettingsCard({
   titleClassName,
   description,
   action,
+  icon,
+  iconClassName,
   children,
   className,
   attachedList = false,
@@ -82,7 +94,11 @@ export function FactorySettingsCard({
   titleClassName?: string;
   description?: ReactNode;
   action?: ReactNode;
-  children: ReactNode;
+  /** Small glyph in a tile before the title, such as a section icon. */
+  icon?: ReactNode;
+  /** Extra classes for the icon tile, such as a section tint. */
+  iconClassName?: string;
+  children?: ReactNode;
   className?: string;
   /** List rows sit directly under the header with a top border, like integration instances. */
   attachedList?: boolean;
@@ -90,37 +106,77 @@ export function FactorySettingsCard({
   "data-testid"?: string;
 }) {
   const sectionId = id ?? testId;
-  const showHeader = Boolean(title || description || action);
+  const hasBody = hasSettingsCardBody(children);
   return (
     <section
       id={sectionId}
       className={cn(factoryCardClassName, "scroll-mt-8 p-4", attachedList && "pb-0", className)}
       data-testid={testId}
     >
-      {showHeader ? (
-        <div
-          className={cn(
-            "flex justify-between gap-3",
-            attachedList ? "pb-2" : "mb-3",
-            action ? "items-start" : "items-center",
-          )}
-        >
-          {title || description ? (
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              {title ? (
-                <h2 className={cn("text-[13px] font-medium tracking-[-0.01em] text-foreground", titleClassName)}>
-                  {title}
-                </h2>
-              ) : null}
-              {description ? <p className="text-[12px] text-muted-foreground">{description}</p> : null}
-            </div>
-          ) : (
-            <div className="min-w-0 flex-1" />
-          )}
-          {action}
-        </div>
+      {title || description || action || icon ? (
+        <SettingsCardHeader
+          title={title}
+          titleClassName={titleClassName}
+          description={description}
+          action={action}
+          icon={icon}
+          iconClassName={iconClassName}
+          attachedList={attachedList}
+          hasBody={hasBody}
+        />
       ) : null}
-      {children}
+      {hasBody ? children : null}
     </section>
+  );
+}
+
+function SettingsCardHeader({
+  title,
+  titleClassName,
+  description,
+  action,
+  icon,
+  iconClassName,
+  attachedList,
+  hasBody,
+}: {
+  title?: string;
+  titleClassName?: string;
+  description?: ReactNode;
+  action?: ReactNode;
+  icon?: ReactNode;
+  iconClassName?: string;
+  attachedList: boolean;
+  hasBody: boolean;
+}) {
+  return (
+    <div className={settingsCardHeaderClassName(attachedList, hasBody, Boolean(action))}>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {icon ? (
+          <span
+            aria-hidden
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/60 text-muted-foreground",
+              iconClassName,
+            )}
+          >
+            {icon}
+          </span>
+        ) : null}
+        {title || description ? (
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            {title ? (
+              <h2 className={cn("text-[13px] font-medium tracking-[-0.01em] text-foreground", titleClassName)}>
+                {title}
+              </h2>
+            ) : null}
+            {description ? <p className="text-[12px] text-muted-foreground">{description}</p> : null}
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1" />
+        )}
+      </div>
+      {action}
+    </div>
   );
 }

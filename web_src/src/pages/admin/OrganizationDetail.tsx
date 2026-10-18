@@ -11,6 +11,7 @@ import { OrgIntegrationsTable } from "./OrgIntegrationsTable";
 import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
 import { OrgOverviewPanel } from "./OrgOverviewPanel";
 import { OrgUsersTable } from "./OrgUsersTable";
+import { OrganizationVelocityPanel } from "./OrganizationVelocityPanel";
 import { useAdminOrganizationSpendingReport } from "./useAdminOrganizationSpendingReport";
 
 const ORGANIZATION_TABS = [
@@ -20,6 +21,7 @@ const ORGANIZATION_TABS = [
   "connections",
   "features",
   "spending",
+  "velocity",
   "credits",
 ] as const;
 
@@ -34,6 +36,7 @@ const OrganizationDetail: React.FC = () => {
   const [tab, setTab] = useState<OrganizationTab>("overview");
   const [creditsVisited, setCreditsVisited] = useState(false);
   const [spendingVisited, setSpendingVisited] = useState(false);
+  const [velocityVisited, setVelocityVisited] = useState(false);
 
   useReportPageReady(true);
 
@@ -58,6 +61,9 @@ const OrganizationDetail: React.FC = () => {
           if (nextTab === "spending") {
             setSpendingVisited(true);
           }
+          if (nextTab === "velocity") {
+            setVelocityVisited(true);
+          }
           setTab(nextTab);
         }}
       >
@@ -68,6 +74,7 @@ const OrganizationDetail: React.FC = () => {
           <TabsTrigger value="connections">Connections</TabsTrigger>
           <TabsTrigger value="features">Features</TabsTrigger>
           <TabsTrigger value="spending">Spending</TabsTrigger>
+          <TabsTrigger value="velocity">Velocity</TabsTrigger>
           <TabsTrigger value="credits">Credits</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-3">
@@ -95,6 +102,13 @@ const OrganizationDetail: React.FC = () => {
             setDocumentTitle={false}
             useReport={useAdminOrganizationSpendingReport}
           />
+        </TabsContent>
+        <TabsContent
+          value="velocity"
+          forceMount={velocityVisited || undefined}
+          className="mt-3 data-[state=inactive]:hidden"
+        >
+          <OrganizationVelocityPanel orgId={orgId!} />
         </TabsContent>
         <TabsContent
           value="credits"
