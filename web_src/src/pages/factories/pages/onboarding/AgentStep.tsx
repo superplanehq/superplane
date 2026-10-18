@@ -2,11 +2,23 @@ import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceU
 import { cn } from "@/lib/utils";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import { KeyRound } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { hostedCreditGrantCopy, shouldShowHostedCreditGrant } from "./onboardingAgentReadiness";
 import { AGENT_OPTIONS, CUSTOM_PROVIDER_OPTION, type IntegrationId } from "./onboardingFixtures";
 import { ConnectOptionRow, IntegrationChoiceIcon } from "./onboardingSteps";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
+
+export type OnboardingAgentModelPicker = {
+  models: string[];
+  value: string;
+  loading: boolean;
+  error: boolean;
+  retry: () => void;
+  onChange: (model: string) => void;
+};
 
 export function AgentStep({
   organizationId,
@@ -14,12 +26,14 @@ export function AgentStep({
   showHostedCredit = true,
   showCustomProvider = false,
   onRequestConnect,
+  modelPicker,
 }: {
   organizationId: string;
   setup: OnboardingSetupApi;
   showHostedCredit?: boolean;
   showCustomProvider?: boolean;
   onRequestConnect: (id: IntegrationId) => void;
+  modelPicker?: OnboardingAgentModelPicker;
 }) {
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const grantTotalCents = parseWorkOrderMetric(spend.data?.grantTotalCents);
@@ -62,6 +76,43 @@ export function AgentStep({
           />
         ))}
       </div>
+      {modelPicker ? <AgentModelSelect picker={modelPicker} /> : null}
+    </div>
+  );
+}
+
+function AgentModelSelect({ picker }: { picker: OnboardingAgentModelPicker }) {
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor="onboarding-agent-model">Model</Label>
+      <Select
+        value={picker.value}
+        onValueChange={picker.onChange}
+        disabled={picker.loading || picker.error || picker.models.length === 0}
+      >
+        <SelectTrigger id="onboarding-agent-model" aria-describedby="onboarding-agent-model-help">
+          <SelectValue placeholder={picker.loading ? "Loading models..." : "Select a model"} />
+        </SelectTrigger>
+        <SelectContent>
+          {picker.models.map((model) => (
+            <SelectItem key={model} value={model}>
+              {model}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p id="onboarding-agent-model-help" className="text-xs text-muted-foreground">
+        {picker.error
+          ? "Unable to load models. Try again."
+          : !picker.loading && picker.models.length === 0
+            ? "No models are available for this key."
+            : "Use this model for Planning, Implementation, and other factory agents."}
+      </p>
+      {picker.error ? (
+        <Button type="button" variant="outline" onClick={picker.retry}>
+          Retry
+        </Button>
+      ) : null}
     </div>
   );
 }

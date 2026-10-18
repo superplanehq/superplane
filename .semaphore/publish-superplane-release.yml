@@ -1,0 +1,149 @@
+version: v1.0
+name: "Publish SuperPlane Release"
+
+queue:
+  name: component-releases
+  scope: project
+  processing: serialized
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: SUPERPLANE_IMAGE_REPO
+      value: ghcr.io/superplanehq/superplane
+    - name: SUPERPLANE_CHART_REPO
+      value: oci://ghcr.io/superplanehq/superplane-chart
+    - name: SKOPEO_CONTAINER_IMAGE
+      value: quay.io/skopeo/stable:v1.22.3-immutable@sha256:c0ee1f4edca5c01cb8d5611124f92f3cc47196ecab68aee5d0f90834e00574d5
+  prologue:
+    commands:
+      - checkout
+      - test "$SEMAPHORE_GIT_BRANCH" = main
+      - test "$SEMAPHORE_PIPELINE_PROMOTION" = true
+      - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
+
+blocks:
+  - name: "Verify Prepared Release"
+    dependencies: []
+    task:
+      jobs:
+        - name: "Verify immutable artifacts"
+          commands:
+            - bash release/component-release-artifact.sh pull superplane "$RELEASE_VERSION" "build/superplane/$RELEASE_VERSION"
+            - |
+              set -euo pipefail
+              release_dir="build/superplane/$RELEASE_VERSION"
+              (cd "$release_dir" && sha256sum --check release-manifest.sha256)
+              node release/component-release.js verify-manifest \
+                --component superplane \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
+                --directory "$release_dir" \
+                --assets "install.sh,superplane-cli-darwin-amd64,superplane-cli-darwin-arm64,superplane-cli-linux-amd64,superplane-cli-linux-arm64,superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_VERSION#v}.tgz,checksums.txt,superplane-amd64.oci.tar,superplane-arm64.oci.tar" \
+                --manifest "$release_dir/release-manifest.json"
+              (cd "$release_dir" && sha256sum --check checksums.txt)
+              test -n "${GITHUB_TOKEN:-}"
+
+  - name: "Publish amd64 Image"
+    dependencies: ["Verify Prepared Release"]
+    task:
+      secrets:
+        - name: ghcr-push-token
+      jobs:
+        - name: "Publish linux/amd64 image"
+          commands:
+            - bash release/component-release-artifact.sh pull superplane "$RELEASE_VERSION" "build/superplane/$RELEASE_VERSION"
+            - docker pull "$SKOPEO_CONTAINER_IMAGE"
+            - mkdir -m 700 /tmp/ghcr-auth
+            - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/superplane/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
+            - REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/superplane/publish-architecture.sh "$RELEASE_VERSION" amd64 "build/superplane/$RELEASE_VERSION/superplane-amd64.oci.tar"
+
+  - name: "Publish arm64 Image"
+    dependencies: ["Verify Prepared Release"]
+    task:
+      secrets:
+        - name: ghcr-push-token
+      jobs:
+        - name: "Publish linux/arm64 image"
+          commands:
+            - bash release/component-release-artifact.sh pull superplane "$RELEASE_VERSION" "build/superplane/$RELEASE_VERSION"
+            - docker pull "$SKOPEO_CONTAINER_IMAGE"
+            - mkdir -m 700 /tmp/ghcr-auth
+            - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/superplane/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
+            - REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/superplane/publish-architecture.sh "$RELEASE_VERSION" arm64 "build/superplane/$RELEASE_VERSION/superplane-arm64.oci.tar"
+
+  - name: "Publish Release"
+    dependencies:
+      - "Publish amd64 Image"
+      - "Publish arm64 Image"
+    task:
+      secrets:
+        - name: ghcr-push-token
+      jobs:
+        - name: "Publish verified SuperPlane release"
+          commands:
+            - bash release/component-release-artifact.sh pull superplane "$RELEASE_VERSION" "build/superplane/$RELEASE_VERSION"
+            - docker pull "$SKOPEO_CONTAINER_IMAGE"
+            - mkdir -m 700 /tmp/ghcr-auth
+            - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/superplane/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
+            - printf '%s' "$GHCR_PUSH_TOKEN" | docker login ghcr.io --username superplanehq --password-stdin
+            - printf '%s' "$GHCR_PUSH_TOKEN" | HELM_REGISTRY_CONFIG=/tmp/ghcr-auth/helm.json helm registry login ghcr.io --username superplanehq --password-stdin
+            - |
+              set -euo pipefail
+              REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json \
+                bash release/superplane/publish-manifest.sh "$RELEASE_VERSION" "$SEMAPHORE_GIT_SHA" \
+                >/tmp/superplane-image-digest
+              HELM_REGISTRY_CONFIG=/tmp/ghcr-auth/helm.json \
+                bash release/superplane/publish-chart.sh \
+                "$RELEASE_VERSION" \
+                "build/superplane/$RELEASE_VERSION/superplane-${RELEASE_VERSION#v}.tgz" \
+                >/tmp/superplane-chart-digest
+            - bash release/fetch-component-release-history.sh
+            - |
+              set -euo pipefail
+              node release/component-release.js generate-release-notes \
+                --component superplane \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --output /tmp/superplane-release-notes.md \
+                --github-authors
+              node release/component-release.js stage-github-release \
+                --component superplane \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --directory "build/superplane/$RELEASE_VERSION" \
+                --assets "install.sh,superplane-cli-darwin-amd64,superplane-cli-darwin-arm64,superplane-cli-linux-amd64,superplane-cli-linux-arm64,superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_VERSION#v}.tgz,checksums.txt" \
+                --release-id-file /tmp/github-release-id
+            - |
+              set -euo pipefail
+              release_notes_args=()
+              if [ -f /tmp/superplane-release-notes.md ]; then
+                release_notes_args=(--release-notes /tmp/superplane-release-notes.md)
+              fi
+              export SUPERPLANE_IMAGE_DIGEST="$(tail -n 1 /tmp/superplane-image-digest)"
+              export SUPERPLANE_CHART_DIGEST="$(tail -n 1 /tmp/superplane-chart-digest)"
+              node release/component-release.js publish-github-release \
+                --release-id "$(cat /tmp/github-release-id)" \
+                --component superplane \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                "${release_notes_args[@]}"
+            - |
+              set -euo pipefail
+              bash release/verify-public-assets.sh \
+                "https://github.com/superplanehq/superplane/releases/download/$RELEASE_VERSION" \
+                "build/superplane/$RELEASE_VERSION" \
+                install.sh \
+                superplane-cli-darwin-amd64 \
+                superplane-cli-darwin-arm64 \
+                superplane-cli-linux-amd64 \
+                superplane-cli-linux-arm64 \
+                superplane-sbom.json \
+                superplane-single-host.tar.gz \
+                "superplane-${RELEASE_VERSION#v}.tgz" \
+                checksums.txt

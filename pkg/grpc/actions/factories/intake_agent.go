@@ -127,7 +127,33 @@ func intakeAgentFromSetup(tx *gorm.DB, factory *models.Factory, integrationID st
 		return nil
 	}
 
-	return intakeAgentFromIntegration(integration)
+	agent := intakeAgentFromIntegration(integration)
+	if agent == nil {
+		return nil
+	}
+	appID, err := uuid.Parse(factory.OnboardingConfigValue().ProvisionedAppID)
+	if err != nil {
+		return agent
+	}
+	app, err := models.FindCanvasInTransaction(tx, factory.OrganizationID, appID)
+	if err != nil || app.FactoryID == nil || *app.FactoryID != factory.ID || app.LiveVersionID == nil {
+		return agent
+	}
+	version, err := models.FindLiveCanvasVersionInTransaction(tx, appID)
+	if err != nil {
+		log.WithError(err).Warnf("factory %s: intake cannot read the provisioned agent model", factory.ID)
+		return agent
+	}
+	provisioned := intakeAgentFromCanvasNodes(version.Nodes)
+	if provisioned == nil || provisioned.Component != agent.Component || provisioned.Model == "" {
+		return agent
+	}
+	credentials := provisioned.Credentials
+	ref, _ := credentials["integration"].(map[string]any)
+	if credentials["source"] == runner.CredentialsSourceIntegration && ref["name"] == integration.InstallationName {
+		agent.Model = provisioned.Model
+	}
+	return agent
 }
 
 // intakeAgentFromInstallations takes the first ready agent installation.

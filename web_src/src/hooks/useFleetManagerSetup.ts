@@ -5,14 +5,16 @@ import { useCreateUserToken } from "@/hooks/useUserTokens";
 import {
   clearFleetManagerDraft,
   DEFAULT_FLEET_CAPACITY,
+  DEFAULT_SETUP_FLEET_ID,
   fleetImage,
   fleetsMatchConfiguration,
   generateFleetManagerValues,
+  installationRunnerVersion,
   loadFleetManagerDraft,
   mergeTerraformInfrastructure,
   normalizeInfrastructureFields,
-  recommendedMachineType,
   rememberProviderFields,
+  resolveSetupMachineType,
   saveFleetManagerDraft,
   terraformInstallPlaceholders,
   validateFleetInfrastructure,
@@ -30,19 +32,17 @@ function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
   const defaults = metadata.infrastructureDefaults;
   const provider = defaults.provider ?? "aws";
   const { superplaneUrl, ...infrastructureFields } = normalizeInfrastructureFields(defaults.fields);
-  const fields = withRecommendedMachineTypes(infrastructureFields, provider, metadata);
-  const firstAvailableFleet = metadata.fleetPresets.find((preset) => fleetImage(fields, preset.spec.architecture));
+  const fields = withRecommendedMachineTypes(infrastructureFields, provider);
+  const hasDefaultFleet = metadata.fleetPresets.some((preset) => preset.id === DEFAULT_SETUP_FLEET_ID);
   return {
     provider,
     managerId: defaults.managerId || "my-cluster",
     namespace: defaults.namespace || "superplane",
     serviceAccountName: defaults.serviceAccountName || "superplane-fleet-manager",
     superplaneUrl: superplaneUrl || window.location.origin,
-    runnerVersion: metadata.defaultRunnerVersion,
-    selectedFleetIds: firstAvailableFleet ? [firstAvailableFleet.id] : [],
-    fleetCapacities: Object.fromEntries(
-      metadata.fleetPresets.map((preset) => [preset.id, { ...DEFAULT_FLEET_CAPACITY }]),
-    ),
+    runnerVersion: installationRunnerVersion(metadata),
+    selectedFleetIds: hasDefaultFleet ? [DEFAULT_SETUP_FLEET_ID] : [],
+    fleetCapacities: hasDefaultFleet ? { [DEFAULT_SETUP_FLEET_ID]: { ...DEFAULT_FLEET_CAPACITY } } : {},
     fields,
   };
 }
@@ -50,26 +50,34 @@ function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
 function withRecommendedMachineTypes(
   fields: Record<string, string>,
   provider: FleetManagerProvider,
-  metadata: FleetManagerSetupMetadata,
 ): Record<string, string> {
-  const next = { ...fields };
-  for (const preset of metadata.fleetPresets) {
-    next[`machineType.${preset.id}`] ||= recommendedMachineType(provider, preset.spec.architecture);
-  }
-  return next;
+  const key = `machineType.${DEFAULT_SETUP_FLEET_ID}`;
+  return { ...fields, [key]: resolveSetupMachineType(provider, fields[key]) };
+}
+
+function pinSetupFleet(draft: FleetManagerDraft, metadata: FleetManagerSetupMetadata): FleetManagerDraft {
+  const hasDefaultFleet = metadata.fleetPresets.some((preset) => preset.id === DEFAULT_SETUP_FLEET_ID);
+  if (!hasDefaultFleet) return { ...draft, selectedFleetIds: [] };
+  return {
+    ...draft,
+    selectedFleetIds: [DEFAULT_SETUP_FLEET_ID],
+    fleetCapacities: {
+      ...draft.fleetCapacities,
+      [DEFAULT_SETUP_FLEET_ID]: draft.fleetCapacities[DEFAULT_SETUP_FLEET_ID] ?? { ...DEFAULT_FLEET_CAPACITY },
+    },
+    fields: withRecommendedMachineTypes(draft.fields, draft.provider),
+  };
 }
 
 function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
-  metadata.runnerVersions = metadata.runnerVersions?.length ? metadata.runnerVersions : [metadata.defaultRunnerVersion];
+  metadata.runnerVersions = metadata.runnerVersions?.length
+    ? metadata.runnerVersions
+    : metadata.defaultRunnerVersion
+      ? [metadata.defaultRunnerVersion]
+      : [];
   const restoredDraft = loadFleetManagerDraft();
-  if (!restoredDraft) return defaultDraft(metadata);
-  return mergeTerraformInfrastructure(
-    {
-      ...restoredDraft,
-      fields: withRecommendedMachineTypes(restoredDraft.fields, restoredDraft.provider, metadata),
-    },
-    metadata,
-  );
+  const draft = restoredDraft ? mergeTerraformInfrastructure(restoredDraft, metadata) : defaultDraft(metadata);
+  return pinSetupFleet({ ...draft, runnerVersion: installationRunnerVersion(metadata) }, metadata);
 }
 
 function draftForProvider(
@@ -82,7 +90,7 @@ function draftForProvider(
   const defaults = metadata?.infrastructureDefaults.provider === provider ? providerDefaults : {};
   const remembered = rememberProviderFields(current);
   const base = remembered.fieldsByProvider?.[provider] ?? defaults;
-  const fields = metadata ? withRecommendedMachineTypes(base, provider, metadata) : base;
+  const fields = withRecommendedMachineTypes(base, provider);
   return {
     ...remembered,
     provider,
@@ -102,7 +110,7 @@ function missingImageErrors(draft: FleetManagerDraft, metadata: FleetManagerSetu
 
 function fleetSelectionErrors(draft: FleetManagerDraft | null, metadata: FleetManagerSetupMetadata | null): string[] {
   if (!draft) return [];
-  const errors = validateFleetSelection(draft);
+  const errors = validateFleetSelection({ ...draft, runnerVersions: metadata?.runnerVersions ?? [] });
   if (!metadata) return errors;
   return [...errors, ...missingImageErrors(draft, metadata), ...terraformInstallPlaceholders(draft, metadata)];
 }
@@ -262,7 +270,6 @@ export function useFleetManagerSetup(enabled = true, organizationId = "") {
     setNamespace: (value: string) => updateDraft((current) => ({ ...current, namespace: value })),
     setServiceAccountName: (value: string) => updateDraft((current) => ({ ...current, serviceAccountName: value })),
     setSuperplaneUrl: (value: string) => updateDraft((current) => ({ ...current, superplaneUrl: value })),
-    setRunnerVersion: (value: string) => updateDraft((current) => ({ ...current, runnerVersion: value })),
   };
 }
 

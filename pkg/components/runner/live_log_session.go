@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 var extraRunnerComponents sync.Map
@@ -93,17 +94,17 @@ func BrokerTaskIDFromExecutionMetadata(meta map[string]any) string {
 
 func ResolveLiveLogAccess(orgID uuid.UUID, canvasID uuid.UUID, executionID uuid.UUID) (*LiveLogAccessContext, error) {
 	if _, err := models.FindCanvas(orgID, canvasID); err != nil {
-		return nil, ErrLiveLogCanvasNotFound
+		return nil, liveLogLookupError(ErrLiveLogCanvasNotFound, err)
 	}
 
 	execution, err := models.FindNodeExecution(canvasID, executionID)
 	if err != nil {
-		return nil, ErrLiveLogExecutionNotFound
+		return nil, liveLogLookupError(ErrLiveLogExecutionNotFound, err)
 	}
 
 	node, err := models.FindCanvasNode(database.Conn(), canvasID, execution.NodeID)
 	if err != nil {
-		return nil, ErrLiveLogNodeNotFound
+		return nil, liveLogLookupError(ErrLiveLogNodeNotFound, err)
 	}
 
 	ref := node.Ref.Data()
@@ -122,6 +123,13 @@ func ResolveLiveLogAccess(orgID uuid.UUID, canvasID uuid.UUID, executionID uuid.
 		Configuration: execution.Configuration.Data(),
 		TaskBackend:   TaskBackendFromExecutionMetadata(execution.Metadata.Data()),
 	}, nil
+}
+
+func liveLogLookupError(notFound error, err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return notFound
+	}
+	return err
 }
 
 func taskBrokerBaseURL() (string, error) {

@@ -1111,6 +1111,15 @@ type ListFactoryWorkOrdersFilters struct {
 	// even after a run on another line. Archives do not consume the page.
 	PublicBoard     bool
 	ExcludeArchived bool
+	// OriginMatch keeps orders whose recorded origin is the same issue.
+	OriginMatch *WorkOrderOriginMatch
+}
+
+// WorkOrderOriginMatch is a SQL predicate over factory_work_orders.origin_url.
+// The SQL uses `?` placeholders. Args supplies their values.
+type WorkOrderOriginMatch struct {
+	SQL  string
+	Args []any
 }
 
 func (f *Factory) CountWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) (int64, error) {
@@ -1178,6 +1187,10 @@ func (f *Factory) workOrdersQuery(tx *gorm.DB, filters ListFactoryWorkOrdersFilt
 	if filters.ExcludeArchived || filters.PublicBoard {
 		query = query.Where("NOT (factory_work_orders.state = ? AND COALESCE(factory_work_orders.result, '') IN ?)",
 			FactoryWorkOrderStateClosed, []string{FactoryWorkOrderResultArchived, FactoryWorkOrderResultRejected})
+	}
+
+	if filters.OriginMatch != nil && filters.OriginMatch.SQL != "" {
+		query = query.Where(filters.OriginMatch.SQL, filters.OriginMatch.Args...)
 	}
 
 	query = applyWorkOrderUserFilters(query, filters)

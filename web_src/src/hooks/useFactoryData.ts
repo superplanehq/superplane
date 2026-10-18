@@ -39,6 +39,7 @@ import type {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
 import { buildOptimisticDispatchedOrder } from "@/pages/factories/lib/dispatchOptimistic";
+import { factoryPlanningEnabled } from "@/pages/factories/pages/planningSettingsModel";
 import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
@@ -593,9 +594,12 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     },
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      // The Backlog run for this order is created asynchronously after this
-      // RPC returns. Show "Analyzing" until the canvas WebSocket delivers it.
-      markBacklogAnalysisPending(order.id);
+      // A Backlog run starts only when Planning is on. Show Analyzing until
+      // that run arrives. Missing factory data defaults to Planning on.
+      const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
+      if (factoryPlanningEnabled(factory)) {
+        markBacklogAnalysisPending(order.id);
+      }
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {
         void queryClient.invalidateQueries({

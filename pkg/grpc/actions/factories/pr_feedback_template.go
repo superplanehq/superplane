@@ -41,6 +41,8 @@ const (
 	prFeedbackMaximumAttemptsMin     = 1
 	prFeedbackMaximumAttemptsMax     = 10
 
+	bitbucketPRCommentAcknowledgement = `Sure, looking into this. Follow along: [{{ $["Find Pull Request"].data.workOrder.key }}]({{ $["Find Pull Request"].data.workOrder.url }})`
+
 	prFeedbackDiscussionTemplateID = "pr-feedback:discussion"
 	prFeedbackChecksTemplateID     = "pr-feedback:checks"
 
@@ -242,7 +244,7 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 		Description:  prFeedbackCommentActivityDescriptionExpression(),
 		Y:            prFeedbackCommentFlowY,
 	}, request)
-	commentFlow = commentFlow.withAcknowledge(yaml.Node{
+	commentFlow = commentFlow.withAcknowledgeFrom(prFeedbackFindNodeID, "found", yaml.Node{
 		ID:        prFeedbackAcknowledgeCommentNodeID,
 		Name:      "Acknowledge PR Comment",
 		Type:      yaml.NodeTypeAction,
@@ -251,7 +253,7 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 			"repository":      "{{ root().data.repository.full_name }}",
 			"pullNumber":      "{{ root().data.pullrequest.id }}",
 			"parentCommentId": "{{ root().data.comment.id }}",
-			"body":            "SuperPlane is looking into this.",
+			"body":            bitbucketPRCommentAcknowledgement,
 		},
 		Integration: request.Binding.integrationRef(),
 		Position:    prFeedbackAcknowledgePosition(prFeedbackCommentFlowY),
@@ -329,10 +331,14 @@ type prFeedbackDiscussionFlowSpec struct {
 }
 
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedbackDiscussionFlowSpec {
+	return flow.withAcknowledgeFrom(flow.triggerID, "default", node)
+}
+
+func (flow prFeedbackDiscussionFlowSpec) withAcknowledgeFrom(sourceID, channel string, node yaml.Node) prFeedbackDiscussionFlowSpec {
 	flow.nodes = append(flow.nodes, node)
 	flow.edges = append(flow.edges, yaml.Edge{
-		Channel:  "default",
-		SourceID: flow.triggerID,
+		Channel:  channel,
+		SourceID: sourceID,
 		TargetID: node.ID,
 	})
 	return flow

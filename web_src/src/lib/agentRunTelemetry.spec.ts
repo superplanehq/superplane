@@ -14,7 +14,7 @@ import {
   telemetryFromFinishedResult,
   telemetrySeriesFromFinishedResult,
 } from "./agentRunTelemetry";
-import { chartPointsForTelemetry } from "./agentRunTelemetryChart";
+import { agentRunNewTokenCount } from "./agentRunTelemetryChart";
 
 describe("reduceAgentTelemetryRecords", () => {
   it("joins turn usage with tool records on the same turn", () => {
@@ -67,28 +67,19 @@ describe("reduceAgentTelemetryRecords", () => {
   });
 });
 
-describe("chartPointsForTelemetry", () => {
-  const telemetry = reduceAgentTelemetryRecords([
-    { type: "turn", turn: 1, usage: { input_tokens: 100, output_tokens: 20 } },
-    { type: "tool_start", turn: 1, kind: "bash", text: "make pb.gen" },
-    { type: "turn", turn: 2, usage: { input_tokens: 80, output_tokens: 10 } },
-    { type: "tool_start", turn: 2, kind: "read", text: "a.go" },
-    { type: "tool_start", turn: 2, kind: "bash", text: "git status" },
-  ]);
+describe("agentRunNewTokenCount", () => {
+  it("sums each turn's own input and output tokens", () => {
+    const telemetry = reduceAgentTelemetryRecords([
+      { type: "turn", turn: 1, usage: { input_tokens: 100, output_tokens: 20 } },
+      { type: "tool_start", turn: 1, kind: "bash", text: "make pb.gen" },
+      { type: "turn", turn: 2, usage: { input_tokens: 80, output_tokens: 10 } },
+      { type: "tool_start", turn: 2, kind: "read", text: "a.go" },
+    ]);
 
-  it("uses each turn's own usage for tokens", () => {
-    const points = chartPointsForTelemetry(telemetry);
-    expect(points[0].tokens).toBe(120);
-    expect(points[1].input_tokens).toBe(80);
-    expect(points[1].output_tokens).toBe(10);
-    expect(points[1].tokens).toBe(90);
-    expect(points[0].inputBar).toBe(100);
-    expect(points[0].outputBar).toBe(20);
-    expect(points[1].inputBar).toBe(80);
-    expect(points[1].outputBar).toBe(10);
+    expect(agentRunNewTokenCount(telemetry)).toBe(210);
   });
 
-  it("does not count cached context in the bar", () => {
+  it("does not count cached context", () => {
     const cached = reduceAgentTelemetryRecords([
       {
         type: "turn",
@@ -106,15 +97,8 @@ describe("chartPointsForTelemetry", () => {
         },
       },
     ]);
-    const points = chartPointsForTelemetry(cached);
-    expect(points[0].tokens).toBe(107);
-    expect(points[0].inputBar).toBe(102);
-    expect(points[0].outputBar).toBe(5);
-    expect(points[0].cache_read_tokens).toBe(1448);
-    expect(points[1].tokens).toBe(170);
-    expect(points[1].inputBar).toBe(150);
-    expect(points[1].outputBar).toBe(20);
-    expect(points[1].cache_read_tokens).toBe(5000);
+
+    expect(agentRunNewTokenCount(cached)).toBe(277);
   });
 });
 

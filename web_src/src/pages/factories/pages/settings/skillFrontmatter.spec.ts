@@ -48,6 +48,24 @@ describe("skillFrontmatterField", () => {
   it("strips quotes around YAML scalars", () => {
     expect(skillFrontmatterField('---\ntitle: "Oy Pirate!"\n---\n', "title")).toBe("Oy Pirate!");
   });
+
+  it("drops an inline comment and keeps a hash inside quotes", () => {
+    expect(skillFrontmatterField("---\nname: review-copy # command name\n---\n", "name")).toBe("review-copy");
+    expect(skillFrontmatterField('---\ntitle: "review # copy" # label\n---\n', "title")).toBe("review # copy");
+  });
+
+  it("keeps escaped quotes inside a double-quoted title", () => {
+    expect(skillFrontmatterField('---\ntitle: "Review \\"copy\\"" # label\n---\n', "title")).toBe('Review "copy"');
+  });
+
+  it("keeps doubled quotes inside a single-quoted title", () => {
+    expect(skillFrontmatterField("---\ntitle: 'Review ''copy'''\n---\n", "title")).toBe("Review 'copy'");
+  });
+
+  it("decodes YAML escapes and keeps a hash inside the quotes", () => {
+    expect(skillFrontmatterField('---\ntitle: "Review\\x20copy # notes"\n---\n', "title")).toBe("Review copy # notes");
+    expect(skillFrontmatterField('---\ntitle: "Review\\u0020copy"\n---\n', "title")).toBe("Review copy");
+  });
 });
 
 describe("setSkillFrontmatterFields", () => {
@@ -59,6 +77,12 @@ describe("setSkillFrontmatterFields", () => {
     expect(skillFrontmatterField(next, "name")).toBe("oypirate");
     expect(skillFrontmatterField(next, "title")).toBe("Oy Pirate!");
     expect(skillFrontmatterField(next, "description")).toBe("");
+  });
+
+  it("round-trips a title that contains quotes and a backslash", () => {
+    const title = 'Review "copy" \\ path';
+    const next = setSkillFrontmatterFields("---\ntitle: \n---\n", { title });
+    expect(skillFrontmatterField(next, "title")).toBe(title);
   });
 });
 

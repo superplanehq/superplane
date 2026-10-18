@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -189,6 +190,7 @@ func attachWorkspaceMCPServers(
 		return environment, files, nil
 	}
 	httpClient := mcp.DoerFromCore(ctx.HTTP)
+	tokenLifetime := workspaceMCPAccessTokenLifetime(ctx.Configuration)
 	servers := make([]workspaceMCPServer, 0, len(resources))
 	for i := range resources {
 		server, ok := assembleWorkspaceMCPServer(
@@ -199,6 +201,7 @@ func attachWorkspaceMCPServers(
 			&resources[i],
 			disabledTools[resources[i].ID.String()],
 			enabledTools[resources[i].ID.String()],
+			tokenLifetime,
 		)
 		if !ok {
 			continue
@@ -327,6 +330,20 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 	})
 }
 
+func workspaceMCPAccessTokenLifetime(configuration any) time.Duration {
+	seconds := DefaultExecutionTimeoutSeconds
+	config, ok := configuration.(map[string]any)
+	if ok {
+		if value, ok := asInt(config["executionTimeoutSeconds"]); ok && value > 0 {
+			seconds = int(value)
+		}
+	}
+	if seconds > maxExecutionTimeoutSecondsRequest {
+		seconds = maxExecutionTimeoutSecondsRequest
+	}
+	return time.Duration(seconds) * time.Second
+}
+
 func workspaceAgentResourcesLogger(ctx core.ExecutionContext) *log.Entry {
 	if ctx.Logger != nil {
 		return ctx.Logger
@@ -342,6 +359,7 @@ func assembleWorkspaceMCPServer(
 	resource *models.FactoryAgentResource,
 	automationDisabledTools []string,
 	enabledOverride []string,
+	tokenLifetime time.Duration,
 ) (workspaceMCPServer, bool) {
 	logger := workspaceAgentResourcesLogger(ctx)
 	config := resource.Config.Data()
@@ -374,7 +392,14 @@ func assembleWorkspaceMCPServer(
 			logger.WithField("mcp", resource.Name).Warn("skip workspace MCP: encryptor missing")
 			return workspaceMCPServer{}, false
 		}
-		token, err := mcp.MintFactoryAgentResourceAccessToken(context.Background(), encryptor, httpClient, db, resource)
+		token, err := mcp.MintFactoryAgentResourceAccessTokenWithLifetime(
+			context.Background(),
+			encryptor,
+			httpClient,
+			db,
+			resource,
+			tokenLifetime,
+		)
 		if err != nil || strings.TrimSpace(token) == "" {
 			logger.WithError(err).WithField("mcp", resource.Name).Warn("skip workspace MCP: sign-in required")
 			return workspaceMCPServer{}, false

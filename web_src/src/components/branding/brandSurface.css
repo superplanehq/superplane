@@ -72,6 +72,12 @@
   outline: 2px solid #ed8e09;
   outline-offset: 4px;
 }
+.brand-configure .review-bot-manual-add input {
+  height: 42px;
+}
+.brand-configure .review-bot-manual-add :is(input, [data-slot="button"]):focus-visible {
+  outline-offset: -2px;
+}
 .brand-configure .configure-preview-content {
   color: #08090a;
   --foreground: #08090a;

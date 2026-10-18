@@ -332,12 +332,17 @@ describe("PhaseLogCard phase actions", () => {
 
     expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
   });
 
   it("offers a run link with a tooltip on expanded phases", async () => {
     const user = userEvent.setup();
-    renderCard(<PhaseLogCard phase={{ ...PHASE, artifacts: [PLAN_MD_ARTIFACT] }} expanded runHref={RUN_HREF} />);
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, artifacts: [PLAN_MD_ARTIFACT], costCents: "45", totalTokens: "210" }}
+        expanded
+        runHref={RUN_HREF}
+      />,
+    );
 
     const header = screen.getByTestId("split-run-automation-header-plan");
     const view = screen.getByRole("link", { name: "View run" });
@@ -345,7 +350,7 @@ describe("PhaseLogCard phase actions", () => {
     expect(view).toHaveAttribute("href", RUN_HREF);
     expect(screen.queryByText("View run")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
+    expect(duration).toHaveTextContent("$0.45");
     expect(duration).toHaveTextContent("1m");
 
     await user.hover(view);
@@ -410,6 +415,5 @@ describe("PhaseLogCard phase actions", () => {
 
     expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
   });
 });

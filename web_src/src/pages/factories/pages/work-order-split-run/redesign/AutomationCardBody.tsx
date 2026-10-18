@@ -14,7 +14,6 @@ import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { displayRunnerModel, joinRunnerModels } from "../draftStartModel";
 import { useLivePhaseSpend } from "../liveHeaderSpendContext";
 import { PhaseAgentUsageProvider } from "../phaseAgentUsageContext";
-import { PhaseUsageSpendButton } from "../PhaseUsageChartButton";
 import { useSpecificModelIds } from "../specificModelIds";
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { AutomationStage, ConsoleAutomation } from "./automationsViewModel";
@@ -205,13 +204,7 @@ function CardRunFooter({
       className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3"
       data-testid={`redesign-console-run-footer-${stage.id}`}
     >
-      <CardFooterMeta
-        stageId={stage.id}
-        live={stage.status === "running"}
-        lead={lead}
-        spendLabel={spendLabel}
-        model={model}
-      />
+      <CardFooterMeta lead={lead} spendLabel={spendLabel} model={model} />
       <CardFooterActions actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} queued={queued} />
     </div>
   );
@@ -242,31 +235,12 @@ function useCardFooterMeta(automation: ConsoleAutomation, phases: SplitRunPhase[
   };
 }
 
-function CardFooterMeta({
-  stageId,
-  live,
-  lead,
-  spendLabel,
-  model,
-}: {
-  stageId: string;
-  live: boolean;
-  lead?: string;
-  spendLabel?: string;
-  model?: string;
-}) {
+function CardFooterMeta({ lead, spendLabel, model }: { lead?: string; spendLabel?: string; model?: string }) {
   return (
     <span className={cn(META_TEXT_CLASSNAME, "inline-flex min-w-0 flex-wrap items-center gap-x-1")}>
       {lead ? <span>{lead}</span> : null}
       {lead && spendLabel ? <span aria-hidden>·</span> : null}
-      {spendLabel ? (
-        <PhaseUsageSpendButton
-          phaseId={stageId}
-          spendLabel={spendLabel}
-          live={live}
-          className={cn(META_TEXT_CLASSNAME, "font-medium text-current underline underline-offset-2")}
-        />
-      ) : null}
+      {spendLabel ? <span className={cn(META_TEXT_CLASSNAME, "font-medium")}>{spendLabel}</span> : null}
       {(lead || spendLabel) && model ? <span aria-hidden>·</span> : null}
       {model ? <span>{model}</span> : null}
     </span>
