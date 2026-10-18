@@ -166,8 +166,9 @@ func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
 			},
 		},
 	}, nil, nil)
-	require.Len(t, files, 1)
-	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[0].Path)
+	require.Len(t, files, 2)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[1].Path)
 	require.Len(t, environment, 1)
 	assert.Equal(t, runner.EnvSuperplaneWorkspaceMCPConfig, environment[0].Name)
 	assert.Equal(t, "$SUPERPLANE_TASK_DIR/"+runner.WorkspaceMCPConfigPath, environment[0].Value)
@@ -179,7 +180,7 @@ func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
 			Headers map[string]string `json:"headers"`
 		} `json:"servers"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(files[0].Content), &payload))
+	require.NoError(t, json.Unmarshal([]byte(files[1].Content), &payload))
 	require.Len(t, payload.Servers, 1)
 	assert.Equal(t, "docs", payload.Servers[0].Name)
 	assert.Equal(t, "https://mcp.example.com/mcp", payload.Servers[0].URL)
@@ -205,7 +206,8 @@ func TestAttachWorkspaceAgentResourcesWritesPublicServersWithoutHeaders(t *testi
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
 	}, nil, nil)
-	require.Len(t, files, 1)
+	require.Len(t, files, 2)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
 	require.Len(t, environment, 1)
 	var payload struct {
 		Servers []struct {
@@ -214,7 +216,7 @@ func TestAttachWorkspaceAgentResourcesWritesPublicServersWithoutHeaders(t *testi
 			Headers map[string]string `json:"headers"`
 		} `json:"servers"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(files[0].Content), &payload))
+	require.NoError(t, json.Unmarshal([]byte(files[1].Content), &payload))
 	require.Len(t, payload.Servers, 1)
 	assert.Equal(t, "deepwiki", payload.Servers[0].Name)
 	assert.Equal(t, "https://mcp.deepwiki.com/mcp", payload.Servers[0].URL)
@@ -240,7 +242,8 @@ func TestAttachWorkspaceAgentResourcesSkipsServerUntilDefaultsAreSaved(t *testin
 		WorkflowID:     canvas.ID.String(),
 	}, nil, nil)
 	assert.Empty(t, environment)
-	assert.Empty(t, files)
+	require.Len(t, files, 1)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsServerWhenHeaderSecretMissing(t *testing.T) {
@@ -269,7 +272,8 @@ func TestAttachWorkspaceAgentResourcesSkipsServerWhenHeaderSecretMissing(t *test
 		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{}},
 	}, nil, nil)
 	assert.Empty(t, environment)
-	assert.Empty(t, files)
+	require.Len(t, files, 1)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsWhenFeatureDisabled(t *testing.T) {
@@ -301,7 +305,8 @@ func TestAttachWorkspaceAgentResourcesSkipsWhenFeatureDisabled(t *testing.T) {
 		},
 	}, nil, nil)
 	assert.Empty(t, environment)
-	assert.Empty(t, files)
+	require.Len(t, files, 1)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
 }
 
 func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
@@ -330,13 +335,14 @@ func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n\n", Mode: "0644"},
 	})
 	assert.Empty(t, environment)
-	require.Len(t, files, 4)
+	require.Len(t, files, 5)
 	assert.Equal(t, "Refine the request.\n", files[0].Content)
 	assert.Equal(t, "Implement the plan.\n\n", files[1].Content)
-	assert.Equal(t, ".claude/skills/review-copy/SKILL.md", files[2].Path)
-	assert.Equal(t, ".agents/skills/review-copy/SKILL.md", files[3].Path)
-	assert.Equal(t, "# Review copy\n\nWrite STE UI copy.\n", files[2].Content)
-	assert.Equal(t, files[2].Content, files[3].Content)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[2].Path)
+	assert.Equal(t, ".claude/skills/review-copy/SKILL.md", files[3].Path)
+	assert.Equal(t, ".agents/skills/review-copy/SKILL.md", files[4].Path)
+	assert.Equal(t, "# Review copy\n\nWrite STE UI copy.\n", files[3].Content)
+	assert.Equal(t, files[3].Content, files[4].Content)
 }
 
 func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
@@ -365,10 +371,11 @@ func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
 		WorkflowID:     canvas.ID.String(),
 	}, nil, nil)
 	require.Len(t, environment, 1)
-	require.Len(t, files, 3)
-	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[0].Path)
-	assert.Equal(t, ".claude/skills/review-copy/SKILL.md", files[1].Path)
-	assert.Equal(t, ".agents/skills/review-copy/SKILL.md", files[2].Path)
+	require.Len(t, files, 4)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[1].Path)
+	assert.Equal(t, ".claude/skills/review-copy/SKILL.md", files[2].Path)
+	assert.Equal(t, ".agents/skills/review-copy/SKILL.md", files[3].Path)
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing.T) {
@@ -409,20 +416,21 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 	require.Len(t, environment, 1)
-	require.Len(t, files, 4)
+	require.Len(t, files, 5)
 	assert.Equal(t, "prompts/implement.txt", files[0].Path)
 	assert.Contains(t, files[0].Content, "You can use these resources.")
 	assert.Contains(t, files[0].Content, "MCP servers: "+kept.Name)
 	assert.NotContains(t, files[0].Content, "Skills:")
 	assert.NotContains(t, files[0].Content, "review-copy")
 	assert.NotContains(t, files[0].Content, "linear")
-	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[1].Path)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[1].Path)
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[2].Path)
 	var payload struct {
 		Servers []struct {
 			Name string `json:"name"`
 		} `json:"servers"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(files[1].Content), &payload))
+	require.NoError(t, json.Unmarshal([]byte(files[2].Content), &payload))
 	require.Len(t, payload.Servers, 1)
 	assert.Equal(t, "deepwiki", payload.Servers[0].Name)
 }
@@ -458,15 +466,16 @@ func TestAttachWorkspaceAgentResourcesMergesDisabledTools(t *testing.T) {
 		},
 	}, nil, nil)
 	require.Len(t, environment, 1)
-	require.Len(t, files, 1)
-	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[0].Path)
+	require.Len(t, files, 2)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[1].Path)
 	var payload struct {
 		Servers []struct {
 			Name          string   `json:"name"`
 			DisabledTools []string `json:"disabledTools"`
 		} `json:"servers"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(files[0].Content), &payload))
+	require.NoError(t, json.Unmarshal([]byte(files[1].Content), &payload))
 	require.Len(t, payload.Servers, 1)
 	assert.Equal(t, "docs", payload.Servers[0].Name)
 	assert.Equal(t, []string{"search", "create_issue"}, payload.Servers[0].DisabledTools)
@@ -500,13 +509,14 @@ func TestAttachWorkspaceAgentResourcesOmitsEnabledOverride(t *testing.T) {
 			},
 		},
 	}, nil, nil)
-	require.Len(t, files, 1)
+	require.Len(t, files, 2)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
 	var payload struct {
 		Servers []struct {
 			DisabledTools []string `json:"disabledTools"`
 		} `json:"servers"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(files[0].Content), &payload))
+	require.NoError(t, json.Unmarshal([]byte(files[1].Content), &payload))
 	require.Len(t, payload.Servers, 1)
 	assert.Equal(t, []string{"search", "update_issue"}, payload.Servers[0].DisabledTools)
 }
@@ -539,13 +549,14 @@ func TestAttachWorkspaceAgentResourcesKeepsToolOffWhenBothListsNameIt(t *testing
 			},
 		},
 	}, nil, nil)
-	require.Len(t, files, 1)
+	require.Len(t, files, 2)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
 	var payload struct {
 		Servers []struct {
 			DisabledTools []string `json:"disabledTools"`
 		} `json:"servers"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(files[0].Content), &payload))
+	require.NoError(t, json.Unmarshal([]byte(files[1].Content), &payload))
 	require.Len(t, payload.Servers, 1)
 	assert.Equal(t, []string{"create_issue"}, payload.Servers[0].DisabledTools)
 }
@@ -575,8 +586,9 @@ func TestAttachWorkspaceAgentResourcesAttachesMCPOnlyWhenSkillsFlagIsOff(t *test
 		WorkflowID:     canvas.ID.String(),
 	}, nil, nil)
 	require.Len(t, environment, 1)
-	require.Len(t, files, 1)
-	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[0].Path)
+	require.Len(t, files, 2)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[1].Path)
 }
 
 func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
@@ -604,8 +616,9 @@ func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 	assert.Empty(t, environment)
-	require.Len(t, files, 1)
+	require.Len(t, files, 2)
 	assert.Equal(t, "Implement the plan.\n", files[0].Content)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[1].Path)
 }
 
 func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
@@ -657,7 +670,7 @@ func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
 	assert.Equal(t, "https://github.com/superplanehq/suss.git", contextFile.Repositories[0].URL)
 	assert.Equal(t, "context/superplanehq/suss", contextFile.Repositories[0].Directory)
 	assert.Contains(t, paths["prompts/implement.txt"], "Setup commands")
-	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss")
+	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss (../context/superplanehq/suss)")
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsSetupAndContextWhenFlagOff(t *testing.T) {
@@ -676,7 +689,10 @@ func TestAttachWorkspaceAgentResourcesSkipsSetupAndContextWhenFlagOff(t *testing
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
 	}, nil, nil)
-	assert.Empty(t, files)
+	// Setup and context stay flag-gated, but the checkout helper ships on
+	// every factory task.
+	require.Len(t, files, 1)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsDisabledSetupAndContext(t *testing.T) {
@@ -704,8 +720,52 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledSetupAndContext(t *testing.T)
 	}, nil, []runner.BrokerTaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
-	require.Len(t, files, 1)
+	// The prompt stays untouched, but the checkout helper still ships: it
+	// checks out the main repo even when every context repo is disabled.
+	require.Len(t, files, 2)
 	assert.Equal(t, "Implement the plan.\n", files[0].Content)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[1].Path)
+}
+
+func TestAttachWorkspaceAgentResourcesShipsCheckoutHelper(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+	require.Len(t, files, 1)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	assert.Equal(t, "0755", files[0].Mode)
+	script := files[0].Content
+	assert.Contains(t, script, "REPO_URL")
+	assert.Contains(t, script, "workspace_context.json")
+	assert.Contains(t, script, "git clone --depth 1")
+	assert.Contains(t, script, runner.WorkspaceCheckoutCommitSetupEnv)
+	assert.Contains(t, script, runner.FactoryRepoCommitSetup())
+	assert.NotContains(t, script, "x-access-token")
+	assert.NotContains(t, script, "insteadOf")
+}
+
+func TestAttachWorkspaceAgentResourcesShipsCheckoutHelperWithoutFlags(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+
+	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+	assert.Empty(t, environment)
+	require.Len(t, files, 1)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
 }
 
 func TestAttachWorkspaceAgentResourcesKeepsSystemSkillsEnabled(t *testing.T) {
@@ -725,9 +785,10 @@ func TestAttachWorkspaceAgentResourcesKeepsSystemSkillsEnabled(t *testing.T) {
 		OrganizationID: r.Organization.ID.String(), WorkflowID: canvas.ID.String(),
 		Configuration: map[string]any{"disabledAgentResourceIds": []string{system.ID.String(), custom.ID.String()}},
 	}, nil, nil)
-	require.Len(t, files, 2)
-	assert.Equal(t, ".claude/skills/refine-task/SKILL.md", files[0].Path)
-	assert.Equal(t, ".agents/skills/refine-task/SKILL.md", files[1].Path)
-	assert.Equal(t, "# Refine task\n", files[0].Content)
-	assert.Equal(t, files[0].Content, files[1].Content)
+	require.Len(t, files, 3)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	assert.Equal(t, ".claude/skills/refine-task/SKILL.md", files[1].Path)
+	assert.Equal(t, ".agents/skills/refine-task/SKILL.md", files[2].Path)
+	assert.Equal(t, "# Refine task\n", files[1].Content)
+	assert.Equal(t, files[1].Content, files[2].Content)
 }

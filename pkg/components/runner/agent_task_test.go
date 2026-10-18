@@ -1,6 +1,9 @@
 package runner
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -37,7 +40,19 @@ func TestWrapCommandInWorkingDirectoryAllowsAbsolutePath(t *testing.T) {
 	t.Parallel()
 
 	got := WrapCommandInWorkingDirectory("/tmp/workspace", "node run.js")
-	assert.Equal(t, `cd '/tmp/workspace' && node run.js`, got)
+	assert.Equal(t, "cd '/tmp/workspace' || exit 1\nnode run.js", got)
+}
+
+func TestWrapPromptCommandStopsWhenRepoIsMissing(t *testing.T) {
+	task := t.TempDir()
+	launch := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(task, "task_cwd"), []byte(launch+"\n"), 0o644))
+	marker := filepath.Join(task, "ran")
+	script := WrapPromptCommandInWorkingDirectory("repo", "echo ran > "+ShellSingleQuote(marker))
+	cmd := exec.Command("bash", "--noprofile", "--norc", "-c", script)
+	cmd.Env = []string{"PATH=/usr/bin:/bin", "SUPERPLANE_TASK_DIR=" + task}
+	require.Error(t, cmd.Run())
+	assert.NoFileExists(t, marker)
 }
 
 func TestWrapPromptCommandInWorkingDirectoryCopiesSkills(t *testing.T) {
