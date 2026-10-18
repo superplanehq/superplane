@@ -7,229 +7,111 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
-	"time"
 
-	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
 
-const encryptionRegistryVersion = 1
-const migrationBatchSize = 100
+const RegistryVersion = 1
 
-var ErrMigrationAlreadyRunning = errors.New("an encryption migration is already unfinished")
 var errUnreadableValue = errors.New("encrypted value cannot be read")
 
 const migrationValueError = "Some values could not be migrated. Check worker logs and start a new migration."
 
 type Migrator struct {
+	job       *models.ApplicationEncryptionMigration
 	encryptor *crypto.VersionedEncryptor
 	registry  *registry.Registry
 	locations []models.EncryptedStorageLocation
 }
 
-func NewMigrator(encryptor *crypto.VersionedEncryptor, registry *registry.Registry, locations []models.EncryptedStorageLocation) *Migrator {
-	return &Migrator{encryptor: encryptor, registry: registry, locations: locations}
+func NewMigrator(job *models.ApplicationEncryptionMigration, encryptor *crypto.VersionedEncryptor, registry *registry.Registry, locations []models.EncryptedStorageLocation) *Migrator {
+	return &Migrator{job: job, encryptor: encryptor, registry: registry, locations: locations}
 }
 
-func (m *Migrator) Start(ctx context.Context) (*models.ApplicationEncryptionMigration, error) {
-	var job *models.ApplicationEncryptionMigration
-	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		active, err := models.LockActiveApplicationEncryptionKey(tx)
-		if err != nil {
-			return err
-		}
-		unfinished, err := models.HasUnfinishedApplicationEncryptionMigration(tx)
-		if err != nil {
-			return err
-		}
-		if unfinished {
-			return ErrMigrationAlreadyRunning
-		}
-		job = &models.ApplicationEncryptionMigration{
-			ID: uuid.New(), TargetKeyID: active.ID, State: "pending",
-			RegistryVersion: encryptionRegistryVersion,
-			StorageLocation: m.locations[0].Name,
-			Pass:            1,
-		}
-		return tx.Create(job).Error
-	})
-	return job, err
-}
-
-func (m *Migrator) Get(ctx context.Context, id uuid.UUID) (*models.ApplicationEncryptionMigration, error) {
-	return models.LoadApplicationEncryptionMigration(database.DB(ctx), id)
-}
-
-func (m *Migrator) List(ctx context.Context) ([]models.ApplicationEncryptionMigration, error) {
-	return models.ListApplicationEncryptionMigrations(database.DB(ctx))
-}
-
-// Run lets every worker pod attempt one short batch at a time. PostgreSQL row
-// locking gives each batch to one pod and rolls it back if that pod exits.
-func (m *Migrator) Run(ctx context.Context) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	for {
-		if err := m.RunBatch(ctx); err != nil && ctx.Err() == nil {
-			log.WithError(err).Error("application encryption migration batch failed")
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-	}
-}
-
-func (m *Migrator) RunBatch(ctx context.Context) error {
-	var skipped []error
-	var jobID uuid.UUID
-	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		job, err := models.LockNextApplicationEncryptionMigration(tx)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		jobID = job.ID
-		next := *job
-		if err := tx.Transaction(func(batch *gorm.DB) error {
-			return m.processBatch(ctx, batch, &next, &skipped)
-		}); err != nil {
-			return m.failJob(tx, job, err.Error())
-		}
-		return tx.Save(&next).Error
-	})
+func (m *Migrator) ProcessBatch(ctx context.Context, tx *gorm.DB) ([]error, error) {
+	page, locationIndex, err := readMigrationPage(tx, m.job, m.locations)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	for _, skippedError := range skipped {
-		log.WithField("migration_id", jobID).WithError(skippedError).Error("application encryption value could not be migrated")
-	}
-	return nil
-}
 
-func (m *Migrator) processBatch(ctx context.Context, tx *gorm.DB, job *models.ApplicationEncryptionMigration, skipped *[]error) error {
-	if job.RegistryVersion != encryptionRegistryVersion {
-		return errors.New("migration registry version is not supported")
-	}
-	locations := m.locations
-	locationIndex := -1
-	for i, location := range locations {
-		if location.Name == job.StorageLocation {
-			locationIndex = i
-			break
-		}
-	}
-	if locationIndex == -1 {
-		return errors.New("migration storage location is not supported")
-	}
-	page, err := locations[locationIndex].ReadPage(tx, job.Cursor, migrationBatchSize)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", job.StorageLocation, err)
-	}
+	var unreadable []error
 	for _, row := range page {
-		changed, err := m.migrateRow(ctx, tx, locations[locationIndex], row, job.TargetKeyID)
+		err := m.migrateRow(ctx, tx, m.locations[locationIndex], row)
 		if err != nil {
 			if !errors.Is(err, errUnreadableValue) {
-				return fmt.Errorf("%s row %s: %w", job.StorageLocation, row.Cursor, err)
+				return nil, fmt.Errorf("%s row %s: %w", m.job.StorageLocation, row.Cursor, err)
 			}
-			job.ErrorMessage = migrationValueError
-			*skipped = append(*skipped, fmt.Errorf("%s row %s: %w", job.StorageLocation, row.Cursor, err))
+			m.job.ErrorMessage = migrationValueError
+			unreadable = append(unreadable, fmt.Errorf("%s row %s: %w", m.job.StorageLocation, row.Cursor, err))
 		}
-		if changed && job.Pass >= 2 && job.Pass%2 == 0 {
-			job.Pass++ // odd verification pass means at least one value changed
-		}
-		job.Cursor = row.Cursor
+		m.job.Cursor = row.Cursor
 	}
-	job.State = "running"
+
+	if m.job.State == "pending" {
+		m.job.State = "running"
+	}
 	if len(page) < migrationBatchSize {
-		job.Cursor = ""
-		if locationIndex+1 < len(locations) {
-			job.StorageLocation = locations[locationIndex+1].Name
-		} else if job.ErrorMessage != "" {
-			job.State = "failed"
-		} else if job.Pass == 1 || job.Pass%2 == 1 {
-			job.Pass++
-			job.StorageLocation = locations[0].Name
+		m.job.Cursor = ""
+		if locationIndex+1 < len(m.locations) {
+			m.job.StorageLocation = m.locations[locationIndex+1].Name
+		} else if m.job.ErrorMessage != "" {
+			m.job.State = "failed"
 		} else {
-			job.State = "completed"
-			now := time.Now()
-			job.CompletedAt = &now
+			m.job.State = "auditing"
+			m.job.StorageLocation = m.locations[0].Name
 		}
 	}
-	return nil
+	return unreadable, nil
 }
-
-func (m *Migrator) failJob(tx *gorm.DB, job *models.ApplicationEncryptionMigration, message string) error {
-	job.State = "failed"
-	job.ErrorMessage = message
-	return tx.Save(job).Error
-}
-
-func (m *Migrator) migrateRow(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow, target uuid.UUID) (bool, error) {
+func (m *Migrator) migrateRow(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow) error {
 	switch location.Format {
 	case models.EncryptedStorageIntegrationJSON:
-		return m.migrateIntegrationConfiguration(ctx, tx, location, row, target)
+		return m.migrateIntegrationConfiguration(ctx, tx, location, row)
 	default:
 		if len(row.Value) == 0 {
-			return false, nil
+			return nil
 		}
-		return m.migrateCiphertext(ctx, tx, location, row, row.Value, target, func(value []byte) []byte { return value })
+		return m.migrateCiphertext(ctx, tx, location, row)
 	}
 }
 
-func (m *Migrator) migrateCiphertext(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow, ciphertext []byte, target uuid.UUID, encode func([]byte) []byte) (bool, error) {
-	id, versioned, err := crypto.EncryptedDataKeyID(ciphertext)
+func (m *Migrator) migrateCiphertext(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow) error {
+	id, versioned, err := crypto.EncryptedDataKeyID(row.Value)
 	if err != nil {
-		return false, fmt.Errorf("%w: parse encrypted value: %w", errUnreadableValue, err)
+		return fmt.Errorf("%w: parse encrypted value: %w", errUnreadableValue, err)
 	}
-	if versioned && id == target {
-		return false, nil
+	if versioned && id == m.job.TargetKeyID {
+		return nil
 	}
-	plain, err := m.encryptor.Decrypt(ctx, ciphertext, []byte(row.AssociatedData))
+	plain, err := m.encryptor.Decrypt(ctx, row.Value, []byte(row.AssociatedData))
 	if err != nil {
-		return false, fmt.Errorf("%w: decrypt value: %w", errUnreadableValue, err)
+		return fmt.Errorf("%w: decrypt value: %w", errUnreadableValue, err)
 	}
 	replacement, err := m.encryptor.Encrypt(ctx, plain, []byte(row.AssociatedData))
 	if err != nil {
-		return false, err
+		return err
 	}
 	actual, _, err := crypto.EncryptedDataKeyID(replacement)
-	if err != nil || actual != target {
-		return false, errors.New("active data key changed during migration")
+	if err != nil || actual != m.job.TargetKeyID {
+		return errors.New("active data key changed during migration")
 	}
-	return location.Replace(tx, row, encode(replacement))
+	_, err = location.Replace(tx, row, replacement)
+	return err
 }
 
-func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow, target uuid.UUID) (bool, error) {
+func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow) error {
 	var configuration map[string]any
 	decoder := json.NewDecoder(bytes.NewReader(row.Value))
 	decoder.UseNumber()
 	if err := decoder.Decode(&configuration); err != nil {
-		return false, fmt.Errorf("%w: decode integration configuration: %w", errUnreadableValue, err)
+		return fmt.Errorf("%w: decode integration configuration: %w", errUnreadableValue, err)
 	}
-	integration, err := m.registry.GetIntegration(row.AppName)
+	fields, err := sensitiveConfigurationFields(m.registry, row.AppName)
 	if err != nil {
-		return false, fmt.Errorf("%w: load integration %s: %w", errUnreadableValue, row.AppName, err)
-	}
-	fields := make([]string, 0)
-	for _, field := range integration.Configuration() {
-		if field.Sensitive {
-			fields = append(fields, field.Name)
-		}
-	}
-	// The factory BYOK path stores this field for OpenRouter even though its
-	// regular integration configuration does not declare it.
-	if row.AppName == "openrouter" && !slices.Contains(fields, "apiKey") {
-		fields = append(fields, "apiKey")
+		return fmt.Errorf("%w: %w", errUnreadableValue, err)
 	}
 	changed := false
 	var unreadable []error
@@ -253,7 +135,7 @@ func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm
 			unreadable = append(unreadable, fmt.Errorf("%w: parse sensitive field %s: %w", errUnreadableValue, name, err))
 			continue
 		}
-		if versioned && id == target {
+		if versioned && id == m.job.TargetKeyID {
 			continue
 		}
 		plain, err := m.encryptor.Decrypt(ctx, ciphertext, []byte(row.AssociatedData))
@@ -263,21 +145,21 @@ func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm
 		}
 		replacement, err := m.encryptor.Encrypt(ctx, plain, []byte(row.AssociatedData))
 		if err != nil {
-			return false, err
+			return err
 		}
 		configuration[name] = base64.StdEncoding.EncodeToString(replacement)
 		changed = true
 	}
 	if !changed {
-		return false, errors.Join(unreadable...)
+		return errors.Join(unreadable...)
 	}
 	replacement, err := json.Marshal(configuration)
 	if err != nil {
-		return false, err
+		return err
 	}
-	replaced, err := location.Replace(tx, row, replacement)
+	_, err = location.Replace(tx, row, replacement)
 	if err != nil {
-		return false, err
+		return err
 	}
-	return replaced, errors.Join(unreadable...)
+	return errors.Join(unreadable...)
 }

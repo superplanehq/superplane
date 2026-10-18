@@ -53,17 +53,17 @@ type Services struct {
 }
 
 type ServicesConfig struct {
-	BaseURL            string
-	WebhooksBaseURL    string
-	RunnerAPIBaseURL   string
-	Encryptor          crypto.Encryptor
-	EncryptionStore    *encryption.Store
-	EncryptionMigrator *encryption.Migrator
-	AuthService        authorization.Authorization
-	Registry           *registry.Registry
-	OIDCProvider       oidc.Provider
-	AgentService       agentsActions.AgentsService
-	JWTSigner          *jwt.Signer
+	BaseURL                     string
+	WebhooksBaseURL             string
+	RunnerAPIBaseURL            string
+	Encryptor                   crypto.Encryptor
+	EncryptionStore             *encryption.Store
+	EncryptionMigrationsEnabled bool
+	AuthService                 authorization.Authorization
+	Registry                    *registry.Registry
+	OIDCProvider                oidc.Provider
+	AgentService                agentsActions.AgentsService
+	JWTSigner                   *jwt.Signer
 
 	// Entitlements defaults to Community mode. Enterprise defaults to a
 	// registry whose Community implementations refuse every operation.
@@ -133,6 +133,6 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 				cfg.RunnerAPIBaseURL,
 			),
 		),
-		AdminKeys: NewAdminKeysService(cfg.EncryptionStore, cfg.EncryptionMigrator),
+		AdminKeys: NewAdminKeysService(cfg.EncryptionStore, cfg.EncryptionMigrationsEnabled),
 	}, nil
 }

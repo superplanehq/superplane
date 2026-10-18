@@ -1,4 +1,4 @@
-package encryption
+package workers
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -47,7 +48,7 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	master := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
 	masters, err := crypto.ParseLocalMasterKeys("local-v1:" + master)
 	require.NoError(t, err)
-	store := NewStore(masters, "local-v1")
+	store := encryption.NewStore(masters, "local-v1")
 	require.NoError(t, store.Initialize(ctx))
 	encryptor := crypto.NewVersionedEncryptor(store, legacy)
 	table := "encryption_migration_test_" + uuid.NewString()[:8]
@@ -57,7 +58,22 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	configurationLocation := testEncryptedStorageLocation(table, "configuration", "id::text", "app_name", models.EncryptedStorageIntegrationJSON)
 	integrations, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 	require.NoError(t, err)
-	migrator := NewMigrator(encryptor, integrations, []models.EncryptedStorageLocation{location, configurationLocation})
+	worker := NewApplicationEncryptionMigrationWorker(encryptor, integrations, []models.EncryptedStorageLocation{location, configurationLocation})
+	startJob := func() (*models.ApplicationEncryptionMigration, error) {
+		active, err := models.LoadActiveApplicationEncryptionKey(db)
+		if err != nil {
+			return nil, err
+		}
+		job := &models.ApplicationEncryptionMigration{
+			ID: uuid.New(), TargetKeyID: active.ID, State: "pending",
+			RegistryVersion: encryption.RegistryVersion,
+			StorageLocation: location.Name,
+		}
+		return job, db.Create(job).Error
+	}
+	getJob := func(id uuid.UUID) (*models.ApplicationEncryptionMigration, error) {
+		return models.LoadApplicationEncryptionMigration(db, id)
+	}
 
 	ciphertext, err := legacy.Encrypt(ctx, []byte("smtp secret"), []byte("smtp_password"))
 	require.NoError(t, err)
@@ -81,18 +97,23 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	require.NoError(t, err)
 	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name) VALUES (?, ?, ?, 'openrouter')", openRouterID, ciphertext, string(openRouterConfig)).Error)
 
-	job, err := migrator.Start(ctx)
+	job, err := startJob()
 	require.NoError(t, err)
-	_, err = store.Rotate(ctx)
-	require.ErrorIs(t, err, ErrMigrationUnfinished)
+	_, err = store.CreateAndActivateDataKey(ctx)
+	require.ErrorIs(t, err, encryption.ErrMigrationUnfinished)
 
-	for range 100 {
-		require.NoError(t, migrator.RunBatch(ctx))
-		job, err = migrator.Get(ctx, job.ID)
+	for range 2 {
+		require.NoError(t, worker.RunBatch(ctx))
+		job, err = getJob(job.ID)
 		require.NoError(t, err)
-		if job.State == "completed" {
-			break
-		}
+	}
+	require.Equal(t, "auditing", job.State)
+	_, err = store.CreateAndActivateDataKey(ctx)
+	require.ErrorIs(t, err, encryption.ErrMigrationUnfinished)
+	for range 2 {
+		require.NoError(t, worker.RunBatch(ctx))
+		job, err = getJob(job.ID)
+		require.NoError(t, err)
 	}
 	require.Equal(t, "completed", job.State, job.ErrorMessage)
 	var stored []byte
@@ -132,18 +153,18 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	plain, err = encryptor.Decrypt(ctx, decoded, []byte(openRouterID.String()))
 	require.NoError(t, err)
 	require.Equal(t, "router secret", string(plain))
-	newKeyID, err := store.Rotate(ctx)
+	newKeyID, err := store.CreateAndActivateDataKey(ctx)
 	require.NoError(t, err)
 	if _, plaintext := legacy.(*crypto.NoOpEncryptor); plaintext {
 		return
 	}
 	corruptID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name) VALUES (?, ?, '{}', 'openai')", corruptID, []byte("invalid ciphertext")).Error)
-	failedJob, err := migrator.Start(ctx)
+	failedJob, err := startJob()
 	require.NoError(t, err)
 	for range 100 {
-		require.NoError(t, migrator.RunBatch(ctx))
-		failedJob, err = migrator.Get(ctx, failedJob.ID)
+		require.NoError(t, worker.RunBatch(ctx))
+		failedJob, err = getJob(failedJob.ID)
 		require.NoError(t, err)
 		if failedJob.State == "failed" {
 			break
@@ -160,20 +181,34 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	repaired, err := legacy.Encrypt(ctx, []byte("repaired secret"), []byte("smtp_password"))
 	require.NoError(t, err)
 	require.NoError(t, db.Exec("UPDATE "+table+" SET secret = ? WHERE id = ?", repaired, corruptID).Error)
-	newJob, err := migrator.Start(ctx)
+	newJob, err := startJob()
 	require.NoError(t, err)
 	require.NotEqual(t, failedJob.ID, newJob.ID)
 	require.Equal(t, failedJob.TargetKeyID, newJob.TargetKeyID)
-	for range 100 {
-		require.NoError(t, migrator.RunBatch(ctx))
-		newJob, err = migrator.Get(ctx, newJob.ID)
+	for range 2 {
+		require.NoError(t, worker.RunBatch(ctx))
+		newJob, err = getJob(newJob.ID)
 		require.NoError(t, err)
-		if newJob.State == "completed" {
-			break
-		}
 	}
-	require.Equal(t, "completed", newJob.State, newJob.ErrorMessage)
-	failedJob, err = migrator.Get(ctx, failedJob.ID)
+	require.Equal(t, "auditing", newJob.State)
+	require.NoError(t, db.Exec("UPDATE "+table+" SET secret = ? WHERE id = ?", ciphertext, id).Error)
+	for range 2 {
+		require.NoError(t, worker.RunBatch(ctx))
+		newJob, err = getJob(newJob.ID)
+		require.NoError(t, err)
+	}
+	require.Equal(t, "failed", newJob.State)
+	require.Contains(t, newJob.ErrorMessage, "target data key")
+
+	retryJob, err := startJob()
+	require.NoError(t, err)
+	for range 4 {
+		require.NoError(t, worker.RunBatch(ctx))
+	}
+	retryJob, err = getJob(retryJob.ID)
+	require.NoError(t, err)
+	require.Equal(t, "completed", retryJob.State, retryJob.ErrorMessage)
+	failedJob, err = getJob(failedJob.ID)
 	require.NoError(t, err)
 	require.Equal(t, "failed", failedJob.State)
 }

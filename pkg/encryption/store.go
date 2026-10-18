@@ -21,7 +21,7 @@ type Store struct {
 	cache   map[uuid.UUID]crypto.DataKey
 }
 
-var ErrMigrationUnfinished = errors.New("finish the encryption migration before rotating data keys")
+var ErrMigrationUnfinished = errors.New("finish the encryption migration before creating a data key")
 
 func NewStore(masters crypto.MasterKeys, primary string) *Store {
 	return &Store{masters: masters, primary: primary, cache: make(map[uuid.UUID]crypto.DataKey)}
@@ -114,7 +114,7 @@ func (s *Store) List(ctx context.Context) ([]models.ApplicationEncryptionKey, uu
 	return nil, uuid.Nil, errors.New("no active data key")
 }
 
-func (s *Store) Rotate(ctx context.Context) (uuid.UUID, error) {
+func (s *Store) CreateAndActivateDataKey(ctx context.Context) (uuid.UUID, error) {
 	var newID uuid.UUID
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		active, err := models.LockActiveApplicationEncryptionKey(tx)

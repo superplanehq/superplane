@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import InstallationEncryption from "./InstallationEncryption";
@@ -30,7 +31,32 @@ describe("InstallationEncryption", () => {
     render(<InstallationEncryption />);
 
     expect(await screen.findByText("Could not decrypt a value.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Rotate data key" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Create data key" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Start migration" })).toBeEnabled();
+  });
+
+  it("creates a data key through the keys endpoint", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = String(input).endsWith("/migrations")
+        ? { migrations: [] }
+        : init?.method === "POST"
+          ? { activeKeyId: "key-2" }
+          : { keys: [{ id: "key-1", masterKeyRef: "local-v1" }], activeKeyId: "key-1" };
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<InstallationEncryption />);
+
+    await user.click(await screen.findByRole("button", { name: "Create data key" }));
+    await user.click(screen.getAllByRole("button", { name: "Create data key" })[1]);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/admin/api/installation/keys",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
   });
 });

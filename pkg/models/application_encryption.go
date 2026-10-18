@@ -71,7 +71,7 @@ func RewrapApplicationEncryptionKey(tx *gorm.DB, key *ApplicationEncryptionKey, 
 func HasUnfinishedApplicationEncryptionMigration(tx *gorm.DB) (bool, error) {
 	var count int64
 	err := tx.Table("application_encryption_migrations").
-		Where("state IN ?", []string{"pending", "running"}).
+		Where("state IN ?", []string{"pending", "running", "auditing"}).
 		Count(&count).Error
 	return count > 0, err
 }

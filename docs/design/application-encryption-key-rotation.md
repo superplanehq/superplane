@@ -16,7 +16,7 @@ PostgreSQL will store job progress and coordinate worker pods.
 
 ## Goals
 
-- Rotate data keys without making existing ciphertext unreadable.
+- Create active data keys without making existing ciphertext unreadable.
 - Convert ciphertext created with the current `ENCRYPTION_KEY`.
 - Re-encrypt stored values with an active data key when an admin requests it.
 - Resume migration after a worker or database connection fails.
@@ -49,10 +49,10 @@ The new decryptor will use this order:
    legacy key.
 
 The new encryptor will always read the active data key ID from PostgreSQL.
-An in-flight write can finish with the previous key after rotation returns.
-This is safe because the old key remains available. The migration's final
-verification pass must catch such writes. Do not retire old data keys while
-retained backups or in-flight writes can reference them.
+An in-flight write can finish with the previous key after key creation returns.
+This is safe because the old key remains available. A read-only audit after
+migration finds any values that still use an old key. Do not retire old data
+keys while retained backups or in-flight writes can reference them.
 
 The local master provider will read a map of named keys from a secret supplied
 at startup. The stored master key reference selects one entry in that map.
@@ -103,7 +103,6 @@ Define a registry in Go. Each entry has a stable identifier and code that can:
 - Reconstruct its existing associated data.
 - Decode and encode its storage form, including base64 values in JSON or text.
 - Replace a value without overwriting a concurrent application update.
-- Check whether any value still uses a legacy or non-target data key.
 
 The registry must cover every field encrypted through `crypto.Encryptor`.
 This initial inventory requires confirmation during implementation:
@@ -142,7 +141,7 @@ response.
 | UI action | Endpoint | Result |
 | --- | --- | --- |
 | View data keys | `GET /admin/api/installation/keys` | List data key IDs, creation times, and the active ID. |
-| Rotate data key | `POST /admin/api/installation/keys/rotate` | Add and activate a data key. |
+| Create data key | `POST /admin/api/installation/keys` | Create and activate a data key. |
 | Start migration | `POST /admin/api/installation/keys/migrations` | Create a migration job for the current active key. Return its ID. |
 | View migrations | `GET /admin/api/installation/keys/migrations` | List recent jobs so progress remains visible after a page reload. |
 | Fetch one job | `GET /admin/api/installation/keys/migrations/{id}` | Show state, current storage location, and failures. |
@@ -151,7 +150,7 @@ response.
 The UI starts a server job and shows its saved progress. The browser does not
 hold decrypted values or run migration batches.
 
-Reject data key rotation while a migration job is pending or running.
+Reject data key creation while a migration job is pending, running, or auditing.
 Enforce this rule in the same database transaction that activates a new key.
 An admin can start a new job after a failed job. The failed job remains in the history.
 Keep old data keys available while stored values or backups reference them.
@@ -162,8 +161,8 @@ Permit only one unfinished migration job per installation.
 Use one PostgreSQL row per job. The row stores:
 
 - Job ID, target data key ID, and registry version.
-- State: `pending`, `running`, `failed`, `completed`, or `abandoned`.
-- Current storage location identifier, page cursor, and pass.
+- State: `pending`, `running`, `auditing`, `failed`, or `completed`.
+- Current storage location identifier and page cursor.
 - Creation, update, and completion times.
 - A short error code and message, without plaintext or ciphertext.
 
@@ -171,12 +170,22 @@ Log unreadable values with their storage location and row ID. Keep logs free of
 plaintext and ciphertext. Do not store one progress row per migrated value.
 Do not require scanned or migrated counters for correctness.
 
-The target key ID is fixed when the job starts. The first pass converts values.
-Later passes verify that all values use the target key. A cursor identifies the last examined row
+Log job start, location changes, completion, and failure. Log each
+committed batch at info level. Include the job ID and target key ID so an
+operator can follow one job across worker pods. Emit progress and outcome logs
+after the transaction commits. Log transaction errors when they occur.
+
+The target key ID is fixed when the job starts. The job scans each registered
+location once. A cursor identifies the last examined row
 within the current storage location. Process registry handlers sequentially in
 the first version. Separate progress rows and parallel handlers are optional
 future work. A worker must refuse to resume a job if its code lacks the job's
 registry version or current handler identifier.
+
+The admin API creates and reads job rows through the models. A worker in
+`pkg/workers` polls for unfinished jobs. For each locked batch, it creates a
+job-bound migrator or auditor. The migrator changes stored values; the auditor
+only reads them. The worker saves progress and logs results after commit.
 
 For each batch, the worker will:
 
@@ -195,15 +204,22 @@ the row lock for each batch. Other worker pods skip the locked row.
 If a pod stops before commit, PostgreSQL rolls back and another pod repeats the batch.
 If it stops after commit, the next pod resumes from the saved cursor. A
 conditional update that loses a race with an application request must not
-overwrite the request. A later verification scan will revisit that value if it
-still uses an old key.
+overwrite the request. The read-only audit can find that value if it still
+uses an old key.
 
-After the initial walk, scan every registered location again for legacy values
-or values that do not use the target key. Repeat bounded passes until none
-remain. Continue past unreadable values and process the remaining rows. Mark
-the job failed after the full scan if any value could not be migrated. Keep
-successful changes. After the operator resolves the errors, start a new job.
-The new job scans all locations and targets the active data key.
+Continue past unreadable values and process the remaining rows. Mark the job
+failed after the migration scan if any value could not be migrated. Keep
+successful changes. After the operator resolves errors, start a new job. The
+new job scans all locations and targets the active data key.
+
+After the migration scan, the worker audits the same storage registry in
+bounded read-only batches. It marks the job completed only if the audit finds
+no value with another key. It marks the job failed if it finds a
+mismatch, and logs the affected storage location and row ID. An operator can
+also run [the SQL query](application-encryption-audit.sql) with a job ID to
+investigate. The audit checks stored key IDs; it cannot prove that a value
+decrypts or that a later write will use the same key. Keep old keys available
+until backup retention and any remaining writes permit removal.
 
 ## Rollout and Operations
 
@@ -240,14 +256,14 @@ the legacy format. Use this setting only when the old unmarked values are
 known to be plaintext; an installation with legacy AES-GCM data must keep the
 default `aes-gcm` format. Do not mix both unmarked formats in one database.
 
-### Rotate a data key
+### Create a data key
 
-1. Rotate the data key from the admin UI.
+1. Create a data key from the admin UI.
 2. New writes use the new active key. Old ciphertext stays readable.
 3. Start a migration only when re-encryption is required.
 4. Keep old data keys while current data or retained backups need them.
 
-Rotation does not require a migration job. Migration is an explicit operation.
+Creating a data key does not require a migration job. Migration is an explicit operation.
 Do not remove an old data key until verification and backup retention allow it.
 
 ### Rotate a master key
@@ -259,7 +275,7 @@ replaces the wrapped keys and verifies that it can read them. Application
 ciphertext and data key IDs do not change. The rewrap operation uses the first configured KMS URI.
 
 For a new KMS URI or local master key, deploy `new,old` to every API and worker
-instance in one rollout. Do not rotate or rewrap data keys during the rollout.
+instance in one rollout. Do not create or rewrap data keys during the rollout.
 Operators must confirm that every instance has the new configuration before
 they run either operation. Then rewrap the data keys in the admin UI. The server
 selects the first configured key. It updates the wrapped data keys and stored
@@ -277,8 +293,8 @@ the prior data keys and references intact.
 - Verify concurrent updates cannot lose application writes.
 - Verify a worker crash before and after a batch commit.
 - Verify a second worker skips a locked job row and another worker resumes after rollback.
-- Verify rotation fails while a migration remains unfinished.
-- Verify final scans catch values changed during the initial walk.
+- Verify data key creation fails while a migration remains unfinished.
+- Verify the read-only audit finds values that do not use the target key.
 - Verify a KMS or local master rewrap preserves all data key IDs.
 - Verify restore from a backup that still contains legacy or old-key values.
 

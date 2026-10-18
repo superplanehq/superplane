@@ -14,9 +14,9 @@ service Keys {
     };
   }
 
-  rpc RotateKey(RotateKeyRequest) returns (RotateKeyResponse) {
+  rpc CreateDataKey(CreateDataKeyRequest) returns (CreateDataKeyResponse) {
     option (google.api.http) = {
-      post: "/admin/api/installation/keys/rotate"
+      post: "/admin/api/installation/keys"
       body: "*"
     };
   }
@@ -63,9 +63,9 @@ message ListKeysResponse {
   string primary_master_key_ref = 3;
 }
 
-message RotateKeyRequest {}
+message CreateDataKeyRequest {}
 
-message RotateKeyResponse {
+message CreateDataKeyResponse {
   string active_key_id = 1;
 }
 
@@ -90,9 +90,8 @@ message MigrationResponse {
   string target_key_id = 2;
   string state = 3;
   string storage_location = 4;
-  int32 pass = 5;
-  string error_message = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp updated_at = 8;
-  google.protobuf.Timestamp completed_at = 9;
+  string error_message = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp completed_at = 8;
 }

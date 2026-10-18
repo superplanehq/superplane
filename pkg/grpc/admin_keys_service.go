@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/keys"
@@ -16,12 +18,14 @@ import (
 
 type AdminKeysService struct {
 	pb.UnimplementedKeysServer
-	store    *encryption.Store
-	migrator *encryption.Migrator
+	store             *encryption.Store
+	migrationsEnabled bool
 }
 
-func NewAdminKeysService(store *encryption.Store, migrator *encryption.Migrator) *AdminKeysService {
-	return &AdminKeysService{store: store, migrator: migrator}
+var errMigrationAlreadyRunning = errors.New("an encryption migration is already unfinished")
+
+func NewAdminKeysService(store *encryption.Store, migrationsEnabled bool) *AdminKeysService {
+	return &AdminKeysService{store: store, migrationsEnabled: migrationsEnabled}
 }
 
 func (s *AdminKeysService) ListKeys(ctx context.Context, _ *pb.ListKeysRequest) (*pb.ListKeysResponse, error) {
@@ -41,18 +45,18 @@ func (s *AdminKeysService) ListKeys(ctx context.Context, _ *pb.ListKeysRequest) 
 	return response, nil
 }
 
-func (s *AdminKeysService) RotateKey(ctx context.Context, _ *pb.RotateKeyRequest) (*pb.RotateKeyResponse, error) {
+func (s *AdminKeysService) CreateDataKey(ctx context.Context, _ *pb.CreateDataKeyRequest) (*pb.CreateDataKeyResponse, error) {
 	if s.store == nil {
 		return nil, status.Error(codes.Unavailable, "application encryption keys are not configured")
 	}
-	id, err := s.store.Rotate(ctx)
+	id, err := s.store.CreateAndActivateDataKey(ctx)
 	if errors.Is(err, encryption.ErrMigrationUnfinished) {
 		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
 	if err != nil {
-		return nil, status.Error(codes.Internal, "could not rotate encryption key")
+		return nil, status.Error(codes.Internal, "could not create data key")
 	}
-	return &pb.RotateKeyResponse{ActiveKeyId: id.String()}, nil
+	return &pb.CreateDataKeyResponse{ActiveKeyId: id.String()}, nil
 }
 
 func (s *AdminKeysService) RewrapKeys(ctx context.Context, _ *pb.RewrapKeysRequest) (*pb.RewrapKeysResponse, error) {
@@ -66,28 +70,54 @@ func (s *AdminKeysService) RewrapKeys(ctx context.Context, _ *pb.RewrapKeysReque
 }
 
 func (s *AdminKeysService) StartMigration(ctx context.Context, _ *pb.StartMigrationRequest) (*pb.MigrationResponse, error) {
-	if s.migrator == nil {
+	if !s.migrationsEnabled {
 		return nil, s.migrationUnavailable()
 	}
-	job, err := s.migrator.Start(ctx)
-	if errors.Is(err, encryption.ErrMigrationAlreadyRunning) {
+	var job *models.ApplicationEncryptionMigration
+	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		active, err := models.LockActiveApplicationEncryptionKey(tx)
+		if err != nil {
+			return err
+		}
+		unfinished, err := models.HasUnfinishedApplicationEncryptionMigration(tx)
+		if err != nil {
+			return err
+		}
+		if unfinished {
+			return errMigrationAlreadyRunning
+		}
+		job = &models.ApplicationEncryptionMigration{
+			ID:              uuid.New(),
+			TargetKeyID:     active.ID,
+			State:           "pending",
+			RegistryVersion: encryption.RegistryVersion,
+			StorageLocation: models.ApplicationEncryptedStorage()[0].Name,
+		}
+		return tx.Create(job).Error
+	})
+	if errors.Is(err, errMigrationAlreadyRunning) {
 		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
 	if err != nil {
 		return nil, status.Error(codes.Internal, "could not start encryption migration")
 	}
+	log.WithFields(log.Fields{
+		"migration_id":     job.ID,
+		"target_key_id":    job.TargetKeyID,
+		"storage_location": job.StorageLocation,
+	}).Info("application encryption migration started")
 	return migrationResponse(job), nil
 }
 
 func (s *AdminKeysService) GetMigration(ctx context.Context, req *pb.GetMigrationRequest) (*pb.MigrationResponse, error) {
-	if s.migrator == nil {
+	if !s.migrationsEnabled {
 		return nil, s.migrationUnavailable()
 	}
 	id, err := uuid.Parse(req.Id)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid migration ID")
 	}
-	job, err := s.migrator.Get(ctx, id)
+	job, err := models.LoadApplicationEncryptionMigration(database.DB(ctx), id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, status.Error(codes.NotFound, "encryption migration not found")
 	}
@@ -98,10 +128,10 @@ func (s *AdminKeysService) GetMigration(ctx context.Context, req *pb.GetMigratio
 }
 
 func (s *AdminKeysService) ListMigrations(ctx context.Context, _ *pb.ListMigrationsRequest) (*pb.ListMigrationsResponse, error) {
-	if s.migrator == nil {
+	if !s.migrationsEnabled {
 		return nil, s.migrationUnavailable()
 	}
-	migrations, err := s.migrator.List(ctx)
+	migrations, err := models.ListApplicationEncryptionMigrations(database.DB(ctx))
 	if err != nil {
 		return nil, status.Error(codes.Internal, "could not list encryption migrations")
 	}
@@ -122,7 +152,7 @@ func (s *AdminKeysService) migrationUnavailable() error {
 func migrationResponse(job *models.ApplicationEncryptionMigration) *pb.MigrationResponse {
 	response := &pb.MigrationResponse{
 		Id: job.ID.String(), TargetKeyId: job.TargetKeyID.String(), State: job.State,
-		StorageLocation: job.StorageLocation, Pass: int32(job.Pass), ErrorMessage: job.ErrorMessage,
+		StorageLocation: job.StorageLocation, ErrorMessage: job.ErrorMessage,
 		CreatedAt: timestamppb.New(job.CreatedAt), UpdatedAt: timestamppb.New(job.UpdatedAt),
 	}
 	if job.CompletedAt != nil {

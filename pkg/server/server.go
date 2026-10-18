@@ -482,25 +482,25 @@ func buildGRPCServices(
 	jwtSigner *jwt.Signer,
 	licenseService *licensing.Service,
 	keyStore *encryption.Store,
-	migrator *encryption.Migrator,
+	migrationsEnabled bool,
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
 
 	return grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:            baseURL,
-		WebhooksBaseURL:    webhooksBaseURL,
-		RunnerAPIBaseURL:   runnerAPIBaseURL,
-		Encryptor:          encryptor,
-		EncryptionStore:    keyStore,
-		EncryptionMigrator: migrator,
-		AuthService:        authService,
-		Registry:           registry,
-		OIDCProvider:       oidcProvider,
-		AgentService:       agentService,
-		JWTSigner:          jwtSigner,
-		Entitlements:       licenseService,
-		Enterprise:         features,
+		BaseURL:                     baseURL,
+		WebhooksBaseURL:             webhooksBaseURL,
+		RunnerAPIBaseURL:            runnerAPIBaseURL,
+		Encryptor:                   encryptor,
+		EncryptionStore:             keyStore,
+		EncryptionMigrationsEnabled: migrationsEnabled,
+		AuthService:                 authService,
+		Registry:                    registry,
+		OIDCProvider:                oidcProvider,
+		AgentService:                agentService,
+		JWTSigner:                   jwtSigner,
+		Entitlements:                licenseService,
+		Enterprise:                  features,
 	})
 }
 
@@ -860,11 +860,11 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
-	var migrator *encryption.Migrator
-	if keyStore != nil && !encryptionConfig.legacyWrites {
-		migrator = encryption.NewMigrator(encryptorInstance.(*crypto.VersionedEncryptor), registry, models.ApplicationEncryptedStorage())
+	migrationsEnabled := keyStore != nil && !encryptionConfig.legacyWrites
+	if migrationsEnabled {
 		if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
-			go migrator.Run(context.Background())
+			worker := workers.NewApplicationEncryptionMigrationWorker(encryptorInstance.(*crypto.VersionedEncryptor), registry, models.ApplicationEncryptedStorage())
+			go worker.Start(context.Background())
 		}
 	}
 
@@ -884,7 +884,7 @@ func Start() {
 			jwtSigner,
 			licenseService,
 			keyStore,
-			migrator,
+			migrationsEnabled,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)

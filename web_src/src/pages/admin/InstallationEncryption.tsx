@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/button";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useCallback, useEffect, useState } from "react";
 
-type Action = "rotate" | "migrate" | "rewrap";
+type Action = "create" | "migrate" | "rewrap";
 
 const basePath = "/admin/api/installation/keys";
-const activeStates = ["pending", "running"];
+const activeStates = ["pending", "running", "auditing"];
 
 async function request<T>(path: string, method = "GET", body?: object): Promise<T> {
   const response = await fetch(`${basePath}${path}`, {
@@ -33,42 +33,6 @@ function formatDate(value?: string): string {
   if (!value) return "—";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
-}
-
-function MigrationStatus({ migration }: { migration: KeysMigrationResponse }) {
-  return (
-    <div className="mt-4 rounded-md border border-slate-200 p-4 text-sm dark:border-gray-700">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span className="font-medium capitalize text-gray-900 dark:text-gray-100">{migration.state}</span>
-        <span className="text-gray-500 dark:text-gray-400">Started {formatDate(migration.createdAt)}</span>
-      </div>
-      <dl className="mt-3 grid gap-2 text-gray-600 dark:text-gray-400 sm:grid-cols-2">
-        <div>
-          <dt className="font-medium">Job ID</dt>
-          <dd className="break-all font-mono text-xs">{migration.id}</dd>
-        </div>
-        <div>
-          <dt className="font-medium">Target key</dt>
-          <dd className="break-all font-mono text-xs">{migration.targetKeyId}</dd>
-        </div>
-        {migration.state !== "completed" ? (
-          <div>
-            <dt className="font-medium">Current location</dt>
-            <dd>{migration.storageLocation || "Waiting to start"}</dd>
-          </div>
-        ) : null}
-        {migration.state === "completed" ? (
-          <div>
-            <dt className="font-medium">Completed</dt>
-            <dd>{formatDate(migration.completedAt)}</dd>
-          </div>
-        ) : null}
-      </dl>
-      {migration.errorMessage ? (
-        <Text className="mt-3 break-words text-sm text-red-600 dark:text-red-400">{migration.errorMessage}</Text>
-      ) : null}
-    </div>
-  );
 }
 
 type SectionProps = {
@@ -93,16 +57,16 @@ function DataKeysSection({
         <div>
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Data keys</h2>
           <Text className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Rotation creates a new key for future values. It does not re-encrypt existing values.
+            A new data key protects future values. Existing values keep their current keys.
           </Text>
         </div>
-        <Button disabled={!!busy || !!unfinished} onClick={() => setConfirm("rotate")}>
-          Rotate data key
+        <Button disabled={!!busy || !!unfinished} onClick={() => setConfirm("create")}>
+          Create data key
         </Button>
       </div>
       {unfinished ? (
         <Text className="mt-3 text-sm text-amber-700 dark:text-amber-400">
-          Complete the current migration before rotation.
+          Complete the current migration before you create a data key.
         </Text>
       ) : null}
       <div className="mt-5 overflow-x-auto">
@@ -133,35 +97,65 @@ function DataKeysSection({
 }
 
 function MigrationSection({
-  latestMigration,
+  migrations,
   unfinished,
   busy,
   setConfirm,
-  refresh,
 }: SectionProps & {
-  latestMigration?: KeysMigrationResponse;
+  migrations: KeysMigrationResponse[];
   unfinished: boolean;
-  refresh: () => Promise<void>;
 }) {
   return (
     <section className="border-t border-slate-200 py-6 dark:border-gray-700">
-      <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Re-encrypt stored values</h2>
-      <Text className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-        Start a migration to convert older values or move stored values to the active data key.
-      </Text>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Re-encrypt stored values</h2>
+          <Text className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Start a migration to convert older values or move stored values to the active data key.
+          </Text>
+        </div>
         <Button disabled={!!busy || !!unfinished} onClick={() => setConfirm("migrate")}>
           Start migration
         </Button>
-        <Button variant="outline" disabled={!!busy} onClick={() => void refresh()}>
-          Refresh status
-        </Button>
       </div>
-      {latestMigration ? (
-        <MigrationStatus migration={latestMigration} />
-      ) : (
-        <Text className="mt-4 text-sm text-gray-500">No migrations have started.</Text>
-      )}
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-slate-200 text-gray-500 dark:border-gray-700 dark:text-gray-400">
+            <tr>
+              <th className="py-2 font-medium">Job ID</th>
+              <th className="py-2 font-medium">Target key</th>
+              <th className="py-2 font-medium">Started</th>
+              <th className="py-2 font-medium">Status</th>
+              <th className="py-2 font-medium">Current location</th>
+              <th className="py-2 font-medium">Completed</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 dark:divide-gray-700">
+            {migrations.map((migration) => (
+              <tr key={migration.id}>
+                <td className="py-3 pr-4 break-all font-mono text-xs">{migration.id}</td>
+                <td className="py-3 pr-4 break-all font-mono text-xs">{migration.targetKeyId}</td>
+                <td className="py-3 pr-4 whitespace-nowrap">{formatDate(migration.createdAt)}</td>
+                <td className="py-3 pr-4">
+                  <span className="font-medium capitalize">{migration.state}</span>
+                  {migration.errorMessage ? (
+                    <Text className="mt-1 break-words text-sm text-red-600 dark:text-red-400">
+                      {migration.errorMessage}
+                    </Text>
+                  ) : null}
+                </td>
+                <td className="py-3 pr-4">
+                  {migration.state === "completed" ? "—" : migration.storageLocation || "Waiting to start"}
+                </td>
+                <td className="py-3 whitespace-nowrap">{formatDate(migration.completedAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {migrations.length === 0 ? (
+          <Text className="py-4 text-sm text-gray-500">No migrations have started.</Text>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -205,7 +199,7 @@ function ConfirmAction({
   primaryMasterKeyRef: string;
 }) {
   const confirmation = {
-    rotate: ["Rotate data key", "New values will use a new data key. Existing values will remain readable."],
+    create: ["Create data key", "New values will use the new data key. Existing values will remain readable."],
     migrate: ["Start encryption migration", "This job will re-encrypt stored values with the active data key."],
     rewrap: [
       "Rewrap data keys",
@@ -271,7 +265,7 @@ export default function InstallationEncryption() {
   const unfinished = latestMigration && activeStates.includes(latestMigration.state ?? "");
 
   useEffect(() => {
-    if (latestMigration?.state !== "pending" && latestMigration?.state !== "running") return;
+    if (!activeStates.includes(latestMigration?.state ?? "")) return;
     const timer = window.setInterval(() => void refresh(), 5000);
     return () => window.clearInterval(timer);
   }, [latestMigration?.state, refresh]);
@@ -280,8 +274,8 @@ export default function InstallationEncryption() {
     setBusy(action);
     try {
       switch (action) {
-        case "rotate":
-          await request("/rotate", "POST", {});
+        case "create":
+          await request("", "POST", {});
           showSuccessToast("New data key is active.");
           break;
         case "migrate":
@@ -328,13 +322,7 @@ export default function InstallationEncryption() {
             busy={busy}
             setConfirm={setConfirm}
           />
-          <MigrationSection
-            latestMigration={latestMigration}
-            unfinished={!!unfinished}
-            busy={busy}
-            setConfirm={setConfirm}
-            refresh={refresh}
-          />
+          <MigrationSection migrations={migrations} unfinished={!!unfinished} busy={busy} setConfirm={setConfirm} />
           <MasterKeySection primaryMasterKeyRef={primaryMasterKeyRef} busy={busy} setConfirm={setConfirm} />
         </div>
       ) : null}

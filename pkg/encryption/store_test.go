@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-func TestStoreRotatesDataKeysAndRewrapsMaster(t *testing.T) {
+func TestStoreCreatesDataKeysAndRewrapsMaster(t *testing.T) {
 	ctx := t.Context()
 	db := database.DB(context.Background())
 	require.NoError(t, database.VerifyTestDatabase(db))
@@ -36,7 +36,7 @@ func TestStoreRotatesDataKeysAndRewrapsMaster(t *testing.T) {
 	store = NewStore(masters, "local-v2")
 	require.NoError(t, store.Initialize(ctx))
 	encryptor = crypto.NewVersionedEncryptor(store, nil)
-	newID, err := store.Rotate(ctx)
+	newID, err := store.CreateAndActivateDataKey(ctx)
 	require.NoError(t, err)
 	newValue, err := encryptor.Encrypt(ctx, []byte("new value"), []byte("record"))
 	require.NoError(t, err)

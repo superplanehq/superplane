@@ -15,7 +15,6 @@ type ApplicationEncryptionMigration struct {
 	RegistryVersion int
 	StorageLocation string
 	Cursor          string
-	Pass            int
 	ErrorMessage    string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -43,7 +42,7 @@ func ListApplicationEncryptionMigrations(tx *gorm.DB) ([]ApplicationEncryptionMi
 func LockNextApplicationEncryptionMigration(tx *gorm.DB) (*ApplicationEncryptionMigration, error) {
 	var migration ApplicationEncryptionMigration
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("state IN ?", []string{"pending", "running"}).
+		Where("state IN ?", []string{"pending", "running", "auditing"}).
 		Order("created_at, id").First(&migration).Error
 	if err != nil {
 		return nil, err

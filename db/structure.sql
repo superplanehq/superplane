@@ -272,12 +272,11 @@ CREATE TABLE public.application_encryption_migrations (
     registry_version integer NOT NULL,
     storage_location text NOT NULL,
     cursor text DEFAULT ''::text NOT NULL,
-    pass integer DEFAULT 1 NOT NULL,
     error_message text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     completed_at timestamp with time zone,
-    CONSTRAINT application_encryption_migrations_state_check CHECK ((state = ANY (ARRAY['pending'::text, 'running'::text, 'failed'::text, 'completed'::text, 'abandoned'::text])))
+    CONSTRAINT application_encryption_migrations_state_check CHECK ((state = ANY (ARRAY['pending'::text, 'running'::text, 'auditing'::text, 'failed'::text, 'completed'::text])))
 );
 
 
@@ -3164,7 +3163,7 @@ CREATE UNIQUE INDEX application_encryption_keys_one_active ON public.application
 -- Name: application_encryption_migrations_unfinished; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.application_encryption_migrations USING btree ((1)) WHERE (state = ANY (ARRAY['pending'::text, 'running'::text]));
+CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.application_encryption_migrations USING btree ((1)) WHERE (state = ANY (ARRAY['pending'::text, 'running'::text, 'auditing'::text]));
 
 
 --
