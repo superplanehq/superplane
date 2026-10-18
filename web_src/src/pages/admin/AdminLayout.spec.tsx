@@ -22,6 +22,7 @@ const pageLinks = [
   { label: "Organizations", href: "/admin", icon: "lucide-building" },
   { label: "Accounts", href: "/admin/accounts", icon: "lucide-users" },
   { label: "Settings", href: "/admin/settings", icon: "lucide-network" },
+  { label: "Encryption", href: "/admin/encryption", icon: "lucide-key-round" },
   { label: "License", href: "/admin/license", icon: "lucide-key-round" },
   { label: "Price Books", href: "/admin/price-books", icon: "lucide-book-open" },
   { label: "Fleets", href: "/admin/runner-tasks", icon: "lucide-terminal" },

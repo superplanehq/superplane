@@ -68,7 +68,7 @@ func ResolveProcess(ctx context.Context) (config.GitHubHostedAppConfig, error) {
 	if env.Enabled() {
 		return env, nil
 	}
-	encryptor, err := crypto.FromEnv()
+	encryptor, err := crypto.ProcessEncryptor()
 	if err != nil {
 		return config.GitHubHostedAppConfig{}, nil
 	}

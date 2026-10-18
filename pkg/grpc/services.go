@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	adminRunnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/admin/runners"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
@@ -12,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
@@ -47,18 +49,21 @@ type Services struct {
 	APIKeys       pbAPIKeys.ApiKeysServer
 	Agents        pbAgents.AgentsServer
 	AdminRunners  pbAdminRunners.RunnersServer
+	AdminKeys     pbAdminKeys.KeysServer
 }
 
 type ServicesConfig struct {
-	BaseURL          string
-	WebhooksBaseURL  string
-	RunnerAPIBaseURL string
-	Encryptor        crypto.Encryptor
-	AuthService      authorization.Authorization
-	Registry         *registry.Registry
-	OIDCProvider     oidc.Provider
-	AgentService     agentsActions.AgentsService
-	JWTSigner        *jwt.Signer
+	BaseURL                     string
+	WebhooksBaseURL             string
+	RunnerAPIBaseURL            string
+	Encryptor                   crypto.Encryptor
+	EncryptionStore             *encryption.Store
+	EncryptionMigrationsEnabled bool
+	AuthService                 authorization.Authorization
+	Registry                    *registry.Registry
+	OIDCProvider                oidc.Provider
+	AgentService                agentsActions.AgentsService
+	JWTSigner                   *jwt.Signer
 
 	// Entitlements defaults to Community mode. Enterprise defaults to a
 	// registry whose Community implementations refuse every operation.
@@ -128,5 +133,6 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 				cfg.RunnerAPIBaseURL,
 			),
 		),
+		AdminKeys: NewAdminKeysService(cfg.EncryptionStore, cfg.EncryptionMigrationsEnabled),
 	}, nil
 }

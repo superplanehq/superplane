@@ -19,6 +19,7 @@ const adminPageLinks: AdminPageLink[] = [
   { label: "Organizations", to: "/admin", icon: Building, end: true },
   { label: "Accounts", to: "/admin/accounts", icon: Users },
   { label: "Settings", to: "/admin/settings", icon: Network },
+  { label: "Encryption", to: "/admin/encryption", icon: KeyRound },
   { label: "License", to: "/admin/license", icon: KeyRound },
   { label: "Price Books", to: "/admin/price-books", icon: BookOpen },
   { label: "Fleets", to: "/admin/runner-tasks", icon: Terminal },

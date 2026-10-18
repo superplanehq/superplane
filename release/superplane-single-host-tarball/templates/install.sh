@@ -40,12 +40,14 @@ echo "Generating secrets..."
 
 if command -v openssl >/dev/null 2>&1; then
   ENCRYPTION_KEY="$(openssl rand -hex 16)"
+  ENCRYPTION_MASTER_KEYS="env://host-v1:$(openssl rand -base64 32 | tr -d '\n')"
   JWT_SECRET="$(openssl rand -hex 32)"
   SESSION_SECRET="$(openssl rand -hex 32)"
   DB_PASSWORD="$(openssl rand -hex 16)"
 else
   echo "openssl not found, using /dev/urandom for secrets."
   ENCRYPTION_KEY="$(head -c 32 /dev/urandom | tr -dc 'a-f0-9' | head -c 32)"
+  ENCRYPTION_MASTER_KEYS="env://host-v1:$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
   JWT_SECRET="$(head -c 64 /dev/urandom | tr -dc 'a-f0-9' | head -c 64)"
   SESSION_SECRET="$(head -c 64 /dev/urandom | tr -dc 'a-f0-9' | head -c 64)"
   DB_PASSWORD="$(head -c 32 /dev/urandom | tr -dc 'a-f0-9' | head -c 32)"
@@ -104,10 +106,10 @@ RBAC_ORG_POLICY_PATH=/app/rbac/rbac_org_policy.csv
 TEMPLATE_DIR=/app/templates
 
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
+ENCRYPTION_MASTER_KEYS=${ENCRYPTION_MASTER_KEYS}
 JWT_SECRET=${JWT_SECRET}
 OIDC_KEYS_PATH=${OIDC_KEYS_CONTAINER_PATH}
 SESSION_SECRET=${SESSION_SECRET}
-NO_ENCRYPTION=no
 
 OWNER_SETUP_ENABLED=yes
 BLOCK_SIGNUP=${BLOCK_SIGNUP}
