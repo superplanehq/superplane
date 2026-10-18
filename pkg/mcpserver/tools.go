@@ -27,7 +27,7 @@ func Tools() []Tool {
 	return []Tool{
 		{
 			Name:        "list_tasks",
-			Description: "List tasks in this workspace. Draft is the backlog. Open is in progress. Closed is finished. Set mine to true to return tasks assigned to you or created by you. Poll after a write to see new state.",
+			Description: "List tasks in this workspace. Draft is the backlog. Open is in progress. Closed is finished. Set mine to true to return tasks assigned to you or created by you. Set source_url to the full issue URL to return tasks created from that issue. Archived tasks stay hidden. Poll after a write to see new state.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -44,7 +44,33 @@ func Tools() []Tool {
 						"type":        "string",
 						"description": "Return the next page older than this task id.",
 					},
+					"source_url": map[string]any{
+						"type":        "string",
+						"description": "Full issue URL. GitHub matches the repository and issue number. Issue 12 does not match issue 123. Archived tasks stay hidden.",
+					},
 				},
+			},
+		},
+		{
+			Name:        "get_task_report",
+			Description: "Return recorded usage, pull requests, line steps, and automation runs for one task. The task is an id, a number, or a key. Archived tasks are included. usage.recorded is false when the task has no usage rows. Do not treat missing totals as zero. vm_duration_seconds is runner time, not elapsed time. Task totals are the usage authority. run_counts cover every associated run. The runs list is one page.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"task": map[string]any{
+						"type":        "string",
+						"description": "Task id, number, or key.",
+					},
+					"limit": map[string]any{
+						"type":        "integer",
+						"description": "Run page size. The default is 50. The maximum is 200.",
+					},
+					"before": map[string]any{
+						"type":        "string",
+						"description": "Run cursor from next_run_before. Omit it for the first page.",
+					},
+				},
+				"required": []string{"task"},
 			},
 		},
 		{
@@ -147,6 +173,8 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 		return rt.listTasks(ctx, claims, args)
 	case "get_task":
 		return rt.getTask(ctx, claims, args)
+	case "get_task_report":
+		return rt.getTaskReport(ctx, claims, args)
 	case "list_task_artifacts":
 		return rt.listTaskArtifacts(ctx, claims, args)
 	case "get_task_agent":
@@ -178,6 +206,15 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 	if beforeID, _ := args["before_id"].(string); strings.TrimSpace(beforeID) != "" {
 		req.BeforeId = strings.TrimSpace(beforeID)
 	}
+	if raw, ok := args["source_url"]; ok && raw != nil {
+		sourceURL, ok := raw.(string)
+		if !ok {
+			return ToolResult{}, ToolError("source_url must be an absolute http URL")
+		}
+		if sourceURL = strings.TrimSpace(sourceURL); sourceURL != "" {
+			req.SourceUrl = sourceURL
+		}
+	}
 	states, err := parseTaskStates(args["states"])
 	if err != nil {
 		return ToolResult{}, err
@@ -194,15 +231,21 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 		Title     string        `json:"title"`
 		State     string        `json:"state"`
 		Assignees []assigneeRef `json:"assignees"`
+		SourceURL string        `json:"source_url"`
 	}
 	rows := make([]taskRow, 0, len(resp.GetOrders()))
 	for _, order := range resp.GetOrders() {
+		sourceURL := ""
+		if origin := order.GetOrigin(); origin != nil {
+			sourceURL = origin.GetUrl()
+		}
 		rows = append(rows, taskRow{
 			ID:        order.GetId(),
 			Key:       order.GetKey(),
 			Title:     order.GetTitle(),
 			State:     protoStateName(order.GetState()),
 			Assignees: assigneeRefs(order.GetAssignees()),
+			SourceURL: sourceURL,
 		})
 	}
 	payload := map[string]any{"tasks": rows, "has_next_page": resp.GetHasNextPage()}

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -442,6 +443,45 @@ func SumUsageForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID
 		Select("work_order_id AS id, "+usageSumSelect).
 		Where("work_order_id IN ?", workOrderIDs).
 		Group("work_order_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return scanUsageSums(rows), nil
+}
+
+// WorkOrderHasUsageEvents reports whether the ledger has any row for the task.
+// A task with no rows is not the same as a recorded total of zero.
+func WorkOrderHasUsageEvents(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) {
+	if workOrderID == uuid.Nil {
+		return false, nil
+	}
+	var event WorkspaceUsageEvent
+	err := tx.Model(&WorkspaceUsageEvent{}).
+		Select("id").
+		Where("work_order_id = ?", workOrderID).
+		Take(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// SumUsageForCanvasRuns returns ledger totals for each run id.
+// Descendant runs are not included. Missing ids are absent from the map.
+func SumUsageForCanvasRuns(tx *gorm.DB, runIDs []uuid.UUID) (map[uuid.UUID]UsageTotals, error) {
+	if len(runIDs) == 0 {
+		return map[uuid.UUID]UsageTotals{}, nil
+	}
+
+	var rows []usageSumRow
+	err := tx.Model(&WorkspaceUsageEvent{}).
+		Select("canvas_run_id AS id, "+usageSumSelect).
+		Where("canvas_run_id IN ?", runIDs).
+		Group("canvas_run_id").
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err
