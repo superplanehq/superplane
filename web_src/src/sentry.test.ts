@@ -90,6 +90,17 @@ describe("isMonacoCanceledEvent", () => {
     expect(isMonacoCanceledEvent(event)).toBe(true);
   });
 
+  it("drops a Canceled rejection from editor dispose during React unmount", () => {
+    const event = buildEvent("Canceled", [
+      "../../../../../web_src/node_modules/monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter.js",
+      "../../../../../web_src/node_modules/@monaco-editor/react/dist/index.mjs",
+      "../../../../../web_src/node_modules/react-dom/cjs/react-dom-client.production.js",
+    ]);
+
+    expect(isMonacoCanceledEvent(event)).toBe(true);
+    expect(filterSentryEvent(event)).toBeNull();
+  });
+
   it("keeps a Canceled rejection that includes an application frame", () => {
     const event = buildEvent("Canceled", [
       "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/esm/vs/base/common/async.js",
@@ -97,6 +108,7 @@ describe("isMonacoCanceledEvent", () => {
     ]);
 
     expect(isMonacoCanceledEvent(event)).toBe(false);
+    expect(filterSentryEvent(event)).not.toBeNull();
   });
 
   it("keeps a Canceled rejection with no frames", () => {
