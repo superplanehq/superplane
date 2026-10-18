@@ -335,6 +335,56 @@ func TestWorkspaceCheckoutScriptDetachesAtPullRequestRevision(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(repo, ".git", "hooks", "prepare-commit-msg"))
 }
 
+func TestWorkspaceCheckoutScriptKeepsGitHubBranchWhenBitbucketTokenIsPresent(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	sha := pushCommit(t, remote, "refs/pull/4/head", "feature", "branch\n")
+	dir := t.TempDir()
+	home := t.TempDir()
+	git := requireGitAndNode(t)
+	cmd := exec.Command(git, "config", "--file", filepath.Join(home, ".gitconfig"),
+		"url."+remote+".insteadOf", "https://github.com/acme/widgets.git")
+	cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + home, "GIT_CONFIG_NOSYSTEM=1"}
+	require.NoError(t, cmd.Run())
+	output, err := runCheckoutScriptFull(t, dir, "", "main", checkoutScriptOptions{
+		home:        home,
+		omitRepoURL: true,
+		extraEnv: []string{
+			"REPO=acme/widgets",
+			"PR_NUMBER=4",
+			"PR_HEAD=feature",
+			"PR_REVISION=" + sha,
+			"GITHUB_TOKEN=github-token",
+			"BITBUCKET_TOKEN=bitbucket-token",
+		},
+	})
+	require.NoError(t, err, output)
+	repo := filepath.Join(dir, "repo")
+	assert.Equal(t, "feature", runGitQuiet(t, "", repo, "rev-parse", "--abbrev-ref", "HEAD"))
+	assert.Equal(t, sha, runGitQuiet(t, "", repo, "rev-parse", "HEAD"))
+}
+
+func TestWorkspaceCheckoutScriptUsesBitbucketWhenGitHubTokenIsAbsent(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	sha := pushCommit(t, remote, "refs/pull/4/head", "feature", "branch\n")
+	dir := t.TempDir()
+	binDir := filepath.Join(dir, "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "curl"), []byte("#!/bin/sh\necho bitbucket-api >&2\nexit 1\n"), 0o755))
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
+		extraEnv: []string{
+			"REPO=acme/widgets",
+			"PR_NUMBER=4",
+			"PR_HEAD=feature",
+			"PR_REVISION=" + sha,
+			"BITBUCKET_TOKEN=bitbucket-token",
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, output, "bitbucket-api")
+	assert.NotContains(t, output, "Checkout complete")
+	assert.NoDirExists(t, filepath.Join(dir, "repo", ".git"))
+}
+
 func TestWorkspaceCheckoutScriptChecksOutPullRequestBranch(t *testing.T) {
 	remote := initBareRepo(t, "main")
 	sha := pushCommit(t, remote, "refs/pull/4/head", "feature", "branch\n")
@@ -411,7 +461,7 @@ func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
 		{Name: "Score", Type: runner.AgentStepPrompt, Prompt: commandPtr("review the checkout")},
 		{Name: "Diff", Type: runner.AgentStepBash, Command: commandPtr("git rev-parse HEAD > /tmp/pr.diff")},
 	}
-	out := runner.InsertFactoryCheckoutCommand(commands, steps)
+	out := runner.InsertFactoryCheckoutCommand(commands, steps, nil)
 	require.Len(t, out, 3)
 	assert.Equal(t, "Auth", out[0].Name)
 	assert.Equal(t, "Checkout", out[1].Name)
@@ -428,8 +478,45 @@ func TestInsertFactoryCheckoutCommandSkipsExistingClone(t *testing.T) {
 		{Name: "Helper", Type: runner.AgentStepBash, Command: commandPtr("set -euo pipefail\ncheckout\n")},
 	}
 	for _, step := range cases {
-		out := runner.InsertFactoryCheckoutCommand(commands, []runner.AgentStep{step})
+		out := runner.InsertFactoryCheckoutCommand(commands, []runner.AgentStep{step}, nil)
 		assert.Equal(t, commands, out, step.Name)
+	}
+}
+
+func TestApplyFactoryCheckoutKeepsInstructionsForSavedClone(t *testing.T) {
+	files := checkoutHintFiles()
+	steps := []runner.AgentStep{{
+		Name:    "Clone",
+		Type:    runner.AgentStepBash,
+		Command: commandPtr("git clone https://example.com/repo.git repo"),
+	}}
+	commands := []runner.BrokerCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
+	out := runner.ApplyFactoryCheckout(files, commands, steps)
+	assert.Equal(t, commands, out)
+	assert.Contains(t, files[0].Content, "run `checkout`")
+	assert.NotContains(t, files[0].Content, "already ran")
+}
+
+func TestApplyFactoryCheckoutMarksInstructionsDone(t *testing.T) {
+	files := checkoutHintFiles()
+	commands := []runner.BrokerCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
+	out := runner.ApplyFactoryCheckout(files, commands, nil)
+	require.Len(t, out, 2)
+	assert.Equal(t, "Checkout", out[0].Name)
+	assert.Contains(t, files[0].Content, "Setup commands already ran in repo/ after checkout, in order: npm ci")
+	assert.Contains(t, files[0].Content, "Context repositories are already checked out: acme/extra")
+	assert.NotContains(t, files[0].Content, "run `checkout`")
+}
+
+func checkoutHintFiles() []runner.BrokerTaskFile {
+	return []runner.BrokerTaskFile{
+		{
+			Path: "prompts/implement.txt",
+			Content: "Implement.\nYou can use these resources." +
+				"\nSetup commands (run in repo/ after clone, in order): npm ci" +
+				"\nCheckout: run `checkout` to check out repo/ and context repositories. Extra repositories (already checked out when the automation runs it): acme/extra (context/acme/extra)\n",
+		},
+		{Path: runner.WorkspaceCheckoutScriptPath, Content: "#!/bin/bash\n"},
 	}
 }
 

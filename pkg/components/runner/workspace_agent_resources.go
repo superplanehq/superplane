@@ -365,7 +365,10 @@ set -euo pipefail
 cd "$SUPERPLANE_TASK_DIR" || exit 1
 
 if [ -z "${REPO_URL:-}" ] && [ -n "${REPO:-}" ]; then
-  if [ -n "${SOURCE_REPO:-}" ] || [ -n "${BITBUCKET_TOKEN:-}" ]; then
+  # An extra Bitbucket credential on a GitHub run must not change the host.
+  # Bitbucket is selected from the source repository, or from its token when
+  # the GitHub token is absent.
+  if [ -n "${SOURCE_REPO:-}" ] || { [ -n "${BITBUCKET_TOKEN:-}" ] && [ -z "${GITHUB_TOKEN:-}" ]; }; then
     REPO_URL="https://bitbucket.org/${REPO}.git"
   else
     REPO_URL="https://github.com/${REPO}.git"
@@ -537,10 +540,10 @@ checkout_bitbucket_pull_request() {
 
 if [ -n "${SOURCE_REPO:-}" ] && [ -n "${PR_REVISION:-}" ]; then
   checkout_bitbucket_revision
+elif [ -n "${PR_HEAD:-}" ] && [ "${PR_HEAD}" != "null" ] && { [ -z "${BITBUCKET_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; }; then
+  checkout_github_branch
 elif [ -n "${BITBUCKET_TOKEN:-}" ] && [ -n "${PR_NUMBER:-}" ]; then
   checkout_bitbucket_pull_request
-elif [ -n "${PR_HEAD:-}" ] && [ "${PR_HEAD}" != "null" ]; then
-  checkout_github_branch
 elif [ -n "${PR_NUMBER:-}" ] && [ -z "${PR_REVISION:-}" ]; then
   checkout_github_branch
 elif [ -n "${PR_REVISION:-}" ]; then
@@ -668,23 +671,33 @@ func taskShipsCheckout(files []BrokerTaskFile) bool {
 	return false
 }
 
+const (
+	setupHintPending   = "\nSetup commands (run in repo/ after clone, in order): "
+	setupHintDone      = "\nSetup commands already ran in repo/ after checkout, in order: "
+	contextHintPending = "\nCheckout: run `checkout` to check out repo/ and context repositories. Extra repositories (already checked out when the automation runs it): "
+	contextHintDone    = "\nContext repositories are already checked out: "
+)
+
 // ApplyFactoryCheckout inserts the checkout command after setup and before
 // the canvas steps. Factory tasks ship the helper file. A canvas that
 // already clones keeps that step and does not get a second checkout.
+// Prompt hints stay on the saved-clone instructions unless this inserts
+// the command, because only then have setup and context checkout run.
 func ApplyFactoryCheckout(files []BrokerTaskFile, commands []BrokerCommand, steps []AgentStep) []BrokerCommand {
 	if !taskShipsCheckout(files) {
 		return commands
 	}
-	return InsertFactoryCheckoutCommand(commands, steps)
+	return InsertFactoryCheckoutCommand(commands, steps, files)
 }
 
 // InsertFactoryCheckoutCommand inserts checkout before the first canvas
 // step. Steps that already run git clone, or the checkout helper, are left
 // unchanged so saved automations keep their own clone.
-func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep) []BrokerCommand {
+func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, files []BrokerTaskFile) []BrokerCommand {
 	if stepsAlreadyCheckout(steps) {
 		return commands
 	}
+	markCheckoutHintsComplete(files)
 	checkout := BrokerCommand{
 		Name:    "Checkout",
 		Command: WrapAgentStepCommand("checkout"),
@@ -701,6 +714,18 @@ func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep) [
 		return append(out, commands[i:]...)
 	}
 	return append(commands, checkout)
+}
+
+func markCheckoutHintsComplete(files []BrokerTaskFile) {
+	for i := range files {
+		if !strings.HasPrefix(files[i].Path, "prompts/") || !strings.HasSuffix(files[i].Path, ".txt") {
+			continue
+		}
+		content := files[i].Content
+		content = strings.ReplaceAll(content, setupHintPending, setupHintDone)
+		content = strings.ReplaceAll(content, contextHintPending, contextHintDone)
+		files[i].Content = content
+	}
 }
 
 func stepsAlreadyCheckout(steps []AgentStep) bool {
@@ -959,7 +984,7 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 		builder.WriteString(strings.Join(mcpNames, ", "))
 	}
 	if len(setupCommands) > 0 {
-		builder.WriteString("\nSetup commands already ran in repo/ after checkout, in order: ")
+		builder.WriteString(setupHintPending)
 		builder.WriteString(strings.Join(setupCommands, " && "))
 	}
 	if len(contextRepos) > 0 {
@@ -971,7 +996,7 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 			}
 			names = append(names, repository+" ("+WorkspaceContextRepoDirectory(repository)+")")
 		}
-		builder.WriteString("\nContext repositories are already checked out: ")
+		builder.WriteString(contextHintPending)
 		builder.WriteString(strings.Join(names, ", "))
 	}
 	return builder.String()
