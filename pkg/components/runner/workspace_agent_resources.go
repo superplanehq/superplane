@@ -347,8 +347,8 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 
 // WorkspaceCheckoutScript is the checkout command the runner inserts before
 // factory agent steps. It checks out the main repo to repo/, positions a
-// pull request when the task environment describes one, runs workspace
-// setup commands, then clones every workspace_context.json entry.
+// pull request when the task environment describes one, then clones every
+// workspace_context.json entry. Setup commands are separate steps.
 // Authentication comes from the VCS integration setup that already ran
 // (gh auth setup-git / Bitbucket credential helper), so the script uses
 // plain HTTPS URLs and never embeds tokens. It is idempotent: directories
@@ -359,10 +359,15 @@ func WorkspaceCheckoutScript() string {
 	return `#!/bin/bash
 set -euo pipefail
 : "${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}"
-# Prompt steps run inside repo/, so anchor every relative clone path to the
-# task directory. Agents that run this helper from a step working directory
-# must still check out beside the task root, never nested inside it.
-cd "$SUPERPLANE_TASK_DIR" || exit 1
+# Later steps resolve repo/ from the launch directory in task_cwd. Clone
+# there. Without that file, use the task directory so a helper started in
+# another directory does not nest the clone.
+if [ -f "$SUPERPLANE_TASK_DIR/task_cwd" ]; then
+  _sp_root=$(cat "$SUPERPLANE_TASK_DIR/task_cwd")
+else
+  _sp_root="$SUPERPLANE_TASK_DIR"
+fi
+cd "$_sp_root" || exit 1
 
 if [ -z "${REPO_URL:-}" ] && [ -n "${REPO:-}" ]; then
   # An extra Bitbucket credential on a GitHub run must not change the host.
@@ -425,7 +430,7 @@ checkout_github_revision() {
     base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
     gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
   fi
-  cd "$SUPERPLANE_TASK_DIR" || exit 1
+  cd "$_sp_root" || exit 1
 }
 
 checkout_bitbucket_revision() {
@@ -453,7 +458,7 @@ checkout_bitbucket_revision() {
   if [ -n "${BASE:-}" ]; then
     git diff "$(git merge-base "${BASE}" HEAD)" HEAD > /tmp/pr.diff
   fi
-  cd "$SUPERPLANE_TASK_DIR" || exit 1
+  cd "$_sp_root" || exit 1
 }
 
 checkout_github_branch() {
@@ -479,7 +484,7 @@ checkout_github_branch() {
   fi
   git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"
   git checkout "${PR_HEAD}"
-  cd "$SUPERPLANE_TASK_DIR" || exit 1
+  cd "$_sp_root" || exit 1
 }
 
 checkout_bitbucket_pull_request() {
@@ -543,7 +548,7 @@ checkout_bitbucket_pull_request() {
     echo "Local checkout does not match the pull request source commit." >&2
     exit 1
   fi
-  cd "$SUPERPLANE_TASK_DIR" || exit 1
+  cd "$_sp_root" || exit 1
 }
 
 if [ -n "${SOURCE_REPO:-}" ] && [ -n "${PR_REVISION:-}" ]; then
@@ -559,22 +564,6 @@ elif [ -n "${PR_REVISION:-}" ]; then
 else
   clone_default_branch
 ` + workspaceCheckoutCommitSetup() + `
-fi
-
-setup="$SUPERPLANE_TASK_DIR/workspace_setup.json"
-if [ -f "$setup" ]; then
-  if [ ! -d repo ]; then
-    echo "Setup commands need repo/, and checkout did not create it." >&2
-    exit 1
-  fi
-  if ! command -v node >/dev/null 2>&1; then
-    echo "node not found on PATH; cannot run setup commands" >&2
-    exit 1
-  fi
-  (
-    cd repo || exit 1
-    node -e 'const fs=require("fs");const {spawnSync}=require("child_process");let d;try{d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));}catch(e){console.error("workspace_setup.json parse failed: "+e.message);process.exit(1);}const cmds=Array.isArray(d.commands)?d.commands:[];for(const c of cmds){if(typeof c!=="string"||!c.trim())continue;const r=spawnSync("bash",["-lc",c],{stdio:"inherit"});if(r.status!==0)process.exit(r.status||1);}' "$setup"
-  ) || exit 1
 fi
 
 ctx="$SUPERPLANE_TASK_DIR/workspace_context.json"
@@ -619,7 +608,7 @@ echo "Checkout complete: repo/ and context repositories (if any)."
 // environment. The script is sourced, so it saves and restores the working
 // directory instead of a subshell: the exports below must persist in the
 // caller, and the context clones after this block use paths relative to
-// the task directory. Pull request checkouts skip this block.
+// the checkout root. Pull request checkouts skip this block.
 func workspaceCheckoutCommitSetup() string {
 	return `if [ "${` + WorkspaceCheckoutCommitSetupEnv + `:-0}" = "1" ]; then
 git config --global user.email "` + FactoryAgentEmail + `"
@@ -699,30 +688,58 @@ func ApplyFactoryCheckout(files []BrokerTaskFile, commands []BrokerCommand, step
 }
 
 // InsertFactoryCheckoutCommand inserts checkout before the first canvas
-// step. The command is a regular bash step so the task log shows it.
-// Steps that already run git clone, or the checkout helper, are left
-// unchanged so saved automations keep their own clone.
+// step, then one bash step per workspace setup command. Both are regular
+// commands so the task log shows them apart. Steps that already run git
+// clone, or the checkout helper, are left unchanged so saved automations
+// keep their own clone and run setup themselves.
 func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, files []BrokerTaskFile) []BrokerCommand {
 	if stepsAlreadyCheckout(steps) {
 		return commands
 	}
 	markCheckoutHintsComplete(files)
-	checkout := BrokerCommand{
-		Name:    "Checkout",
-		Command: WrapAgentStepCommand("checkout"),
-		Kind:    LiveLogKindBash,
-		Preview: LiveLogText("Checkout"),
-	}
+	inserted := factoryCheckoutCommands(files)
 	for i, command := range commands {
 		if command.Kind == LiveLogKindSetup {
 			continue
 		}
-		out := make([]BrokerCommand, 0, len(commands)+1)
+		out := make([]BrokerCommand, 0, len(commands)+len(inserted))
 		out = append(out, commands[:i]...)
-		out = append(out, checkout)
+		out = append(out, inserted...)
 		return append(out, commands[i:]...)
 	}
-	return append(commands, checkout)
+	return append(commands, inserted...)
+}
+
+func factoryCheckoutCommands(files []BrokerTaskFile) []BrokerCommand {
+	commands := []BrokerCommand{{
+		Name:    "Checkout",
+		Command: WrapAgentStepCommand("checkout"),
+		Kind:    LiveLogKindBash,
+		Preview: LiveLogText("Checkout"),
+	}}
+	for _, command := range setupCommandsFromFiles(files) {
+		commands = append(commands, BrokerCommand{
+			Name:    "Setup",
+			Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory("repo", command)),
+			Kind:    LiveLogKindBash,
+			Preview: LiveLogText(command),
+		})
+	}
+	return commands
+}
+
+func setupCommandsFromFiles(files []BrokerTaskFile) []string {
+	for i := range files {
+		if files[i].Path != WorkspaceSetupConfigPath {
+			continue
+		}
+		var setup workspaceSetupFile
+		if err := json.Unmarshal([]byte(files[i].Content), &setup); err != nil {
+			return nil
+		}
+		return models.NormalizeSetupCommands(setup.Commands)
+	}
+	return nil
 }
 
 func markCheckoutHintsComplete(files []BrokerTaskFile) {

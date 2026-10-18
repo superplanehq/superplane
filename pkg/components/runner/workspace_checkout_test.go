@@ -191,6 +191,20 @@ func TestWorkspaceCheckoutScriptReusesExistingCheckouts(t *testing.T) {
 	assert.Contains(t, output, "already checked out")
 }
 
+func TestWorkspaceCheckoutScriptClonesIntoTaskLaunchDirectory(t *testing.T) {
+	main := initBareRepo(t, "main")
+	dir := t.TempDir()
+	launch := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "task_cwd"), []byte(launch+"\n"), 0o644))
+	nested := filepath.Join(dir, "session")
+	require.NoError(t, os.MkdirAll(nested, 0o755))
+	output, err := runCheckoutScriptFull(t, dir, "file://"+main, "main", checkoutScriptOptions{workDir: nested})
+	require.NoError(t, err, output)
+	assert.DirExists(t, filepath.Join(launch, "repo", ".git"))
+	assert.NoDirExists(t, filepath.Join(dir, "repo"))
+	assert.NoDirExists(t, filepath.Join(nested, "repo"))
+}
+
 func TestWorkspaceCheckoutScriptAnchorsToTaskDirFromSubdirectory(t *testing.T) {
 	main := initBareRepo(t, "main")
 	dir := t.TempDir()
@@ -450,28 +464,32 @@ func TestWorkspaceCheckoutScriptWritesGitHubPullRequestDiff(t *testing.T) {
 	assert.Contains(t, string(diff), "diff --git a/change")
 }
 
-func TestWorkspaceCheckoutScriptRunsSetupCommandsInRepo(t *testing.T) {
+func TestWorkspaceCheckoutScriptLeavesSetupCommandsForALaterStep(t *testing.T) {
 	remote := initBareRepo(t, "main")
 	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "task_cwd"), []byte(dir+"\n"), 0o644))
 	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
-		setup: `{"commands":["pwd > setup-pwd","touch from-setup"]}`,
+		setup: `{"commands":["touch from-setup"]}`,
 	})
 	require.NoError(t, err, output)
-	assert.FileExists(t, filepath.Join(dir, "repo", "from-setup"))
-	assert.NoFileExists(t, filepath.Join(dir, "from-setup"))
-	pwd, err := os.ReadFile(filepath.Join(dir, "repo", "setup-pwd"))
-	require.NoError(t, err)
-	assert.True(t, strings.HasSuffix(strings.TrimSpace(string(pwd)), string(os.PathSeparator)+"repo"))
-}
+	assert.NoFileExists(t, filepath.Join(dir, "repo", "from-setup"))
 
-func TestWorkspaceCheckoutScriptFailsWhenSetupCommandFails(t *testing.T) {
-	remote := initBareRepo(t, "main")
-	dir := t.TempDir()
-	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
-		setup: `{"commands":["echo setup-failed >&2","exit 1"]}`,
-	})
-	require.Error(t, err)
-	assert.Contains(t, output, "setup-failed")
+	files := []runner.BrokerTaskFile{{
+		Path:    runner.WorkspaceSetupConfigPath,
+		Content: "{\"commands\":[\"touch from-setup\"]}\n",
+	}}
+	commands := runner.InsertFactoryCheckoutCommand(nil, nil, files)
+	require.Len(t, commands, 2)
+	assert.Equal(t, "Setup", commands[1].Name)
+	assert.Equal(t, "touch from-setup", commands[1].Preview)
+	cmd := exec.Command("bash", "--noprofile", "--norc", "-c", commands[1].Command)
+	cmd.Env = []string{
+		"PATH=/usr/bin:/bin:/usr/local/bin",
+		"SUPERPLANE_TASK_DIR=" + dir,
+	}
+	outputBytes, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(outputBytes))
+	assert.FileExists(t, filepath.Join(dir, "repo", "from-setup"))
 }
 
 func commandPtr(command string) *string {
@@ -487,14 +505,25 @@ func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
 		{Name: "Score", Type: runner.AgentStepPrompt, Prompt: commandPtr("review the checkout")},
 		{Name: "Diff", Type: runner.AgentStepBash, Command: commandPtr("git rev-parse HEAD > /tmp/pr.diff")},
 	}
-	out := runner.InsertFactoryCheckoutCommand(commands, steps, nil)
-	require.Len(t, out, 3)
+	files := []runner.BrokerTaskFile{{
+		Path:    runner.WorkspaceSetupConfigPath,
+		Content: "{\"commands\":[\"npm ci\",\"echo ready\"]}\n",
+	}}
+	out := runner.InsertFactoryCheckoutCommand(commands, steps, files)
+	require.Len(t, out, 5)
 	assert.Equal(t, "Auth", out[0].Name)
 	assert.Equal(t, "Checkout", out[1].Name)
 	assert.Equal(t, runner.LiveLogKindBash, out[1].Kind)
 	assert.Equal(t, runner.WrapAgentStepCommand("checkout"), out[1].Command)
 	assert.Equal(t, runner.LiveLogText("Checkout"), out[1].Preview)
-	assert.Equal(t, "Prompt", out[2].Name)
+	assert.Equal(t, "Setup", out[2].Name)
+	assert.Equal(t, runner.LiveLogKindBash, out[2].Kind)
+	assert.Equal(t, "npm ci", out[2].Preview)
+	assert.Contains(t, out[2].Command, `cd "$_sp_root"/'repo' || exit 1`)
+	assert.Contains(t, out[2].Command, "npm ci")
+	assert.Equal(t, "Setup", out[3].Name)
+	assert.Equal(t, "echo ready", out[3].Preview)
+	assert.Equal(t, "Prompt", out[4].Name)
 }
 
 func TestInsertFactoryCheckoutCommandSkipsExistingClone(t *testing.T) {
@@ -503,8 +532,12 @@ func TestInsertFactoryCheckoutCommandSkipsExistingClone(t *testing.T) {
 		{Name: "Clone", Type: runner.AgentStepBash, Command: commandPtr("git clone https://example.com/repo.git repo")},
 		{Name: "Helper", Type: runner.AgentStepBash, Command: commandPtr("set -euo pipefail\ncheckout\n")},
 	}
+	files := []runner.BrokerTaskFile{{
+		Path:    runner.WorkspaceSetupConfigPath,
+		Content: "{\"commands\":[\"npm ci\"]}\n",
+	}}
 	for _, step := range cases {
-		out := runner.InsertFactoryCheckoutCommand(commands, []runner.AgentStep{step}, nil)
+		out := runner.InsertFactoryCheckoutCommand(commands, []runner.AgentStep{step}, files)
 		assert.Equal(t, commands, out, step.Name)
 	}
 }

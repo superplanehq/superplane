@@ -186,16 +186,19 @@ func EffectiveWorkingDirectory(nodeDir, stepDir string) string {
 // WrapCommandInWorkingDirectory prefixes command so it runs in dir.
 // Relative dirs are resolved from the task launch directory recorded in
 // prepare.sh, so a later `cd` in another step cannot nest or miss the clone.
+// A failed cd stops the step. The exit alias in the runner shell returns
+// from this command, so later lines, including the agent, do not run.
 func WrapCommandInWorkingDirectory(dir, command string) string {
 	dir = strings.TrimSpace(dir)
 	if dir == "" {
 		return command
 	}
 	if filepath.IsAbs(dir) {
-		return "cd " + ShellSingleQuote(dir) + " && " + command
+		return "cd " + ShellSingleQuote(dir) + " || exit 1\n" + command
 	}
 	return `_sp_root=$(cat "$SUPERPLANE_TASK_DIR/task_cwd")
-cd "$_sp_root"/` + ShellSingleQuote(dir) + ` && ` + command
+cd "$_sp_root"/` + ShellSingleQuote(dir) + ` || exit 1
+` + command
 }
 
 // WrapPromptCommandInWorkingDirectory cds into dir, then copies workspace
