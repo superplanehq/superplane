@@ -29,7 +29,9 @@ export function isIgnoredConsoleMessage(message: unknown): boolean {
 // True when the event is the known-benign monaco-editor "Canceled"
 // unhandled rejection. monaco-editor rejects a DeferredPromise with no
 // .catch() when a WebKit clipboard-write is superseded by a new copy action.
-// This is upstream noise, not a bug in our code.
+// The same cancel also fires from word-highlighter dispose during model
+// dispose on React unmount. React and editor-wrapper frames are not
+// application code. A cancel that includes an application frame still reports.
 export function isMonacoCanceledEvent(event: Sentry.ErrorEvent): boolean {
   const exception = event.exception?.values?.[0];
   if (exception?.value !== "Canceled") {
@@ -37,10 +39,19 @@ export function isMonacoCanceledEvent(event: Sentry.ErrorEvent): boolean {
   }
 
   const frames = exception.stacktrace?.frames ?? [];
-  return (
-    frames.length > 0 &&
-    frames.every((frame) => frame.filename?.includes("monaco-editor") || frame.filename?.includes("@sentry"))
-  );
+  if (!frames.some((frame) => frame.filename?.includes("monaco-editor"))) {
+    return false;
+  }
+
+  return frames.every((frame) => isEditorCancelFrame(frame.filename));
+}
+
+function isEditorCancelFrame(filename: string | undefined): boolean {
+  if (!filename) {
+    return false;
+  }
+
+  return filename.includes("monaco-editor") || filename.includes("@sentry") || filename.includes("react-dom");
 }
 
 const USER_AGENT_PERMISSION_DENIAL =
