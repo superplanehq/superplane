@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
 import { useState } from "react";
@@ -116,6 +116,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
+    agentModelPicker: undefined,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
@@ -127,6 +128,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     canConfigureWorkspace: true,
     saving: false,
     saveName: vi.fn().mockResolvedValue(true),
+    saveAgent: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
     provisionedDestination: null,
@@ -333,6 +335,33 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyBody)).toBeInTheDocument();
     expect(screen.getByTestId("agent-step")).toHaveAttribute("data-custom-provider", "no");
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+  });
+
+  it.each([true, false])("saves the agent before opening the backlog (saved: %s)", async (saved) => {
+    const user = userEvent.setup();
+    let completeSave!: (saved: boolean) => void;
+    const saveAgent = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          completeSave = resolve;
+        }),
+    );
+    const model = pageModel({
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      agentCredentialChoice: "own-key",
+      openSection: "agent",
+      setup: { ...withRepository(), connected: new Set(["github", "claude"]) },
+      saveAgent,
+    });
+    renderSetup(model, "/org-1/workspaces/PAY/setup?step=agent");
+
+    await user.click(screen.getByTestId("first-run-finish-setup"));
+
+    expect(saveAgent).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("first-run-tickets")).not.toBeInTheDocument();
+    await act(async () => completeSave(saved));
+    expect(Boolean(screen.queryByTestId("first-run-tickets"))).toBe(saved);
   });
 
   it("offers a custom provider on the agent card when that flag is on", async () => {

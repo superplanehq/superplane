@@ -86,6 +86,10 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   wizardBotsAddManually: "Add a bot manually",
   wizardBotsAddLabel: "Add bot login",
   wizardBotsAddPlaceholder: "Add bot login, for example coderabbitai",
+  wizardBotsNameInstruction: "Type the name of each review bot SuperPlane should respond to.",
+  wizardBotsNameLabel: "Bot name",
+  wizardBotsNamePlaceholder: "Bot name, for example coderabbitai",
+  wizardBotsRemove: "Remove",
   wizardBotsAdd: "Add",
   wizardToolsDescription:
     "Connect the external tools reporting the status checks so the agent fixing the issues has enough access to troubleshoot the issues.",

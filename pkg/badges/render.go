@@ -741,7 +741,7 @@ const smallSVG = `<?xml version="1.0" encoding="UTF-8"?>
   <g clip-path="url(#{{.ClipID}})">
     <rect width="{{.LeftWidth}}" height="28" fill="{{.Palette.Background}}"/>
     <rect x="{{.LeftWidth}}" width="{{.RightWidth}}" height="28" fill="{{.Palette.Accent}}"/>
-    <path class="logo" transform="{{.Logo.Transform}}" d="` + logoPath + `"/>
+    <path fill-rule="evenodd" class="logo" transform="{{.Logo.Transform}}" d="` + logoPath + `"/>
     <text class="label" x="{{.LeftTextX}}" y="19">{{.LeftText}}</text>
     <text class="value" x="{{.RightTextX}}" y="19">{{.RightText}}</text>
   </g>
@@ -763,7 +763,7 @@ const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
     #{{.RootID}} .cost     { font-size: 13px; font-weight: 600; fill: {{.Palette.Text}}; }
   </style>
   <rect x="0.5" y="0.5" width="359" height="{{.InnerH}}" rx="12" fill="{{.Palette.Background}}" stroke="{{.Palette.Border}}"/>
-  <path class="logo" transform="{{.Logo.Transform}}" d="` + logoPath + `"/>
+  <path fill-rule="evenodd" class="logo" transform="{{.Logo.Transform}}" d="` + logoPath + `"/>
   <text class="wordmark" x="{{.Wordmark.X}}" y="{{.Wordmark.Y}}">{{.Wordmark.Text}}</text>
   {{if .Share.Show}}<text class="share" x="{{.Share.X}}" y="{{.Share.Y}}">{{.Share.Text}}</text>{{end}}
   {{if .Trend.Show}}<text class="trend" x="{{.Trend.X}}" y="{{.Trend.Y}}">{{.Trend.Text}}</text>{{end}}
@@ -800,7 +800,7 @@ const wideSVG = `<?xml version="1.0" encoding="UTF-8"?>
   </style>
   <rect x="0.5" y="0.5" width="799" height="{{.InnerH}}" rx="12" fill="{{.Palette.Background}}" stroke="{{.Palette.Border}}"/>
 
-  <path class="logo" transform="{{.Logo.Transform}}" d="` + logoPath + `"/>
+  <path fill-rule="evenodd" class="logo" transform="{{.Logo.Transform}}" d="` + logoPath + `"/>
   <text class="wordmark" x="{{.Wordmark.X}}" y="{{.Wordmark.Y}}">{{.Wordmark.Text}}</text>
   {{if .Share.Show}}<text class="share" x="{{.Share.X}}" y="{{.Share.Y}}">{{.Share.Text}}</text>{{end}}
   {{if .Trend.Show}}<text class="trend" x="{{.Trend.X}}" y="{{.Trend.Y}}">{{.Trend.Text}}</text>{{end}}

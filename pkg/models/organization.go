@@ -60,30 +60,32 @@ type OrganizationWithCounts struct {
 	TaskCount             int64  `gorm:"column:task_count"`
 	DoneTaskCount         int64  `gorm:"column:done_task_count"`
 	MemberCount           int64  `gorm:"column:member_count"`
+	WorkspaceCount        int64  `gorm:"column:workspace_count"`
+	RepositoryCount       int64  `gorm:"column:repository_count"`
 	RemainingCreditMicros *int64 `gorm:"-"`
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
-	if sortBy == OrganizationSortRemainingCreditCents {
-		return listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection)
-	}
-	return listOrganizations(tx, search, limit, offset, sortBy, sortDirection)
+	organizations, total, _, err := ListUnpinnedOrganizations(tx, search, limit, offset, sortBy, sortDirection, nil)
+	return organizations, total, err
 }
 
-func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
-	query := tx.
-		Model(&Organization{}).
-		Where("organizations.deleted_at IS NULL")
-
-	search = strings.TrimSpace(search)
-	if search != "" {
-		pattern := "%" + search + "%"
-		query = query.Where(
-			"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
-			pattern,
-			pattern,
-		)
+func ListUnpinnedOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) (organizations []OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
+	if err = organizationsMatchingSearch(tx, search).Count(&matchTotal).Error; err != nil {
+		return nil, 0, 0, err
 	}
+
+	if sortBy == OrganizationSortRemainingCreditCents {
+		organizations, unpinnedTotal, err = listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection, excludeIDs)
+		return organizations, unpinnedTotal, matchTotal, err
+	}
+
+	organizations, unpinnedTotal, err = listOrganizations(tx, search, limit, offset, sortBy, sortDirection, excludeIDs)
+	return organizations, unpinnedTotal, matchTotal, err
+}
+
+func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
+	query := excludeOrganizationIDs(organizationsMatchingSearch(tx, search), excludeIDs)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -91,27 +93,23 @@ func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, so
 	}
 
 	query = withOrganizationCounts(tx, query)
-
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
-
 	if offset > 0 {
 		query = query.Offset(offset)
 	}
 
-	orderClause := resolveOrganizationOrderClause(sortBy, sortDirection)
-
 	var organizations []OrganizationWithCounts
-	if err := query.Order(orderClause).Find(&organizations).Error; err != nil {
+	if err := query.Order(resolveOrganizationOrderClause(sortBy, sortDirection)).Find(&organizations).Error; err != nil {
 		return nil, 0, err
 	}
 
 	return organizations, total, nil
 }
 
-func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offset int, sortDirection string) ([]OrganizationWithCounts, int64, error) {
-	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc")
+func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offset int, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc", excludeIDs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -205,18 +203,35 @@ func withOrganizationCounts(tx *gorm.DB, query *gorm.DB) *gorm.DB {
 		Where("type = ?", UserTypeHuman).
 		Group("organization_id")
 
+	workspaceCountsQuery := tx.
+		Table("factories").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Group("organization_id")
+
+	repositoryCountsQuery := tx.
+		Table("factories").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Where("BTRIM(COALESCE(onboarding_config->>'app_repository', '')) <> ''").
+		Group("organization_id")
+
 	return query.
 		Select(`
 			organizations.*,
 			COALESCE(canvas_counts.count, 0) AS canvas_count,
 			COALESCE(task_counts.count, 0) AS task_count,
 			COALESCE(done_task_counts.count, 0) AS done_task_count,
-			COALESCE(member_counts.count, 0) AS member_count
+			COALESCE(member_counts.count, 0) AS member_count,
+			COALESCE(workspace_counts.count, 0) AS workspace_count,
+			COALESCE(repository_counts.count, 0) AS repository_count
 		`).
 		Joins("LEFT JOIN (?) AS canvas_counts ON canvas_counts.organization_id = organizations.id", canvasCountsQuery).
 		Joins("LEFT JOIN (?) AS task_counts ON task_counts.organization_id = organizations.id", taskCountsQuery).
 		Joins("LEFT JOIN (?) AS done_task_counts ON done_task_counts.organization_id = organizations.id", doneTaskCountsQuery).
-		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery)
+		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery).
+		Joins("LEFT JOIN (?) AS workspace_counts ON workspace_counts.organization_id = organizations.id", workspaceCountsQuery).
+		Joins("LEFT JOIN (?) AS repository_counts ON repository_counts.organization_id = organizations.id", repositoryCountsQuery)
 }
 
 func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
@@ -238,6 +253,10 @@ func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
 		return "COALESCE(done_task_counts.count, 0) " + direction + ", organizations.name ASC"
 	case "member_count":
 		return "COALESCE(member_counts.count, 0) " + direction + ", organizations.name ASC"
+	case "workspace_count":
+		return "COALESCE(workspace_counts.count, 0) " + direction + ", organizations.name ASC"
+	case "repository_count":
+		return "COALESCE(repository_counts.count, 0) " + direction + ", organizations.name ASC"
 	case OrganizationSortRemainingCreditCents:
 		return "organizations.name ASC"
 	default:
@@ -541,4 +560,30 @@ func HasExperimentalFeature(orgID uuid.UUID, featureID string) (bool, error) {
 		return false, err
 	}
 	return organization.HasExperimentalFeature(featureID), nil
+}
+
+func organizationsMatchingSearch(tx *gorm.DB, search string) *gorm.DB {
+	query := tx.
+		Model(&Organization{}).
+		Where("organizations.deleted_at IS NULL")
+
+	search = strings.TrimSpace(search)
+	if search == "" {
+		return query
+	}
+
+	pattern := "%" + search + "%"
+	return query.Where(
+		"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
+		pattern,
+		pattern,
+	)
+}
+
+func excludeOrganizationIDs(query *gorm.DB, ids []uuid.UUID) *gorm.DB {
+	if len(ids) == 0 {
+		return query
+	}
+
+	return query.Where("organizations.id NOT IN ?", ids)
 }

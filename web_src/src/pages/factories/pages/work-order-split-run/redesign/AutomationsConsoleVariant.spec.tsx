@@ -1,43 +1,16 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { renderConsole } from "./consoleTestSupport";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
-
-import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../../__fixtures__/lineMetricsBoardOrders";
 import { OPEN_WORK_ORDER_CHECKS } from "../../../__fixtures__/workOrderCheckFixtures";
 import { TWO_HOURS_AGO } from "../../../__fixtures__/factoryPageIds";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
-import { LiveHeaderSpendProvider, useReportLiveHeaderSpend } from "../liveHeaderSpendContext";
 import { buildSplitRunFooter } from "../splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "../splitRunMocks";
 import { CREATED_MANUALLY } from "../splitRunSource";
-import { AutomationsConsoleVariant } from "./AutomationsConsoleVariant";
-
-type ConsoleProps = Parameters<typeof AutomationsConsoleVariant>[0];
-
-function renderConsole(fixture: typeof SPLIT_RUN_RUNNING, extra: Partial<ConsoleProps> = {}) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const ui = (next: typeof fixture) => (
-    <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <ThemeProvider>
-          <TooltipProvider>
-            <LiveHeaderSpendProvider>
-              <AutomationsConsoleVariant fixture={next} source={next.source} {...extra} />
-            </LiveHeaderSpendProvider>
-          </TooltipProvider>
-        </ThemeProvider>
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
-  const view = render(ui(fixture));
-  return { ...view, rerenderConsole: (next: typeof fixture) => view.rerender(ui(next)) };
-}
 
 describe("AutomationsConsoleVariant timeline markers", () => {
   it("fills finished columns and spins the live column", () => {
@@ -486,58 +459,5 @@ describe("AutomationsConsoleVariant column timing", () => {
     const verify = screen.getByTestId("redesign-console-column-timing-verify");
     expect(verify).toHaveTextContent(`Arrived ${formatWorkOrderDateTime(new Date(entered))}`);
     expect(verify).toHaveTextContent("Spent");
-  });
-});
-
-describe("AutomationsConsoleVariant run footer", () => {
-  it("shows recorded spend and model on the open card footer", () => {
-    renderConsole({
-      ...SPLIT_RUN_RUNNING,
-      phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
-        phase.id === "implement"
-          ? { ...phase, costCents: "45", totalTokens: "2700", startedAt: "2026-09-30T00:59:00.000Z" }
-          : phase,
-      ),
-    });
-
-    const footer = screen.getByTestId("redesign-console-run-footer-implement");
-    expect(footer).toHaveTextContent(formatWorkOrderDateTime(new Date("2026-09-30T00:59:00.000Z")));
-    expect(footer).not.toHaveTextContent("Started");
-    expect(footer).toHaveTextContent("$0.45");
-    expect(footer).toHaveTextContent("2.7k");
-    expect(footer).toHaveTextContent("sonnet 4-6");
-  });
-
-  it("updates the footer spend from live telemetry", () => {
-    function ReportLiveSpend() {
-      useReportLiveHeaderSpend("implement:agent", 2100, 45);
-      return (
-        <AutomationsConsoleVariant
-          fixture={SPLIT_RUN_RUNNING}
-          source={SPLIT_RUN_RUNNING.source}
-          organizationId="org-1"
-        />
-      );
-    }
-
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter>
-          <ThemeProvider>
-            <TooltipProvider>
-              <LiveHeaderSpendProvider>
-                <ReportLiveSpend />
-              </LiveHeaderSpendProvider>
-            </TooltipProvider>
-          </ThemeProvider>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    const footer = screen.getByTestId("redesign-console-run-footer-implement");
-    expect(footer).toHaveTextContent("$0.45");
-    expect(footer).toHaveTextContent("2.1k");
-    expect(footer).toHaveTextContent("sonnet 4-6");
   });
 });

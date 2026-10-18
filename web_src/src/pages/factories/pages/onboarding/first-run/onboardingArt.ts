@@ -16,7 +16,7 @@ export type OnboardingArtMountOptions = {
   allowModeSwitch: false;
   bgColor: string;
   arrowColor: string;
-  overrides?: { globe: { count: number } };
+  overrides?: { globe?: { count: number }; global?: { arrowScale: number } };
 };
 
 type OnboardingArtApi = {
@@ -41,6 +41,9 @@ export function onboardingArtMountOptions(scene: FirstRunArtScene): OnboardingAr
   };
   if (scene.mode === "globe" && scene.count) {
     options.overrides = { globe: { count: scene.count } };
+  }
+  if (scene.arrowScale !== undefined) {
+    options.overrides = { ...options.overrides, global: { arrowScale: scene.arrowScale } };
   }
   return options;
 }

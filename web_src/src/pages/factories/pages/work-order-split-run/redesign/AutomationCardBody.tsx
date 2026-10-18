@@ -11,10 +11,9 @@ import { formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsag
 import { formatCheckScore, workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { WorkOrderCheckAnalysis } from "../../../WorkOrderCheckDialog";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
-import { displayRunnerModel } from "../draftStartModel";
+import { displayRunnerModel, joinRunnerModels } from "../draftStartModel";
 import { useLivePhaseSpend } from "../liveHeaderSpendContext";
 import { PhaseAgentUsageProvider } from "../phaseAgentUsageContext";
-import { PhaseUsageSpendButton } from "../PhaseUsageChartButton";
 import { useSpecificModelIds } from "../specificModelIds";
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { AutomationStage, ConsoleAutomation } from "./automationsViewModel";
@@ -91,8 +90,8 @@ export function AutomationCardBody({
         {active === "artifacts" ? <ArtifactsPage stage={latest} /> : null}
         {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
         <CardRunFooter
-          stage={latest}
-          phase={phase}
+          automation={automation}
+          phases={phases ?? (phase ? [phase] : [])}
           actionBusy={actionBusy}
           onRetry={onRetry}
           onStop={onStop}
@@ -182,20 +181,21 @@ function CardPageTabs({
 
 function CardRunFooter({
   queued,
-  stage,
-  phase,
+  automation,
+  phases,
   actionBusy,
   onRetry,
   onStop,
 }: {
-  stage: AutomationStage;
+  automation: ConsoleAutomation;
   queued: boolean;
-  phase?: SplitRunPhase;
+  phases: SplitRunPhase[];
   actionBusy: boolean;
   onRetry?: () => void;
   onStop?: () => void;
 }) {
-  const { lead, spendLabel, model } = useCardFooterMeta(stage, phase);
+  const stage = automation.latest;
+  const { lead, spendLabel, model } = useCardFooterMeta(automation, phases);
   if (!lead && !spendLabel && !model && !onRetry && !onStop) {
     return null;
   }
@@ -204,58 +204,43 @@ function CardRunFooter({
       className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3"
       data-testid={`redesign-console-run-footer-${stage.id}`}
     >
-      <CardFooterMeta
-        stageId={stage.id}
-        live={stage.status === "running"}
-        lead={lead}
-        spendLabel={spendLabel}
-        model={model}
-      />
+      <CardFooterMeta lead={lead} spendLabel={spendLabel} model={model} />
       <CardFooterActions actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} queued={queued} />
     </div>
   );
 }
 
-function useCardFooterMeta(stage: AutomationStage, phase?: SplitRunPhase) {
+function useCardFooterMeta(automation: ConsoleAutomation, phases: SplitRunPhase[]) {
+  const stage = automation.latest;
   const live = useLivePhaseSpend(stage.id);
-  const tokens = Math.max(parseWorkOrderMetric(phase?.totalTokens), live.tokens);
-  const cents = Math.max(parseWorkOrderMetric(phase?.costCents), live.cents);
   const modelIds = useSpecificModelIds();
+  const phasesById = new Map(phases.map((phase) => [phase.id, phase]));
+  let tokens = 0;
+  let cents = 0;
+  const models = automation.runs.map((run) => {
+    const phase = phasesById.get(run.id);
+    const recordedTokens = parseWorkOrderMetric(phase?.totalTokens);
+    const recordedCents = parseWorkOrderMetric(phase?.costCents);
+    tokens += run.id === stage.id ? Math.max(recordedTokens, live.tokens) : recordedTokens;
+    cents += run.id === stage.id ? Math.max(recordedCents, live.cents) : recordedCents;
+    return phase?.model ?? run.model;
+  });
   return {
     lead: runFooterLine(stage),
     spendLabel: runFooterSpendLabel(
       cents > 0 ? formatUsdCents(cents) : undefined,
       tokens > 0 ? formatCompactTokenValue(tokens) : undefined,
     ),
-    model: displayRunnerModel(phase?.model ?? stage.model ?? "", modelIds),
+    model: displayRunnerModel(joinRunnerModels(models), modelIds),
   };
 }
 
-function CardFooterMeta({
-  stageId,
-  live,
-  lead,
-  spendLabel,
-  model,
-}: {
-  stageId: string;
-  live: boolean;
-  lead?: string;
-  spendLabel?: string;
-  model?: string;
-}) {
+function CardFooterMeta({ lead, spendLabel, model }: { lead?: string; spendLabel?: string; model?: string }) {
   return (
     <span className={cn(META_TEXT_CLASSNAME, "inline-flex min-w-0 flex-wrap items-center gap-x-1")}>
       {lead ? <span>{lead}</span> : null}
       {lead && spendLabel ? <span aria-hidden>·</span> : null}
-      {spendLabel ? (
-        <PhaseUsageSpendButton
-          phaseId={stageId}
-          spendLabel={spendLabel}
-          live={live}
-          className={cn(META_TEXT_CLASSNAME, "font-medium text-current underline underline-offset-2")}
-        />
-      ) : null}
+      {spendLabel ? <span className={cn(META_TEXT_CLASSNAME, "font-medium")}>{spendLabel}</span> : null}
       {(lead || spendLabel) && model ? <span aria-hidden>·</span> : null}
       {model ? <span>{model}</span> : null}
     </span>

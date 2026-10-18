@@ -1,12 +1,22 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { MemoryRouter } from "react-router";
 
 import OwnerSetup from "./OwnerSetup";
 import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
 
 const jsonResponse = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+
+const { createToken } = vi.hoisted(() => ({ createToken: vi.fn() }));
+
+vi.mock("@/hooks/useUserTokens", () => ({
+  useCreateUserToken: () => ({ mutateAsync: createToken, isPending: false }),
+}));
+
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
 
 vi.mock("./ownerSetup/LicenseStep", () => ({
   LicenseStep: ({ onContinue }: { onContinue: () => void }) => (
@@ -69,6 +79,7 @@ const fleetManagerMetadata = {
   runnerReleaseUrlTemplate: "https://example/releases/runner%2F{version}",
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
+  runnerVersions: ["v0.1.0"],
   fleetPresets: [
     {
       id: "e1-large-amd64",
@@ -88,12 +99,15 @@ const fleetManagerMetadata = {
     managerId: "test-cluster",
     namespace: "superplane",
     serviceAccountName: "superplane-fleet-manager",
-    fields: { superplaneUrl: "https://superplane.example.com", region: "us-east-1" },
-  },
-  credentials: {
-    existingSecret: "superplane-fleet-manager-token",
-    tokenKey: "INSTALLATION_ADMIN_TOKEN",
-    autoProvisioned: true,
+    fields: {
+      superplaneUrl: "https://superplane.example.com",
+      region: "us-east-1",
+      subnetIds: ["subnet-a"],
+      securityGroupIds: ["sg-runner"],
+      runnerIdentity: "runner-profile",
+      fleetManagerIdentity: "arn:aws:iam::123456789012:role/fleet-manager",
+      imageAmd64: "ami-amd64",
+    },
   },
 };
 
@@ -147,6 +161,8 @@ describe("OwnerSetup", () => {
     posthogMock.enabled = false;
     posthogMock.getActiveMatchingSurveys.mockReset();
     posthogMock.capture.mockReset();
+    createToken.mockReset();
+    createToken.mockResolvedValue({ plaintext: "owner-setup-token" });
     Object.defineProperty(window, "location", {
       configurable: true,
       value: { ...originalLocation, href: "http://localhost/setup" },
@@ -205,26 +221,30 @@ describe("OwnerSetup", () => {
     fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
     expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
 
-    for (const heading of [
-      "Choose runner fleets",
-      "Confirm cloud infrastructure",
-      "Review Fleet Manager values",
-      "Install Fleet Manager",
-    ]) {
-      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-      expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
-    }
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate install command" }));
+    expect(await screen.findByRole("heading", { name: "Create the chart values" })).toBeInTheDocument();
+    expect(screen.getByText(/cat > fleet-manager-values.yaml/)).toBeInTheDocument();
+    expect(createToken).toHaveBeenCalledWith({ name: "Fleet Manager" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("heading", { name: "Install the chart" })).toBeInTheDocument();
 
     for (const heading of [
-      "Review Fleet Manager values",
-      "Confirm cloud infrastructure",
-      "Choose runner fleets",
+      "Create the chart values",
+      "Configure the default fleet",
       "Choose a cloud provider",
       OWNER_SETUP_COPY.fleet.headline,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: "Back" }));
       expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
     }
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("heading", { name: OWNER_SETUP_COPY.smtp.headline })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
   });
 
   it("keeps the gold scene and hides step dots while the survey is completed", async () => {

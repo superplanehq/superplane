@@ -819,6 +819,10 @@ func TestBuildDiscussionPRFeedbackCanvasBitbucket(t *testing.T) {
 	acknowledge := findSpecNode(t, canvas, prFeedbackAcknowledgeCommentNodeID)
 	assert.Equal(t, "bitbucket.createPullRequestComment", acknowledge.Component)
 	assert.Equal(t, "{{ root().data.comment.id }}", acknowledge.Configuration["parentCommentId"])
+	assert.Equal(t, `Sure, looking into this. Follow along: [{{ $["Find Pull Request"].data.workOrder.key }}]({{ $["Find Pull Request"].data.workOrder.url }})`, acknowledge.Configuration["body"])
+	edges := yamlEdgeChannels(canvas)
+	assert.Contains(t, edges, "found:"+prFeedbackFindNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
+	assert.NotContains(t, edges, "default:"+prFeedbackCommentTriggerNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
 
 	for _, node := range canvas.Spec.Nodes {
 		assert.NotContains(t, node.Component, "github.")

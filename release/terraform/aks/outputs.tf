@@ -88,6 +88,16 @@ output "runner_image_arm64_id" {
   value       = azurerm_shared_image.runner_arm64.id
 }
 
+output "runner_image_amd64" {
+  description = "Packer-built image version configured for linux/amd64 runner VMs"
+  value       = var.runner_image_amd64
+}
+
+output "runner_image_arm64" {
+  description = "Packer-built image version configured for linux/arm64 runner VMs"
+  value       = var.runner_image_arm64
+}
+
 output "superplane_namespace" {
   description = "Kubernetes namespace where SuperPlane is deployed"
   value       = var.superplane_namespace

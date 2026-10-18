@@ -18,6 +18,17 @@ const RELEASE_NOTES_NAME = "release-notes.md";
 const GIT_CLIFF_IMAGE =
   "ghcr.io/orhun/git-cliff/git-cliff:2.14.0@sha256:0f72b15def11c5836c9dfb2e4da8b9b52b4bc2c8c2f46c47701b7e68f3998ff7";
 const COMPONENTS = {
+  superplane: {
+    initialChangelogRef: "v0.30.0",
+    tagPrefix: "",
+    releaseName: "SuperPlane",
+    releaseScopes: ["superplane", "release/superplane"],
+    releasePaths: [],
+    digestNames: {
+      image: "SuperPlane image",
+      chart: "SuperPlane chart",
+    },
+  },
   runner: {
     initialChangelogRef: "v0.30.0",
     tagPrefix: "runner/",
@@ -51,6 +62,10 @@ const COMPONENTS = {
       "release/fleet-manager/**",
       "release/fleet-manager-chart/**",
     ],
+    digestNames: {
+      image: "Fleet Manager image",
+      chart: "Fleet Manager chart",
+    },
   },
 };
 
@@ -639,11 +654,19 @@ async function publishGitHubRelease({
     throw new Error("stable releases require git-cliff release notes");
   }
 
-  let body = imageDigest
-    ? `Source commit: ${sha}\n\nFleet Manager image digest: \`${imageDigest}\``
-    : `Source commit: ${sha}`;
+  const config = componentConfig(component);
+  let body = `Source commit: ${sha}`;
+  if (imageDigest) {
+    if (!config.digestNames?.image) {
+      throw new Error(`${component} releases do not publish an image digest`);
+    }
+    body += `\n\n${config.digestNames.image} digest: \`${imageDigest}\``;
+  }
   if (chartDigest) {
-    body += `\n\nFleet Manager chart digest: \`${chartDigest}\``;
+    if (!config.digestNames?.chart) {
+      throw new Error(`${component} releases do not publish a chart digest`);
+    }
+    body += `\n\n${config.digestNames.chart} digest: \`${chartDigest}\``;
   }
   if (!prerelease) {
     body += `\n\n${releaseNotes.trim()}`;
@@ -774,8 +797,12 @@ async function main() {
       component: option("component"),
       version: option("version"),
       sha: option("sha"),
-      imageDigest: process.env.FLEET_MANAGER_IMAGE_DIGEST,
-      chartDigest: process.env.FLEET_MANAGER_CHART_DIGEST,
+      imageDigest:
+        process.env.SUPERPLANE_IMAGE_DIGEST ||
+        process.env.FLEET_MANAGER_IMAGE_DIGEST,
+      chartDigest:
+        process.env.SUPERPLANE_CHART_DIGEST ||
+        process.env.FLEET_MANAGER_CHART_DIGEST,
       releaseNotes: releaseNotesPath
         ? fs.readFileSync(releaseNotesPath, "utf8")
         : undefined,

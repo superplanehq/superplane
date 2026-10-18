@@ -11,6 +11,7 @@ if [ -z "${1:-}" ]; then
 fi
 
 VERSION="$1"
+SYFT_VERSION="v1.54.1"
 BUILD_ROOT="build/superplane-single-host-tarball-${VERSION}"
 SBOM_OUTPUT="${BUILD_ROOT}/superplane-sbom.json"
 
@@ -31,7 +32,8 @@ elif [ -x "${SYFT_BIN}" ]; then
 else
   echo "* syft not found, installing..."
   mkdir -p "${REPO_ROOT}/tmp/bin"
-  curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b "${REPO_ROOT}/tmp/bin"
+  curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | \
+    sh -s -- -b "${REPO_ROOT}/tmp/bin" "${SYFT_VERSION}"
 fi
 
 # Create build directory if it doesn't exist

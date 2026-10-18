@@ -117,7 +117,6 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                   markdownName
                   showMarkdownDescription
                   stream={model.stream}
-                  streamLoading={model.streamLoading}
                   selectedNodeId={model.nodeId}
                   onSelectNode={model.setNodeId}
                   organizationId={model.organizationId}

@@ -79,6 +79,8 @@ func TestListTasksAppliesMineAndStates(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, draftMine.ID.String(), row["id"])
 	assert.Equal(t, "draft", row["state"])
+	assert.Equal(t, "", row["source_url"])
+	assert.Contains(t, row, "assignees")
 }
 
 func TestGetTaskRejectsOtherWorkspace(t *testing.T) {

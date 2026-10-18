@@ -21,7 +21,7 @@ Do the steps in this order:
 | SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release | Always |
 | Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` |
 | Runner network | Runner subnetwork, deny-all ingress firewall rule, `superplane-fleet-mgr` service account | `enable_runners` |
-| Fleet Manager infrastructure | Service account, Workload Identity binding, setup values, service-token Secret | `enable_runners` |
+| Fleet Manager infrastructure | Service account, Workload Identity binding, and setup metadata | `enable_runners` |
 
 A new install sets both flags to `true` in `terraform.tfvars` before the first
 apply. The variable defaults stay `false`. An existing install that omitted
@@ -101,9 +101,9 @@ domain_name       = "superplane.example.com"
 static_ip_name    = "superplane-ip"
 letsencrypt_email = "admin@example.com"
 
-# Required. Confirm both artifacts exist before you apply.
-superplane_image_tag     = "<commit-sha>-selfhosted"
-superplane_chart_version = "0.0.0-<commit-sha>"
+# Confirm the release exists before you apply.
+superplane_image_tag     = ""
+superplane_chart_version = "1.0.0-rc1"
 
 enable_gcs_blob_storage = true
 enable_runners          = true
@@ -112,24 +112,28 @@ enable_runners          = true
 Set both flags in this file. Do not rely on the variable defaults. Those
 defaults stay `false` so an existing install keeps its current blob storage.
 
-Select a `main` commit that published both artifacts. The image and the
-chart can use different SHAs. Confirm them:
+The default node type is `e2-standard-2`. Keep that type, or use a larger
+type. The API, the runner API, and the runner workers share one log disk.
+They must run on one node. `e2-medium` does not have enough CPU for that
+node. The Helm release then fails at the timeout.
+
+Select a published stable or release-candidate version. Confirm the image and
+chart before you apply:
 
 ```bash
-export APP_SHA=<commit-sha>
-export CHART_SHA=<commit-sha>
+export SUPERPLANE_VERSION=v1.0.0-rc1
 
-docker manifest inspect ghcr.io/superplanehq/superplane:${APP_SHA}-selfhosted
-helm show chart oci://ghcr.io/superplanehq/superplane-chart --version 0.0.0-${CHART_SHA}
+docker manifest inspect ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION}
+helm show chart oci://ghcr.io/superplanehq/superplane-chart --version "${SUPERPLANE_VERSION#v}"
 ```
 
-The plain `<commit-sha>` and `stable` images load JS and CSS from
-`assets.superplane.com`. That host allows only `app.superplane.com`.
-The UI then fails on your domain.
+Leave `superplane_image_tag` empty. The chart appVersion selects the matching
+versioned image. Legacy self-hosted tags remain valid as explicit overrides.
 
 If the chart is not published yet, set `superplane_chart_path` to
 `../../superplane-helm-chart/helm` and leave `superplane_chart_version`
-empty.
+empty. Also set `superplane_image_tag`. The checked-in chart appVersion
+is a placeholder, not a published image.
 
 With `enable_gcs_blob_storage = false`, SuperPlane stores blobs on pod
 volumes. Each pod has its own volume, and the data is lost when a pod restarts.
@@ -154,7 +158,7 @@ The runner infrastructure includes:
   the project.
 - A runner API Deployment. Runners connect to
   `https://superplane.example.com/runner/v1`.
-- Fleet Manager setup values and the service-token Secret.
+- Fleet Manager setup metadata, including the configured runner images.
 
 If `172.20.0.0/24` overlaps a range in your network, set `runner_subnet_cidr`
 before you apply.
@@ -168,17 +172,20 @@ kubectl get pods -n superplane
 kubectl get certificate -n superplane
 ```
 
+The apply waits until `https://superplane.example.com/health` responds.
+The GCE controller skips the certificate check on the first sync.
+Terraform syncs the Ingress twice after Helm, then waits for the
+certificate. This wait can take 15 minutes.
+
 All pods must be `Running`. The namespace must have one Certificate, and
-that Certificate must be `Ready`. The load balancer and the certificate
-can take 15 minutes after the apply.
+that Certificate must be `Ready`.
 
 Open `https://superplane.example.com`. Create the owner account. The owner
 account is the installation admin.
 
 ## 3. Install Fleet Manager
 
-Do these steps after the installation in step 2 works. They do not need another
-Terraform apply.
+Do these steps after the installation in step 2 works.
 
 ### 3.1 Build the runner image
 
@@ -197,8 +204,13 @@ packer build \
 cd release/terraform/gke
 ```
 
-The image goes into the `superplane-runner-amd64` image family. Fleet Manager
-uses the newest image in the family.
+The image goes into the `superplane-runner-amd64` image family. Set the
+immutable image resource in `terraform.tfvars`, and apply the stack again:
+
+```hcl
+runner_image_amd64 = "projects/PROJECT/global/images/IMAGE_NAME"
+runner_image_arm64 = "projects/PROJECT/global/images/ARM_IMAGE_NAME"
+```
 
 The default build uses a public IP address and SSH on TCP 22. If the
 network blocks inbound SSH, build after the apply. Use Identity-Aware Proxy
@@ -229,16 +241,18 @@ terraform output runner_project
 terraform output runner_zones
 terraform output runner_subnetwork
 terraform output runner_network_tag
+terraform output runner_image_amd64
+terraform output runner_image_arm64
 terraform output fleet_manager_service_account_email
 ```
 
-Replace the GCP image placeholder with an image or image family that contains
-the Runner. Save `values.yaml` and run the displayed Helm command. The
-SuperPlane chart creates a dedicated service-token Secret in Kubernetes. The
-credential does not enter Terraform state or Helm release metadata.
+Select only fleets whose image output is set. SuperPlane creates a personal
+token when you generate the install command. Run the displayed Helm commands.
+The standalone chart stores the complete configuration in
+`fleet-manager-config`.
 
-The chart startup Job creates or updates the fleets before Fleet Manager
-starts. For complete install, upgrade, token rotation, fleet removal, and
+The chart startup Job creates or updates the fleets after the configuration
+Secret exists. For complete install, upgrade, token rotation, fleet removal, and
 rollback instructions, see
 [the standalone chart guide](../../fleet-manager-chart/README.md).
 
@@ -290,12 +304,12 @@ must stop and Fleet Manager must delete it after the task.
 | --- | --- | --- |
 | `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
 | `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the standalone Fleet Manager image. Set this for private GCP registries so nodes keep pull access. |
-| `superplane_image_tag` | required | Image tag. Must contain `selfhosted`. Published tags are `<git-sha>-selfhosted`. |
+| `superplane_image_tag` | empty | Image tag override. Empty uses the chart appVersion. A local chart requires an explicit tag. Versioned, legacy self-hosted, and local tags are supported. |
 | `enable_gcs_blob_storage` | `false` | Store blobs in GCS. Set this to `true` in `terraform.tfvars` for a new install. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |
 | `superplane_chart_path` | empty | Path to a local chart. Empty installs the published chart. |
-| `superplane_chart_version` | empty | Version of the published chart, for example `0.0.0-<commit-sha>`. Required when `superplane_chart_path` is empty. |
+| `superplane_chart_version` | `1.0.0-rc1` | Published chart version. Use a stable `1.x` chart when one exists. Do not use chart `0.30.0` or any lower chart. |
 | `enable_runners` | `false` | Enable the runner API and create the runner network. Set this to `true` in `terraform.tfvars` for a new install. |
 | `runner_subnet_cidr` | `172.20.0.0/24` | Range of the runner subnetwork. |
 | `runner_zones` | `[zone]` | Zones for runner VMs. |
@@ -305,9 +319,13 @@ type. For example, T2A machines are not available in all zones.
 
 ## Troubleshooting
 
-**The UI loads HTML but scripts fail CORS.** The image tag is not a
-self-hosted tag. Set `superplane_image_tag` to `<commit-sha>-selfhosted`
-and apply again. Hard-refresh the browser.
+**The UI loads HTML but scripts fail CORS.** Use a versioned release image or
+a legacy self-hosted image. Apply again, then hard-refresh the browser.
+
+**The API or the runner workers stay `Pending`.** The node does not have
+enough CPU. Those pods share one log disk, so they must run on one node.
+Set `machine_type` to `e2-standard-2` or a larger type. A change of
+`machine_type` replaces the cluster.
 
 **Pods stay in `ImagePullBackOff` with HTTP 403.** You pointed
 `superplane_image_registry` at `gcr.io/<project>` or Artifact Registry.

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Check, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -8,6 +9,101 @@ import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsModel";
 import { normalizeReviewBotLogin, reviewBotRows, type ReviewBotOption } from "./reviewBotPickerModel";
 
 export function ReviewBotPicker({
+  selected,
+  catalog,
+  loading,
+  loadError,
+  supportsReviewBots = true,
+  onToggle,
+  onAdd,
+}: {
+  selected: string[];
+  catalog: ReviewBotOption[];
+  loading?: boolean;
+  loadError?: boolean;
+  supportsReviewBots?: boolean;
+  onToggle: (login: string) => void;
+  onAdd: (login: string) => boolean;
+}) {
+  if (!supportsReviewBots) {
+    return <ReviewBotNameEntry selected={selected} onToggle={onToggle} onAdd={onAdd} />;
+  }
+
+  return (
+    <ReviewBotCatalogPicker
+      selected={selected}
+      catalog={catalog}
+      loading={loading}
+      loadError={loadError}
+      onToggle={onToggle}
+      onAdd={onAdd}
+    />
+  );
+}
+
+function ReviewBotNameEntry({
+  selected,
+  onToggle,
+  onAdd,
+}: {
+  selected: string[];
+  onToggle: (login: string) => void;
+  onAdd: (login: string) => boolean;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const submitDraft = () => {
+    if (!onAdd(draft)) {
+      return;
+    }
+    setDraft("");
+  };
+
+  return (
+    <section className="space-y-3">
+      <p className="workspace-body-text text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsNameInstruction}</p>
+      <div className="space-y-1.5">
+        <Label htmlFor="discussion-setup-bot-manual">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsNameLabel}</Label>
+        <ReviewBotManualAdd
+          draft={draft}
+          label={PR_FEEDBACK_SETTINGS_COPY.wizardBotsNameLabel}
+          placeholder={PR_FEEDBACK_SETTINGS_COPY.wizardBotsNamePlaceholder}
+          onDraftChange={setDraft}
+          onSubmit={submitDraft}
+        />
+      </div>
+      <ReviewBotNameList selected={selected} onToggle={onToggle} />
+    </section>
+  );
+}
+
+function ReviewBotNameList({ selected, onToggle }: { selected: string[]; onToggle: (login: string) => void }) {
+  const names = selected.map((login) => login.trim()).filter((login) => login.length > 0);
+  if (names.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="divide-y divide-border rounded-lg border border-border" data-testid="discussion-setup-bot-names">
+      {names.map((login) => (
+        <li key={login.toLowerCase()} className="flex items-center justify-between gap-3 px-3 py-2">
+          <span className="min-w-0 truncate text-[13px] font-medium">{login}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onToggle(login)}
+            aria-label={`${PR_FEEDBACK_SETTINGS_COPY.wizardBotsRemove} ${login}`}
+          >
+            {PR_FEEDBACK_SETTINGS_COPY.wizardBotsRemove}
+          </Button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ReviewBotCatalogPicker({
   selected,
   catalog,
   loading,
@@ -48,7 +144,13 @@ export function ReviewBotPicker({
       ) : null}
       <ReviewBotList rows={rows} selectedKeys={selectedKeys} showFullLoading={showFullLoading} onToggle={onToggle} />
       {manualAddOpen ? (
-        <ReviewBotManualAdd draft={draft} onDraftChange={setDraft} onSubmit={submitDraft} />
+        <ReviewBotManualAdd
+          draft={draft}
+          label={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddLabel}
+          placeholder={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddPlaceholder}
+          onDraftChange={setDraft}
+          onSubmit={submitDraft}
+        />
       ) : (
         <ReviewBotManualPrompt onOpen={() => setManualAddOpen(true)} />
       )}
@@ -123,20 +225,24 @@ function ReviewBotList({
 
 function ReviewBotManualAdd({
   draft,
+  label,
+  placeholder,
   onDraftChange,
   onSubmit,
 }: {
   draft: string;
+  label: string;
+  placeholder: string;
   onDraftChange: (value: string) => void;
   onSubmit: () => void;
 }) {
   return (
-    <div className="flex gap-2">
+    <div className="review-bot-manual-add flex items-center gap-2">
       <Input
         id="discussion-setup-bot-manual"
         value={draft}
-        placeholder={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddPlaceholder}
-        aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardBotsAddLabel}
+        placeholder={placeholder}
+        aria-label={label}
         onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {

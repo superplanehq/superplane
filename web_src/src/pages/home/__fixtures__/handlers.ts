@@ -343,6 +343,20 @@ const STORYBOOK_GITHUB_REPOSITORIES = [
   { id: "repo_acme_docs", name: "acme/docs", type: "repository" },
 ];
 
+function storybookBranchResources(resourceType: string): FixtureResult {
+  if (resourceType === "default_branch") {
+    return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+  }
+  return {
+    json: {
+      resources: [
+        { id: "main", name: "main", type: "branch" },
+        { id: "develop", name: "develop", type: "branch" },
+      ],
+    },
+  };
+}
+
 /** Storybook definitions aligned with real integration Configuration() fields. */
 function storybookApiKeyField(description: string): StorybookConfigField {
   return {
@@ -468,8 +482,8 @@ export async function matchFactorySetupFixture(
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
     const resourceType = url.searchParams.get("type");
-    if (resourceType === "default_branch") {
-      return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+    if (resourceType === "default_branch" || resourceType === "branch") {
+      return storybookBranchResources(resourceType);
     }
     if (resourceType === "status_check") {
       return {

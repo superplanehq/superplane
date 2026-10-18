@@ -61,9 +61,9 @@ variable "node_count" {
 }
 
 variable "machine_type" {
-  description = "Machine type for GKE nodes"
+  description = "Machine type for GKE nodes. Use e2-standard-2 or a larger type. The API and the runner pods share one log disk, so they run on one node. e2-medium does not have enough CPU for that node."
   type        = string
-  default     = "e2-medium"
+  default     = "e2-standard-2"
 }
 
 # -----------------------------------------------------------------------------
@@ -124,12 +124,13 @@ variable "fleet_manager_image_registry" {
 }
 
 variable "superplane_image_tag" {
-  description = "SuperPlane image tag. Must end with -selfhosted. The plain <git-sha> and stable images load UI files from the hosted CDN and fail CORS on a customer domain."
+  description = "SuperPlane image tag. Empty uses the chart appVersion. Versioned releases use vMAJOR.MINOR.PATCH with an optional prerelease. Legacy selfhosted and local tags remain supported."
   type        = string
+  default     = ""
 
   validation {
-    condition     = strcontains(var.superplane_image_tag, "selfhosted")
-    error_message = "Set superplane_image_tag to a tag that contains selfhosted, for example <git-sha>-selfhosted."
+    condition     = var.superplane_image_tag == "" || can(regex("^v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$", var.superplane_image_tag)) || strcontains(var.superplane_image_tag, "selfhosted") || startswith(var.superplane_image_tag, "local-")
+    error_message = "Use a vMAJOR.MINOR.PATCH release tag, a legacy selfhosted tag, a local- tag, or leave the value empty."
   }
 }
 
@@ -140,9 +141,9 @@ variable "superplane_chart_path" {
 }
 
 variable "superplane_chart_version" {
-  description = "Version of the published SuperPlane Helm chart, for example 0.0.0-<git-sha>. Required when superplane_chart_path is empty. Empty version installs the latest chart, which may lack GKE ACME and migrate fixes."
+  description = "Published SuperPlane Helm chart version, for example 1.0.0-rc1. Required when superplane_chart_path is empty. Chart versions 0.30.0 and lower are the previous chart line."
   type        = string
-  default     = ""
+  default     = "1.0.0-rc1"
 }
 
 # -----------------------------------------------------------------------------
@@ -187,6 +188,18 @@ variable "runner_zones" {
   description = "Zones for runner VMs. Fleet Manager tries the next zone when a zone has no capacity. Leave empty to use var.zone."
   type        = list(string)
   default     = []
+}
+
+variable "runner_image_amd64" {
+  description = "Packer-built GCP image resource for linux/amd64 runner VMs."
+  type        = string
+  default     = ""
+}
+
+variable "runner_image_arm64" {
+  description = "Packer-built GCP image resource for linux/arm64 runner VMs."
+  type        = string
+  default     = ""
 }
 
 # -----------------------------------------------------------------------------

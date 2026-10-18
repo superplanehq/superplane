@@ -400,10 +400,7 @@ func prFeedbackChecksWaitingTitleExpression() string {
 }
 
 func prFeedbackChecksWaitingTitleExpressionFor(provider string) string {
-	if provider == models.ProviderBitbucket {
-		return prFeedbackChecksSHATitleExpressionFor("Waiting for builds on ", provider)
-	}
-	return prFeedbackChecksSHATitleExpressionFor("Waiting for checks on ", "")
+	return prFeedbackChecksSHATitleExpressionFor("Waiting for checks on ", provider)
 }
 
 func prFeedbackChecksPassedTitleExpression() string {
@@ -411,10 +408,7 @@ func prFeedbackChecksPassedTitleExpression() string {
 }
 
 func prFeedbackChecksPassedTitleExpressionFor(provider string) string {
-	if provider == models.ProviderBitbucket {
-		return prFeedbackChecksSHATitleExpressionFor("Builds passed on ", provider)
-	}
-	return prFeedbackChecksSHATitleExpressionFor("Checks passed on ", "")
+	return prFeedbackChecksSHATitleExpressionFor("Checks passed on ", provider)
 }
 
 func prFeedbackChecksRepairTitleExpression() string {
@@ -422,10 +416,7 @@ func prFeedbackChecksRepairTitleExpression() string {
 }
 
 func prFeedbackChecksRepairTitleExpressionFor(provider string) string {
-	if provider == models.ProviderBitbucket {
-		return prFeedbackChecksSHATitleExpressionFor("Fixing failed builds on ", provider)
-	}
-	return prFeedbackChecksSHATitleExpressionFor("Fixing failed checks on ", "")
+	return prFeedbackChecksSHATitleExpressionFor("Fixing failed checks on ", provider)
 }
 
 func prFeedbackChecksSHATitleExpression(prefix string) string {
@@ -463,11 +454,7 @@ func prFeedbackChecksRepairDescriptionExpression() string {
 }
 
 func prFeedbackChecksRepairDescriptionExpressionFor(provider string) string {
-	label := "Failed checks"
-	if provider == models.ProviderBitbucket {
-		label = "Failed builds"
-	}
-	return `{{ "` + label + `\n" + ` + prFeedbackChecksMarkdownListSource(prFeedbackWaitChecksFailedSourceFor(provider)) + ` }}`
+	return `{{ "Failed checks\n" + ` + prFeedbackChecksMarkdownListSource(prFeedbackWaitChecksFailedSourceFor(provider)) + ` }}`
 }
 
 func prFeedbackWaitChecksSelectedSource() string {

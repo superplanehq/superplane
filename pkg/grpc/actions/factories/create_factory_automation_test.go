@@ -41,4 +41,15 @@ func Test__CreateFactoryAutomation(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
+	t.Run("custom automation cannot bypass the scheduled intake gate", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+		_, err := CreateFactoryAutomation(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAutomationRequest{
+			FactoryId: "00000000-0000-0000-0000-000000000001", ColumnKey: models.CanvasColumnKeyBacklog,
+		})
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		require.Equal(t, codes.InvalidArgument, code)
+		require.Contains(t, message, "scheduled intake template")
+	})
+
 }

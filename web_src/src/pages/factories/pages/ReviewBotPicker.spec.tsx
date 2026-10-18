@@ -82,4 +82,52 @@ describe("ReviewBotPicker", () => {
     expect(screen.queryByTestId("discussion-setup-bots-empty")).not.toBeInTheDocument();
     expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "true");
   });
+
+  it("shows a name field immediately when there is no review bot catalog", async () => {
+    const user = userEvent.setup();
+    const onAdd = vi.fn().mockReturnValue(true);
+    const onToggle = vi.fn();
+    const { rerender } = render(
+      <ReviewBotPicker
+        selected={[]}
+        catalog={[{ login: "bugbot", displayName: "bugbot[bot]" }]}
+        loading
+        loadError
+        supportsReviewBots={false}
+        onToggle={onToggle}
+        onAdd={onAdd}
+      />,
+    );
+
+    expect(screen.queryByTestId("discussion-setup-bots-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bots-missing")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bots-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bots-loading")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bots-found")).not.toBeInTheDocument();
+    expect(screen.queryByText("SuperPlane could not load review bots from this repository.")).not.toBeInTheDocument();
+    expect(screen.getByText("Type the name of each review bot SuperPlane should respond to.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Bot name")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Bot name, for example coderabbitai")).toBeInTheDocument();
+
+    await user.type(screen.getByTestId("discussion-setup-bot-manual"), "coderabbitai");
+    await user.click(screen.getByTestId("discussion-setup-bot-add"));
+    expect(onAdd).toHaveBeenCalledWith("coderabbitai");
+    expect(screen.getByTestId("discussion-setup-bot-manual")).toBeInTheDocument();
+
+    rerender(
+      <ReviewBotPicker
+        selected={["coderabbitai"]}
+        catalog={[]}
+        supportsReviewBots={false}
+        onToggle={onToggle}
+        onAdd={onAdd}
+      />,
+    );
+
+    expect(screen.queryByTestId("discussion-setup-bots-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bots-missing")).not.toBeInTheDocument();
+    expect(screen.getByTestId("discussion-setup-bot-manual")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove coderabbitai" }));
+    expect(onToggle).toHaveBeenCalledWith("coderabbitai");
+  });
 });

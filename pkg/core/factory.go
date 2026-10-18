@@ -162,6 +162,7 @@ type WorkOrder struct {
 	Result      string           `json:"result,omitempty"`
 	Number      int64            `json:"number,omitempty"`
 	Key         string           `json:"key,omitempty"`
+	URL         string           `json:"url,omitempty"`
 	Origin      *WorkOrderOrigin `json:"origin,omitempty"`
 }
 

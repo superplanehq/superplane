@@ -68,6 +68,8 @@ describe("OrganizationDetail", () => {
             task_count: 4,
             done_task_count: 6,
             member_count: 3,
+            workspace_count: 7,
+            repository_count: 8,
             created_at: "2024-01-15T12:00:00Z",
             updated_at: "2024-02-20T12:00:00Z",
           });
@@ -199,6 +201,10 @@ describe("OrganizationDetail", () => {
     expect(within(panel).getByText("Automations")).toBeInTheDocument();
     expect(within(panel).getByText("Tasks")).toBeInTheDocument();
     expect(within(panel).getByText("Done Tasks")).toBeInTheDocument();
+    expect(within(panel).getByText("Workspaces")).toBeInTheDocument();
+    expect(within(panel).getByText("Repositories")).toBeInTheDocument();
+    expect(within(panel).getByText("7")).toBeInTheDocument();
+    expect(within(panel).getByText("8")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
   });
 
@@ -447,13 +453,16 @@ describe("OrganizationDetail", () => {
       task_count: 4,
       done_task_count: 6,
       member_count: 3,
+      workspace_count: 7,
+      repository_count: 8,
       created_at: "2024-01-15T12:00:00Z",
       updated_at: "2024-02-20T12:00:00Z",
     };
+    let allowOrganization = false;
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === `/admin/api/organizations/${ORG_ID}`) {
-        if (vi.mocked(fetch).mock.calls.filter(([call]) => String(call) === url).length === 1) {
+        if (!allowOrganization) {
           return new Response("error", { status: 500 });
         }
         return jsonResponse(overview);
@@ -464,6 +473,7 @@ describe("OrganizationDetail", () => {
     renderPage();
 
     expect(await screen.findByText("Could not load this organization.")).toBeInTheDocument();
+    allowOrganization = true;
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Acme")).toBeInTheDocument();
   });
@@ -479,6 +489,8 @@ function organizationOverview() {
     task_count: 4,
     done_task_count: 6,
     member_count: 3,
+    workspace_count: 7,
+    repository_count: 8,
     created_at: "2024-01-15T12:00:00Z",
     updated_at: "2024-02-20T12:00:00Z",
   };

@@ -9,6 +9,7 @@ import {
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
   factoriesCreateFactoryAutomation,
+  factoriesPreviewFactorySchedule,
   factoriesDeleteFactoryAutomation,
   factoriesListFactories,
   factoriesListFactoryAutomations,
@@ -38,6 +39,7 @@ import type {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
 import { buildOptimisticDispatchedOrder } from "@/pages/factories/lib/dispatchOptimistic";
+import { factoryPlanningEnabled } from "@/pages/factories/pages/planningSettingsModel";
 import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
@@ -64,6 +66,7 @@ import {
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
 import { integrationKeys } from "./useIntegrations";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
@@ -591,9 +594,12 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     },
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      // The Backlog run for this order is created asynchronously after this
-      // RPC returns. Show "Analyzing" until the canvas WebSocket delivers it.
-      markBacklogAnalysisPending(order.id);
+      // A Backlog run starts only when Planning is on. Show Analyzing until
+      // that run arrives. Missing factory data defaults to Planning on.
+      const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
+      if (factoryPlanningEnabled(factory)) {
+        markBacklogAnalysisPending(order.id);
+      }
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {
         void queryClient.invalidateQueries({
@@ -924,7 +930,12 @@ export function useCreateFactoryAutomation(organizationId: string, factoryId: st
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name?: string; columnKey?: string }) => {
+    mutationFn: async (input: {
+      name?: string;
+      columnKey?: string;
+      templateId?: string;
+      installParams?: Record<string, string>;
+    }) => {
       const response = await factoriesCreateFactoryAutomation(
         withOrganizationHeader({
           organizationId,
@@ -932,6 +943,8 @@ export function useCreateFactoryAutomation(organizationId: string, factoryId: st
           body: {
             name: input.name,
             columnKey: input.columnKey,
+            templateId: input.templateId,
+            installParams: input.installParams,
           },
         }),
       );
@@ -1032,3 +1045,45 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
 }
 
 export type { FactoryAutomation, FactoriesFactoryLine, FactoryLineStep };
+
+export function useFactorySchedulePreview(
+  organizationId: string,
+  factoryId: string,
+  params: Record<string, string>,
+  enabled: boolean,
+) {
+  const [now, setNow] = useState(() => Date.now());
+  const preview = useQuery({
+    queryKey: ["factory-schedule-preview", organizationId, factoryId, params],
+    enabled: enabled && Boolean(organizationId && factoryId),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+    queryFn: async () => {
+      const response = await factoriesPreviewFactorySchedule(
+        withOrganizationHeader({ organizationId, path: { factoryId }, body: { installParams: params } }),
+      );
+      const nextRun = response.data?.nextRun;
+      const timestamp = Date.parse(nextRun ?? "");
+      if (!nextRun || !Number.isFinite(timestamp) || timestamp <= Date.now()) {
+        throw new Error("Could not calculate a future run. Try again.");
+      }
+      return nextRun;
+    },
+  });
+  const nextRunAt = Date.parse(preview.data ?? "");
+  const { refetch } = preview;
+  useEffect(() => {
+    const remaining = nextRunAt - Date.now();
+    if (!enabled || !Number.isFinite(remaining) || remaining <= 0) return;
+    const timer = setTimeout(
+      () => {
+        setNow(Date.now());
+        void refetch();
+      },
+      Math.min(remaining, 60_000),
+    );
+    return () => clearTimeout(timer);
+  }, [enabled, nextRunAt, now, refetch]);
+  return { ...preview, isFuture: nextRunAt > Math.max(now, Date.now()) };
+}

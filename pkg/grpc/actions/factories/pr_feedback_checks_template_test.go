@@ -63,12 +63,12 @@ func bitbucketChecksTitleData() map[string]any {
 func TestPrFeedbackBitbucketTitleExpressions(t *testing.T) {
 	assert.Equal(
 		t,
-		"Waiting for builds on [3fc0c4c](https://bitbucket.org/acme/widgets/commits/3fc0c4c0123456789abcdef)",
+		"Waiting for checks on [3fc0c4c](https://bitbucket.org/acme/widgets/commits/3fc0c4c0123456789abcdef)",
 		evalRootDataExpression(t, templateExpressionSource(t, prFeedbackChecksWaitingTitleExpressionFor("bitbucket")), bitbucketChecksTitleData()),
 	)
 	assert.Equal(
 		t,
-		"Builds passed on [3fc0c4c](https://bitbucket.org/acme/widgets/commits/3fc0c4c0123456789abcdef)",
+		"Checks passed on [3fc0c4c](https://bitbucket.org/acme/widgets/commits/3fc0c4c0123456789abcdef)",
 		evalRootDataExpression(t, templateExpressionSource(t, prFeedbackChecksPassedTitleExpressionFor("bitbucket")), bitbucketChecksTitleData()),
 	)
 
@@ -76,7 +76,7 @@ func TestPrFeedbackBitbucketTitleExpressions(t *testing.T) {
 	delete(fallback["repository"].(map[string]any), "links")
 	assert.Equal(
 		t,
-		"Fixing failed builds on [3fc0c4c](https://bitbucket.org/acme/widgets/commits/3fc0c4c0123456789abcdef)",
+		"Fixing failed checks on [3fc0c4c](https://bitbucket.org/acme/widgets/commits/3fc0c4c0123456789abcdef)",
 		evalRootDataExpression(t, templateExpressionSource(t, prFeedbackChecksRepairTitleExpressionFor("bitbucket")), fallback),
 	)
 }
@@ -177,7 +177,7 @@ func TestPrFeedbackBitbucketBuildListExpressions(t *testing.T) {
 			},
 		},
 	})
-	assert.Equal(t, "Failed builds\n· [pipeline](https://example.com/pipeline)", got)
+	assert.Equal(t, "Failed checks\n· [pipeline](https://example.com/pipeline)", got)
 	assert.Contains(t, prFeedbackFailedChecksExpressionFor("bitbucket"), "failedBuilds")
 	assert.Contains(t, prFeedbackFailedChecksExpression(), "failedChecks")
 }
