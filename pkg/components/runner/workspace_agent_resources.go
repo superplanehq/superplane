@@ -717,22 +717,31 @@ func factoryCheckoutCommands(files []BrokerTaskFile) []BrokerCommand {
 		Kind:    LiveLogKindBash,
 		Preview: LiveLogText("Checkout"),
 	}}
-	if setup := setupCommandScript(setupCommandsFromFiles(files)); setup != "" {
-		commands = append(commands, BrokerCommand{
-			Name:    "Setup",
-			Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory("repo", "set -e\n"+setup)),
-			Kind:    LiveLogKindBash,
-			Preview: LiveLogText(setup),
-		})
+	setup := setupCommandsFromFiles(files)
+	if len(setup) == 0 {
+		return commands
 	}
-	return commands
+	return append(commands, BrokerCommand{
+		Name:    "Setup",
+		Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory("repo", setupCommandBody(setup))),
+		Kind:    LiveLogKindBash,
+		Preview: LiveLogText(setupCommandScript(setup)),
+	})
 }
 
 func setupCommandScript(commands []string) string {
-	if len(commands) == 0 {
-		return ""
-	}
 	return strings.Join(commands, "\n")
+}
+
+// setupCommandBody runs each command in its own shell. The checkout step
+// wraps this body in a status handler that ignores set -e, so a failing
+// command must be a separate process.
+func setupCommandBody(commands []string) string {
+	lines := make([]string, 0, len(commands))
+	for _, command := range commands {
+		lines = append(lines, "bash -e -c "+ShellSingleQuote(command)+" || exit 1")
+	}
+	return strings.Join(lines, "\n")
 }
 
 func setupCommandsFromFiles(files []BrokerTaskFile) []string {

@@ -492,6 +492,25 @@ func TestWorkspaceCheckoutScriptLeavesSetupCommandsForALaterStep(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, "repo", "from-setup"))
 }
 
+func TestFactorySetupCommandStopsAfterAFailure(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "repo"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "task_cwd"), []byte(dir+"\n"), 0o644))
+	files := []runner.BrokerTaskFile{{
+		Path:    runner.WorkspaceSetupConfigPath,
+		Content: "{\"commands\":[\"exit 1\",\"touch should-not-exist\"]}\n",
+	}}
+	commands := runner.InsertFactoryCheckoutCommand(nil, nil, files)
+	require.Len(t, commands, 2)
+	cmd := exec.Command("bash", "--noprofile", "--norc", "-c", commands[1].Command)
+	cmd.Env = []string{
+		"PATH=/usr/bin:/bin:/usr/local/bin",
+		"SUPERPLANE_TASK_DIR=" + dir,
+	}
+	require.Error(t, cmd.Run())
+	assert.NoFileExists(t, filepath.Join(dir, "repo", "should-not-exist"))
+}
+
 func commandPtr(command string) *string {
 	return &command
 }
@@ -520,7 +539,8 @@ func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
 	assert.Equal(t, runner.LiveLogKindBash, out[2].Kind)
 	assert.Equal(t, "npm ci\necho ready", out[2].Preview)
 	assert.Contains(t, out[2].Command, `cd "$_sp_root"/'repo' || exit 1`)
-	assert.Contains(t, out[2].Command, "set -e\nnpm ci\necho ready")
+	assert.Contains(t, out[2].Command, "bash -e -c 'npm ci' || exit 1")
+	assert.Contains(t, out[2].Command, "bash -e -c 'echo ready' || exit 1")
 	assert.Equal(t, "Prompt", out[3].Name)
 }
 

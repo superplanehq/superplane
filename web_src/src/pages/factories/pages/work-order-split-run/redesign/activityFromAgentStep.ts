@@ -91,39 +91,48 @@ function bashToolsFromStep(
   status: AgentActivityStatus,
 ): AgentActivityItem[] {
   const lines = step.title === "Setup" ? command.script.split(/\r?\n/).filter((line) => line.trim()) : [];
-  if (lines.length <= 1) {
-    return [bashTool(step, command.script, command.stdout, status, stepDurationMs(step.duration))];
+  // A failed setup has one result. The runner does not say which line stopped.
+  if (lines.length <= 1 || status === "failed" || status === "cancelled") {
+    return [
+      bashTool({
+        step,
+        script: command.script,
+        stdout: command.stdout,
+        status,
+        durationMs: stepDurationMs(step.duration),
+      }),
+    ];
   }
   return lines.map((line, index) =>
-    bashTool(
+    bashTool({
       step,
-      line,
-      index === lines.length - 1 ? command.stdout : "",
+      script: line,
+      stdout: index === lines.length - 1 ? command.stdout : "",
       status,
-      index === 0 ? stepDurationMs(step.duration) : undefined,
+      durationMs: index === 0 ? stepDurationMs(step.duration) : undefined,
       index,
-    ),
+    }),
   );
 }
 
-function bashTool(
-  step: AgentStep,
-  script: string,
-  stdout: string,
-  status: AgentActivityStatus,
-  durationMs: number | undefined,
-  index?: number,
-): AgentActivityItem {
+function bashTool(input: {
+  step: AgentStep;
+  script: string;
+  stdout: string;
+  status: AgentActivityStatus;
+  durationMs?: number;
+  index?: number;
+}): AgentActivityItem {
   return {
     type: "tool",
-    id: index === undefined ? `${step.id}-output` : `${step.id}-output-${index}`,
+    id: input.index === undefined ? `${input.step.id}-output` : `${input.step.id}-output-${input.index}`,
     kind: "bash",
-    name: step.title,
-    input: script,
-    output: stdout,
+    name: input.step.title,
+    input: input.script,
+    output: input.stdout,
     outputStreams: [],
-    status,
-    durationMs,
+    status: input.status,
+    durationMs: input.durationMs,
     truncated: false,
   };
 }
