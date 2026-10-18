@@ -84,32 +84,6 @@ func ListUnpinnedOrganizations(tx *gorm.DB, search string, limit, offset int, so
 	return organizations, unpinnedTotal, matchTotal, err
 }
 
-func organizationsMatchingSearch(tx *gorm.DB, search string) *gorm.DB {
-	query := tx.
-		Model(&Organization{}).
-		Where("organizations.deleted_at IS NULL")
-
-	search = strings.TrimSpace(search)
-	if search == "" {
-		return query
-	}
-
-	pattern := "%" + search + "%"
-	return query.Where(
-		"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
-		pattern,
-		pattern,
-	)
-}
-
-func excludeOrganizationIDs(query *gorm.DB, ids []uuid.UUID) *gorm.DB {
-	if len(ids) == 0 {
-		return query
-	}
-
-	return query.Where("organizations.id NOT IN ?", ids)
-}
-
 func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
 	query := excludeOrganizationIDs(organizationsMatchingSearch(tx, search), excludeIDs)
 
@@ -586,4 +560,30 @@ func HasExperimentalFeature(orgID uuid.UUID, featureID string) (bool, error) {
 		return false, err
 	}
 	return organization.HasExperimentalFeature(featureID), nil
+}
+
+func organizationsMatchingSearch(tx *gorm.DB, search string) *gorm.DB {
+	query := tx.
+		Model(&Organization{}).
+		Where("organizations.deleted_at IS NULL")
+
+	search = strings.TrimSpace(search)
+	if search == "" {
+		return query
+	}
+
+	pattern := "%" + search + "%"
+	return query.Where(
+		"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
+		pattern,
+		pattern,
+	)
+}
+
+func excludeOrganizationIDs(query *gorm.DB, ids []uuid.UUID) *gorm.DB {
+	if len(ids) == 0 {
+		return query
+	}
+
+	return query.Where("organizations.id NOT IN ?", ids)
 }
