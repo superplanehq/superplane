@@ -420,6 +420,11 @@ checkout_github_revision() {
     echo "Checked out $(git rev-parse HEAD). Expected ${PR_REVISION}." >&2
     exit 1
   fi
+  if [ -n "${REPO:-}" ] && [ -n "${BASE:-}" ]; then
+    revision="$(git rev-parse HEAD)"
+    base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
+    gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
+  fi
   cd "$SUPERPLANE_TASK_DIR" || exit 1
 }
 
@@ -444,6 +449,9 @@ checkout_bitbucket_revision() {
   if ! revision_matches; then
     echo "Checked out the wrong revision." >&2
     exit 1
+  fi
+  if [ -n "${BASE:-}" ]; then
+    git diff "$(git merge-base "${BASE}" HEAD)" HEAD > /tmp/pr.diff
   fi
   cd "$SUPERPLANE_TASK_DIR" || exit 1
 }
@@ -691,7 +699,8 @@ func ApplyFactoryCheckout(files []BrokerTaskFile, commands []BrokerCommand, step
 }
 
 // InsertFactoryCheckoutCommand inserts checkout before the first canvas
-// step. Steps that already run git clone, or the checkout helper, are left
+// step. The command is a regular bash step so the task log shows it.
+// Steps that already run git clone, or the checkout helper, are left
 // unchanged so saved automations keep their own clone.
 func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, files []BrokerTaskFile) []BrokerCommand {
 	if stepsAlreadyCheckout(steps) {
@@ -701,7 +710,7 @@ func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, f
 	checkout := BrokerCommand{
 		Name:    "Checkout",
 		Command: WrapAgentStepCommand("checkout"),
-		Kind:    LiveLogKindSetup,
+		Kind:    LiveLogKindBash,
 		Preview: LiveLogText("Checkout"),
 	}
 	for i, command := range commands {

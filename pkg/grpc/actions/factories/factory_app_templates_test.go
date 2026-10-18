@@ -171,13 +171,13 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
 	assert.Contains(t, prompt, "report_merge_check")
 	assert.Contains(t, prompt, "check is risk.")
-	for _, name := range []string{"Checkout Pull Request", "Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"} {
+	for _, name := range []string{"Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"} {
 		implementationStep(t, agent, name)
 	}
+	assert.NotContains(t, result.canvasYAML, "Checkout Pull Request")
+	assert.Contains(t, prompt, "/tmp/pr.diff")
 	assert.NotContains(t, prompt, "install_params.riskRules")
 	assert.NotContains(t, prompt, "install_params.enabledChecks")
-	assert.Contains(t, result.canvasYAML, `gh api -H "Accept: application/vnd.github.v3.diff"`)
-	assert.Contains(t, result.canvasYAML, `/compare/${base_ref}...${revision}" > /tmp/pr.diff`)
 	assert.Contains(t, result.canvasYAML, "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID")
 	assert.Contains(t, result.canvasYAML, `root().data.workOrder.id`)
 	assert.NotContains(t, result.canvasYAML, "findPullRequest")
@@ -233,7 +233,8 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	assert.Contains(t, prompt, "Merge check: risk.")
 	assert.Contains(t, prompt, "Description: {{ root().data.pull_request.description }}")
 	assert.NotContains(t, result.canvasYAML, "git clone")
-	assert.Contains(t, result.canvasYAML, "git merge-base")
+	assert.NotContains(t, result.canvasYAML, "Checkout Pull Request")
+	assert.Contains(t, prompt, "/tmp/pr.diff")
 	assert.Contains(t, result.canvasYAML, "SOURCE_REPO")
 	assert.Contains(t, result.canvasYAML, "source?.repository?.full_name")
 	assert.NotContains(t, result.canvasYAML, "git checkout --detach FETCH_HEAD")
@@ -264,7 +265,6 @@ func TestMaterializeRiskScoreOmitsDisabledChecks(t *testing.T) {
 	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
 	require.NoError(t, err)
 	agent := findYAMLNode(t, canvas, "assess-risk")
-	implementationStep(t, agent, "Checkout Pull Request")
 	implementationStep(t, agent, "Blast radius")
 	steps, ok := agent.Configuration["steps"].([]any)
 	require.True(t, ok)
@@ -343,16 +343,15 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-claude"},
 	}, agent.Configuration["credentials"])
-	checkout, ok := implementationStep(t, agent, "Checkout Pull Request")["command"].(string)
-	require.True(t, ok)
-	assert.NotContains(t, checkout, "git clone")
-	assert.Contains(t, checkout, `Checked out ${revision}. Expected ${PR_REVISION}.`)
-	assert.Contains(t, checkout, `gh api -H "Accept: application/vnd.github.v3.diff"`)
-	assert.Equal(t, "repo", implementationStep(t, agent, "Checkout Pull Request")["workingDirectory"])
+	for _, step := range agent.Configuration["steps"].([]any) {
+		item := step.(map[string]any)
+		assert.NotEqual(t, "Checkout Pull Request", item["name"])
+	}
 	prompt, ok := implementationStep(t, agent, "Capture Visual Evidence")["prompt"].(string)
 	require.True(t, ok)
 	assert.Contains(t, prompt, "Do not implement the task.")
 	assert.Contains(t, prompt, "Do not change files. Do not commit. Do not push.")
+	assert.Contains(t, prompt, "/tmp/pr.diff")
 	assert.Contains(t, prompt, "Capture visual evidence only for user interface changes")
 	assert.NotContains(t, prompt, "task()")
 	emit, ok := implementationStep(t, agent, "Emit Visual Evidence")["command"].(string)

@@ -60,14 +60,6 @@ spec:
             value: '{{ root().data.workOrder.id }}'
             valueSource: literal
         steps:
-          - name: Checkout Pull Request
-            type: bash
-            workingDirectory: repo
-            command: |-
-              set -euo pipefail
-              revision="$(git rev-parse HEAD)"
-              base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
-              gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
           - name: Blast radius
             type: prompt
             workingDirectory: repo

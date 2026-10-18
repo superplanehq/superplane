@@ -12,6 +12,37 @@ import (
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
+func TestPRFeedbackOmitsCommitIdentityWhenWorkspaceAgentIsEnabled(t *testing.T) {
+	cases := []struct {
+		name     string
+		provider string
+		build    func(prFeedbackBuildRequest) *yaml.Canvas
+		prompt   string
+	}{
+		{name: "discussion", build: buildDiscussionPRFeedbackCanvas, prompt: "Address PR feedback"},
+		{name: "discussion bitbucket", provider: models.ProviderBitbucket, build: buildDiscussionPRFeedbackCanvas, prompt: "Address PR feedback"},
+		{name: "checks", build: buildChecksPRFeedbackCanvas, prompt: "Fix Failed Checks"},
+		{name: "checks bitbucket", provider: models.ProviderBitbucket, build: buildChecksPRFeedbackCanvas, prompt: "Fix Failed Builds"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			canvas := testCase.build(prFeedbackBuildRequest{
+				Repository:         "acme/app",
+				Mention:            prFeedbackDefaultMention,
+				VCSProvider:        testCase.provider,
+				OmitCommitIdentity: true,
+				MaximumAttempts:    prFeedbackDefaultMaximumAttempts,
+				CheckNames:         []string{"lint"},
+			})
+			runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
+			assert.False(t, runnerHasStep(t, runner, "Set Up Git User"))
+			assert.False(t, runnerHasStep(t, runner, "Set Up DCO Signing"))
+			assert.True(t, runnerHasStep(t, runner, testCase.prompt))
+			assert.True(t, runnerHasStep(t, runner, "Commit and Push"))
+		})
+	}
+}
+
 func Test__ResolvePRFeedbackGraph(t *testing.T) {
 	t.Run("resolves a generated graph", func(t *testing.T) {
 		spec := prFeedbackSpecFromTemplate(t, "acme/app")

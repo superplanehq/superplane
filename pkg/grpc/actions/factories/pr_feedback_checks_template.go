@@ -243,24 +243,12 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 }
 
 func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
-	steps := []any{
-		map[string]any{
-			"name": "Set Up Git User",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"git config --global user.email \"" + runner.FactoryAgentEmail + "\"",
-				"git config --global user.name \"" + runner.FactoryAgentName + "\"",
-			}, "\n"),
-		},
+	steps := []any{}
+	if !request.OmitCommitIdentity {
+		steps = append(steps, prFeedbackCommitIdentitySteps()...)
 	}
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return append(steps,
-			map[string]any{
-				"name":             "Set Up DCO Signing",
-				"type":             "bash",
-				"workingDirectory": "repo",
-				"command":          runner.FactoryRepoCommitSetup(),
-			},
 			map[string]any{
 				"name":             "Fix Failed Builds",
 				"type":             "prompt",
@@ -271,12 +259,6 @@ func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
 		)
 	}
 	return append(steps,
-		map[string]any{
-			"name":             "Set Up DCO Signing",
-			"type":             "bash",
-			"workingDirectory": "repo",
-			"command":          runner.FactoryRepoCommitSetup(),
-		},
 		map[string]any{
 			"name":             "Fix Failed Checks",
 			"type":             "prompt",

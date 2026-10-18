@@ -63,21 +63,6 @@ spec:
             value: '{{ root().data.workOrder.id }}'
             valueSource: literal
         steps:
-          - name: Checkout Pull Request
-            type: bash
-            workingDirectory: repo
-            command: |-
-              set -euo pipefail
-              if [ -z "${PR_REVISION:-}" ]; then
-                echo "The pull request revision is missing." >&2
-                exit 1
-              fi
-              revision="$(git rev-parse HEAD)"
-              if [ "${revision}" != "${PR_REVISION}" ]; then
-                echo "Checked out the wrong revision." >&2
-                exit 1
-              fi
-              git diff "$(git merge-base "${BASE}" "${revision}")" "${revision}" > /tmp/pr.diff
           - name: Blast radius
             type: prompt
             workingDirectory: repo

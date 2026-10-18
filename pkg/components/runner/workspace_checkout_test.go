@@ -422,6 +422,32 @@ func TestWorkspaceCheckoutScriptDetachesBitbucketSourceRevision(t *testing.T) {
 	assert.Equal(t, sha, runGitQuiet(t, "", repo, "rev-parse", "HEAD"))
 	assert.Equal(t, "HEAD", runGitQuiet(t, "", repo, "rev-parse", "--abbrev-ref", "HEAD"))
 	assert.NoDirExists(t, filepath.Join(dir, ".superplane"))
+	diff, err := os.ReadFile("/tmp/pr.diff")
+	require.NoError(t, err)
+	assert.Contains(t, string(diff), "bb")
+}
+
+func TestWorkspaceCheckoutScriptWritesGitHubPullRequestDiff(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	sha := pushCommit(t, remote, "refs/pull/9/head", "change", "pr\n")
+	dir := t.TempDir()
+	binDir := filepath.Join(dir, "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "gh"), []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$SUPERPLANE_TASK_DIR/gh-args\"\nprintf '%s\\n' 'diff --git a/change'\n"), 0o755))
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
+		extraEnv: []string{
+			"REPO=acme/widgets",
+			"PR_NUMBER=9",
+			"PR_REVISION=" + sha,
+		},
+	})
+	require.NoError(t, err, output)
+	args, err := os.ReadFile(filepath.Join(dir, "gh-args"))
+	require.NoError(t, err)
+	assert.Contains(t, string(args), "/repos/acme/widgets/compare/main..."+sha)
+	diff, err := os.ReadFile("/tmp/pr.diff")
+	require.NoError(t, err)
+	assert.Contains(t, string(diff), "diff --git a/change")
 }
 
 func TestWorkspaceCheckoutScriptRunsSetupCommandsInRepo(t *testing.T) {
@@ -465,7 +491,7 @@ func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
 	require.Len(t, out, 3)
 	assert.Equal(t, "Auth", out[0].Name)
 	assert.Equal(t, "Checkout", out[1].Name)
-	assert.Equal(t, runner.LiveLogKindSetup, out[1].Kind)
+	assert.Equal(t, runner.LiveLogKindBash, out[1].Kind)
 	assert.Equal(t, runner.WrapAgentStepCommand("checkout"), out[1].Command)
 	assert.Equal(t, runner.LiveLogText("Checkout"), out[1].Preview)
 	assert.Equal(t, "Prompt", out[2].Name)
