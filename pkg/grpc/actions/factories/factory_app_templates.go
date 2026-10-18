@@ -880,9 +880,13 @@ func materializePRFeedbackDefaults(
 		Agent:                  resetFactoryIntakeAgent(tx, factory, version.Nodes),
 		VCSProvider:            factoryVCSProviderOrDefault(factory),
 	}
-	omitIdentity, err := models.HasExperimentalFeature(factory.OrganizationID, features.FeatureWorkspaceAgent)
-	if err != nil {
-		return nil, err
+	omitIdentity := false
+	if factory.OrganizationID != uuid.Nil {
+		var err error
+		omitIdentity, err = models.HasExperimentalFeature(factory.OrganizationID, features.FeatureWorkspaceAgent)
+		if err != nil {
+			return nil, err
+		}
 	}
 	request.OmitCommitIdentity = omitIdentity
 
