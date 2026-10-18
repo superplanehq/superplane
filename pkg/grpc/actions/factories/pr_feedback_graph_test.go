@@ -335,14 +335,7 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
 		assert.Contains(t, runnerEnv(t, runner, "PR_HEAD"), "pull_request?.head?.ref")
 
-		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
-		assert.Contains(t, checkout, "gh auth setup-git --hostname github.com --force")
-		assert.Contains(t, checkout, `git clone --depth 1 "https://github.com/${REPO}.git" repo`)
-		assert.NotContains(t, checkout, "x-access-token")
-		assert.Contains(t, checkout, `git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`)
-		assert.Contains(t, checkout, `git checkout "${PR_HEAD}"`)
-		assert.NotContains(t, checkout, "pr-feedback")
-
+		assert.False(t, runnerHasStep(t, runner, "Checkout Pull Request"))
 		assert.Contains(t, runnerEnv(t, runner, "COAUTHORS"), "task().assignees")
 		dco := runnerStepCommand(t, runner, "Set Up DCO Signing")
 		assert.Contains(t, dco, runnerpkg.FactoryRepoCommitSetup())
@@ -474,10 +467,7 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, runnerStepCommand(t, runner, "Set Up DCO Signing"), runnerpkg.FactoryRepoCommitSetup())
 		assert.Contains(t, runnerStepPrompt(t, runner, "Fix Failed Checks"), runnerpkg.FactoryCommitIdentityPrompt)
 
-		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
-		assert.Contains(t, checkout, "gh auth setup-git --hostname github.com --force")
-		assert.Contains(t, checkout, `git clone --depth 1 "https://github.com/${REPO}.git" repo`)
-		assert.NotContains(t, checkout, "x-access-token")
+		assert.False(t, runnerHasStep(t, runner, "Checkout Pull Request"))
 		assert.Equal(t, false, runner.Configuration["includeVisualEvidence"])
 	})
 

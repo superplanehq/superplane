@@ -62,17 +62,9 @@ spec:
         steps:
           - name: Checkout Pull Request
             type: bash
+            workingDirectory: repo
             command: |-
               set -euo pipefail
-              gh auth setup-git --hostname github.com --force
-              git clone --depth 1 --branch "${BASE}" "https://github.com/${REPO}.git" repo
-              cd repo
-              git fetch --depth 1 origin "pull/${PR_NUMBER}/head"
-              if [ -n "${PR_REVISION:-}" ]; then
-                git checkout --detach "${PR_REVISION}" || git checkout --detach FETCH_HEAD
-              else
-                git checkout --detach FETCH_HEAD
-              fi
               revision="$(git rev-parse HEAD)"
               base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
               gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
