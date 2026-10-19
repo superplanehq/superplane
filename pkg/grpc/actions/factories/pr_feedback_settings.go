@@ -21,8 +21,12 @@ type prFeedbackSettings struct {
 }
 
 func defaultPRFeedbackSettings() prFeedbackSettings {
+	return defaultPRFeedbackSettingsFor(models.ProviderGitHub)
+}
+
+func defaultPRFeedbackSettingsFor(provider string) prFeedbackSettings {
 	return prFeedbackSettings{
-		Mention:         prFeedbackDefaultMention,
+		Mention:         prFeedbackMentionFor(provider),
 		IgnoreBots:      true,
 		MaximumAttempts: prFeedbackDefaultMaximumAttempts,
 	}

@@ -364,6 +364,7 @@ func TestCreateBitbucketDiscussionHandlerListensForComments(t *testing.T) {
 	require.NoError(t, err)
 	handler := response.GetHandler()
 	assert.True(t, handler.GetHealthy())
+	assert.Equal(t, "@SuperPlane", handler.GetSettings().GetDiscussion().GetMention())
 
 	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 	require.NoError(t, err)
@@ -376,6 +377,9 @@ func TestCreateBitbucketDiscussionHandlerListensForComments(t *testing.T) {
 
 	for _, node := range liveVersion.Nodes {
 		assert.NotContains(t, node.ComponentName(), "github.")
+		if node.ID == prFeedbackCommentTriggerNodeID {
+			assert.Equal(t, "@SuperPlane", node.Configuration["contentFilter"])
+		}
 	}
 }
 

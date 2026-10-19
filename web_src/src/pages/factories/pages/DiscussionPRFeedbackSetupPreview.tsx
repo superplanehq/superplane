@@ -12,7 +12,7 @@ import {
 import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 import type { ReviewBotOption } from "./reviewBotPickerModel";
 import { PRFeedbackSetupPreviewPane, PRFeedbackSetupPreviewPrLabel } from "./PRFeedbackSetupWizardChrome";
-import { DISCUSSION_MENTION, type DiscussionBotMode } from "./useDiscussionPRFeedbackSetup";
+import { type DiscussionBotMode } from "./useDiscussionPRFeedbackSetup";
 
 const TYPE_INTERVAL_MS = 22;
 const BOT_CYCLE_INTERVAL_MS = 2800;
@@ -72,12 +72,14 @@ function useCycledIndex(length: number, enabled: boolean): number {
 export function DiscussionPRFeedbackSetupPreview({
   step,
   mentionRequired,
+  mention,
   botMode,
   selectedBots,
   catalog,
 }: {
   step: "mention" | "bots";
   mentionRequired: boolean;
+  mention: string;
   botMode: DiscussionBotMode;
   selectedBots: string[];
   catalog: ReviewBotOption[];
@@ -92,7 +94,7 @@ export function DiscussionPRFeedbackSetupPreview({
       captionTestId="discussion-setup-preview-caption"
     >
       {step === "mention" ? (
-        <MentionCommentPreview mentionRequired={mentionRequired} />
+        <MentionCommentPreview mentionRequired={mentionRequired} mention={mention} />
       ) : (
         <BotCommentPreview botMode={botMode} selectedBots={selectedBots} catalog={catalog} />
       )}
@@ -100,29 +102,29 @@ export function DiscussionPRFeedbackSetupPreview({
   );
 }
 
-function MentionCommentPreview({ mentionRequired }: { mentionRequired: boolean }) {
-  const comment = discussionMentionPreviewComment(mentionRequired);
+function MentionCommentPreview({ mentionRequired, mention }: { mentionRequired: boolean; mention: string }) {
+  const comment = discussionMentionPreviewComment(mentionRequired, mention);
   const typed = useTypedPreviewText(comment);
 
   return (
     <PreviewCommentCard author={PR_FEEDBACK_SETTINGS_COPY.wizardPreviewCommentAuthor} initials="A" comment={comment}>
-      <MentionPreviewBody mentionRequired={mentionRequired} visible={typed.visible} />
+      <MentionPreviewBody mention={mentionRequired ? mention : ""} visible={typed.visible} />
       <PreviewCaret visible={!typed.isComplete} />
     </PreviewCommentCard>
   );
 }
 
-function MentionPreviewBody({ mentionRequired, visible }: { mentionRequired: boolean; visible: string }) {
-  if (!mentionRequired) {
+function MentionPreviewBody({ mention, visible }: { mention: string; visible: string }) {
+  if (!mention) {
     return visible;
   }
-  if (visible.length <= DISCUSSION_MENTION.length) {
+  if (visible.length <= mention.length) {
     return <PreviewMention>{visible}</PreviewMention>;
   }
   return (
     <>
-      <PreviewMention>{DISCUSSION_MENTION}</PreviewMention>
-      {visible.slice(DISCUSSION_MENTION.length)}
+      <PreviewMention>{mention}</PreviewMention>
+      {visible.slice(mention.length)}
     </>
   );
 }
