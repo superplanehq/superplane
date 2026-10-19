@@ -163,8 +163,11 @@ describe("MergeConfidenceConfigModal", () => {
       }),
     );
     if (!enabled) return;
-    await user.click(screen.getByRole("combobox", { name: "Settings for" }));
-    await user.click(screen.getByRole("option", { name: "Create Pull Request" }));
+    await user.click(
+      within(screen.getByRole("navigation", { name: "Automation settings" })).getByRole("button", {
+        name: "Create Pull Request",
+      }),
+    );
     expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Draft" })).toBeChecked();
     await user.click(screen.getByRole("switch", { name: "Draft" }));

@@ -2,15 +2,14 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
 import { cn } from "@/lib/utils";
-import { useId, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { ImplementRunHistory } from "./implementRunHistory/ImplementRunHistory";
+import { ImplementSettingsNavigation } from "./ImplementSettingsNavigation";
 import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
@@ -310,9 +309,9 @@ function ImplementSettings({
 }) {
   const node = settings.selectedNode ?? implementationNode;
   return (
-    <section aria-label="Implement settings" className="flex min-h-0 flex-1 flex-col">
-      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
-        <ImplementSettingsPicker
+    <section aria-label="Implement settings" className="flex min-h-0 flex-1 flex-col bg-background">
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col md:flex-row">
+        <ImplementSettingsNavigation
           nodes={settings.graph?.specNodes ?? []}
           selectedNodeId={node.id ?? ""}
           onNodeSelect={settings.onNodeSelect}
@@ -329,37 +328,6 @@ function ImplementSettings({
         />
       </div>
     </section>
-  );
-}
-
-function ImplementSettingsPicker({
-  nodes,
-  selectedNodeId,
-  onNodeSelect,
-}: {
-  nodes: SuperplaneComponentsNode[];
-  selectedNodeId: string;
-  onNodeSelect: (nodeId: string) => void;
-}) {
-  const id = useId();
-  return (
-    <div className="flex shrink-0 flex-col gap-2 px-10 pt-6">
-      <Label htmlFor={id}>Settings for</Label>
-      <Select value={selectedNodeId} onValueChange={onNodeSelect}>
-        <SelectTrigger id={id} className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {nodes.map((node) =>
-            node.id ? (
-              <SelectItem key={node.id} value={node.id}>
-                {node.name?.trim() || "Step"}
-              </SelectItem>
-            ) : null,
-          )}
-        </SelectContent>
-      </Select>
-    </div>
   );
 }
 
