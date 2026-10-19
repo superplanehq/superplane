@@ -32,6 +32,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
@@ -480,22 +481,26 @@ func buildGRPCServices(
 	agentService agentsActions.AgentsService,
 	jwtSigner *jwt.Signer,
 	licenseService *licensing.Service,
+	keyStore *encryption.Store,
+	migrationsEnabled bool,
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
 
 	return grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:          baseURL,
-		WebhooksBaseURL:  webhooksBaseURL,
-		RunnerAPIBaseURL: runnerAPIBaseURL,
-		Encryptor:        encryptor,
-		AuthService:      authService,
-		Registry:         registry,
-		OIDCProvider:     oidcProvider,
-		AgentService:     agentService,
-		JWTSigner:        jwtSigner,
-		Entitlements:     licenseService,
-		Enterprise:       features,
+		BaseURL:                     baseURL,
+		WebhooksBaseURL:             webhooksBaseURL,
+		RunnerAPIBaseURL:            runnerAPIBaseURL,
+		Encryptor:                   encryptor,
+		EncryptionStore:             keyStore,
+		EncryptionMigrationsEnabled: migrationsEnabled,
+		AuthService:                 authService,
+		Registry:                    registry,
+		OIDCProvider:                oidcProvider,
+		AgentService:                agentService,
+		JWTSigner:                   jwtSigner,
+		Entitlements:                licenseService,
+		Enterprise:                  features,
 	})
 }
 
@@ -743,20 +748,15 @@ func Start() {
 		log.WithError(err).Warn("failed to load usage price book; using in-memory rates")
 	}
 
-	encryptionKey := os.Getenv("ENCRYPTION_KEY")
-	if encryptionKey == "" {
-		panic("ENCRYPTION_KEY can't be empty")
-	}
-
 	log.SetLevel(log.DebugLevel)
 
-	var encryptorInstance crypto.Encryptor
-	if os.Getenv("NO_ENCRYPTION") == "yes" {
-		log.Warn("NO_ENCRYPTION is set to yes, using NoOpEncryptor")
-		encryptorInstance = crypto.NewNoOpEncryptor()
-	} else {
-		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
+	encryptionConfig, err := loadApplicationEncryption(context.Background())
+	if err != nil {
+		panic(err)
 	}
+	encryptorInstance := encryptionConfig.encryptor
+	keyStore := encryptionConfig.keyStore
+	crypto.SetProcessEncryptor(encryptorInstance)
 
 	bitbucketapp.SetSystemTokenSource(func(installationID string) (string, time.Time, error) {
 		return bitbucketapp.LoadSystemToken(context.Background(), database.Conn(), encryptorInstance, installationID, time.Now())
@@ -860,6 +860,17 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
+	migrationsEnabled := keyStore != nil && !encryptionConfig.legacyWrites
+	if migrationsEnabled {
+		if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
+			rabbitMQURL, err := config.RabbitMQURL()
+			if err != nil {
+				panic(err)
+			}
+			worker := workers.NewApplicationEncryptionMigrationWorker(rabbitMQURL, encryptorInstance, registry, models.ApplicationEncryptedStorage())
+			go worker.Start(context.Background())
+		}
+	}
 
 	agentProvider, agentService := buildAgentService(authService)
 
@@ -876,6 +887,8 @@ func Start() {
 			agentService,
 			jwtSigner,
 			licenseService,
+			keyStore,
+			migrationsEnabled,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)

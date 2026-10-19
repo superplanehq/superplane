@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
@@ -30,7 +31,7 @@ func NewRunnerTaskContext(
 ) *RunnerTaskContext {
 	return &RunnerTaskContext{
 		tx:             tx,
-		encryptor:      encryptor,
+		encryptor:      encryption.ForDB(tx, encryptor),
 		organizationID: organizationID,
 	}
 }

@@ -206,7 +206,11 @@ func attachWorkspaceMCPServers(
 		return environment, files, nil
 	}
 	logger := workspaceAgentResourcesLogger(ctx)
-	encryptor, _ := crypto.FromEnv()
+	encryptor, err := crypto.ProcessEncryptor()
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace MCP: encryptor unavailable")
+		return environment, files, nil
+	}
 	httpClient := mcp.DoerFromCore(ctx.HTTP)
 	tokenLifetime := workspaceMCPAccessTokenLifetime(ctx.Configuration)
 	servers := make([]workspaceMCPServer, 0, len(resources))

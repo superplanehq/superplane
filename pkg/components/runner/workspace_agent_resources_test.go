@@ -126,7 +126,6 @@ func TestAttachWorkspaceAgentResourcesSkipsNonFactoryCanvas(t *testing.T) {
 
 func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
 	r := support.Setup(t)
-	t.Setenv("NO_ENCRYPTION", "yes")
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")

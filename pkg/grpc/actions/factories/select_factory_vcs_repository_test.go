@@ -97,16 +97,13 @@ func TestSelectFactoryVCSProviderRepositoryFromPublicAppRequiresLinkedAccount(t 
 
 func saveInstallationGitHubApp(t *testing.T) {
 	t.Helper()
-	t.Setenv("NO_ENCRYPTION", "yes")
 	t.Setenv(config.EnvGitHubAppID, "")
 	t.Setenv(config.EnvGitHubAppSlug, "")
 	t.Setenv(config.EnvGitHubAppPrivateKey, "")
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
 	t.Setenv("GITHUB_CLIENT_ID", "")
 	t.Setenv("GITHUB_CLIENT_SECRET", "")
-	encryptor, err := crypto.FromEnv()
-	require.NoError(t, err)
-	require.NoError(t, githubapp.Save(t.Context(), database.Conn(), encryptor, config.GitHubHostedAppConfig{
+	require.NoError(t, githubapp.Save(t.Context(), database.Conn(), crypto.NewNoOpEncryptor(), config.GitHubHostedAppConfig{
 		ID:            12345,
 		Slug:          "superplane-test",
 		PrivateKey:    "test-private-key",

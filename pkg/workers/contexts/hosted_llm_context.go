@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -27,7 +28,7 @@ type HostedLLMContext struct {
 func NewHostedLLMContext(tx *gorm.DB, encryptor crypto.Encryptor, organizationID uuid.UUID, factoryID *uuid.UUID) *HostedLLMContext {
 	return &HostedLLMContext{
 		tx:             tx,
-		encryptor:      encryptor,
+		encryptor:      encryption.ForDB(tx, encryptor),
 		organizationID: organizationID,
 		factoryID:      factoryID,
 	}
@@ -39,12 +40,13 @@ func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error
 		return core.HostedLLMAccess{}, err
 	}
 
-	apiKey, err := llm.DecryptAPIKey(context.Background(), c.encryptor, row.Provider, row.APIKey)
+	ctx := context.Background()
+	apiKey, err := llm.DecryptAPIKey(ctx, c.encryptor, row.Provider, row.APIKey)
 	if err != nil {
 		return core.HostedLLMAccess{}, err
 	}
 
-	managementKey, err := decryptHostedManagementKey(c.encryptor, row)
+	managementKey, err := decryptHostedManagementKey(ctx, c.encryptor, row)
 	if err != nil {
 		return core.HostedLLMAccess{}, err
 	}
@@ -62,14 +64,14 @@ func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error
 	}, nil
 }
 
-func decryptHostedManagementKey(encryptor crypto.Encryptor, row *models.HostedLLMProvider) (string, error) {
+func decryptHostedManagementKey(ctx context.Context, encryptor crypto.Encryptor, row *models.HostedLLMProvider) (string, error) {
 	if row.Provider != models.UsageProviderOpenRouter {
 		return "", nil
 	}
 	if !row.HasManagementKey() {
 		return "", fmt.Errorf("%w: %s", models.ErrHostedLLMProviderNoManagementKey, row.Provider)
 	}
-	return llm.DecryptManagementKey(context.Background(), encryptor, row.Provider, row.ManagementKey)
+	return llm.DecryptManagementKey(ctx, encryptor, row.Provider, row.ManagementKey)
 }
 
 func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
