@@ -135,6 +135,11 @@ posthog:
   enabled: false
   key: ""
 
+# Organization billing pages. Self-hosted charts hide them.
+# Set hidePages to false only when polar.enabled is true.
+billing:
+  hidePages: true
+
 polar:
   secretName: ""
   enabled: false

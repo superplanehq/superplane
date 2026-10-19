@@ -268,6 +268,11 @@ resource "helm_release" "superplane" {
   }
 
   set {
+    name  = "billing.hidePages"
+    value = "true"
+  }
+
+  set {
     name  = "telemetry.opentelemetry.endpoint"
     value = ""
   }

@@ -237,6 +237,20 @@ func TestAccountLicenseHidesStateFromNonAdmins(t *testing.T) {
 	assert.Equal(t, []string{}, expired.Features)
 }
 
+func TestHideBillingPages(t *testing.T) {
+	t.Setenv(HideBillingPagesEnv, "")
+	assert.False(t, hideBillingPages())
+
+	t.Setenv(HideBillingPagesEnv, "no")
+	assert.False(t, hideBillingPages())
+
+	t.Setenv(HideBillingPagesEnv, "yes")
+	assert.True(t, hideBillingPages())
+
+	t.Setenv(HideBillingPagesEnv, "true")
+	assert.True(t, hideBillingPages())
+}
+
 func TestAccountLicenseHidesExpiryBanner(t *testing.T) {
 	status := licensing.Status{Edition: licensing.EditionCommunity, State: licensing.StateNone}
 
