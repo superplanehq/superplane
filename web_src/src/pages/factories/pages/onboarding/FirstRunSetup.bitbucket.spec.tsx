@@ -1,197 +1,22 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FirstRunSetup } from "./FirstRunSetup";
+import { readBitbucketInstallWait, writeBitbucketInstallWait } from "./bitbucketInstallWait";
+import { bitbucketInstallationAttemptMs } from "./bitbucketOnboardingPoll";
+import {
+  bitbucketOnboarding,
+  bitbucketSetupElement,
+  chooseBitbucket,
+  renderSetup,
+  resetBitbucketFirstRunHarness,
+  resources,
+} from "./FirstRunSetup.bitbucket.spec.fixtures";
 import type { IntegrationId } from "./onboardingFixtures";
-import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
-import type { useOnboardingPageModel } from "./useOnboardingPageModel";
-
-type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
-
-const resources = vi.hoisted(() => ({
-  calls: [] as Array<{ integrationId: string; type: string; enabled?: boolean }>,
-}));
-
-const bitbucketOnboarding = vi.hoisted(() => ({
-  loaded: true,
-  refetch: (() => undefined) as () => unknown,
-  providerConfigured: false,
-  identity: undefined as { login?: string; providerUserId?: string } | undefined,
-  identities: [] as Array<{ login?: string; providerUserId?: string }>,
-  selectIdentity: (async () => undefined) as (providerUserId: string) => Promise<void>,
-  repositories: [] as Array<{ fullName?: string }>,
-  installedWorkspaces: [] as Array<{ slug?: string }>,
-  isPending: false,
-  error: null as unknown,
-}));
-
-vi.mock("@/hooks/useIntegrations", () => ({
-  useIntegrationResources: (
-    _organizationId: string,
-    integrationId: string,
-    type: string,
-    _parameters?: Record<string, string>,
-    options?: { enabled?: boolean },
-  ) => {
-    resources.calls.push({ integrationId, type, enabled: options?.enabled });
-    return {
-      data: options?.enabled ? [{ name: "acme-team/api" }, { name: "acme-team/web" }] : undefined,
-      isLoading: false,
-      isError: false,
-    };
-  },
-}));
-
-vi.mock("./useBitbucketOnboarding", () => ({
-  useBitbucketOnboarding: () => ({
-    data: bitbucketOnboarding.loaded
-      ? {
-          providerConfigured: bitbucketOnboarding.providerConfigured,
-          identity: bitbucketOnboarding.identity,
-          identities: bitbucketOnboarding.identities,
-          repositories: bitbucketOnboarding.repositories,
-          installedWorkspaces: bitbucketOnboarding.installedWorkspaces,
-        }
-      : undefined,
-    isPending: bitbucketOnboarding.isPending,
-    error: bitbucketOnboarding.error,
-    refetch: bitbucketOnboarding.refetch,
-    startInstallation: { mutateAsync: vi.fn() },
-    selectIdentity: { mutateAsync: bitbucketOnboarding.selectIdentity },
-  }),
-}));
-
-vi.mock("./useGitHubOnboarding", () => ({
-  useGitHubOnboarding: () => ({
-    data: {
-      providerConfigured: true,
-      accountConnectionRequired: true,
-      identity: undefined,
-      repositories: [],
-      pendingRequests: [],
-      synchronizing: false,
-    },
-    isPending: false,
-    error: null,
-    startInstallation: { mutateAsync: vi.fn() },
-    configureInstallation: { mutateAsync: vi.fn() },
-    selectIdentity: { mutateAsync: vi.fn() },
-  }),
-  useGitHubInstallationChecks: vi.fn(),
-}));
-
-vi.mock("../../layout/factoriesLayoutContext", () => ({
-  useFactoriesLayout: () => ({
-    organizationId: "org-1",
-    factoryId: "factory-1",
-    factoryKey: "PAY",
-    routeSegment: "pay",
-    factory: { id: "factory-1", key: "PAY", name: "Payments" },
-    factories: [{ id: "factory-1", key: "PAY", name: "Payments" }],
-  }),
-}));
-
-vi.mock("@/contexts/useAccount", () => ({
-  useAccount: () => ({ account: { id: "account-1", name: "Ada Lovelace", email: "ada@example.com" } }),
-}));
-
-vi.mock("@/hooks/useAccountOrganizations", () => ({
-  useAccountOrganizations: () => ({ data: [{ id: "org-1", name: "Acme" }] }),
-}));
-
-vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
-vi.mock("./AgentStep", () => ({ AgentStep: () => <div data-testid="agent-step" /> }));
-
-function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageModel>): OnboardingPageModel {
-  return {
-    setup,
-    hostedAgentReady: true,
-    hostedModelsAvailable: true,
-    hostedModelsAvailableLoading: false,
-    bringYourOwnKey: false,
-    bringYourOwnKeyLoading: false,
-    customProvider: false,
-    agentCredentialChoice: null,
-    setAgentCredentialChoice: vi.fn(),
-    agentLoading: false,
-    agentModelPicker: undefined,
-    openSection: "vcs",
-    setOpenSection: vi.fn(),
-    requestConnect: vi.fn(),
-    selectCatalogRepository: vi.fn().mockResolvedValue(true),
-    selectBitbucketRepository: vi.fn().mockResolvedValue(true),
-    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
-    bitbucketIntegrationId: "",
-    integrationDialogs: <></>,
-    canConfigureWorkspace: true,
-    saving: false,
-    saveName: vi.fn().mockResolvedValue(true),
-    saveAgent: vi.fn().mockResolvedValue(true),
-    saveIssues: vi.fn().mockResolvedValue(true),
-    finish: vi.fn(),
-    provisionedDestination: null,
-    githubOwner: undefined,
-    jiraIntegrationId: "",
-    jiraProjectId: "",
-    setJiraProjectId: vi.fn(),
-    jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
-    jiraProjects: [],
-    jiraProjectsLoading: false,
-    jiraProjectsError: false,
-    retryJiraProjects: vi.fn(),
-    linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
-    ...overrides,
-  };
-}
-
-function StatefulSetup({
-  connected,
-  overrides,
-}: {
-  connected: Set<IntegrationId>;
-  overrides: Partial<OnboardingPageModel>;
-}) {
-  const setup = useOnboardingSetupState("Payments", { connected, simulateDiscovery: false });
-  return <FirstRunSetup model={pageModel(setup, overrides)} />;
-}
-
-function renderSetup(connected: Set<IntegrationId>, overrides: Partial<OnboardingPageModel> = {}) {
-  return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
-      <StatefulSetup connected={connected} overrides={overrides} />
-    </MemoryRouter>,
-  );
-}
-
-async function chooseBitbucket(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByTestId("first-run-get-started"));
-  await user.click(within(screen.getByTestId("first-run-host-bitbucket")).getByRole("button"));
-  const workspace = screen.queryByRole("button", { name: "Use acme-team" });
-  if (workspace) await user.click(workspace);
-}
 
 describe("FirstRunSetup Bitbucket", () => {
   beforeEach(() => {
-    resources.calls = [];
-    bitbucketOnboarding.loaded = true;
-    bitbucketOnboarding.refetch = vi.fn();
-    bitbucketOnboarding.providerConfigured = false;
-    bitbucketOnboarding.identity = undefined;
-    bitbucketOnboarding.identities = [];
-    bitbucketOnboarding.selectIdentity = vi.fn().mockResolvedValue(undefined);
-    bitbucketOnboarding.repositories = [];
-    bitbucketOnboarding.installedWorkspaces = [];
-    bitbucketOnboarding.isPending = false;
-    bitbucketOnboarding.error = null;
-    localStorage.clear();
+    resetBitbucketFirstRunHarness();
   });
 
   it("offers GitHub and Bitbucket on the host screen and keeps GitLab disabled", async () => {
@@ -267,11 +92,7 @@ describe("FirstRunSetup Bitbucket", () => {
 
     bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
     bitbucketOnboarding.repositories = [{ fullName: "acme-team/api" }];
-    rerender(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
-        <StatefulSetup connected={new Set()} overrides={{}} />
-      </MemoryRouter>,
-    );
+    rerender(bitbucketSetupElement());
 
     await user.click(await screen.findByRole("button", { name: "Use acme-team" }));
 
@@ -308,6 +129,127 @@ describe("FirstRunSetup Bitbucket", () => {
       expect(screen.getByTestId("first-run-back")).toBeEnabled();
     },
   );
+
+  it("restores the installation spinner after a refresh", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-1", { startedAt: Date.now(), knownSlugs: [] });
+    const user = userEvent.setup();
+    renderSetup(new Set());
+
+    await chooseBitbucket(user);
+
+    expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent("Checking for the new workspace…");
+  });
+
+  it("keeps the remaining installation wait after a refresh", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-19T12:00:00.000Z"));
+    try {
+      bitbucketOnboarding.providerConfigured = true;
+      bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+      const startedAt = Date.now() - 4 * 60_000;
+      writeBitbucketInstallWait("org-1", { startedAt, knownSlugs: [] });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      renderSetup(new Set());
+
+      await chooseBitbucket(user);
+
+      expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent("Checking for the new workspace…");
+      expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+      expect(readBitbucketInstallWait("org-1")?.startedAt).toBe(startedAt);
+
+      const remaining = startedAt + bitbucketInstallationAttemptMs - Date.now();
+      expect(remaining).toBeGreaterThan(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(remaining - 1);
+      });
+
+      expect(screen.getByTestId("first-run-bitbucket-waiting")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+      expect(readBitbucketInstallWait("org-1")?.startedAt).toBe(startedAt);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+
+      expect(screen.queryByTestId("first-run-bitbucket-waiting")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+      expect(readBitbucketInstallWait("org-1")?.startedAt).toBe(startedAt);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows Check again when a refreshed wait has already timed out", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-1", {
+      startedAt: Date.now() - bitbucketInstallationAttemptMs,
+      knownSlugs: [],
+    });
+    const user = userEvent.setup();
+    renderSetup(new Set());
+
+    await chooseBitbucket(user);
+
+    expect(screen.queryByTestId("first-run-bitbucket-waiting")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+    expect(readBitbucketInstallWait("org-1")).not.toBeNull();
+  });
+
+  it("starts a new wait when Check again is clicked after a timeout", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-1", {
+      startedAt: Date.now() - bitbucketInstallationAttemptMs,
+      knownSlugs: ["old-team"],
+    });
+    const user = userEvent.setup();
+    renderSetup(new Set());
+    await chooseBitbucket(user);
+
+    const beforeClick = Date.now();
+    await user.click(screen.getByRole("button", { name: "Check again" }));
+
+    expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent("Checking for the new workspace…");
+    const saved = readBitbucketInstallWait("org-1");
+    expect(saved?.startedAt).toBeGreaterThanOrEqual(beforeClick);
+    expect(saved?.knownSlugs).toEqual([]);
+  });
+
+  it("stops the restored spinner when a new workspace appears", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-1", { startedAt: Date.now(), knownSlugs: [] });
+    const user = userEvent.setup();
+    const { rerender } = renderSetup(new Set());
+    await chooseBitbucket(user);
+    expect(screen.getByTestId("first-run-bitbucket-waiting")).toBeInTheDocument();
+
+    bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
+    rerender(bitbucketSetupElement());
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Use acme-team" })).toBeInTheDocument();
+      expect(screen.queryByText("Checking for the new workspace…")).not.toBeInTheDocument();
+    });
+    expect(readBitbucketInstallWait("org-1")).toBeNull();
+  });
+
+  it("does not restore a wait saved for another organization", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-2", { startedAt: Date.now(), knownSlugs: [] });
+    const user = userEvent.setup();
+    renderSetup(new Set());
+
+    await chooseBitbucket(user);
+
+    expect(screen.queryByTestId("first-run-bitbucket-waiting")).not.toBeInTheDocument();
+    expect(screen.getByText("SuperPlane checks automatically for installed workspaces.")).toBeInTheDocument();
+  });
 
   it("offers a retry instead of the access token setup when the Bitbucket lookup fails", async () => {
     bitbucketOnboarding.loaded = false;
@@ -358,117 +300,5 @@ describe("FirstRunSetup Bitbucket", () => {
     await user.click(screen.getByTestId("first-run-back"));
 
     expect(screen.getByTestId("first-run-host")).toBeInTheDocument();
-  });
-
-  describe("account switcher", () => {
-    const ada = { login: "ada-bb", providerUserId: "11111111-1111-1111-1111-111111111111" };
-    const grace = { login: "grace-bb", providerUserId: "22222222-2222-2222-2222-222222222222" };
-
-    beforeEach(() => {
-      bitbucketOnboarding.providerConfigured = true;
-      bitbucketOnboarding.identity = ada;
-      bitbucketOnboarding.repositories = [{ fullName: "acme-team/api" }];
-    });
-
-    it("lists linked accounts like GitHub and blocks the screen while a switch runs", async () => {
-      bitbucketOnboarding.identities = [ada, grace];
-      let finishSwitch: (() => void) | undefined;
-      bitbucketOnboarding.selectIdentity = vi.fn(
-        () =>
-          new Promise<void>((resolve) => {
-            finishSwitch = resolve;
-          }),
-      );
-      const user = userEvent.setup();
-      renderSetup(new Set());
-
-      await chooseBitbucket(user);
-
-      expect(screen.getByTestId("first-run-bitbucket-signed-in-as")).toHaveTextContent(
-        "You are signed in to Bitbucket as ada-bb.",
-      );
-      const switchButton = screen.getByTestId("first-run-switch-bitbucket-account");
-      expect(switchButton).toHaveTextContent("Switch account");
-
-      await user.click(switchButton);
-      const menuEntries = Array.from(
-        screen.getByRole("menu").querySelectorAll('[role="menuitemradio"], [role="separator"], [role="menuitem"]'),
-      ).map((entry) => `${entry.getAttribute("role")}:${entry.textContent}`);
-      expect(menuEntries).toEqual([
-        "menuitemradio:ada-bb",
-        "menuitemradio:grace-bb",
-        "separator:",
-        "menuitem:Connect another Bitbucket account",
-      ]);
-      expect(screen.getByRole("menuitemradio", { name: "ada-bb" })).toHaveAttribute("aria-checked", "true");
-
-      await user.click(screen.getByRole("menuitemradio", { name: "grace-bb" }));
-
-      expect(bitbucketOnboarding.selectIdentity).toHaveBeenCalledWith(grace.providerUserId);
-      expect(screen.getByTestId("first-run-switch-bitbucket-account")).toBeDisabled();
-      await act(async () => finishSwitch?.());
-      expect(screen.getByTestId("first-run-switch-bitbucket-account")).toBeEnabled();
-    });
-
-    it("explains a failed account switch and clears the message on the next attempt", async () => {
-      bitbucketOnboarding.identities = [ada, grace];
-      let rejectSwitch: ((error: Error) => void) | undefined;
-      let finishSwitch: (() => void) | undefined;
-      bitbucketOnboarding.selectIdentity = vi
-        .fn()
-        .mockImplementationOnce(
-          () =>
-            new Promise<void>((_, reject) => {
-              rejectSwitch = reject;
-            }),
-        )
-        .mockImplementationOnce(
-          () =>
-            new Promise<void>((resolve) => {
-              finishSwitch = resolve;
-            }),
-        );
-      const user = userEvent.setup();
-      renderSetup(new Set());
-      await chooseBitbucket(user);
-
-      await user.click(screen.getByTestId("first-run-switch-bitbucket-account"));
-      await user.click(screen.getByRole("menuitemradio", { name: "grace-bb" }));
-      await act(async () => rejectSwitch?.(new Error("denied")));
-
-      expect(await screen.findByTestId("first-run-bitbucket-switch-error")).toHaveTextContent(
-        "SuperPlane could not switch the Bitbucket account. Try again.",
-      );
-      expect(screen.getByTestId("first-run-bitbucket-signed-in-as")).toHaveTextContent(
-        "You are signed in to Bitbucket as ada-bb.",
-      );
-
-      await user.click(screen.getByTestId("first-run-switch-bitbucket-account"));
-      await user.click(screen.getByRole("menuitemradio", { name: "grace-bb" }));
-
-      expect(screen.queryByTestId("first-run-bitbucket-switch-error")).not.toBeInTheDocument();
-      await act(async () => finishSwitch?.());
-      expect(screen.queryByTestId("first-run-bitbucket-switch-error")).not.toBeInTheDocument();
-    });
-
-    it("offers to connect another account when only one account is linked", async () => {
-      bitbucketOnboarding.identities = [ada];
-      const previousAssign = window.location.assign.bind(window.location);
-      const assign = vi.fn();
-      window.location.assign = assign;
-      const user = userEvent.setup();
-
-      try {
-        renderSetup(new Set());
-        await chooseBitbucket(user);
-        await user.click(screen.getByTestId("first-run-switch-bitbucket-account"));
-        await user.click(screen.getByRole("menuitem", { name: "Connect another Bitbucket account" }));
-
-        expect(assign).toHaveBeenCalledWith(expect.stringContaining("/auth/bitbucket?intent=connect"));
-        expect(bitbucketOnboarding.selectIdentity).not.toHaveBeenCalled();
-      } finally {
-        window.location.assign = previousAssign;
-      }
-    });
   });
 });
