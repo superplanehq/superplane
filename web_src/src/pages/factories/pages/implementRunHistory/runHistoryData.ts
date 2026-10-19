@@ -29,7 +29,7 @@ function displayTime(value?: string): string {
   });
 }
 
-function runDuration(run: CanvasesCanvasRun, now: number): string {
+export function runDuration(run: CanvasesCanvasRun, now: number): string {
   const start = Date.parse(run.createdAt ?? "");
   const end = run.finishedAt ? Date.parse(run.finishedAt) : run.state === "STATE_FINISHED" ? NaN : now;
   return Number.isFinite(start) && Number.isFinite(end) ? formatCompactDuration(Math.max(0, end - start)) : "—";
