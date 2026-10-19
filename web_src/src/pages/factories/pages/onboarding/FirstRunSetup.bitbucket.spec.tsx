@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { readBitbucketInstallWait, writeBitbucketInstallWait } from "./bitbucketInstallWait";
+import { bitbucketInstallationAttemptMs } from "./bitbucketOnboardingPoll";
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { IntegrationId } from "./onboardingFixtures";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -192,6 +194,7 @@ describe("FirstRunSetup Bitbucket", () => {
     bitbucketOnboarding.isPending = false;
     bitbucketOnboarding.error = null;
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it("offers GitHub and Bitbucket on the host screen and keeps GitLab disabled", async () => {
@@ -308,6 +311,131 @@ describe("FirstRunSetup Bitbucket", () => {
       expect(screen.getByTestId("first-run-back")).toBeEnabled();
     },
   );
+
+  it("restores the installation spinner after a refresh", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-1", { startedAt: Date.now(), knownSlugs: [] });
+    const user = userEvent.setup();
+    renderSetup(new Set());
+
+    await chooseBitbucket(user);
+
+    expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent("Checking for the new workspace…");
+  });
+
+  it("keeps the remaining installation wait after a refresh", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-19T12:00:00.000Z"));
+    try {
+      bitbucketOnboarding.providerConfigured = true;
+      bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+      const startedAt = Date.now() - 4 * 60_000;
+      writeBitbucketInstallWait("org-1", { startedAt, knownSlugs: [] });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      renderSetup(new Set());
+
+      await chooseBitbucket(user);
+
+      expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent("Checking for the new workspace…");
+      expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+      expect(readBitbucketInstallWait("org-1")?.startedAt).toBe(startedAt);
+
+      const remaining = startedAt + bitbucketInstallationAttemptMs - Date.now();
+      expect(remaining).toBeGreaterThan(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(remaining - 1);
+      });
+
+      expect(screen.getByTestId("first-run-bitbucket-waiting")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+      expect(readBitbucketInstallWait("org-1")?.startedAt).toBe(startedAt);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+
+      expect(screen.queryByTestId("first-run-bitbucket-waiting")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+      expect(readBitbucketInstallWait("org-1")?.startedAt).toBe(startedAt);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows Check again when a refreshed wait has already timed out", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-1", {
+      startedAt: Date.now() - bitbucketInstallationAttemptMs,
+      knownSlugs: [],
+    });
+    const user = userEvent.setup();
+    renderSetup(new Set());
+
+    await chooseBitbucket(user);
+
+    expect(screen.queryByTestId("first-run-bitbucket-waiting")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+    expect(readBitbucketInstallWait("org-1")).not.toBeNull();
+  });
+
+  it("starts a new wait when Check again is clicked after a timeout", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-1", {
+      startedAt: Date.now() - bitbucketInstallationAttemptMs,
+      knownSlugs: ["old-team"],
+    });
+    const user = userEvent.setup();
+    renderSetup(new Set());
+    await chooseBitbucket(user);
+
+    const beforeClick = Date.now();
+    await user.click(screen.getByRole("button", { name: "Check again" }));
+
+    expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent("Checking for the new workspace…");
+    const saved = readBitbucketInstallWait("org-1");
+    expect(saved?.startedAt).toBeGreaterThanOrEqual(beforeClick);
+    expect(saved?.knownSlugs).toEqual([]);
+  });
+
+  it("stops the restored spinner when a new workspace appears", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-1", { startedAt: Date.now(), knownSlugs: [] });
+    const user = userEvent.setup();
+    const { rerender } = renderSetup(new Set());
+    await chooseBitbucket(user);
+    expect(screen.getByTestId("first-run-bitbucket-waiting")).toBeInTheDocument();
+
+    bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
+    rerender(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+        <StatefulSetup connected={new Set()} overrides={{}} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Use acme-team" })).toBeInTheDocument();
+      expect(screen.queryByText("Checking for the new workspace…")).not.toBeInTheDocument();
+    });
+    expect(readBitbucketInstallWait("org-1")).toBeNull();
+  });
+
+  it("does not restore a wait saved for another organization", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    writeBitbucketInstallWait("org-2", { startedAt: Date.now(), knownSlugs: [] });
+    const user = userEvent.setup();
+    renderSetup(new Set());
+
+    await chooseBitbucket(user);
+
+    expect(screen.queryByTestId("first-run-bitbucket-waiting")).not.toBeInTheDocument();
+    expect(screen.getByText("SuperPlane checks automatically for installed workspaces.")).toBeInTheDocument();
+  });
 
   it("offers a retry instead of the access token setup when the Bitbucket lookup fails", async () => {
     bitbucketOnboarding.loaded = false;
