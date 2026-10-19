@@ -69,7 +69,7 @@ blocks:
     dependencies: ["Validate Release"]
     task:
       jobs:
-        - name: "Prepare CLI, chart, and install assets"
+        - name: "Prepare chart and bundle assets"
           commands:
             - make dev.up
             - make dev.setup
@@ -77,32 +77,11 @@ blocks:
             - tar -C build/superplane-assets -czf "superplane-assets-$RELEASE_VERSION.tar.gz" "$RELEASE_VERSION"
             - artifact push workflow "superplane-assets-$RELEASE_VERSION.tar.gz"
 
-  - name: "Build CLI Assets"
-    dependencies: ["Validate Release"]
-    task:
-      jobs:
-        - name: "Prepare CLI binaries"
-          parallelism: 4
-          commands:
-            - make dev.up
-            - make dev.setup
-            - |
-              set -euo pipefail
-              platforms=(darwin-amd64 darwin-arm64 linux-amd64 linux-arm64)
-              platform="${platforms[$((SEMAPHORE_JOB_INDEX - 1))]}"
-              os="${platform%-*}"
-              architecture="${platform#*-}"
-              asset="superplane-cli-$platform"
-              bash release/superplane/build-cli.sh \
-                "$RELEASE_VERSION" "$os" "$architecture" "$asset"
-              artifact push workflow "$asset"
-
   - name: "Assemble Release"
     dependencies:
       - "Build amd64 Image"
       - "Build arm64 Image"
       - "Build Release Assets"
-      - "Build CLI Assets"
     task:
       jobs:
         - name: "Bind prepared artifacts"
@@ -116,23 +95,13 @@ blocks:
             - bash release/superplane/verify-prepared-archive.sh superplane-amd64.oci.tar
             - bash release/superplane/verify-prepared-archive.sh superplane-arm64.oci.tar
             - artifact pull workflow "superplane-assets-$RELEASE_VERSION.tar.gz"
-            - artifact pull workflow superplane-cli-darwin-amd64
-            - artifact pull workflow superplane-cli-darwin-arm64
-            - artifact pull workflow superplane-cli-linux-amd64
-            - artifact pull workflow superplane-cli-linux-arm64
             - mkdir -p build/superplane
             - tar -C build/superplane -xzf "superplane-assets-$RELEASE_VERSION.tar.gz"
             - mv superplane-amd64.oci.tar superplane-arm64.oci.tar "build/superplane/$RELEASE_VERSION/"
-            - mv superplane-cli-* "build/superplane/$RELEASE_VERSION/"
             - |
               set -euo pipefail
               release_dir="build/superplane/$RELEASE_VERSION"
               (cd "$release_dir" && sha256sum \
-                install.sh \
-                superplane-cli-darwin-amd64 \
-                superplane-cli-darwin-arm64 \
-                superplane-cli-linux-amd64 \
-                superplane-cli-linux-arm64 \
                 superplane-sbom.json \
                 superplane-single-host.tar.gz \
                 "superplane-${RELEASE_VERSION#v}.tgz" \
@@ -153,7 +122,7 @@ blocks:
                 --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
                 --pipeline-id "$SEMAPHORE_PIPELINE_ID" \
                 --directory "$release_dir" \
-                --assets "install.sh,superplane-cli-darwin-amd64,superplane-cli-darwin-arm64,superplane-cli-linux-amd64,superplane-cli-linux-arm64,superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_VERSION#v}.tgz,checksums.txt,superplane-amd64.oci.tar,superplane-arm64.oci.tar" \
+                --assets "superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_VERSION#v}.tgz,checksums.txt,superplane-amd64.oci.tar,superplane-arm64.oci.tar" \
                 --output "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum release-manifest.json >release-manifest.sha256)
               bash release/component-release-artifact.sh \

@@ -1,0 +1,107 @@
+version: v1.0
+name: "Prepare CLI Release"
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: DOCKER_BUILDKIT
+      value: "1"
+  prologue:
+    commands:
+      - checkout
+      - test -n "$RELEASE_VERSION"
+      - test -n "$SEMAPHORE_GIT_SHA"
+      - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
+
+blocks:
+  - name: "Validate Release"
+    dependencies: []
+    task:
+      jobs:
+        - name: "Validate source and release tooling"
+          commands:
+            - bash release/verify-component-release-source.sh cli "$RELEASE_VERSION"
+            - make test.release
+
+  - name: "Build CLI Assets"
+    dependencies: ["Validate Release"]
+    task:
+      jobs:
+        - name: "Prepare CLI binaries"
+          parallelism: 4
+          commands:
+            - make dev.up
+            - make dev.setup
+            - |
+              set -euo pipefail
+              platforms=(darwin-amd64 darwin-arm64 linux-amd64 linux-arm64)
+              platform="${platforms[$((SEMAPHORE_JOB_INDEX - 1))]}"
+              os="${platform%-*}"
+              architecture="${platform#*-}"
+              asset="superplane-cli-$platform"
+              bash release/cli/build.sh \
+                "$RELEASE_VERSION" "$os" "$architecture" "$asset"
+              artifact push workflow "$asset"
+
+  - name: "Assemble Release"
+    dependencies: ["Build CLI Assets"]
+    task:
+      jobs:
+        - name: "Bind prepared artifacts"
+          commands:
+            - artifact pull workflow superplane-cli-darwin-amd64
+            - artifact pull workflow superplane-cli-darwin-arm64
+            - artifact pull workflow superplane-cli-linux-amd64
+            - artifact pull workflow superplane-cli-linux-arm64
+            - mkdir -p "build/cli/$RELEASE_VERSION"
+            - cp release/cli/install.sh "build/cli/$RELEASE_VERSION/install.sh"
+            - chmod 0755 "build/cli/$RELEASE_VERSION/install.sh"
+            - mv superplane-cli-* "build/cli/$RELEASE_VERSION/"
+            - |
+              set -euo pipefail
+              release_dir="build/cli/$RELEASE_VERSION"
+              (cd "$release_dir" && sha256sum \
+                install.sh \
+                superplane-cli-darwin-amd64 \
+                superplane-cli-darwin-arm64 \
+                superplane-cli-linux-amd64 \
+                superplane-cli-linux-arm64 \
+                >checksums.txt)
+            - bash release/fetch-component-release-history.sh
+            - |
+              set -euo pipefail
+              release_dir="build/cli/$RELEASE_VERSION"
+              node release/component-release.js generate-release-notes \
+                --component cli \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --output "$release_dir/release-notes.md"
+              node release/component-release.js create-manifest \
+                --component cli \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
+                --pipeline-id "$SEMAPHORE_PIPELINE_ID" \
+                --directory "$release_dir" \
+                --assets "install.sh,superplane-cli-darwin-amd64,superplane-cli-darwin-arm64,superplane-cli-linux-amd64,superplane-cli-linux-arm64,checksums.txt" \
+                --output "$release_dir/release-manifest.json"
+              (cd "$release_dir" && sha256sum release-manifest.json >release-manifest.sha256)
+              bash release/component-release-artifact.sh \
+                push cli "$RELEASE_VERSION" "$release_dir"
+
+promotions:
+  - name: Publish CLI Release
+    pipeline_file: publish-cli-release.yml
+    deployment_target: release
+    auto_promote:
+      when: "branch = 'main' AND result = 'passed'"
+    parameters:
+      env_vars:
+        - name: RELEASE_VERSION
+          required: true
+          default_value: "${{parameters.RELEASE_VERSION}}"
+          description: Prepared CLI version
