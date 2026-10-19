@@ -208,6 +208,13 @@ func (s *Store) createKey(ctx context.Context, reference string) (*models.Applic
 	if err != nil {
 		return nil, fmt.Errorf("wrap data key: %w", err)
 	}
+	verified, err := s.masters.Unwrap(ctx, reference, wrapped, keyAssociatedData(id))
+	if err != nil {
+		return nil, fmt.Errorf("verify wrapped data key: %w", err)
+	}
+	if !bytes.Equal(material, verified) {
+		return nil, errors.New("verify wrapped data key: decrypted key changed")
+	}
 	return &models.ApplicationEncryptionKey{ID: id, WrappedKey: wrapped, MasterKeyRef: reference, State: models.ApplicationEncryptionKeyAvailable}, nil
 }
 

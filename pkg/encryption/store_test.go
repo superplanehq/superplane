@@ -143,3 +143,20 @@ func TestStoreRewrapKeepsOriginalKeysWhenPrimaryCannotDecrypt(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, before, after)
 }
+
+func TestStoreCreateKeepsActiveKeyWhenPrimaryCannotDecrypt(t *testing.T) {
+	ctx := t.Context()
+	db := storeTestDB(t)
+	masters := storeTestMasterKeys(t)
+	store := NewStore(masters, "local-v1")
+	require.NoError(t, store.Initialize(ctx))
+	before, err := models.ListApplicationEncryptionKeys(db)
+	require.NoError(t, err)
+
+	store = NewStore(cannotDecryptPrimary{MasterKeys: masters, primary: "local-v2"}, "local-v2")
+	_, err = store.CreateAndActivateDataKey(ctx)
+	require.ErrorContains(t, err, "KMS decrypt denied")
+	after, err := models.ListApplicationEncryptionKeys(db)
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+}

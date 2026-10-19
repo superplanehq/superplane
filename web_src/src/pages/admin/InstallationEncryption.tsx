@@ -126,6 +126,7 @@ function MigrationSection({
   migrationError: MigrationError;
   onRetry: () => void;
 }) {
+  const showMigrations = migrationError === null || (migrationError === "load" && migrations.length > 0);
   return (
     <section className="border-t border-slate-200 py-6 dark:border-gray-700">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -152,7 +153,8 @@ function MigrationSection({
             </Button>
           ) : null}
         </div>
-      ) : (
+      ) : null}
+      {showMigrations ? (
         <div className="mt-5 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 text-gray-500 dark:border-gray-700 dark:text-gray-400">
@@ -191,7 +193,7 @@ function MigrationSection({
             <Text className="py-4 text-sm text-gray-500">No migrations have started.</Text>
           ) : null}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -295,12 +297,12 @@ export function InstallationEncryption() {
       setLoadError(false);
     }
     if (migrationResult.status === "rejected") {
-      setMigrations([]);
-      setMigrationError(
-        migrationResult.reason instanceof RequestError && migrationResult.reason.status === 400
-          ? "unavailable"
-          : "load",
-      );
+      if (migrationResult.reason instanceof RequestError && migrationResult.reason.status === 400) {
+        setMigrations([]);
+        setMigrationError("unavailable");
+      } else {
+        setMigrationError("load");
+      }
     } else {
       setMigrations(migrationResult.value.migrations ?? []);
       setMigrationError(null);
