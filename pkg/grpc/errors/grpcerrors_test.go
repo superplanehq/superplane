@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -83,6 +84,64 @@ func TestCode(t *testing.T) {
 	assert.Equal(t, codes.NotFound, Code(NotFound(gorm.ErrRecordNotFound, "user not found")))
 	assert.Equal(t, codes.Internal, Code(Internal(errors.New("db down"), "failed")))
 	assert.Equal(t, codes.PermissionDenied, Code(status.Error(codes.PermissionDenied, "nope")))
+}
+
+func TestSanitizeError(t *testing.T) {
+	t.Run("nil error", func(t *testing.T) {
+		assert.NoError(t, SanitizeError(context.Background(), nil))
+	})
+
+	t.Run("grpc status passes through", func(t *testing.T) {
+		original := status.Error(codes.PermissionDenied, "nope")
+		assert.Equal(t, original, SanitizeError(context.Background(), original))
+	})
+
+	t.Run("canceled request", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := SanitizeError(ctx, context.Canceled)
+		require.Error(t, err)
+		assert.Equal(t, codes.Canceled, status.Code(err))
+		assert.Equal(t, RequestCanceledMessage, status.Convert(err).Message())
+	})
+
+	t.Run("deadline exceeded", func(t *testing.T) {
+		err := SanitizeError(context.Background(), context.DeadlineExceeded)
+		require.Error(t, err)
+		assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+		assert.Equal(t, RequestDeadlineExceededMessage, status.Convert(err).Message())
+	})
+
+	t.Run("handler message", func(t *testing.T) {
+		err := SanitizeError(context.Background(), Internal(errors.New("db down"), "failed to get user roles"))
+		assert.Equal(t, codes.Internal, status.Code(err))
+		assert.Equal(t, "failed to get user roles", status.Convert(err).Message())
+	})
+
+	t.Run("record not found", func(t *testing.T) {
+		err := SanitizeError(context.Background(), gorm.ErrRecordNotFound)
+		assert.Equal(t, codes.NotFound, status.Code(err))
+		assert.Equal(t, "resource not found", status.Convert(err).Message())
+	})
+
+	t.Run("not found text", func(t *testing.T) {
+		err := SanitizeError(context.Background(), errors.New("Widget Not Found"))
+		assert.Equal(t, codes.NotFound, status.Code(err))
+		assert.Equal(t, "resource not found", status.Convert(err).Message())
+	})
+
+	t.Run("postgres error", func(t *testing.T) {
+		err := SanitizeError(context.Background(), &pgconn.PgError{Code: "23505", Message: "duplicate key"})
+		assert.Equal(t, codes.Internal, status.Code(err))
+		assert.Equal(t, "internal error", status.Convert(err).Message())
+	})
+
+	t.Run("other errors", func(t *testing.T) {
+		err := SanitizeError(context.Background(), errors.New("db down"))
+		assert.Equal(t, codes.Internal, status.Code(err))
+		assert.Equal(t, "internal error", status.Convert(err).Message())
+	})
 }
 
 func TestStatusMessage(t *testing.T) {

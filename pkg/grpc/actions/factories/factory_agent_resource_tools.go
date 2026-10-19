@@ -54,7 +54,7 @@ func ListFactoryAgentResourceTools(
 	listed := resource.Config.Data()
 	tools, err := mcp.ListTools(ctx, mcpHTTPClient(deps), listed.URL, headers)
 	if err != nil {
-		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
+		return nil, factoryErrorToStatus(listMCPToolsError(ctx, err), "failed to list MCP tools")
 	}
 	if err := saveDefaultMCPWriteTools(db, resource, listed, tools); err != nil {
 		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
@@ -69,6 +69,13 @@ func ListFactoryAgentResourceTools(
 		})
 	}
 	return &pb.ListFactoryAgentResourceToolsResponse{Tools: out}, nil
+}
+
+func listMCPToolsError(ctx context.Context, err error) error {
+	if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+		return errListMCPTools
+	}
+	return errors.Join(errListMCPTools, err)
 }
 
 func applyDefaultMCPWriteTools(
