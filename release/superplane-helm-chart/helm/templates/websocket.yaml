@@ -160,6 +160,8 @@ spec:
               value: {{ .Values.installation.type | quote }}
             - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
               value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
+            - name: SUPERPLANE_HIDE_BILLING_PAGES
+              value: {{ ternary "yes" "no" .Values.billing.hidePages | quote }}
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
             - name: BLOB_STORAGE_ACCOUNT

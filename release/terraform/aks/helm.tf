@@ -245,6 +245,11 @@ resource "helm_release" "superplane" {
   }
 
   set {
+    name  = "billing.hidePages"
+    value = "true"
+  }
+
+  set {
     name  = "session.secretName"
     value = "superplane-session"
   }

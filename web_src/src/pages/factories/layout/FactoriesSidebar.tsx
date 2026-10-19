@@ -72,7 +72,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         userName={account?.name ?? "You"}
         userAvatarUrl={account?.avatar_url}
         organizationName={organization?.metadata?.name || "Organization"}
-        planLabel={planLabel}
+        planLabel={account?.hide_billing_pages ? undefined : planLabel}
       />
     </aside>
   );

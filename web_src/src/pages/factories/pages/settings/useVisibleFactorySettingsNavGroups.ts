@@ -1,3 +1,4 @@
+import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_ORGANIZATION_BYOK, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
@@ -11,14 +12,18 @@ const WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID = "workspace-superplane-mcp-se
 /** Nav item id for the organization LLM Models settings page, gated behind `FEATURE_ORGANIZATION_BYOK`. */
 const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
 
+/** Nav item id for organization billing. Hidden on self-hosted installations. */
+const ORGANIZATION_BILLING_NAV_ITEM_ID = "organization-billing";
+
 /**
  * Drops nav items whose experimental features are off, and skips any group
  * left with no items. The source groups stay static so other consumers
  * (e.g. route lookups) keep seeing the full, approved list.
  */
-function visibleFactorySettingsNavGroups(
+export function visibleFactorySettingsNavGroups(
   groups: FactorySettingsNavGroup[],
   hasExperimentalFeature: (featureId: string) => boolean,
+  hideBillingPages = false,
 ): FactorySettingsNavGroup[] {
   const hiddenNavItemIds = new Set<string>();
   if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
@@ -26,6 +31,9 @@ function visibleFactorySettingsNavGroups(
   }
   if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
     hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);
+  }
+  if (hideBillingPages) {
+    hiddenNavItemIds.add(ORGANIZATION_BILLING_NAV_ITEM_ID);
   }
   if (hiddenNavItemIds.size === 0) {
     return groups;
@@ -45,10 +53,12 @@ function visibleFactorySettingsNavGroups(
  */
 export function useVisibleFactorySettingsNavGroups(organizationId: string): FactorySettingsNavGroup[] {
   const settingsNavGroups = useFactorySettingsNavGroups();
+  const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   return visibleFactorySettingsNavGroups(
     filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading),
     hasExperimentalFeature,
+    account?.hide_billing_pages === true,
   );
 }

@@ -1491,11 +1491,16 @@ type AccountResponse struct {
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
 	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
 	License                      AccountLicense                       `json:"license"`
+	HideBillingPages             bool                                 `json:"hide_billing_pages"`
 }
 
 // HideLicenseExpiryBannerEnv hides the license expiry banner when it is "yes"
 // or "true". The default is "no", so the banner stays visible.
 const HideLicenseExpiryBannerEnv = "SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER"
+
+// HideBillingPagesEnv hides organization billing pages when it is "yes" or
+// "true". The default is "no", so the pages stay visible.
+const HideBillingPagesEnv = "SUPERPLANE_HIDE_BILLING_PAGES"
 
 // AccountLicense tells the UI which Enterprise features are available. Only
 // installation administrators receive the license state and expiry.
@@ -1509,6 +1514,15 @@ type AccountLicense struct {
 
 func hideLicenseExpiryBanner() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(HideLicenseExpiryBannerEnv))) {
+	case "yes", "true":
+		return true
+	default:
+		return false
+	}
+}
+
+func hideBillingPages() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(HideBillingPagesEnv))) {
 	case "yes", "true":
 		return true
 	default:
@@ -1605,6 +1619,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
 		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
+		HideBillingPages:             hideBillingPages(),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {

@@ -45,6 +45,7 @@ interface Account {
   groups?: string[];
   impersonation?: AccountImpersonation;
   license?: AccountLicense;
+  hide_billing_pages?: boolean;
 }
 
 export interface AccountContextType {

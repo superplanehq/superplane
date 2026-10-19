@@ -204,6 +204,8 @@ spec:
 {{- end }}
             - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
               value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
+            - name: SUPERPLANE_HIDE_BILLING_PAGES
+              value: {{ ternary "yes" "no" .Values.billing.hidePages | quote }}
             {{- if $mountRunnerLogs }}
             - name: RUNNER_ACTIVE_LOG_FS_PATH
               value: {{ .Values.runner.activeLogs.path | quote }}

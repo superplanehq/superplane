@@ -1,6 +1,7 @@
 import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
+import { useAccount } from "@/contexts/useAccount";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
 import { FEATURE_ORGANIZATION_BYOK, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 import {
@@ -42,6 +43,21 @@ import {
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
 import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
+
+function OrganizationBillingSettingsRoute() {
+  const { account, loading } = useAccount();
+  if (loading || !account) {
+    return null;
+  }
+  if (account.hide_billing_pages) {
+    return <Navigate to="../general" replace />;
+  }
+  return (
+    <RequirePermission resource="org" action="read">
+      <OrganizationSettingsBillingPage />
+    </RequirePermission>
+  );
+}
 
 export const factorySettingsSectionRoutes = [
   <Route key="factory-settings-index" index element={<FactorySettingsIndexRoute />} />,
@@ -259,11 +275,7 @@ export const factorySettingsSectionRoutes = [
   <Route
     key="factory-settings-organization-billing"
     path="organization/billing"
-    element={
-      <RequirePermission resource="org" action="read">
-        <OrganizationSettingsBillingPage />
-      </RequirePermission>
-    }
+    element={<OrganizationBillingSettingsRoute />}
   />,
   <Route key="factory-settings-organization-usage" path="organization/usage" element={<OrganizationUsageRedirect />} />,
   <Route
