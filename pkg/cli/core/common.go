@@ -87,15 +87,13 @@ func ResolveAppID(ctx CommandContext, appID string) (string, error) {
 
 	activeApp := strings.TrimSpace(ctx.Config.GetActiveApp())
 	if activeApp == "" {
-		return "", fmt.Errorf("app id is required; pass --app-id or set one with \"superplane apps active\"")
+		return "", fmt.Errorf("automation id is required; pass --automation or set one with \"superplane automations active\"")
 	}
 
 	return activeApp, nil
 }
 
-// BindAppIDFlag registers --app-id and a deprecated --canvas-id alias.
-func BindAppIDFlag(cmd *cobra.Command, dest *string, usage string) {
-	cmd.Flags().StringVar(dest, "app-id", "", usage)
-	cmd.Flags().StringVar(dest, "canvas-id", "", usage)
-	_ = cmd.Flags().MarkDeprecated("canvas-id", "use --app-id")
+// BindAutomationFlag registers --automation.
+func BindAutomationFlag(cmd *cobra.Command, dest *string, usage string) {
+	cmd.Flags().StringVar(dest, "automation", "", usage)
 }
