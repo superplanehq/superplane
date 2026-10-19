@@ -18,15 +18,15 @@ func newActionsCommand(options core.BindOptions) *cobra.Command {
 	var full bool
 
 	cmd := &cobra.Command{
-		Use:   "actions",
-		Short: "List or describe available actions",
-		Long: `List or describe available actions.
+		Use:   "components",
+		Short: "List or describe available components",
+		Long: `List or describe available components.
 
 Use -o json or -o yaml with --name to inspect nested schema fields, enum options, defaults, and conditions.`,
 		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringVar(&from, "from", "", "integration definition name")
-	cmd.Flags().StringVar(&name, "name", "", "action name")
+	cmd.Flags().StringVar(&name, "name", "", "component name")
 	cmd.Flags().BoolVar(&full, "full", false, "show full output including all fields")
 	core.Bind(cmd, &actionsCommand{from: &from, name: &name, full: &full}, options)
 
@@ -257,7 +257,7 @@ func (c *actionsCommand) findActionByName(ctx core.CommandContext, name string) 
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.ActionsAction{}, fmt.Errorf("action %q not found: no integration named %q", name, integrationName)
+			return openapi_client.ActionsAction{}, fmt.Errorf("component %q not found: no integration named %q", name, integrationName)
 		}
 		return findIntegrationComponent(integration, componentName)
 	}
@@ -278,7 +278,7 @@ func findIntegrationComponent(integration openapi_client.IntegrationsIntegration
 		}
 	}
 
-	return openapi_client.ActionsAction{}, fmt.Errorf("action %q not found in integration %q", name, integration.GetName())
+	return openapi_client.ActionsAction{}, fmt.Errorf("component %q not found in integration %q", name, integration.GetName())
 }
 
 func actionsFromCapabilities(capabilities []openapi_client.IntegrationsCapabilityDefinition) []openapi_client.ActionsAction {

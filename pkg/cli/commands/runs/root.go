@@ -14,16 +14,16 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	root := &cobra.Command{
 		Use:     "runs",
-		Short:   "List and inspect app runs",
+		Short:   "List and inspect automation runs",
 		Aliases: []string{"run"},
 	}
 
 	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List runs for an app",
+		Short: "List runs for an automation",
 		Args:  cobra.NoArgs,
 	}
-	core.BindAppIDFlag(listCmd, &appID, "app ID")
+	core.BindAutomationFlag(listCmd, &appID, "automation ID")
 	listCmd.Flags().Int64Var(&limit, "limit", 20, "maximum number of items to return")
 	listCmd.Flags().StringVar(&before, "before", "", "return items before this timestamp (RFC3339)")
 	listCmd.Flags().StringSliceVar(&states, "state", nil, "filter by run state (repeatable, e.g. STATE_STARTED)")
@@ -41,7 +41,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "Show full details for a run",
 		Args:  cobra.ExactArgs(1),
 	}
-	core.BindAppIDFlag(describeCmd, &appID, "app ID")
+	core.BindAutomationFlag(describeCmd, &appID, "automation ID")
 	core.Bind(describeCmd, &DescribeRunCommand{
 		AppID: &appID,
 	}, options)
