@@ -338,16 +338,20 @@ func configureIntakeAuthorAccess(
 	graph intakeGraph,
 	enabled bool,
 ) ([]models.Node, []models.Edge, error) {
+	// Publishing can rename re-created nodes; reuse their live IDs and remove old duplicates.
+	removedIDs := map[string]bool{}
+	nodes = slices.DeleteFunc(nodes, func(node models.Node) bool {
+		remove := (isIntakeAuthorPermissionNode(&node) && (!enabled || node.ID != graph.AuthorPermissionNodeID)) ||
+			(isIntakeAuthorFilterNode(&node) && (!enabled || node.ID != graph.AuthorFilterNodeID))
+		if remove {
+			removedIDs[node.ID] = true
+		}
+		return remove
+	})
+	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
+		return removedIDs[edge.SourceID] || removedIDs[edge.TargetID]
+	})
 	if !enabled {
-		nodes = slices.DeleteFunc(nodes, func(node models.Node) bool {
-			return node.ID == graph.AuthorPermissionNodeID || node.ID == graph.AuthorFilterNodeID
-		})
-		edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
-			return edge.SourceID == graph.AuthorPermissionNodeID ||
-				edge.TargetID == graph.AuthorPermissionNodeID ||
-				edge.SourceID == graph.AuthorFilterNodeID ||
-				edge.TargetID == graph.AuthorFilterNodeID
-		})
 		return nodes, ensureIntakeEdge(edges, models.Edge{
 			Channel:  "true",
 			SourceID: graph.FilterNodeID,
@@ -382,6 +386,9 @@ func configureIntakeAuthorAccess(
 		Concurrency:   intakeModelConcurrency(),
 		IntegrationID: trigger.IntegrationID,
 	}
+	if graph.AuthorPermissionNodeID != "" {
+		permissionNode.ID = graph.AuthorPermissionNodeID
+	}
 	authorFilterNode := models.Node{
 		ID:   intakeAuthorFilterNodeID,
 		Name: "Author Has Repository Access?",
@@ -395,26 +402,29 @@ func configureIntakeAuthorAccess(
 		Position:    models.Position{X: 160, Y: 620},
 		Concurrency: intakeModelConcurrency(),
 	}
+	if graph.AuthorFilterNodeID != "" {
+		authorFilterNode.ID = graph.AuthorFilterNodeID
+	}
 	nodes = upsertIntakeNode(nodes, permissionNode)
 	nodes = upsertIntakeNode(nodes, authorFilterNode)
 
 	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
 		return edge.SourceID == graph.FilterNodeID &&
-			(edge.TargetID == graph.CreateNodeID || edge.TargetID == intakeAuthorPermissionNodeID)
+			(edge.TargetID == graph.CreateNodeID || edge.TargetID == permissionNode.ID)
 	})
 	edges = ensureIntakeEdge(edges, models.Edge{
 		Channel:  "true",
 		SourceID: graph.FilterNodeID,
-		TargetID: intakeAuthorPermissionNodeID,
+		TargetID: permissionNode.ID,
 	})
 	edges = ensureIntakeEdge(edges, models.Edge{
 		Channel:  "default",
-		SourceID: intakeAuthorPermissionNodeID,
-		TargetID: intakeAuthorFilterNodeID,
+		SourceID: permissionNode.ID,
+		TargetID: authorFilterNode.ID,
 	})
 	edges = ensureIntakeEdge(edges, models.Edge{
 		Channel:  "true",
-		SourceID: intakeAuthorFilterNodeID,
+		SourceID: authorFilterNode.ID,
 		TargetID: graph.CreateNodeID,
 	})
 	return nodes, edges, nil
