@@ -39,6 +39,7 @@ export function PlanningReviewForm({
   showResources = true,
   showConcurrency = true,
   appearance = "card",
+  view = "full",
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled = false,
   restoreError,
@@ -55,6 +56,7 @@ export function PlanningReviewForm({
   showConcurrency?: boolean;
   /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
   appearance?: "card" | "fields";
+  view?: "full" | "implementation";
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled?: boolean;
   restoreError?: string;
@@ -74,6 +76,7 @@ export function PlanningReviewForm({
         <AgentPanel
           key={component.id}
           appearance={appearance}
+          view={view}
           component={component}
           organizationId={organizationId}
           factoryId={factoryId}
@@ -95,6 +98,7 @@ export function PlanningReviewForm({
 
 function AgentPanel({
   appearance,
+  view,
   component,
   organizationId,
   factoryId,
@@ -110,6 +114,7 @@ function AgentPanel({
   onChange,
 }: {
   appearance: "card" | "fields";
+  view: "full" | "implementation";
   component: PlanningReviewComponent;
   organizationId?: string;
   factoryId?: string;
@@ -125,7 +130,9 @@ function AgentPanel({
   onChange: (next: PlanningReviewComponent) => void;
 }) {
   const features = useExperimentalFeature(organizationId);
-  const skillsEnabled = Boolean(organizationId && factoryId && features.has(FEATURE_WORKSPACE_SKILLS));
+  const skillsEnabled = Boolean(
+    view === "full" && organizationId && factoryId && features.has(FEATURE_WORKSPACE_SKILLS),
+  );
   const skills = useFactoryAgentResources(organizationId ?? "", factoryId ?? "", "KIND_SKILL", skillsEnabled);
   const disabledSkills = disabledAgentResourceIds(component.configuration);
   const promptSkills = skillsEnabled
@@ -175,6 +182,37 @@ function AgentPanel({
     });
   }, [byokModelDefault]);
 
+  const ModelGroup = view === "implementation" ? "fieldset" : "div";
+  const modelControl = modelUsedField ? (
+    <ModelGroup className={appearance === "fields" ? "flex flex-col gap-2" : undefined}>
+      {view === "implementation" ? (
+        <legend className="mb-2 text-sm font-medium">Default model</legend>
+      ) : appearance === "fields" ? (
+        <h3 className="workspace-section-title">Model</h3>
+      ) : null}
+      <ConfigurationFieldRenderer
+        field={view === "implementation" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
+        hideLabel={appearance === "fields"}
+        triggerClassName={appearance === "fields" ? FLAT_FIELD_CONTROL : undefined}
+        value={byokModelDefault ?? component.configuration.model}
+        onChange={(value) => setConfigurationField("model", value)}
+        onValuesChange={(patch) => {
+          const configuration = { ...component.configuration, ...patch };
+          if (!patch.thinkingLevel) {
+            delete configuration.thinkingLevel;
+          }
+          onChange({ ...component, configuration });
+        }}
+        allValues={component.configuration}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        allowExpressions={view === "full"}
+        autocompleteExampleObj={EXPRESSION_CONTEXT}
+        fieldPath="model"
+      />
+    </ModelGroup>
+  ) : null;
+
   return (
     <div
       className={appearance === "fields" ? "flex flex-col gap-8" : "flex flex-col gap-4"}
@@ -191,9 +229,12 @@ function AgentPanel({
         }
         data-testid="planning-review-settings"
       >
+        {view === "implementation" ? modelControl : null}
         {showConcurrency ? (
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`planning-review-concurrency-max-${component.id}`}>Concurrency</Label>
+            <Label htmlFor={`planning-review-concurrency-max-${component.id}`}>
+              {view === "implementation" ? "Parallel runs" : "Concurrency"}
+            </Label>
             <Input
               id={`planning-review-concurrency-max-${component.id}`}
               data-testid={`planning-review-concurrency-max-${component.id}`}
@@ -207,34 +248,16 @@ function AgentPanel({
                 })
               }
               className="shadow-none"
+              aria-describedby={view === "implementation" ? `parallel-runs-help-${component.id}` : undefined}
             />
+            {view === "implementation" ? (
+              <p id={`parallel-runs-help-${component.id}`} className="text-[12px] text-muted-foreground">
+                Maximum implementation runs at the same time. Additional runs wait in the queue.
+              </p>
+            ) : null}
           </div>
         ) : null}
-        {modelUsedField ? (
-          <div className={appearance === "fields" ? "flex flex-col gap-2" : undefined}>
-            {appearance === "fields" ? <h3 className="workspace-section-title">Model</h3> : null}
-            <ConfigurationFieldRenderer
-              field={modelUsedField}
-              hideLabel={appearance === "fields"}
-              triggerClassName={appearance === "fields" ? FLAT_FIELD_CONTROL : undefined}
-              value={byokModelDefault ?? component.configuration.model}
-              onChange={(value) => setConfigurationField("model", value)}
-              onValuesChange={(patch) => {
-                const configuration = { ...component.configuration, ...patch };
-                if (!patch.thinkingLevel) {
-                  delete configuration.thinkingLevel;
-                }
-                onChange({ ...component, configuration });
-              }}
-              allValues={component.configuration}
-              organizationId={organizationId}
-              factoryId={factoryId}
-              allowExpressions
-              autocompleteExampleObj={EXPRESSION_CONTEXT}
-              fieldPath="model"
-            />
-          </div>
-        ) : null}
+        {view === "full" ? modelControl : null}
         {showVisualEvidenceSetting ? (
           <div className="flex flex-col gap-2">
             <Label htmlFor={`planning-review-visual-evidence-${component.id}`}>Include visual evidence</Label>
@@ -248,27 +271,29 @@ function AgentPanel({
           </div>
         ) : null}
       </section>
-      <PlanningReviewStepList
-        skills={promptSkills}
-        skillHref={(skill) =>
-          organizationId && factoryKey && skill.id
-            ? factoryAgentSkillEditorPath(organizationId, factoryKey, skill.id)
-            : undefined
-        }
-        appearance={appearance}
-        steps={(component.configuration.steps as PlanningReviewStep[]) ?? []}
-        onChange={(steps) => setConfigurationField("steps", steps)}
-        createStep={
-          isMergeConfidenceSteps((component.configuration.steps as PlanningReviewStep[]) ?? [])
-            ? newMergeConfidenceStep
-            : undefined
-        }
-        onRestoreDefaultPrompt={onRestoreDefaultPrompt}
-        restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
-        restoreError={restoreError}
-        onRetryRestore={onRetryRestore}
-        restoreRetryDisabled={restoreRetryDisabled}
-      />
+      {view === "full" ? (
+        <PlanningReviewStepList
+          skills={promptSkills}
+          skillHref={(skill) =>
+            organizationId && factoryKey && skill.id
+              ? factoryAgentSkillEditorPath(organizationId, factoryKey, skill.id)
+              : undefined
+          }
+          appearance={appearance}
+          steps={(component.configuration.steps as PlanningReviewStep[]) ?? []}
+          onChange={(steps) => setConfigurationField("steps", steps)}
+          createStep={
+            isMergeConfidenceSteps((component.configuration.steps as PlanningReviewStep[]) ?? [])
+              ? newMergeConfidenceStep
+              : undefined
+          }
+          onRestoreDefaultPrompt={onRestoreDefaultPrompt}
+          restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
+          restoreError={restoreError}
+          onRetryRestore={onRetryRestore}
+          restoreRetryDisabled={restoreRetryDisabled}
+        />
+      ) : null}
       {showResources ? (
         <PlanningReviewResourcesCard
           appearance={appearance}

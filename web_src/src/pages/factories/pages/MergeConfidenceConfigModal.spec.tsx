@@ -9,7 +9,11 @@ import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
-import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_RUN_HISTORY,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -94,12 +98,13 @@ function renderModal(
   options: { initialNodeId?: string; runHistoryEnabled?: boolean } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const features = [FEATURE_FACTORY_RUN_HISTORY, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
   client.setQueryData(experimentalFeaturesKeys.registry(), {
-    features: [{ id: FEATURE_FACTORY_RUN_HISTORY, released: false }],
+    features: features.map((id) => ({ id, released: false })),
   });
   if (graph.organizationId) {
     client.setQueryData(organizationKeys.details(graph.organizationId), {
-      spec: { enabledExperimentalFeatures: options.runHistoryEnabled ? [FEATURE_FACTORY_RUN_HISTORY] : [] },
+      spec: { enabledExperimentalFeatures: options.runHistoryEnabled ? features : [] },
     });
   }
   const element = (nextGraph: IntakeAutomationGraph = graph) => (
@@ -115,6 +120,7 @@ function renderModal(
               onSaveNode={onSaveNode}
               onDelete={onDelete}
               initialNodeId={options.initialNodeId}
+              factoryKey="SUPER"
             />
           </TooltipProvider>
         </ThemeProvider>
@@ -136,7 +142,11 @@ afterEach(() => {
 describe("MergeConfidenceConfigModal", () => {
   it.each([true, false])("gates the Implement configuration layout with factory_run_history=%s", async (enabled) => {
     const user = userEvent.setup();
-    const onSaveNode = vi.fn();
+    let finishSave = () => {};
+    const saving = new Promise<void>((resolve) => {
+      finishSave = resolve;
+    });
+    const onSaveNode = vi.fn(() => saving);
     const steps = [{ name: "Implementation", type: "prompt", prompt: "Built-in implementation instructions" }];
     const graph = implementConfigGraph(steps);
     renderModal(vi.fn(), onSaveNode, graph, {
@@ -145,37 +155,50 @@ describe("MergeConfidenceConfigModal", () => {
     });
 
     expect(Boolean(screen.queryByTestId("merge-confidence-config-canvas"))).toBe(!enabled);
-    expect(screen.getByRole("region", { name: "Steps" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Implementation" })).toBeInTheDocument();
+    expect(Boolean(screen.queryByRole("region", { name: "Steps" }))).toBe(!enabled);
     expect(Boolean(screen.queryByRole("button", { name: "Collapse step" }))).toBe(!enabled);
     expect(screen.getByDisplayValue("sonnet")).toBeInTheDocument();
-    const concurrency = screen.getByRole("spinbutton", { name: "Concurrency" });
+    const concurrency = screen.getByRole("spinbutton", { name: enabled ? "Parallel runs" : "Concurrency" });
     expect(concurrency).toHaveValue(5);
     await user.clear(concurrency);
     await user.type(concurrency, "3");
     await user.tab();
 
-    expect(onSaveNode).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        nodeId: "implementation-agent-no-issue",
-        configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
-        concurrency: { max: 3, key: "implementation" },
-      }),
-    );
+    if (enabled) {
+      expect(screen.queryByRole("navigation", { name: "Automation settings" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: /^Name/ })).not.toBeInTheDocument();
+      expect(screen.queryByText("Key")).not.toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "MCP servers" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Skills" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Start implementation")).not.toBeInTheDocument();
+      expect(screen.queryByText("Implement From Task Description")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add step" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Run history" })).toBeInTheDocument();
+      expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeChecked();
+      await user.click(screen.getByRole("switch", { name: "Create draft pull requests" }));
+      expect(onSaveNode).toHaveBeenCalledTimes(1);
+    }
+    finishSave();
+    await waitFor(() => {
+      expect(onSaveNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeId: "implementation-agent-no-issue",
+          configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
+          concurrency: { max: 3, key: "implementation" },
+        }),
+      );
+    });
     if (!enabled) return;
-    await user.click(
-      within(screen.getByRole("navigation", { name: "Automation settings" })).getByRole("button", {
-        name: "Create Pull Request",
-      }),
-    );
-    expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Draft" })).toBeChecked();
-    await user.click(screen.getByRole("switch", { name: "Draft" }));
     await waitFor(() =>
-      expect(onSaveNode).toHaveBeenLastCalledWith(
+      expect(onSaveNode).toHaveBeenCalledWith(
         expect.objectContaining({
           nodeId: "create-pr",
-          configuration: { draft: false },
+          name: "Create Pull Request",
+          configuration: { draft: false, repository: "{{ install_params.appRepository }}" },
+          integration: { id: "github-connection" },
+          concurrency: { max: 1, key: "{{ $.data.branch }}" },
         }),
       ),
     );

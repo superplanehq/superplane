@@ -102,6 +102,7 @@ export function implementConfigGraph(
     nodes: [],
     edges: [],
     organizationId: "implement-org",
+    factoryId: "implement-workspace",
     specNodes: [
       { id: "onrun-implement", name: "Start implementation", type: "TYPE_TRIGGER", component: "onRun" },
       {
@@ -117,7 +118,9 @@ export function implementConfigGraph(
         name: "Create Pull Request",
         type: "TYPE_ACTION",
         component: "github.createPullRequest",
-        configuration: { draft: true },
+        configuration: { draft: true, repository: "{{ install_params.appRepository }}" },
+        integration: { id: "github-connection" },
+        concurrency: { max: 1, key: "{{ $.data.branch }}" },
       },
     ],
   };

@@ -9,7 +9,6 @@ import { useComponents } from "@/hooks/useComponentData";
 import { useTriggers, useWidgets } from "@/hooks/useCanvasData";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
-import { cn } from "@/lib/utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SettingsTab } from "@/ui/componentSidebar/SettingsTab";
@@ -84,7 +83,6 @@ export function NodeConfigPanel({
   factoryId,
   factoryKey,
   widthPercent = 50,
-  layout = "panel",
   body,
   onClose,
   onSave,
@@ -94,7 +92,6 @@ export function NodeConfigPanel({
   factoryId?: string;
   factoryKey?: string;
   widthPercent?: number;
-  layout?: "panel" | "page";
   body?: ReactNode;
   onClose?: () => void;
   onSave: (update: NodeConfigurationUpdate) => Promise<void> | void;
@@ -106,11 +103,8 @@ export function NodeConfigPanel({
   return (
     <>
       <aside
-        className={cn(
-          "relative flex min-h-0 min-w-0 flex-col bg-background",
-          layout === "panel" ? "shrink-0 border-r border-border" : "flex-1",
-        )}
-        style={layout === "panel" ? { width: `${widthPercent}%` } : undefined}
+        className="relative flex min-w-0 shrink-0 flex-col border-r border-border bg-background"
+        style={{ width: `${widthPercent}%` }}
         aria-label={catalog.nodeName}
         data-testid="merge-confidence-config-form"
       >

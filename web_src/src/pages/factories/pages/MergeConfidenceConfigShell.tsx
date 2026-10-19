@@ -9,7 +9,7 @@ import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "re
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { ImplementRunHistory } from "./implementRunHistory/ImplementRunHistory";
-import { ImplementSettingsNavigation } from "./ImplementSettingsNavigation";
+import { ImplementConfiguration } from "./ImplementConfiguration";
 import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
@@ -87,20 +87,39 @@ export function MergeConfidenceConfigShell(props: MergeConfidenceConfigShellProp
 }
 
 function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
+  const features = useExperimentalFeature(props.organizationId);
+  const simplifiedImplement = Boolean(
+    features.has(FEATURE_FACTORY_RUN_HISTORY) &&
+      props.graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID),
+  );
   return (
     <>
       <PopupHeader
-        title={props.title}
+        title={simplifiedImplement && props.tab === "runs" ? `${props.title} run history` : props.title}
         onClose={props.onClose}
         actions={
-          props.onDelete ? (
-            <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
-          ) : null
+          <>
+            {simplifiedImplement && props.showRunsTab ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => props.onTabChange(props.tab === "runs" ? "automation" : "runs")}
+              >
+                {props.tab === "runs" ? "Back to settings" : "Run history"}
+              </Button>
+            ) : null}
+            {props.onDelete ? (
+              <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
+            ) : null}
+          </>
         }
       >
-        <SettingsAutomationHeaderRow
-          tabs={<ConfigTabs tab={props.tab} showRunsTab={props.showRunsTab} onTabChange={props.onTabChange} />}
-        />
+        {!simplifiedImplement ? (
+          <SettingsAutomationHeaderRow
+            tabs={<ConfigTabs tab={props.tab} showRunsTab={props.showRunsTab} onTabChange={props.onTabChange} />}
+          />
+        ) : null}
       </PopupHeader>
       <MergeConfidenceConfigBody {...configBodyProps(props)} />
       {props.onDelete ? (
@@ -218,7 +237,16 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
   const features = useExperimentalFeature(organizationId);
   const implementAgent = implementSettingsNode(props);
   if (implementAgent && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
-    return <ImplementSettings node={implementAgent} settings={props} />;
+    return (
+      <ImplementConfiguration
+        agent={implementAgent}
+        nodes={graph?.specNodes ?? []}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        onSave={onSaveNode}
+      />
+    );
   }
   const historyContext = implementHistoryContext(props);
   if (historyContext && features.isLoading) {
@@ -297,37 +325,6 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
         )}
       </div>
     </div>
-  );
-}
-
-function ImplementSettings({
-  node: implementationNode,
-  settings,
-}: {
-  node: SuperplaneComponentsNode;
-  settings: ReturnType<typeof configBodyProps>;
-}) {
-  const node = settings.selectedNode ?? implementationNode;
-  return (
-    <section aria-label="Implement settings" className="flex min-h-0 flex-1 flex-col bg-background">
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col md:flex-row">
-        <ImplementSettingsNavigation
-          nodes={settings.graph?.specNodes ?? []}
-          selectedNodeId={node.id ?? ""}
-          onNodeSelect={settings.onNodeSelect}
-        />
-        <NodeConfigPanel
-          key={node.id}
-          node={node}
-          organizationId={settings.organizationId}
-          factoryId={settings.factoryId}
-          factoryKey={settings.factoryKey}
-          onSave={settings.onSaveNode}
-          body={settings.nodeBody}
-          layout="page"
-        />
-      </div>
-    </section>
   );
 }
 
