@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from "bun:test";
 import { MergeConfidenceConfigShell } from "../MergeConfidenceConfigShell";
 import { DEFAULT_SPLIT_CONFIG_DELETE_COPY } from "../splitConfigDeleteCopy";
 
-const access = vi.hoisted(() => ({ enabled: false, isLoading: false, organizationReady: true }));
+const access = vi.hoisted(() => ({
+  enabled: false,
+  isLoading: false,
+  organizationReady: true,
+  retryOrganization: vi.fn(),
+}));
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({ ...access, has: (id: string) => id === "factory_run_history" && access.enabled }),
 }));
@@ -56,6 +61,7 @@ describe("Implement Runs routing", () => {
     "gates Implement history while preserving the old view: %j",
     ({ nodeId, enabled, isLoading, organizationReady, expected }) => {
       Object.assign(access, { enabled, isLoading, organizationReady });
+      access.retryOrganization.mockClear();
       const onSelectRun = vi.fn();
       const view = (
         <MergeConfidenceConfigShell
@@ -97,7 +103,12 @@ describe("Implement Runs routing", () => {
       );
       const { rerender } = render(view);
       if (isLoading || !organizationReady) {
-        expect(screen.getByRole("status")).toBeInTheDocument();
+        if (isLoading) expect(screen.getByRole("status")).toBeInTheDocument();
+        else {
+          expect(screen.getByRole("alert")).toBeInTheDocument();
+          fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+          expect(access.retryOrganization).toHaveBeenCalledTimes(1);
+        }
         expect(screen.queryByTestId("existing-canvas")).not.toBeInTheDocument();
         expect(onSelectRun).not.toHaveBeenCalled();
         Object.assign(access, { isLoading: false, organizationReady: true });

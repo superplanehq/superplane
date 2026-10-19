@@ -207,11 +207,21 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
   } = props;
   const features = useExperimentalFeature(organizationId);
   const historyContext = implementHistoryContext(props);
-  if (historyContext && (!features.organizationReady || features.isLoading)) {
+  if (historyContext && features.isLoading) {
     return (
       <p role="status" className="p-6 text-sm text-muted-foreground">
         Loading run history…
       </p>
+    );
+  }
+  if (historyContext && !features.organizationReady) {
+    return (
+      <div role="alert" className="p-6 text-sm">
+        <p>Could not load run history access.</p>
+        <Button variant="outline" className="mt-3" onClick={features.retryOrganization}>
+          Try again
+        </Button>
+      </div>
     );
   }
   if (historyContext && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
