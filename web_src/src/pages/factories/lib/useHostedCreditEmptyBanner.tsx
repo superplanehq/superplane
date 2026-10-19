@@ -2,6 +2,7 @@ import type {
   OrganizationsDescribeOrganizationBillingResponse,
   OrganizationsDescribeOrganizationWorkspaceUsageResponse,
 } from "@/api-client";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
@@ -38,11 +39,12 @@ export function useHostedCreditChrome(
 ): { headerKicker?: ReactNode } {
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const billing = useOrganizationBilling(organizationId);
+  const billingProductEnabled = useBillingProductEnabled();
   const { kind, remainingCreditCents, welcomeCreditExpiresAt, billingEnabled } = hostedCreditChromeState(
     spend.data,
     billing.data,
   );
-  if (!kind) {
+  if (!billingProductEnabled || !kind) {
     return {};
   }
 

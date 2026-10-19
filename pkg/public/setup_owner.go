@@ -104,9 +104,10 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 			return err
 		}
-
-		if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
-			return err
+		if models.BillingEnabled() {
+			if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
+				return err
+			}
 		}
 
 		// Account creation is not the end of the wizard: the owner still

@@ -99,6 +99,7 @@ spec:
             {{- end }}
           env:
             {{- include "runner.processEnv" (dict "enabled" (list "START_RUNNER_API")) | nindent 12 }}
+            {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
             - name: PUBLIC_API_BASE_PATH
               value: "/api/v1"
             - name: RBAC_MODEL_PATH

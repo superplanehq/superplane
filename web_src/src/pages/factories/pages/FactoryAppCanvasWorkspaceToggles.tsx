@@ -1,18 +1,14 @@
-import { Blocks, Bot } from "lucide-react";
+import { Blocks, type LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 export type FactoryAppCanvasWorkspaceTogglesProps = {
-  agentOpen: boolean;
   componentsOpen: boolean;
-  onAgentOpenChange: (open: boolean) => void;
   onComponentsOpenChange: (open: boolean) => void;
 };
 
 export function FactoryAppCanvasWorkspaceToggles({
-  agentOpen,
   componentsOpen,
-  onAgentOpenChange,
   onComponentsOpenChange,
 }: FactoryAppCanvasWorkspaceTogglesProps) {
   return (
@@ -22,13 +18,6 @@ export function FactoryAppCanvasWorkspaceToggles({
       aria-label="Edit workspace"
       data-testid="factory-app-workspace-toggles"
     >
-      <WorkspaceToggle
-        testId="factory-app-workspace-agent"
-        pressed={agentOpen}
-        icon={Bot}
-        label="Agent"
-        onPressedChange={onAgentOpenChange}
-      />
       <WorkspaceToggle
         testId="factory-app-workspace-components"
         pressed={componentsOpen}
@@ -49,7 +38,7 @@ function WorkspaceToggle({
 }: {
   testId: string;
   pressed: boolean;
-  icon: typeof Bot;
+  icon: LucideIcon;
   label: string;
   onPressedChange: (open: boolean) => void;
 }) {

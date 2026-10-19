@@ -260,3 +260,27 @@ func TestSetupOwnerProgressRejectsNonAdmin(t *testing.T) {
 	response := patchSetupOwnerProgress(t, server, token, models.OwnerSetupStepSMTP)
 	assert.Equal(t, http.StatusForbidden, response.Code)
 }
+
+func TestSetupOwnerSkipsWelcomeCreditWhenBillingDisabled(t *testing.T) {
+	t.Setenv(models.BillingEnabledEnv, "no")
+	server := setupOwnerTestServer(t)
+	authCookie := submitOwnerForm(t, server)
+
+	organization, err := models.FindOrganizationByName("Demo")
+	require.NoError(t, err)
+	credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
+	require.NoError(t, err)
+	assert.Zero(t, credit.GrantMicros)
+
+	plan, err := models.FindOrganizationBillingPlan(database.Conn(), organization.ID)
+	require.NoError(t, err)
+	assert.Nil(t, plan)
+
+	owner, err := models.FindAccountByEmail("owner@example.com")
+	require.NoError(t, err)
+	assert.False(t, owner.HasReceivedWelcomeCredit())
+
+	status := getSetupOwnerStatus(t, server, authCookie)
+	assert.Equal(t, setupOwnerStatusInProgress, status["status"])
+	assert.Equal(t, models.OwnerSetupStepLicense, status["step"])
+}

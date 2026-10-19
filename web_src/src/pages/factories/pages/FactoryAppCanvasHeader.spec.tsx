@@ -183,9 +183,7 @@ describe("FactoryAppCanvasHeader", () => {
           onDiscard={vi.fn()}
           onSave={vi.fn()}
           workspace={{
-            agentOpen: false,
             componentsOpen: false,
-            onAgentOpenChange: vi.fn(),
             onComponentsOpenChange: vi.fn(),
             onViewYaml: vi.fn(),
             onEditWithLocalAgent: vi.fn(),
@@ -205,7 +203,6 @@ describe("FactoryAppCanvasHeader", () => {
 
   it("marks edit mode with workspace toggles and more options", async () => {
     const user = userEvent.setup();
-    const onAgentOpenChange = vi.fn();
     const onComponentsOpenChange = vi.fn();
     const onViewYaml = vi.fn();
     const onEditWithLocalAgent = vi.fn();
@@ -222,9 +219,7 @@ describe("FactoryAppCanvasHeader", () => {
           onDiscard={vi.fn()}
           onSave={vi.fn()}
           workspace={{
-            agentOpen: false,
             componentsOpen: true,
-            onAgentOpenChange,
             onComponentsOpenChange,
             onViewYaml,
             onEditWithLocalAgent,
@@ -237,6 +232,8 @@ describe("FactoryAppCanvasHeader", () => {
     expect(screen.queryByTestId("factory-app-editing-badge")).not.toBeInTheDocument();
     expect(screen.getByText("Applies the plan across affected repos and opens PRs.")).toBeInTheDocument();
     expect(screen.getByTestId("factory-app-workspace-components")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByTestId("factory-app-workspace-agent")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Describe the change to build...")).not.toBeInTheDocument();
 
     const save = screen.getByTestId("factory-app-save");
     const discard = screen.getByTestId("factory-app-discard");
@@ -268,9 +265,7 @@ describe("FactoryAppCanvasHeader", () => {
           onDiscard={vi.fn()}
           onSave={vi.fn()}
           workspace={{
-            agentOpen: false,
             componentsOpen: false,
-            onAgentOpenChange: vi.fn(),
             onComponentsOpenChange: vi.fn(),
             onViewYaml: vi.fn(),
             onEditWithLocalAgent: vi.fn(),

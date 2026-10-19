@@ -68,9 +68,7 @@ export function FactoryAppCanvasPage() {
         workspace={
           model.isConfigure
             ? {
-                agentOpen: model.agentOpen,
                 componentsOpen: model.componentsOpen,
-                onAgentOpenChange: model.handleAgentOpenChange,
                 onComponentsOpenChange: model.handleComponentsOpenChange,
                 onViewYaml: model.handleViewYaml,
                 onEditWithLocalAgent: model.handleEditWithLocalAgent,
@@ -133,7 +131,6 @@ function FactoryAppCanvasWorkspace({ model }: { model: FactoryAppCanvasPageModel
         <AppPage
           factoryEmbed
           factoryConfigure={model.isConfigure}
-          factoryAgentEnabled={model.isConfigure}
           factoryEditWorkspace={model.isConfigure}
           factoryConfigureActionsRef={model.configureActionsRef}
           onFactoryConfigureBusyChange={model.handleConfigureBusyChange}
