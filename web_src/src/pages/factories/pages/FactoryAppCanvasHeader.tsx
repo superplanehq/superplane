@@ -148,9 +148,7 @@ function FactoryAppCanvasConfigureActions({
       {workspace ? (
         <div className="flex items-center gap-1.5">
           <FactoryAppCanvasWorkspaceToggles
-            agentOpen={workspace.agentOpen}
             componentsOpen={workspace.componentsOpen}
-            onAgentOpenChange={workspace.onAgentOpenChange}
             onComponentsOpenChange={workspace.onComponentsOpenChange}
           />
           <FactoryAppCanvasMoreOptions
