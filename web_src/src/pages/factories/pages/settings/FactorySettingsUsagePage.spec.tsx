@@ -10,9 +10,14 @@ import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { FactorySettingsUsagePage } from "./FactorySettingsUsagePage";
 
 const mutateAsync = vi.fn();
+let billingProductEnabled = true;
 
 vi.mock("@/hooks/usePageTitle", () => ({
   usePageTitle: vi.fn(),
+}));
+
+vi.mock("@/hooks/useBillingProductEnabled", () => ({
+  useBillingProductEnabled: () => billingProductEnabled,
 }));
 
 vi.mock("@/hooks/useFactoryUsage", () => ({
@@ -55,6 +60,7 @@ describe("FactorySettingsUsagePage hosted spend limit", () => {
   beforeEach(() => {
     mutateAsync.mockReset();
     mutateAsync.mockResolvedValue({});
+    billingProductEnabled = true;
   });
 
   it("does not render the Save button while No limit is on", () => {
@@ -97,5 +103,13 @@ describe("FactorySettingsUsagePage hosted spend limit", () => {
 
     expect(mutateAsync).toHaveBeenCalledWith({ hostedSpendBudgetCents: null });
     expect(screen.queryByRole("button", { name: "Save hosted spend limit" })).not.toBeInTheDocument();
+  });
+
+  it("hides the hosted spend limit when billing is off and still shows usage", () => {
+    billingProductEnabled = false;
+    renderPage();
+
+    expect(screen.queryByText("Hosted spend limit")).not.toBeInTheDocument();
+    expect(screen.getByText("Tokens · last 30 days")).toBeInTheDocument();
   });
 });

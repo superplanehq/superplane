@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
 
@@ -54,8 +55,12 @@ type adminPolarWebhooksResponse struct {
 	Limit      int                         `json:"limit"`
 }
 
+func polarAdminConfigured() bool {
+	return models.BillingEnabled() && polar.Configured()
+}
+
 func (s *Server) adminListPolarWebhooks(w http.ResponseWriter, r *http.Request) {
-	if !polar.Configured() {
+	if !polarAdminConfigured() {
 		respondJSON(w, adminPolarWebhooksResponse{
 			Configured: false,
 			Items:      []adminPolarWebhookDelivery{},
@@ -109,7 +114,7 @@ func (s *Server) adminListPolarWebhooks(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) adminListPolarWebhookEndpoints(w http.ResponseWriter, r *http.Request) {
-	if !polar.Configured() {
+	if !polarAdminConfigured() {
 		respondJSON(w, adminPolarWebhookEndpointsResponse{
 			Configured: false,
 			APIVersion: polar.APIVersion(),
@@ -143,6 +148,10 @@ func (s *Server) adminListPolarWebhookEndpoints(w http.ResponseWriter, r *http.R
 }
 
 func (s *Server) adminRedeliverPolarWebhook(w http.ResponseWriter, r *http.Request) {
+	if !models.BillingEnabled() {
+		http.Error(w, "Billing is not available", http.StatusNotFound)
+		return
+	}
 	if !polar.Configured() {
 		http.Error(w, "Polar is not configured", http.StatusBadRequest)
 		return

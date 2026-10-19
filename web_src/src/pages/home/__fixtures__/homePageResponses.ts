@@ -63,6 +63,8 @@ export interface HomePageFixture {
   canvases: CanvasesCanvasSummary[];
   enabledExperimentalFeatures?: string[];
   factories?: Array<{ id: string; name: string; description?: string }>;
+  /** When false, the account response turns product billing off. */
+  billingEnabled?: boolean;
 }
 
 export const defaultHomePageFixture: HomePageFixture = {

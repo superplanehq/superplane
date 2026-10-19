@@ -47,7 +47,7 @@ func DescribeOrganizationBilling(
 		CurrentPeriodEnd:            protoTimestamp(plan.CurrentPeriodEnd),
 		CreditPurchaseAllowed:       plan.AllowsCreditPurchase(),
 		BillingEnabled:              billingEnabled,
-		SubscriptionCheckoutEnabled: polar.SubscriptionCheckoutEnabled(),
+		SubscriptionCheckoutEnabled: models.BillingEnabled() && polar.SubscriptionCheckoutEnabled(),
 		HasBillingCustomer:          hasCustomer,
 		RemainingCreditCents:        pricebook.MicrosToCents(credit.RemainingMicros),
 		IncludedRemainingCents:      pricebook.MicrosToCents(credit.IncludedRemainingMicros),
@@ -68,6 +68,10 @@ func SyncOrganizationBilling(
 		return nil, err
 	}
 
+	if !models.BillingEnabled() {
+		return nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")
+	}
+
 	if err := polar.SyncOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
 		log.WithError(err).WithField("organization_id", organizationID.String()).Warn("failed to sync Polar subscription")
 	}
@@ -86,7 +90,7 @@ func CreateBusinessCheckout(
 	if err != nil {
 		return nil, err
 	}
-	if !polar.SubscriptionCheckoutEnabled() {
+	if !models.BillingEnabled() || !polar.SubscriptionCheckoutEnabled() {
 		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
 	}
 
@@ -151,6 +155,9 @@ func CancelOrganizationSubscription(
 	if err != nil {
 		return nil, err
 	}
+	if !models.BillingEnabled() {
+		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
+	}
 	if err := polar.CancelOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
 		return nil, subscriptionCancelError(err, "failed to cancel Business")
 	}
@@ -165,6 +172,9 @@ func ResumeOrganizationSubscription(
 	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
 		return nil, err
+	}
+	if !models.BillingEnabled() {
+		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
 	}
 	if err := polar.ResumeOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
 		return nil, subscriptionCancelError(err, "failed to keep Business")

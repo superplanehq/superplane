@@ -169,15 +169,20 @@ async function loadOrganizationCreditState(
   applyCredit: (data: OrganizationLLMCredit) => void,
   applyPlan: (plan: OrganizationBillingPlan) => void,
   clearPlan: () => void,
+  billingEnabled: boolean,
 ) {
   const [creditResponse, nextPlan] = await Promise.all([
     fetch(`/admin/api/organizations/${orgId}/llm-credit`, { credentials: "include" }),
-    fetchOrganizationBillingPlan(orgId),
+    billingEnabled ? fetchOrganizationBillingPlan(orgId) : Promise.resolve(null),
   ]);
   if (!creditResponse.ok) {
     throw new Error(await readErrorMessage(creditResponse, "Failed to load organization credit"));
   }
   applyCredit(await creditResponse.json());
+  if (!billingEnabled) {
+    clearPlan();
+    return;
+  }
   if (nextPlan) {
     applyPlan(nextPlan);
     return;
@@ -265,7 +270,7 @@ function useOrgMarkupOverride(orgId: string, setCredit: (credit: OrganizationLLM
   return { markupPercent, setMarkupPercent, savingMarkup, saveMarkup, resetMarkup };
 }
 
-export function useOrgLLMCredit(orgId: string) {
+export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolean }) {
   const [credit, setCredit] = useState<OrganizationLLMCredit | null>(null);
   const [grants, setGrants] = useState<OrganizationsOrganizationCreditGrant[]>([]);
   const [grantsLoadFailed, setGrantsLoadFailed] = useState(false);
@@ -308,7 +313,7 @@ export function useOrgLLMCredit(orgId: string) {
     setLoading(true);
     try {
       await Promise.all([
-        loadOrganizationCreditState(orgId, applyCreditAndBalances, applyPlan, clearPlan),
+        loadOrganizationCreditState(orgId, applyCreditAndBalances, applyPlan, clearPlan, options.billingEnabled),
         loadGrants(),
       ]);
     } catch (error) {
@@ -316,7 +321,7 @@ export function useOrgLLMCredit(orgId: string) {
     } finally {
       setLoading(false);
     }
-  }, [applyCreditAndBalances, applyPlan, clearPlan, loadGrants, orgId]);
+  }, [applyCreditAndBalances, applyPlan, clearPlan, loadGrants, options.billingEnabled, orgId]);
 
   useEffect(() => {
     loadCredit();
