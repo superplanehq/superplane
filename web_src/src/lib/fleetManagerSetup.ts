@@ -73,7 +73,7 @@ type FleetInfrastructureInput = Pick<
 
 const LEGACY_FLEET_MANAGER_DRAFT_KEY = "superplane.fleet-manager-setup.v1";
 export const FLEET_MANAGER_DRAFT_KEY = "superplane.fleet-manager-setup.v2";
-export const DEFAULT_FLEET_CAPACITY: FleetCapacity = { warmCapacity: 0, maxCapacity: 1 };
+export const DEFAULT_FLEET_CAPACITY: FleetCapacity = { warmCapacity: 1, maxCapacity: 10 };
 
 const splitList = (value: string | undefined, fallback: string) =>
   (value || fallback)
