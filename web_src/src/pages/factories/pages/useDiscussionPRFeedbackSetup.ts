@@ -12,7 +12,15 @@ import {
 } from "./prFeedbackSettingsModel";
 import { normalizeReviewBotLogin, type ReviewBotOption } from "./reviewBotPickerModel";
 
-export const DISCUSSION_MENTION = "@superplaneagent";
+// The Bitbucket app shows up as SuperPlane, so the required mention differs
+// from the GitHub bot login. Matching is case-insensitive.
+export function discussionMentionFor(vcsProvider?: string): string {
+  return factoryVCSProvider(vcsProvider) === "bitbucket" ? "@SuperPlane" : "@superplaneagent";
+}
+
+export function prFeedbackMentionRequireHelper(mention: string): string {
+  return PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelperSuffix.replace("{mention}", mention);
+}
 
 export type DiscussionBotMode = "ignore" | "address";
 
@@ -112,7 +120,7 @@ export function useDiscussionPRFeedbackSetup(
         settings: {
           subject: repository ? { repository } : undefined,
           discussion: {
-            mention: mentionRequired ? DISCUSSION_MENTION : "",
+            mention: mentionRequired ? discussionMentionFor(vcsProvider) : "",
             ignoreBots: bots.ignoreBots,
             allowedBots: bots.allowedBots,
           },
@@ -138,6 +146,7 @@ export function useDiscussionPRFeedbackSetup(
     catalogQuery,
     catalogLoading,
     supportsReviewBots,
+    vcsProvider,
     error,
     createHandler,
     finish,

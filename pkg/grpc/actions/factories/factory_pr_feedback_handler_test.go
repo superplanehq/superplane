@@ -85,6 +85,31 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		assertLivePRFeedbackConcurrency(t, canvas.ID, liveVersion.Nodes)
 	})
 
+	t.Run("a bitbucket handler defaults the mention to the SuperPlane app", func(t *testing.T) {
+		factory := newFactory(t)
+		provider := models.ProviderBitbucket
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			VCSProvider:   &provider,
+			AppRepository: &appRepo,
+		}))
+
+		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{})
+		assert.Equal(t, prFeedbackBitbucketMention, handler.GetSettings().GetDiscussion().GetMention())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+		for _, node := range liveVersion.Nodes {
+			if node.ID != prFeedbackCommentTriggerNodeID {
+				continue
+			}
+			assert.Equal(t, "bitbucket.onPullRequestComment", node.ComponentName())
+			assert.Equal(t, prFeedbackBitbucketMention, node.Configuration["contentFilter"])
+		}
+	})
+
 	t.Run("creation fails when no repository is available", func(t *testing.T) {
 		factory := newFactory(t)
 		_, err := CreateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.CreateFactoryPRFeedbackHandlerRequest{

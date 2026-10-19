@@ -8,7 +8,9 @@ import { ReviewBotPicker } from "./ReviewBotPicker";
 import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
 import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackSource } from "./prFeedbackSettingsModel";
 import {
+  prFeedbackMentionRequireHelper,
   useDiscussionPRFeedbackSetup,
+  discussionMentionFor,
   type DiscussionBotMode,
   type DiscussionPRFeedbackSetupModel,
 } from "./useDiscussionPRFeedbackSetup";
@@ -40,6 +42,7 @@ export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetup
       preview={
         <DiscussionPRFeedbackSetupPreview
           step={setup.step}
+          mention={discussionMentionFor(props.vcsProvider)}
           mentionRequired={setup.mentionRequired}
           botMode={setup.botMode}
           selectedBots={setup.allowedBots}
@@ -97,6 +100,7 @@ function SetupHeader({ step, onBack }: { step: "mention" | "bots"; onBack: () =>
 }
 
 function MentionStep({ setup }: { setup: DiscussionPRFeedbackSetupModel }) {
+  const mention = discussionMentionFor(setup.vcsProvider);
   return (
     <section
       className="flex flex-col gap-2"
@@ -107,8 +111,8 @@ function MentionStep({ setup }: { setup: DiscussionPRFeedbackSetupModel }) {
         name="discussion-setup-mention"
         value="require"
         checked={setup.mentionRequired}
-        title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireOption}
-        helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelper}
+        title={`${PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequirePrefix} ${mention}`}
+        helper={prFeedbackMentionRequireHelper(mention)}
         onChange={() => setup.setMentionRequired(true)}
       />
       <IntakeSettingsRadioOption

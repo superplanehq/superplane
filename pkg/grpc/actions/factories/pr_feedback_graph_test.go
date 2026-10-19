@@ -343,6 +343,19 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		}
 	})
 
+	t.Run("a bitbucket canvas writes the mention into the comment trigger", func(t *testing.T) {
+		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository:  "acme/app",
+			Mention:     prFeedbackBitbucketMention,
+			IgnoreBots:  true,
+			VCSProvider: models.ProviderBitbucket,
+		})
+
+		trigger := findSpecNode(t, canvas, prFeedbackCommentTriggerNodeID)
+		assert.Equal(t, "bitbucket.onPullRequestComment", trigger.Component)
+		assert.Equal(t, prFeedbackBitbucketMention, trigger.Configuration["contentFilter"])
+	})
+
 	t.Run("an empty allowed bots list is omitted from trigger configuration", func(t *testing.T) {
 		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
 			Repository: "acme/app",

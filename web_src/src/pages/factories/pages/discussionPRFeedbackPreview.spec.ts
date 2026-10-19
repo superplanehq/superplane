@@ -8,17 +8,25 @@ import {
   discussionSetupPreviewCaption,
 } from "./discussionPRFeedbackPreview";
 import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
-import { DISCUSSION_MENTION } from "./useDiscussionPRFeedbackSetup";
+import { discussionMentionFor } from "./useDiscussionPRFeedbackSetup";
 
 describe("discussionMentionPreviewComment", () => {
   it("includes the SuperPlane mention when a mention is required", () => {
-    expect(discussionMentionPreviewComment(true)).toBe(
-      `${DISCUSSION_MENTION} ${PR_FEEDBACK_SETTINGS_COPY.wizardPreviewCommentBody}`,
+    expect(discussionMentionPreviewComment(true, discussionMentionFor())).toBe(
+      `${discussionMentionFor()} ${PR_FEEDBACK_SETTINGS_COPY.wizardPreviewCommentBody}`,
+    );
+  });
+
+  it("includes the Bitbucket mention when a mention is required", () => {
+    expect(discussionMentionPreviewComment(true, discussionMentionFor("bitbucket"))).toBe(
+      "@SuperPlane fix this and make no mistakes",
     );
   });
 
   it("omits the SuperPlane mention when any human comment starts a run", () => {
-    expect(discussionMentionPreviewComment(false)).toBe(PR_FEEDBACK_SETTINGS_COPY.wizardPreviewCommentBody);
+    expect(discussionMentionPreviewComment(false, discussionMentionFor())).toBe(
+      PR_FEEDBACK_SETTINGS_COPY.wizardPreviewCommentBody,
+    );
   });
 });
 

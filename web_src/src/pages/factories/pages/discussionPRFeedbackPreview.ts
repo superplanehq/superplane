@@ -1,10 +1,10 @@
 import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 import type { ReviewBotOption } from "./reviewBotPickerModel";
-import { DISCUSSION_MENTION, type DiscussionBotMode } from "./useDiscussionPRFeedbackSetup";
+import type { DiscussionBotMode } from "./useDiscussionPRFeedbackSetup";
 
-export function discussionMentionPreviewComment(mentionRequired: boolean): string {
+export function discussionMentionPreviewComment(mentionRequired: boolean, mention: string): string {
   if (mentionRequired) {
-    return `${DISCUSSION_MENTION} ${PR_FEEDBACK_SETTINGS_COPY.wizardPreviewCommentBody}`;
+    return `${mention} ${PR_FEEDBACK_SETTINGS_COPY.wizardPreviewCommentBody}`;
   }
   return PR_FEEDBACK_SETTINGS_COPY.wizardPreviewCommentBody;
 }
