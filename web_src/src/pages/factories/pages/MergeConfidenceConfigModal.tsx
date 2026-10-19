@@ -7,6 +7,7 @@ import { MergeConfidenceConfigShell } from "./MergeConfidenceConfigShell";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { useSplitRunPanePercent } from "./work-order-split-run/useSplitRunPanePercent";
+import { useAutomationRunNavigation } from "./useAutomationRunNavigation";
 
 interface MergeConfidenceConfigModalProps {
   title: string;
@@ -54,8 +55,7 @@ export function MergeConfidenceConfigModal({
   fallbackNode,
   initialNodeId,
 }: MergeConfidenceConfigModalProps) {
-  const [tab, setTab] = useState<"automation" | "runs">("automation");
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const { tab, setTab, selectedRunId, setSelectedRunId } = useAutomationRunNavigation(showRunsTab);
   const selection = useCanvasNodeSelection(graph, initialNodeId);
   const focus = usePanelFocus(tab, selection.selectedNodeId);
   const [confirmDelete, setConfirmDelete] = useState(false);

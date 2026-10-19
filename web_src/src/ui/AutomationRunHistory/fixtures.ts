@@ -16,6 +16,14 @@ const durations = ["2m 18s", "12m 42s", "8m 06s", "16m 11s", "3m 09s", "6m 32s"]
 const implementationLog =
   "$ Run implementation agent\nPreparing repository…\nRepository ready.\nStarting agent…\nConnecting to MCP servers…";
 
+function fixtureTime(index: number, clock = times[index]) {
+  const date = new Date();
+  date.setDate(date.getDate() - [0, 0, 1, 3, 7, 30][index]);
+  const [hour, minute] = clock.split(":").map(Number);
+  date.setHours(hour, minute, 0, 0);
+  return date.toISOString();
+}
+
 export const implementationRuns: AutomationRun[] = titles.map((title, index) => {
   const status = statuses[index];
   const error = status === "Failed" ? "Agent process exited with code 1." : undefined;
@@ -23,14 +31,11 @@ export const implementationRuns: AutomationRun[] = titles.map((title, index) => 
     id: `${prefixes[index]}-7b41-4d2e-9c83-6a0295dce108`,
     task: { id: taskIds[index], title },
     status,
-    started: `Today, ${times[index]}`,
-    startedAt: `2026-10-19T${times[index]}:00Z`,
+    startedAt: fixtureTime(index),
     finishedAt:
       status === "Running"
         ? undefined
-        : new Date(
-            Date.parse(`2026-10-19T${times[index]}:00Z`) + [138, 762, 486, 971, 189, 392][index] * 1000,
-          ).toISOString(),
+        : new Date(Date.parse(fixtureTime(index)) + [138, 762, 486, 971, 189, 392][index] * 1000).toISOString(),
     duration: durations[index],
     error,
     activities: [
@@ -38,7 +43,7 @@ export const implementationRuns: AutomationRun[] = titles.map((title, index) => 
         id: "start",
         name: "Run started",
         status: "Passed",
-        time: times[index],
+        recordedAt: fixtureTime(index),
         logs: { state: "empty" },
         outputs: { task: { id: taskIds[index], title } },
       },
@@ -46,7 +51,7 @@ export const implementationRuns: AutomationRun[] = titles.map((title, index) => 
         id: "implement",
         name: "Implement task",
         status,
-        time: times[index],
+        recordedAt: fixtureTime(index),
         logs: {
           state: "ready",
           text: `${implementationLog}\n\n${error ? `Error: could not list MCP tools\n${error}` : status === "Running" ? "Inspecting repository files…" : status === "Cancelled" ? "Agent process stopped." : "Changes committed and pushed.\nAgent process exited with code 0."}`,
@@ -60,7 +65,7 @@ export const implementationRuns: AutomationRun[] = titles.map((title, index) => 
               id: "record",
               name: "Record implementation failure",
               status: "Passed" as const,
-              time: "14:18",
+              recordedAt: fixtureTime(index, "14:18"),
               logs: { state: "empty" as const },
               outputs: { result: "failed", message: error },
             },
@@ -76,7 +81,7 @@ export const verificationRuns: AutomationRun[] = implementationRuns.map((run, in
   task: index === 0 ? undefined : run.task,
   status: index === 0 ? "Passed" : index === 1 ? "Running" : run.status,
   error: index === 1 ? undefined : run.error,
-  finishedAt: index === 0 ? "2026-10-19T14:32:02Z" : index === 1 ? undefined : run.finishedAt,
+  finishedAt: index === 0 ? fixtureTime(index, "14:32") : index === 1 ? undefined : run.finishedAt,
   duration: index === 0 ? "2s" : run.duration,
   activities:
     index === 0
@@ -85,14 +90,14 @@ export const verificationRuns: AutomationRun[] = implementationRuns.map((run, in
             id: "review",
             name: "Pull request review received",
             status: "Passed",
-            time: "14:32",
+            recordedAt: fixtureTime(index, "14:32"),
             logs: { state: "empty" },
           },
           {
             id: "find",
             name: "Find pull request",
             status: "Passed",
-            time: "14:32",
+            recordedAt: fixtureTime(index, "14:32"),
             logs: { state: "empty" },
             outputs: { channel: "notFound", type: "pullRequest.notFound" },
           },

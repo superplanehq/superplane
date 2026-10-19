@@ -5,6 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CopyButton } from "@/ui/CopyButton";
 import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import { RunIdCopy, RunStatusLabel } from "./RunIdentity";
+import { RunTimestamp } from "./RunTimestamp";
+import { Skeleton } from "@/ui/skeleton";
 import type { AutomationRun, RunLogs, RunActivity } from "./types";
 
 function formatRunTime(value: string) {
@@ -45,11 +47,13 @@ export function AutomationRunDetails({
   onBack,
   onRetryLogs,
   renderLogs,
+  tasksLoading,
 }: {
   run: AutomationRun;
   onBack: () => void;
   onRetryLogs: (activityId: string) => void;
   renderLogs?: (activity: RunActivity) => ReactNode;
+  tasksLoading?: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string>();
   const selected =
@@ -64,14 +68,7 @@ export function AutomationRunDetails({
         <ArrowLeft className="size-4" />
         Run history
       </Button>
-      <div className="flex flex-wrap items-center gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">{run.task?.title ?? run.title ?? "Run details"}</h1>
-        <RunStatusLabel status={run.status} />
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <span className="text-sm text-muted-foreground">{run.task ? `Task ${run.task.id}` : "No linked task"}</span>
-        <RunIdCopy id={run.id} full />
-      </div>
+      <RunDetailsHeader run={run} tasksLoading={tasksLoading} />
       <dl className="flex flex-wrap gap-x-16 gap-y-4 border-y border-border py-5 text-sm">
         {[
           ["Started", formatRunTime(run.startedAt)],
@@ -105,12 +102,13 @@ export function AutomationRunDetails({
                 <span>{activity.name}</span>
                 <span className="flex w-full items-center justify-between gap-2">
                   <RunStatusLabel status={activity.status} />
-                  <span className="text-xs font-normal text-muted-foreground">{activity.time}</span>
+                  <span className="text-xs font-normal tabular-nums text-muted-foreground">
+                    <RunTimestamp value={activity.recordedAt} runStartedAt={run.startedAt} />
+                  </span>
                 </span>
               </Button>
             ))}
           </div>
-          <p className="pt-3 text-xs leading-5 text-muted-foreground">Only activity recorded for this run is shown.</p>
         </aside>
         {selected ? (
           <div className="min-w-0 space-y-5">
@@ -153,5 +151,41 @@ export function AutomationRunDetails({
         )}
       </div>
     </section>
+  );
+}
+
+function RunDetailsHeader({ run, tasksLoading }: { run: AutomationRun; tasksLoading?: boolean }) {
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-4">
+        {tasksLoading && !run.task ? (
+          <Skeleton className="h-8 w-80 max-w-full" aria-label="Loading task" role="status" />
+        ) : (
+          <h1 className="text-2xl font-semibold tracking-tight">{run.task?.title ?? run.title ?? "Run details"}</h1>
+        )}
+        <RunStatusLabel status={run.status} />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          {run.task ? (
+            <>
+              <span>
+                Task <code className="font-mono">{run.task.id}</code>
+              </span>
+              <CopyButton
+                text={run.task.id}
+                ariaLabel={`Copy task ID ${run.task.id}`}
+                copiedAriaLabel="Task ID copied"
+              />
+            </>
+          ) : tasksLoading ? (
+            <Skeleton className="h-4 w-24" />
+          ) : (
+            "No linked task"
+          )}
+        </div>
+        <RunIdCopy id={run.id} full />
+      </div>
+    </>
   );
 }

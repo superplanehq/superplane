@@ -32,6 +32,8 @@ describe("ImplementRunHistory", () => {
     );
     const { rerender } = render(view);
     expect(screen.getByRole("button", { name: "Open run run-1" })).toBeInTheDocument();
+    expect(screen.queryByText("No linked task")).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading task" })).toBeInTheDocument();
     queries.tasks.data = [{ id: "task-1", key: "SP-123", title: "Linked task", sourceRunId: "run-1" }];
     queries.tasks.isLoading = false;
     rerender(

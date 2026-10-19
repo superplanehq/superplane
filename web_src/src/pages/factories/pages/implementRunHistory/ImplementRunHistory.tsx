@@ -7,6 +7,7 @@ import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { AutomationRunHistory } from "@/ui/AutomationRunHistory/AutomationRunHistory";
 import { AutomationRunDetails } from "@/ui/AutomationRunHistory/AutomationRunDetails";
 import { RunnerLogsTerminal } from "@/ui/Runs/RunInspectorRunnerLogs";
+import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import { runDuration, toAutomationRun, toRunActivities } from "./runHistoryData";
 
 const emptyOrders: FactoriesWorkOrder[] = [];
@@ -41,33 +42,44 @@ export function ImplementRunHistory(props: ImplementRunHistoryProps) {
         <DataError message="Task links could not be loaded." onRetry={() => void tasksQuery.refetch()} />
       )}
       {selectedRunId ? (
-        <ImplementRunDetails key={selectedRunId} {...props} orders={orders} now={now} />
+        <ImplementRunDetails
+          key={selectedRunId}
+          {...props}
+          orders={orders}
+          now={now}
+          tasksLoading={tasksQuery.isLoading}
+        />
       ) : (
         <>
-          {runsQuery.isFetchNextPageError && (
-            <DataError message="More runs could not be loaded." onRetry={() => void runsQuery.fetchNextPage()} />
-          )}
           {runsQuery.hasNextPage && (
-            <p className="mb-3 text-xs text-muted-foreground">
-              Search and filters apply to loaded runs. Load more to include older runs.
-            </p>
+            <p className="mb-3 text-xs text-muted-foreground">Search and filters apply to loaded runs.</p>
           )}
           <AutomationRunHistory
             runs={mappedRuns.map((run, index) => ({ ...run, duration: runDuration(runs[index], now) }))}
             onSelectRun={(run) => onSelectRun(run.id)}
             loading={runsQuery.isLoading}
+            tasksLoading={tasksQuery.isLoading}
             error={runsQuery.isError && !runsQuery.isFetchNextPageError ? "Could not load run history." : undefined}
             onRetry={() => void runsQuery.refetch()}
-            onLoadMore={runsQuery.hasNextPage ? () => void runsQuery.fetchNextPage() : undefined}
+            onLoadMore={
+              runsQuery.hasNextPage && !runsQuery.isFetchNextPageError && !runsQuery.isRefetching
+                ? () => void runsQuery.fetchNextPage()
+                : undefined
+            }
             loadingMore={runsQuery.isFetchingNextPage}
           />
+          {runsQuery.isFetchNextPageError && (
+            <DataError message="More runs could not be loaded." onRetry={() => void runsQuery.fetchNextPage()} />
+          )}
         </>
       )}
     </div>
   );
 }
 
-function ImplementRunDetails(props: ImplementRunHistoryProps & { orders: FactoriesWorkOrder[]; now: number }) {
+function ImplementRunDetails(
+  props: ImplementRunHistoryProps & { orders: FactoriesWorkOrder[]; now: number; tasksLoading: boolean },
+) {
   const { canvasId, organizationId, selectedRunId, onSelectRun } = props;
   const runQuery = useDescribeRun(canvasId, selectedRunId);
   const run = runQuery.data?.run;
@@ -107,9 +119,11 @@ function LoadedImplementRunDetails({
   run,
   executionsQuery,
   versionQuery,
+  tasksLoading,
 }: ImplementRunHistoryProps & {
   orders: FactoriesWorkOrder[];
   now: number;
+  tasksLoading: boolean;
   run: CanvasesCanvasRun;
   executionsQuery: ReturnType<typeof useEventExecutions>;
   versionQuery: ReturnType<typeof useCanvasVersion>;
@@ -135,6 +149,7 @@ function LoadedImplementRunDetails({
       )}
       <AutomationRunDetails
         run={details}
+        tasksLoading={tasksLoading}
         onBack={() => onSelectRun(null)}
         onRetryLogs={() => void executionsQuery.refetch()}
         renderLogs={(activity) => {
@@ -145,6 +160,7 @@ function LoadedImplementRunDetails({
             );
           if (executionsQuery.isError)
             return <p className="py-8 text-sm text-muted-foreground">Load execution details to check for logs.</p>;
+          if (executionsQuery.isFetching) return <LiveLogStateNotice state="loading" />;
           return <p className="py-8 text-sm text-muted-foreground">No logs are available for this activity.</p>;
         }}
       />

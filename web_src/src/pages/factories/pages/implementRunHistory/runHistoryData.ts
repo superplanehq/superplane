@@ -19,16 +19,6 @@ export function recordedStatus(record: Pick<CanvasesCanvasRun, "state" | "result
   return "Unknown";
 }
 
-function displayTime(value?: string): string {
-  if (!value || !Number.isFinite(Date.parse(value))) return "—";
-  return new Date(value).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export function runDuration(run: CanvasesCanvasRun, now: number): string {
   const start = Date.parse(run.createdAt ?? "");
   const end = run.finishedAt ? Date.parse(run.finishedAt) : run.state === "STATE_FINISHED" ? NaN : now;
@@ -42,7 +32,6 @@ export function toAutomationRun(run: CanvasesCanvasRun, orders: FactoriesWorkOrd
     title: run.rootEvent?.customName,
     task: order ? { id: order.key || order.id || "—", title: order.title || "Untitled task" } : undefined,
     status: recordedStatus(run),
-    started: displayTime(run.createdAt),
     startedAt: run.createdAt ?? "",
     finishedAt: run.finishedAt,
     duration: runDuration(run, now),
@@ -72,7 +61,6 @@ export function toRunActivities(
       id: `event:${run.rootEvent.id}`,
       name: "Run started",
       status: "Passed",
-      time: displayTime(run.createdAt),
       logs: { state: "empty" },
       outputs: run.rootEvent.data,
       recordedAt: run.createdAt,
@@ -84,7 +72,6 @@ export function toRunActivities(
       id: `queue:${item.id}`,
       name: nodes.find((node) => node.id === item.nodeId)?.name || item.nodeId || "Queued execution",
       status: "Pending",
-      time: displayTime(item.createdAt),
       recordedAt: item.createdAt,
       logs: { state: "empty" },
     });
@@ -101,7 +88,6 @@ function executionActivity(
     id: execution.id!,
     name: node?.name || execution.nodeId || "Execution",
     status: recordedStatus(execution),
-    time: displayTime(execution.createdAt),
     recordedAt: execution.createdAt,
     error: execution.result === "RESULT_FAILED" ? execution.resultMessage || undefined : undefined,
     logs: { state: "empty" },
