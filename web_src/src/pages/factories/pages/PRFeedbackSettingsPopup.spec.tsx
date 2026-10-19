@@ -306,6 +306,8 @@ describe("PRFeedbackSettingsPopup discussion", () => {
   it("shows a bot name field for Bitbucket instead of an empty catalog", async () => {
     const user = userEvent.setup();
     renderChecksPopup(vi.fn(), discussionDraft(), "org-1", "gh-1", "bitbucket");
+    expect(screen.getByRole("radio", { name: /Require @SuperPlane/ })).toBeChecked();
+    expect(screen.queryByRole("radio", { name: /Require @superplaneagent/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: /Address bot comments/ }));
     expect(screen.queryByTestId("discussion-setup-bots-empty")).not.toBeInTheDocument();
     expect(screen.queryByTestId("discussion-setup-bots-picker")).not.toBeInTheDocument();

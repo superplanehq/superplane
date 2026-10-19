@@ -1,3 +1,11 @@
+export function mentionRequireOption(mention: string): string {
+  return `Require ${mention}`;
+}
+
+export function mentionRequireHelper(mention: string): string {
+  return `Humans must mention ${mention} for pull request feedback.`;
+}
+
 export const PR_FEEDBACK_SETTINGS_COPY = {
   tabsLabel: "PR feedback settings",
   generalTab: "General",
@@ -34,8 +42,6 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   wizardStepAIComments: "How to handle AI comments?",
   wizardStepWhichChecks: "Which status checks should be fixed?",
   wizardStepWhichTools: "Which tools report these checks?",
-  wizardMentionRequireOption: "Require @superplaneagent",
-  wizardMentionRequireHelper: "Humans must mention @superplaneagent for pull request feedback.",
   wizardMentionAnyOption: "Start from any human comment",
   wizardMentionAnyHelper: "Handle any human comment or review on the pull request.",
   wizardPreviewLabel: "Example pull request comment",

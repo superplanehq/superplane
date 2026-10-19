@@ -387,16 +387,45 @@ func matchBitbucketContentFilter(filter string, event map[string]any) bool {
 	return matched
 }
 
+const (
+	// bitbucketAgentNickname is the Bitbucket app display name. Existing
+	// canvases still store the previous login, so those two filters match
+	// either typed mention. No other filter has an alias.
+	bitbucketAgentNickname       = "superplane"
+	bitbucketLegacyAgentNickname = "superplaneagent"
+)
+
 // bitbucketMentionMatches reports whether body contains mention as a whole
 // nickname. A longer nickname that only starts with the filter does not match.
+// The SuperPlane app mention and the previous login match each other. A picked
+// account reference such as @{uuid} does not match.
 func bitbucketMentionMatches(mention, body string) bool {
-	mention = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(mention), "@"))
-	if mention == "" {
+	for _, nickname := range bitbucketMentionNicknames(mention) {
+		if bitbucketNicknameAppears(nickname, body) {
+			return true
+		}
+	}
+	return false
+}
+
+func bitbucketMentionNicknames(mention string) []string {
+	nickname := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(mention), "@"))
+	if nickname == "" {
+		return nil
+	}
+	if nickname == bitbucketAgentNickname || nickname == bitbucketLegacyAgentNickname {
+		return []string{bitbucketAgentNickname, bitbucketLegacyAgentNickname}
+	}
+	return []string{nickname}
+}
+
+func bitbucketNicknameAppears(nickname, body string) bool {
+	if nickname == "" {
 		return false
 	}
 
 	lower := strings.ToLower(body)
-	needle := "@" + mention
+	needle := "@" + nickname
 	start := 0
 	for {
 		index := strings.Index(lower[start:], needle)

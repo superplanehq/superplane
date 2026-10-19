@@ -14,11 +14,12 @@ import { useMemo, useState } from "react";
 import { isChecksHandlerCIIntegration } from "./checksPRFeedbackSetup";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
+import { mentionRequireHelper, mentionRequireOption } from "./prFeedbackSettingsCopy";
 import { normalizeReviewBotLogin } from "./reviewBotPickerModel";
 import { ReviewBotPicker } from "./ReviewBotPicker";
 import {
   catalogReviewBots,
-  DISCUSSION_MENTION,
+  discussionMentionFor,
   discussionBotModeFromDraft,
   discussionBotSettings,
   type DiscussionBotMode,
@@ -148,6 +149,7 @@ export function PRFeedbackDiscussionFields({
   vcsProvider?: string;
 }) {
   const supportsReviewBots = factoryVCSProvider(vcsProvider) !== "bitbucket";
+  const mention = discussionMentionFor(vcsProvider);
   const mentionRequired = draft.mention.trim().length > 0;
   const [botMode, setBotMode] = useState<DiscussionBotMode>(() => discussionBotModeFromDraft(draft));
   const catalogEnabled = Boolean(organizationId && githubIntegrationId) && supportsReviewBots;
@@ -183,9 +185,9 @@ export function PRFeedbackDiscussionFields({
             name="pr-feedback-mention-mode"
             value="require"
             checked={mentionRequired}
-            title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireOption}
-            helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelper}
-            onChange={() => onUpdate("mention", DISCUSSION_MENTION)}
+            title={mentionRequireOption(mention)}
+            helper={mentionRequireHelper(mention)}
+            onChange={() => onUpdate("mention", mention)}
           />
           <IntakeSettingsRadioOption
             name="pr-feedback-mention-mode"
