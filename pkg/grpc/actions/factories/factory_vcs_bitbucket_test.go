@@ -364,6 +364,7 @@ func TestCreateBitbucketDiscussionHandlerListensForComments(t *testing.T) {
 	require.NoError(t, err)
 	handler := response.GetHandler()
 	assert.True(t, handler.GetHealthy())
+	assert.Equal(t, "@SuperPlane", handler.GetSettings().GetDiscussion().GetMention())
 
 	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 	require.NoError(t, err)
@@ -377,6 +378,10 @@ func TestCreateBitbucketDiscussionHandlerListensForComments(t *testing.T) {
 	for _, node := range liveVersion.Nodes {
 		assert.NotContains(t, node.ComponentName(), "github.")
 	}
+
+	trigger := findIntakeNode(liveVersion.Nodes, prFeedbackCommentTriggerNodeID)
+	require.NotNil(t, trigger)
+	assert.Equal(t, "@SuperPlane", trigger.Configuration["contentFilter"])
 }
 
 func TestUpdateBitbucketDiscussionHandlerKeepsAuthorTitle(t *testing.T) {
@@ -414,7 +419,7 @@ func TestUpdateBitbucketDiscussionHandlerKeepsAuthorTitle(t *testing.T) {
 				Repository: appRepo,
 			},
 			Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
-				Mention:    "@superplaneagent",
+				Mention:    prFeedbackBitbucketDefaultMention,
 				IgnoreBots: true,
 			},
 		},
@@ -509,7 +514,7 @@ func TestUpdateBitbucketDiscussionHandlerRefreshesRunnerCheckout(t *testing.T) {
 				Repository: appRepo,
 			},
 			Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
-				Mention:    "@superplaneagent",
+				Mention:    prFeedbackBitbucketDefaultMention,
 				IgnoreBots: true,
 			},
 		},

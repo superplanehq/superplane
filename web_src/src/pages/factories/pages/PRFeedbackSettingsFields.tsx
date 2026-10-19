@@ -18,7 +18,7 @@ import { normalizeReviewBotLogin } from "./reviewBotPickerModel";
 import { ReviewBotPicker } from "./ReviewBotPicker";
 import {
   catalogReviewBots,
-  DISCUSSION_MENTION,
+  discussionMention,
   discussionBotModeFromDraft,
   discussionBotSettings,
   type DiscussionBotMode,
@@ -148,6 +148,7 @@ export function PRFeedbackDiscussionFields({
   vcsProvider?: string;
 }) {
   const supportsReviewBots = factoryVCSProvider(vcsProvider) !== "bitbucket";
+  const mention = discussionMention(vcsProvider);
   const mentionRequired = draft.mention.trim().length > 0;
   const [botMode, setBotMode] = useState<DiscussionBotMode>(() => discussionBotModeFromDraft(draft));
   const catalogEnabled = Boolean(organizationId && githubIntegrationId) && supportsReviewBots;
@@ -183,9 +184,9 @@ export function PRFeedbackDiscussionFields({
             name="pr-feedback-mention-mode"
             value="require"
             checked={mentionRequired}
-            title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireOption}
-            helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelper}
-            onChange={() => onUpdate("mention", DISCUSSION_MENTION)}
+            title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireOption(mention)}
+            helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelper(mention)}
+            onChange={() => onUpdate("mention", mention)}
           />
           <IntakeSettingsRadioOption
             name="pr-feedback-mention-mode"

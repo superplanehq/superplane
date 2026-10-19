@@ -12,7 +12,13 @@ import {
 } from "./prFeedbackSettingsModel";
 import { normalizeReviewBotLogin, type ReviewBotOption } from "./reviewBotPickerModel";
 
-export const DISCUSSION_MENTION = "@superplaneagent";
+const GITHUB_DISCUSSION_MENTION = "@superplaneagent";
+// Bitbucket shows the app as SuperPlane.
+const BITBUCKET_DISCUSSION_MENTION = "@SuperPlane";
+
+export function discussionMention(vcsProvider?: string): string {
+  return factoryVCSProvider(vcsProvider) === "bitbucket" ? BITBUCKET_DISCUSSION_MENTION : GITHUB_DISCUSSION_MENTION;
+}
 
 export type DiscussionBotMode = "ignore" | "address";
 
@@ -112,7 +118,7 @@ export function useDiscussionPRFeedbackSetup(
         settings: {
           subject: repository ? { repository } : undefined,
           discussion: {
-            mention: mentionRequired ? DISCUSSION_MENTION : "",
+            mention: mentionRequired ? discussionMention(vcsProvider) : "",
             ignoreBots: bots.ignoreBots,
             allowedBots: bots.allowedBots,
           },
@@ -141,6 +147,7 @@ export function useDiscussionPRFeedbackSetup(
     error,
     createHandler,
     finish,
+    mention: discussionMention(vcsProvider),
   };
 }
 
