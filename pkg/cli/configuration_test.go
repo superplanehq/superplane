@@ -309,7 +309,7 @@ func TestEnvironmentContextOverridesConfiguredContext(t *testing.T) {
 	config := NewEnvironmentContext(context)
 	err = config.SetActiveApp("canvas-from-env-run")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "pass --app-id")
+	require.Contains(t, err.Error(), "pass --automation")
 	require.Empty(t, config.GetActiveApp())
 
 	err = config.SetActiveWorkspace("workspace-from-env-run")
