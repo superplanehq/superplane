@@ -18,6 +18,7 @@ bash release/superplane-helm-chart/test-fleet-manager-setup.sh
 bash release/superplane-helm-chart/update_component_release_defaults_test.sh
 bash release/superplane/publish_architecture_test.sh
 bash release/superplane/publish_chart_test.sh
+bash release/cli/pipeline_test.sh
 bash release/superplane/pipeline_test.sh
 bash release/superplane/verify_prepared_archive_test.sh
 bash release/superplane/verify_image_test.sh
@@ -46,8 +47,9 @@ bash -n \
   release/superplane-helm-chart/build.sh \
   release/superplane-helm-chart/test-fleet-manager-setup.sh \
   release/superplane-helm-chart/update_component_release_defaults_test.sh \
+  release/cli/build.sh \
+  release/cli/pipeline_test.sh \
   release/superplane/build-assets.sh \
-  release/superplane/build-cli.sh \
   release/superplane/build-image.sh \
   release/superplane/publish-architecture.sh \
   release/superplane/publish-chart.sh \

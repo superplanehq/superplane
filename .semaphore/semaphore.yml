@@ -213,6 +213,16 @@ promotions:
           default_value: vX.Y.Z
           description: Fleet Manager version in vMAJOR.MINOR.PATCH[-PRERELEASE] format
 
+  - name: Prepare CLI Release
+    pipeline_file: prepare-cli-release.yml
+    deployment_target: release
+    parameters:
+      env_vars:
+        - name: RELEASE_VERSION
+          required: true
+          default_value: vX.Y.Z
+          description: CLI version in vMAJOR.MINOR.PATCH[-PRERELEASE] format
+
   - name: Prepare SuperPlane Release
     pipeline_file: prepare-superplane-release.yml
     deployment_target: release

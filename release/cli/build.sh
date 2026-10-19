@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if [ "$#" -ne 4 ]; then
-  echo "Usage: release/superplane/build-cli.sh <version> <os> <architecture> <output>" >&2
+  echo "Usage: release/cli/build.sh <version> <os> <architecture> <output>" >&2
   exit 1
 fi
 
