@@ -47,13 +47,13 @@ func TestResolveAppID(t *testing.T) {
 		{
 			name:        "missing app id and active app",
 			wantErr:     true,
-			errContains: "app id is required",
+			errContains: "automation id is required",
 		},
 		{
 			name:        "whitespace app id with empty active app",
 			appID:       "   ",
 			wantErr:     true,
-			errContains: "app id is required",
+			errContains: "automation id is required",
 		},
 	}
 
@@ -76,24 +76,16 @@ func TestResolveAppID(t *testing.T) {
 	}
 }
 
-func TestBindAppIDFlag(t *testing.T) {
+func TestBindAutomationFlag(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
-	var appID string
+	var automationID string
 
-	core.BindAppIDFlag(cmd, &appID, "app ID")
+	core.BindAutomationFlag(cmd, &automationID, "automation ID")
 
-	require.NoError(t, cmd.Flags().Set("app-id", "app-from-flag"))
-	require.Equal(t, "app-from-flag", appID)
+	require.NoError(t, cmd.Flags().Set("automation", "automation-from-flag"))
+	require.Equal(t, "automation-from-flag", automationID)
 
-	require.NoError(t, cmd.Flags().Set("canvas-id", "app-from-legacy-flag"))
-	require.Equal(t, "app-from-legacy-flag", appID)
-
-	appIDFlag := cmd.Flags().Lookup("app-id")
-	require.NotNil(t, appIDFlag)
-	require.Equal(t, "app ID", appIDFlag.Usage)
-
-	canvasIDFlag := cmd.Flags().Lookup("canvas-id")
-	require.NotNil(t, canvasIDFlag)
-	require.Equal(t, "app ID", canvasIDFlag.Usage)
-	require.Equal(t, "use --app-id", canvasIDFlag.Deprecated)
+	flag := cmd.Flags().Lookup("automation")
+	require.NotNil(t, flag)
+	require.Equal(t, "automation ID", flag.Usage)
 }

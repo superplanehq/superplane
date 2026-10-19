@@ -287,7 +287,7 @@ func TestIntegrationsDescribeByNameTextOutput(t *testing.T) {
 	out := stdout.String()
 	require.Contains(t, out, "Name: slack")
 	require.Contains(t, out, "Configuration:")
-	require.Contains(t, out, "Actions:")
+	require.Contains(t, out, "Components:")
 	require.Contains(t, out, "slack.post-message")
 	require.Contains(t, out, "Triggers:")
 	require.Contains(t, out, "slack.message-received")

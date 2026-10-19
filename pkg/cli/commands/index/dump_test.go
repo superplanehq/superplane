@@ -57,8 +57,8 @@ func TestDumpWritesFullRegistryToFile(t *testing.T) {
 	require.Len(t, dump.Integrations, 1)
 	require.Equal(t, "slack", dump.Integrations[0].GetName())
 
-	require.Len(t, dump.Actions, 1)
-	require.Equal(t, "http", dump.Actions[0].GetName())
+	require.Len(t, dump.Components, 1)
+	require.Equal(t, "http", dump.Components[0].GetName())
 
 	require.Len(t, dump.Triggers, 1)
 	require.Equal(t, "cron", dump.Triggers[0].GetName())
@@ -123,7 +123,7 @@ func TestDumpFullComponentFields(t *testing.T) {
 	var dump indexDump
 	require.NoError(t, json.Unmarshal(raw, &dump))
 
-	component := dump.Actions[0]
+	component := dump.Components[0]
 	require.Equal(t, "HTTP", component.GetLabel())
 
 	config := component.GetConfiguration()
@@ -232,7 +232,7 @@ func TestDumpUsesProvidedOpenAPITypes(t *testing.T) {
 	require.IsType(t, integration, dump.Integrations[0])
 
 	var action openapi_client.ActionsAction
-	require.IsType(t, action, dump.Actions[0])
+	require.IsType(t, action, dump.Components[0])
 
 	var trigger openapi_client.TriggersTrigger
 	require.IsType(t, trigger, dump.Triggers[0])

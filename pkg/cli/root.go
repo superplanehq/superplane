@@ -10,14 +10,12 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	apps "github.com/superplanehq/superplane/pkg/cli/commands/apps"
-	groups "github.com/superplanehq/superplane/pkg/cli/commands/groups"
+	automations "github.com/superplanehq/superplane/pkg/cli/commands/automations"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
 	members "github.com/superplanehq/superplane/pkg/cli/commands/members"
 	oidc "github.com/superplanehq/superplane/pkg/cli/commands/oidc"
 	organizations "github.com/superplanehq/superplane/pkg/cli/commands/organizations"
-	roles "github.com/superplanehq/superplane/pkg/cli/commands/roles"
 	runs "github.com/superplanehq/superplane/pkg/cli/commands/runs"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	tasks "github.com/superplanehq/superplane/pkg/cli/commands/tasks"
@@ -57,15 +55,13 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&OutputFormat, "output", "o", "", "output format: text|json|yaml (overrides config output)")
 
 	options := defaultBindOptions()
-	RootCmd.AddCommand(apps.NewCommand(options))
+	RootCmd.AddCommand(automations.NewCommand(options))
 	RootCmd.AddCommand(runs.NewCommand(options))
-	RootCmd.AddCommand(groups.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))
 	RootCmd.AddCommand(integrations.NewCommand(options))
 	RootCmd.AddCommand(members.NewCommand(options))
 	RootCmd.AddCommand(oidc.NewCommand(options))
 	RootCmd.AddCommand(organizations.NewCommand(options))
-	RootCmd.AddCommand(roles.NewCommand(options))
 	RootCmd.AddCommand(secrets.NewCommand(options))
 	RootCmd.AddCommand(tasks.NewCommand(options))
 	RootCmd.AddCommand(workspaces.NewCommand(options))

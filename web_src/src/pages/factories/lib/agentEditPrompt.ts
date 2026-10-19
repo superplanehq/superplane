@@ -53,13 +53,13 @@ export function buildAgentEditPrompt(input: AgentEditPromptInput): string {
     "Get the canvas:",
     "",
     "```bash",
-    `superplane apps canvas get ${appId} -o yaml > canvas.yaml`,
+    `superplane automations get ${appId} -o yaml > canvas.yaml`,
     "```",
     "",
     "Update the canvas:",
     "",
     "```bash",
-    `superplane apps canvas update ${appId} -f canvas.yaml -m "Describe the change"`,
+    `superplane automations update ${appId} -f canvas.yaml -m "Describe the change"`,
     "```",
   ].join("\n");
 }

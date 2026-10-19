@@ -125,7 +125,7 @@ func renderIntegrationText(stdout io.Writer, integration openapi_client.Integrat
 }
 
 func renderIntegrationActionsText(stdout io.Writer, actions []openapi_client.ActionsAction) error {
-	_, err := fmt.Fprintln(stdout, "Actions:")
+	_, err := fmt.Fprintln(stdout, "Components:")
 	if err != nil {
 		return err
 	}
