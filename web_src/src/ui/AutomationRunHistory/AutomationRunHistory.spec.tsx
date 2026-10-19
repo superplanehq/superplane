@@ -6,6 +6,57 @@ import { implementationRuns } from "./fixtures";
 // CopyButton owns clipboard feedback; this covers the history-to-copy wiring,
 // where accidentally passing the displayed prefix would lose the real identity.
 describe("AutomationRunHistory", () => {
+  it("loads another page when the end is visible, without duplicate requests during loading", () => {
+    let intersect: IntersectionObserverCallback = () => {};
+    const original = globalThis.IntersectionObserver;
+    const disconnect = vi.fn();
+    globalThis.IntersectionObserver = class {
+      constructor(callback: IntersectionObserverCallback) {
+        intersect = callback;
+      }
+      observe() {}
+      disconnect = disconnect;
+    } as unknown as typeof IntersectionObserver;
+    const onLoadMore = vi.fn();
+    try {
+      const { rerender, unmount } = render(
+        <AutomationRunHistory runs={implementationRuns} onSelectRun={() => {}} onLoadMore={onLoadMore} />,
+      );
+      const entry = { isIntersecting: true } as IntersectionObserverEntry;
+      act(() => intersect([entry], {} as IntersectionObserver));
+      act(() => intersect([entry], {} as IntersectionObserver));
+      expect(onLoadMore).toHaveBeenCalledTimes(1);
+      rerender(
+        <AutomationRunHistory runs={implementationRuns} onSelectRun={() => {}} onLoadMore={onLoadMore} loadingMore />,
+      );
+      expect(screen.getByRole("status", { name: "Loading more runs" })).toBeInTheDocument();
+      unmount();
+      expect(disconnect).toHaveBeenCalled();
+    } finally {
+      globalThis.IntersectionObserver = original;
+    }
+  });
+
+  it("shows calendar days for recent runs and always keeps the absolute time", () => {
+    const today = new Date();
+    today.setHours(14, 6, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const older = new Date(today);
+    older.setDate(older.getDate() - 3);
+    render(
+      <AutomationRunHistory
+        runs={[today, yesterday, older].map((date, i) => ({
+          ...implementationRuns[i],
+          startedAt: date.toISOString(),
+        }))}
+        onSelectRun={() => {}}
+      />,
+    );
+    expect(screen.getByText("Today, 14:06")).toBeInTheDocument();
+    expect(screen.getByText("Yesterday, 14:06")).toBeInTheDocument();
+    expect(screen.getAllByText(/14:06/)).toHaveLength(3);
+  });
   it("copies the complete run ID without selecting the run", async () => {
     const writeText = vi.fn(() => Promise.resolve());
     const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");

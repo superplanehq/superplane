@@ -25,21 +25,19 @@ export function RunStatusLabel({ status }: { status: RunStatus }) {
 export function RunIdCopy({ id, full = false }: { id: string; full?: boolean }) {
   const [copyError, setCopyError] = useState(false);
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {full && <code className="break-all text-xs text-muted-foreground">{id}</code>}
+    <div className="flex min-w-0 items-center gap-2">
+      {full && <code className="min-w-0 break-all text-xs text-muted-foreground">{id}</code>}
       <Tooltip>
         <TooltipTrigger asChild>
-          <span tabIndex={0}>
+          <span tabIndex={0} className="shrink-0">
             <CopyButton
               text={id}
-              variant={full ? "button" : "icon"}
+              variant="icon"
               ariaLabel={`Copy full run ID ${id}`}
               copiedAriaLabel="Run ID copied"
               copiedLabel="Run ID copied"
               onCopyError={() => setCopyError(true)}
-            >
-              {full ? "Copy full ID" : undefined}
-            </CopyButton>
+            />
           </span>
         </TooltipTrigger>
         <TooltipContent>

@@ -1,5 +1,5 @@
 import { withFactoriesTheme } from "@/pages/factories/__fixtures__/factoriesStoryTheme";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AutomationRunHistory } from "./AutomationRunHistory";
 import { AutomationRunDetails } from "./AutomationRunDetails";
@@ -12,6 +12,8 @@ interface PreviewProps {
   initialRun?: AutomationRun;
   loading?: boolean;
   error?: string;
+  tasksLoading?: boolean;
+  pagination?: "automatic" | "loading";
 }
 
 function HistoryPreview({
@@ -20,9 +22,28 @@ function HistoryPreview({
   initialRun,
   loading,
   error,
+  tasksLoading,
+  pagination,
 }: PreviewProps) {
   const [selected, setSelected] = useState(initialRun);
   const [historyError, setHistoryError] = useState(error);
+  const [rowCount, setRowCount] = useState(25);
+  const [loadingMore, setLoadingMore] = useState(pagination === "loading");
+  useEffect(() => {
+    if (!loadingMore || pagination !== "automatic") return;
+    const timer = window.setTimeout(() => {
+      setRowCount((count) => count + 25);
+      setLoadingMore(false);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [loadingMore, pagination]);
+  const displayedRuns =
+    pagination === "automatic"
+      ? Array.from({ length: Math.min(rowCount, 75) }, (_, index) => ({
+          ...runs[index % runs.length],
+          id: `${(index + 1).toString(16).padStart(8, "0")}-7b41-4d2e-9c83-6a0295dce108`,
+        }))
+      : runs;
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground md:px-16">
       <div className="mx-auto max-w-[1440px] space-y-7">
@@ -33,6 +54,7 @@ function HistoryPreview({
           <AutomationRunDetails
             key={selected.id}
             run={selected}
+            tasksLoading={tasksLoading}
             onBack={() => setSelected(undefined)}
             onRetryLogs={(activityId) => {
               console.info("Retry logs", activityId);
@@ -57,7 +79,12 @@ function HistoryPreview({
             <h1 className="text-2xl font-semibold tracking-tight">{automation}</h1>
             <div className="border-b border-border pb-3 text-sm font-medium">Run history</div>
             <AutomationRunHistory
-              runs={runs}
+              runs={displayedRuns}
+              tasksLoading={tasksLoading}
+              loadingMore={loadingMore}
+              onLoadMore={
+                pagination && (pagination === "loading" || rowCount < 75) ? () => setLoadingMore(true) : undefined
+              }
               loading={loading}
               error={historyError}
               onRetry={() => {
@@ -95,6 +122,23 @@ export const NoLinkedTask: Story = {
 };
 export const EmptyHistory: Story = { args: { runs: [] } };
 export const LoadingHistory: Story = { args: { runs: [], loading: true } };
+export const LoadingTaskLinks: Story = {
+  args: { tasksLoading: true, runs: implementationRuns.map((run) => ({ ...run, task: undefined })) },
+};
+export const AutomaticPagination: Story = { args: { pagination: "automatic" } };
+export const LoadingMoreRuns: Story = { args: { pagination: "loading" } };
+export const OvernightRun: Story = {
+  args: {
+    initialRun: {
+      ...implementationRuns[2],
+      startedAt: new Date(new Date().setHours(0, 0, 0, 0) - 60 * 60 * 1000).toISOString(),
+      activities: implementationRuns[2].activities.map((activity, index) => ({
+        ...activity,
+        recordedAt: new Date(new Date().setHours(0, 0, 0, 0) + (index === 0 ? -60 : 30) * 60 * 1000).toISOString(),
+      })),
+    },
+  },
+};
 export const HistoryError: Story = { args: { error: "Could not load run history. Try again." } };
 function withLogs(logs: RunLogs): AutomationRun {
   return {
