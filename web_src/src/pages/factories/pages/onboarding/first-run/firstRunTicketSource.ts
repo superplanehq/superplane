@@ -19,6 +19,20 @@ export function ticketSourceFromIssuesChoice(
   return null;
 }
 
+export function resolveTicketSelection(args: {
+  issuesChoice: IssuesChoiceId | null;
+  vcsHost: VcsHostId | null;
+  githubConnected: boolean;
+}): { ticketSource: FirstRunTicketSource | null; issuesChoice: IssuesChoiceId | null } {
+  if (args.issuesChoice == null && args.vcsHost === "github" && args.githubConnected) {
+    return { ticketSource: "github-issues", issuesChoice: "vcs" };
+  }
+  return {
+    ticketSource: ticketSourceFromIssuesChoice(args.issuesChoice, args.vcsHost),
+    issuesChoice: args.issuesChoice,
+  };
+}
+
 export function canAnalyzeTicketSource(args: {
   ticketSource: FirstRunTicketSource | null;
   githubConnected?: boolean;
