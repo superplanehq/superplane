@@ -73,6 +73,8 @@ export const factoryQueryKeys = {
   detail: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId] as const,
   workOrders: (organizationId: string, factoryId: string) =>
     ["factories", organizationId, factoryId, "work-orders"] as const,
+  historicalWorkOrders: (organizationId: string, factoryId: string) =>
+    ["factories", organizationId, factoryId, "work-orders", "including-archived"] as const,
   workOrdersPagePrefix: factoryWorkOrdersPagePrefix,
   workOrdersPage: factoryWorkOrdersPageKey,
   workOrderDetail: (organizationId: string, factoryId: string, orderId: string) =>
@@ -175,9 +177,16 @@ export function useFactory(organizationId: string, factoryId: string) {
   });
 }
 
-export function useFactoryWorkOrders(organizationId: string, factoryId: string) {
+export function useFactoryWorkOrders(
+  organizationId: string,
+  factoryId: string,
+  options?: { includeArchived?: boolean },
+) {
+  const includeArchived = options?.includeArchived === true;
   return useQuery({
-    queryKey: workOrdersKey(organizationId, factoryId),
+    queryKey: includeArchived
+      ? factoryQueryKeys.historicalWorkOrders(organizationId, factoryId)
+      : workOrdersKey(organizationId, factoryId),
     queryFn: async (): Promise<FactoriesWorkOrderSummary[]> => {
       const orders: FactoriesWorkOrderSummary[] = [];
       let beforeId: string | undefined;
@@ -188,6 +197,7 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
             path: { factoryId },
             query: {
               limit: WORK_ORDER_LIST_PAGE_SIZE,
+              ...(includeArchived ? { includeArchived: true } : {}),
               ...(beforeId ? { beforeId } : {}),
             },
           }),

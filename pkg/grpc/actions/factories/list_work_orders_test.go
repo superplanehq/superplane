@@ -73,6 +73,17 @@ func Test__WorkOrderVisibility_ArchivesStayHiddenAndRejectionsStayVisible(t *tes
 		assert.ElementsMatch(t, []pb.WorkOrder_Result{pb.WorkOrder_RESULT_REJECTED, pb.WorkOrder_RESULT_PR_CLOSED},
 			[]pb.WorkOrder_Result{page.Orders[0].Result, page.Orders[1].Result})
 	}
+
+	history, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+		FactoryId: factory.ID.String(), IncludeArchived: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, uint32(4), history.TotalCount)
+	require.Len(t, history.Orders, 4)
+	for _, order := range history.Orders {
+		assert.NotEmpty(t, order.Key)
+		assert.NotEmpty(t, order.Title)
+	}
 }
 
 func Test__ListWorkOrders_PagesByUpdatedAt(t *testing.T) {

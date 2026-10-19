@@ -6,6 +6,10 @@ import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
 import { cn } from "@/lib/utils";
 import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
+import { ImplementRunHistory } from "./implementRunHistory/ImplementRunHistory";
+import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
 import { MergeConfidenceActionsMenu, MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
@@ -162,32 +166,69 @@ function ConfigTabs({
   );
 }
 
-function MergeConfidenceConfigBody({
-  containerRef,
-  selectedNode,
-  nodeBody,
+function implementHistoryContext({
+  tab,
+  canvasId,
   organizationId,
   factoryId,
-  factoryKey,
-  widthPercent,
-  isResizing,
-  onResizeStart,
-  onClosePanel,
-  onSaveNode,
-  tab,
   graph,
-  loading,
-  error,
-  onRetry,
-  canvasId,
-  runHrefFor,
-  selectedRunId,
-  onSelectedRunIdChange,
-  onNodeSelect,
-  selectedNodeId,
-  focusNonce,
-  layoutFitNonce,
 }: ReturnType<typeof configBodyProps>) {
+  if (tab !== "runs" || !canvasId || !organizationId || !factoryId) return null;
+  if (!graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID)) return null;
+  return { canvasId, organizationId, factoryId };
+}
+
+function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
+  const {
+    containerRef,
+    selectedNode,
+    nodeBody,
+    organizationId,
+    factoryId,
+    factoryKey,
+    widthPercent,
+    isResizing,
+    onResizeStart,
+    onClosePanel,
+    onSaveNode,
+    tab,
+    graph,
+    loading,
+    error,
+    onRetry,
+    canvasId,
+    runHrefFor,
+    selectedRunId,
+    onSelectedRunIdChange,
+    onNodeSelect,
+    selectedNodeId,
+    focusNonce,
+    layoutFitNonce,
+  } = props;
+  const features = useExperimentalFeature(organizationId);
+  const historyContext = implementHistoryContext(props);
+  if (historyContext && features.isLoading) {
+    return (
+      <p role="status" className="p-6 text-sm text-muted-foreground">
+        Loading run history…
+      </p>
+    );
+  }
+  if (historyContext && !features.organizationReady) {
+    return (
+      <div role="alert" className="p-6 text-sm">
+        <p>Could not load run history access.</p>
+        <Button variant="outline" className="mt-3" onClick={features.retryOrganization}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+  if (historyContext && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
+    return (
+      <ImplementRunHistory {...historyContext} selectedRunId={selectedRunId} onSelectRun={onSelectedRunIdChange} />
+    );
+  }
   return (
     <div
       ref={containerRef}

@@ -452,12 +452,13 @@ export function useCanvasWebsocket({
     // The initial REST snapshot can complete before the subscription opens.
     // Resync after every successful connection to close that gap and to recover
     // messages missed during later disconnects.
-    invalidateRuns();
+    invalidateCanvasRunQueries();
+    void queryClient.invalidateQueries({ queryKey: [...canvasKeys.eventExecutions(), canvasId] });
     // Refresh memory in case mutations happened while we were disconnected; we
     // no longer poll, so the websocket is the only push channel.
     invalidateMemoryEntries();
     onConnectionOpen?.();
-  }, [invalidateRuns, invalidateMemoryEntries, onConnectionOpen]);
+  }, [invalidateCanvasRunQueries, invalidateMemoryEntries, queryClient, canvasId, onConnectionOpen]);
 
   // Cleanup on unmount
   useEffect(() => {
