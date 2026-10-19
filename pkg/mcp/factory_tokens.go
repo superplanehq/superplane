@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -45,6 +46,7 @@ func StoreOAuthTokens(
 	resource *models.FactoryAgentResource,
 	tokens *TokenResponse,
 ) error {
+	encryptor = encryption.ForDB(db, encryptor)
 	if refresh := strings.TrimSpace(tokens.RefreshToken); refresh != "" {
 		encrypted, err := EncryptResourceSecret(ctx, encryptor, resource.ID, refresh)
 		if err != nil {
@@ -74,6 +76,7 @@ func DecryptedResourceSecret(
 	resource *models.FactoryAgentResource,
 	name string,
 ) (string, error) {
+	encryptor = encryption.ForDB(db, encryptor)
 	secret, err := resource.FindSecret(db, name)
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryAgentResourceSecretNotFound) {

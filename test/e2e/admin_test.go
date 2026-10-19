@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -212,7 +213,11 @@ func (s *adminSteps) assertSMTPSettingsEnabled() {
 	assert.Equal(s.t, "smtp.example.com", settings.SMTPHost)
 	assert.Equal(s.t, 587, settings.SMTPPort)
 	assert.Equal(s.t, "smtp-user", settings.SMTPUsername)
-	assert.Equal(s.t, []byte("smtp-pass"), settings.SMTPPassword)
+	encryptor, err := crypto.ProcessEncryptor()
+	require.NoError(s.t, err)
+	password, err := encryptor.Decrypt(s.t.Context(), settings.SMTPPassword, []byte("smtp_password"))
+	require.NoError(s.t, err)
+	assert.Equal(s.t, "smtp-pass", string(password))
 	assert.Equal(s.t, "SuperPlane", settings.SMTPFromName)
 	assert.Equal(s.t, "noreply@example.com", settings.SMTPFromEmail)
 	assert.True(s.t, settings.SMTPUseTLS)
