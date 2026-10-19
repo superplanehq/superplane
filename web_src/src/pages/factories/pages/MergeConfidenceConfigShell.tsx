@@ -16,7 +16,11 @@ import { MergeConfidenceActionsMenu, MergeConfidenceDeleteDialog } from "./Merge
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { NodeConfigPanel } from "./NodeConfigPanel";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
-import { SettingsAutomationHeaderRow, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
+import {
+  SettingsAutomationHeaderRow,
+  SettingsAutomationWorkspace,
+  type RunSelectionChange,
+} from "./SettingsAutomationWorkspace";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 
@@ -54,7 +58,7 @@ interface MergeConfidenceConfigShellProps {
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
   selectedRunId: string | null;
-  onSelectedRunIdChange: (runId: string | null) => void;
+  onSelectedRunIdChange: RunSelectionChange;
   onNodeSelect: (nodeId: string) => void;
   selectedNodeId: string | null;
   focusNonce: number;
@@ -340,7 +344,7 @@ function MergeConfidenceCanvas({
   showRuns: boolean;
   selectLatestRun?: boolean;
   selectedRunId?: string | null;
-  onSelectedRunIdChange?: (runId: string | null) => void;
+  onSelectedRunIdChange?: RunSelectionChange;
   onNodeSelect?: (nodeId: string) => void;
   focusNodeId?: string | null;
   focusNonce?: number;

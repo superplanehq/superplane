@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RunIdCopy, RunStatusLabel } from "./RunIdentity";
+import { Skeleton } from "@/ui/skeleton";
+import { RunTimestamp } from "./RunTimestamp";
 import type { AutomationRun } from "./types";
 
 interface AutomationRunHistoryProps {
@@ -14,6 +16,7 @@ interface AutomationRunHistoryProps {
   onRetry?: () => void;
   onLoadMore?: () => void;
   loadingMore?: boolean;
+  tasksLoading?: boolean;
 }
 
 export function AutomationRunHistory({
@@ -24,6 +27,7 @@ export function AutomationRunHistory({
   onRetry,
   onLoadMore,
   loadingMore,
+  tasksLoading,
 }: AutomationRunHistoryProps) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -57,7 +61,6 @@ export function AutomationRunHistory({
             ))}
           </SelectContent>
         </Select>
-        <span className="ml-auto text-xs text-muted-foreground">Newest first</span>
       </div>
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full min-w-[850px] table-fixed text-left text-sm">
@@ -78,13 +81,16 @@ export function AutomationRunHistory({
             </tr>
           </thead>
           <tbody>
+            {loading && <RunHistorySkeleton />}
             {!loading &&
               !error &&
-              filtered.map((run) => <RunHistoryRow key={run.id} run={run} onSelectRun={onSelectRun} />)}
+              filtered.map((run) => (
+                <RunHistoryRow key={run.id} run={run} onSelectRun={onSelectRun} tasksLoading={tasksLoading} />
+              ))}
           </tbody>
         </table>
         {loading && (
-          <p role="status" className="p-12 text-center text-sm text-muted-foreground">
+          <p role="status" className="sr-only">
             Loading run history…
           </p>
         )}
@@ -119,17 +125,27 @@ export function AutomationRunHistory({
         )}
       </div>
       {onLoadMore && !loading && !error && (
-        <div className="flex justify-center">
-          <Button variant="outline" onClick={onLoadMore} disabled={loadingMore}>
-            {loadingMore ? "Loading more…" : "Load more"}
-          </Button>
-        </div>
+        <LoadMoreRuns
+          onLoadMore={onLoadMore}
+          loading={loadingMore}
+          itemCount={runs.length}
+          query={query}
+          status={status}
+        />
       )}
     </section>
   );
 }
 
-function RunHistoryRow({ run, onSelectRun }: { run: AutomationRun; onSelectRun: (run: AutomationRun) => void }) {
+function RunHistoryRow({
+  run,
+  onSelectRun,
+  tasksLoading,
+}: {
+  run: AutomationRun;
+  onSelectRun: (run: AutomationRun) => void;
+  tasksLoading?: boolean;
+}) {
   return (
     <tr className="h-12 border-b border-border last:border-0 hover:bg-muted/40">
       <td className="px-5">
@@ -150,13 +166,17 @@ function RunHistoryRow({ run, onSelectRun }: { run: AutomationRun; onSelectRun: 
           <Button
             variant="ghost"
             onClick={() => onSelectRun(run)}
-            className="h-auto w-full justify-start gap-3 p-0 text-left font-normal hover:bg-transparent"
+            className="-mx-2 h-auto w-[calc(100%+1rem)] justify-start gap-3 px-2 py-1 text-left font-normal"
           >
             <span className="shrink-0 font-mono text-xs text-muted-foreground">{run.task.id}</span>
             <span className="truncate" title={run.task.title}>
               {run.task.title}
             </span>
           </Button>
+        ) : tasksLoading ? (
+          <div role="status" aria-label="Loading task">
+            <Skeleton className="h-4 w-3/4 max-w-80" />
+          </div>
         ) : (
           <span className="text-muted-foreground">No linked task</span>
         )}
@@ -165,11 +185,64 @@ function RunHistoryRow({ run, onSelectRun }: { run: AutomationRun; onSelectRun: 
         <RunStatusLabel status={run.status} />
       </td>
       <td className="whitespace-nowrap px-5 text-muted-foreground">
-        <time dateTime={run.startedAt} title={run.startedAt}>
-          {run.started}
-        </time>
+        <RunTimestamp value={run.startedAt} />
       </td>
       <td className="px-5 tabular-nums text-muted-foreground">{run.duration}</td>
     </tr>
   );
+}
+
+function LoadMoreRuns({
+  onLoadMore,
+  loading,
+  itemCount,
+  query,
+  status,
+}: {
+  onLoadMore: () => void;
+  loading?: boolean;
+  itemCount: number;
+  query: string;
+  status: string;
+}) {
+  const sentinel = useRef<HTMLDivElement>(null);
+  const loadMore = useRef(onLoadMore);
+  loadMore.current = onLoadMore;
+  useEffect(() => {
+    if (loading || !sentinel.current || typeof IntersectionObserver === "undefined") return;
+    let requested = false;
+    const observer = new IntersectionObserver((entries) => {
+      if (requested || !entries.some((entry) => entry.isIntersecting)) return;
+      requested = true;
+      loadMore.current();
+    });
+    observer.observe(sentinel.current);
+    return () => observer.disconnect();
+  }, [loading, itemCount, query, status]);
+  return (
+    <div ref={sentinel} className="flex min-h-12 items-center justify-center text-sm text-muted-foreground">
+      {loading ? (
+        <div role="status" aria-label="Loading more runs" className="flex items-center gap-2">
+          <Loader2 aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
+          Loading more runs…
+        </div>
+      ) : (
+        <Button variant="ghost" onClick={onLoadMore} className="sr-only focus:not-sr-only">
+          Load more runs
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function RunHistorySkeleton() {
+  return Array.from({ length: 6 }, (_, index) => (
+    <tr key={index} aria-hidden className="h-12 border-b border-border last:border-0">
+      {Array.from({ length: 5 }, (_, column) => (
+        <td key={column} className="px-5">
+          <Skeleton className="h-4 w-3/4" />
+        </td>
+      ))}
+    </tr>
+  ));
 }
