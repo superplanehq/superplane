@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CopyButton } from "@/ui/CopyButton";
 import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import { RunIdCopy, RunStatusLabel } from "./RunIdentity";
-import type { AutomationRun, RunLogs } from "./types";
+import type { AutomationRun, RunLogs, RunActivity } from "./types";
 
 function formatRunTime(value: string) {
+  if (!value || !Number.isFinite(Date.parse(value))) return "—";
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -16,7 +17,6 @@ function formatRunTime(value: string) {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-    timeZone: "UTC",
     timeZoneName: "short",
   }).format(new Date(value));
 }
@@ -44,14 +44,17 @@ export function AutomationRunDetails({
   run,
   onBack,
   onRetryLogs,
+  renderLogs,
 }: {
   run: AutomationRun;
   onBack: () => void;
   onRetryLogs: (activityId: string) => void;
+  renderLogs?: (activity: RunActivity) => ReactNode;
 }) {
   const [selectedId, setSelectedId] = useState(
-    run.activities.find((activity) => activity.status === "Failed" || activity.status === "Running")?.id ??
-      run.activities[0]?.id,
+    run.activities.find(
+      (activity) => activity.status === "Failed" || activity.status === "Running" || activity.status === "Pending",
+    )?.id ?? run.activities[0]?.id,
   );
   const selected = run.activities.find((activity) => activity.id === selectedId);
   return (
@@ -61,7 +64,7 @@ export function AutomationRunDetails({
         Run history
       </Button>
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">{run.task?.title ?? "Run details"}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{run.task?.title ?? run.title ?? "Run details"}</h1>
         <RunStatusLabel status={run.status} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -114,13 +117,22 @@ export function AutomationRunDetails({
               <h2 className="font-semibold">{selected.name}</h2>
               <RunStatusLabel status={selected.status} />
             </div>
+            {selected.error && (
+              <p role="alert" className="text-sm text-destructive">
+                {selected.error}
+              </p>
+            )}
             <Tabs defaultValue="logs">
               <TabsList>
                 <TabsTrigger value="logs">Logs</TabsTrigger>
                 <TabsTrigger value="outputs">Outputs</TabsTrigger>
               </TabsList>
               <TabsContent value="logs" className="pt-5">
-                <RunLogContent logs={selected.logs} onRetry={() => onRetryLogs(selected.id)} />
+                {renderLogs ? (
+                  renderLogs(selected)
+                ) : (
+                  <RunLogContent logs={selected.logs} onRetry={() => onRetryLogs(selected.id)} />
+                )}
               </TabsContent>
               <TabsContent value="outputs" className="pt-5">
                 {selected.outputs ? (
