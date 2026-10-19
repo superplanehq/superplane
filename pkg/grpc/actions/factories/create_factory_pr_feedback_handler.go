@@ -52,7 +52,10 @@ func CreateFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
-	settings := parsePRFeedbackSettings(defaultPRFeedbackSettings(), req.GetSettings())
+	settings := parsePRFeedbackSettings(
+		defaultPRFeedbackSettings(factory.OnboardingConfigValue().EffectiveVCSProvider()),
+		req.GetSettings(),
+	)
 	settings.Repository = repository
 	if err := validatePRFeedbackSettingsForSource(db, orgID, source, settings, req.GetSettings()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")

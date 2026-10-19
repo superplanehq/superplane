@@ -288,3 +288,18 @@ func Test__MatchBitbucketContentFilter(t *testing.T) {
 	assert.True(t, matchBitbucketContentFilter("/solve", event))
 	assert.False(t, matchBitbucketContentFilter("/deploy", event))
 }
+
+func Test__BitbucketMentionMatches__AgentMentionAliases(t *testing.T) {
+	for _, filter := range []string{"@SuperPlane", "@superplane", "@SUPERPLANE", "@superplaneagent"} {
+		assert.True(t, bitbucketMentionMatches(filter, "@SuperPlane fix this"), filter)
+		assert.True(t, bitbucketMentionMatches(filter, "@superplaneagent fix this"), filter)
+		assert.True(t, bitbucketMentionMatches(filter, "hey @superplane, please fix"), filter)
+	}
+
+	assert.False(t, bitbucketMentionMatches("@superplane", "a@superplaneuser fix this"))
+	assert.False(t, bitbucketMentionMatches("@SuperPlane", "no mention here"))
+	assert.False(t, bitbucketMentionMatches("@superplane", "hey @superplanehq, please fix"))
+
+	assert.True(t, bitbucketMentionMatches("@ada", "@ada fix this"))
+	assert.False(t, bitbucketMentionMatches("@ada", "@adaa fix this"))
+}
