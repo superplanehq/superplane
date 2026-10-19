@@ -7,14 +7,19 @@ import (
 
 const ServerWebsiteURL = "https://superplane.com"
 
+const dataPNGPrefix = "data:image/png;base64,"
+
 //go:embed icon-light.png
 var iconLightPNG []byte
 
 //go:embed icon-dark.png
 var iconDarkPNG []byte
 
+//go:embed icon-192.png
+var icon192PNG []byte
+
 func dataPNGURI(raw []byte) string {
-	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(raw)
+	return dataPNGPrefix + base64.StdEncoding.EncodeToString(raw)
 }
 
 func ServerInfo() map[string]any {
@@ -35,6 +40,11 @@ func ServerInfo() map[string]any {
 				"mimeType": "image/png",
 				"sizes":    []string{"96x96"},
 				"theme":    "dark",
+			},
+			{
+				"src":      dataPNGURI(icon192PNG),
+				"mimeType": "image/png",
+				"sizes":    []string{"192x192"},
 			},
 		},
 	}

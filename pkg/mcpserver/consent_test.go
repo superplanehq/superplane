@@ -58,3 +58,12 @@ func TestRenderConsentPageUsesFactoriesTheme(t *testing.T) {
 	assert.Contains(t, html, "Allow access to SuperPlane")
 	assert.Contains(t, html, "Acme / Factory")
 }
+
+func TestRenderConsentPageShowsCurrentBrandMark(t *testing.T) {
+	page, err := RenderConsentPage("Cursor", "token", "", nil)
+	require.NoError(t, err)
+	html := string(page)
+	assert.NotContains(t, html, "M29 14.32", "old fan mark must not render")
+	assert.Contains(t, html, `viewBox="0 0 712 813"`)
+	assert.Contains(t, html, "M359.243 20.3306C")
+}
