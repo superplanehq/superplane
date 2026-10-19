@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -29,7 +30,7 @@ type SecretsContext struct {
 func NewSecretsContext(tx *gorm.DB, reg *registry.Registry, organizationID uuid.UUID, encryptor crypto.Encryptor) *SecretsContext {
 	return &SecretsContext{
 		tx:             tx,
-		encryptor:      encryptor,
+		encryptor:      encryption.ForDB(tx, encryptor),
 		registry:       reg,
 		organizationID: organizationID,
 	}

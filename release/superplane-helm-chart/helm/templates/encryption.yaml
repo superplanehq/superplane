@@ -1,5 +1,5 @@
 {{- if eq .Values.encryption.secretName "" }}
-{{- $key := .Values.encryption.key | required ".Values.encryption.key is required." -}}
+{{- $masters := .Values.encryption.masterKeys | required "Set encryption.masterKeys." -}}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -7,5 +7,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
 type: Opaque
 data:
-  ENCRYPTION_KEY: {{ $key }}
+  ENCRYPTION_MASTER_KEYS: {{ $masters | b64enc | quote }}
+  {{- if .Values.encryption.key }}
+  ENCRYPTION_KEY: {{ .Values.encryption.key | quote }}
+  {{- end }}
 {{- end }}

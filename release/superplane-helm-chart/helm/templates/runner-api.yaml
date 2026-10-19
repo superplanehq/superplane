@@ -98,6 +98,8 @@ spec:
                 name: {{ include "secrets.linear.name" . }}
             {{- end }}
           env:
+            - name: ENCRYPTION_WRITE_FORMAT
+              value: {{ .Values.encryption.writeFormat | quote }}
             {{- include "runner.processEnv" (dict "enabled" (list "START_RUNNER_API")) | nindent 12 }}
             {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
             - name: PUBLIC_API_BASE_PATH

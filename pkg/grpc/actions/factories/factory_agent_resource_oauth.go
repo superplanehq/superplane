@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -183,7 +184,7 @@ func persistOAuthStart(
 	if err := resource.SetOAuthPending(db, state, time.Now().Add(10*time.Minute)); err != nil {
 		return err
 	}
-	encryptedVerifier, err := mcp.EncryptResourceSecret(ctx, encryptor, resource.ID, verifier)
+	encryptedVerifier, err := mcp.EncryptResourceSecret(ctx, encryption.ForDB(db, encryptor), resource.ID, verifier)
 	if err != nil {
 		return err
 	}
@@ -191,7 +192,7 @@ func persistOAuthStart(
 		return err
 	}
 	if clientSecret != "" {
-		encryptedSecret, err := mcp.EncryptResourceSecret(ctx, encryptor, resource.ID, clientSecret)
+		encryptedSecret, err := mcp.EncryptResourceSecret(ctx, encryption.ForDB(db, encryptor), resource.ID, clientSecret)
 		if err != nil {
 			return err
 		}
