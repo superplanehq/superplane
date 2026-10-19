@@ -503,10 +503,15 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("tablist", { name: "Task views" })).not.toBeInTheDocument();
     const panel = screen.getByTestId("redesign-console-summary");
     expect(within(panel).getByTestId("task-edit-owner")).toHaveAccessibleName(`Owner: ${SPLIT_RUN_RUNNING.owner.name}`);
+    expect(within(panel).getByText("Started")).toBeInTheDocument();
+    expect(within(panel).getByText("Spend")).toBeInTheDocument();
     expect(panel).toHaveTextContent("$0.73");
     expect(panel).toHaveTextContent("2.7k tokens");
-    expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("GitHub issues");
-    expect(within(panel).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
+    expect(within(panel).queryByText("Source")).not.toBeInTheDocument();
+    expect(within(panel).queryByTestId("split-run-source-ticket")).not.toBeInTheDocument();
+    const intake = screen.getByTestId("redesign-console-task-description");
+    expect(within(intake).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
+    expect(within(intake).getByTestId("redesign-console-intake-added-by")).toHaveTextContent("Intake GitHub issues");
   });
 
   it("does not list attached files in the console summary", () => {
@@ -925,7 +930,11 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Toggle Ingest details" })).not.toBeInTheDocument();
     const summary = screen.getByTestId("redesign-console-summary");
     expect(within(summary).getByRole("button", { name: "description.md" })).toBeInTheDocument();
-    expect(within(summary).getByText("Source")).toBeInTheDocument();
+    expect(within(summary).getByText("Owner")).toBeInTheDocument();
+    expect(within(summary).getByText("Started")).toBeInTheDocument();
+    expect(within(summary).getByText("Spend")).toBeInTheDocument();
+    expect(within(summary).queryByText("Source")).not.toBeInTheDocument();
+    expect(within(summary).queryByTestId("split-run-source-ticket")).not.toBeInTheDocument();
   });
 
   it("opens produced artifacts on the card's Artifacts page", async () => {
@@ -1925,11 +1934,15 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const panel = screen.getByTestId("redesign-console-summary");
     expect(within(panel).getByTestId("empty-owner-mark")).toBeInTheDocument();
-    expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("Igor Šarčević");
-    expect(within(panel).getByText("Created manually")).toBeInTheDocument();
+    expect(within(panel).queryByText("Source")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Created manually")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Igor Šarčević")).not.toBeInTheDocument();
+    const intake = screen.getByTestId("redesign-console-task-description");
+    expect(within(intake).getByTestId("split-run-source")).toHaveTextContent("Igor Šarčević");
+    expect(within(intake).getByTestId("redesign-console-intake-added-by")).toHaveTextContent("Created manually");
   });
 
-  it("does not repeat the owner on a manual source", () => {
+  it("shows a manual author on Intake when that person owns the task", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...LINE_BOARD_DONE_RECEIPTS_ORDER,
@@ -1940,9 +1953,12 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     const panel = screen.getByTestId("redesign-console-summary");
-    expect(within(panel).getByText("Created manually")).toBeInTheDocument();
-    expect(within(panel).queryByTestId("split-run-source")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Source")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Created manually")).not.toBeInTheDocument();
     expect(within(panel).getAllByText("Igor Šarčević", { ignore: "script, style, title" })).toHaveLength(1);
+    const intake = screen.getByTestId("redesign-console-task-description");
+    expect(within(intake).getByTestId("split-run-source")).toHaveTextContent("Igor Šarčević");
+    expect(within(intake).getByTestId("redesign-console-intake-added-by")).toHaveTextContent("Created manually");
   });
 
   it("shows an unsuccessful result in the summary panel", () => {

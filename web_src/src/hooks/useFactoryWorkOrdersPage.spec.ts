@@ -13,7 +13,7 @@ vi.mock("@/api-client", () => ({
   factoriesListWorkOrders,
 }));
 
-import { useFactoryBoardWorkOrders, useFactoryWorkOrdersPage } from "./useFactoryData";
+import { useFactoryBoardWorkOrders, useFactoryWorkOrders, useFactoryWorkOrdersPage } from "./useFactoryData";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -28,6 +28,23 @@ function ordersPage(orders: { id: string }[]) {
 describe("useFactoryWorkOrdersPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("loads historical task identities without putting archived tasks in the active list cache", async () => {
+    const archived = { id: "archived", key: "SP-42", title: "Past task" };
+    factoriesListWorkOrders.mockImplementation(({ query }: { query: { includeArchived?: boolean } }) =>
+      Promise.resolve(ordersPage(query.includeArchived ? [archived] : [])),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(
+      () => ({
+        active: useFactoryWorkOrders("org-1", "factory-1"),
+        history: useFactoryWorkOrders("org-1", "factory-1", { includeArchived: true }),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+    await waitFor(() => expect(result.current.history.data).toEqual([archived]));
+    expect(result.current.active.data).toEqual([]);
   });
 
   /**

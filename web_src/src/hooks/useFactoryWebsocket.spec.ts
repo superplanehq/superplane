@@ -55,6 +55,29 @@ async function emit(payload: unknown) {
 }
 
 describe("useFactoryWebsocket", () => {
+  it.each(["existing", "new", "archived"])(
+    "updates historical tasks without reloading all pages: %s",
+    async (state) => {
+      const describe = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
+      if (state === "archived") describe.mockRejectedValue(new Error("404 not found"));
+      else describe.mockResolvedValue(describeResponse({ id: "order-1", key: "SP-42", title: "Updated" }));
+      const { queryClient } = renderFactoryWebsocket();
+      const key = [...factoryQueryKeys.workOrders("org-1", "factory-1"), "including-archived"];
+      const otherKey = [...factoryQueryKeys.workOrders("org-1", "other-factory"), "including-archived"];
+      const other = { id: "order-2", title: "Other", key: "SP-43" };
+      queryClient.setQueryData(key, state === "new" ? [other] : [{ id: "order-1", title: "Old" }, other]);
+      queryClient.setQueryData(otherKey, []);
+      await emit({ event: "work_order_updated", payload: { factoryId: "factory-1", orderId: "order-1" } });
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(state === "archived");
+      if (state !== "archived") {
+        expect(queryClient.getQueryData(key)).toEqual([
+          expect.objectContaining({ id: "order-1", key: "SP-42", title: "Updated" }),
+          other,
+        ]);
+      }
+      expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    },
+  );
   it("connects to the per-factory WebSocket URL with org id", () => {
     renderFactoryWebsocket();
     const [url, , enabled] = lastCall();
@@ -366,7 +389,9 @@ describe("useFactoryWebsocket", () => {
   });
 
   it("skips invalidation on the first open and refreshes the orders list on reconnect", () => {
-    const { invalidateSpy } = renderFactoryWebsocket();
+    const { queryClient, invalidateSpy } = renderFactoryWebsocket();
+    const historyKey = [...factoryQueryKeys.workOrders("org-1", "factory-1"), "including-archived"];
+    queryClient.setQueryData(historyKey, []);
     invalidateSpy.mockClear();
     const [, options] = lastCall();
     const onOpen = options.onOpen as () => void;
@@ -375,10 +400,12 @@ describe("useFactoryWebsocket", () => {
       onOpen();
     });
     expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(false);
 
     act(() => {
       onOpen();
     });
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(true);
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["factories", "org-1", "factory-1", "work-orders"],
       exact: true,

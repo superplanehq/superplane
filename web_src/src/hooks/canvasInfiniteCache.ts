@@ -144,18 +144,25 @@ function mergeCanvasRunFields(existing: CanvasesCanvasRun, incoming: CanvasesCan
     id: incoming.id ?? existing.id,
     canvasId: incoming.canvasId ?? existing.canvasId,
     rootEvent: incoming.rootEvent ?? existing.rootEvent,
-    state: incoming.state ?? existing.state,
-    result: incoming.result ?? existing.result,
+    ...mergeRunOutcome(existing, incoming),
     executions: incoming.executions?.length ? incoming.executions : (existing.executions ?? incoming.executions),
     queueItems: incoming.queueItems !== undefined ? incoming.queueItems : existing.queueItems,
     createdAt: incoming.createdAt ?? existing.createdAt,
     updatedAt: incoming.updatedAt ?? existing.updatedAt,
-    finishedAt: incoming.finishedAt ?? existing.finishedAt,
     versionId: incoming.versionId ?? existing.versionId,
     parent: incoming.parent ?? existing.parent,
     totalTokens: keepRecordedMetric(existing.totalTokens, incoming.totalTokens),
     costCents: keepRecordedMetric(existing.costCents, incoming.costCents),
     models: keepRecordedModels(existing.models, incoming.models),
+  };
+}
+
+function mergeRunOutcome(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun) {
+  return {
+    state: incoming.state ?? existing.state,
+    result: incoming.result ?? existing.result,
+    errors: incoming.errors ?? existing.errors,
+    finishedAt: incoming.finishedAt ?? existing.finishedAt,
   };
 }
 

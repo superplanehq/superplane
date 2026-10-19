@@ -107,6 +107,40 @@ describe("FleetManagerSetup", () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
+  it("starts a new fleet at warm 1 and max 10", async () => {
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByLabelText("Warm capacity")).toHaveValue(1);
+    expect(screen.getByLabelText("Maximum capacity")).toHaveValue(10);
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate install command" }));
+    const command = await screen.findByTestId("fleet-manager-install-command");
+    expect(command).toHaveTextContent("warmCapacity: 1");
+    expect(command).toHaveTextContent("maxCapacity: 10");
+  });
+
+  it("keeps a saved warm 0 and max 1 capacity", async () => {
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({
+        provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v0.2.0",
+        selectedFleetIds: ["e1-large-amd64"],
+        fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+        fields: { region: "us-east-1", imageAmd64: "ami-amd64" },
+      }),
+    );
+
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByLabelText("Warm capacity")).toHaveValue(0);
+    expect(screen.getByLabelText("Maximum capacity")).toHaveValue(1);
+  });
+
   it("uses the Provider, Fleets, and Install sequence", async () => {
     render(<FleetManagerSetup />);
 

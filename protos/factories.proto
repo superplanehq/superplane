@@ -1395,6 +1395,8 @@ message FactoryIntake {
   // Live trigger resource, such as a Jira project key.
   string resource_id = 15;
   Health health = 16;
+  // Why the intake cannot receive items. Empty when health is HEALTH_OK.
+  string health_message = 17;
 }
 
 message FactoryIntakeRun {
@@ -1801,6 +1803,8 @@ message ListWorkOrdersRequest {
   // Recorded external issue URL. Match that issue, not a text fragment.
   // GitHub matches the repository and issue number. Archived tasks stay hidden.
   string source_url = 9;
+  // Include archived tasks when resolving historical run identities.
+  bool include_archived = 10;
 }
 
 message ListWorkOrdersResponse {

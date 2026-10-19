@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -35,6 +36,7 @@ func TestGitHub__ResolveSecrets__PAT(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []byte("ghp_test_token"), secrets.Values[integrationSecretGitHubToken])
+	assert.NotContains(t, secrets.Values, integrationSecretGitHubContextToken)
 	assert.Contains(t, secrets.Usage, "GITHUB_TOKEN")
 	assert.Contains(t, secrets.Usage, "The gh CLI is already installed")
 	assert.Contains(t, secrets.Usage, "Do not download or install gh")
@@ -90,4 +92,152 @@ func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	body, err := io.ReadAll(httpCtx.Requests[0].Body)
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"repository_ids":[601]}`, string(body))
+	assert.NotContains(t, secrets.Values, integrationSecretGitHubContextToken)
+}
+
+func TestGitHub__ResolveSecrets__HostedContextRepositoriesAreReadOnly(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	organization, err := models.CreateOrganization("org-"+uuid.NewString(), "")
+	require.NoError(t, err)
+	other, err := models.CreateOrganization("org-"+uuid.NewString(), "")
+	require.NoError(t, err)
+	t.Setenv(common.EnvGitHubAppID, "99")
+	t.Setenv(common.EnvGitHubAppSlug, "superplane")
+	t.Setenv(common.EnvGitHubAppPrivateKey, string(githubPrivateKeyPEM(t)))
+	t.Setenv(common.EnvGitHubAppWebhookSecret, "whsec")
+
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 501,
+		AccountLogin:   "acme",
+	}))
+	integration, err := models.FindOrCreateVCSProviderBinding(database.Conn(), organization.ID, models.ProviderGitHub, 501, "acme")
+	require.NoError(t, err)
+	otherIntegration, err := models.FindOrCreateVCSProviderBinding(database.Conn(), other.ID, models.ProviderGitHub, 501, "acme")
+	require.NoError(t, err)
+	require.NoError(t, models.ReplaceVCSProviderRepositories(database.Conn(), models.ProviderGitHub, 501, []models.VCSProviderRepository{
+		{RepositoryID: 601, FullName: "acme/api"},
+		{RepositoryID: 602, FullName: "acme/web"},
+		{RepositoryID: 603, FullName: "acme/secret"},
+		{RepositoryID: 604, FullName: "acme/other"},
+		{RepositoryID: 605, FullName: "acme/bb"},
+	}))
+	require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), integration.ID, models.ProviderGitHub, 601))
+
+	factory := createContextRepoWorkspace(t, organization.ID, integration.ID)
+	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/web",
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", false, models.FactoryAgentResourceConfig{
+		Repository: "acme/secret",
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository:  "acme/bb",
+		VCSProvider: models.ProviderBitbucket,
+	})
+	require.NoError(t, err)
+
+	otherFactory := createContextRepoWorkspace(t, other.ID, otherIntegration.ID)
+	_, err = otherFactory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/other",
+	})
+	require.NoError(t, err)
+
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_read","expires_at":"2030-01-01T00:00:00Z"}`),
+	}}
+	secrets, err := (&GitHub{}).ResolveSecrets(core.IntegrationSecretContext{
+		HTTP: httpCtx,
+		Integration: &contexts.IntegrationContext{
+			IntegrationID: integration.ID.String(),
+			Metadata:      common.Metadata{HostedApp: true},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, runner.GitHubContextTokenEnv, integrationSecretGitHubContextToken)
+	assert.Equal(t, []byte("ghs_write"), secrets.Values[integrationSecretGitHubToken])
+	assert.Equal(t, []byte("ghs_read"), secrets.Values[integrationSecretGitHubContextToken])
+	assert.Contains(t, secrets.Usage, "read-only token")
+	require.Len(t, httpCtx.Requests, 2)
+	writeBody := readRequestBody(t, httpCtx.Requests[0])
+	readBody := readRequestBody(t, httpCtx.Requests[1])
+	assert.JSONEq(t, `{"repository_ids":[601]}`, writeBody)
+	assert.JSONEq(t, `{"repository_ids":[602],"permissions":{"contents":"read","metadata":"read"}}`, readBody)
+}
+
+func TestGitHub__ResolveSecrets__HostedContextRepositoryRefresh(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	organization, err := models.CreateOrganization("org-"+uuid.NewString(), "")
+	require.NoError(t, err)
+	t.Setenv(common.EnvGitHubAppID, "99")
+	t.Setenv(common.EnvGitHubAppSlug, "superplane")
+	t.Setenv(common.EnvGitHubAppPrivateKey, string(githubPrivateKeyPEM(t)))
+	t.Setenv(common.EnvGitHubAppWebhookSecret, "whsec")
+
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 501,
+		AccountLogin:   "acme",
+	}))
+	integration, err := models.FindOrCreateVCSProviderBinding(database.Conn(), organization.ID, models.ProviderGitHub, 501, "acme")
+	require.NoError(t, err)
+	require.NoError(t, models.ReplaceVCSProviderRepositories(database.Conn(), models.ProviderGitHub, 501, []models.VCSProviderRepository{
+		{RepositoryID: 601, FullName: "acme/api"},
+		{RepositoryID: 602, FullName: "acme/web"},
+	}))
+	require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), integration.ID, models.ProviderGitHub, 601))
+
+	factory := createContextRepoWorkspace(t, organization.ID, integration.ID)
+	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/web",
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/missing",
+	})
+	require.NoError(t, err)
+
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_read","expires_at":"2030-01-01T00:00:00Z"}`),
+	}}
+	secrets, err := (&GitHub{}).ResolveSecrets(core.IntegrationSecretContext{
+		HTTP: httpCtx,
+		Integration: &contexts.IntegrationContext{
+			IntegrationID: integration.ID.String(),
+			Metadata:      common.Metadata{HostedApp: true},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []byte("ghs_read"), secrets.Values[integrationSecretGitHubContextToken])
+	require.Len(t, httpCtx.Requests, 2)
+	assert.JSONEq(t, `{"repository_ids":[602],"permissions":{"contents":"read","metadata":"read"}}`, readRequestBody(t, httpCtx.Requests[1]))
+	var jobs int64
+	require.NoError(t, database.Conn().Model(&models.VCSProviderInstallationReconcileJob{}).
+		Where("provider = ? AND installation_id = ?", models.ProviderGitHub, int64(501)).
+		Count(&jobs).Error)
+	assert.Equal(t, int64(1), jobs)
+}
+
+func createContextRepoWorkspace(t *testing.T, organizationID, integrationID uuid.UUID) *models.Factory {
+	t.Helper()
+	factory, err := models.CreateFactory(database.Conn(), organizationID, "workspace-"+uuid.NewString(), "", "")
+	require.NoError(t, err)
+	integration := integrationID.String()
+	require.NoError(t, factory.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+		VCSIntegrationID: &integration,
+	}))
+	return factory
+}
+
+func readRequestBody(t *testing.T, request *http.Request) string {
+	t.Helper()
+	body, err := io.ReadAll(request.Body)
+	require.NoError(t, err)
+	return string(body)
 }

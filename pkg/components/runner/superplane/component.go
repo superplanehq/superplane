@@ -98,6 +98,7 @@ func (c *RunSuperPlane) Configuration() []configuration.Field {
 		runner.AgentWorkingDirectoryField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(""),
+		runner.AgentSkipSetupCommandsField(),
 		runner.AgentTimeoutField(),
 	}
 }
@@ -177,6 +178,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	}
 	files = runner.AppendPlanningSessionContinuation(ctx, environment, files)
 	environment, files = runner.AttachWorkspaceAgentResources(ctx, environment, files)
+	commands = runner.ApplyFactoryCheckout(files, commands, spec.Steps)
 	environment, files = runner.AttachFactoryCommitIdentity(ctx, environment, files)
 	files = runner.AppendTaskArtifactMCP(environment, files)
 	files = runner.AppendMergeConfidenceMCP(environment, files)

@@ -143,6 +143,15 @@ posthog:
   enabled: false
   key: ""
 
+#
+# Self-hosted billing is off when this value is empty and Polar is off.
+# An empty value follows polar.enabled. Set false or "no" to keep billing
+# off when Polar is on. Set true or "yes" to force billing on. SuperPlane
+# Cloud does not set this off.
+#
+billing:
+  enabled: ""
+
 polar:
   secretName: ""
   enabled: false

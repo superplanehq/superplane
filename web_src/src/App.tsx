@@ -16,6 +16,7 @@ import "./App.css";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
+import { SetupGuard } from "./components/SetupGuard";
 import { GlobalCommandPalette } from "./components/GlobalCommandPalette";
 import { RequireExperimentalFeature } from "./components/RequireExperimentalFeature";
 import { AccountProvider } from "./contexts/AccountProvider";
@@ -465,17 +466,6 @@ function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {
 
   const path = settings ? appSettingsPath(organizationId, canvasId) : appPath(organizationId, canvasId);
   return <Navigate to={`${path}${location.search}`} replace />;
-}
-
-function SetupGuard({ children }: { children: React.ReactNode }) {
-  const { setupRequired, loading } = useAccount();
-  const location = useLocation();
-
-  if (!loading && setupRequired && location.pathname !== "/setup") {
-    return <Navigate to="/setup" replace />;
-  }
-
-  return <>{children}</>;
 }
 
 export default App;

@@ -64,6 +64,78 @@ func Test__SoftDeleteWebhookIfUnreferenced(t *testing.T) {
 	})
 }
 
+func Test__WebhookFail__SetsErrorWhenMetadataIsEmpty(t *testing.T) {
+	support.Setup(t)
+
+	webhookID := createWebhook(t)
+	webhook, err := models.FindWebhook(webhookID)
+	require.NoError(t, err)
+
+	require.NoError(t, webhook.Fail(database.Conn(), "boom"))
+
+	assert.Equal(t, map[string]any{"setupError": "boom"}, webhookMetadata(t, webhookID))
+}
+
+func Test__WebhookFail__PreservesExistingMetadata(t *testing.T) {
+	support.Setup(t)
+
+	webhookID := createWebhook(t)
+	setWebhookMetadata(t, webhookID, map[string]any{"webhookId": "wh-123"})
+	webhook, err := models.FindWebhook(webhookID)
+	require.NoError(t, err)
+
+	require.NoError(t, webhook.Fail(database.Conn(), "boom"))
+
+	metadata := webhookMetadata(t, webhookID)
+	assert.Equal(t, "wh-123", metadata["webhookId"])
+	assert.Equal(t, "boom", metadata["setupError"])
+}
+
+func Test__WebhookFail__ReplacesPreviousSetupError(t *testing.T) {
+	support.Setup(t)
+
+	webhookID := createWebhook(t)
+	setWebhookMetadata(t, webhookID, map[string]any{"webhookId": "wh-123", "setupError": "old"})
+	webhook, err := models.FindWebhook(webhookID)
+	require.NoError(t, err)
+
+	require.NoError(t, webhook.Fail(database.Conn(), "new"))
+
+	metadata := webhookMetadata(t, webhookID)
+	assert.Equal(t, "wh-123", metadata["webhookId"])
+	assert.Equal(t, "new", metadata["setupError"])
+}
+
+func Test__WebhookFail__EmptyReasonLeavesMetadataUnchanged(t *testing.T) {
+	support.Setup(t)
+
+	webhookID := createWebhook(t)
+	setWebhookMetadata(t, webhookID, map[string]any{"webhookId": "wh-123"})
+	webhook, err := models.FindWebhook(webhookID)
+	require.NoError(t, err)
+
+	require.NoError(t, webhook.Fail(database.Conn(), ""))
+
+	assert.Equal(t, map[string]any{"webhookId": "wh-123"}, webhookMetadata(t, webhookID))
+}
+
+func setWebhookMetadata(t *testing.T, webhookID uuid.UUID, metadata map[string]any) {
+	t.Helper()
+	require.NoError(t, database.Conn().Model(&models.Webhook{ID: webhookID}).
+		Update("metadata", datatypes.NewJSONType[any](metadata)).Error)
+}
+
+func webhookMetadata(t *testing.T, webhookID uuid.UUID) map[string]any {
+	t.Helper()
+
+	reloaded, err := models.FindWebhook(webhookID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WebhookStateFailed, reloaded.State)
+	metadata, ok := reloaded.Metadata.Data().(map[string]any)
+	require.True(t, ok)
+	return metadata
+}
+
 func createWebhook(t *testing.T) uuid.UUID {
 	t.Helper()
 	webhookID := uuid.New()

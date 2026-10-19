@@ -24,7 +24,7 @@ func ListHostedCreditProducts(
 	if err != nil {
 		return nil, err
 	}
-	if !polar.Configured() {
+	if !models.BillingEnabled() || !polar.Configured() {
 		return &pb.ListHostedCreditProductsResponse{}, nil
 	}
 
@@ -66,7 +66,7 @@ func CreateHostedCreditCheckout(
 	if err != nil {
 		return nil, err
 	}
-	if !polar.Configured() {
+	if !models.BillingEnabled() || !polar.Configured() {
 		return nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")
 	}
 	plan, err := models.ResolveOrganizationBillingPlan(database.DB(ctx), organizationID)
@@ -139,7 +139,7 @@ func CreateBillingPortalSession(
 	if err != nil {
 		return nil, err
 	}
-	if !polar.Configured() {
+	if !models.BillingEnabled() || !polar.Configured() {
 		return nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")
 	}
 
@@ -258,7 +258,7 @@ func metadataValue(ctx context.Context, key string) string {
 }
 
 func billingState(ctx context.Context, orgID uuid.UUID) (enabled bool, hasCustomer bool) {
-	if !polar.Configured() {
+	if !models.BillingEnabled() || !polar.Configured() {
 		return false, false
 	}
 	settings, err := models.FindOrganizationLLMSettings(database.DB(ctx), orgID)

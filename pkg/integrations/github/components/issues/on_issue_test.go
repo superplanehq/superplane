@@ -289,6 +289,90 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
+	t.Run("superplane flag fires for the configured include label", func(t *testing.T) {
+		cases := []struct {
+			name   string
+			body   []byte
+			labels []string
+			mode   string
+			want   int
+		}{
+			{
+				name:   "configured label on an open issue",
+				body:   labeledIssueBody("superplane-claude", "open"),
+				labels: []string{"superplane-claude"},
+				want:   1,
+			},
+			{
+				name:   "default label does not fire when a custom include label is set",
+				body:   labeledIssueBody("superplane", "open"),
+				labels: []string{"superplane-claude"},
+				want:   0,
+			},
+			{
+				name:   "closed issue does not fire",
+				body:   labeledIssueBody("superplane-claude", "closed"),
+				labels: []string{"superplane-claude"},
+				want:   0,
+			},
+			{
+				name:   "any of several include labels fires",
+				body:   labeledIssueBody("bug", "open"),
+				labels: []string{"bug", "superplane-claude"},
+				want:   1,
+			},
+			{
+				name:   "default label fires without a label filter",
+				body:   labeledIssueBody("superplane", "open"),
+				labels: nil,
+				want:   1,
+			},
+			{
+				name:   "custom label does not fire without a label filter",
+				body:   labeledIssueBody("superplane-claude", "open"),
+				labels: nil,
+				want:   0,
+			},
+			{
+				name:   "default label fires with an exclude filter",
+				body:   labeledIssueBody("superplane", "open"),
+				labels: []string{"bug"},
+				mode:   "exclude",
+				want:   1,
+			},
+			{
+				name:   "custom label does not fire with an exclude filter",
+				body:   labeledIssueBody("superplane-claude", "open"),
+				labels: []string{"bug"},
+				mode:   "exclude",
+				want:   0,
+			},
+			{
+				name:   "other actions still fire",
+				body:   []byte(`{"action":"opened","issue":{"state":"open","labels":[{"name":"superplane-claude"}]}}`),
+				labels: []string{"superplane-claude"},
+				want:   1,
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				events := &contexts.EventContext{}
+				code, _, err := trigger.HandleWebhook(signedIssueContext(tc.body, map[string]any{
+					"repository":           "acme/widgets",
+					"actions":              []string{"opened", "labeled"},
+					"superplaneLabelAdded": true,
+					"labels":               tc.labels,
+					"labelFilterMode":      tc.mode,
+				}, events, nil))
+
+				assert.Equal(t, http.StatusOK, code)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.want, events.Count())
+			})
+		}
+	})
+
 	t.Run("assignment filter uses issue assignees", func(t *testing.T) {
 		body := []byte(`{"action":"opened","issue":{"assignees":[{"login":"octocat"}]}}`)
 		events := &contexts.EventContext{}
@@ -472,4 +556,8 @@ func Test__OnIssue__Setup(t *testing.T) {
 		assert.Equal(t, webhookRequest.EventType, "issues")
 		assert.Equal(t, webhookRequest.Repository, "hello")
 	})
+}
+
+func labeledIssueBody(label, state string) []byte {
+	return []byte(fmt.Sprintf(`{"action":"labeled","label":{"name":%q},"issue":{"state":%q,"labels":[{"name":%q}]}}`, label, state, label))
 }

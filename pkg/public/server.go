@@ -735,6 +735,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
+	publicRoute.HandleFunc("/api/v1/setup-owner/status", s.setupOwnerStatus).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/public/organizations/{org}/workspaces/{key}/lines/{lineId}/board", s.handlePublicFactoryBoard).Methods("GET")
@@ -808,6 +809,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
+	accountRoute.HandleFunc("/api/v1/setup-owner/progress", s.updateSetupOwnerProgress).Methods("PATCH")
 	accountRoute.HandleFunc(mcpserver.PathAuthorize, s.handleMCPAuthorize).Methods("GET", "POST")
 
 	// Admin API routes — requires account auth + installation admin
@@ -820,6 +822,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/pin", s.adminPinOrganization).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/pin", s.adminUnpinOrganization).Methods("DELETE")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/built-in-automations/reset", s.adminResetBuiltInAutomations).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/integrations", s.adminListOrgIntegrations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
@@ -1159,12 +1162,14 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
-	if err != nil {
-		tx.Rollback()
-		log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
-		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-		return
+	if models.BillingEnabled() {
+		err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+		if err != nil {
+			tx.Rollback()
+			log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
+			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	err = tx.Commit().Error
@@ -1443,8 +1448,10 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
 	}
-	if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
-		return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
+	if models.BillingEnabled() {
+		if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
+			return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
+		}
 	}
 
 	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")
@@ -1496,6 +1503,7 @@ type AccountResponse struct {
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
 	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
 	License                      AccountLicense                       `json:"license"`
+	BillingEnabled               bool                                 `json:"billing_enabled"`
 }
 
 // HideLicenseExpiryBannerEnv hides the license expiry banner when it is "yes"
@@ -1610,6 +1618,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
 		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
+		BillingEnabled:               models.BillingEnabled(),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {

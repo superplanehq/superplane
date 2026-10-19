@@ -11,34 +11,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/yaml"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 )
 
 func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
-	analysis := intakeAnalysisCloneCommand("")
-	implementation := implementationCloneCommand(t)
-	clone := cloneRepositoryCommand()
-
-	assert.Contains(t, analysis, clone)
-	assert.Contains(t, implementation, clone)
-	rewriteAt := strings.Index(analysis, "insteadOf")
-	headsAt := strings.Index(analysis, "git ls-remote --heads")
-	require.GreaterOrEqual(t, rewriteAt, 0)
-	require.GreaterOrEqual(t, headsAt, 0)
-	assert.Less(t, rewriteAt, headsAt)
-
+	// The runner inserts checkout. Analysis leaves commit setup off.
+	// Implement turns it on through the task environment.
 	scripts := []struct {
 		name   string
 		script string
 	}{
-		{name: "analysis", script: analysis},
-		{name: "implementation", script: implementation},
+		{name: "analysis", script: "checkout"},
+		{name: "implementation", script: "checkout"},
 	}
 	for _, script := range scripts {
 		t.Run(script.name, func(t *testing.T) {
 			t.Run("empty remote clones without a branch", func(t *testing.T) {
 				remote := bareRepository(t)
-				result := runCloneScript(t, script.script, fileURL(remote), "main")
+				result := runCloneScript(t, script.script, fileURL(remote), "main", script.name == "implementation")
 
 				require.NoError(t, result.err, result.stderr)
 				assert.DirExists(t, filepath.Join(result.dir, "repo"))
@@ -58,7 +48,7 @@ func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
 			t.Run("named branch uses a depth-1 clone", func(t *testing.T) {
 				remote := bareRepository(t)
 				commitRemoteBranch(t, remote, "develop")
-				result := runCloneScript(t, script.script, fileURL(remote), "develop")
+				result := runCloneScript(t, script.script, fileURL(remote), "develop", script.name == "implementation")
 
 				require.NoError(t, result.err, result.stderr)
 				cloneLine := cloneInvocation(result.gitArgs)
@@ -74,7 +64,7 @@ func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
 			t.Run("missing named branch fails", func(t *testing.T) {
 				remote := bareRepository(t)
 				commitRemoteBranch(t, remote, "develop")
-				result := runCloneScript(t, script.script, fileURL(remote), "main")
+				result := runCloneScript(t, script.script, fileURL(remote), "main", script.name == "implementation")
 
 				require.Error(t, result.err)
 				assert.Contains(t, result.stderr, "Remote branch main not found. The repository has other branches.")
@@ -89,10 +79,11 @@ func TestEmptyRepositoryUsesBranchFromLostInitRace(t *testing.T) {
 	remote := bareRepository(t)
 	result := runCloneScriptWithPushShim(
 		t,
-		implementationCloneCommand(t),
+		"checkout",
 		fileURL(remote),
 		"develop",
 		seedRemoteBranchScript(t, "develop"),
+		true,
 	)
 
 	require.NoError(t, result.err, result.stderr)
@@ -109,10 +100,11 @@ func TestEmptyRepositoryFailsWhenInitPushFails(t *testing.T) {
 	remote := bareRepository(t)
 	result := runCloneScriptWithPushShim(
 		t,
-		implementationCloneCommand(t),
+		"checkout",
 		fileURL(remote),
 		"develop",
 		"#!/bin/sh\nexit 1\n",
+		true,
 	)
 
 	require.Error(t, result.err)
@@ -124,7 +116,7 @@ func TestEmptyRepositoryFailsWhenInitPushFails(t *testing.T) {
 
 func TestEmptyRepositoryCreatesNamedBaseBranch(t *testing.T) {
 	remote := bareRepository(t)
-	result := runCloneScript(t, implementationCloneCommand(t), fileURL(remote), "develop")
+	result := runCloneScript(t, "checkout", fileURL(remote), "develop", true)
 
 	require.NoError(t, result.err, result.stderr)
 	heads := gitOutput(t, remote, "ls-remote", "--heads", fileURL(remote))
@@ -144,41 +136,12 @@ func TestEmptyRepositoryCreatesNamedBaseBranch(t *testing.T) {
 func TestCloneRepositoryUsesMainWhenBranchIsEmpty(t *testing.T) {
 	remote := bareRepository(t)
 	commitRemoteBranch(t, remote, "main")
-	result := runCloneScript(t, cloneRepositoryCommand(), fileURL(remote), "")
+	result := runCloneScript(t, "checkout", fileURL(remote), "", false)
 
 	require.NoError(t, result.err, result.stderr)
 	cloneLine := cloneInvocation(result.gitArgs)
 	assert.Contains(t, cloneLine, "--depth 1")
 	assert.Contains(t, cloneLine, "--branch main")
-}
-
-func implementationCloneCommand(t *testing.T) string {
-	t.Helper()
-
-	result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
-		appID:   "app-1",
-		appName: "Implement refunds",
-		installParams: map[string]string{
-			"appRepository": "acme/refunds",
-			"defaultBranch": "develop",
-		},
-		integrations: map[string]factoryTemplateIntegration{
-			"github": {id: "github-1", name: "acme-github"},
-		},
-		agent: &factoryTemplateAgent{
-			component:                 "runnerOpenRouter",
-			model:                     "anthropic/claude-sonnet-4-6",
-			credentialSource:          "integration",
-			credentialIntegrationName: "acme-openrouter",
-		},
-	})
-	require.NoError(t, err)
-
-	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
-	require.NoError(t, err)
-	command, ok := implementationStep(t, findYAMLNode(t, canvas, "implementation-agent-no-issue"), "Clone Repo")["command"].(string)
-	require.True(t, ok)
-	return command
 }
 
 type cloneScriptResult struct {
@@ -188,12 +151,12 @@ type cloneScriptResult struct {
 	err     error
 }
 
-func runCloneScript(t *testing.T, script, repoURL, base string) cloneScriptResult {
+func runCloneScript(t *testing.T, script, repoURL, base string, commitSetup bool) cloneScriptResult {
 	t.Helper()
-	return runCloneScriptWithPushShim(t, script, repoURL, base, "")
+	return runCloneScriptWithPushShim(t, script, repoURL, base, "", commitSetup)
 }
 
-func runCloneScriptWithPushShim(t *testing.T, script, repoURL, base, pushShim string) cloneScriptResult {
+func runCloneScriptWithPushShim(t *testing.T, script, repoURL, base, pushShim string, commitSetup bool) cloneScriptResult {
 	t.Helper()
 
 	gitPath := gitBinary(t)
@@ -218,11 +181,19 @@ func runCloneScriptWithPushShim(t *testing.T, script, repoURL, base, pushShim st
 	configPath := filepath.Join(home, ".gitconfig")
 	denyNetworkGit(t, configPath)
 
+	// Stage the real checkout command: template steps run it as a single
+	// word resolved through the bin directory on PATH, so execution
+	// tests run through the shipped file.
+	helperPath := filepath.Join(dir, filepath.FromSlash(runner.WorkspaceCheckoutScriptPath))
+	require.NoError(t, os.MkdirAll(filepath.Dir(helperPath), 0o755))
+	require.NoError(t, os.WriteFile(helperPath, []byte(runner.WorkspaceCheckoutScript()), 0o755))
+
 	cmd := exec.Command("bash", "-c", script)
 	cmd.Dir = dir
-	cmd.Env = []string{
+	env := []string{
 		"PATH=" + binDir + ":/usr/bin:/bin",
 		"HOME=" + home,
+		"SUPERPLANE_TASK_DIR=" + dir,
 		"GIT_CONFIG_GLOBAL=" + configPath,
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_TERMINAL_PROMPT=0",
@@ -235,6 +206,12 @@ func runCloneScriptWithPushShim(t *testing.T, script, repoURL, base, pushShim st
 		"PUSH_SHIM=" + shimPath,
 		"PUSH_SHIM_ONCE=" + filepath.Join(dir, "push-shim-once"),
 	}
+	// The Implement step opts into the commit setup through its step
+	// environment; analysis runs leave it off and stay read-only.
+	if commitSetup {
+		env = append(env, runner.WorkspaceCheckoutCommitSetupEnv+"=1")
+	}
+	cmd.Env = env
 	output, err := cmd.CombinedOutput()
 	args, readErr := os.ReadFile(logPath)
 	if readErr != nil && !os.IsNotExist(readErr) {

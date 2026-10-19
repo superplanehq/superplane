@@ -13,6 +13,13 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	setupOwnerStatusDisabled   = "disabled"
+	setupOwnerStatusRequired   = "required"
+	setupOwnerStatusInProgress = "in_progress"
+	setupOwnerStatusComplete   = "complete"
+)
+
 type SetupOwnerRequest struct {
 	Email     string `json:"email"`
 	FirstName string `json:"first_name"`
@@ -97,7 +104,16 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 			return err
 		}
-		return models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+		if models.BillingEnabled() {
+			if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
+				return err
+			}
+		}
+
+		// Account creation is not the end of the wizard: the owner still
+		// goes through license, SMTP, and fleet steps. Record the next step
+		// so a refresh resumes the wizard instead of reopening the form.
+		return models.SetOwnerSetupStep(tx, models.OwnerSetupStepLicense)
 	})
 
 	if err != nil {
@@ -121,4 +137,98 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		OrganizationID:   organization.ID.String(),
 		OrganizationSlug: organization.Slug,
 	})
+}
+
+type SetupOwnerStatusResponse struct {
+	Status string `json:"status"`
+	Step   string `json:"step,omitempty"`
+}
+
+// setupOwnerStatus reports the owner setup wizard state to any caller.
+// It must not expose organization data: an anonymous caller only learns
+// whether the wizard is available, required, in progress, or closed.
+func (s *Server) setupOwnerStatus(w http.ResponseWriter, r *http.Request) {
+	if !middleware.OwnerSetupEnabled() {
+		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusDisabled})
+		return
+	}
+
+	if middleware.IsOwnerSetupRequired() {
+		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusRequired})
+		return
+	}
+
+	step, err := models.GetOwnerSetupStep(database.DB(r.Context()))
+	if err != nil {
+		log.Errorf("Failed to read owner setup step: %v", err)
+		http.Error(w, "Failed to read owner setup status", http.StatusInternalServerError)
+		return
+	}
+
+	if step == "" {
+		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusComplete})
+		return
+	}
+
+	respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusInProgress, Step: step})
+}
+
+type SetupOwnerProgressRequest struct {
+	Step string `json:"step"`
+}
+
+// updateSetupOwnerProgress moves the owner setup wizard to a new step, or
+// closes it when the step is cleared. Only an installation admin can write
+// progress, and a closed wizard cannot be reopened.
+func (s *Server) updateSetupOwnerProgress(w http.ResponseWriter, r *http.Request) {
+	if !middleware.OwnerSetupEnabled() {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if !account.IsInstallationAdmin() {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req SetupOwnerProgressRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Step != "" && !models.IsOwnerSetupStep(req.Step) {
+		http.Error(w, "Unknown setup step", http.StatusBadRequest)
+		return
+	}
+
+	var updated bool
+	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		var err error
+		updated, err = models.SetOwnerSetupStepIfOpen(tx, req.Step)
+		return err
+	})
+	if err != nil {
+		log.Errorf("Failed to update owner setup step: %v", err)
+		http.Error(w, "Failed to update owner setup progress", http.StatusInternalServerError)
+		return
+	}
+
+	if !updated {
+		http.Error(w, "Owner setup is already finished", http.StatusConflict)
+		return
+	}
+
+	if req.Step == "" {
+		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusComplete})
+		return
+	}
+
+	respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusInProgress, Step: req.Step})
 }

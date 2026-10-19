@@ -1,7 +1,6 @@
 import { factoriesMaterializeFactoryAutomationDefaults, type CanvasesCanvas } from "@/api-client";
 import {
   requestCanvasAgentSidebarClose,
-  requestCanvasAgentSidebarOpen,
   subscribeCanvasAgentSidebarChanged,
 } from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
@@ -124,13 +123,6 @@ export function useFactoryAppCanvasEditActions({
     configureActionsRef,
   });
 
-  const handleAgentOpenChange = useCallback(
-    (open: boolean) => {
-      handleSearchParamFlag("agent", open);
-    },
-    [handleSearchParamFlag],
-  );
-
   const handleComponentsOpenChange = useCallback(
     (open: boolean) => {
       handleSearchParamFlag("blocks", open);
@@ -143,7 +135,6 @@ export function useFactoryAppCanvasEditActions({
     isConfigure,
     agentOpen,
     componentsOpen,
-    onAgentOpenChange: handleAgentOpenChange,
     onComponentsOpenChange: handleComponentsOpenChange,
   });
 
@@ -153,7 +144,6 @@ export function useFactoryAppCanvasEditActions({
     handleYamlViewOpenChange,
     handleViewYaml,
     handleEditWithLocalAgent,
-    handleAgentOpenChange,
     handleComponentsOpenChange,
     ...reset,
   };
@@ -222,28 +212,17 @@ function useFactoryAppCanvasWorkspaceSync({
   isConfigure,
   agentOpen,
   componentsOpen,
-  onAgentOpenChange,
   onComponentsOpenChange,
 }: {
   appId: string;
   isConfigure: boolean;
   agentOpen: boolean;
   componentsOpen: boolean;
-  onAgentOpenChange: (open: boolean) => void;
   onComponentsOpenChange: (open: boolean) => void;
 }) {
   useEffect(() => {
     if (!appId) return;
-    if (!isConfigure) {
-      writeCanvasAgentSidebarOpen(appId, false);
-      requestCanvasAgentSidebarClose(appId);
-      return;
-    }
-    writeCanvasAgentSidebarOpen(appId, agentOpen);
-    if (agentOpen) {
-      requestCanvasAgentSidebarOpen(appId);
-      return;
-    }
+    writeCanvasAgentSidebarOpen(appId, false);
     requestCanvasAgentSidebarClose(appId);
   }, [appId, agentOpen, isConfigure]);
 
@@ -255,10 +234,11 @@ function useFactoryAppCanvasWorkspaceSync({
   useEffect(() => {
     if (!isConfigure || !appId) return;
     return subscribeCanvasAgentSidebarChanged((canvasId, open) => {
-      if (canvasId !== appId) return;
-      onAgentOpenChange(open);
+      if (canvasId !== appId || !open) return;
+      writeCanvasAgentSidebarOpen(appId, false);
+      requestCanvasAgentSidebarClose(appId);
     });
-  }, [appId, isConfigure, onAgentOpenChange]);
+  }, [appId, isConfigure]);
 
   useEffect(() => {
     if (!isConfigure || !appId) return;

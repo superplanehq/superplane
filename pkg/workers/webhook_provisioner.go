@@ -306,7 +306,11 @@ func (w *WebhookProvisioner) handleProvisioningError(logger *log.Entry, webhook 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if webhook.HasExceededRetries() {
 			logger.Infof("Webhook has exceeded max retries (%d), marking as failed", webhook.MaxRetries)
-			if err := webhook.MarkFailed(tx); err != nil {
+			reason := ""
+			if originalErr != nil {
+				reason = originalErr.Error()
+			}
+			if err := webhook.Fail(tx, reason); err != nil {
 				logger.Errorf("Error marking webhook as failed: %v", err)
 				return err
 			}

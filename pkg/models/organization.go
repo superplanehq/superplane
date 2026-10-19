@@ -333,13 +333,16 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 
 	now := time.Now()
 	organization := Organization{
-		Name:                        name,
-		Slug:                        slug,
-		Description:                 description,
-		AllowedProviders:            datatypes.JSONSlice[string]{ProviderGitHub},
-		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureFactories},
-		CreatedAt:                   &now,
-		UpdatedAt:                   &now,
+		Name:             name,
+		Slug:             slug,
+		Description:      description,
+		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub},
+		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{
+			features.FeatureFactories,
+			features.FeatureWorkspaceAgent,
+		},
+		CreatedAt: &now,
+		UpdatedAt: &now,
 	}
 
 	err = tx.
@@ -352,8 +355,10 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		if inviteErr != nil {
 			return nil, inviteErr
 		}
-		if _, planErr := EnsureOrganizationBillingPlan(tx, organization.ID); planErr != nil {
-			return nil, planErr
+		if BillingEnabled() {
+			if _, planErr := EnsureOrganizationBillingPlan(tx, organization.ID); planErr != nil {
+				return nil, planErr
+			}
 		}
 
 		return &organization, nil

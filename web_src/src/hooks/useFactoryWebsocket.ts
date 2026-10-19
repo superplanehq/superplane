@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderSummary } from "@/api-client";
 import { factoriesDescribeWorkOrder } from "@/api-client";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -12,6 +12,7 @@ import {
   applyWorkOrderToListCaches,
   cachedWorkOrderIdsFromLists,
   pageKeysWithUnknownWorkOrderMembership,
+  patchCachedWorkOrderList,
   removeWorkOrderFromListCaches,
 } from "./workOrderListCache";
 
@@ -84,6 +85,10 @@ function invalidateOrdersList(queryClient: WorkOrderQueryClient, organizationId:
   // exact: the detail, events, and artifacts keys extend this prefix.
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
+    exact: true,
+  });
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.historicalWorkOrders(organizationId, factoryId),
     exact: true,
   });
   void queryClient.invalidateQueries({
@@ -161,6 +166,10 @@ function dropMissingWorkOrder(
   factoryId: string,
   orderId: string,
 ) {
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.historicalWorkOrders(organizationId, factoryId),
+    exact: true,
+  });
   removeWorkOrderFromListCaches(queryClient, organizationId, factoryId, orderId);
   queryClient.removeQueries({
     queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
@@ -189,6 +198,10 @@ async function refreshUpdatedWorkOrder(
   );
   queryClient.setQueryData(factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId), order);
   applyWorkOrderToListCaches(queryClient, organizationId, factoryId, orderId, order);
+  queryClient.setQueryData<FactoriesWorkOrderSummary[]>(
+    factoryQueryKeys.historicalWorkOrders(organizationId, factoryId),
+    (orders) => patchCachedWorkOrderList(orders, orderId, order),
+  );
   for (const queryKey of unknownMembershipKeys) {
     void queryClient.invalidateQueries({ queryKey });
   }

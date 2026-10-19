@@ -12,6 +12,37 @@ import (
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
+func TestPRFeedbackOmitsCommitIdentityWhenWorkspaceAgentIsEnabled(t *testing.T) {
+	cases := []struct {
+		name     string
+		provider string
+		build    func(prFeedbackBuildRequest) *yaml.Canvas
+		prompt   string
+	}{
+		{name: "discussion", build: buildDiscussionPRFeedbackCanvas, prompt: "Address PR feedback"},
+		{name: "discussion bitbucket", provider: models.ProviderBitbucket, build: buildDiscussionPRFeedbackCanvas, prompt: "Address PR feedback"},
+		{name: "checks", build: buildChecksPRFeedbackCanvas, prompt: "Fix Failed Checks"},
+		{name: "checks bitbucket", provider: models.ProviderBitbucket, build: buildChecksPRFeedbackCanvas, prompt: "Fix Failed Builds"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			canvas := testCase.build(prFeedbackBuildRequest{
+				Repository:         "acme/app",
+				Mention:            prFeedbackDefaultMention,
+				VCSProvider:        testCase.provider,
+				OmitCommitIdentity: true,
+				MaximumAttempts:    prFeedbackDefaultMaximumAttempts,
+				CheckNames:         []string{"lint"},
+			})
+			runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
+			assert.False(t, runnerHasStep(t, runner, "Set Up Git User"))
+			assert.False(t, runnerHasStep(t, runner, "Set Up DCO Signing"))
+			assert.True(t, runnerHasStep(t, runner, testCase.prompt))
+			assert.True(t, runnerHasStep(t, runner, "Commit and Push"))
+		})
+	}
+}
+
 func Test__ResolvePRFeedbackGraph(t *testing.T) {
 	t.Run("resolves a generated graph", func(t *testing.T) {
 		spec := prFeedbackSpecFromTemplate(t, "acme/app")
@@ -335,14 +366,7 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
 		assert.Contains(t, runnerEnv(t, runner, "PR_HEAD"), "pull_request?.head?.ref")
 
-		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
-		assert.Contains(t, checkout, "gh auth setup-git --hostname github.com --force")
-		assert.Contains(t, checkout, `git clone --depth 1 "https://github.com/${REPO}.git" repo`)
-		assert.NotContains(t, checkout, "x-access-token")
-		assert.Contains(t, checkout, `git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`)
-		assert.Contains(t, checkout, `git checkout "${PR_HEAD}"`)
-		assert.NotContains(t, checkout, "pr-feedback")
-
+		assert.False(t, runnerHasStep(t, runner, "Checkout Pull Request"))
 		assert.Contains(t, runnerEnv(t, runner, "COAUTHORS"), "task().assignees")
 		dco := runnerStepCommand(t, runner, "Set Up DCO Signing")
 		assert.Contains(t, dco, runnerpkg.FactoryRepoCommitSetup())
@@ -474,10 +498,7 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, runnerStepCommand(t, runner, "Set Up DCO Signing"), runnerpkg.FactoryRepoCommitSetup())
 		assert.Contains(t, runnerStepPrompt(t, runner, "Fix Failed Checks"), runnerpkg.FactoryCommitIdentityPrompt)
 
-		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
-		assert.Contains(t, checkout, "gh auth setup-git --hostname github.com --force")
-		assert.Contains(t, checkout, `git clone --depth 1 "https://github.com/${REPO}.git" repo`)
-		assert.NotContains(t, checkout, "x-access-token")
+		assert.False(t, runnerHasStep(t, runner, "Checkout Pull Request"))
 		assert.Equal(t, false, runner.Configuration["includeVisualEvidence"])
 	})
 
