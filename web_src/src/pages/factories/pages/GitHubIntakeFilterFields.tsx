@@ -126,7 +126,7 @@ function IntakeLabelField({ labels, options, loading, onChange }: IntakeLabelFie
   }
 
   return (
-    <div className="mb-1 ml-6 flex flex-col gap-2" data-testid="intake-label-options">
+    <div className="mb-1 flex flex-col gap-2" data-testid="intake-label-options">
       <IntakeSelectedLabels
         labels={view.selected}
         onRemove={(label) => onChange(labels.filter((entry) => entry !== label))}
