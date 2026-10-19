@@ -729,6 +729,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
+	publicRoute.HandleFunc("/api/v1/setup-owner/status", s.setupOwnerStatus).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/public/organizations/{org}/workspaces/{key}/lines/{lineId}/board", s.handlePublicFactoryBoard).Methods("GET")
@@ -802,6 +803,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
+	accountRoute.HandleFunc("/api/v1/setup-owner/progress", s.updateSetupOwnerProgress).Methods("PATCH")
 	accountRoute.HandleFunc(mcpserver.PathAuthorize, s.handleMCPAuthorize).Methods("GET", "POST")
 
 	// Admin API routes — requires account auth + installation admin
