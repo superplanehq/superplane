@@ -4,18 +4,24 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
+	githubauth "github.com/google/go-github/v75/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
-	integrationSecretGitHubToken = "GITHUB_TOKEN"
-	githubSetupName              = "Set up GitHub"
+	integrationSecretGitHubToken        = "GITHUB_TOKEN"
+	integrationSecretGitHubContextToken = "SUPERPLANE_GITHUB_CONTEXT_TOKEN"
+	githubSetupName                     = "Set up GitHub"
 )
 
 const githubSecretUsage = `A GitHub token is available in the GITHUB_TOKEN environment variable.
@@ -120,6 +126,91 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 		return "", fmt.Errorf("failed to create installation access token: %v", err)
 	}
 
+	return token, nil
+}
+
+// resolveContextAccessToken mints a contents:read installation token for
+// enabled GitHub context repositories on workspaces that use this integration.
+// The write token stays limited to the workspace and backlog repositories.
+// Names the catalog does not know yet schedule a full installation refresh.
+func resolveContextAccessToken(httpCtx core.HTTPContext, integrationCtx core.IntegrationContext) (string, error) {
+	if !integrationCtx.LegacySetup() {
+		return "", nil
+	}
+	var metadata common.Metadata
+	if err := mapstructure.Decode(integrationCtx.GetMetadata(), &metadata); err != nil || !metadata.HostedApp {
+		return "", nil
+	}
+	hosted, err := common.ResolveHostedAppBinding(integrationCtx)
+	if err != nil {
+		return "", err
+	}
+	names, err := models.ListEnabledGitHubContextRepositoryNames(database.Conn(), integrationCtx.ID())
+	if err != nil {
+		return "", fmt.Errorf("failed to list context repositories: %w", err)
+	}
+	if len(names) == 0 {
+		return "", nil
+	}
+	repositoryIDs, missing, err := models.MatchVCSProviderRepositoryIDs(
+		database.Conn(),
+		models.ProviderGitHub,
+		hosted.ID,
+		names,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to match context repositories: %w", err)
+	}
+	if len(missing) > 0 {
+		binding, bindErr := models.FindVCSProviderIntegrationBinding(database.Conn(), integrationCtx.ID())
+		if bindErr != nil {
+			return "", fmt.Errorf("failed to find GitHub App binding: %w", bindErr)
+		}
+		enqueueErr := models.EnqueueVCSProviderInstallationReconciliation(
+			database.Conn(),
+			models.ProviderGitHub,
+			hosted.ID,
+			binding.OrganizationID,
+			time.Now(),
+		)
+		if enqueueErr != nil && len(repositoryIDs) == 0 {
+			return "", fmt.Errorf("failed to refresh GitHub repositories: %w", enqueueErr)
+		}
+	}
+	if len(repositoryIDs) == 0 {
+		return "", nil
+	}
+	slices.Sort(repositoryIDs)
+	return mintReadOnlyInstallationToken(httpCtx, hosted.App.ID, hosted.ID, hosted.App.PrivateKey, repositoryIDs)
+}
+
+func mintReadOnlyInstallationToken(
+	httpCtx core.HTTPContext,
+	appID, installationID int64,
+	pem string,
+	repositoryIDs []int64,
+) (string, error) {
+	transport, err := ghinstallation.New(
+		&httpContextTransport{http: httpCtx},
+		appID,
+		installationID,
+		[]byte(pem),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create apps transport: %v", err)
+	}
+	read := "read"
+	transport.InstallationTokenOptions = &githubauth.InstallationTokenOptions{
+		RepositoryIDs: repositoryIDs,
+		Permissions: &githubauth.InstallationPermissions{
+			Contents: &read,
+			Metadata: &read,
+		},
+	}
+	token, err := transport.Token(context.Background())
+	if err != nil {
+		return "", fmt.Errorf("failed to create read-only installation access token: %v", err)
+	}
 	return token, nil
 }
 

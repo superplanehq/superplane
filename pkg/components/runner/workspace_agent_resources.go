@@ -37,6 +37,10 @@ const (
 	// Implement sets it on the node environment. Pull request checkouts
 	// leave it off so the helper never pushes an initial commit.
 	WorkspaceCheckoutCommitSetupEnv = "CHECKOUT_COMMIT_SETUP"
+	// GitHubContextTokenEnv is the read-only installation token used to
+	// clone context repositories. The GitHub integration sets it. The
+	// write token in GITHUB_TOKEN stays on the workspace repository.
+	GitHubContextTokenEnv = "SUPERPLANE_GITHUB_CONTEXT_TOKEN"
 )
 
 type workspaceMCPServer struct {
@@ -352,9 +356,11 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 // factory agent steps. It checks out the main repo to repo/, positions a
 // pull request when the task environment describes one, then clones every
 // workspace_context.json entry. Setup commands are separate steps.
-// Authentication comes from the VCS integration setup that already ran
-// (gh auth setup-git / Bitbucket credential helper), so the script uses
-// plain HTTPS URLs and never embeds tokens. It is idempotent: directories
+// Authentication for the main repository comes from the VCS integration
+// setup that already ran (gh auth setup-git / Bitbucket credential
+// helper). GitHub context repositories use a read-only token from
+// SUPERPLANE_GITHUB_CONTEXT_TOKEN and skip the write credential helper.
+// The script uses plain HTTPS URLs and never embeds tokens. It is idempotent: directories
 // that already contain a checkout are reused, never wiped. The factory
 // commit setup (agent git identity, trailer hook, branch handling) runs
 // only for a default-branch checkout when CHECKOUT_COMMIT_SETUP=1.
@@ -577,6 +583,17 @@ if [ -f "$ctx" ]; then
     _sp_tab="$(printf '\t')"
     _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();if(u&&dir){console.log(u+"\t"+dir);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx")" || exit 1
     if [ -n "$_sp_ctx_list" ]; then
+      clone_context_repository() {
+        case "$1" in
+          https://github.com/*|https://www.github.com/*)
+            if [ -n "${` + GitHubContextTokenEnv + `:-}" ]; then
+              git -c credential.helper= -c 'credential.helper=!f() { echo username=superplane; echo "password=$` + GitHubContextTokenEnv + `"; }; f' clone --depth 1 "$1" "$2"
+              return
+            fi
+            ;;
+        esac
+        git clone --depth 1 "$1" "$2"
+      }
       printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir; do
         case "$dir" in
           ""|"."|"/"|*..*)
@@ -596,7 +613,7 @@ if [ -f "$ctx" ]; then
         fi
         mkdir -p "$(dirname "$dir")"
         rm -rf "$dir"
-        git clone --depth 1 "$url" "$dir" || exit 1
+        clone_context_repository "$url" "$dir" || exit 1
       done
     fi
     unset _sp_tab _sp_ctx_list

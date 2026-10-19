@@ -341,6 +341,18 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 		if err := models.DeleteVCSProviderRepositories(tx, models.ProviderGitHub, installationID, removedIDs); err != nil {
 			return err
 		}
+		// The added and removed lists can be empty or truncated, including
+		// when access changes to every repository. Replace the catalog from
+		// the installation API.
+		if err := models.EnqueueVCSProviderInstallationReconciliation(
+			tx,
+			models.ProviderGitHub,
+			installationID,
+			uuid.Nil,
+			time.Now(),
+		); err != nil {
+			return err
+		}
 		return enqueueWebhookRepositories(tx, added)
 
 	case *gh.MemberEvent:
