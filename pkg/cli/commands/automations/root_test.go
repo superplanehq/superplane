@@ -8,7 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-func TestHelpOmitsAutomationDefinitionEdits(t *testing.T) {
+func TestHelpDoesNotRegisterAutomationDefinitionEdits(t *testing.T) {
 	root := NewCommand(core.BindOptions{})
 	var buf bytes.Buffer
 	root.SetOut(&buf)
@@ -23,8 +23,7 @@ func TestHelpOmitsAutomationDefinitionEdits(t *testing.T) {
 	}
 	for _, name := range []string{"create", "get", "init", "update", "staging"} {
 		require.NotContains(t, help, name)
-		cmd, _, err := root.Find([]string{name})
-		require.NoError(t, err)
-		require.True(t, cmd.Hidden)
+		_, _, err := root.Find([]string{name})
+		require.Error(t, err)
 	}
 }
