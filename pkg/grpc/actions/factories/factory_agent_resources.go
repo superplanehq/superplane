@@ -2,15 +2,19 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/githubapp"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func ListFactoryAgentResources(
@@ -66,6 +70,9 @@ func CreateFactoryAgentResource(
 
 	config, err := protoAgentResourceConfig(req.GetKind(), req.GetUrl(), req.GetAuth(), req.GetHeaders(), req.GetMarkdown(), req.GetRepository(), req.GetCommands(), req.GetVcsProvider())
 	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create agent resource")
+	}
+	if err := authorizeContextRepository(ctx, db, organizationID, factory, config); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
 	resource, err := factory.CreateAgentResource(
@@ -167,6 +174,16 @@ func UpdateFactoryAgentResource(
 		config = &merged
 	}
 
+	if resource.Kind == models.FactoryAgentResourceKindContextRepo && (config != nil || (enabled != nil && *enabled)) {
+		merged := resource.Config.Data()
+		if config != nil {
+			merged = *config
+		}
+		if err := authorizeContextRepository(ctx, db, organizationID, factory, merged); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update agent resource")
+		}
+	}
+
 	var revocation *oauthRevocation
 	if config != nil && resource.Config.Data().InvalidatesOAuth(*config) {
 		revocation = captureOAuthRevocation(ctx, deps, db, resource)
@@ -176,6 +193,59 @@ func UpdateFactoryAgentResource(
 	}
 	revocation.run(ctx, deps)
 	return &pb.UpdateFactoryAgentResourceResponse{Resource: serializeFactoryAgentResource(resource)}, nil
+}
+
+// authorizeContextRepository rejects a GitHub context repository the caller
+// cannot access. The read token later covers every saved name on the
+// installation, so the save must use the same access check as workspace
+// repository selection. Workspaces that are not connected yet do not receive
+// that token.
+func authorizeContextRepository(
+	ctx context.Context,
+	db *gorm.DB,
+	organizationID string,
+	factory *models.Factory,
+	config models.FactoryAgentResourceConfig,
+) error {
+	provider := strings.ToLower(strings.TrimSpace(config.VCSProvider))
+	if provider != "" && provider != models.ProviderGitHub {
+		return nil
+	}
+	if strings.TrimSpace(config.Repository) == "" {
+		return nil
+	}
+	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
+	if integrationID == "" || !githubapp.AccountConnectionRequired(ctx) {
+		return nil
+	}
+	bindingID, err := uuid.Parse(integrationID)
+	if err != nil {
+		return err
+	}
+	binding, err := models.FindVCSProviderIntegrationBinding(db, bindingID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// A personal token or a customer GitHub App has no installation
+		// binding. Those automations do not receive the read-only token.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if binding.Provider != models.ProviderGitHub {
+		return nil
+	}
+
+	repository, err := findGitHubCatalogRepositoryByName(ctx, db, organizationID, config.Repository)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return grpcerrors.PermissionDenied(err, "repository is not accessible")
+	}
+	if err != nil {
+		return err
+	}
+	if repository.InstallationID != binding.InstallationID {
+		return grpcerrors.PermissionDenied(nil, "repository is not accessible")
+	}
+	return nil
 }
 
 func DeleteFactoryAgentResource(

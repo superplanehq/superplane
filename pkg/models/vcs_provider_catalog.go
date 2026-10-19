@@ -1251,6 +1251,65 @@ func GrantVCSProviderBindingRepository(
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&grant).Error
 }
 
+// MatchVCSProviderRepositoryIDs resolves owner/name values to repository IDs
+// on one installation. Missing names are returned so the caller can refresh
+// the catalog. Matching is case-insensitive.
+func MatchVCSProviderRepositoryIDs(
+	tx *gorm.DB,
+	provider string,
+	installationID int64,
+	fullNames []string,
+) (ids []int64, missing []string, err error) {
+	provider, err = normalizeVCSProvider(provider)
+	if err != nil {
+		return nil, nil, err
+	}
+	wanted := make([]string, 0, len(fullNames))
+	seen := map[string]struct{}{}
+	for _, name := range fullNames {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		wanted = append(wanted, name)
+	}
+	if len(wanted) == 0 {
+		return nil, nil, nil
+	}
+
+	var repositories []VCSProviderRepository
+	err = tx.
+		Where("provider = ? AND installation_id = ? AND LOWER(full_name) IN ?", provider, installationID, wanted).
+		Find(&repositories).
+		Error
+	if err != nil {
+		return nil, nil, err
+	}
+	found := make(map[string]int64, len(repositories))
+	for _, repository := range repositories {
+		found[strings.ToLower(repository.FullName)] = repository.RepositoryID
+	}
+	ids = make([]int64, 0, len(found))
+	idSeen := map[int64]struct{}{}
+	for _, name := range wanted {
+		repositoryID, ok := found[name]
+		if !ok {
+			missing = append(missing, name)
+			continue
+		}
+		if _, ok := idSeen[repositoryID]; ok {
+			continue
+		}
+		idSeen[repositoryID] = struct{}{}
+		ids = append(ids, repositoryID)
+	}
+	return ids, missing, nil
+}
+
 func ListVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID) ([]VCSProviderRepository, error) {
 	var repositories []VCSProviderRepository
 	err := tx.

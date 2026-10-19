@@ -718,6 +718,44 @@ func (f *Factory) ListEnabledContextRepos(tx *gorm.DB) ([]FactoryAgentResource, 
 	return resources, nil
 }
 
+// ListEnabledGitHubContextRepositoryNames returns owner/name values for
+// enabled GitHub context repositories on workspaces that use this integration.
+// Disabled resources, other providers, and deleted workspaces are omitted.
+func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUID) ([]string, error) {
+	if integrationID == uuid.Nil {
+		return nil, nil
+	}
+	var rows []struct {
+		Name string
+	}
+	err := tx.Raw(`
+		SELECT DISTINCT BTRIM(resource.config ->> 'repository') AS name
+		FROM factory_agent_resources AS resource
+		JOIN factories AS factory
+			ON factory.id = resource.factory_id
+			AND factory.organization_id = resource.organization_id
+		WHERE factory.deleted_at IS NULL
+			AND factory.onboarding_config ->> 'vcs_integration_id' = ?
+			AND resource.kind = ?
+			AND resource.enabled = TRUE
+			AND BTRIM(COALESCE(resource.config ->> 'repository', '')) <> ''
+			AND (
+				COALESCE(resource.config ->> 'vcsProvider', '') = ''
+				OR LOWER(resource.config ->> 'vcsProvider') = ?
+			)
+	`, integrationID.String(), FactoryAgentResourceKindContextRepo, ProviderGitHub).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if row.Name != "" {
+			names = append(names, row.Name)
+		}
+	}
+	return names, nil
+}
+
 func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, config *FactoryAgentResourceConfig) error {
 	if r.IsSystemSkill() && ((name != nil && NormalizeFactoryAgentResourceName(*name) != r.Name) || (enabled != nil && !*enabled)) {
 		return ErrFactorySystemSkillProtected
