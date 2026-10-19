@@ -247,6 +247,10 @@ func createIntakeCanvas(
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to build intake automation")
 	}
+	nodes, edges, err = applyDefaultAuthorAccess(request, nodes, edges)
+	if err != nil {
+		return uuid.Nil, factoryErrorToStatus(err, "failed to build intake automation")
+	}
 
 	response, err := canvases.CreateCanvas(
 		ctx,
@@ -271,6 +275,27 @@ func createIntakeCanvas(
 	}
 
 	return canvasID, nil
+}
+
+// applyDefaultAuthorAccess installs the collaborator gate on a new GitHub
+// intake that already listens on a repository. An intake with no repository
+// cannot check access yet, so the gate waits until the repository is set.
+func applyDefaultAuthorAccess(
+	request intakeCanvasRequest,
+	nodes []models.Node,
+	edges []models.Edge,
+) ([]models.Node, []models.Edge, error) {
+	if request.Source != models.FactoryIntakeSourceGitHubIssues || !request.Settings.AuthorsWithAccess {
+		return nodes, edges, nil
+	}
+
+	spec := models.LiveCanvasSpec{Nodes: nodes, Edges: edges}
+	graph := resolveIntakeGraph(request.Source, spec)
+	if graph.TriggerResourceID(spec) == "" {
+		return nodes, edges, nil
+	}
+
+	return configureIntakeAuthorAccess(nodes, edges, graph, true)
 }
 
 func discardIntakeCanvas(db *gorm.DB, orgID, canvasID uuid.UUID) {

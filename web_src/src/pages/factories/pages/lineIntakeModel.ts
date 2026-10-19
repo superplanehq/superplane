@@ -295,6 +295,8 @@ export interface ConfiguredLineIntakeSource {
   source: LineIntakeSource;
   /** Why the intake is unhealthy. HEALTH_OK when it can receive items. */
   health?: FactoryIntakeHealth;
+  /** What the user can do when the intake cannot receive items. */
+  healthMessage?: string;
   /** Live trigger connection. Empty when the intake is unbound. */
   integrationId?: string;
   /** Live trigger resource, such as a Jira project key. */
@@ -369,6 +371,7 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         },
         source: { ...source, name },
         health: intake.health,
+        healthMessage: intake.healthMessage?.trim() || undefined,
         integrationId: textFields.integrationId,
         resourceId: textFields.resourceId,
       },

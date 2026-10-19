@@ -231,6 +231,9 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 
 	if intakeSourceHasFilterNode(request.Source) {
 		settings := intakeSettingsOrDefault(request.Source, request.Settings)
+		if request.Source == models.FactoryIntakeSourceGitHubIssues {
+			settings = deriveGitHubIssueListening(settings)
+		}
 		nodes = append(nodes, yaml.Node{
 			ID:        intakeFilterNodeID,
 			Name:      "Matches filters?",
@@ -450,6 +453,9 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 	}
 	for name, value := range binding.configuration() {
 		configuration[name] = value
+	}
+	if request.Source == models.FactoryIntakeSourceGitHubIssues {
+		configuration["actions"] = intakeTriggerActionsFor(deriveGitHubIssueListening(intakeSettingsOrDefault(request.Source, request.Settings)))
 	}
 	if request.Source == models.FactoryIntakeSourceProductiveTasks {
 		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
