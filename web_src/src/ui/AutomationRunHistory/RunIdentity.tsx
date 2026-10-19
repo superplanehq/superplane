@@ -4,6 +4,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { RunStatus } from "./types";
 
 const statusColors: Record<RunStatus, string> = {
+  Pending: "bg-slate-400",
+  Cancelling: "bg-amber-500",
+  Unknown: "bg-slate-400",
   Running: "bg-blue-500",
   Passed: "bg-emerald-500",
   Failed: "bg-red-400",

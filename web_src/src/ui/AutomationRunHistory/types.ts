@@ -1,4 +1,4 @@
-export type RunStatus = "Running" | "Passed" | "Failed" | "Cancelled";
+export type RunStatus = "Running" | "Passed" | "Failed" | "Cancelled" | "Pending" | "Cancelling" | "Unknown";
 
 export type RunLogs =
   | { state: "ready"; text: string }
@@ -10,11 +10,14 @@ export interface RunActivity {
   name: string;
   status: RunStatus;
   time: string;
+  recordedAt?: string;
+  error?: string;
   logs: RunLogs;
   outputs?: Record<string, unknown>;
 }
 
 export interface AutomationRun {
+  title?: string;
   id: string;
   task?: { id: string; title: string };
   status: RunStatus;
