@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 func MaterializeFactoryAppTemplate(
@@ -93,16 +94,7 @@ func MaterializeFactoryAutomationDefaults(
 		return nil, factoryErrorToStatus(err, "failed to materialize factory automation defaults")
 	}
 
-	var result *materializedFactoryTemplate
-	intake, intakeErr := models.FindFactoryIntakeByCanvasID(db, automationID)
-	switch {
-	case intakeErr == nil && intake.FactoryID == factoryID:
-		result, err = materializeIntakeDefaults(db, canvas, version, intake)
-	case intakeErr != nil && !errors.Is(intakeErr, models.ErrFactoryIntakeNotFound):
-		err = intakeErr
-	default:
-		result, err = materializeNonIntakeFactoryAppDefaults(db, factory, canvas, version)
-	}
+	result, err := materializeLiveAutomationDefaults(db, factory, canvas, version)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory automation defaults")
 	}
@@ -112,4 +104,21 @@ func MaterializeFactoryAutomationDefaults(
 		CanvasYaml:  result.canvasYAML,
 		ConsoleYaml: result.consoleYAML,
 	}, nil
+}
+
+func materializeLiveAutomationDefaults(
+	tx *gorm.DB,
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+) (*materializedFactoryTemplate, error) {
+	intake, intakeErr := models.FindFactoryIntakeByCanvasID(tx, canvas.ID)
+	switch {
+	case intakeErr == nil && intake.FactoryID == factory.ID:
+		return materializeIntakeDefaults(tx, canvas, version, intake)
+	case intakeErr != nil && !errors.Is(intakeErr, models.ErrFactoryIntakeNotFound):
+		return nil, intakeErr
+	default:
+		return materializeNonIntakeFactoryAppDefaults(tx, factory, canvas, version)
+	}
 }
