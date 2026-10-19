@@ -393,18 +393,24 @@ describe("useCanvasWebsocket", () => {
     renderCanvasWebsocketHook(queryClient);
     emitWebSocketOpen();
 
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasRunQueriesKey())).toHaveLength(1);
   });
 
-  it("invalidates runs on websocket reconnect", () => {
+  it("invalidates cached run details and executions after reconnect without touching another canvas", () => {
     const queryClient = new QueryClient();
-    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
-
+    const keys = [
+      canvasKeys.infiniteRuns(testCanvasId),
+      canvasKeys.run(testCanvasId, "run-1"),
+      canvasKeys.eventExecution(testCanvasId, "event-1"),
+    ];
+    const otherKey = canvasKeys.run("other-canvas", "run-2");
     renderCanvasWebsocketHook(queryClient);
     emitWebSocketOpen();
+    for (const key of [...keys, otherKey]) queryClient.setQueryData(key, { state: "running" });
+    emitWebSocketClose();
     emitWebSocketOpen();
-
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(2);
+    for (const key of keys) expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
   });
 
   it("invalidates runs when the first connection succeeds after a failed attempt", () => {
@@ -415,7 +421,7 @@ describe("useCanvasWebsocket", () => {
     emitWebSocketClose();
     emitWebSocketOpen();
 
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasRunQueriesKey())).toHaveLength(1);
   });
 
   it("patches run caches when live canvas rendering is disabled", () => {

@@ -175,9 +175,16 @@ export function useFactory(organizationId: string, factoryId: string) {
   });
 }
 
-export function useFactoryWorkOrders(organizationId: string, factoryId: string) {
+export function useFactoryWorkOrders(
+  organizationId: string,
+  factoryId: string,
+  options?: { includeArchived?: boolean },
+) {
+  const includeArchived = options?.includeArchived === true;
   return useQuery({
-    queryKey: workOrdersKey(organizationId, factoryId),
+    queryKey: includeArchived
+      ? [...workOrdersKey(organizationId, factoryId), "including-archived"]
+      : workOrdersKey(organizationId, factoryId),
     queryFn: async (): Promise<FactoriesWorkOrderSummary[]> => {
       const orders: FactoriesWorkOrderSummary[] = [];
       let beforeId: string | undefined;
@@ -188,6 +195,7 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
             path: { factoryId },
             query: {
               limit: WORK_ORDER_LIST_PAGE_SIZE,
+              ...(includeArchived ? { includeArchived: true } : {}),
               ...(beforeId ? { beforeId } : {}),
             },
           }),

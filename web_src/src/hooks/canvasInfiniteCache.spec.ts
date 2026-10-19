@@ -34,6 +34,16 @@ function makeInfiniteRunsData(runs: CanvasesCanvasRun[], totalCount = runs.lengt
   };
 }
 
+describe("run failure messages", () => {
+  it("keeps recorded errors through sparse live updates and accepts refreshed failure messages", () => {
+    const failed = makeRun({ state: "STATE_FINISHED", result: "RESULT_FAILED", errors: ["Agent exited"] });
+    const afterUpdate = upsertRunIntoDescribeRunData({ run: failed }, { id: failed.id, state: "STATE_FINISHED" });
+    expect(afterUpdate?.run?.errors).toEqual(["Agent exited"]);
+    const refreshed = upsertRunIntoDescribeRunData(afterUpdate, { ...failed, errors: ["Setup failed"] });
+    expect(refreshed?.run?.errors).toEqual(["Setup failed"]);
+  });
+});
+
 describe("parseRunsFiltersFromQueryKey", () => {
   it("parses state and result filters from infinite run query keys", () => {
     const queryKey = canvasKeys.infiniteRuns("canvas-1", {

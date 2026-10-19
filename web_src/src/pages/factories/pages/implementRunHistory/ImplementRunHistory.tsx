@@ -23,7 +23,7 @@ export function ImplementRunHistory(props: ImplementRunHistoryProps) {
   const { canvasId, organizationId, factoryId, selectedRunId, onSelectRun } = props;
   useCanvasRuntimeWebsocket(canvasId, organizationId, true);
   const runsQuery = useInfiniteCanvasRuns(canvasId);
-  const tasksQuery = useFactoryWorkOrders(organizationId, factoryId);
+  const tasksQuery = useFactoryWorkOrders(organizationId, factoryId, { includeArchived: true });
   const runs = useMemo(
     () => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []).filter((run) => run.id) ?? [],
     [runsQuery.data],

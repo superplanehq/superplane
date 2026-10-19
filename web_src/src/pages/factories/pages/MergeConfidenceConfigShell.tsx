@@ -166,51 +166,57 @@ function ConfigTabs({
   );
 }
 
-function MergeConfidenceConfigBody({
-  containerRef,
-  selectedNode,
-  nodeBody,
+function implementHistoryContext({
+  tab,
+  canvasId,
   organizationId,
   factoryId,
-  factoryKey,
-  widthPercent,
-  isResizing,
-  onResizeStart,
-  onClosePanel,
-  onSaveNode,
-  tab,
   graph,
-  loading,
-  error,
-  onRetry,
-  canvasId,
-  runHrefFor,
-  selectedRunId,
-  onSelectedRunIdChange,
-  onNodeSelect,
-  selectedNodeId,
-  focusNonce,
-  layoutFitNonce,
 }: ReturnType<typeof configBodyProps>) {
+  if (tab !== "runs" || !canvasId || !organizationId || !factoryId) return null;
+  if (!graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID)) return null;
+  return { canvasId, organizationId, factoryId };
+}
+
+function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
+  const {
+    containerRef,
+    selectedNode,
+    nodeBody,
+    organizationId,
+    factoryId,
+    factoryKey,
+    widthPercent,
+    isResizing,
+    onResizeStart,
+    onClosePanel,
+    onSaveNode,
+    tab,
+    graph,
+    loading,
+    error,
+    onRetry,
+    canvasId,
+    runHrefFor,
+    selectedRunId,
+    onSelectedRunIdChange,
+    onNodeSelect,
+    selectedNodeId,
+    focusNonce,
+    layoutFitNonce,
+  } = props;
   const features = useExperimentalFeature(organizationId);
-  if (
-    features.organizationReady &&
-    !features.isLoading &&
-    features.has(FEATURE_FACTORY_RUN_HISTORY) &&
-    tab === "runs" &&
-    canvasId &&
-    organizationId &&
-    factoryId &&
-    graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID)
-  ) {
+  const historyContext = implementHistoryContext(props);
+  if (historyContext && (!features.organizationReady || features.isLoading)) {
     return (
-      <ImplementRunHistory
-        canvasId={canvasId}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        selectedRunId={selectedRunId}
-        onSelectRun={onSelectedRunIdChange}
-      />
+      <p role="status" className="p-6 text-sm text-muted-foreground">
+        Loading run history…
+      </p>
+    );
+  }
+  if (historyContext && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
+    return (
+      <ImplementRunHistory {...historyContext} selectedRunId={selectedRunId} onSelectRun={onSelectedRunIdChange} />
     );
   }
   return (

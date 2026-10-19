@@ -1,4 +1,4 @@
-import { createRef } from "react";
+import { cloneElement, createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
 import { MergeConfidenceConfigShell } from "../MergeConfidenceConfigShell";
@@ -57,7 +57,7 @@ describe("Implement Runs routing", () => {
     ({ nodeId, enabled, isLoading, organizationReady, expected }) => {
       Object.assign(access, { enabled, isLoading, organizationReady });
       const onSelectRun = vi.fn();
-      render(
+      const view = (
         <MergeConfidenceConfigShell
           title="Automation"
           page
@@ -93,8 +93,19 @@ describe("Implement Runs routing", () => {
           selectedNodeId={null}
           focusNonce={0}
           layoutFitNonce={null}
-        />,
+        />
       );
+      const { rerender } = render(view);
+      if (isLoading || !organizationReady) {
+        expect(screen.getByRole("status")).toBeInTheDocument();
+        expect(screen.queryByTestId("existing-canvas")).not.toBeInTheDocument();
+        expect(onSelectRun).not.toHaveBeenCalled();
+        Object.assign(access, { isLoading: false, organizationReady: true });
+        rerender(cloneElement(view));
+        expect(screen.getByTestId("connected-history")).toBeInTheDocument();
+        expect(onSelectRun).not.toHaveBeenCalled();
+        return;
+      }
       if (expected) {
         fireEvent.click(screen.getByTestId("connected-history"));
         expect(onSelectRun).toHaveBeenCalledWith("selected-run");
