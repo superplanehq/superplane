@@ -109,6 +109,7 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 		runner.AgentWorkingDirectoryField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envAnthropicAPIKey),
+		runner.AgentSkipSetupCommandsField(),
 		runner.AgentTimeoutField(),
 	}
 }

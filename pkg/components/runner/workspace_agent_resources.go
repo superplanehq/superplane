@@ -154,6 +154,9 @@ func AttachWorkspaceAgentResources(
 	skills = rejectDisabledAgentResources(skills, disabled)
 	contextRepos = rejectDisabledAgentResources(contextRepos, disabled)
 	setupCommands = rejectDisabledSetupCommands(db, factory, setupCommands, disabled)
+	if skipSetupCommands(ctx.Configuration) {
+		setupCommands = nil
+	}
 
 	var mcpNames []string
 	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
@@ -793,6 +796,15 @@ func commandChecksOutRepository(command string) bool {
 		}
 	}
 	return false
+}
+
+func skipSetupCommands(configuration any) bool {
+	config, ok := configuration.(map[string]any)
+	if !ok {
+		return false
+	}
+	enabled, ok := config[SkipSetupCommandsField].(bool)
+	return ok && enabled
 }
 
 func workspaceMCPAccessTokenLifetime(configuration any) time.Duration {

@@ -98,6 +98,7 @@ func (c *RunSuperPlane) Configuration() []configuration.Field {
 		runner.AgentWorkingDirectoryField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(""),
+		runner.AgentSkipSetupCommandsField(),
 		runner.AgentTimeoutField(),
 	}
 }
