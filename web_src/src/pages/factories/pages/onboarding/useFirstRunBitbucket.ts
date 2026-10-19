@@ -3,16 +3,17 @@ import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
 
+import {
+  clearBitbucketInstallWait,
+  readBitbucketInstallWait,
+  writeBitbucketInstallWait,
+  type BitbucketInstallWait,
+} from "./bitbucketInstallWait";
 import { bitbucketInstallationAttemptMs } from "./bitbucketOnboardingPoll";
 import { navigateGitHubWindow, openGitHubWindow } from "./useFirstRunGitHub";
 import type { FirstRunBlocking } from "./useFirstRunBlockingAction";
 import { useBitbucketOnboarding } from "./useBitbucketOnboarding";
 import { onboardingStepPath } from "./onboardingStepPath";
-
-type InstallationAttempt = {
-  startedAt: number;
-  knownSlugs: string[];
-};
 
 function installedSlugs(data: { installedWorkspaces?: Array<{ slug?: string; externalId?: string }> } | undefined) {
   return (data?.installedWorkspaces ?? [])
@@ -37,11 +38,17 @@ export function useFirstRunBitbucket(args: {
   blocking: FirstRunBlocking;
 }) {
   const location = useLocation();
-  const [attempt, setAttempt] = useState<InstallationAttempt | null>(null);
+  const organizationId = args.organizationId;
+  const [attempt, setAttempt] = useState<BitbucketInstallWait | null>(() => readBitbucketInstallWait(organizationId));
+  const [loadedOrganizationId, setLoadedOrganizationId] = useState(organizationId);
+  if (loadedOrganizationId !== organizationId) {
+    setLoadedOrganizationId(organizationId);
+    setAttempt(readBitbucketInstallWait(organizationId));
+  }
   const [now, setNow] = useState(() => Date.now());
   const timedOut = attempt != null && now - attempt.startedAt >= bitbucketInstallationAttemptMs;
   const attemptActive = attempt != null && !timedOut;
-  const onboarding = useBitbucketOnboarding(args.organizationId, {
+  const onboarding = useBitbucketOnboarding(organizationId, {
     poll: !args.setupFinished,
     attemptActive,
   });
@@ -52,8 +59,10 @@ export function useFirstRunBitbucket(args: {
   // stay untouched, and the picker shows the new workspace automatically.
   useEffect(() => {
     if (attempt == null) return;
-    if (slugs.some((slug) => !attempt.knownSlugs.includes(slug))) setAttempt(null);
-  }, [attempt, slugs.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!slugs.some((slug) => !attempt.knownSlugs.includes(slug))) return;
+    clearBitbucketInstallWait(organizationId);
+    setAttempt(null);
+  }, [attempt, organizationId, slugs.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-render once when the five-minute window ends.
   useEffect(() => {
@@ -78,7 +87,11 @@ export function useFirstRunBitbucket(args: {
     };
   }, [attemptActive, refetchOnboarding]);
 
-  const startAttempt = (known: string[]) => setAttempt({ startedAt: Date.now(), knownSlugs: known });
+  const startAttempt = (knownSlugs: string[]) => {
+    const next = { startedAt: Date.now(), knownSlugs };
+    writeBitbucketInstallWait(organizationId, next);
+    setAttempt(next);
+  };
 
   const installUrl = onboarding.data?.installUrl ?? "";
 
