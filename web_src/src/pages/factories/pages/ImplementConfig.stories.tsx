@@ -2,7 +2,11 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { useState } from "react";
-import type { FactoriesFactoryAgentResource, SuperplaneComponentsNode } from "@/api-client";
+import type {
+  FactoriesFactoryAgentResource,
+  IntegrationsCapabilityDefinition,
+  SuperplaneComponentsNode,
+} from "@/api-client";
 import {
   FEATURE_FACTORY_RUN_HISTORY,
   FEATURE_WORKSPACE_MCP,
@@ -21,6 +25,14 @@ const factoryId = "implement-config-workspace";
 const canvasId = "implement-config";
 const features = [FEATURE_FACTORY_RUN_HISTORY, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 const action = { name: "runnerClaudeCode", label: "Run Claude Code", configuration: PLANNING_REVIEW_RUNNER_FIELDS };
+const pullRequestAction: IntegrationsCapabilityDefinition = {
+  name: "github.createPullRequest",
+  label: "Create Pull Request",
+  type: "TYPE_ACTION",
+  configuration: [
+    { name: "draft", label: "Draft", type: "boolean", description: "Create the pull request as a draft." },
+  ],
+};
 const resources: FactoriesFactoryAgentResource[] = [
   {
     id: "sentry",
@@ -55,8 +67,16 @@ const handlers = [
   http.get("/api/v1/actions/runnerClaudeCode", () => HttpResponse.json({ action })),
   http.get("/api/v1/triggers", () => HttpResponse.json({ triggers: [{ name: "onRun", label: "On Run" }] })),
   http.get("/api/v1/widgets", () => HttpResponse.json({ widgets: [] })),
-  http.get("/api/v1/integrations", () => HttpResponse.json({ integrations: [] })),
-  http.get(`/api/v1/organizations/${organizationId}/integrations`, () => HttpResponse.json({ integrations: [] })),
+  http.get("/api/v1/integrations", () =>
+    HttpResponse.json({ integrations: [{ name: "github", label: "GitHub", capabilities: [pullRequestAction] }] }),
+  ),
+  http.get(`/api/v1/organizations/${organizationId}/integrations`, () =>
+    HttpResponse.json({
+      integrations: [
+        { metadata: { id: "github", name: "GitHub", integrationName: "github" }, status: { state: "ready" } },
+      ],
+    }),
+  ),
   http.get(resourcePath, ({ request }) =>
     HttpResponse.json({
       resources: resources.filter((resource) => resource.kind === new URL(request.url).searchParams.get("kind")),
@@ -69,7 +89,13 @@ const handlers = [
   http.get(`/api/v1/factories/${factoryId}/orders`, () => HttpResponse.json({ orders: [], hasNextPage: false })),
 ];
 
-function ImplementConfigPreview({ page = true }: { page?: boolean }) {
+function ImplementConfigPreview({
+  page = true,
+  initialNodeId = IMPLEMENT_AGENT_NODE_ID,
+}: {
+  page?: boolean;
+  initialNodeId?: string;
+}) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   const [specNodes, setSpecNodes] = useState<SuperplaneComponentsNode[]>(() => [
     { id: "onrun-implement", name: "Start implementation", type: "TYPE_TRIGGER", component: "onRun" },
@@ -81,17 +107,28 @@ function ImplementConfigPreview({ page = true }: { page?: boolean }) {
       configuration: structuredClone(PLANNING_REVIEW_DRAFT.components[0].configuration),
       concurrency: { max: 5, key: "" },
     },
+    {
+      id: "create-pr",
+      name: "Create Pull Request",
+      type: "TYPE_ACTION",
+      component: "github.createPullRequest",
+      configuration: { draft: true },
+      integration: { id: "github" },
+    },
   ]);
   const prepared = prepareData({
     workflow: {
       metadata: { id: canvasId },
       spec: {
         nodes: specNodes,
-        edges: [{ sourceId: "onrun-implement", targetId: IMPLEMENT_AGENT_NODE_ID, channel: "default" }],
+        edges: [
+          { sourceId: "onrun-implement", targetId: IMPLEMENT_AGENT_NODE_ID, channel: "default" },
+          { sourceId: IMPLEMENT_AGENT_NODE_ID, targetId: "create-pr", channel: "default" },
+        ],
       },
     },
     triggers: [{ name: "onRun", label: "On Run" }],
-    components: [action],
+    components: [action, pullRequestAction],
     nodeEventsMap: {},
     nodeExecutionsMap: {},
     nodeQueueItemsMap: {},
@@ -110,7 +147,7 @@ function ImplementConfigPreview({ page = true }: { page?: boolean }) {
           canvasId={canvasId}
           factoryId={factoryId}
           factoryKey="SUPER"
-          initialNodeId={IMPLEMENT_AGENT_NODE_ID}
+          initialNodeId={initialNodeId}
           onClose={() => console.log("Close Implement settings")}
           onDelete={() => console.log("Delete Implement automation")}
           onSaveNode={(update) => {
@@ -139,6 +176,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Configuration: Story = {};
 export const Popup: Story = { args: { page: false } };
+export const PullRequestSettings: Story = { args: { initialNodeId: "create-pr" } };
 export const FeatureDisabled: Story = {
   parameters: {
     msw: {

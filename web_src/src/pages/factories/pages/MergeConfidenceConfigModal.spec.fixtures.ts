@@ -8,6 +8,12 @@ export const mergeConfidenceAvailableIntegrations = [
     label: "GitHub",
     capabilities: [
       {
+        type: "TYPE_ACTION",
+        name: "github.createPullRequest",
+        label: "Create Pull Request",
+        configuration: [{ name: "draft", label: "Draft", type: "boolean" }],
+      },
+      {
         type: "TYPE_TRIGGER",
         name: "github.onPullRequest",
         label: "On Pull Request",
@@ -88,6 +94,34 @@ export const mergeConfidenceAvailableIntegrations = [
     ],
   },
 ];
+
+export function implementConfigGraph(
+  steps: Array<{ name: string; type: string; prompt: string }>,
+): IntakeAutomationGraph {
+  return {
+    nodes: [],
+    edges: [],
+    organizationId: "implement-org",
+    specNodes: [
+      { id: "onrun-implement", name: "Start implementation", type: "TYPE_TRIGGER", component: "onRun" },
+      {
+        id: "implementation-agent-no-issue",
+        name: "Implement From Task Description",
+        type: "TYPE_ACTION",
+        component: "runnerClaudeCode",
+        configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
+        concurrency: { max: 5, key: "implementation" },
+      },
+      {
+        id: "create-pr",
+        name: "Create Pull Request",
+        type: "TYPE_ACTION",
+        component: "github.createPullRequest",
+        configuration: { draft: true },
+      },
+    ],
+  };
+}
 
 export function confidenceGraph(): IntakeAutomationGraph {
   const { nodes, edges } = prepareData({

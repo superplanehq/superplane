@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -15,6 +15,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import {
   confidenceGraph,
+  implementConfigGraph,
   issueGraph,
   mergeConfidenceAvailableIntegrations,
 } from "./MergeConfidenceConfigModal.spec.fixtures";
@@ -137,21 +138,7 @@ describe("MergeConfidenceConfigModal", () => {
     const user = userEvent.setup();
     const onSaveNode = vi.fn();
     const steps = [{ name: "Implementation", type: "prompt", prompt: "Built-in implementation instructions" }];
-    const graph: IntakeAutomationGraph = {
-      ...confidenceGraph(),
-      organizationId: "implement-org",
-      specNodes: [
-        { id: "onrun-implement", name: "Start implementation", type: "TYPE_TRIGGER", component: "onRun" },
-        {
-          id: "implementation-agent-no-issue",
-          name: "Implement From Task Description",
-          type: "TYPE_ACTION",
-          component: "runnerClaudeCode",
-          configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
-          concurrency: { max: 5, key: "implementation" },
-        },
-      ],
-    };
+    const graph = implementConfigGraph(steps);
     renderModal(vi.fn(), onSaveNode, graph, {
       runHistoryEnabled: enabled,
       initialNodeId: "implementation-agent-no-issue",
@@ -174,6 +161,20 @@ describe("MergeConfidenceConfigModal", () => {
         configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
         concurrency: { max: 3, key: "implementation" },
       }),
+    );
+    if (!enabled) return;
+    await user.click(screen.getByRole("combobox", { name: "Settings for" }));
+    await user.click(screen.getByRole("option", { name: "Create Pull Request" }));
+    expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Draft" })).toBeChecked();
+    await user.click(screen.getByRole("switch", { name: "Draft" }));
+    await waitFor(() =>
+      expect(onSaveNode).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          nodeId: "create-pr",
+          configuration: { draft: false },
+        }),
+      ),
     );
   });
 
