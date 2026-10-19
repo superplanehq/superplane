@@ -54,5 +54,10 @@ export function markBitbucketInstallAttempt(organizationId: string, knownSlugs: 
 
 export function clearBitbucketInstallAttempt(organizationId: string): void {
   const key = storageKey(organizationId);
-  if (key) localStorage.removeItem(key);
+  if (!key) return;
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Blocked storage must not block onboarding.
+  }
 }

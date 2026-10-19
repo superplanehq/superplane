@@ -57,6 +57,20 @@ describe("bitbucketInstallAttempt", () => {
     expect(localStorage.getItem(key)).toBeNull();
   });
 
+  it("keeps onboarding usable when storage blocks removal", () => {
+    markBitbucketInstallAttempt("org-1", ["acme-team"]);
+    const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+    localStorage.removeItem = () => {
+      throw new Error("Storage is blocked");
+    };
+
+    try {
+      expect(() => clearBitbucketInstallAttempt("org-1")).not.toThrow();
+    } finally {
+      localStorage.removeItem = originalRemoveItem;
+    }
+  });
+
   it("scopes the marker by organization", () => {
     markBitbucketInstallAttempt("org-1", ["acme-team"]);
 
