@@ -7,6 +7,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -112,14 +113,24 @@ func loadResetSummary(db *gorm.DB) (resetSummary, error) {
 }
 
 func encryptorFromEnv() (crypto.Encryptor, error) {
-	if os.Getenv("NO_ENCRYPTION") == "yes" {
-		return crypto.NewNoOpEncryptor(), nil
+	ctx := context.Background()
+	legacy, err := crypto.LegacyDecryptorFromEnv()
+	if err != nil {
+		return nil, err
 	}
-
-	key := os.Getenv("ENCRYPTION_KEY")
-	if key == "" {
-		return nil, fmt.Errorf("ENCRYPTION_KEY must be set when NO_ENCRYPTION is not yes")
+	masters, primary, err := crypto.MasterKeysFromEnv(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	return crypto.NewAESGCMEncryptor([]byte(key)), nil
+	if masters == nil {
+		if legacy == nil || os.Getenv("ENCRYPTION_LEGACY_FORMAT") == "plaintext" {
+			return nil, fmt.Errorf("ENCRYPTION_MASTER_KEYS is required")
+		}
+		return legacy, nil
+	}
+	store := encryption.NewStore(masters, primary)
+	if err := store.Initialize(ctx); err != nil {
+		return nil, err
+	}
+	return crypto.NewVersionedEncryptor(store, legacy), nil
 }

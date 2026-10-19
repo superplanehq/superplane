@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -24,7 +25,7 @@ func NewNodeWebhookContext(ctx context.Context, tx *gorm.DB, encryptor crypto.En
 		tx:        tx,
 		ctx:       ctx,
 		node:      node,
-		encryptor: encryptor,
+		encryptor: encryption.ForDB(tx, encryptor),
 		baseURL:   baseURL,
 	}
 }

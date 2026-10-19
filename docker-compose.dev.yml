@@ -81,9 +81,13 @@ services:
       SIGNUP_WAITLIST_HUBSPOT_FORM_ID: ${SIGNUP_WAITLIST_HUBSPOT_FORM_ID:-}
       SIGNUP_WAITLIST_HUBSPOT_REGION: ${SIGNUP_WAITLIST_HUBSPOT_REGION:-}
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
+      # Fixed test key for local development only. Set ENCRYPTION_MASTER_KEYS
+      # in .env to test rotation with another key.
+      ENCRYPTION_MASTER_KEYS: ${ENCRYPTION_MASTER_KEYS:-env://dev-v1:MTIzNDU2Nzg5MGFiY2RlZmdoaWprbG1ub3BxcnN0dXY=}
+      ENCRYPTION_LEGACY_FORMAT: ${ENCRYPTION_LEGACY_FORMAT:-plaintext}
+      ENCRYPTION_WRITE_FORMAT: ${ENCRYPTION_WRITE_FORMAT:-versioned}
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
       OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
-      NO_ENCRYPTION: "yes"
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}

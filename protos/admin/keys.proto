@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package Superplane.Admin.Keys;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/admin/keys";
+
+service Keys {
+  rpc ListKeys(ListKeysRequest) returns (ListKeysResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/keys"
+    };
+  }
+
+  rpc CreateDataKey(CreateDataKeyRequest) returns (CreateDataKeyResponse) {
+    option (google.api.http) = {
+      post: "/admin/api/installation/keys"
+      body: "*"
+    };
+  }
+
+  rpc RewrapKeys(RewrapKeysRequest) returns (RewrapKeysResponse) {
+    option (google.api.http) = {
+      post: "/admin/api/installation/keys/rewrap"
+      body: "*"
+    };
+  }
+
+  rpc StartMigration(StartMigrationRequest) returns (MigrationResponse) {
+    option (google.api.http) = {
+      post: "/admin/api/installation/keys/migrations"
+      body: "*"
+    };
+  }
+
+  rpc GetMigration(GetMigrationRequest) returns (MigrationResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/keys/migrations/{id}"
+    };
+  }
+
+  rpc ListMigrations(ListMigrationsRequest) returns (ListMigrationsResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/keys/migrations"
+    };
+  }
+
+}
+
+message DataKey {
+  string id = 1;
+  string master_key_ref = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message ListKeysRequest {}
+
+message ListKeysResponse {
+  repeated DataKey keys = 1;
+  string active_key_id = 2;
+  string primary_master_key_ref = 3;
+}
+
+message CreateDataKeyRequest {}
+
+message CreateDataKeyResponse {
+  string active_key_id = 1;
+}
+
+message RewrapKeysRequest {}
+
+message RewrapKeysResponse {}
+
+message StartMigrationRequest {}
+
+message GetMigrationRequest {
+  string id = 1;
+}
+
+message ListMigrationsRequest {}
+
+message ListMigrationsResponse {
+  repeated MigrationResponse migrations = 1;
+}
+
+message MigrationResponse {
+  string id = 1;
+  string target_key_id = 2;
+  string state = 3;
+  string storage_location = 4;
+  string error_message = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp completed_at = 8;
+}
