@@ -89,7 +89,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, filter.Component)
-		assert.Equal(t, intakeSuperplaneLabelCondition, filter.Configuration["expression"])
+		assert.Equal(t, "true", filter.Configuration["expression"])
 	})
 
 	t.Run("Jira issues flow from the trigger through the filter to the work order", func(t *testing.T) {
@@ -288,7 +288,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
 		assert.Equal(t, binding.Integration, trigger.Integration)
 		assert.Equal(t, "acme/backlog", trigger.Configuration["repository"])
-		assert.Equal(t, []any{"opened", "reopened", "labeled"}, trigger.Configuration["actions"])
+		assert.Equal(t, []any{"opened", "reopened"}, trigger.Configuration["actions"])
 	})
 
 	t.Run("a binding does not leak into the next intake", func(t *testing.T) {
@@ -310,8 +310,8 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 }
 
 func Test__IntakeFilterExpression(t *testing.T) {
-	t.Run("a default GitHub filter matches the superplane label event", func(t *testing.T) {
-		assert.Equal(t, intakeSuperplaneLabelCondition, intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, defaultIntakeSettings()))
+	t.Run("a default GitHub filter accepts every issue", func(t *testing.T) {
+		assert.Equal(t, "true", intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, defaultIntakeSettings()))
 	})
 
 	t.Run("GitHub labels and assignment join without a score", func(t *testing.T) {

@@ -18,7 +18,7 @@ export function BacklogIntakeSources({
     title: lineIntakeListenTitle(intake.source, intake.paused),
     iconSrc: intake.source.iconSrc,
     iconAlt: intake.source.iconAlt,
-    healthy: true,
+    healthy: intake.health !== "HEALTH_WEBHOOK_FAILED",
     paused: intake.paused,
     pausedLabel: LINE_INTAKE_COPY.paused,
     pausedHelper: LINE_INTAKE_COPY.pausedHelper,
