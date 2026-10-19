@@ -112,6 +112,53 @@ describe("activityFromAgentStep", () => {
     ]);
   });
 
+  it("lists each factory setup command under one step", () => {
+    const script = ["pwd", 'echo "hello world"', 'echo "there"'].join("\n");
+    const stdout = ["/home/node/repo", "hello world", "there"].join("\n");
+    const section: CommandSection = {
+      index: 1,
+      text: "Setup",
+      kind: "bash",
+      preview: script,
+      lines: stdout.split("\n"),
+      events: [],
+      status: "passed",
+      duration_ms: 20,
+      started_at: 1,
+      collapsed: true,
+    };
+    const step = agentStepsFromNotes(notesFromLiveLogSections("agent", [section]))[0];
+    const items = activityFromAgentStep(step!)?.items ?? [];
+
+    expect(items.map((item) => ("input" in item ? item.input : ""))).toEqual([
+      "pwd",
+      'echo "hello world"',
+      'echo "there"',
+    ]);
+    expect(items.map((item) => ("output" in item ? item.output : ""))).toEqual(["", "", stdout]);
+  });
+
+  it("keeps a failed setup as one command result", () => {
+    const script = ["exit 1", "npm ci"].join("\n");
+    const section: CommandSection = {
+      index: 1,
+      text: "Setup",
+      kind: "bash",
+      preview: script,
+      lines: ["stopped"],
+      events: [],
+      status: "failed",
+      duration_ms: 20,
+      started_at: 1,
+      collapsed: true,
+    };
+    const step = agentStepsFromNotes(notesFromLiveLogSections("agent", [section], "failed"), "failed")[0];
+    const items = activityFromAgentStep(step!)?.items ?? [];
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toEqual(expect.objectContaining({ input: script, output: "stopped", status: "failed" }));
+  });
+
   it("keeps a multi-line bash script apart from its stdout", () => {
     const script = ["set -euo pipefail", "", 'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo'].join(
       "\n",

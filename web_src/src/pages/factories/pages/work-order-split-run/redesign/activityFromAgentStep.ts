@@ -12,18 +12,7 @@ export function activityFromAgentStep(step: AgentStep): AgentActivity | undefine
 
   const command = bashCommandFromStep(step);
   if (command) {
-    items.push({
-      type: "tool",
-      id: `${step.id}-output`,
-      kind: "bash",
-      name: step.title,
-      input: command.script,
-      output: command.stdout,
-      outputStreams: [],
-      status: commandStatus,
-      durationMs: stepDurationMs(step.duration),
-      truncated: false,
-    });
+    items.push(...bashToolsFromStep(step, command, commandStatus));
   }
 
   for (const event of step.events) {
@@ -93,6 +82,58 @@ export function activityFromTranscript(activities: AgentActivity[]): AgentActivi
     items: withItems.flatMap((activity) => activity.items),
     sequence: last.sequence,
     status: withItems.some((activity) => activity.status === "running") ? "running" : last.status,
+  };
+}
+
+function bashToolsFromStep(
+  step: AgentStep,
+  command: { script: string; stdout: string },
+  status: AgentActivityStatus,
+): AgentActivityItem[] {
+  const lines = step.title === "Setup" ? command.script.split(/\r?\n/).filter((line) => line.trim()) : [];
+  // A failed setup has one result. The runner does not say which line stopped.
+  if (lines.length <= 1 || status === "failed" || status === "cancelled") {
+    return [
+      bashTool({
+        step,
+        script: command.script,
+        stdout: command.stdout,
+        status,
+        durationMs: stepDurationMs(step.duration),
+      }),
+    ];
+  }
+  return lines.map((line, index) =>
+    bashTool({
+      step,
+      script: line,
+      stdout: index === lines.length - 1 ? command.stdout : "",
+      status,
+      durationMs: index === 0 ? stepDurationMs(step.duration) : undefined,
+      index,
+    }),
+  );
+}
+
+function bashTool(input: {
+  step: AgentStep;
+  script: string;
+  stdout: string;
+  status: AgentActivityStatus;
+  durationMs?: number;
+  index?: number;
+}): AgentActivityItem {
+  return {
+    type: "tool",
+    id: input.index === undefined ? `${input.step.id}-output` : `${input.step.id}-output-${input.index}`,
+    kind: "bash",
+    name: input.step.title,
+    input: input.script,
+    output: input.stdout,
+    outputStreams: [],
+    status: input.status,
+    durationMs: input.durationMs,
+    truncated: false,
   };
 }
 
