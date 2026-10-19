@@ -201,7 +201,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Name:          "Refine Task",
 					Type:          yaml.NodeTypeAction,
 					Component:     request.Agent.component(),
-					Configuration: intakeRefinementConfiguration(request.Agent, request.VCSName, request.VCSProvider),
+					Configuration: intakeRefinementConfiguration(request.Agent, request.VCSName),
 					Concurrency:   intakeConcurrency(),
 					Position:      yaml.Position{X: 160, Y: 440},
 				},

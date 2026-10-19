@@ -72,7 +72,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
-SuperPlane keeps the selected OpenRouter model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. After 4 failed attempts, the prompt step fails. The live log shows each wait and retry.
+SuperPlane keeps the selected OpenRouter model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. Every 2 successful model calls set the attempt count back to 1. After 4 failed attempts without that reset, the prompt step fails. The live log shows each wait and retry.
 
 Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
@@ -101,6 +101,7 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 		runner.AgentWorkingDirectoryField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envOpenRouterAPIKey),
+		runner.AgentSkipSetupCommandsField(),
 		runner.AgentTimeoutField(),
 	}
 }
@@ -166,6 +167,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	task.Files = runner.AppendMergeConfidenceMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
+	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps)
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
 	taskID, err := client.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,

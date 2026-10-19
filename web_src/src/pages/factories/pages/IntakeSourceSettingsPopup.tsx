@@ -4,11 +4,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { Bot, Settings, Workflow } from "lucide-react";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import { IntakeSourceSettingsFooter } from "./IntakeSourceSettingsFooter";
 import {
   INTAKE_SETTINGS_COPY,
+  intakeSettingsContentKey,
   intakeSettingsTabs,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
@@ -87,12 +88,8 @@ export function IntakeSourceSettingsPopup({
 }: IntakeSourceSettingsPopupProps) {
   const tabs = intakeSettingsTabs(Boolean(agent));
   const hasAgent = Boolean(agent);
-  const [draft, setDraft] = useState(settings);
+  const { draft, onDraftChange, getDraft } = useIntakeSettingsDraft(settings);
   const [tab, setTab] = useState<IntakeSettingsTab>(() => (tabs.includes(initialTab) ? initialTab : "general"));
-
-  useEffect(() => {
-    setDraft(settings);
-  }, [settings]);
 
   useEffect(() => {
     const next = intakeSettingsTabs(hasAgent);
@@ -153,7 +150,8 @@ export function IntakeSourceSettingsPopup({
         deletePending={deletePending}
         deleteError={deleteError}
         onDelete={onDelete}
-        onDraftChange={setDraft}
+        onDraftChange={onDraftChange}
+        getDraft={getDraft}
         onSave={onSave}
         onClose={onClose}
       />
@@ -177,6 +175,37 @@ export function IntakeSourceSettingsPopup({
       {content}
     </PopupShell>
   );
+}
+
+/**
+ * Keeps unsaved edits while the parent passes equal settings in a new object.
+ * `getDraft` returns the latest edit even before React re-renders.
+ */
+function useIntakeSettingsDraft(settings: IntakeSourceSettings) {
+  const [draft, setDraft] = useState(settings);
+  const draftRef = useRef(settings);
+  const settingsContentKey = intakeSettingsContentKey(settings);
+  const syncedSettingsKey = useRef(settingsContentKey);
+
+  const onDraftChange = useCallback((update: SetStateAction<IntakeSourceSettings>) => {
+    setDraft((current) => {
+      const next = typeof update === "function" ? update(current) : update;
+      draftRef.current = next;
+      return next;
+    });
+  }, []);
+  const getDraft = useCallback(() => draftRef.current, []);
+
+  useEffect(() => {
+    if (syncedSettingsKey.current === settingsContentKey) {
+      return;
+    }
+    syncedSettingsKey.current = settingsContentKey;
+    setDraft(settings);
+    draftRef.current = settings;
+  }, [settings, settingsContentKey]);
+
+  return { draft, onDraftChange, getDraft };
 }
 
 function IntakeSourceTitleLogo({ sourceId }: { sourceId: LineIntakeSourceId }) {
@@ -222,6 +251,7 @@ function IntakeSettingsTabPanel({
   deleteError,
   onDelete,
   onDraftChange,
+  getDraft,
   onSave,
   onClose,
 }: {
@@ -247,6 +277,7 @@ function IntakeSettingsTabPanel({
   deleteError?: string;
   onDelete?: () => Promise<void> | void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  getDraft: () => IntakeSourceSettings;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
 }) {
@@ -294,6 +325,7 @@ function IntakeSettingsTabPanel({
       deleteError={deleteError}
       onDelete={onDelete}
       onDraftChange={onDraftChange}
+      getDraft={getDraft}
       onSave={onSave}
       onClose={onClose}
     />
@@ -314,6 +346,7 @@ function IntakeGeneralTab({
   deleteError,
   onDelete,
   onDraftChange,
+  getDraft,
   onSave,
   onClose,
 }: {
@@ -330,6 +363,7 @@ function IntakeGeneralTab({
   deleteError?: string;
   onDelete?: () => Promise<void> | void;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  getDraft: () => IntakeSourceSettings;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
 }) {
@@ -393,6 +427,7 @@ function IntakeGeneralTab({
         deletePending={deletePending}
         deleteError={deleteError}
         onDelete={onDelete}
+        getDraft={getDraft}
         onSave={onSave}
         onClose={onClose}
       />

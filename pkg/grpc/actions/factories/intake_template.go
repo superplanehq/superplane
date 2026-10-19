@@ -231,6 +231,9 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 
 	if intakeSourceHasFilterNode(request.Source) {
 		settings := intakeSettingsOrDefault(request.Source, request.Settings)
+		if request.Source == models.FactoryIntakeSourceGitHubIssues {
+			settings = deriveGitHubIssueListening(settings)
+		}
 		nodes = append(nodes, yaml.Node{
 			ID:        intakeFilterNodeID,
 			Name:      "Matches filters?",
@@ -451,6 +454,9 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 	for name, value := range binding.configuration() {
 		configuration[name] = value
 	}
+	if request.Source == models.FactoryIntakeSourceGitHubIssues {
+		configuration["actions"] = intakeTriggerActionsFor(deriveGitHubIssueListening(intakeSettingsOrDefault(request.Source, request.Settings)))
+	}
 	if request.Source == models.FactoryIntakeSourceProductiveTasks {
 		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
 	}
@@ -508,14 +514,10 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	return defaultIntakeSettings()
 }
 
-func intakeRefinementConfiguration(agent *intakeAgent, vcsName, vcsProvider string) map[string]any {
+func intakeRefinementConfiguration(agent *intakeAgent, vcsName string) map[string]any {
 	configuration := intakeRunnerConfiguration(agent, vcsName)
+	configuration[runner.SkipSetupCommandsField] = true
 	configuration["steps"] = []any{
-		map[string]any{
-			"name":    "Clone repository",
-			"type":    runner.AgentStepBash,
-			"command": intakeAnalysisCloneCommand(vcsProvider),
-		},
 		map[string]any{
 			"name":             "Refine Task",
 			"type":             "prompt",
@@ -572,37 +574,6 @@ func intakeRunnerConfiguration(agent *intakeAgent, vcsName string) map[string]an
 // is left unchanged.
 func intakeRefinementPrompt() string {
 	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
-}
-
-func intakeAnalysisCloneCommand(vcsProvider string) string {
-	lines := []string{
-		"set -euo pipefail",
-		`if [ -z "${REPO_URL:-}" ]; then`,
-		`  echo "This workspace has no repository to analyze." >&2`,
-		"  exit 1",
-		"fi",
-	}
-	// ponytail: GitHub-only auth rewrite; Bitbucket uses the credential helper
-	if !strings.EqualFold(strings.TrimSpace(vcsProvider), models.ProviderBitbucket) {
-		lines = append(lines, `git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`)
-	}
-	lines = append(lines, "rm -rf repo", cloneRepositoryCommand())
-	return strings.Join(lines, "\n")
-}
-
-func cloneRepositoryCommand() string {
-	return strings.Join([]string{
-		`branch="${BASE:-main}"`,
-		`heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1`,
-		`if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then`,
-		`  git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo`,
-		`elif [ -z "$heads" ]; then`,
-		`  git clone "${REPO_URL}" repo`,
-		`else`,
-		`  echo "Remote branch ${branch} not found. The repository has other branches." >&2`,
-		`  exit 1`,
-		`fi`,
-	}, "\n")
 }
 
 var intakeThresholdPattern = regexp.MustCompile(`>=\s*(\d+)`)

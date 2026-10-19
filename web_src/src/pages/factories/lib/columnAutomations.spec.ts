@@ -176,6 +176,16 @@ describe("buildColumnAutomations", () => {
     expect(columnAutomationsNeedRepair(automations)).toBe(false);
   });
 
+  it("marks a GitHub intake that cannot create its webhook", () => {
+    const automations = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      intakes: [{ ...GITHUB_INTAKE, healthy: false, health: "HEALTH_WEBHOOK_FAILED" }],
+    });
+
+    expect(automations[0]?.health).toBe("needs-repair");
+    expect(columnAutomationsNeedRepair(automations)).toBe(true);
+  });
+
   it("builds a phase agent sentence from the column name", () => {
     const automations = buildColumnAutomations("phase-0", {
       columnTitle: "Implement",

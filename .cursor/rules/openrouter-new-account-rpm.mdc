@@ -26,4 +26,4 @@ Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Rate limit reached:
 
 ## SuperPlane handling
 
-Classify this as `rate_limit`. Stay on the selected OpenRouter model. Honor `Retry-After` when present. Otherwise wait 30 seconds, then 45 seconds, then 60 seconds. Fail the prompt after 4 attempts. Do not rotate to another model. Do not treat this as a hard auth or credit failure.
+Classify this as `rate_limit`. Stay on the selected OpenRouter model. Honor `Retry-After` when present. Otherwise wait 30 seconds, then 45 seconds, then 60 seconds. Every 2 successful model calls set the attempt count back to 1. Fail the prompt after 4 failed attempts without that reset. Do not rotate to another model. Do not treat this as a hard auth or credit failure.

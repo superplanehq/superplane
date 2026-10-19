@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
+	ghissue "github.com/superplanehq/superplane/pkg/integrations/github/issue"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
@@ -204,6 +205,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	skip, err = c.skipDuplicateGitHubIssueWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	merged, err := c.mergeDependabotWorkOrder(f)
 	if err != nil {
 		return nil, false, err
@@ -312,6 +321,35 @@ func (c *FactoryContext) skipDuplicateProductiveWorkOrder(factoryModel *models.F
 	}
 	if hasOrder {
 		log.Infof("skipping Productive task %s in organization %s: work order already exists", ref.TaskID, ref.OrganizationID)
+	}
+	return hasOrder, nil
+}
+
+func (c *FactoryContext) skipDuplicateGitHubIssueWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := ghissue.RefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := ghissue.LockWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := ghissue.HasActiveWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping GitHub issue %s#%d: a task that is not closed already exists", ref.Repository, ref.Number)
 	}
 	return hasOrder, nil
 }
@@ -1006,6 +1044,7 @@ func (c *FactoryContext) pullRequestMatch(pullRequest *models.FactoryPullRequest
 	}
 	workOrder := workOrderToCore(order)
 	workOrder.Key = factoryModel.WorkOrderKey(order.Number)
+	workOrder.URL = workOrderPermalink(order, factoryModel.RouteSegment())
 	return &core.PullRequestMatch{
 		PullRequest: pullRequestToCore(pullRequest),
 		WorkOrder:   workOrder,

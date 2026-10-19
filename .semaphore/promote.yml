@@ -1,5 +1,5 @@
 version: v1.0
-name: Deploy to Production
+name: Promote
 
 agent:
   machine:
@@ -10,10 +10,10 @@ agent:
 #   SEMAPHORE_API_TOKEN — service account token
 #   DEPLOY_TASK_ID      — Semaphore task that deploys the SuperPlane image
 blocks:
-  - name: Trigger production deploy
+  - name: Trigger promotion
     task:
       jobs:
-        - name: Trigger Deploy SuperPlane image
+        - name: Promote SuperPlane commit
           commands:
             - |
               set -euo pipefail
@@ -31,7 +31,7 @@ blocks:
               payload="$(cat <<EOF
               {
                 "parameters": {
-                  "ENVIRONMENT": "production",
+                  "ENVIRONMENT": "staging",
                   "BRANCH": "main",
                   "COMMIT_SHA": "${SEMAPHORE_GIT_SHA}"
                 }

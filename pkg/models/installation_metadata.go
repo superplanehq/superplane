@@ -18,6 +18,7 @@ const (
 	OwnerSetupStepFleetIntro    = "fleet-intro"
 	OwnerSetupStepFleetProvider = "fleet-provider"
 	OwnerSetupStepFleetFleets   = "fleet-fleets"
+	OwnerSetupStepFleetValues   = "fleet-values"
 	OwnerSetupStepFleetInstall  = "fleet-install"
 )
 
@@ -39,6 +40,7 @@ var OwnerSetupSteps = []string{
 	OwnerSetupStepFleetIntro,
 	OwnerSetupStepFleetProvider,
 	OwnerSetupStepFleetFleets,
+	OwnerSetupStepFleetValues,
 	OwnerSetupStepFleetInstall,
 }
 

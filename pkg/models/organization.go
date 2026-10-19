@@ -66,26 +66,26 @@ type OrganizationWithCounts struct {
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
-	if sortBy == OrganizationSortRemainingCreditCents {
-		return listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection)
-	}
-	return listOrganizations(tx, search, limit, offset, sortBy, sortDirection)
+	organizations, total, _, err := ListUnpinnedOrganizations(tx, search, limit, offset, sortBy, sortDirection, nil)
+	return organizations, total, err
 }
 
-func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
-	query := tx.
-		Model(&Organization{}).
-		Where("organizations.deleted_at IS NULL")
-
-	search = strings.TrimSpace(search)
-	if search != "" {
-		pattern := "%" + search + "%"
-		query = query.Where(
-			"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
-			pattern,
-			pattern,
-		)
+func ListUnpinnedOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) (organizations []OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
+	if err = organizationsMatchingSearch(tx, search).Count(&matchTotal).Error; err != nil {
+		return nil, 0, 0, err
 	}
+
+	if sortBy == OrganizationSortRemainingCreditCents {
+		organizations, unpinnedTotal, err = listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection, excludeIDs)
+		return organizations, unpinnedTotal, matchTotal, err
+	}
+
+	organizations, unpinnedTotal, err = listOrganizations(tx, search, limit, offset, sortBy, sortDirection, excludeIDs)
+	return organizations, unpinnedTotal, matchTotal, err
+}
+
+func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
+	query := excludeOrganizationIDs(organizationsMatchingSearch(tx, search), excludeIDs)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -93,27 +93,23 @@ func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, so
 	}
 
 	query = withOrganizationCounts(tx, query)
-
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
-
 	if offset > 0 {
 		query = query.Offset(offset)
 	}
 
-	orderClause := resolveOrganizationOrderClause(sortBy, sortDirection)
-
 	var organizations []OrganizationWithCounts
-	if err := query.Order(orderClause).Find(&organizations).Error; err != nil {
+	if err := query.Order(resolveOrganizationOrderClause(sortBy, sortDirection)).Find(&organizations).Error; err != nil {
 		return nil, 0, err
 	}
 
 	return organizations, total, nil
 }
 
-func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offset int, sortDirection string) ([]OrganizationWithCounts, int64, error) {
-	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc")
+func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offset int, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc", excludeIDs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -337,13 +333,16 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 
 	now := time.Now()
 	organization := Organization{
-		Name:                        name,
-		Slug:                        slug,
-		Description:                 description,
-		AllowedProviders:            datatypes.JSONSlice[string]{ProviderGitHub},
-		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureFactories},
-		CreatedAt:                   &now,
-		UpdatedAt:                   &now,
+		Name:             name,
+		Slug:             slug,
+		Description:      description,
+		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub},
+		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{
+			features.FeatureFactories,
+			features.FeatureWorkspaceAgent,
+		},
+		CreatedAt: &now,
+		UpdatedAt: &now,
 	}
 
 	err = tx.
@@ -564,4 +563,30 @@ func HasExperimentalFeature(orgID uuid.UUID, featureID string) (bool, error) {
 		return false, err
 	}
 	return organization.HasExperimentalFeature(featureID), nil
+}
+
+func organizationsMatchingSearch(tx *gorm.DB, search string) *gorm.DB {
+	query := tx.
+		Model(&Organization{}).
+		Where("organizations.deleted_at IS NULL")
+
+	search = strings.TrimSpace(search)
+	if search == "" {
+		return query
+	}
+
+	pattern := "%" + search + "%"
+	return query.Where(
+		"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
+		pattern,
+		pattern,
+	)
+}
+
+func excludeOrganizationIDs(query *gorm.DB, ids []uuid.UUID) *gorm.DB {
+	if len(ids) == 0 {
+		return query
+	}
+
+	return query.Where("organizations.id NOT IN ?", ids)
 }

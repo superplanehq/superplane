@@ -215,6 +215,43 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Equal(t, "oops", response.Integration.Status.StateDescription)
 	})
 
+	for _, appName := range []string{"claude", "openai"} {
+		t.Run(appName+" rejects an invalid key before saving", func(t *testing.T) {
+			original := r.Registry.Integrations[appName]
+			t.Cleanup(func() { r.Registry.Integrations[appName] = original })
+			invalidKey := true
+			r.Registry.Integrations[appName] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+				OnSync: func(ctx core.SyncContext) error {
+					if invalidKey {
+						return errors.New("invalid API key")
+					}
+					ctx.Integration.Ready()
+					return nil
+				},
+			})
+			name := support.RandomName("key")
+			response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), appName, name, nil)
+			require.Error(t, err)
+			assert.Nil(t, response)
+			code, message, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.InvalidArgument, code)
+			assert.Equal(t, "Unable to verify the API key. Check the key and try again.", message)
+			var count int64
+			require.NoError(t, database.DB(ctx).Unscoped().Model(&models.Integration{}).
+				Where("organization_id = ? AND installation_name = ?", r.Organization.ID, name).Count(&count).Error)
+			assert.Zero(t, count)
+
+			invalidKey = false
+			response, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), appName, name, nil)
+			require.NoError(t, err)
+			assert.Equal(t, models.IntegrationStateReady, response.Integration.Status.State)
+			stored, err := models.FindIntegrationByName(database.DB(ctx), r.Organization.ID, name)
+			require.NoError(t, err)
+			assert.Equal(t, response.Integration.Metadata.Id, stored.ID.String())
+		})
+	}
+
 	t.Run("successful integration -> integration created in ready state", func(t *testing.T) {
 		//
 		// Register a test integration that succeeds on Sync

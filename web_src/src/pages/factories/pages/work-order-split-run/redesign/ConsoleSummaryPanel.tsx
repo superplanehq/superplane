@@ -28,7 +28,6 @@ import type { SplitRunFixture } from "../splitRunMocks";
 import { splitRunPanelArtifacts } from "../splitRunPopupModel";
 import { isPullRequestReviewFooter, pullRequestReviewNote } from "../splitRunPullRequestReview";
 import type { SplitRunSource } from "../splitRunSource";
-import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
 import type { AutomationStage, outcomeSummary } from "./automationsViewModel";
 import { StaticStatusGlyph } from "./redesignShared";
 
@@ -151,7 +150,6 @@ export function ConsoleSummaryPanel({
               onOwnerSave={onOwnerSave}
             />
           </SummaryRow>
-          <PanelSource source={source} ownerId={displayedOwnerId(shownOwner, shownAssigneeIds)} />
           <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
           {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
@@ -337,32 +335,6 @@ function withoutPullRequest(
 /** The pull request supersedes its branch, so a listed branch would repeat it. */
 function isBranchArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
   return (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase() === "branch";
-}
-
-function displayedOwnerId(owner: SplitRunFixture["owner"], assigneeIds?: string[]): string | undefined {
-  if (assigneeIds !== undefined && assigneeIds.length === 0) {
-    return undefined;
-  }
-  return owner.id || undefined;
-}
-
-/**
- * The source of the task. A task the owner created by hand keeps one
- * "Created manually" row instead of repeating the owner's name.
- */
-function PanelSource({ source, ownerId }: { source?: SplitRunSource; ownerId?: string }) {
-  if (!source) {
-    return null;
-  }
-  if (source.kind === "manual" && ownerId && source.person.id === ownerId) {
-    return <SummaryRow label="Source">{source.detail}</SummaryRow>;
-  }
-  return (
-    <div>
-      <span className="text-[12px] font-medium text-muted-foreground">Source</span>
-      <WorkOrderSplitRunSource source={source} />
-    </div>
-  );
 }
 
 /**

@@ -41,6 +41,8 @@ const (
 	prFeedbackMaximumAttemptsMin     = 1
 	prFeedbackMaximumAttemptsMax     = 10
 
+	bitbucketPRCommentAcknowledgement = `Sure, looking into this. Follow along: [{{ $["Find Pull Request"].data.workOrder.key }}]({{ $["Find Pull Request"].data.workOrder.url }})`
+
 	prFeedbackDiscussionTemplateID = "pr-feedback:discussion"
 	prFeedbackChecksTemplateID     = "pr-feedback:checks"
 
@@ -79,6 +81,9 @@ type prFeedbackBuildRequest struct {
 	Agent                  *intakeAgent
 	// VCSProvider selects the Git host. Empty means GitHub.
 	VCSProvider string
+	// OmitCommitIdentity drops the git user and DCO steps. The factory git
+	// wrapper already sets the agent identity and the sign-off hook.
+	OmitCommitIdentity bool
 }
 
 // prFeedbackVCSProvider normalizes the request host. Bitbucket canvases use
@@ -242,7 +247,7 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 		Description:  prFeedbackCommentActivityDescriptionExpression(),
 		Y:            prFeedbackCommentFlowY,
 	}, request)
-	commentFlow = commentFlow.withAcknowledge(yaml.Node{
+	commentFlow = commentFlow.withAcknowledgeFrom(prFeedbackFindNodeID, "found", yaml.Node{
 		ID:        prFeedbackAcknowledgeCommentNodeID,
 		Name:      "Acknowledge PR Comment",
 		Type:      yaml.NodeTypeAction,
@@ -251,7 +256,7 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 			"repository":      "{{ root().data.repository.full_name }}",
 			"pullNumber":      "{{ root().data.pullrequest.id }}",
 			"parentCommentId": "{{ root().data.comment.id }}",
-			"body":            "SuperPlane is looking into this.",
+			"body":            bitbucketPRCommentAcknowledgement,
 		},
 		Integration: request.Binding.integrationRef(),
 		Position:    prFeedbackAcknowledgePosition(prFeedbackCommentFlowY),
@@ -329,10 +334,14 @@ type prFeedbackDiscussionFlowSpec struct {
 }
 
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedbackDiscussionFlowSpec {
+	return flow.withAcknowledgeFrom(flow.triggerID, "default", node)
+}
+
+func (flow prFeedbackDiscussionFlowSpec) withAcknowledgeFrom(sourceID, channel string, node yaml.Node) prFeedbackDiscussionFlowSpec {
 	flow.nodes = append(flow.nodes, node)
 	flow.edges = append(flow.edges, yaml.Edge{
-		Channel:  "default",
-		SourceID: flow.triggerID,
+		Channel:  channel,
+		SourceID: sourceID,
 		TargetID: node.ID,
 	})
 	return flow
@@ -595,10 +604,7 @@ func prFeedbackRunnerSteps() []any {
 	return prFeedbackRunnerStepsFor(prFeedbackBuildRequest{})
 }
 
-func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
-	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
-		return prFeedbackBitbucketRunnerSteps(request)
-	}
+func prFeedbackCommitIdentitySteps() []any {
 	return []any{
 		map[string]any{
 			"name": "Set Up Git User",
@@ -609,30 +615,23 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 			}, "\n"),
 		},
 		map[string]any{
-			"name": "Checkout Pull Request",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"set -euo pipefail",
-				"gh auth setup-git --hostname github.com --force",
-				`git clone --depth 1 "https://github.com/${REPO}.git" repo`,
-				"cd repo",
-				`if [ -z "${PR_HEAD:-}" ]; then`,
-				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)`,
-				"fi",
-				`if [ -z "${PR_HEAD}" ] || [ "${PR_HEAD}" = "null" ]; then`,
-				`  echo "Could not resolve the pull request head branch." >&2`,
-				"  exit 1",
-				"fi",
-				`git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`,
-				`git checkout "${PR_HEAD}"`,
-			}, "\n"),
-		},
-		map[string]any{
 			"name":             "Set Up DCO Signing",
 			"type":             "bash",
 			"workingDirectory": "repo",
 			"command":          runner.FactoryRepoCommitSetup(),
 		},
+	}
+}
+
+func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
+	steps := []any{}
+	if !request.OmitCommitIdentity {
+		steps = append(steps, prFeedbackCommitIdentitySteps()...)
+	}
+	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
+		return append(steps, prFeedbackBitbucketWorkSteps(request)...)
+	}
+	return append(steps,
 		map[string]any{
 			"name":             "Address PR feedback",
 			"type":             "prompt",
@@ -652,32 +651,14 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 				"fi",
 			}, "\n"),
 		},
-	}
+	)
 }
 
-// prFeedbackBitbucketRunnerSteps checks out the pull request source
-// repository. A same-named branch on the destination is not a push target.
-func prFeedbackBitbucketRunnerSteps(request prFeedbackBuildRequest) []any {
+// prFeedbackBitbucketWorkSteps pushes to the pull request source
+// branch. The runner checks that branch out before these steps. A
+// same-named branch on the destination is not a push target.
+func prFeedbackBitbucketWorkSteps(request prFeedbackBuildRequest) []any {
 	return []any{
-		map[string]any{
-			"name": "Set Up Git User",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"git config --global user.email \"" + runner.FactoryAgentEmail + "\"",
-				"git config --global user.name \"" + runner.FactoryAgentName + "\"",
-			}, "\n"),
-		},
-		map[string]any{
-			"name":    "Checkout Pull Request",
-			"type":    "bash",
-			"command": bitbucketCheckoutCommand(),
-		},
-		map[string]any{
-			"name":             "Set Up DCO Signing",
-			"type":             "bash",
-			"workingDirectory": "repo",
-			"command":          runner.FactoryRepoCommitSetup(),
-		},
 		map[string]any{
 			"name":             "Address PR feedback",
 			"type":             "prompt",

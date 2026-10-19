@@ -26,10 +26,11 @@ import {
   githubIntegrationSelection,
   selectionsWithSavedVcsInstallation,
 } from "./githubIntegrationSelection";
-import { isHostedAgentReady } from "./onboardingAgentReadiness";
+import { isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
+import { useOnboardingAgentPageState } from "./useOnboardingAgentPageState";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
@@ -46,7 +47,7 @@ import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
-import { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
+import type { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
 import { useOnboardingJiraBinding } from "./useOnboardingJiraBinding";
 import { useOnboardingLinearBinding } from "./useOnboardingLinearBinding";
 import {
@@ -106,6 +107,7 @@ function useSectionSaves(args: {
   takenNames: string[];
   updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
+  agentPlan: OnboardingAgentPlan | undefined;
 }) {
   const saveName = () => {
     const workspaceName = args.setup.workspaceName.trim();
@@ -131,7 +133,21 @@ function useSectionSaves(args: {
       }),
     );
   };
-  return { saveName, saveIssues };
+  const saveAgent = () => {
+    const plan = args.agentPlan;
+    if (!plan) return Promise.resolve(false);
+    const integration = plan.integrationName ? args.selections[plan.integrationName] : undefined;
+    if (plan.credentialsSource === "integration" && (!integration?.id || !integration.ready)) {
+      return Promise.resolve(false);
+    }
+    return runSave(args.setSaving, () =>
+      args.updateOnboarding({
+        agentHarness: plan.harness,
+        agentIntegrationId: plan.credentialsSource === "integration" ? integration?.id : "",
+      }),
+    );
+  };
+  return { saveName, saveIssues, saveAgent };
 }
 
 /** Names held by the other workspaces of the organization. */
@@ -229,6 +245,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     takenNames,
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
+    agentPlan: args.agent.plan,
   });
   const githubOwner = args.setup.selectedRepo?.split("/")[0];
   const finish = useFinishOnboarding({
@@ -358,19 +375,21 @@ export function useOnboardingPageModel(args: {
   const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
-  const preferOwnKey = bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && agentCredentialChoice !== "hosted";
-  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected, preferOwnKey, customProvider);
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(args.organizationId, {
     enabled: Boolean(args.organizationId),
   });
-  const existingIntegrationNames = useMemo(
-    () =>
-      new Set(
-        connectedIntegrations
-          .map((item) => item.metadata?.name?.trim())
-          .filter((name): name is string => Boolean(name)),
-      ),
-    [connectedIntegrations],
+  const { agent, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    connected: integrations.connected,
+    customProvider,
+    agentCredentialChoice,
+    setSelections: integrations.setSelections,
+    connectedIntegrations,
+    agentIntegrationId: onboarding?.agentIntegrationId,
+  });
+  const existingIntegrationNames = new Set(
+    connectedIntegrations.map((item) => item.metadata?.name?.trim()).filter((name): name is string => Boolean(name)),
   );
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
   const setup = useOnboardingSetupState(
@@ -390,7 +409,7 @@ export function useOnboardingPageModel(args: {
     returnTo: onboardingStepPath(onboardingPath, openSection),
     integrationNames: [...ONBOARDING_CONNECTION_NAMES],
     selections: integrations.selections,
-    onSelectionsChange: integrations.setSelections,
+    onSelectionsChange,
     hiddenConfigurationFields: ONBOARDING_HIDDEN_CONFIGURATION_FIELDS,
     manualSelectionNames: ONBOARDING_MANUAL_CONNECTION_NAMES,
   });
@@ -435,6 +454,7 @@ export function useOnboardingPageModel(args: {
     agentCredentialChoice,
     setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,
+    agentModelPicker: agent.modelPicker ? { ...agent.modelPicker, onChange: selectModel } : undefined,
     openSection,
     setOpenSection,
     requestConnect,

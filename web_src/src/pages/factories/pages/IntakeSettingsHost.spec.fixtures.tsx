@@ -248,6 +248,12 @@ function integrationResourceResult(_organizationId: string, integrationId: strin
       { id: "OPS", name: "Operations" },
     ]);
   }
+  if (resourceType === "label") {
+    return resourceResult([
+      { id: "bug", name: "bug" },
+      { id: "docs", name: "docs" },
+    ]);
+  }
   return resourceResult([]);
 }
 
@@ -298,6 +304,7 @@ export function renderHost(
   props: {
     intake?: ConfiguredLineIntakeSource;
     repository?: string;
+    vcsIntegrationId?: string;
     initialTab?: IntakeSettingsTab;
     onClose?: () => void;
     path?: string;
@@ -315,6 +322,7 @@ export function renderHost(
               lineId="line-plan"
               intake={props.intake ?? GITHUB_INTAKE}
               repository={props.repository}
+              vcsIntegrationId={props.vcsIntegrationId}
               initialTab={props.initialTab}
               onClose={props.onClose ?? vi.fn()}
             />

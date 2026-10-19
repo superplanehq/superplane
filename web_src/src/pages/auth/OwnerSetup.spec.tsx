@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { MemoryRouter } from "react-router";
 
 import OwnerSetup from "./OwnerSetup";
 import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
@@ -12,6 +12,10 @@ const { createToken } = vi.hoisted(() => ({ createToken: vi.fn() }));
 
 vi.mock("@/hooks/useUserTokens", () => ({
   useCreateUserToken: () => ({ mutateAsync: createToken, isPending: false }),
+}));
+
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
 }));
 
 vi.mock("./ownerSetup/LicenseStep", () => ({
@@ -240,12 +244,21 @@ describe("OwnerSetup", () => {
     expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(await screen.findByRole("heading", { name: "Choose runner fleets" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Generate install command" }));
-    expect(await screen.findByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Create the chart values" })).toBeInTheDocument();
+    expect(screen.getByText(/cat > fleet-manager-values.yaml/)).toBeInTheDocument();
     expect(createToken).toHaveBeenCalledWith({ name: "Fleet Manager" });
 
-    for (const heading of ["Choose runner fleets", "Choose a cloud provider", OWNER_SETUP_COPY.fleet.headline]) {
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("heading", { name: "Install the chart" })).toBeInTheDocument();
+
+    for (const heading of [
+      "Create the chart values",
+      "Configure the default fleet",
+      "Choose a cloud provider",
+      OWNER_SETUP_COPY.fleet.headline,
+    ]) {
       fireEvent.click(screen.getByRole("button", { name: "Back" }));
       expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
     }
@@ -290,7 +303,7 @@ describe("OwnerSetup", () => {
     });
     renderOwnerSetup();
 
-    expect(await screen.findByRole("heading", { name: "Choose runner fleets" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Create the owner account" })).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-signed-in")).toHaveTextContent("ada@example.com");
     expect(replaceState).toHaveBeenCalledWith(null, "", "/setup?step=fleet-fleets");
@@ -330,9 +343,9 @@ describe("OwnerSetup", () => {
     expect(screen.queryByRole("heading", { name: OWNER_SETUP_COPY.smtp.headline })).not.toBeInTheDocument();
   });
 
-  it("prepares a personal token before showing a resumed install command", async () => {
+  it("prepares a personal token before showing a resumed values command", async () => {
     stubOwnerSetupFetch({
-      status: { status: "in_progress", step: "fleet-install" },
+      status: { status: "in_progress", step: "fleet-values" },
       account: { status: 200 },
       organizations: [{ slug: "acme" }],
     });
@@ -343,10 +356,10 @@ describe("OwnerSetup", () => {
     expect(screen.queryByText(/<<'EOF'\s*EOF/)).not.toBeInTheDocument();
   });
 
-  it("keeps the install command hidden when a resumed token cannot be created", async () => {
+  it("keeps the values command hidden when a resumed token cannot be created", async () => {
     createToken.mockRejectedValueOnce(new Error("no token"));
     stubOwnerSetupFetch({
-      status: { status: "in_progress", step: "fleet-install" },
+      status: { status: "in_progress", step: "fleet-values" },
       account: { status: 200 },
       organizations: [{ slug: "acme" }],
     });
@@ -354,7 +367,7 @@ describe("OwnerSetup", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not create the Fleet Manager personal token/i);
     expect(screen.getByRole("button", { name: "Finish later" })).toBeInTheDocument();
-    expect(screen.queryByText(/fleet-manager-values.yaml/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/cat >/)).not.toBeInTheDocument();
 
     createToken.mockResolvedValue({ plaintext: "owner-setup-token" });
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -362,7 +375,7 @@ describe("OwnerSetup", () => {
     expect(await screen.findByText(/installationAdminToken: owner-setup-token/)).toBeInTheDocument();
   });
 
-  it("keeps Finish later available while a resumed install command is prepared", async () => {
+  it("keeps Finish later available while a resumed values command is prepared", async () => {
     let releaseToken: (value: { plaintext: string }) => void = () => undefined;
     createToken.mockImplementation(
       () =>
@@ -371,23 +384,23 @@ describe("OwnerSetup", () => {
         }),
     );
     stubOwnerSetupFetch({
-      status: { status: "in_progress", step: "fleet-install" },
+      status: { status: "in_progress", step: "fleet-values" },
       account: { status: 200 },
       organizations: [{ slug: "acme" }],
     });
     renderOwnerSetup();
 
-    expect(await screen.findByText("Preparing the install command...")).toBeInTheDocument();
+    expect(await screen.findByText("Preparing the values command...")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Finish later" })).toBeInTheDocument();
 
     releaseToken({ plaintext: "owner-setup-token" });
     expect(await screen.findByText(/installationAdminToken: owner-setup-token/)).toBeInTheDocument();
   });
 
-  it("closes setup from Finish later when the resumed install command fails", async () => {
+  it("closes setup from Finish later when the resumed values command fails", async () => {
     createToken.mockRejectedValueOnce(new Error("no token"));
     stubOwnerSetupFetch({
-      status: { status: "in_progress", step: "fleet-install" },
+      status: { status: "in_progress", step: "fleet-values" },
       account: { status: 200 },
       organizations: [{ slug: "acme" }],
     });
@@ -396,6 +409,20 @@ describe("OwnerSetup", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Finish later" }));
 
     await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
+  });
+
+  it("shows the Helm command when a resumed install step has no personal token", async () => {
+    stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-install" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    expect(await screen.findByRole("heading", { name: "Install the chart" })).toBeInTheDocument();
+    expect(screen.getByText(/helm upgrade --install fleet-manager/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Finish later" })).toBeInTheDocument();
+    expect(createToken).not.toHaveBeenCalled();
   });
 
   it("stays on the page when closing setup fails", async () => {

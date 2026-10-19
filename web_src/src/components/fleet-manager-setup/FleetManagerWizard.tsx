@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 
+import { FleetManagerCommandBlock } from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
 import {
   FleetManagerFleetSection,
   FleetManagerProviderSection,
@@ -7,10 +8,13 @@ import {
 } from "@/components/fleet-manager-setup/FleetManagerSections";
 import { Button } from "@/components/ui/button";
 import { type FleetManagerVerificationStatus, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
-import { fleetManagerInstallCommand } from "@/lib/fleetManagerSetup";
+import {
+  FLEET_MANAGER_VALUES_FILE,
+  fleetManagerHelmCommand,
+  fleetManagerValuesFileCommand,
+} from "@/lib/fleetManagerSetup";
 import type { FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
-import { CopyButton } from "@/ui/CopyButton";
 import { CheckCircle2, LoaderCircle, TriangleAlert } from "lucide-react";
 
 type WizardProps = {
@@ -82,9 +86,9 @@ function FleetsStep({ setup, actions }: { setup: FleetManagerSetupState; actions
 
   return (
     <div data-testid="fleet-manager-fleets-step">
-      <FirstRunHeading headline="Choose runner fleets" size="display">
+      <FirstRunHeading headline="Configure the default fleet" size="display">
         <p className="text-[15px] leading-6 text-muted-foreground">
-          Select fleet sizes and set their initial capacity.
+          Set the cloud machine type and how many machines to keep ready.
         </p>
       </FirstRunHeading>
       <div className="mt-6">
@@ -135,31 +139,48 @@ export function FleetManagerVerificationStatus({
   );
 }
 
-function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
-  const verification = useFleetManagerVerification(true, setup.draft, setup.metadata);
-  const command = useMemo(
-    () =>
-      setup.metadata && setup.draft
-        ? fleetManagerInstallCommand(setup.metadata, setup.draft.namespace, setup.values)
-        : "",
-    [setup.draft, setup.metadata, setup.values],
+function ValuesStep({ setup, actions }: { setup: FleetManagerSetupState; actions: React.ReactNode }) {
+  const valuesCommand = useMemo(
+    () => (setup.values ? fleetManagerValuesFileCommand(setup.values) : null),
+    [setup.values],
   );
 
   return (
-    <div data-testid="fleet-manager-install-step">
-      <FirstRunHeading headline="Install Fleet Manager" size="display">
+    <div data-testid="fleet-manager-values-step">
+      <FirstRunHeading headline="Create the chart values" size="display">
         <p className="text-[15px] leading-6 text-muted-foreground">
-          Run these commands where kubectl can access your cluster.
+          Run this command. It writes {FLEET_MANAGER_VALUES_FILE}.
         </p>
       </FirstRunHeading>
-      <pre className="mt-5 max-h-80 overflow-auto rounded-md border border-border bg-muted p-4 text-left font-mono text-xs">
-        <code>{command}</code>
-      </pre>
-      <div className="mt-3">
-        <CopyButton variant="button" buttonVariant="default" copiedLabel="Copied" text={command}>
-          Copy commands
-        </CopyButton>
-      </div>
+      {valuesCommand && (
+        <div className="mt-5">
+          <FleetManagerCommandBlock code={valuesCommand} language="shell" copyLabel="Copy values command" />
+        </div>
+      )}
+      {actions}
+    </div>
+  );
+}
+
+function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
+  const verification = useFleetManagerVerification(true, setup.draft, setup.metadata);
+  const helmCommand = useMemo(() => {
+    if (!setup.metadata || !setup.draft) return null;
+    return fleetManagerHelmCommand(setup.metadata, setup.draft.namespace);
+  }, [setup.draft, setup.metadata]);
+
+  return (
+    <div data-testid="fleet-manager-install-step">
+      <FirstRunHeading headline="Install the chart" size="display">
+        <p className="text-[15px] leading-6 text-muted-foreground">
+          Run this command in the same directory. It reads {FLEET_MANAGER_VALUES_FILE}.
+        </p>
+      </FirstRunHeading>
+      {helmCommand && (
+        <div className="mt-5">
+          <FleetManagerCommandBlock code={helmCommand} language="shell" copyLabel="Copy install command" />
+        </div>
+      )}
       <div className="mt-5">
         <FleetManagerVerificationStatus status={verification.status} onRetry={verification.retry} />
       </div>
@@ -183,7 +204,7 @@ function FinishLaterButton({ onFinishLater }: { onFinishLater: () => void }) {
   );
 }
 
-function InstallCommandPending({
+function ValuesCommandPending({
   setup,
   onRetry,
   onFinishLater,
@@ -193,10 +214,10 @@ function InstallCommandPending({
   onFinishLater: () => void;
 }) {
   return (
-    <div data-testid="fleet-manager-install-step">
-      <FirstRunHeading headline="Install Fleet Manager" size="display">
+    <div data-testid="fleet-manager-values-step">
+      <FirstRunHeading headline="Create the chart values" size="display">
         <p className="text-[15px] leading-6 text-muted-foreground">
-          Run these commands where kubectl can access your cluster.
+          Run this command. It writes {FLEET_MANAGER_VALUES_FILE}.
         </p>
       </FirstRunHeading>
       {setup.tokenError ? (
@@ -213,7 +234,7 @@ function InstallCommandPending({
         </div>
       ) : (
         <>
-          <p className="mt-5 text-sm text-muted-foreground">Preparing the install command...</p>
+          <p className="mt-5 text-sm text-muted-foreground">Preparing the values command...</p>
           <div className="mt-7">
             <FinishLaterButton onFinishLater={onFinishLater} />
           </div>
@@ -223,18 +244,18 @@ function InstallCommandPending({
   );
 }
 
-function usePrepareInstallCommand(step: FleetManagerWizardStep, setup: FleetManagerSetupState) {
+function usePrepareValuesCommand(step: FleetManagerWizardStep, setup: FleetManagerSetupState) {
   const started = useRef(false);
 
   useEffect(() => {
-    if (step !== "install" || setup.values || started.current) return;
+    if (step !== "values" || setup.values || started.current) return;
     started.current = true;
     void setup.prepareInstallation();
   }, [setup, step]);
 }
 
 export function FleetManagerWizardScreen(props: WizardProps) {
-  usePrepareInstallCommand(props.step, props.setup);
+  usePrepareValuesCommand(props.step, props.setup);
   const back = props.showBackButton ? props.onBack : undefined;
   const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
   const continueToNextStep = async () => {
@@ -271,14 +292,17 @@ export function FleetManagerWizardScreen(props: WizardProps) {
 
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;
   if (props.step === "fleets") return <FleetsStep setup={props.setup} actions={continueActions} />;
-  if (!props.setup.values) {
-    return (
-      <InstallCommandPending
-        setup={props.setup}
-        onRetry={() => void props.setup.prepareInstallation()}
-        onFinishLater={props.onFinishLater}
-      />
-    );
+  if (props.step === "values") {
+    if (!props.setup.values) {
+      return (
+        <ValuesCommandPending
+          setup={props.setup}
+          onRetry={() => void props.setup.prepareInstallation()}
+          onFinishLater={props.onFinishLater}
+        />
+      );
+    }
+    return <ValuesStep setup={props.setup} actions={continueActions} />;
   }
   return <InstallStep {...props} />;
 }

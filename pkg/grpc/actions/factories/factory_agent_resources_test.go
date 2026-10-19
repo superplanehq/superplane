@@ -543,6 +543,7 @@ func Test__ListFactoryAgentResourcesFiltersByNewKinds(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceRequiresAgentFeatureForNewKinds(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

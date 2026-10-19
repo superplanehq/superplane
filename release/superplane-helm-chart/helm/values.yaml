@@ -5,11 +5,9 @@
 image:
   registry: ghcr.io/superplanehq
   name: superplane
-  # Self-hosted installs must use <git-sha>-selfhosted. The plain <git-sha>
-  # and stable images load JS and CSS from assets.superplane.com. That host
-  # allows only app.superplane.com, so the UI fails on a customer domain.
-  # Empty uses Chart.AppVersion, which published charts set to
-  # <git-sha>-selfhosted.
+  # Empty uses Chart.AppVersion. Published charts set it to the matching
+  # vMAJOR.MINOR.PATCH or release-candidate image tag. Legacy charts can use
+  # <git-sha>-selfhosted, and local builds can override this value.
   tag: ""
   pullPolicy: IfNotPresent
   pullSecrets: []
@@ -116,7 +114,7 @@ componentReleases:
   runnerVersion: v0.2.0
   runnerVersions:
     - v0.2.0
-  fleetManagerVersion: v0.1.3
+  fleetManagerVersion: v0.1.4
 
 sentry:
   secretName: ""
