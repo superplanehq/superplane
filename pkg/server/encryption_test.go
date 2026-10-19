@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
+	"gorm.io/gorm"
 )
 
 func TestApplicationEncryptionRolloutWriteFormat(t *testing.T) {
@@ -33,6 +35,17 @@ func TestApplicationEncryptionRolloutWriteFormat(t *testing.T) {
 	legacyValue, err := legacyConfig.encryptor.Encrypt(ctx, []byte("legacy secret"), []byte("record"))
 	require.NoError(t, err)
 	_, versioned, err := crypto.EncryptedDataKeyID(legacyValue)
+	require.NoError(t, err)
+	require.False(t, versioned)
+	var legacyTransactionValue []byte
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		legacyTransactionValue, err = encryption.ForDB(tx, legacyConfig.encryptor).Encrypt(
+			ctx, []byte("legacy transaction secret"), []byte("record"),
+		)
+		return err
+	}))
+	_, versioned, err = crypto.EncryptedDataKeyID(legacyTransactionValue)
 	require.NoError(t, err)
 	require.False(t, versioned)
 

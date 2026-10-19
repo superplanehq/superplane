@@ -182,10 +182,13 @@ the first version. Separate progress rows and parallel handlers are optional
 future work. A worker must refuse to resume a job if its code lacks the job's
 registry version or current handler identifier.
 
-The admin API creates and reads job rows through the models. A worker in
-`pkg/workers` polls for unfinished jobs. For each locked batch, it creates a
-job-bound migrator or auditor. The migrator changes stored values; the auditor
-only reads them. The worker saves progress and logs results after commit.
+The admin API creates and reads job rows through the models. After it creates
+a job, it publishes a RabbitMQ wake-up message. A worker in `pkg/workers`
+processes batches until no unfinished job remains. Workers also check at
+startup and every five minutes to recover jobs after a missed message or a
+worker crash. For each locked batch, the worker creates a job-bound migrator
+or auditor. The migrator changes stored values; the auditor only reads them.
+The worker saves progress and logs results after commit.
 
 For each batch, the worker will:
 

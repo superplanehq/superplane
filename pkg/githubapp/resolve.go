@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -40,6 +41,7 @@ func Resolve(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor) (conf
 	if err != nil {
 		return config.GitHubHostedAppConfig{}, fmt.Errorf("load installation GitHub App: %w", err)
 	}
+	encryptor = encryption.ForDB(tx, encryptor)
 
 	privateKey, err := encryptor.Decrypt(ctx, record.EncryptedPrivateKey, []byte(privateKeyAssociatedData))
 	if err != nil {
@@ -94,6 +96,7 @@ func Save(
 	if !cfg.Enabled() {
 		return errors.New("GitHub App credentials are incomplete")
 	}
+	encryptor = encryption.ForDB(tx, encryptor)
 	privateKey, err := encryptor.Encrypt(ctx, []byte(cfg.PrivateKey), []byte(privateKeyAssociatedData))
 	if err != nil {
 		return fmt.Errorf("encrypt GitHub App private key: %w", err)

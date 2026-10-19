@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/renderedtext/go-tackle"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -50,7 +51,7 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	require.NoError(t, err)
 	store := encryption.NewStore(masters, "local-v1")
 	require.NoError(t, store.Initialize(ctx))
-	encryptor := crypto.NewVersionedEncryptor(store, legacy)
+	encryptor := encryption.NewApplicationEncryptor(crypto.NewVersionedEncryptor(store, legacy), store)
 	table := "encryption_migration_test_" + uuid.NewString()[:8]
 	require.NoError(t, db.Exec(fmt.Sprintf("CREATE TABLE %s (id uuid PRIMARY KEY, secret bytea NOT NULL, configuration jsonb NOT NULL, app_name text NOT NULL)", table)).Error)
 	t.Cleanup(func() { require.NoError(t, db.Exec("DROP TABLE "+table).Error) })
@@ -58,7 +59,7 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	configurationLocation := testEncryptedStorageLocation(table, "configuration", "id::text", "app_name", models.EncryptedStorageIntegrationJSON)
 	integrations, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 	require.NoError(t, err)
-	worker := NewApplicationEncryptionMigrationWorker(encryptor, integrations, []models.EncryptedStorageLocation{location, configurationLocation})
+	worker := NewApplicationEncryptionMigrationWorker("", encryptor, integrations, []models.EncryptedStorageLocation{location, configurationLocation})
 	startJob := func() (*models.ApplicationEncryptionMigration, error) {
 		active, err := models.LoadActiveApplicationEncryptionKey(db)
 		if err != nil {
@@ -103,7 +104,8 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	require.ErrorIs(t, err, encryption.ErrMigrationUnfinished)
 
 	for range 2 {
-		require.NoError(t, worker.RunBatch(ctx))
+		_, err = worker.RunBatch(ctx)
+		require.NoError(t, err)
 		job, err = getJob(job.ID)
 		require.NoError(t, err)
 	}
@@ -111,7 +113,8 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	_, err = store.CreateAndActivateDataKey(ctx)
 	require.ErrorIs(t, err, encryption.ErrMigrationUnfinished)
 	for range 2 {
-		require.NoError(t, worker.RunBatch(ctx))
+		_, err = worker.RunBatch(ctx)
+		require.NoError(t, err)
 		job, err = getJob(job.ID)
 		require.NoError(t, err)
 	}
@@ -163,7 +166,8 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	failedJob, err := startJob()
 	require.NoError(t, err)
 	for range 100 {
-		require.NoError(t, worker.RunBatch(ctx))
+		_, err = worker.RunBatch(ctx)
+		require.NoError(t, err)
 		failedJob, err = getJob(failedJob.ID)
 		require.NoError(t, err)
 		if failedJob.State == "failed" {
@@ -186,14 +190,16 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	require.NotEqual(t, failedJob.ID, newJob.ID)
 	require.Equal(t, failedJob.TargetKeyID, newJob.TargetKeyID)
 	for range 2 {
-		require.NoError(t, worker.RunBatch(ctx))
+		_, err = worker.RunBatch(ctx)
+		require.NoError(t, err)
 		newJob, err = getJob(newJob.ID)
 		require.NoError(t, err)
 	}
 	require.Equal(t, "auditing", newJob.State)
 	require.NoError(t, db.Exec("UPDATE "+table+" SET secret = ? WHERE id = ?", ciphertext, id).Error)
 	for range 2 {
-		require.NoError(t, worker.RunBatch(ctx))
+		_, err = worker.RunBatch(ctx)
+		require.NoError(t, err)
 		newJob, err = getJob(newJob.ID)
 		require.NoError(t, err)
 	}
@@ -202,9 +208,7 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 
 	retryJob, err := startJob()
 	require.NoError(t, err)
-	for range 4 {
-		require.NoError(t, worker.RunBatch(ctx))
-	}
+	require.NoError(t, worker.consumeMigrationRequested(ctx, tackle.NewFakeDelivery(nil)))
 	retryJob, err = getJob(retryJob.ID)
 	require.NoError(t, err)
 	require.Equal(t, "completed", retryJob.State, retryJob.ErrorMessage)

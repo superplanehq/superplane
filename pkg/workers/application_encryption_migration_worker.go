@@ -4,45 +4,115 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/encryption"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
 
 type ApplicationEncryptionMigrationWorker struct {
-	encryptor *crypto.VersionedEncryptor
-	registry  *registry.Registry
-	locations []models.EncryptedStorageLocation
+	rabbitMQURL string
+	encryptor   crypto.Encryptor
+	registry    *registry.Registry
+	locations   []models.EncryptedStorageLocation
+	drainLock   sync.Mutex
 }
 
-func NewApplicationEncryptionMigrationWorker(encryptor *crypto.VersionedEncryptor, registry *registry.Registry, locations []models.EncryptedStorageLocation) *ApplicationEncryptionMigrationWorker {
-	return &ApplicationEncryptionMigrationWorker{encryptor: encryptor, registry: registry, locations: locations}
+const encryptionMigrationRecoveryInterval = 5 * time.Minute
+
+func NewApplicationEncryptionMigrationWorker(rabbitMQURL string, encryptor crypto.Encryptor, registry *registry.Registry, locations []models.EncryptedStorageLocation) *ApplicationEncryptionMigrationWorker {
+	return &ApplicationEncryptionMigrationWorker{rabbitMQURL: rabbitMQURL, encryptor: encryptor, registry: registry, locations: locations}
 }
 
-// Start lets every worker pod attempt one short batch at a time. PostgreSQL
-// releases the job row lock after each batch or when a pod exits.
+// Start wakes on migration requests. The recovery scan finds jobs left pending
+// when a message is lost or a worker exits before finishing.
 func (w *ApplicationEncryptionMigrationWorker) Start(ctx context.Context) {
-	ticker := time.NewTicker(time.Second)
+	go w.consumeMigrationRequests(ctx)
+	w.recoverMigrations(ctx)
+
+	ticker := time.NewTicker(encryptionMigrationRecoveryInterval)
 	defer ticker.Stop()
 	for {
-		if err := w.RunBatch(ctx); err != nil && ctx.Err() == nil {
-			log.WithError(err).Error("application encryption migration batch failed")
-		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			w.recoverMigrations(ctx)
 		}
 	}
 }
 
-func (w *ApplicationEncryptionMigrationWorker) RunBatch(ctx context.Context) error {
+func (w *ApplicationEncryptionMigrationWorker) recoverMigrations(ctx context.Context) {
+	if err := w.drainMigrations(ctx); err != nil && ctx.Err() == nil {
+		log.WithError(err).Error("application encryption migration recovery failed")
+	}
+}
+
+func (w *ApplicationEncryptionMigrationWorker) consumeMigrationRequests(ctx context.Context) {
+	routingKey := messages.ApplicationEncryptionMigrationRequestedRoutingKey
+	consumer := tackle.NewConsumer()
+	consumer.SetLogger(logging.NewTackleLogger(log.WithField("worker", "ApplicationEncryptionMigrationWorker")))
+	options := tackle.Options{
+		URL:            w.rabbitMQURL,
+		ConnectionName: "ApplicationEncryptionMigrationWorker",
+		RemoteExchange: messages.CanvasExchange,
+		Service:        messages.CanvasExchange + "." + routingKey + ".ApplicationEncryptionMigrationWorker",
+		RoutingKey:     routingKey,
+	}
+
+	for ctx.Err() == nil {
+		err := consumer.Start(&options, func(delivery tackle.Delivery) error {
+			if err := w.consumeMigrationRequested(ctx, delivery); err != nil && ctx.Err() == nil {
+				log.WithError(err).Error("application encryption migration request failed; recovery scan will retry")
+			}
+			// The job is durable in PostgreSQL. Acknowledge the wake-up and let
+			// the recovery scan retry database failures without a message loop.
+			return nil
+		})
+		if ctx.Err() != nil {
+			return
+		}
+		log.WithError(err).Warn("application encryption migration consumer disconnected; reconnecting")
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
+	}
+}
+
+func (w *ApplicationEncryptionMigrationWorker) consumeMigrationRequested(ctx context.Context, _ tackle.Delivery) error {
+	return w.drainMigrations(ctx)
+}
+
+func (w *ApplicationEncryptionMigrationWorker) drainMigrations(ctx context.Context) error {
+	w.drainLock.Lock()
+	defer w.drainLock.Unlock()
+
+	for ctx.Err() == nil {
+		processed, err := w.RunBatch(ctx)
+		if err != nil {
+			return err
+		}
+		if !processed {
+			return nil
+		}
+	}
+	return ctx.Err()
+}
+
+// RunBatch claims one short batch. PostgreSQL releases the job row lock after
+// each batch or when a pod exits.
+func (w *ApplicationEncryptionMigrationWorker) RunBatch(ctx context.Context) (bool, error) {
 	var job *models.ApplicationEncryptionMigration
 	var stateBefore, locationBefore string
 	var issues []error
@@ -62,29 +132,25 @@ func (w *ApplicationEncryptionMigrationWorker) RunBatch(ctx context.Context) err
 			if job.State == "auditing" {
 				issues, err = encryption.NewAuditor(job, w.registry, w.locations).ProcessBatch(batch)
 			} else {
-				issues, err = encryption.NewMigrator(job, w.encryptor, w.registry, w.locations).ProcessBatch(ctx, batch)
+				issues, err = encryption.NewMigrator(job, encryption.ForDB(batch, w.encryptor), w.registry, w.locations).ProcessBatch(ctx, batch)
 			}
 			return err
 		})
 		if processingError != nil {
-			job.State = "failed"
-			job.ErrorMessage = processingError.Error()
-			return tx.Model(&models.ApplicationEncryptionMigration{}).
-				Where("id = ?", job.ID).
-				Updates(map[string]any{"state": job.State, "error_message": job.ErrorMessage}).Error
+			return job.Fail(tx, processingError)
 		}
-		return tx.Save(job).Error
+		return job.SaveProgress(tx)
 	})
 	if err != nil {
 		if job != nil {
-			return fmt.Errorf("migration %s: %w", job.ID, err)
+			return false, fmt.Errorf("migration %s: %w", job.ID, err)
 		}
-		return err
+		return false, err
 	}
 	if job != nil {
 		logEncryptionMigrationBatch(job, stateBefore, locationBefore, issues, processingError)
 	}
-	return nil
+	return job != nil, nil
 }
 
 func logEncryptionMigrationBatch(job *models.ApplicationEncryptionMigration, stateBefore, locationBefore string, issues []error, processingError error) {

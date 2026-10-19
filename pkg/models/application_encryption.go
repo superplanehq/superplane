@@ -8,6 +8,11 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+const (
+	ApplicationEncryptionKeyActive    = "active"
+	ApplicationEncryptionKeyAvailable = "available"
+)
+
 type ApplicationEncryptionKey struct {
 	ID           uuid.UUID `gorm:"primaryKey"`
 	WrappedKey   []byte
@@ -16,10 +21,27 @@ type ApplicationEncryptionKey struct {
 	CreatedAt    time.Time
 }
 
-const (
-	ApplicationEncryptionKeyActive    = "active"
-	ApplicationEncryptionKeyAvailable = "available"
-)
+func (k *ApplicationEncryptionKey) CreateInitial(tx *gorm.DB) error {
+	k.State = ApplicationEncryptionKeyActive
+	return tx.Create(k).Error
+}
+
+func (k *ApplicationEncryptionKey) CreateAndActivate(tx *gorm.DB, current *ApplicationEncryptionKey) error {
+	if err := tx.Create(k).Error; err != nil {
+		return err
+	}
+	if err := tx.Model(current).Update("state", ApplicationEncryptionKeyAvailable).Error; err != nil {
+		return err
+	}
+	return tx.Model(k).Update("state", ApplicationEncryptionKeyActive).Error
+}
+
+func (k *ApplicationEncryptionKey) Rewrap(tx *gorm.DB, wrapped []byte, reference string) error {
+	return tx.Model(k).Updates(map[string]any{
+		"wrapped_key":    wrapped,
+		"master_key_ref": reference,
+	}).Error
+}
 
 func LoadActiveApplicationEncryptionKey(tx *gorm.DB) (*ApplicationEncryptionKey, error) {
 	var key ApplicationEncryptionKey
@@ -52,26 +74,4 @@ func LoadApplicationEncryptionKey(tx *gorm.DB, id uuid.UUID) (*ApplicationEncryp
 		return nil, err
 	}
 	return &key, nil
-}
-
-func ActivateApplicationEncryptionKey(tx *gorm.DB, current, next *ApplicationEncryptionKey) error {
-	if err := tx.Model(current).Update("state", ApplicationEncryptionKeyAvailable).Error; err != nil {
-		return err
-	}
-	return tx.Model(next).Update("state", ApplicationEncryptionKeyActive).Error
-}
-
-func RewrapApplicationEncryptionKey(tx *gorm.DB, key *ApplicationEncryptionKey, wrapped []byte, reference string) error {
-	return tx.Model(key).Updates(map[string]any{
-		"wrapped_key":    wrapped,
-		"master_key_ref": reference,
-	}).Error
-}
-
-func HasUnfinishedApplicationEncryptionMigration(tx *gorm.DB) (bool, error) {
-	var count int64
-	err := tx.Table("application_encryption_migrations").
-		Where("state IN ?", []string{"pending", "running", "auditing"}).
-		Count(&count).Error
-	return count > 0, err
 }

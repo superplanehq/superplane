@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
-import InstallationEncryption from "./InstallationEncryption";
+import { InstallationEncryption } from "./InstallationEncryption";
 
 describe("InstallationEncryption", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -50,7 +50,7 @@ describe("InstallationEncryption", () => {
     render(<InstallationEncryption />);
 
     await user.click(await screen.findByRole("button", { name: "Create data key" }));
-    await user.click(screen.getAllByRole("button", { name: "Create data key" })[1]);
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Create data key" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -58,5 +58,28 @@ describe("InstallationEncryption", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
+  });
+
+  it("keeps key controls available when migrations are unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).endsWith("/migrations")) {
+          return new Response("Migrations are unavailable while legacy writes are enabled.", { status: 400 });
+        }
+        return new Response(
+          JSON.stringify({ keys: [{ id: "key-1", masterKeyRef: "local-v1" }], activeKeyId: "key-1" }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
+    );
+
+    render(<InstallationEncryption />);
+
+    expect(await screen.findByText("key-1")).toBeInTheDocument();
+    expect(screen.getByText("Migrations are unavailable while legacy writes are enabled.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create data key" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Rewrap data keys" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start migration" })).toBeDisabled();
   });
 });

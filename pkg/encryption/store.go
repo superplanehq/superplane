@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -52,8 +53,7 @@ func (s *Store) Initialize(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		key.State = models.ApplicationEncryptionKeyActive
-		return tx.Create(key).Error
+		return key.CreateInitial(tx)
 	})
 	if err != nil {
 		if _, loadErr := models.LoadActiveApplicationEncryptionKey(database.DB(ctx)); loadErr != nil {
@@ -80,25 +80,46 @@ func (s *Store) verifyKeys(ctx context.Context) error {
 }
 
 func (s *Store) Active(ctx context.Context) (crypto.DataKey, error) {
-	active, err := models.LoadActiveApplicationEncryptionKey(database.DB(ctx))
+	return s.active(ctx, database.DB(ctx))
+}
+
+func (s *Store) active(ctx context.Context, db *gorm.DB) (crypto.DataKey, error) {
+	active, err := models.LoadActiveApplicationEncryptionKey(db)
 	if err != nil {
 		return crypto.DataKey{}, err
 	}
-	return s.Find(ctx, active.ID)
+	return s.find(ctx, db, active.ID)
 }
 
 func (s *Store) Find(ctx context.Context, id uuid.UUID) (crypto.DataKey, error) {
+	return s.find(ctx, database.DB(ctx), id)
+}
+
+func (s *Store) find(ctx context.Context, db *gorm.DB, id uuid.UUID) (crypto.DataKey, error) {
 	s.mu.RLock()
 	key, found := s.cache[id]
 	s.mu.RUnlock()
 	if found {
 		return key, nil
 	}
-	row, err := models.LoadApplicationEncryptionKey(database.DB(ctx), id)
+	row, err := models.LoadApplicationEncryptionKey(db, id)
 	if err != nil {
 		return crypto.DataKey{}, err
 	}
 	return s.unwrap(ctx, row)
+}
+
+type transactionDataKeys struct {
+	store *Store
+	tx    *gorm.DB
+}
+
+func (k transactionDataKeys) Active(ctx context.Context) (crypto.DataKey, error) {
+	return k.store.active(ctx, k.tx)
+}
+
+func (k transactionDataKeys) Find(ctx context.Context, id uuid.UUID) (crypto.DataKey, error) {
+	return k.store.find(ctx, k.tx, id)
 }
 
 func (s *Store) List(ctx context.Context) ([]models.ApplicationEncryptionKey, uuid.UUID, error) {
@@ -132,10 +153,7 @@ func (s *Store) CreateAndActivateDataKey(ctx context.Context) (uuid.UUID, error)
 		if err != nil {
 			return err
 		}
-		if err := tx.Create(key).Error; err != nil {
-			return err
-		}
-		if err := models.ActivateApplicationEncryptionKey(tx, active, key); err != nil {
+		if err := key.CreateAndActivate(tx, active); err != nil {
 			return err
 		}
 		newID = key.ID
@@ -145,7 +163,10 @@ func (s *Store) CreateAndActivateDataKey(ctx context.Context) (uuid.UUID, error)
 }
 
 func (s *Store) Rewrap(ctx context.Context) error {
-	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := models.LoadActiveApplicationEncryptionKey(tx); err != nil {
+			return fmt.Errorf("load active data key: %w", err)
+		}
 		keys, err := models.ListApplicationEncryptionKeys(tx)
 		if err != nil {
 			return err
@@ -155,20 +176,26 @@ func (s *Store) Rewrap(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("unwrap data key %s: %w", keys[i].ID, err)
 			}
+			if len(plain) != 32 {
+				return fmt.Errorf("unwrap data key %s: stored data key must contain 32 bytes", keys[i].ID)
+			}
 			wrapped, err := s.masters.Wrap(ctx, s.primary, plain, keyAssociatedData(keys[i].ID))
 			if err != nil {
 				return fmt.Errorf("wrap data key %s: %w", keys[i].ID, err)
 			}
-			if err := models.RewrapApplicationEncryptionKey(tx, &keys[i], wrapped, s.primary); err != nil {
+			verified, err := s.masters.Unwrap(ctx, s.primary, wrapped, keyAssociatedData(keys[i].ID))
+			if err != nil {
+				return fmt.Errorf("verify wrapped data key %s: %w", keys[i].ID, err)
+			}
+			if !bytes.Equal(plain, verified) {
+				return fmt.Errorf("verify wrapped data key %s: decrypted key changed", keys[i].ID)
+			}
+			if err := keys[i].Rewrap(tx, wrapped, s.primary); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return s.verifyKeys(ctx)
 }
 
 func (s *Store) createKey(ctx context.Context, reference string) (*models.ApplicationEncryptionKey, error) {

@@ -863,7 +863,11 @@ func Start() {
 	migrationsEnabled := keyStore != nil && !encryptionConfig.legacyWrites
 	if migrationsEnabled {
 		if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
-			worker := workers.NewApplicationEncryptionMigrationWorker(encryptorInstance.(*crypto.VersionedEncryptor), registry, models.ApplicationEncryptedStorage())
+			rabbitMQURL, err := config.RabbitMQURL()
+			if err != nil {
+				panic(err)
+			}
+			worker := workers.NewApplicationEncryptionMigrationWorker(rabbitMQURL, encryptorInstance, registry, models.ApplicationEncryptedStorage())
 			go worker.Start(context.Background())
 		}
 	}

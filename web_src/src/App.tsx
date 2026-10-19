@@ -94,7 +94,7 @@ import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
-import InstallationEncryptionAdmin from "./pages/admin/InstallationEncryption";
+import { InstallationEncryption as InstallationEncryptionAdmin } from "./pages/admin/InstallationEncryption";
 import InstallationLicenseAdmin from "./pages/admin/InstallationLicense";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import { FleetManagerSetup as FleetManagerSetupAdmin } from "./pages/admin/FleetManagerSetup";

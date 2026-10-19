@@ -39,6 +39,12 @@ func (e *VersionedEncryptor) WithLegacyWrites() *VersionedEncryptor {
 	return &copy
 }
 
+func (e *VersionedEncryptor) WithKeys(keys DataKeys) *VersionedEncryptor {
+	copy := *e
+	copy.keys = keys
+	return &copy
+}
+
 func (e *VersionedEncryptor) Encrypt(ctx context.Context, plain, associatedData []byte) ([]byte, error) {
 	if e.legacyWrites {
 		return e.legacy.Encrypt(ctx, plain, associatedData)

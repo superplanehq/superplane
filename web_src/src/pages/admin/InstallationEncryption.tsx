@@ -4,16 +4,33 @@ import type {
   KeysListMigrationsResponse,
   KeysMigrationResponse,
 } from "@/api-client";
-import { Dialog, DialogActions, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useCallback, useEffect, useState } from "react";
 
 type Action = "create" | "migrate" | "rewrap";
+type MigrationError = "unavailable" | "load" | null;
 
 const basePath = "/admin/api/installation/keys";
 const activeStates = ["pending", "running", "auditing"];
+
+class RequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 async function request<T>(path: string, method = "GET", body?: object): Promise<T> {
   const response = await fetch(`${basePath}${path}`, {
@@ -24,7 +41,7 @@ async function request<T>(path: string, method = "GET", body?: object): Promise<
   });
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(detail || `Request failed (${response.status}).`);
+    throw new RequestError(detail || `Request failed (${response.status}).`, response.status);
   }
   return response.json() as Promise<T>;
 }
@@ -101,9 +118,13 @@ function MigrationSection({
   unfinished,
   busy,
   setConfirm,
+  migrationError,
+  onRetry,
 }: SectionProps & {
   migrations: KeysMigrationResponse[];
   unfinished: boolean;
+  migrationError: MigrationError;
+  onRetry: () => void;
 }) {
   return (
     <section className="border-t border-slate-200 py-6 dark:border-gray-700">
@@ -114,48 +135,63 @@ function MigrationSection({
             Start a migration to convert older values or move stored values to the active data key.
           </Text>
         </div>
-        <Button disabled={!!busy || !!unfinished} onClick={() => setConfirm("migrate")}>
+        <Button disabled={!!busy || !!unfinished || migrationError !== null} onClick={() => setConfirm("migrate")}>
           Start migration
         </Button>
       </div>
-      <div className="mt-5 overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 text-gray-500 dark:border-gray-700 dark:text-gray-400">
-            <tr>
-              <th className="py-2 font-medium">Job ID</th>
-              <th className="py-2 font-medium">Target key</th>
-              <th className="py-2 font-medium">Started</th>
-              <th className="py-2 font-medium">Status</th>
-              <th className="py-2 font-medium">Current location</th>
-              <th className="py-2 font-medium">Completed</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-gray-700">
-            {migrations.map((migration) => (
-              <tr key={migration.id}>
-                <td className="py-3 pr-4 break-all font-mono text-xs">{migration.id}</td>
-                <td className="py-3 pr-4 break-all font-mono text-xs">{migration.targetKeyId}</td>
-                <td className="py-3 pr-4 whitespace-nowrap">{formatDate(migration.createdAt)}</td>
-                <td className="py-3 pr-4">
-                  <span className="font-medium capitalize">{migration.state}</span>
-                  {migration.errorMessage ? (
-                    <Text className="mt-1 break-words text-sm text-red-600 dark:text-red-400">
-                      {migration.errorMessage}
-                    </Text>
-                  ) : null}
-                </td>
-                <td className="py-3 pr-4">
-                  {migration.state === "completed" ? "—" : migration.storageLocation || "Waiting to start"}
-                </td>
-                <td className="py-3 whitespace-nowrap">{formatDate(migration.completedAt)}</td>
+      {migrationError ? (
+        <div className="mt-5 flex items-center gap-3">
+          <Text className="text-sm text-red-600 dark:text-red-400" role="status">
+            {migrationError === "unavailable"
+              ? "Migrations are unavailable while legacy writes are enabled."
+              : "Could not load migrations."}
+          </Text>
+          {migrationError === "load" ? (
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              Retry
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-200 text-gray-500 dark:border-gray-700 dark:text-gray-400">
+              <tr>
+                <th className="py-2 font-medium">Job ID</th>
+                <th className="py-2 font-medium">Target key</th>
+                <th className="py-2 font-medium">Started</th>
+                <th className="py-2 font-medium">Status</th>
+                <th className="py-2 font-medium">Current location</th>
+                <th className="py-2 font-medium">Completed</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {migrations.length === 0 ? (
-          <Text className="py-4 text-sm text-gray-500">No migrations have started.</Text>
-        ) : null}
-      </div>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-gray-700">
+              {migrations.map((migration) => (
+                <tr key={migration.id}>
+                  <td className="py-3 pr-4 break-all font-mono text-xs">{migration.id}</td>
+                  <td className="py-3 pr-4 break-all font-mono text-xs">{migration.targetKeyId}</td>
+                  <td className="py-3 pr-4 whitespace-nowrap">{formatDate(migration.createdAt)}</td>
+                  <td className="py-3 pr-4">
+                    <span className="font-medium capitalize">{migration.state}</span>
+                    {migration.errorMessage ? (
+                      <Text className="mt-1 break-words text-sm text-red-600 dark:text-red-400">
+                        {migration.errorMessage}
+                      </Text>
+                    ) : null}
+                  </td>
+                  <td className="py-3 pr-4">
+                    {migration.state === "completed" ? "—" : migration.storageLocation || "Waiting to start"}
+                  </td>
+                  <td className="py-3 whitespace-nowrap">{formatDate(migration.completedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {migrations.length === 0 ? (
+            <Text className="py-4 text-sm text-gray-500">No migrations have started.</Text>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }
@@ -207,54 +243,69 @@ function ConfirmAction({
     ],
   } as const;
   return (
-    <Dialog open={confirm !== null} onClose={() => (busy ? undefined : setConfirm(null))} size="md">
+    <Dialog open={confirm !== null} onOpenChange={(open) => !open && !busy && setConfirm(null)}>
       {confirm ? (
-        <>
-          <DialogTitle>{confirmation[confirm][0]}</DialogTitle>
-          <DialogDescription className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            {confirmation[confirm][1]}
-            {confirm === "rewrap" ? <span className="mt-2 block break-all">Target: {primaryMasterKeyRef}</span> : null}
-          </DialogDescription>
-          <DialogActions>
-            <Button onClick={() => void act(confirm)} disabled={!!busy}>
-              {busy ? "Working..." : confirmation[confirm][0]}
-            </Button>
+        <DialogContent showCloseButton={!busy}>
+          <DialogHeader>
+            <DialogTitle>{confirmation[confirm][0]}</DialogTitle>
+            <DialogDescription>
+              {confirmation[confirm][1]}
+              {confirm === "rewrap" ? (
+                <span className="mt-2 block break-all">Target: {primaryMasterKeyRef}</span>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
             <Button variant="outline" onClick={() => setConfirm(null)} disabled={!!busy}>
               Cancel
             </Button>
-          </DialogActions>
-        </>
+            <Button onClick={() => void act(confirm)} disabled={!!busy}>
+              {busy ? "Working..." : confirmation[confirm][0]}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       ) : null}
     </Dialog>
   );
 }
 
-export default function InstallationEncryption() {
+export function InstallationEncryption() {
   const [keys, setKeys] = useState<KeysDataKey[]>([]);
   const [activeKeyId, setActiveKeyId] = useState("");
   const [migrations, setMigrations] = useState<KeysMigrationResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [migrationError, setMigrationError] = useState<MigrationError>(null);
   const [busy, setBusy] = useState<Action | null>(null);
   const [confirm, setConfirm] = useState<Action | null>(null);
   const [primaryMasterKeyRef, setPrimaryMasterKeyRef] = useState("");
 
   const refresh = useCallback(async () => {
-    try {
-      const [keyData, migrationData] = await Promise.all([
-        request<KeysListKeysResponse>(""),
-        request<KeysListMigrationsResponse>("/migrations"),
-      ]);
-      setKeys(keyData.keys ?? []);
-      setActiveKeyId(keyData.activeKeyId ?? "");
-      setPrimaryMasterKeyRef(keyData.primaryMasterKeyRef ?? "");
-      setMigrations(migrationData.migrations ?? []);
-      setLoadError(false);
-    } catch {
+    const [keyResult, migrationResult] = await Promise.allSettled([
+      request<KeysListKeysResponse>(""),
+      request<KeysListMigrationsResponse>("/migrations"),
+    ]);
+
+    if (keyResult.status === "rejected") {
       setLoadError(true);
-    } finally {
-      setLoading(false);
+    } else {
+      setKeys(keyResult.value.keys ?? []);
+      setActiveKeyId(keyResult.value.activeKeyId ?? "");
+      setPrimaryMasterKeyRef(keyResult.value.primaryMasterKeyRef ?? "");
+      setLoadError(false);
     }
+    if (migrationResult.status === "rejected") {
+      setMigrations([]);
+      setMigrationError(
+        migrationResult.reason instanceof RequestError && migrationResult.reason.status === 400
+          ? "unavailable"
+          : "load",
+      );
+    } else {
+      setMigrations(migrationResult.value.migrations ?? []);
+      setMigrationError(null);
+    }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -306,7 +357,7 @@ export default function InstallationEncryption() {
       {loading ? <Text className="mt-6">Loading encryption keys...</Text> : null}
       {loadError ? (
         <div className="mt-6 flex items-center gap-3">
-          <Text className="text-sm text-red-600 dark:text-red-400">Could not load encryption keys or migrations.</Text>
+          <Text className="text-sm text-red-600 dark:text-red-400">Could not load encryption keys.</Text>
           <Button variant="outline" size="sm" onClick={() => void refresh()}>
             Retry
           </Button>
@@ -322,7 +373,14 @@ export default function InstallationEncryption() {
             busy={busy}
             setConfirm={setConfirm}
           />
-          <MigrationSection migrations={migrations} unfinished={!!unfinished} busy={busy} setConfirm={setConfirm} />
+          <MigrationSection
+            migrations={migrations}
+            unfinished={!!unfinished}
+            busy={busy}
+            setConfirm={setConfirm}
+            migrationError={migrationError}
+            onRetry={() => void refresh()}
+          />
           <MasterKeySection primaryMasterKeyRef={primaryMasterKeyRef} busy={busy} setConfirm={setConfirm} />
         </div>
       ) : null}

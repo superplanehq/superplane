@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/encryption"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	"google.golang.org/grpc/codes"
@@ -89,11 +90,10 @@ func (s *AdminKeysService) StartMigration(ctx context.Context, _ *pb.StartMigrat
 		job = &models.ApplicationEncryptionMigration{
 			ID:              uuid.New(),
 			TargetKeyID:     active.ID,
-			State:           "pending",
 			RegistryVersion: encryption.RegistryVersion,
 			StorageLocation: models.ApplicationEncryptedStorage()[0].Name,
 		}
-		return tx.Create(job).Error
+		return job.Start(tx)
 	})
 	if errors.Is(err, errMigrationAlreadyRunning) {
 		return nil, status.Error(codes.FailedPrecondition, err.Error())
@@ -106,6 +106,9 @@ func (s *AdminKeysService) StartMigration(ctx context.Context, _ *pb.StartMigrat
 		"target_key_id":    job.TargetKeyID,
 		"storage_location": job.StorageLocation,
 	}).Info("application encryption migration started")
+	if err := messages.PublishApplicationEncryptionMigrationRequested(); err != nil {
+		log.WithError(err).WithField("migration_id", job.ID).Warn("application encryption migration wake-up failed; recovery scan will start the job")
+	}
 	return migrationResponse(job), nil
 }
 

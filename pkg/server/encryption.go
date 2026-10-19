@@ -50,7 +50,7 @@ func loadApplicationEncryption(ctx context.Context) (applicationEncryption, erro
 	}
 	versioned := crypto.NewVersionedEncryptor(keyStore, legacy)
 	if writeFormat == "legacy" {
-		return applicationEncryption{encryptor: versioned.WithLegacyWrites(), keyStore: keyStore, legacyWrites: true}, nil
+		return applicationEncryption{encryptor: encryption.NewApplicationEncryptor(versioned.WithLegacyWrites(), keyStore), keyStore: keyStore, legacyWrites: true}, nil
 	}
-	return applicationEncryption{encryptor: versioned, keyStore: keyStore}, nil
+	return applicationEncryption{encryptor: encryption.NewApplicationEncryptor(versioned, keyStore), keyStore: keyStore}, nil
 }

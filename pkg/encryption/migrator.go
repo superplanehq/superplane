@@ -22,12 +22,12 @@ const migrationValueError = "Some values could not be migrated. Check worker log
 
 type Migrator struct {
 	job       *models.ApplicationEncryptionMigration
-	encryptor *crypto.VersionedEncryptor
+	encryptor crypto.Encryptor
 	registry  *registry.Registry
 	locations []models.EncryptedStorageLocation
 }
 
-func NewMigrator(job *models.ApplicationEncryptionMigration, encryptor *crypto.VersionedEncryptor, registry *registry.Registry, locations []models.EncryptedStorageLocation) *Migrator {
+func NewMigrator(job *models.ApplicationEncryptionMigration, encryptor crypto.Encryptor, registry *registry.Registry, locations []models.EncryptedStorageLocation) *Migrator {
 	return &Migrator{job: job, encryptor: encryptor, registry: registry, locations: locations}
 }
 

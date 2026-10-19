@@ -25,6 +25,23 @@ func (ApplicationEncryptionMigration) TableName() string {
 	return "application_encryption_migrations"
 }
 
+func (m *ApplicationEncryptionMigration) Start(tx *gorm.DB) error {
+	m.State = "pending"
+	return tx.Create(m).Error
+}
+
+func (m *ApplicationEncryptionMigration) SaveProgress(tx *gorm.DB) error {
+	return tx.Save(m).Error
+}
+
+func (m *ApplicationEncryptionMigration) Fail(tx *gorm.DB, cause error) error {
+	m.State = "failed"
+	m.ErrorMessage = cause.Error()
+	return tx.Model(&ApplicationEncryptionMigration{}).
+		Where("id = ?", m.ID).
+		Updates(map[string]any{"state": m.State, "error_message": m.ErrorMessage}).Error
+}
+
 func LoadApplicationEncryptionMigration(tx *gorm.DB, id uuid.UUID) (*ApplicationEncryptionMigration, error) {
 	var migration ApplicationEncryptionMigration
 	if err := tx.First(&migration, "id = ?", id).Error; err != nil {
@@ -48,4 +65,12 @@ func LockNextApplicationEncryptionMigration(tx *gorm.DB) (*ApplicationEncryption
 		return nil, err
 	}
 	return &migration, nil
+}
+
+func HasUnfinishedApplicationEncryptionMigration(tx *gorm.DB) (bool, error) {
+	var count int64
+	err := tx.Table("application_encryption_migrations").
+		Where("state IN ?", []string{"pending", "running", "auditing"}).
+		Count(&count).Error
+	return count > 0, err
 }
