@@ -97,6 +97,7 @@ func (c *RunCodex) Configuration() []configuration.Field {
 		runner.AgentWorkingDirectoryField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envOpenAIAPIKey),
+		runner.AgentSkipSetupCommandsField(),
 		runner.AgentTimeoutField(),
 	}
 }

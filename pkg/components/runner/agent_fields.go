@@ -266,6 +266,21 @@ func AgentEnvironmentField(reservedEnv string) configuration.Field {
 	}
 }
 
+// SkipSetupCommandsField tells a factory task to check out the repository
+// and leave workspace setup commands unrun.
+const SkipSetupCommandsField = "skipSetupCommands"
+
+func AgentSkipSetupCommandsField() configuration.Field {
+	return configuration.Field{
+		Name:        SkipSetupCommandsField,
+		Label:       "Skip setup commands",
+		Type:        configuration.FieldTypeBool,
+		Required:    false,
+		Default:     false,
+		Description: "Check out the repository. Do not run workspace setup commands.",
+	}
+}
+
 func AgentTimeoutField() configuration.Field {
 	return configuration.Field{
 		Name:        "executionTimeoutSeconds",

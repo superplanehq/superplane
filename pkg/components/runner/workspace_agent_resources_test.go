@@ -673,6 +673,41 @@ func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
 	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss (../context/superplanehq/suss)")
 }
 
+func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+		Commands: []string{"npm ci"},
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "superplanehq/suss",
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+		Configuration:  map[string]any{runner.SkipSetupCommandsField: true},
+	}, nil, []runner.BrokerTaskFile{
+		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
+	})
+
+	paths := map[string]string{}
+	for _, file := range files {
+		paths[file.Path] = file.Content
+	}
+	assert.Contains(t, paths, runner.WorkspaceCheckoutScriptPath)
+	assert.Contains(t, paths, runner.WorkspaceContextConfigPath)
+	assert.NotContains(t, paths, runner.WorkspaceSetupConfigPath)
+	assert.NotContains(t, paths["prompts/implement.txt"], "npm ci")
+	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss")
+}
+
 func TestAttachWorkspaceAgentResourcesSkipsSetupAndContextWhenFlagOff(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
