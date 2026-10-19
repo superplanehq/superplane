@@ -55,19 +55,29 @@ async function emit(payload: unknown) {
 }
 
 describe("useFactoryWebsocket", () => {
-  it.each([false, true])("refreshes historical tasks on updates, including archived tasks: %s", async (archived) => {
-    const describe = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
-    if (archived) describe.mockRejectedValue(new Error("404 not found"));
-    else describe.mockResolvedValue(describeResponse({ id: "order-1", title: "Updated" }));
-    const { queryClient } = renderFactoryWebsocket();
-    const key = [...factoryQueryKeys.workOrders("org-1", "factory-1"), "including-archived"];
-    const otherKey = [...factoryQueryKeys.workOrders("org-1", "other-factory"), "including-archived"];
-    queryClient.setQueryData(key, [{ id: "order-1", title: "Old" }]);
-    queryClient.setQueryData(otherKey, []);
-    await emit({ event: "work_order_updated", payload: { factoryId: "factory-1", orderId: "order-1" } });
-    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
-    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
-  });
+  it.each(["existing", "new", "archived"])(
+    "updates historical tasks without reloading all pages: %s",
+    async (state) => {
+      const describe = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
+      if (state === "archived") describe.mockRejectedValue(new Error("404 not found"));
+      else describe.mockResolvedValue(describeResponse({ id: "order-1", key: "SP-42", title: "Updated" }));
+      const { queryClient } = renderFactoryWebsocket();
+      const key = [...factoryQueryKeys.workOrders("org-1", "factory-1"), "including-archived"];
+      const otherKey = [...factoryQueryKeys.workOrders("org-1", "other-factory"), "including-archived"];
+      const other = { id: "order-2", title: "Other", key: "SP-43" };
+      queryClient.setQueryData(key, state === "new" ? [other] : [{ id: "order-1", title: "Old" }, other]);
+      queryClient.setQueryData(otherKey, []);
+      await emit({ event: "work_order_updated", payload: { factoryId: "factory-1", orderId: "order-1" } });
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(state === "archived");
+      if (state !== "archived") {
+        expect(queryClient.getQueryData(key)).toEqual([
+          expect.objectContaining({ id: "order-1", key: "SP-42", title: "Updated" }),
+          other,
+        ]);
+      }
+      expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    },
+  );
   it("connects to the per-factory WebSocket URL with org id", () => {
     renderFactoryWebsocket();
     const [url, , enabled] = lastCall();
