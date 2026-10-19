@@ -314,10 +314,6 @@ func validateSubscriptionCodexNode(node models.CanvasNode) error {
 		if source != "subscription" {
 			return invalidArgument("This workspace must use Codex with a ChatGPT subscription")
 		}
-		model, _ := configuration["model"].(string)
-		if strings.TrimSpace(model) != "" {
-			return invalidArgument("ChatGPT subscription keeps the Codex model unset")
-		}
 	}
 	return nil
 }

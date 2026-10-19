@@ -83,6 +83,12 @@ if (process.argv[2] === "app-server") {
       }
       process.stdout.write(JSON.stringify({ id: request.id, ...reply }) + "\n");
     }
+    if (request.method === "model/list") {
+      const page = request.params && request.params.cursor
+        ? { data: [{ id: "gpt-5.3", model: "gpt-5.3", displayName: "GPT-5.3", defaultReasoningEffort: "medium", supportedReasoningEfforts: [], isDefault: false }] }
+        : { data: [{ id: "gpt-5.4", model: "gpt-5.4", displayName: "GPT-5.4", defaultReasoningEffort: "medium", supportedReasoningEfforts: [{ reasoningEffort: "low", description: "Fast" }, { reasoningEffort: "xhigh", description: "Deep" }], isDefault: true }], nextCursor: "next" };
+      process.stdout.write(JSON.stringify({ id: request.id, result: page }) + "\n");
+    }
   });
 } else {
   fs.mkdirSync(process.env.CODEX_HOME, { recursive: true });
@@ -145,6 +151,9 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 	require.True(t, ok, "checkpoint must report the account quota")
 	limits := usage["limits"].([]any)
 	require.Len(t, limits, 2, "all account quota buckets must be reported")
+	models := usage["models"].([]any)
+	require.Len(t, models, 2, "the complete account model catalog must be reported")
+	assert.Equal(t, "gpt-5.4", models[0].(map[string]any)["model"])
 	primary := limits[0].(map[string]any)["primary"].(map[string]any)
 	assert.Equal(t, float64(25), primary["usedPercent"])
 	assert.Equal(t, float64(300), primary["windowDurationMins"])

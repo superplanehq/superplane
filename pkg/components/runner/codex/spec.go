@@ -32,7 +32,7 @@ func decodeRunCodexSpec(raw any) (RunCodexSpec, error) {
 	if spec.ExecutionTimeoutSeconds <= 0 {
 		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
 	}
-	if thinking, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel); err == nil {
+	if thinking, err := runner.NormalizeCodexThinkingLevel(spec.ThinkingLevel); err == nil {
 		spec.ThinkingLevel = thinking
 	}
 	return spec, nil
@@ -62,15 +62,12 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
 	}
-	_, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel)
+	_, err := runner.NormalizeCodexThinkingLevel(spec.ThinkingLevel)
 	return err
 }
 
 func validateCodexCredentials(spec RunCodexSpec) error {
 	if spec.Credentials.Source == runner.CredentialsSourceSubscription {
-		if strings.TrimSpace(spec.Model) != "" {
-			return fmt.Errorf("model must stay unset for a ChatGPT subscription")
-		}
 		return nil
 	}
 	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {

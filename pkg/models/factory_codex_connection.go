@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -55,6 +56,7 @@ type FactoryCodexConnection struct {
 	VerificationCode          string
 	AccountLabel              string
 	UsageLimits               datatypes.JSONSlice[CodexUsageLimit]
+	AvailableModels           datatypes.JSONSlice[CodexModel]
 	UsageObservedAt           *time.Time
 	BundleCiphertext          []byte
 	CredentialVersion         int64
@@ -78,6 +80,20 @@ type CodexUsageWindow struct {
 	UsedPercent        *float64 `json:"usedPercent"`
 	WindowDurationMins *int64   `json:"windowDurationMins"`
 	ResetsAt           *int64   `json:"resetsAt"`
+}
+
+type CodexModel struct {
+	ID                        string                       `json:"id"`
+	Model                     string                       `json:"model"`
+	DisplayName               string                       `json:"displayName"`
+	DefaultReasoningEffort    string                       `json:"defaultReasoningEffort"`
+	SupportedReasoningEfforts []CodexReasoningEffortOption `json:"supportedReasoningEfforts"`
+	IsDefault                 bool                         `json:"isDefault"`
+}
+
+type CodexReasoningEffortOption struct {
+	ReasoningEffort string `json:"reasoningEffort"`
+	Description     string `json:"description"`
 }
 
 func (FactoryCodexConnection) TableName() string {
@@ -160,6 +176,7 @@ func (c *FactoryCodexConnection) BeginLogin(tx *gorm.DB, taskID uuid.UUID, now t
 		Updates(map[string]any{
 			"status":                      CodexConnectionStatusPending,
 			"usage_limits":                datatypes.NewJSONSlice([]CodexUsageLimit{}),
+			"available_models":            datatypes.NewJSONSlice([]CodexModel{}),
 			"usage_observed_at":           nil,
 			"resume_status":               c.Status,
 			"verification_url":            "",
@@ -177,6 +194,7 @@ func (c *FactoryCodexConnection) BeginLogin(tx *gorm.DB, taskID uuid.UUID, now t
 	}
 	c.ResumeStatus = c.Status
 	c.UsageLimits = nil
+	c.AvailableModels = nil
 	c.UsageObservedAt = nil
 	c.Status = CodexConnectionStatusPending
 	c.VerificationURL = ""
@@ -337,6 +355,7 @@ func (c *FactoryCodexConnection) Disconnect(tx *gorm.DB, now time.Time) error {
 			"verification_code":        "",
 			"account_label":            "",
 			"usage_limits":             datatypes.NewJSONSlice([]CodexUsageLimit{}),
+			"available_models":         datatypes.NewJSONSlice([]CodexModel{}),
 			"usage_observed_at":        nil,
 			"bundle_ciphertext":        nil,
 			"credential_version":       0,
@@ -356,6 +375,7 @@ func (c *FactoryCodexConnection) Disconnect(tx *gorm.DB, now time.Time) error {
 	c.VerificationCode = ""
 	c.AccountLabel = ""
 	c.UsageLimits = nil
+	c.AvailableModels = nil
 	c.UsageObservedAt = nil
 	c.BundleCiphertext = nil
 	c.CredentialVersion = 0
@@ -598,12 +618,43 @@ func ListOwnedFactoryCodexConnections(tx *gorm.DB, organizationID, ownerUserID u
 	return connections, err
 }
 
-func (c *FactoryCodexConnection) StoreUsage(tx *gorm.DB, limits []CodexUsageLimit, now time.Time) error {
+func ValidateCodexModels(availableModels []CodexModel) error {
+	for _, model := range availableModels {
+		if strings.TrimSpace(model.Model) == "" {
+			return errors.New("invalid Codex model")
+		}
+	}
+	return nil
+}
+
+func (c *FactoryCodexConnection) StoreUsage(tx *gorm.DB, limits []CodexUsageLimit, availableModels []CodexModel, now time.Time) error {
 	if err := ValidateCodexUsageLimits(limits); err != nil {
+		return err
+	}
+	if err := ValidateCodexModels(availableModels); err != nil {
 		return err
 	}
 	return tx.Model(c).Updates(map[string]any{
 		"usage_limits":      datatypes.NewJSONSlice(limits),
+		"available_models":  datatypes.NewJSONSlice(availableModels),
 		"usage_observed_at": now,
 	}).Error
+}
+
+func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]string, error) {
+	connection, err := FindFactoryCodexConnection(tx, organizationID, factoryID)
+	if errors.Is(err, ErrCodexConnectionNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if connection.Status != CodexConnectionStatusReady {
+		return nil, nil
+	}
+	models := make([]string, 0, len(connection.AvailableModels))
+	for _, model := range connection.AvailableModels {
+		models = append(models, model.Model)
+	}
+	return CompactModelIDs(models), nil
 }

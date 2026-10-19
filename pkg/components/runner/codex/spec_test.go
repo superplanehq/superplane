@@ -53,8 +53,10 @@ func TestValidateRunCodexSpecRejectsHostedCredentials(t *testing.T) {
 func TestValidateCodexConfigurationAcceptsSubscription(t *testing.T) {
 	t.Parallel()
 	err := configuration.ValidateConfiguration((&RunCodex{}).Configuration(), map[string]any{
-		"machineType": "e1-large-amd64",
-		"credentials": map[string]any{"source": runner.CredentialsSourceSubscription},
+		"machineType":   "e1-large-amd64",
+		"credentials":   map[string]any{"source": runner.CredentialsSourceSubscription},
+		"model":         "gpt-5.4",
+		"thinkingLevel": "xhigh",
 		"steps": []any{
 			map[string]any{"name": "Plan task", "type": runner.AgentStepPrompt, "prompt": "Plan this task"},
 		},
@@ -144,11 +146,12 @@ func TestBuildCodexBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
 }
 
-func TestBuildCodexBrokerTaskRestoresSubscriptionWithoutModel(t *testing.T) {
+func TestBuildCodexBrokerTaskRestoresSubscriptionWithSelectedModel(t *testing.T) {
 	t.Parallel()
 
 	spec := RunCodexSpec{
 		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceSubscription},
+		Model:       "gpt-5.4",
 		Steps: []runner.AgentStep{
 			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
 		},
@@ -159,7 +162,7 @@ func TestBuildCodexBrokerTaskRestoresSubscriptionWithoutModel(t *testing.T) {
 	assert.Equal(t, "Restore ChatGPT sign-in", task.Commands[1].Name)
 	assert.Equal(t, "Save ChatGPT sign-in", task.Commands[len(task.Commands)-1].Name)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js"`)
-	assert.NotContains(t, task.Commands[2].Command, "gpt-5")
+	assert.Contains(t, task.Commands[2].Command, "gpt-5.4")
 	assert.Contains(t, requireTaskFile(t, task.Files, "codex_subscription.js").Content, "auth.json")
 }
 

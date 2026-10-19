@@ -6,6 +6,7 @@ import {
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 export function factoryCodexConnectionKey(organizationId: string, factoryId: string) {
   return ["factory-codex-connection", organizationId, factoryId] as const;
@@ -18,6 +19,8 @@ export function codexSubscriptionReady(connection: FactoriesFactoryCodexConnecti
 export function useFactoryCodexConnection(organizationId: string, factoryId: string, enabled: boolean) {
   const queryClient = useQueryClient();
   const queryKey = factoryCodexConnectionKey(organizationId, factoryId);
+  const refreshAttempted = useRef(false);
+  const invalidatedCatalog = useRef("");
   const query = useQuery({
     queryKey,
     enabled: enabled && Boolean(organizationId && factoryId),
@@ -32,7 +35,7 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
     },
     refetchInterval: (current) => {
       const status = current.state.data?.status;
-      return status === "pending" || status === "finishing" ? 2000 : false;
+      return status === "pending" || status === "finishing" || current.state.data?.reservationHeld ? 2000 : false;
     },
   });
 
@@ -54,6 +57,20 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
     onSuccess: refresh,
   });
 
+  const refreshCatalog = useMutation({
+    mutationFn: async () => {
+      const response = await factoriesStartFactoryCodexConnection(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          body: { refreshCatalog: true },
+        }),
+      );
+      return response.data?.connection;
+    },
+    onSuccess: refresh,
+  });
+
   const cancel = useMutation({
     mutationFn: async () => {
       const response = await factoriesCancelFactoryCodexConnection(
@@ -68,7 +85,27 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
     onSuccess: refresh,
   });
 
-  return { query, start, cancel };
+  useEffect(() => {
+    if (!enabled || query.data?.status !== "ready") {
+      refreshAttempted.current = false;
+      return;
+    }
+    const availableModels = query.data.availableModels ?? [];
+    if (availableModels.length > 0) {
+      const catalog = availableModels.join("\n");
+      if (invalidatedCatalog.current !== catalog) {
+        invalidatedCatalog.current = catalog;
+        void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "selectable-llm-models"] });
+      }
+      return;
+    }
+    if (!query.data.reservationHeld && !refreshAttempted.current && !refreshCatalog.isPending) {
+      refreshAttempted.current = true;
+      refreshCatalog.mutate();
+    }
+  }, [enabled, organizationId, query.data, queryClient, refreshCatalog]);
+
+  return { query, start, cancel, refreshCatalog };
 }
 
 export function useCodexSubscriptionModel(

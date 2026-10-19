@@ -94,7 +94,7 @@ async function requestJSON(env, method, pathname, body) {
   return response.json();
 }
 
-async function restore(env = process.env) {
+async function restore(env = process.env, options = {}) {
   const payload = await requestJSON(
     env,
     "GET",
@@ -110,7 +110,7 @@ async function restore(env = process.env) {
   const file = authPath(env);
   fs.writeFileSync(file, `${JSON.stringify(bundle)}\n`, { mode: 0o600 });
   fs.chmodSync(file, 0o600);
-  return checkpoint({ env });
+  return checkpoint({ env, final: Boolean(options.final) });
 }
 
 async function checkpoint(options = {}) {
@@ -155,6 +155,9 @@ function readUsage(env) {
       10000,
     );
     let settled = false;
+    let limits;
+    let models;
+    const modelCatalog = [];
     function finish(error, usage) {
       if (settled) return;
       settled = true;
@@ -168,6 +171,11 @@ function readUsage(env) {
     function send(message) {
       child.stdin.write(`${JSON.stringify(message)}\n`);
     }
+    function finishSnapshot() {
+      if (limits !== undefined && models !== undefined) {
+        finish(null, { limits, models });
+      }
+    }
     child.on("error", () => finish(new Error("Codex usage process failed")));
     child.stdin.on("error", () =>
       finish(new Error("Codex usage connection failed")),
@@ -176,17 +184,39 @@ function readUsage(env) {
     lines.on("line", (line) => {
       try {
         const message = JSON.parse(line);
-        if (message.id !== 1 && message.id !== 2) return;
+        if (message.id !== 1 && message.id !== 2 && message.id !== 3) return;
         if (message.error)
           return finish(new Error("Codex usage request failed"));
         if (message.id === 1) {
           send({ method: "initialized" });
           send({ id: 2, method: "account/rateLimits/read" });
+          send({ id: 3, method: "model/list", params: { limit: 100 } });
+          return;
+        }
+        if (message.id === 3) {
+          const result = message.result || {};
+          const page = Array.isArray(result.data)
+            ? result.data.map((model) => ({
+                id: model.id,
+                model: model.model,
+                displayName: model.displayName,
+                defaultReasoningEffort: model.defaultReasoningEffort,
+                supportedReasoningEfforts: model.supportedReasoningEfforts,
+                isDefault: model.isDefault,
+              }))
+            : [];
+          modelCatalog.push(...page);
+          if (result.nextCursor) {
+            send({ id: 3, method: "model/list", params: { cursor: result.nextCursor, limit: 100 } });
+            return;
+          }
+          models = modelCatalog;
+          finishSnapshot();
           return;
         }
         const result = message.result;
         const buckets = Object.entries(result.rateLimitsByLimitId || {});
-        const limits = buckets.length
+        limits = buckets.length
           ? buckets.map(([id, limit]) => ({
               ...limit,
               limitId: limit.limitId || id,
@@ -201,7 +231,7 @@ function readUsage(env) {
             : [];
         if (!limits.length)
           return finish(new Error("Codex usage was not returned"));
-        finish(null, { limits });
+        finishSnapshot();
       } catch (_err) {
         finish(new Error("Codex usage response is invalid"));
       }
@@ -280,6 +310,11 @@ async function main(argv = process.argv.slice(2)) {
     process.stdout.write("ChatGPT sign-in restored\n");
     return;
   }
+  if (command === "refresh") {
+    await restore(process.env, { final: true });
+    process.stdout.write("ChatGPT model catalog refreshed\n");
+    return;
+  }
   if (command === "checkpoint") {
     await checkpoint({ final: argv.includes("--final") });
     process.stdout.write("ChatGPT sign-in saved\n");
@@ -289,7 +324,7 @@ async function main(argv = process.argv.slice(2)) {
     await login();
     return;
   }
-  throw new Error("usage: node codex_subscription.js restore|checkpoint|login");
+  throw new Error("usage: node codex_subscription.js restore|refresh|checkpoint|login");
 }
 
 if (require.main === module) {

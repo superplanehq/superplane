@@ -1,12 +1,12 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import type { FactoriesFactoryCodexConnection } from "@/api-client";
 
+import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 
-type CodexPhase = "device" | "pending" | "finishing" | "ready" | "start" | "idle";
+type CodexPhase = "device" | "pending" | "finishing" | "ready" | "start";
 
-function codexPhase(selected: boolean, connection?: FactoriesFactoryCodexConnection): CodexPhase {
-  if (!selected) return "idle";
+function codexPhase(connection?: FactoriesFactoryCodexConnection): CodexPhase {
   if (!connection) return "start";
   if (connection.status === "pending" && connection.verificationUrl && connection.verificationCode) return "device";
   if (connection.status === "pending") return "pending";
@@ -74,19 +74,6 @@ function ReadySignIn({ connection }: { connection?: FactoriesFactoryCodexConnect
   );
 }
 
-function StartSignIn({ status, starting, onStart }: { status?: string; starting: boolean; onStart: () => void }) {
-  const copy = FIRST_RUN_COPY.agent;
-  const reconnect = status === "reconnect_required";
-  return (
-    <div className="mt-3 space-y-2">
-      {reconnect ? <p className="text-[13px]">{copy.subscriptionReconnect}</p> : null}
-      <LoadingButton type="button" loading={starting} loadingText={copy.subscriptionStart} onClick={onStart}>
-        {reconnect ? copy.subscriptionReconnect : copy.subscriptionStart}
-      </LoadingButton>
-    </div>
-  );
-}
-
 export function FirstRunCodexSubscription({
   selected,
   disabled,
@@ -107,30 +94,38 @@ export function FirstRunCodexSubscription({
   onCancel: () => void;
 }) {
   const copy = FIRST_RUN_COPY.agent;
-  const phase = codexPhase(selected, connection);
+  const phase = codexPhase(connection);
   return (
     <fieldset disabled={disabled} className="m-0 min-w-0 border-0 p-0" data-testid="first-run-codex-subscription">
-      <button
-        type="button"
-        className="w-full rounded-md border px-3 py-3 text-left disabled:opacity-50"
-        aria-pressed={selected}
-        onClick={onSelect}
-      >
-        <span className="block text-[13px] font-medium">{copy.subscription}</span>
-        <span className="mt-1 block text-[13px] text-muted-foreground">{copy.subscriptionHelper}</span>
-      </button>
-      {phase === "device" && connection ? (
-        <DeviceSignIn connection={connection} canceling={canceling} onCancel={onCancel} />
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="openai" />}
+        title={copy.subscription}
+        detail={copy.subscriptionHelper}
+        selected={selected}
+        connectLabel={phase === "start" || phase === "ready" ? "ChatGPT" : undefined}
+        connected={phase === "ready"}
+        disabled={disabled || starting || canceling}
+        onSelect={onSelect}
+        onConnect={onStart}
+      />
+      {selected ? (
+        <>
+          {phase === "device" && connection ? (
+            <DeviceSignIn connection={connection} canceling={canceling} onCancel={onCancel} />
+          ) : null}
+          {phase === "pending" || phase === "finishing" ? (
+            <WaitingSignIn
+              message={phase === "pending" ? copy.subscriptionPending : copy.subscriptionFinishing}
+              canceling={canceling}
+              onCancel={onCancel}
+            />
+          ) : null}
+          {phase === "ready" ? <ReadySignIn connection={connection} /> : null}
+        </>
       ) : null}
-      {phase === "pending" || phase === "finishing" ? (
-        <WaitingSignIn
-          message={phase === "pending" ? copy.subscriptionPending : copy.subscriptionFinishing}
-          canceling={canceling}
-          onCancel={onCancel}
-        />
+      {phase === "start" && connection?.status === "reconnect_required" ? (
+        <p className="mt-3 text-[13px]">{copy.subscriptionReconnect}</p>
       ) : null}
-      {phase === "ready" ? <ReadySignIn connection={connection} /> : null}
-      {phase === "start" ? <StartSignIn status={connection?.status} starting={starting} onStart={onStart} /> : null}
     </fieldset>
   );
 }

@@ -19,6 +19,53 @@ func TestThinkingArgsMapsReasoningEffort(t *testing.T) {
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="low"`}, thinkingArgsFromScript(t, "low"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="medium"`}, thinkingArgsFromScript(t, "medium"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="high"`}, thinkingArgsFromScript(t, "HIGH"))
+	assert.Equal(t, []string{"-c", `model_reasoning_effort="minimal"`}, thinkingArgsFromScript(t, "minimal"))
+	assert.Equal(t, []string{"-c", `model_reasoning_effort="xhigh"`}, thinkingArgsFromScript(t, "xhigh"))
+}
+
+func TestCodexRunReadsModelFromRolloutAndMapsUsage(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	resultPath := filepath.Join(taskDir, "result.json")
+	codexHome := filepath.Join(taskDir, "codex-home")
+	require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	fakeCodex := filepath.Join(taskDir, "codex")
+	require.NoError(t, os.WriteFile(fakeCodex, []byte(`#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+const id = "thread-123";
+const dir = path.join(process.env.CODEX_HOME, "sessions", "2026", "10", "19");
+fs.mkdirSync(dir, { recursive: true });
+fs.writeFileSync(path.join(dir, "rollout-test-" + id + ".jsonl"), [
+  JSON.stringify({ type: "turn_context", payload: { model: "gpt-5.4", effort: "xhigh" } }),
+  "{invalid"
+].join("\n"));
+process.stdout.write(JSON.stringify({ type: "thread.started", thread_id: id }) + "\n");
+process.stdout.write(JSON.stringify({ type: "turn.completed", usage: { input_tokens: 10, output_tokens: 4, cache_read_input_tokens: 3, cache_write_input_tokens: 2, reasoning_output_tokens: 1 } }) + "\n");
+`), 0o700))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(os.Environ(),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+resultPath,
+		"CODEX_HOME="+codexHome,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	var result map[string]any
+	content, err := os.ReadFile(resultPath)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(content, &result))
+	assert.Equal(t, "gpt-5.4", result["model"])
+	assert.Equal(t, "xhigh", result["thinkingLevel"])
+	usage := result["usage"].(map[string]any)
+	assert.Equal(t, float64(2), usage["cache_creation_input_tokens"])
+	assert.Equal(t, float64(1), usage["reasoning_tokens"])
 }
 
 func thinkingArgsFromScript(t *testing.T, thinking string) []string {

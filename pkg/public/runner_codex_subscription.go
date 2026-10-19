@@ -86,8 +86,11 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 	}
 	var usage struct {
 		Limits []models.CodexUsageLimit `json:"limits"`
+		Models []models.CodexModel      `json:"models"`
 	}
-	validUsage := json.Unmarshal(request.Usage, &usage) == nil && models.ValidateCodexUsageLimits(usage.Limits) == nil
+	validUsage := json.Unmarshal(request.Usage, &usage) == nil &&
+		models.ValidateCodexUsageLimits(usage.Limits) == nil &&
+		models.ValidateCodexModels(usage.Models) == nil
 	var version int64
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		if eligibleErr := codexSubscriptionStillEligible(tx, scope.OrganizationID); eligibleErr != nil {
@@ -113,7 +116,7 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		}
 		// Usage is optional. Invalid quota data must not prevent a credential save.
 		if validUsage {
-			if err := connection.StoreUsage(tx, usage.Limits, time.Now()); err != nil {
+			if err := connection.StoreUsage(tx, usage.Limits, usage.Models, time.Now()); err != nil {
 				return err
 			}
 		}

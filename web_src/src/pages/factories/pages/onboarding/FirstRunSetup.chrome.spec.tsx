@@ -345,6 +345,35 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
   });
 
+  it("reveals subscription sign-in with own-key choices and switches back to hosted models", async () => {
+    const user = userEvent.setup();
+    const startCodexConnection = vi.fn();
+    renderStatefulSetup({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      codexSubscriptionOffered: true,
+      startCodexConnection,
+    });
+
+    expect(screen.queryByRole("button", { name: /Use your ChatGPT subscription/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Use your own key or subscription" }));
+    expect(screen.getByTestId("agent-step")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Connect ChatGPT" }));
+
+    expect(startCodexConnection).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId("agent-step")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) }));
+    expect(screen.queryByTestId("first-run-codex-subscription")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-finish-setup")).toBeEnabled();
+  });
+
   it.each([true, false])("saves the agent before opening the backlog (saved: %s)", async (saved) => {
     const user = userEvent.setup();
     let completeSave!: (saved: boolean) => void;

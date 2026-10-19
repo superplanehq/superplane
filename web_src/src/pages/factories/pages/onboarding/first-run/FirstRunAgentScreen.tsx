@@ -76,7 +76,17 @@ function AgentConnectionChoices({
 }) {
   return (
     <>
-      {codex?.offered ? (
+      {modelSource.offered ? (
+        <FirstRunPanel>
+          <FirstRunModelSourceChoice
+            disabled={saving || loading}
+            modelSource={modelSource.choice}
+            subscriptionOffered={codex?.offered}
+            onSelectModelSource={modelSource.onSelect}
+          />
+        </FirstRunPanel>
+      ) : null}
+      {codex?.offered && (!modelSource.offered || modelSource.choice === "own-key" || subscriptionSelected) ? (
         <FirstRunPanel>
           <FirstRunCodexSubscription
             selected={subscriptionSelected}
@@ -87,15 +97,6 @@ function AgentConnectionChoices({
             onSelect={() => modelSource.onSelect("subscription")}
             onStart={codex.onStart}
             onCancel={codex.onCancel}
-          />
-        </FirstRunPanel>
-      ) : null}
-      {modelSource.offered ? (
-        <FirstRunPanel>
-          <FirstRunModelSourceChoice
-            disabled={saving || loading}
-            modelSource={modelSource.choice}
-            onSelectModelSource={modelSource.onSelect}
           />
         </FirstRunPanel>
       ) : null}

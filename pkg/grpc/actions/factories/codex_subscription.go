@@ -63,6 +63,9 @@ func StartFactoryCodexConnection(
 	if baseURL == "" {
 		return nil, grpcerrors.Internal(errors.New("base url is empty"), "ChatGPT sign-in is not configured")
 	}
+	if req.GetRefreshCatalog() {
+		return refreshFactoryCodexCatalog(ctx, encryptor, orgID, callerID, req.GetFactoryId(), secret, baseURL)
+	}
 
 	var connection *models.FactoryCodexConnection
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
@@ -99,33 +102,7 @@ func StartFactoryCodexConnection(
 		if tokenErr != nil {
 			return tokenErr
 		}
-		tasks := contexts.NewRunnerTaskContext(tx, encryptor, orgID)
-		client, _, clientErr := runner.NewTaskClient(nil, tasks)
-		if clientErr != nil {
-			return clientErr
-		}
-		timeout := int(codexLoginTimeout / time.Second)
-		_, clientErr = client.CreateTask(runner.CreateTaskParams{
-			TaskID:      taskID.String(),
-			MachineType: runner.MachineTypeE1LargeAMD64,
-			Commands: []runner.BrokerCommand{{
-				Name:    "Sign in to ChatGPT",
-				Command: `node "$SUPERPLANE_TASK_DIR/codex_subscription.js" login`,
-				Kind:    runner.LiveLogKindSetup,
-			}},
-			Files: []runner.BrokerTaskFile{{
-				Path:    "codex_subscription.js",
-				Content: codex.SubscriptionScript(),
-				Mode:    "0644",
-			}},
-			Environment: []runner.BrokerEnvironmentVariable{
-				{Name: runner.EnvCodexSubscriptionToken, Value: token},
-				{Name: runner.EnvSuperplaneBaseURL, Value: baseURL},
-			},
-			ExecutionMode:  runner.ExecutionModeHost,
-			TimeoutSeconds: timeout,
-		})
-		return clientErr
+		return createCodexConnectionTask(tx, encryptor, orgID, taskID, token, baseURL, "Sign in to ChatGPT", "login")
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to start ChatGPT sign-in")
@@ -133,6 +110,95 @@ func StartFactoryCodexConnection(
 	return &pb.StartFactoryCodexConnectionResponse{
 		Connection: serializeCodexConnection(connection, true, callerID),
 	}, nil
+}
+
+func refreshFactoryCodexCatalog(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	organizationID, callerID uuid.UUID,
+	factoryRef, secret, baseURL string,
+) (*pb.StartFactoryCodexConnectionResponse, error) {
+	var connection *models.FactoryCodexConnection
+	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		factory, err := lockFactory(tx, organizationID, factoryRef)
+		if err != nil {
+			return err
+		}
+		member, err := models.SoleHumanOrganizationMember(tx, organizationID)
+		if err != nil {
+			return err
+		}
+		if member.ID != callerID {
+			return models.ErrCodexConnectionNotEligible
+		}
+		connection, err = models.LockFactoryCodexConnection(tx, organizationID, factory.ID)
+		if err != nil {
+			return err
+		}
+		if connection.OwnerUserID != member.ID {
+			return models.ErrCodexConnectionNotEligible
+		}
+		if len(connection.AvailableModels) > 0 {
+			return nil
+		}
+
+		taskID := uuid.New()
+		connection, err = models.ReserveFactoryCodexConnection(tx, organizationID, factory.ID, taskID, time.Now())
+		if err != nil {
+			return err
+		}
+		token, err := runner.MintCodexSubscriptionToken(jwt.NewSigner(secret), runner.CodexSubscriptionScope{
+			OrganizationID: organizationID,
+			FactoryID:      factory.ID,
+			ConnectionID:   connection.ID,
+			TaskID:         taskID,
+			Generation:     connection.ReservationGeneration,
+		}, codexLoginTimeout)
+		if err != nil {
+			return err
+		}
+		return createCodexConnectionTask(tx, encryptor, organizationID, taskID, token, baseURL, "Refresh ChatGPT models", "refresh")
+	})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to refresh ChatGPT models")
+	}
+	return &pb.StartFactoryCodexConnectionResponse{
+		Connection: serializeCodexConnection(connection, true, callerID),
+	}, nil
+}
+
+func createCodexConnectionTask(
+	tx *gorm.DB,
+	encryptor crypto.Encryptor,
+	organizationID, taskID uuid.UUID,
+	token, baseURL, name, command string,
+) error {
+	tasks := contexts.NewRunnerTaskContext(tx, encryptor, organizationID)
+	client, _, err := runner.NewTaskClient(nil, tasks)
+	if err != nil {
+		return err
+	}
+	_, err = client.CreateTask(runner.CreateTaskParams{
+		TaskID:      taskID.String(),
+		MachineType: runner.MachineTypeE1LargeAMD64,
+		Commands: []runner.BrokerCommand{{
+			Name:    name,
+			Command: `node "$SUPERPLANE_TASK_DIR/codex_subscription.js" ` + command,
+			Kind:    runner.LiveLogKindSetup,
+		}},
+		Files: []runner.BrokerTaskFile{{
+			Path:    "codex_subscription.js",
+			Content: codex.SubscriptionScript(),
+			Mode:    "0644",
+		}},
+		Environment: []runner.BrokerEnvironmentVariable{
+			{Name: runner.EnvCodexSubscriptionToken, Value: token},
+			{Name: runner.EnvSuperplaneBaseURL, Value: baseURL},
+		},
+		ExecutionMode:  runner.ExecutionModeHost,
+		TimeoutSeconds: int(codexLoginTimeout / time.Second),
+	})
+	return err
 }
 
 func CancelFactoryCodexConnection(
@@ -341,6 +407,7 @@ func serializeCodexConnection(
 	view.Status = connection.Status
 	view.AccountLabel = connection.AccountLabel
 	view.ReservationHeld = connection.Reserved()
+	view.AvailableModels = models.CompactModelIDs(codexModelIDs(connection.AvailableModels))
 	if connection.ReservationTaskID != nil {
 		view.ActiveTaskId = connection.ReservationTaskID.String()
 	}
@@ -349,4 +416,12 @@ func serializeCodexConnection(
 		view.VerificationCode = connection.VerificationCode
 	}
 	return view
+}
+
+func codexModelIDs(available []models.CodexModel) []string {
+	ids := make([]string, 0, len(available))
+	for _, model := range available {
+		ids = append(ids, model.Model)
+	}
+	return ids
 }

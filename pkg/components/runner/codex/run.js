@@ -131,7 +131,7 @@ function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
     .toLowerCase();
-  if (level === "low" || level === "medium" || level === "high") {
+  if (["minimal", "low", "medium", "high", "xhigh"].includes(level)) {
     return ["-c", `model_reasoning_effort=${tomlString(level)}`];
   }
   return [];
@@ -451,10 +451,12 @@ async function runPrompt(promptFile, model, thinking) {
   if (tokenTotal(usage) > 0) {
     telemetry.updateCurrentUsage(usage);
   }
+  const rollout = readRolloutContext(childEnv.CODEX_HOME, readSessionID(sp));
   const payload = {
     type: "result",
     result: formatter.lastText() || lastResult.result || lastResult.text || "",
-    model: lastResult.model || model,
+    model: rollout.model || lastResult.model || model,
+    thinkingLevel: rollout.effort || thinking,
     usage,
   };
   telemetry.attachToResult(payload);
@@ -498,6 +500,7 @@ function tokenTotal(usage) {
     Number(usage.input_tokens || 0) +
     Number(usage.output_tokens || 0) +
     Number(usage.cache_read_input_tokens || 0) +
+    Number(usage.cache_creation_input_tokens || 0) +
     Number(usage.reasoning_tokens || 0)
   );
 }
@@ -533,11 +536,45 @@ function extractUsage(event) {
     cache_read_input_tokens: Number(
       source.cached_input_tokens || source.cache_read_input_tokens || 0,
     ),
-    reasoning_tokens: Number(source.reasoning_tokens || 0),
+    cache_creation_input_tokens: Number(source.cache_write_input_tokens || 0),
+    reasoning_tokens: Number(
+      source.reasoning_output_tokens || source.reasoning_tokens || 0,
+    ),
   };
   const cost = event.total_cost_usd ?? source.total_cost_usd;
   if (cost != null && Number.isFinite(Number(cost))) usage.total_cost_usd = Number(cost);
   return usage;
+}
+
+function readRolloutContext(home, sessionID) {
+  const sessions = home && path.join(home, "sessions");
+  if (!sessions || !sessionID || !fs.existsSync(sessions)) {
+    return {};
+  }
+  try {
+    const suffix = `-${sessionID}.jsonl`;
+    const files = fs
+      .readdirSync(sessions, { recursive: true })
+      .filter((file) => path.basename(file).startsWith("rollout-") && file.endsWith(suffix))
+      .sort();
+    const context = {};
+    for (const file of files) {
+      for (const line of fs.readFileSync(path.join(sessions, file), "utf8").split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const record = JSON.parse(line);
+          if (record.type !== "turn_context" || !record.payload) continue;
+          if (typeof record.payload.model === "string") context.model = record.payload.model;
+          if (typeof record.payload.effort === "string") context.effort = record.payload.effort;
+        } catch (_err) {
+          // Rollout files are internal Codex state. Ignore records from formats we do not know.
+        }
+      }
+    }
+    return context;
+  } catch (_err) {
+    return {};
+  }
 }
 
 function accumulateLLMUsage(payload) {

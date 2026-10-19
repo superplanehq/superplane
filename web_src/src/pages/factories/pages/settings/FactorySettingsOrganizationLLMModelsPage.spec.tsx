@@ -20,6 +20,13 @@ let canUpdate = true;
 let enabledFeatures: string[] = [];
 let hostedModels: Array<{ key: string; label: string; provider: string }> = [];
 let selectedHostedModels: typeof hostedModels = [];
+let codexConnection:
+  | {
+      status?: string;
+      reservationHeld?: boolean;
+      availableModels?: string[];
+    }
+  | undefined;
 
 type BYOKQuery = {
   data: {
@@ -71,6 +78,13 @@ vi.mock("@/hooks/useSelectableLLMModels", () => ({
   useSelectableLLMModels: () => ({ data: hostedModels, isLoading: false, isError: false }),
 }));
 
+vi.mock("../onboarding/useFactoryCodexConnection", () => ({
+  useFactoryCodexConnection: () => ({
+    query: { data: codexConnection, isLoading: false },
+    refreshCatalog: { isPending: false },
+  }),
+}));
+
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => canUpdate, isLoading: false }),
 }));
@@ -107,8 +121,11 @@ function setConnected(provider: string, candidateIds: string[], selectedIds = ca
   };
 }
 
-function renderPage(agentHarness?: FactoryOnboardingAgentHarness) {
-  const factory: FactoriesFactory = { ...REFUND_FACTORY, onboarding: { ...REFUND_FACTORY.onboarding, agentHarness } };
+function renderPage(agentHarness?: FactoryOnboardingAgentHarness, codexSubscription = false) {
+  const factory: FactoriesFactory = {
+    ...REFUND_FACTORY,
+    onboarding: { ...REFUND_FACTORY.onboarding, agentHarness, codexSubscription },
+  };
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -134,6 +151,7 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
       { key: "hosted::anthropic::claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6", provider: "anthropic" },
     ];
     selectedHostedModels = [...hostedModels];
+    codexConnection = undefined;
     saveHostedModels.mockReset();
     vi.mocked(showErrorToast).mockClear();
     vi.mocked(showSuccessToast).mockClear();
@@ -183,6 +201,20 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
       "/org-1/workspaces/RF/settings/organization/integrations/int-anthropic",
     );
     expect(screen.getByText("2 of 2 models selected").className).not.toContain("text-red");
+  });
+
+  it("shows every model from the connected ChatGPT subscription", () => {
+    codexConnection = {
+      status: "ready",
+      availableModels: ["gpt-5.4", "gpt-5.3-codex"],
+    };
+    renderPage("AGENT_HARNESS_CODEX", true);
+
+    expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("ChatGPT");
+    const subscription = screen.getByTestId("llm-models-codex-subscription");
+    expect(subscription).toHaveTextContent("All models available to this ChatGPT subscription are enabled.");
+    expect(within(subscription).getByRole("checkbox", { name: "gpt-5.4" })).toBeChecked();
+    expect(within(subscription).getByRole("checkbox", { name: "gpt-5.3-codex" })).toBeChecked();
   });
 
   it("saves hosted selectable keys and disables Save when the selection is unchanged", async () => {

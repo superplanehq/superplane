@@ -45,7 +45,7 @@ describe("FirstRunCodexSubscription", () => {
       "https://auth.openai.com/codex/device",
     );
     expect(screen.getByText(copy.subscriptionDeviceSettings)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: copy.subscriptionStart })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
   });
 
   it("waits for a device code without saying sign-in is finishing", async () => {
@@ -72,6 +72,6 @@ describe("FirstRunCodexSubscription", () => {
     renderPanel({ status: "ready", accountLabel: "ada@example.com", reservationHeld: false });
 
     expect(screen.getByRole("status")).toHaveTextContent("ChatGPT is connected as ada@example.com.");
-    expect(screen.queryByRole("button", { name: copy.subscriptionStart })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
   });
 });

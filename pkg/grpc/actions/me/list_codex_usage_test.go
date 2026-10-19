@@ -29,7 +29,7 @@ func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 	duration := int64(300)
 	reset := now.Add(time.Hour).Unix()
 	limits := []models.CodexUsageLimit{{LimitID: "codex", Primary: &models.CodexUsageWindow{UsedPercent: &used, WindowDurationMins: &duration, ResetsAt: &reset}}}
-	require.NoError(t, connection.StoreUsage(db, limits, now))
+	require.NoError(t, connection.StoreUsage(db, limits, nil, now))
 	response, err := ListCodexUsage(meContext(r))
 	require.NoError(t, err)
 	require.Len(t, response.Connections, 1)

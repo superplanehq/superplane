@@ -47,7 +47,10 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 		server.handleRunnerCodexSubscriptionCheckpoint(response, request)
 		return response
 	}
-	valid := map[string]any{"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 25, "windowDurationMins": 300, "resetsAt": now.Add(time.Hour).Unix()}}}}
+	valid := map[string]any{
+		"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 25, "windowDurationMins": 300, "resetsAt": now.Add(time.Hour).Unix()}}},
+		"models": []any{map[string]any{"id": "gpt-5.4", "model": "gpt-5.4", "displayName": "GPT-5.4", "defaultReasoningEffort": "medium", "supportedReasoningEfforts": []any{map[string]any{"reasoningEffort": "xhigh", "description": "Deep"}}, "isDefault": true}},
+	}
 	require.Equal(t, http.StatusUnauthorized, checkpoint("", valid).Code)
 	response := checkpoint(token, valid)
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
@@ -55,6 +58,8 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 	require.Len(t, connection.UsageLimits, 1)
 	assert.Equal(t, 25.0, *connection.UsageLimits[0].Primary.UsedPercent)
 	require.NotNil(t, connection.UsageObservedAt)
+	require.Len(t, connection.AvailableModels, 1)
+	assert.Equal(t, "gpt-5.4", connection.AvailableModels[0].Model)
 	observed := *connection.UsageObservedAt
 	version := connection.CredentialVersion
 	for _, usage := range []any{
