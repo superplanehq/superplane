@@ -92,7 +92,7 @@ describe("FirstRunSetup Bitbucket", () => {
 
     bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
     bitbucketOnboarding.repositories = [{ fullName: "acme-team/api" }];
-    rerender(bitbucketSetupElement());
+    rerender(bitbucketSetupElement(new Set()));
 
     await user.click(await screen.findByRole("button", { name: "Use acme-team" }));
 
@@ -229,7 +229,7 @@ describe("FirstRunSetup Bitbucket", () => {
     expect(screen.getByTestId("first-run-bitbucket-waiting")).toBeInTheDocument();
 
     bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
-    rerender(bitbucketSetupElement());
+    rerender(bitbucketSetupElement(new Set()));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Use acme-team" })).toBeInTheDocument();
