@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { FleetManagerCommandBlock } from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
 import {
@@ -190,15 +190,72 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
             Finish installation
           </Button>
         )}
-        <Button type="button" variant="ghost" onClick={onFinishLater}>
-          Finish later
-        </Button>
+        <FinishLaterButton onFinishLater={onFinishLater} />
       </div>
     </div>
   );
 }
 
+function FinishLaterButton({ onFinishLater }: { onFinishLater: () => void }) {
+  return (
+    <Button type="button" variant="ghost" onClick={onFinishLater}>
+      Finish later
+    </Button>
+  );
+}
+
+function ValuesCommandPending({
+  setup,
+  onRetry,
+  onFinishLater,
+}: {
+  setup: FleetManagerSetupState;
+  onRetry: () => void;
+  onFinishLater: () => void;
+}) {
+  return (
+    <div data-testid="fleet-manager-values-step">
+      <FirstRunHeading headline="Create the chart values" size="display">
+        <p className="text-[15px] leading-6 text-muted-foreground">
+          Run this command. It writes {FLEET_MANAGER_VALUES_FILE}.
+        </p>
+      </FirstRunHeading>
+      {setup.tokenError ? (
+        <div className="mt-5">
+          <p role="alert" className="text-sm text-destructive">
+            {setup.tokenError}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Button type="button" onClick={onRetry}>
+              Try again
+            </Button>
+            <FinishLaterButton onFinishLater={onFinishLater} />
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="mt-5 text-sm text-muted-foreground">Preparing the values command...</p>
+          <div className="mt-7">
+            <FinishLaterButton onFinishLater={onFinishLater} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function usePrepareValuesCommand(step: FleetManagerWizardStep, setup: FleetManagerSetupState) {
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (step !== "values" || setup.values || started.current) return;
+    started.current = true;
+    void setup.prepareInstallation();
+  }, [setup, step]);
+}
+
 export function FleetManagerWizardScreen(props: WizardProps) {
+  usePrepareValuesCommand(props.step, props.setup);
   const back = props.showBackButton ? props.onBack : undefined;
   const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
   const continueToNextStep = async () => {
@@ -235,6 +292,17 @@ export function FleetManagerWizardScreen(props: WizardProps) {
 
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;
   if (props.step === "fleets") return <FleetsStep setup={props.setup} actions={continueActions} />;
-  if (props.step === "values") return <ValuesStep setup={props.setup} actions={continueActions} />;
+  if (props.step === "values") {
+    if (!props.setup.values) {
+      return (
+        <ValuesCommandPending
+          setup={props.setup}
+          onRetry={() => void props.setup.prepareInstallation()}
+          onFinishLater={props.onFinishLater}
+        />
+      );
+    }
+    return <ValuesStep setup={props.setup} actions={continueActions} />;
+  }
   return <InstallStep {...props} />;
 }
