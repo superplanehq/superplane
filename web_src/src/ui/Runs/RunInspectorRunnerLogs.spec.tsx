@@ -79,6 +79,7 @@ describe("RunInspector runner logs", () => {
       false,
       "passed",
       Date.parse("2026-05-01T12:00:55Z"),
+      undefined,
     );
     expect(screen.getByText(/\$ npm run build/)).toBeInTheDocument();
     expect(screen.getByText(/vite build/)).toBeInTheDocument();
