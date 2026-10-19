@@ -87,6 +87,10 @@ function invalidateOrdersList(queryClient: WorkOrderQueryClient, organizationId:
     exact: true,
   });
   void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.historicalWorkOrders(organizationId, factoryId),
+    exact: true,
+  });
+  void queryClient.invalidateQueries({
     queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId),
   });
 }
@@ -176,6 +180,10 @@ async function refreshUpdatedWorkOrder(
   isCurrent: () => boolean,
 ) {
   invalidateTaskActivity(queryClient, organizationId, factoryId, [orderId]);
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.historicalWorkOrders(organizationId, factoryId),
+    exact: true,
+  });
   const order = await describeWorkOrder(organizationId, factoryId, orderId);
   if (!isCurrent()) {
     return;

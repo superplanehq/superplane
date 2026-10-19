@@ -14,6 +14,7 @@ export interface ExperimentalFeatureAccess {
    * A failed or empty organization lookup does not confirm that a feature is off.
    */
   organizationReady: boolean;
+  retryOrganization?: () => void;
 }
 
 export function useExperimentalFeature(organizationId?: string | null): ExperimentalFeatureAccess {
@@ -24,6 +25,7 @@ export function useExperimentalFeature(organizationId?: string | null): Experime
     data: organization,
     isLoading: organizationLoading,
     isSuccess: organizationLoaded,
+    refetch: refetchOrganization,
   } = useOrganization(resolvedOrganizationId, !skipOrganization);
   const {
     data: features,
@@ -64,5 +66,8 @@ export function useExperimentalFeature(organizationId?: string | null): Experime
     isLoading,
     lookupFailed: registryLookupFailed,
     organizationReady: organizationLoaded && organization != null,
+    retryOrganization: () => {
+      void refetchOrganization();
+    },
   };
 }

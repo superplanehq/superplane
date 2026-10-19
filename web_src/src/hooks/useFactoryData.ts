@@ -73,6 +73,8 @@ export const factoryQueryKeys = {
   detail: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId] as const,
   workOrders: (organizationId: string, factoryId: string) =>
     ["factories", organizationId, factoryId, "work-orders"] as const,
+  historicalWorkOrders: (organizationId: string, factoryId: string) =>
+    ["factories", organizationId, factoryId, "work-orders", "including-archived"] as const,
   workOrdersPagePrefix: factoryWorkOrdersPagePrefix,
   workOrdersPage: factoryWorkOrdersPageKey,
   workOrderDetail: (organizationId: string, factoryId: string, orderId: string) =>
@@ -183,7 +185,7 @@ export function useFactoryWorkOrders(
   const includeArchived = options?.includeArchived === true;
   return useQuery({
     queryKey: includeArchived
-      ? [...workOrdersKey(organizationId, factoryId), "including-archived"]
+      ? factoryQueryKeys.historicalWorkOrders(organizationId, factoryId)
       : workOrdersKey(organizationId, factoryId),
     queryFn: async (): Promise<FactoriesWorkOrderSummary[]> => {
       const orders: FactoriesWorkOrderSummary[] = [];
