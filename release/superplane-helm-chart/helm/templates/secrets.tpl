@@ -173,6 +173,14 @@ affinity:
 {{- end }}
 {{- end }}
 
+{{- define "secrets.ownerBootstrap.name" }}
+{{- if eq .Values.api.ownerBootstrap.secretName "" }}
+{{- printf "%s-owner-bootstrap" .Release.Name }}
+{{- else }}
+{{- .Values.api.ownerBootstrap.secretName }}
+{{- end }}
+{{- end }}
+
 {{- define "secrets.rabbitmq.name" }}
 {{- if eq .Values.rabbitmq.secretName "" }}
 {{- printf "%s-rabbitmq" .Release.Name }}

@@ -15,7 +15,9 @@ bash release/fleet-manager/verify_image_test.sh
 bash release/fleet-manager/publish_chart_test.sh
 bash release/fleet-manager-chart/test-chart.sh
 bash release/superplane-helm-chart/test-fleet-manager-setup.sh
+bash release/superplane-helm-chart/test-owner-bootstrap.sh
 bash release/superplane-helm-chart/update_component_release_defaults_test.sh
+bash release/superplane-single-host-tarball/test-install.sh
 bash release/superplane/publish_architecture_test.sh
 bash release/superplane/publish_chart_test.sh
 bash release/superplane/pipeline_test.sh
@@ -45,7 +47,11 @@ bash -n \
   release/fleet-manager/verify_image_test.sh \
   release/superplane-helm-chart/build.sh \
   release/superplane-helm-chart/test-fleet-manager-setup.sh \
+  release/superplane-helm-chart/test-owner-bootstrap.sh \
   release/superplane-helm-chart/update_component_release_defaults_test.sh \
+  release/superplane-single-host-tarball/build.sh \
+  release/superplane-single-host-tarball/test-install.sh \
+  release/superplane-single-host-tarball/templates/install.sh \
   release/superplane/build-assets.sh \
   release/superplane/build-cli.sh \
   release/superplane/build-image.sh \

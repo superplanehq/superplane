@@ -113,6 +113,15 @@ OWNER_SETUP_ENABLED=yes
 BLOCK_SIGNUP=${BLOCK_SIGNUP}
 ENABLE_PASSWORD_LOGIN=yes
 
+# Optional: set all four to create the owner account at startup and skip
+# the /setup wizard. Leave empty to use the interactive wizard. Values
+# exported before running this script are written here automatically.
+# SUPERPLANE_OWNER_EMAIL=
+# SUPERPLANE_OWNER_PASSWORD=
+# SUPERPLANE_OWNER_FIRST_NAME=
+# SUPERPLANE_OWNER_LAST_NAME=
+# SUPERPLANE_OWNER_ORG_NAME=
+
 START_PUBLIC_API=yes
 START_CONSUMERS=yes
 START_WEB_SERVER=yes
@@ -139,6 +148,34 @@ SUPERPLANE_BEACON_ENABLED=yes
 SUPERPLANE_INSTALLATION_TYPE=single-host
 OTEL_ENABLED=no
 EOF
+
+# Forward SUPERPLANE_OWNER_* values exported before running this script
+# into the env file so scripted installs skip the /setup wizard. Quote
+# each value for the docker compose env file format: wrap in double
+# quotes and escape backslashes, double quotes, and dollar signs.
+quote_env_value() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//\$/\\\$}"
+  printf '"%s"' "${value}"
+}
+
+owner_bootstrap_written=""
+for owner_var in \
+  SUPERPLANE_OWNER_EMAIL \
+  SUPERPLANE_OWNER_PASSWORD \
+  SUPERPLANE_OWNER_FIRST_NAME \
+  SUPERPLANE_OWNER_LAST_NAME \
+  SUPERPLANE_OWNER_ORG_NAME; do
+  if [[ -n "${!owner_var:-}" ]]; then
+    if [[ -z "${owner_bootstrap_written}" ]]; then
+      owner_bootstrap_written="yes"
+      echo "" >> "${ENV_FILE}"
+    fi
+    echo "${owner_var}=$(quote_env_value "${!owner_var}")" >> "${ENV_FILE}"
+  fi
+done
 
 if [[ -n "${RESEND_API_KEY}" ]]; then
   {

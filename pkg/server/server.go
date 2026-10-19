@@ -773,6 +773,13 @@ func Start() {
 		log.Fatalf("failed to create auth service: %v", err)
 	}
 
+	// Bootstrap the owner from SUPERPLANE_OWNER_* when the public API runs.
+	// Workers and websocket-only pods share Start() but skip this so only
+	// one role races to create the first account.
+	if os.Getenv("START_PUBLIC_API") == "yes" {
+		public.TryBootstrapOwnerFromEnv(authService)
+	}
+
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
 		panic("BASE_URL must be set")
