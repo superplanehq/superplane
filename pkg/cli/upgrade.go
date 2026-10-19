@@ -24,8 +24,8 @@ const (
 )
 
 var (
-	releasesURL                 = "https://api.github.com/repos/superplanehq/superplane/releases?per_page=100"
-	stableApplicationTagPattern = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
+	releasesURL         = "https://api.github.com/repos/superplanehq/superplane/releases?per_page=100"
+	stableCLITagPattern = regexp.MustCompile(`^cli/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
 )
 
 type releaseInfo struct {
@@ -99,18 +99,18 @@ func fetchLatestRelease() (*releaseInfo, error) {
 			if release.Draft || release.Prerelease {
 				continue
 			}
-			if stableApplicationTagPattern.MatchString(release.TagName) {
+			if stableCLITagPattern.MatchString(release.TagName) {
 				return release, nil
 			}
 		}
 
 		if nextPageURL == "" {
-			return nil, fmt.Errorf("release response does not contain a stable application release")
+			return nil, fmt.Errorf("release response does not contain a stable CLI release")
 		}
 		nextURL = nextPageURL
 	}
 
-	return nil, fmt.Errorf("stable application release was not found in the first %d pages", maximumReleasePages)
+	return nil, fmt.Errorf("stable CLI release was not found in the first %d pages", maximumReleasePages)
 }
 
 func fetchReleasePage(client *http.Client, url string) ([]releaseInfo, string, error) {

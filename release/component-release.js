@@ -29,6 +29,21 @@ const COMPONENTS = {
       chart: "SuperPlane chart",
     },
   },
+  cli: {
+    initialChangelogRef: "v0.30.0",
+    tagPrefix: "cli/",
+    releaseName: "SuperPlane CLI",
+    releaseScopes: ["cli", "release/cli"],
+    releasePaths: [
+      ".semaphore/*cli-release.yml",
+      "cliff.toml",
+      "cmd/cli/**",
+      "pkg/cli/**",
+      "release/cli/**",
+      "release/superplane-cli-npm/**",
+      "release/component-release.*",
+    ],
+  },
   runner: {
     initialChangelogRef: "v0.30.0",
     tagPrefix: "runner/",

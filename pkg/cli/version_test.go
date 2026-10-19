@@ -27,6 +27,12 @@ func TestIsNewerVersion(t *testing.T) {
 		{"release candidate sequence", "v1.0.0-rc1", "v1.0.0-rc2", true},
 		{"stable is newer than release candidate", "v1.0.0", "v1.0.0-rc2", false},
 		{"newer minor release candidate", "v1.0.0", "v1.1.0-rc1", true},
+		{"cli tag minor bump", "v0.13.0", "cli/v0.14.0", true},
+		{"cli tag same version", "v0.13.0", "cli/v0.13.0", false},
+		{"cli tag older", "v0.14.0", "cli/v0.13.0", false},
+		{"both cli tags", "cli/v0.13.0", "cli/v0.14.0", true},
+		{"cli release candidate to cli stable", "cli/v1.0.0-rc.1", "cli/v1.0.0", true},
+		{"other component tag", "v0.13.0", "runner/v1.0.0", false},
 	}
 
 	for _, tt := range tests {

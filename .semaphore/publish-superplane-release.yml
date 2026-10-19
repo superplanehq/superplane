@@ -44,7 +44,7 @@ blocks:
                 --sha "$SEMAPHORE_GIT_SHA" \
                 --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
                 --directory "$release_dir" \
-                --assets "install.sh,superplane-cli-darwin-amd64,superplane-cli-darwin-arm64,superplane-cli-linux-amd64,superplane-cli-linux-arm64,superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_VERSION#v}.tgz,checksums.txt,superplane-amd64.oci.tar,superplane-arm64.oci.tar" \
+                --assets "superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_VERSION#v}.tgz,checksums.txt,superplane-amd64.oci.tar,superplane-arm64.oci.tar" \
                 --manifest "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum --check checksums.txt)
               test -n "${GITHUB_TOKEN:-}"
@@ -117,7 +117,7 @@ blocks:
                 --version "$RELEASE_VERSION" \
                 --sha "$SEMAPHORE_GIT_SHA" \
                 --directory "build/superplane/$RELEASE_VERSION" \
-                --assets "install.sh,superplane-cli-darwin-amd64,superplane-cli-darwin-arm64,superplane-cli-linux-amd64,superplane-cli-linux-arm64,superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_VERSION#v}.tgz,checksums.txt" \
+                --assets "superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_VERSION#v}.tgz,checksums.txt" \
                 --release-id-file /tmp/github-release-id
             - |
               set -euo pipefail
@@ -138,11 +138,6 @@ blocks:
               bash release/verify-public-assets.sh \
                 "https://github.com/superplanehq/superplane/releases/download/$RELEASE_VERSION" \
                 "build/superplane/$RELEASE_VERSION" \
-                install.sh \
-                superplane-cli-darwin-amd64 \
-                superplane-cli-darwin-arm64 \
-                superplane-cli-linux-amd64 \
-                superplane-cli-linux-arm64 \
                 superplane-sbom.json \
                 superplane-single-host.tar.gz \
                 "superplane-${RELEASE_VERSION#v}.tgz" \
