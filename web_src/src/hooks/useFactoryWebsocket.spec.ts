@@ -55,6 +55,19 @@ async function emit(payload: unknown) {
 }
 
 describe("useFactoryWebsocket", () => {
+  it.each([false, true])("refreshes historical tasks on updates, including archived tasks: %s", async (archived) => {
+    const describe = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
+    if (archived) describe.mockRejectedValue(new Error("404 not found"));
+    else describe.mockResolvedValue(describeResponse({ id: "order-1", title: "Updated" }));
+    const { queryClient } = renderFactoryWebsocket();
+    const key = [...factoryQueryKeys.workOrders("org-1", "factory-1"), "including-archived"];
+    const otherKey = [...factoryQueryKeys.workOrders("org-1", "other-factory"), "including-archived"];
+    queryClient.setQueryData(key, [{ id: "order-1", title: "Old" }]);
+    queryClient.setQueryData(otherKey, []);
+    await emit({ event: "work_order_updated", payload: { factoryId: "factory-1", orderId: "order-1" } });
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  });
   it("connects to the per-factory WebSocket URL with org id", () => {
     renderFactoryWebsocket();
     const [url, , enabled] = lastCall();
@@ -366,7 +379,9 @@ describe("useFactoryWebsocket", () => {
   });
 
   it("skips invalidation on the first open and refreshes the orders list on reconnect", () => {
-    const { invalidateSpy } = renderFactoryWebsocket();
+    const { queryClient, invalidateSpy } = renderFactoryWebsocket();
+    const historyKey = [...factoryQueryKeys.workOrders("org-1", "factory-1"), "including-archived"];
+    queryClient.setQueryData(historyKey, []);
     invalidateSpy.mockClear();
     const [, options] = lastCall();
     const onOpen = options.onOpen as () => void;
@@ -375,10 +390,12 @@ describe("useFactoryWebsocket", () => {
       onOpen();
     });
     expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(false);
 
     act(() => {
       onOpen();
     });
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(true);
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["factories", "org-1", "factory-1", "work-orders"],
       exact: true,
