@@ -1378,6 +1378,7 @@ func TestAdminListOrgExperimentalFeatures(t *testing.T) {
 
 	t.Run("returns an empty enabled list when none are on", func(t *testing.T) {
 		require.NoError(t, models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureFactories))
+		require.NoError(t, models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureWorkspaceAgent))
 
 		response := execRequest(server, requestParams{
 			method:     "GET",
