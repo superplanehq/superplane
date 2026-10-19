@@ -44,6 +44,7 @@ export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetup
           botMode={setup.botMode}
           selectedBots={setup.allowedBots}
           catalog={setup.catalog}
+          vcsProvider={props.vcsProvider}
         />
       }
     >
@@ -107,8 +108,8 @@ function MentionStep({ setup }: { setup: DiscussionPRFeedbackSetupModel }) {
         name="discussion-setup-mention"
         value="require"
         checked={setup.mentionRequired}
-        title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireOption}
-        helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelper}
+        title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireOption(setup.mention)}
+        helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelper(setup.mention)}
         onChange={() => setup.setMentionRequired(true)}
       />
       <IntakeSettingsRadioOption
