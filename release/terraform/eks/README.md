@@ -79,7 +79,13 @@ After deployment, get the NLB DNS name:
 kubectl get svc -n traefik traefik -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-Create a CNAME record in your DNS provider pointing your domain to the NLB DNS name.
+Create a CNAME for the host in `domain_name`. For `superplane.example.com`, the name is `superplane`. Point it at the NLB hostname.
+
+```bash
+dig +short superplane.example.com CNAME @8.8.8.8
+```
+
+The command must print the NLB hostname. Let's Encrypt uses public DNS. An entry in `/etc/hosts` does not issue the certificate.
 
 For an existing installation, update its CNAME to the new Traefik NLB hostname.
 Replacing NGINX removes the old NLB. Plan for an interruption while the NLB and DNS change.
@@ -233,7 +239,7 @@ blobs, then empty the bucket before you destroy the deployment.
 ## Notes
 
 - The NLB is created automatically by the AWS Load Balancer Controller
-- DNS must be configured as a CNAME pointing to the NLB DNS name
+- DNS is a CNAME whose name is the host in `domain_name`, pointing at the NLB hostname
 - RDS is deployed in private subnets with no public access
 - EKS nodes are in private subnets with NAT gateway for outbound access
 - EFS provides shared active-log storage for the Runner API and workers
