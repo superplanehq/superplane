@@ -9,7 +9,7 @@ import type { FirstRunTicketSource } from "./first-run/firstRunTypes";
 import {
   canAnalyzeTicketSource,
   issuesChoiceForTicketSource,
-  ticketSourceFromIssuesChoice,
+  resolveTicketSelection,
 } from "./first-run/firstRunTicketSource";
 import { type IntegrationId, type IssuesChoiceId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
 import {
@@ -209,9 +209,16 @@ function waitForBrowserPaint(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
+function ticketSelection(model: OnboardingPageModel) {
+  return resolveTicketSelection({
+    issuesChoice: model.setup.issuesChoice,
+    vcsHost: model.setup.vcsHost,
+    githubConnected: model.setup.connected.has("github"),
+  });
+}
+
 function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
-  const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice, model.setup.vcsHost);
-  const issuesChoice = issuesChoiceForTicketSource(ticketSource);
+  const { ticketSource, issuesChoice } = ticketSelection(model);
   if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (
     !issuesChoice ||
@@ -438,7 +445,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     credentialChoice: model.agentCredentialChoice,
     selectCredentialChoice: model.setAgentCredentialChoice,
     agentGatePending: agentGate === "pending",
-    ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice, model.setup.vcsHost),
+    ticketSource: ticketSelection(model).ticketSource,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
     repositoriesLoading: connection.onboarding.isPending,

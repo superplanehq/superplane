@@ -36,7 +36,7 @@ export function FirstRunFlow({
   onLogOut?: () => void;
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
-  const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
+  const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>("github-issues");
   const [jiraConnected, setJiraConnected] = useState(false);
   const [jiraProjectId, setJiraProjectId] = useState("");
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);

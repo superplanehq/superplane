@@ -314,16 +314,29 @@ describe("FirstRunSetup chrome", () => {
 
   it("opens the backlog when SuperPlane-hosted models stay selected", async () => {
     const user = userEvent.setup();
-    renderStatefulSetup({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKey: true });
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      openSection: "agent",
+    });
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=agent"]}>
+        <StatefulSetup model={model} />
+      </MemoryRouter>,
+    );
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue }));
 
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /GitHub Issues/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /GitHub Issues/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: /^Jira/ })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: /^Linear/ })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
+
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
+    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
   });
 
   it("shows provider keys when the organization chooses its own key", async () => {

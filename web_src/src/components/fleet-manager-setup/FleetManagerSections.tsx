@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 import {
+  DEFAULT_FLEET_CAPACITY,
   DEFAULT_SETUP_FLEET_ID,
   formatMachineTypeOption,
   machineTypeChoices,
@@ -263,7 +264,7 @@ export function FleetManagerFleetSection({ setup }: { setup: FleetManagerSetupSt
             description={WARM_CAPACITY_HELP}
             type="number"
             min={0}
-            value={capacity?.warmCapacity ?? 0}
+            value={capacity?.warmCapacity ?? DEFAULT_FLEET_CAPACITY.warmCapacity}
             onChange={(event) =>
               setup.setFleetCapacity(DEFAULT_SETUP_FLEET_ID, { warmCapacity: Number(event.target.value) })
             }
@@ -274,7 +275,7 @@ export function FleetManagerFleetSection({ setup }: { setup: FleetManagerSetupSt
             description={MAX_CAPACITY_HELP}
             type="number"
             min={0}
-            value={capacity?.maxCapacity ?? 1}
+            value={capacity?.maxCapacity ?? DEFAULT_FLEET_CAPACITY.maxCapacity}
             onChange={(event) =>
               setup.setFleetCapacity(DEFAULT_SETUP_FLEET_ID, { maxCapacity: Number(event.target.value) })
             }
