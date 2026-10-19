@@ -23,4 +23,6 @@ export const OWNER_SETUP_COPY = {
     continue: "Set up fleets",
     skip: "Skip for now",
   },
+  closeError: "SuperPlane could not close setup.",
+  closeRetry: "Try again",
 } as const;
