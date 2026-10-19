@@ -6,6 +6,10 @@ import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
 import { cn } from "@/lib/utils";
 import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
+import { ImplementRunHistory } from "./implementRunHistory/ImplementRunHistory";
+import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
 import { MergeConfidenceActionsMenu, MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
@@ -188,6 +192,27 @@ function MergeConfidenceConfigBody({
   focusNonce,
   layoutFitNonce,
 }: ReturnType<typeof configBodyProps>) {
+  const features = useExperimentalFeature(organizationId);
+  if (
+    features.organizationReady &&
+    !features.isLoading &&
+    features.has(FEATURE_FACTORY_RUN_HISTORY) &&
+    tab === "runs" &&
+    canvasId &&
+    organizationId &&
+    factoryId &&
+    graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID)
+  ) {
+    return (
+      <ImplementRunHistory
+        canvasId={canvasId}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        selectedRunId={selectedRunId}
+        onSelectRun={onSelectedRunIdChange}
+      />
+    );
+  }
   return (
     <div
       ref={containerRef}

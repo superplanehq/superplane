@@ -39,3 +39,6 @@ export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
 
 /** Organization experimental feature: scheduled task proposals in Backlog. */
 export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
+
+/** Organization experimental feature: new Implement run history and details. */
+export const FEATURE_FACTORY_RUN_HISTORY = "factory_run_history";

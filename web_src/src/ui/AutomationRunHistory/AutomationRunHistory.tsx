@@ -13,6 +13,7 @@ interface AutomationRunHistoryProps {
   error?: string;
   onRetry?: () => void;
   onLoadMore?: () => void;
+  loadingMore?: boolean;
 }
 
 export function AutomationRunHistory({
@@ -22,6 +23,7 @@ export function AutomationRunHistory({
   error,
   onRetry,
   onLoadMore,
+  loadingMore,
 }: AutomationRunHistoryProps) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -48,7 +50,7 @@ export function AutomationRunHistory({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {["all", "Running", "Passed", "Failed", "Cancelled"].map((value) => (
+            {["all", "Pending", "Running", "Cancelling", "Passed", "Failed", "Cancelled", "Unknown"].map((value) => (
               <SelectItem key={value} value={value}>
                 {value === "all" ? "All statuses" : value}
               </SelectItem>
@@ -118,8 +120,8 @@ export function AutomationRunHistory({
       </div>
       {onLoadMore && !loading && !error && (
         <div className="flex justify-center">
-          <Button variant="outline" onClick={onLoadMore}>
-            Load more
+          <Button variant="outline" onClick={onLoadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading more…" : "Load more"}
           </Button>
         </div>
       )}
