@@ -44,7 +44,6 @@ export function buildAgentEditPrompt(input: AgentEditPromptInput): string {
 
   return [
     "You are editing a SuperPlane canvas.",
-    "The CLI does not change this canvas.",
     "",
     `Canvas name: ${appName}`,
     `Canvas id: ${appId}`,

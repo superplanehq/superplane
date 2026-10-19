@@ -43,7 +43,7 @@ describe("buildAgentEditPrompt", () => {
 
     expect(prompt).toContain("Canvas name: Refund Implementer");
     expect(prompt).toContain("Canvas id: app-refund-implementer");
-    expect(prompt).toContain("The CLI does not change this canvas.");
+    expect(prompt).not.toContain("The CLI does not change this canvas.");
     expect(prompt).not.toContain("superplane automations get");
     expect(prompt).not.toContain("superplane automations update");
     expect(prompt).not.toContain("canvas.yaml");
