@@ -81,7 +81,7 @@ func parseAssigneeIDs(tx *gorm.DB, organizationID uuid.UUID, assigneeIDs []strin
 func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkOrdersFilters {
 	filters := models.ListFactoryWorkOrdersFilters{
 		Unassigned:      req.Unassigned,
-		ExcludeArchived: true,
+		ExcludeArchived: !req.GetIncludeArchived(),
 	}
 
 	if req.GetBeforeId() != "" {
