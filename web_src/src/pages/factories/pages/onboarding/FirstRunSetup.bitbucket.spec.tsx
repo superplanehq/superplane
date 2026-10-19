@@ -324,6 +324,46 @@ describe("FirstRunSetup Bitbucket", () => {
     expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent("Checking for the new workspace…");
   });
 
+  it("keeps the remaining installation wait after a refresh", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-19T12:00:00.000Z"));
+    try {
+      bitbucketOnboarding.providerConfigured = true;
+      bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+      const startedAt = Date.now() - 4 * 60_000;
+      writeBitbucketInstallWait("org-1", { startedAt, knownSlugs: [] });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      renderSetup(new Set());
+
+      await chooseBitbucket(user);
+
+      expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent("Checking for the new workspace…");
+      expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+      expect(readBitbucketInstallWait("org-1")?.startedAt).toBe(startedAt);
+
+      const remaining = startedAt + bitbucketInstallationAttemptMs - Date.now();
+      expect(remaining).toBeGreaterThan(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(remaining - 1);
+      });
+
+      expect(screen.getByTestId("first-run-bitbucket-waiting")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+      expect(readBitbucketInstallWait("org-1")?.startedAt).toBe(startedAt);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+
+      expect(screen.queryByTestId("first-run-bitbucket-waiting")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+      expect(readBitbucketInstallWait("org-1")?.startedAt).toBe(startedAt);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows Check again when a refreshed wait has already timed out", async () => {
     bitbucketOnboarding.providerConfigured = true;
     bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
