@@ -444,6 +444,19 @@ func TestTriggersDescribeByNameTextOutput(t *testing.T) {
 	require.Contains(t, out, `"tick": true`)
 }
 
+func TestIndexCommandRegistersComponentsNotWidgets(t *testing.T) {
+	root := NewCommand(core.BindOptions{})
+
+	for _, name := range []string{"integrations", "triggers", "components", "dump"} {
+		cmd, _, err := root.Find([]string{name})
+		require.NoError(t, err)
+		require.Equal(t, name, cmd.Name())
+	}
+
+	_, _, err := root.Find([]string{"widgets"})
+	require.Error(t, err)
+}
+
 // Helpers
 
 func newIndexServer(t *testing.T, method, path, response string) *httptest.Server {
