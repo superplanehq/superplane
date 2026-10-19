@@ -93,6 +93,7 @@ test("rejects build metadata and malformed prereleases", () => {
 
 test("maps each component to its independent tag", () => {
   assert.equal(componentTag("superplane", "v1.2.3"), "v1.2.3");
+  assert.equal(componentTag("cli", "v1.2.3"), "cli/v1.2.3");
   assert.equal(componentTag("runner", "v1.2.3"), "runner/v1.2.3");
   assert.equal(
     componentTag("fleet-manager", "v2.0.0-rc.1"),
