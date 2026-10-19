@@ -182,6 +182,11 @@ function implementHistoryContext({
   return { canvasId, organizationId, factoryId };
 }
 
+function implementSettingsNode({ tab, graph }: ReturnType<typeof configBodyProps>) {
+  if (tab !== "automation") return undefined;
+  return graph?.specNodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID);
+}
+
 function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
   const {
     containerRef,
@@ -210,6 +215,10 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     layoutFitNonce,
   } = props;
   const features = useExperimentalFeature(organizationId);
+  const implementAgent = implementSettingsNode(props);
+  if (implementAgent && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
+    return <ImplementSettings node={implementAgent} settings={props} />;
+  }
   const historyContext = implementHistoryContext(props);
   if (historyContext && features.isLoading) {
     return (
@@ -287,6 +296,31 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
         )}
       </div>
     </div>
+  );
+}
+
+function ImplementSettings({
+  node,
+  settings,
+}: {
+  node: SuperplaneComponentsNode;
+  settings: ReturnType<typeof configBodyProps>;
+}) {
+  return (
+    <section aria-label="Implement settings" className="flex min-h-0 flex-1 flex-col">
+      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
+        <NodeConfigPanel
+          key={node.id}
+          node={node}
+          organizationId={settings.organizationId}
+          factoryId={settings.factoryId}
+          factoryKey={settings.factoryKey}
+          onSave={settings.onSaveNode}
+          body={settings.nodeBody}
+          layout="page"
+        />
+      </div>
+    </section>
   );
 }
 
