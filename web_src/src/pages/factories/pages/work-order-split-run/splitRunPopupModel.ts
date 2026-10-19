@@ -217,8 +217,8 @@ export function splitRunSourceDescription(args: {
 
 /**
  * Every artifact on the task for the console summary panel, including
- * document markdowns such as description.md and plan.md. Only the origin
- * ticket stays out, because the Source row already links it. Oldest first.
+ * document markdowns such as description.md and plan.md. The origin ticket
+ * stays out because Intake already shows it. Oldest first.
  */
 export function splitRunPanelArtifacts(
   artifacts: FactoriesWorkOrderArtifact[],
