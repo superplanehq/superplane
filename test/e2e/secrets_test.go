@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"testing"
 
 	pw "github.com/mxschmitt/playwright-go"
@@ -327,17 +326,13 @@ func (s *SecretsSteps) assertSecretNotVisibleInList(name string) {
 	require.Equal(s.t, 0, count, "secret %q should not be visible in the list", name)
 }
 
-// encryptorFromEnv returns the same encryptor the app uses (from NO_ENCRYPTION / ENCRYPTION_KEY),
-// used to decrypt secret data when asserting DB state after UI-created secrets.
+// encryptorFromEnv returns the encryptor initialized by the E2E server.
 func encryptorFromEnv() crypto.Encryptor {
-	if os.Getenv("NO_ENCRYPTION") == "yes" {
-		return crypto.NewNoOpEncryptor()
+	encryptor, err := crypto.ProcessEncryptor()
+	if err != nil {
+		panic(err)
 	}
-	key := os.Getenv("ENCRYPTION_KEY")
-	if key == "" {
-		panic("ENCRYPTION_KEY must be set when NO_ENCRYPTION is not yes")
-	}
-	return crypto.NewAESGCMEncryptor([]byte(key))
+	return encryptor
 }
 
 // givenASecretExists creates a secret directly in the DB (same format as app), then opens the secret detail page.
