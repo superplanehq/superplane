@@ -2,9 +2,11 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
 import { cn } from "@/lib/utils";
-import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
+import { useId, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
@@ -182,6 +184,11 @@ function implementHistoryContext({
   return { canvasId, organizationId, factoryId };
 }
 
+function implementSettingsNode({ tab, graph }: ReturnType<typeof configBodyProps>) {
+  if (tab !== "automation") return undefined;
+  return graph?.specNodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID);
+}
+
 function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
   const {
     containerRef,
@@ -210,6 +217,10 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     layoutFitNonce,
   } = props;
   const features = useExperimentalFeature(organizationId);
+  const implementAgent = implementSettingsNode(props);
+  if (implementAgent && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
+    return <ImplementSettings node={implementAgent} settings={props} />;
+  }
   const historyContext = implementHistoryContext(props);
   if (historyContext && features.isLoading) {
     return (
@@ -286,6 +297,68 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
           />
         )}
       </div>
+    </div>
+  );
+}
+
+function ImplementSettings({
+  node: implementationNode,
+  settings,
+}: {
+  node: SuperplaneComponentsNode;
+  settings: ReturnType<typeof configBodyProps>;
+}) {
+  const node = settings.selectedNode ?? implementationNode;
+  return (
+    <section aria-label="Implement settings" className="flex min-h-0 flex-1 flex-col">
+      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
+        <ImplementSettingsPicker
+          nodes={settings.graph?.specNodes ?? []}
+          selectedNodeId={node.id ?? ""}
+          onNodeSelect={settings.onNodeSelect}
+        />
+        <NodeConfigPanel
+          key={node.id}
+          node={node}
+          organizationId={settings.organizationId}
+          factoryId={settings.factoryId}
+          factoryKey={settings.factoryKey}
+          onSave={settings.onSaveNode}
+          body={settings.nodeBody}
+          layout="page"
+        />
+      </div>
+    </section>
+  );
+}
+
+function ImplementSettingsPicker({
+  nodes,
+  selectedNodeId,
+  onNodeSelect,
+}: {
+  nodes: SuperplaneComponentsNode[];
+  selectedNodeId: string;
+  onNodeSelect: (nodeId: string) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="flex shrink-0 flex-col gap-2 px-10 pt-6">
+      <Label htmlFor={id}>Settings for</Label>
+      <Select value={selectedNodeId} onValueChange={onNodeSelect}>
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {nodes.map((node) =>
+            node.id ? (
+              <SelectItem key={node.id} value={node.id}>
+                {node.name?.trim() || "Step"}
+              </SelectItem>
+            ) : null,
+          )}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
