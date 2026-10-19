@@ -66,6 +66,7 @@ type checkoutScriptOptions struct {
 	extraEnv    []string
 	omitRepoURL bool
 	setup       string
+	prepare     func(binDir string)
 }
 
 func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkoutScriptOptions) (string, error) {
@@ -76,6 +77,9 @@ func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkou
 	binDir := filepath.Join(dir, "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(binDir, "checkout"), []byte(runner.WorkspaceCheckoutScript()), 0o755))
+	if opts.prepare != nil {
+		opts.prepare(binDir)
+	}
 	if opts.context != "" {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "workspace_context.json"), []byte(opts.context), 0o644))
 	}
@@ -179,6 +183,48 @@ func TestWorkspaceCheckoutScriptClonesMainAndContext(t *testing.T) {
 	assert.DirExists(t, filepath.Join(dir, "repo", ".git"))
 	assert.DirExists(t, filepath.Join(dir, "context", "acme", "extra", ".git"))
 	assert.Contains(t, output, "Checkout complete")
+}
+
+func TestWorkspaceCheckoutScriptClonesGitHubContextReadOnly(t *testing.T) {
+	gitPath := requireGitAndNode(t)
+	main := initBareRepo(t, "main")
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "git-args")
+	const readToken = "read-token-secret"
+	output, err := runCheckoutScriptFull(t, dir, "file://"+main, "main", checkoutScriptOptions{
+		context: contextJSON(t, map[string]string{
+			"context/acme/extra": "https://github.com/acme/extra.git",
+		}),
+		extraEnv: []string{
+			runner.GitHubContextTokenEnv + "=" + readToken,
+			"GIT_ARGV_LOG=" + logPath,
+			"REAL_GIT=" + gitPath,
+		},
+		prepare: func(binDir string) {
+			wrapper := `#!/bin/bash
+printf '%s\n' "$*" >> "$GIT_ARGV_LOG"
+for arg in "$@"; do
+  case "$arg" in
+    https://github.com/*|https://www.github.com/*)
+      mkdir -p "${@: -1}/.git"
+      exit 0
+      ;;
+  esac
+done
+exec "$REAL_GIT" "$@"
+`
+			require.NoError(t, os.WriteFile(filepath.Join(binDir, "git"), []byte(wrapper), 0o755))
+		},
+	})
+	require.NoError(t, err, output)
+	assert.DirExists(t, filepath.Join(dir, "context", "acme", "extra", ".git"))
+	logged, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	commands := string(logged)
+	assert.Contains(t, commands, "credential.helper=")
+	assert.Contains(t, commands, "password=$"+runner.GitHubContextTokenEnv)
+	assert.NotContains(t, commands, readToken)
+	assert.NotContains(t, commands, "x-access-token")
 }
 
 func TestWorkspaceCheckoutScriptReusesExistingCheckouts(t *testing.T) {

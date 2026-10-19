@@ -408,6 +408,11 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 	}, installationID))
 	_, err = models.FindVCSProviderRepository(db, models.ProviderGitHub, repositoryID)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	var refreshJobs int64
+	require.NoError(t, db.Model(&models.VCSProviderInstallationReconcileJob{}).
+		Where("provider = ? AND installation_id = ?", models.ProviderGitHub, installationID).
+		Count(&refreshJobs).Error)
+	assert.Equal(t, int64(1), refreshJobs)
 
 	// Uninstall removes the global installation and every local binding, but
 	// deleting a binding alone never deletes the global installation.
