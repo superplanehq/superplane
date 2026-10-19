@@ -510,6 +510,7 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 
 func intakeRefinementConfiguration(agent *intakeAgent, vcsName string) map[string]any {
 	configuration := intakeRunnerConfiguration(agent, vcsName)
+	configuration[runner.SkipSetupCommandsField] = true
 	configuration["steps"] = []any{
 		map[string]any{
 			"name":             "Refine Task",
