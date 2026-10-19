@@ -38,16 +38,15 @@ describe("buildAgentEditPrompt", () => {
     appId: "app-refund-implementer",
   };
 
-  it("includes canvas IDs and get/update hints without install or connect", () => {
+  it("includes canvas IDs and does not offer CLI edits", () => {
     const prompt = buildAgentEditPrompt(baseInput);
 
     expect(prompt).toContain("Canvas name: Refund Implementer");
     expect(prompt).toContain("Canvas id: app-refund-implementer");
-    expect(prompt).toContain("The canvas is YAML-backed.");
-    expect(prompt).toContain("superplane automations get app-refund-implementer -o yaml > canvas.yaml");
-    expect(prompt).toContain(
-      'superplane automations update app-refund-implementer -f canvas.yaml -m "Describe the change"',
-    );
+    expect(prompt).toContain("The CLI does not change this canvas.");
+    expect(prompt).not.toContain("superplane automations get");
+    expect(prompt).not.toContain("superplane automations update");
+    expect(prompt).not.toContain("canvas.yaml");
     expect(prompt).not.toContain(getInstallCommand());
     expect(prompt).not.toContain("superplane connect");
     expect(prompt).not.toContain(API_TOKEN_PLACEHOLDER);
