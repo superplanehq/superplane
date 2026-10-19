@@ -236,3 +236,9 @@ func Test__IsReleased(t *testing.T) {
 		assert.False(t, IsReleased("explicit-false"))
 	})
 }
+
+func TestFactoryRunHistoryRequiresOrganizationOptIn(t *testing.T) {
+	_, exists := Get("factory_run_history")
+	assert.True(t, exists, "administrators must be able to enable the rollout flag")
+	assert.False(t, IsReleased("factory_run_history"), "the new view must not be enabled for all organizations")
+}
