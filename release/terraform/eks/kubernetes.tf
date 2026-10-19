@@ -40,6 +40,20 @@ resource "kubernetes_storage_class" "gp3_default" {
   ]
 }
 
+# An empty class name is replaced by the default gp3 class, and the static
+# EFS volume then never binds. This class is not the default.
+resource "kubernetes_storage_class" "runner_active_logs" {
+  metadata {
+    name = "superplane-runner-active-logs"
+  }
+
+  storage_provisioner = "efs.csi.aws.com"
+  reclaim_policy      = "Retain"
+  volume_binding_mode = "Immediate"
+
+  depends_on = [aws_eks_addon.efs_csi]
+}
+
 # Bind the chart's runner API and workers to the same EFS access point.
 resource "kubernetes_persistent_volume_v1" "runner_active_logs" {
   metadata {
@@ -52,7 +66,7 @@ resource "kubernetes_persistent_volume_v1" "runner_active_logs" {
     }
     access_modes                     = ["ReadWriteMany"]
     persistent_volume_reclaim_policy = "Retain"
-    storage_class_name               = ""
+    storage_class_name               = kubernetes_storage_class.runner_active_logs.metadata[0].name
     mount_options                    = ["tls"]
 
     persistent_volume_source {
@@ -74,7 +88,7 @@ resource "kubernetes_persistent_volume_claim_v1" "runner_active_logs" {
 
   spec {
     access_modes       = ["ReadWriteMany"]
-    storage_class_name = ""
+    storage_class_name = kubernetes_storage_class.runner_active_logs.metadata[0].name
     volume_name        = kubernetes_persistent_volume_v1.runner_active_logs.metadata[0].name
 
     resources {
