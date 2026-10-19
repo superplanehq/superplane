@@ -205,11 +205,12 @@ function LoadMoreRuns({
   query: string;
   status: string;
 }) {
+  const automatic = query.trim() === "" && status === "all";
   const sentinel = useRef<HTMLDivElement>(null);
   const loadMore = useRef(onLoadMore);
   loadMore.current = onLoadMore;
   useEffect(() => {
-    if (loading || !sentinel.current || typeof IntersectionObserver === "undefined") return;
+    if (!automatic || loading || !sentinel.current || typeof IntersectionObserver === "undefined") return;
     let requested = false;
     const observer = new IntersectionObserver((entries) => {
       if (requested || !entries.some((entry) => entry.isIntersecting)) return;
@@ -218,7 +219,7 @@ function LoadMoreRuns({
     });
     observer.observe(sentinel.current);
     return () => observer.disconnect();
-  }, [loading, itemCount, query, status]);
+  }, [automatic, loading, itemCount]);
   return (
     <div ref={sentinel} className="flex min-h-12 items-center justify-center text-sm text-muted-foreground">
       {loading ? (
@@ -227,7 +228,7 @@ function LoadMoreRuns({
           Loading more runs…
         </div>
       ) : (
-        <Button variant="ghost" onClick={onLoadMore} className="sr-only focus:not-sr-only">
+        <Button variant="ghost" onClick={onLoadMore} className={automatic ? "sr-only focus:not-sr-only" : undefined}>
           Load more runs
         </Button>
       )}

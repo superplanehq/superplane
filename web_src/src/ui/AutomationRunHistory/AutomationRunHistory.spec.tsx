@@ -57,6 +57,50 @@ describe("AutomationRunHistory", () => {
     expect(screen.getByText("Yesterday, 14:06")).toBeInTheDocument();
     expect(screen.getAllByText(/14:06/)).toHaveLength(3);
   });
+
+  it.each(["missing-task", implementationRuns[0].id])(
+    "requires explicit pagination while filtering by %s, then resumes automatic loading when cleared",
+    (query) => {
+      const callbacks = new Set<IntersectionObserverCallback>();
+      const original = globalThis.IntersectionObserver;
+      globalThis.IntersectionObserver = class {
+        constructor(private callback: IntersectionObserverCallback) {}
+        observe() {
+          callbacks.add(this.callback);
+        }
+        disconnect() {
+          callbacks.delete(this.callback);
+        }
+      } as unknown as typeof IntersectionObserver;
+      const onLoadMore = vi.fn();
+      const notifyBottom = () =>
+        act(() => {
+          for (const callback of callbacks)
+            callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+        });
+      const view = (runs = implementationRuns) => (
+        <AutomationRunHistory runs={runs} onSelectRun={() => {}} onLoadMore={onLoadMore} />
+      );
+      try {
+        const { rerender } = render(view());
+        fireEvent.change(screen.getByRole("textbox", { name: "Search task or run ID" }), { target: { value: query } });
+        notifyBottom();
+        expect(onLoadMore).not.toHaveBeenCalled();
+        const loadMore = screen.getByRole("button", { name: "Load more runs" });
+        expect(loadMore).toBeVisible();
+        fireEvent.click(loadMore);
+        expect(onLoadMore).toHaveBeenCalledTimes(1);
+        rerender(view([...implementationRuns, { ...implementationRuns[1], id: "older-run" }]));
+        notifyBottom();
+        expect(onLoadMore).toHaveBeenCalledTimes(1);
+        fireEvent.change(screen.getByRole("textbox", { name: "Search task or run ID" }), { target: { value: "" } });
+        notifyBottom();
+        expect(onLoadMore).toHaveBeenCalledTimes(2);
+      } finally {
+        globalThis.IntersectionObserver = original;
+      }
+    },
+  );
   it("copies the complete run ID without selecting the run", async () => {
     const writeText = vi.fn(() => Promise.resolve());
     const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");

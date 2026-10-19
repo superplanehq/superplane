@@ -1,6 +1,7 @@
 import { withFactoriesTheme } from "@/pages/factories/__fixtures__/factoriesStoryTheme";
 import { useEffect, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { userEvent, within } from "storybook/test";
 import { AutomationRunHistory } from "./AutomationRunHistory";
 import { AutomationRunDetails } from "./AutomationRunDetails";
 import { implementationRuns, verificationRuns } from "./fixtures";
@@ -126,6 +127,12 @@ export const LoadingTaskLinks: Story = {
   args: { tasksLoading: true, runs: implementationRuns.map((run) => ({ ...run, task: undefined })) },
 };
 export const AutomaticPagination: Story = { args: { pagination: "automatic" } };
+export const FilteredPagination: Story = {
+  args: { pagination: "automatic" },
+  play: async ({ canvasElement }) => {
+    await userEvent.type(within(canvasElement).getByRole("textbox", { name: "Search task or run ID" }), "missing-task");
+  },
+};
 export const LoadingMoreRuns: Story = { args: { pagination: "loading" } };
 export const OvernightRun: Story = {
   args: {

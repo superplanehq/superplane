@@ -52,9 +52,7 @@ export function ImplementRunHistory(props: ImplementRunHistoryProps) {
       ) : (
         <>
           {runsQuery.hasNextPage && (
-            <p className="mb-3 text-xs text-muted-foreground">
-              Search and filters apply to loaded runs. Scroll down to include older runs.
-            </p>
+            <p className="mb-3 text-xs text-muted-foreground">Search and filters apply to loaded runs.</p>
           )}
           <AutomationRunHistory
             runs={mappedRuns.map((run, index) => ({ ...run, duration: runDuration(runs[index], now) }))}
