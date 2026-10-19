@@ -57,4 +57,7 @@ func TestRenderConsentPageUsesFactoriesTheme(t *testing.T) {
 	assert.Contains(t, html, "font-family: \"Inter\"")
 	assert.Contains(t, html, "Allow access to SuperPlane")
 	assert.Contains(t, html, "Acme / Factory")
+	assert.NotContains(t, html, "M29 14.32")
+	assert.Contains(t, html, "M359.243")
+	assert.Contains(t, html, `fill="currentColor"`)
 }
