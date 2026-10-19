@@ -51,12 +51,13 @@ export function AutomationRunDetails({
   onRetryLogs: (activityId: string) => void;
   renderLogs?: (activity: RunActivity) => ReactNode;
 }) {
-  const [selectedId, setSelectedId] = useState(
+  const [selectedId, setSelectedId] = useState<string>();
+  const selected =
+    run.activities.find((activity) => activity.id === selectedId) ??
     run.activities.find(
       (activity) => activity.status === "Failed" || activity.status === "Running" || activity.status === "Pending",
-    )?.id ?? run.activities[0]?.id,
-  );
-  const selected = run.activities.find((activity) => activity.id === selectedId);
+    ) ??
+    run.activities[0];
   return (
     <section className="space-y-6">
       <Button variant="ghost" className="px-0 text-muted-foreground" onClick={onBack}>
@@ -97,9 +98,9 @@ export function AutomationRunDetails({
               <Button
                 key={activity.id}
                 variant="ghost"
-                aria-pressed={selectedId === activity.id}
+                aria-pressed={selected?.id === activity.id}
                 onClick={() => setSelectedId(activity.id)}
-                className={`h-auto w-full rounded-md flex-col items-start gap-2 whitespace-normal px-3 py-4 text-left ${selectedId === activity.id ? "bg-muted" : ""}`}
+                className={`h-auto w-full rounded-md flex-col items-start gap-2 whitespace-normal px-3 py-4 text-left ${selected?.id === activity.id ? "bg-muted" : ""}`}
               >
                 <span>{activity.name}</span>
                 <span className="flex w-full items-center justify-between gap-2">
