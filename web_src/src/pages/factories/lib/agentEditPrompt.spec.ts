@@ -44,9 +44,9 @@ describe("buildAgentEditPrompt", () => {
     expect(prompt).toContain("Canvas name: Refund Implementer");
     expect(prompt).toContain("Canvas id: app-refund-implementer");
     expect(prompt).toContain("The canvas is YAML-backed.");
-    expect(prompt).toContain("superplane apps canvas get app-refund-implementer -o yaml > canvas.yaml");
+    expect(prompt).toContain("superplane automations get app-refund-implementer -o yaml > canvas.yaml");
     expect(prompt).toContain(
-      'superplane apps canvas update app-refund-implementer -f canvas.yaml -m "Describe the change"',
+      'superplane automations update app-refund-implementer -f canvas.yaml -m "Describe the change"',
     );
     expect(prompt).not.toContain(getInstallCommand());
     expect(prompt).not.toContain("superplane connect");

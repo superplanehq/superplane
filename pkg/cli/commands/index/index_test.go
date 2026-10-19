@@ -287,7 +287,7 @@ func TestIntegrationsDescribeByNameTextOutput(t *testing.T) {
 	out := stdout.String()
 	require.Contains(t, out, "Name: slack")
 	require.Contains(t, out, "Configuration:")
-	require.Contains(t, out, "Actions:")
+	require.Contains(t, out, "Components:")
 	require.Contains(t, out, "slack.post-message")
 	require.Contains(t, out, "Triggers:")
 	require.Contains(t, out, "slack.message-received")
@@ -442,6 +442,19 @@ func TestTriggersDescribeByNameTextOutput(t *testing.T) {
 	require.Contains(t, out, "schedule")
 	require.Contains(t, out, "Example Payload:")
 	require.Contains(t, out, `"tick": true`)
+}
+
+func TestIndexCommandRegistersComponentsNotWidgets(t *testing.T) {
+	root := NewCommand(core.BindOptions{})
+
+	for _, name := range []string{"integrations", "triggers", "components", "dump"} {
+		cmd, _, err := root.Find([]string{name})
+		require.NoError(t, err)
+		require.Equal(t, name, cmd.Name())
+	}
+
+	_, _, err := root.Find([]string{"widgets"})
+	require.Error(t, err)
 }
 
 // Helpers
