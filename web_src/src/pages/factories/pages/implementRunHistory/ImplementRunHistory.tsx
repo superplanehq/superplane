@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CanvasesCanvasRun, FactoriesWorkOrder } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useCanvasVersion, useDescribeRun, useEventExecutions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
@@ -7,7 +7,9 @@ import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { AutomationRunHistory } from "@/ui/AutomationRunHistory/AutomationRunHistory";
 import { AutomationRunDetails } from "@/ui/AutomationRunHistory/AutomationRunDetails";
 import { RunnerLogsTerminal } from "@/ui/Runs/RunInspectorRunnerLogs";
-import { toAutomationRun, toRunActivities } from "./runHistoryData";
+import { runDuration, toAutomationRun, toRunActivities } from "./runHistoryData";
+
+const emptyOrders: FactoriesWorkOrder[] = [];
 
 interface ImplementRunHistoryProps {
   canvasId: string;
@@ -22,13 +24,17 @@ export function ImplementRunHistory(props: ImplementRunHistoryProps) {
   useCanvasRuntimeWebsocket(canvasId, organizationId, true);
   const runsQuery = useInfiniteCanvasRuns(canvasId);
   const tasksQuery = useFactoryWorkOrders(organizationId, factoryId);
+  const runs = useMemo(
+    () => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []).filter((run) => run.id) ?? [],
+    [runsQuery.data],
+  );
+  const orders = tasksQuery.data ?? emptyOrders;
+  const mappedRuns = useMemo(() => runs.map((run) => toAutomationRun(run, orders, Date.now())), [runs, orders]);
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, []);
-  const runs = runsQuery.data?.pages.flatMap((page) => page?.runs ?? []).filter((run) => run.id) ?? [];
-  const orders = tasksQuery.data ?? [];
   return (
     <div className="min-h-0 flex-1 overflow-auto p-6" data-testid="implement-run-history">
       {tasksQuery.isError && (
@@ -47,9 +53,9 @@ export function ImplementRunHistory(props: ImplementRunHistoryProps) {
             </p>
           )}
           <AutomationRunHistory
-            runs={runs.map((run) => toAutomationRun(run, orders, now))}
+            runs={mappedRuns.map((run, index) => ({ ...run, duration: runDuration(runs[index], now) }))}
             onSelectRun={(run) => onSelectRun(run.id)}
-            loading={runsQuery.isLoading || tasksQuery.isLoading}
+            loading={runsQuery.isLoading}
             error={runsQuery.isError && !runsQuery.isFetchNextPageError ? "Could not load run history." : undefined}
             onRetry={() => void runsQuery.refetch()}
             onLoadMore={runsQuery.hasNextPage ? () => void runsQuery.fetchNextPage() : undefined}
@@ -110,7 +116,12 @@ function LoadedImplementRunDetails({
 }) {
   const executions = executionsQuery.data?.executions ?? [];
   const nodes = versionQuery.data?.spec?.nodes ?? [];
-  const details = { ...toAutomationRun(run, orders, now), activities: toRunActivities(run, executions, nodes) };
+  const mappedRun = useMemo(() => toAutomationRun(run, orders, Date.now()), [run, orders]);
+  const details = {
+    ...mappedRun,
+    duration: runDuration(run, now),
+    activities: toRunActivities(run, executions, nodes),
+  };
   return (
     <>
       {executionsQuery.isError && (
