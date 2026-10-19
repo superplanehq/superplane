@@ -525,6 +525,19 @@ func Test__CreateFactoryAgentResourceRejectsInaccessibleContextRepo(t *testing.T
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "acme/api", response.GetResource().GetRepository())
+
+	personal, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	personalIntegrationID := uuid.NewString()
+	require.NoError(t, personal.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &personalIntegrationID}))
+	personalResponse, err := CreateFactoryAgentResource(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId:  personal.ID.String(),
+		Kind:       pb.FactoryAgentResource_KIND_CONTEXT_REPO,
+		Enabled:    true,
+		Repository: "acme/other",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acme/other", personalResponse.GetResource().GetRepository())
 }
 
 func Test__CreateFactoryAgentResourceRejectsDuplicateContextRepo(t *testing.T) {

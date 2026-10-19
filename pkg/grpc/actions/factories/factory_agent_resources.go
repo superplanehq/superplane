@@ -223,6 +223,11 @@ func authorizeContextRepository(
 		return err
 	}
 	binding, err := models.FindVCSProviderIntegrationBinding(db, bindingID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// A personal token or a customer GitHub App has no installation
+		// binding. Those automations do not receive the read-only token.
+		return nil
+	}
 	if err != nil {
 		return err
 	}
