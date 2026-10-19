@@ -1,10 +1,26 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "bun:test";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "bun:test";
 import { AutomationRunDetails } from "./AutomationRunDetails";
 import { implementationRuns } from "./fixtures";
 import type { RunActivity } from "./types";
 
 describe("AutomationRunDetails live activity", () => {
+  it("copies the task key through its adjacent action", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const run = implementationRuns[0];
+    try {
+      render(<AutomationRunDetails run={run} onBack={() => {}} onRetryLogs={() => {}} />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: `Copy task ID ${run.task!.id}` }));
+      });
+      expect(writeText).toHaveBeenCalledWith(run.task!.id);
+    } finally {
+      if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
   it("selects an available activity after a queue item disappears and preserves user selection", () => {
     const start = implementationRuns[0].activities[0];
     const execution = implementationRuns[0].activities[1];

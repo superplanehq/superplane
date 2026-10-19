@@ -9,7 +9,6 @@ export interface RunActivity {
   id: string;
   name: string;
   status: RunStatus;
-  time: string;
   recordedAt?: string;
   error?: string;
   logs: RunLogs;
@@ -21,7 +20,6 @@ export interface AutomationRun {
   id: string;
   task?: { id: string; title: string };
   status: RunStatus;
-  started: string;
   startedAt: string;
   finishedAt?: string;
   duration: string;
