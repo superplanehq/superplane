@@ -25,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -298,6 +299,10 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	onFileBindCleanup := func(job contexts.FileBindCleanup) {
 		pendingFileBindCleanups = append(pendingFileBindCleanups, job)
 	}
+	pendingProductAnalytics := []productanalytics.Event{}
+	onProductAnalytics := func(event productanalytics.Event) {
+		pendingProductAnalytics = append(pendingProductAnalytics, event)
+	}
 
 	runCancellations := &RunCancellationNotifier{}
 
@@ -337,7 +342,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, runCancellations)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -358,6 +363,9 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	contexts.ApplyFileBindCleanups(pendingFileBindCleanups, nil)
+	for _, event := range pendingProductAnalytics {
+		productanalytics.Capture(event)
+	}
 
 	for _, event := range newEvents {
 		messages.PublishCanvasEventCreatedMessage(&event)
@@ -421,6 +429,7 @@ func (w *NodeExecutor) executeActionNode(
 	onFactoryWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage),
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
+	onProductAnalytics func(productanalytics.Event),
 	runCancellations *RunCancellationNotifier,
 ) error {
 	logger := logging.WithExecution(
@@ -504,6 +513,7 @@ func (w *NodeExecutor) executeActionNode(
 			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
+			WithProductAnalytics(onProductAnalytics).
 			WithRemoteImageIngest(w.encryptor, w.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),

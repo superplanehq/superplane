@@ -25,7 +25,6 @@ import type {
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
 import { HistoryQueuePage, PageHeader } from "./pages";
-import { analytics } from "@/lib/analytics";
 import { FactorySidebarHeading } from "@/ui/factoryNodeChrome";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 
@@ -295,10 +294,7 @@ export const ComponentSidebar = ({
 
   const handleOpenCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(true);
-    if (integrationName && domainId) {
-      analytics.integrationConnectStart(integrationName, "node_configuration", domainId);
-    }
-  }, [integrationName, domainId]);
+  }, []);
 
   const handleCloseCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(false);

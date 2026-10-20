@@ -84,7 +84,13 @@ describe("posthog init", () => {
     expect(initPostHog()).toBe(true);
     expect(init).toHaveBeenCalledWith(
       "test-key",
-      expect.objectContaining({ autocapture: false, capture_pageview: false, person_profiles: "always" }),
+      expect.objectContaining({
+        autocapture: false,
+        capture_pageview: false,
+        capture_pageleave: false,
+        disable_session_recording: true,
+        person_profiles: "always",
+      }),
     );
   });
 
@@ -171,7 +177,7 @@ describe("account identification", () => {
       });
     });
 
-    expect(capture).toHaveBeenCalledWith("auth:signup", {
+    expect(capture).toHaveBeenCalledWith("user_signed_up", {
       product_updates_opt_in: false,
       $set: {
         product_updates_opt_in: false,
@@ -192,7 +198,7 @@ describe("account identification", () => {
     );
 
     await waitFor(() => {
-      expect(capture).toHaveBeenCalledWith("auth:signup", {
+      expect(capture).toHaveBeenCalledWith("user_signed_up", {
         product_updates_opt_in: true,
         $set: {
           product_updates_opt_in: true,
@@ -200,6 +206,27 @@ describe("account identification", () => {
       });
     });
     expect(window.location.search).toBe("");
+  });
+
+  it("captures stored signup attribution on the signup event", async () => {
+    window.history.replaceState({}, "", "/org-123?auth_signup_result=created");
+    localStorage.setItem(
+      "superplane.initial_utm",
+      JSON.stringify({ utm_source: "youtube", utm_campaign: "erictech_beta" }),
+    );
+
+    render(
+      <AccountProvider>
+        <div />
+      </AccountProvider>,
+    );
+
+    await waitFor(() => {
+      expect(capture).toHaveBeenCalledWith("user_signed_up", {
+        utm_source: "youtube",
+        utm_campaign: "erictech_beta",
+      });
+    });
   });
 
   it("captures implicit signup without marketing properties", async () => {
@@ -214,7 +241,7 @@ describe("account identification", () => {
     );
 
     await waitFor(() => {
-      expect(capture).toHaveBeenCalledWith("auth:signup");
+      expect(capture).toHaveBeenCalledWith("user_signed_up");
     });
     expect(identify).toHaveBeenCalledWith("user-123", {
       email: "john@example.com",
@@ -245,7 +272,7 @@ describe("account identification", () => {
       });
     });
 
-    expect(capture).not.toHaveBeenCalledWith("auth:signup", expect.anything());
+    expect(capture).not.toHaveBeenCalledWith("user_signed_up", expect.anything());
     expect(window.location.search).toBe("");
   });
 });

@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -36,6 +37,11 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
 	orderID := resolvedOrder.ID
+	hasPriorDispatch, priorErr := resolvedOrder.HasLineDispatch(db)
+	runKind := "initial"
+	if hasPriorDispatch {
+		runKind = "rerun"
+	}
 
 	lineName := strings.TrimSpace(req.GetLineName())
 	if lineName == "" {
@@ -68,6 +74,23 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
+	}
+	dispatchID := productanalytics.StableEventID(productanalytics.EventFactoryTaskStarted, order.ID.String(), order.UpdatedAt.UTC().String())
+	if dispatch, findErr := order.FindActiveLineDispatch(db); findErr == nil {
+		dispatchID = productanalytics.StableEventID(productanalytics.EventFactoryTaskStarted, dispatch.ID.String())
+	}
+	if priorErr != nil {
+		log.WithError(priorErr).Warn("Skipped factory task started analytics")
+	} else {
+		captureFactoryProductEvent(
+			ctx,
+			db,
+			factory,
+			order.ID,
+			productanalytics.EventFactoryTaskStarted,
+			dispatchID,
+			productanalytics.Properties{"run_kind": runKind},
+		)
 	}
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
