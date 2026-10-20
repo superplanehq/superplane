@@ -49,7 +49,7 @@ export function RunnerLogsTerminal({
 }) {
   const executionInfo = buildExecutionInfo(execution);
   const executionInFlight = isExecutionInFlight(executionInfo);
-  const { sections, orphanLines, error, isLoading, retry, scrollRef } = useLiveLogStream(
+  const { sections, orphanLines, error, isLoading, isStreaming, retry, scrollRef } = useLiveLogStream(
     executionInfo.id,
     executionInFlight,
     terminalCommandStatusForExecution(executionInfo),
@@ -62,7 +62,7 @@ export function RunnerLogsTerminal({
     return <LiveLogStateNotice state="error" error={error} willRetry={executionInFlight} onRetry={retry} compact />;
   }
 
-  if (lines.length === 0 && isLoading) {
+  if (lines.length === 0 && (isLoading || (isStreaming && !executionInFlight))) {
     return <LiveLogStateNotice state="loading" compact />;
   }
 
