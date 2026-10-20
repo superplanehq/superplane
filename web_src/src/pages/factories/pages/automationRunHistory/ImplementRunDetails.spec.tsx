@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
-import { ImplementRunHistory } from "./ImplementRunHistory";
+import { FactoryAutomationRunHistory } from "./FactoryAutomationRunHistory";
 
 const api = vi.hoisted(() => ({
   canvasesListRuns: vi.fn(),
@@ -49,7 +49,7 @@ describe("Implement run details hydration", () => {
     render(
       <QueryClientProvider client={client}>
         <MemoryRouter>
-          <ImplementRunHistory
+          <FactoryAutomationRunHistory
             canvasId="canvas"
             organizationId="org"
             factoryId="factory"

@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { MemoryRouter } from "react-router";
 import type { CanvasesCanvasRun, CanvasesCanvasNodeExecution } from "@/api-client";
 import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
-import { ImplementRunHistory } from "./ImplementRunHistory";
+import { FactoryAutomationRunHistory } from "./FactoryAutomationRunHistory";
 import { useAutomationRunNavigation } from "../useAutomationRunNavigation";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { MergeConfidenceConfigShell } from "../MergeConfidenceConfigShell";
@@ -213,7 +213,7 @@ function ConnectedRunPage() {
         <h1 className="text-xl font-semibold">Implement</h1>
         <p className="mt-3 text-sm">Runs</p>
       </header>
-      <ImplementRunHistory
+      <FactoryAutomationRunHistory
         canvasId={canvasId}
         organizationId="storybook-org"
         factoryId="storybook-factory"

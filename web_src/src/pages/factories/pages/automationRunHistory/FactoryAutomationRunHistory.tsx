@@ -12,7 +12,7 @@ import { runDuration, toAutomationRun, toRunActivities } from "./runHistoryData"
 
 const emptyOrders: FactoriesWorkOrder[] = [];
 
-interface ImplementRunHistoryProps {
+interface FactoryAutomationRunHistoryProps {
   canvasId: string;
   organizationId: string;
   factoryId: string;
@@ -20,7 +20,7 @@ interface ImplementRunHistoryProps {
   onSelectRun: (id: string | null) => void;
 }
 
-export function ImplementRunHistory(props: ImplementRunHistoryProps) {
+export function FactoryAutomationRunHistory(props: FactoryAutomationRunHistoryProps) {
   const { canvasId, organizationId, factoryId, selectedRunId, onSelectRun } = props;
   useCanvasRuntimeWebsocket(canvasId, organizationId, true);
   const runsQuery = useInfiniteCanvasRuns(canvasId);
@@ -42,7 +42,7 @@ export function ImplementRunHistory(props: ImplementRunHistoryProps) {
         <DataError message="Task links could not be loaded." onRetry={() => void tasksQuery.refetch()} />
       )}
       {selectedRunId ? (
-        <ImplementRunDetails
+        <FactoryAutomationRunDetails
           key={selectedRunId}
           {...props}
           orders={orders}
@@ -77,8 +77,8 @@ export function ImplementRunHistory(props: ImplementRunHistoryProps) {
   );
 }
 
-function ImplementRunDetails(
-  props: ImplementRunHistoryProps & { orders: FactoriesWorkOrder[]; now: number; tasksLoading: boolean },
+function FactoryAutomationRunDetails(
+  props: FactoryAutomationRunHistoryProps & { orders: FactoriesWorkOrder[]; now: number; tasksLoading: boolean },
 ) {
   const { canvasId, organizationId, selectedRunId, onSelectRun } = props;
   const runQuery = useDescribeRun(canvasId, selectedRunId);
@@ -106,11 +106,16 @@ function ImplementRunDetails(
       </>
     );
   return (
-    <LoadedImplementRunDetails {...props} run={run} executionsQuery={executionsQuery} versionQuery={versionQuery} />
+    <LoadedFactoryAutomationRunDetails
+      {...props}
+      run={run}
+      executionsQuery={executionsQuery}
+      versionQuery={versionQuery}
+    />
   );
 }
 
-function LoadedImplementRunDetails({
+function LoadedFactoryAutomationRunDetails({
   canvasId,
   organizationId,
   onSelectRun,
@@ -120,7 +125,7 @@ function LoadedImplementRunDetails({
   executionsQuery,
   versionQuery,
   tasksLoading,
-}: ImplementRunHistoryProps & {
+}: FactoryAutomationRunHistoryProps & {
   orders: FactoriesWorkOrder[];
   now: number;
   tasksLoading: boolean;
