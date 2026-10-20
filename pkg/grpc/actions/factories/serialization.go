@@ -560,6 +560,7 @@ func serializeWorkOrderSummary(
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		McpClient:            serializeWorkOrderMCPClient(order),
+		SourceRunId:          serializeWorkOrderSourceRunID(order),
 	}, nil
 }
 
