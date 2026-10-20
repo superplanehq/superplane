@@ -136,7 +136,7 @@ func TestUpgradeOrganizationImplementationTestingGuidance_OverlappingStartKeepsL
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	implementation := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
-	publishImplementationTemplate(t, ctx, r, deps, implementation)
+	publishImplementationTemplate(ctx, t, r, deps, implementation)
 	implementation, err = models.FindCanvasInTransaction(db, r.Organization.ID, implementation.ID)
 	require.NoError(t, err)
 	stripImplementationPrompt(t, db, implementation, "Customer-authored implementation instructions")
@@ -200,8 +200,8 @@ func TestUpgradeOrganizationImplementationTestingGuidance_OverlappingStartKeepsL
 }
 
 func publishImplementationTemplate(
-	t *testing.T,
 	ctx context.Context,
+	t *testing.T,
 	r *support.ResourceRegistry,
 	deps IntakeDependencies,
 	implementation *models.Canvas,
