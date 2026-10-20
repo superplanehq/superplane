@@ -64,9 +64,10 @@ Week-one retention requires another `factory_task_merged` from 7 through 13
 days after activation. Calculate user and organization retention separately.
 
 WAU and MAU are unique account IDs with `actor_type = user` over rolling 7-day
-and 30-day windows. Use these task events:
+and 30-day windows. Count an account when that person refines, starts,
+approves, rejects, archives, or merges a task. Signup, organization creation,
+onboarding, and task creation do not count. Use these events:
 
-- `factory_task_created`
 - `factory_task_refined`
 - `factory_task_started`
 - `factory_task_approved`
