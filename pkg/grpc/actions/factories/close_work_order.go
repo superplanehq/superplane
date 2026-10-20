@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -62,6 +63,19 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	}
 
 	publishWorkOrderClosed(orgID, factory, order, &closedBy, fromState, result, wasClosed)
+	if !wasClosed {
+		if eventName, properties, ok := factoryCloseEvent(result); ok {
+			captureFactoryProductEvent(
+				ctx,
+				db,
+				factory,
+				order.ID,
+				eventName,
+				productanalytics.StableEventID(eventName, order.ID.String(), result),
+				properties,
+			)
+		}
+	}
 	messages.PublishWorkOrderRunCancellations(db, order)
 
 	order, err = factory.FindWorkOrder(db, orderID)

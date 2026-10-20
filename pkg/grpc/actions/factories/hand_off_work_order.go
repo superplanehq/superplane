@@ -17,6 +17,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
@@ -212,8 +213,30 @@ func HandOffWorkOrder(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to hand off work order")
 	}
+	captureFactoryProductEvent(
+		ctx,
+		db,
+		factory,
+		order.ID,
+		productanalytics.EventFactoryTaskCreated,
+		productanalytics.StableEventID(productanalytics.EventFactoryTaskCreated, order.ID.String()),
+		productanalytics.Properties{"creation_source": "handoff"},
+	)
 
 	if dispatched != nil {
+		dispatchID := productanalytics.StableEventID(productanalytics.EventFactoryTaskStarted, order.ID.String(), order.UpdatedAt.UTC().String())
+		if active, findErr := order.FindActiveLineDispatch(db); findErr == nil {
+			dispatchID = productanalytics.StableEventID(productanalytics.EventFactoryTaskStarted, active.ID.String())
+		}
+		captureFactoryProductEvent(
+			ctx,
+			db,
+			factory,
+			order.ID,
+			productanalytics.EventFactoryTaskStarted,
+			dispatchID,
+			productanalytics.Properties{"run_kind": "initial"},
+		)
 		publishDispatchedWorkOrder(
 			dispatched.logger,
 			dispatched.factory.OrganizationID,

@@ -26,20 +26,6 @@ vi.mock("./ownerSetup/LicenseStep", () => ({
   ),
 }));
 
-const posthogMock = vi.hoisted(() => ({
-  enabled: false,
-  getActiveMatchingSurveys: vi.fn(),
-  capture: vi.fn(),
-}));
-
-vi.mock("@/posthog", () => ({
-  isPostHogEnabled: () => posthogMock.enabled,
-  posthog: {
-    getActiveMatchingSurveys: posthogMock.getActiveMatchingSurveys,
-    capture: posthogMock.capture,
-  },
-}));
-
 const ONBOARDING_LABELS = ["Discover", "Awaiting code", "Verify", "01 Plan", "02 Build", "03 Check", "04 Review"];
 
 function expectOwnerSetupPreview() {
@@ -58,19 +44,6 @@ function expectOwnerSetupPreview() {
     expect(screen.queryByText(label)).not.toBeInTheDocument();
   }
 }
-
-const OWNER_SETUP_SURVEY = {
-  id: "owner-setup-survey",
-  name: "Owner Setup Survey",
-  questions: [
-    {
-      id: "role",
-      question: "What best describes your role?",
-      type: "single_choice",
-      choices: ["Software engineer"],
-    },
-  ],
-};
 
 const fleetManagerMetadata = {
   defaultRunnerVersion: "v0.1.0",
@@ -175,9 +148,6 @@ describe("OwnerSetup", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
-    posthogMock.enabled = false;
-    posthogMock.getActiveMatchingSurveys.mockReset();
-    posthogMock.capture.mockReset();
     createToken.mockReset();
     createToken.mockResolvedValue({ plaintext: "owner-setup-token" });
     Object.defineProperty(window, "location", {
@@ -267,31 +237,6 @@ describe("OwnerSetup", () => {
     expect(await screen.findByRole("heading", { name: OWNER_SETUP_COPY.smtp.headline })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
-  });
-
-  it("keeps the gold scene and hides step dots while the survey is completed", async () => {
-    posthogMock.enabled = true;
-    posthogMock.getActiveMatchingSurveys.mockImplementation((callback: (surveys: unknown[]) => void) => {
-      callback([OWNER_SETUP_SURVEY]);
-    });
-    stubOwnerSetupFetch();
-    renderOwnerSetup();
-    await reachFleetStep();
-
-    expect(screen.getByTestId("first-run-progress")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("owner-setup-fleet-skip"));
-
-    expect(await screen.findByText("What best describes your role?")).toBeInTheDocument();
-    expectOwnerSetupPreview();
-    expect(screen.queryByTestId("first-run-progress")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /software engineer/i }));
-
-    await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
-    expect(posthogMock.capture).toHaveBeenCalledWith(
-      "survey sent",
-      expect.objectContaining({ $survey_id: "owner-setup-survey", $survey_completed: true }),
-    );
   });
 
   it("resumes the stored fleet step for the signed-in admin", async () => {

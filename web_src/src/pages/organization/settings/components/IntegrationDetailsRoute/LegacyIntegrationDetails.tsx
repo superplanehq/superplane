@@ -8,7 +8,6 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useAvailableIntegrations, useDeleteIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
-import { useIntegrationConfigureOpen } from "@/lib/analytics";
 import { followBrowserAction } from "@/lib/browserAction";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
@@ -84,8 +83,6 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
   const deleteMutation = useDeleteIntegration(organizationId, integrationId);
 
   usePageTitle(["Integrations", integration.metadata?.name]);
-  useIntegrationConfigureOpen(integration, integrationId, "integrations_page", organizationId);
-
   useEffect(() => {
     const nextConfiguration = integration.spec?.configuration || {};
     setConfiguration(nextConfiguration);
