@@ -2,6 +2,7 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { History, Settings } from "lucide-react";
 import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
 import { cn } from "@/lib/utils";
 import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
@@ -95,31 +96,24 @@ function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
   return (
     <>
       <PopupHeader
-        title={simplifiedImplement && props.tab === "runs" ? `${props.title} run history` : props.title}
+        title={props.title}
         onClose={props.onClose}
         actions={
-          <>
-            {simplifiedImplement && props.showRunsTab ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => props.onTabChange(props.tab === "runs" ? "automation" : "runs")}
-              >
-                {props.tab === "runs" ? "Back to settings" : "Run history"}
-              </Button>
-            ) : null}
-            {props.onDelete ? (
-              <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
-            ) : null}
-          </>
+          props.onDelete ? (
+            <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
+          ) : null
         }
       >
-        {!simplifiedImplement ? (
-          <SettingsAutomationHeaderRow
-            tabs={<ConfigTabs tab={props.tab} showRunsTab={props.showRunsTab} onTabChange={props.onTabChange} />}
-          />
-        ) : null}
+        <SettingsAutomationHeaderRow
+          tabs={
+            <ConfigTabs
+              tab={props.tab}
+              showRunsTab={props.showRunsTab}
+              onTabChange={props.onTabChange}
+              simplifiedImplement={simplifiedImplement}
+            />
+          }
+        />
       </PopupHeader>
       <MergeConfidenceConfigBody {...configBodyProps(props)} />
       {props.onDelete ? (
@@ -169,19 +163,23 @@ function ConfigTabs({
   tab,
   showRunsTab,
   onTabChange,
+  simplifiedImplement,
 }: {
   tab: MergeConfidenceConfigTab;
   showRunsTab: boolean;
   onTabChange: (tab: MergeConfidenceConfigTab) => void;
+  simplifiedImplement: boolean;
 }) {
   return (
     <Tabs value={tab} onValueChange={(value) => onTabChange(value as MergeConfidenceConfigTab)}>
-      <TabsList aria-label={MERGE_CONFIDENCE_CONFIG_COPY.tabsLabel}>
+      <TabsList aria-label={simplifiedImplement ? "Implement sections" : MERGE_CONFIDENCE_CONFIG_COPY.tabsLabel}>
         <TabsTrigger value="automation" data-testid="merge-confidence-config-tab-automation">
-          {MERGE_CONFIDENCE_CONFIG_COPY.automationTab}
+          {simplifiedImplement ? <Settings aria-hidden /> : null}
+          {simplifiedImplement ? "Configuration" : MERGE_CONFIDENCE_CONFIG_COPY.automationTab}
         </TabsTrigger>
         {showRunsTab ? (
           <TabsTrigger value="runs" data-testid="merge-confidence-config-tab-runs">
+            {simplifiedImplement ? <History aria-hidden /> : null}
             {MERGE_CONFIDENCE_CONFIG_COPY.runsTab}
           </TabsTrigger>
         ) : null}
