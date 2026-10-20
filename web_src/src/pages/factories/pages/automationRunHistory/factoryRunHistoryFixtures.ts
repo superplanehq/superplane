@@ -108,7 +108,8 @@ export function factoryHistoryStoryCanvas(source: FactoryHistoryStorySource): Ca
           id: step.id,
           name: step.name,
           type: "TYPE_ACTION",
-          component: source === "pr-closure" ? "updateWorkOrderStatus" : "runnerSuperPlane",
+          component:
+            source === "pr-closure" ? "updateWorkOrderStatus" : source === "custom-done" ? "http" : "runnerSuperPlane",
           configuration: {
             model: "",
             executionTimeoutSeconds: 3600,
@@ -155,7 +156,8 @@ export function factoryHistoryHandlers(source: FactoryHistoryStorySource, enable
     runId: run.id,
     createdAt: new Date(Date.parse(run.createdAt!) + 1000).toISOString(),
     updatedAt: run.finishedAt,
-    metadata: source === "pr-closure" ? {} : { runner_broker_task_id: "history-runner-task" },
+    metadata:
+      source === "pr-closure" || source === "custom-done" ? {} : { runner_broker_task_id: "history-runner-task" },
     outputs: { default: [{ accepted: true, taskId: "task-1" }] },
   };
   const api = `/api/v1/canvases/${factoryHistoryStoryCanvasId(source)}`;
@@ -182,7 +184,11 @@ export function factoryHistoryHandlers(source: FactoryHistoryStorySource, enable
     ),
     http.get("/api/v1/actions", () =>
       HttpResponse.json({
-        actions: [action, { name: "updateWorkOrderStatus", label: "Update task status", configuration: [] }],
+        actions: [
+          action,
+          { name: "updateWorkOrderStatus", label: "Update task status", configuration: [] },
+          { name: "http", label: "Send HTTP request", configuration: [] },
+        ],
       }),
     ),
     http.get(`/api/v1/actions/${action.name}`, () => HttpResponse.json({ action })),

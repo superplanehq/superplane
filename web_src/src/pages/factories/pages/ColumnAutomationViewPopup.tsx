@@ -3,6 +3,9 @@ import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
 import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
+import { Link } from "@/components/Link/link";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Pencil } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
@@ -78,7 +81,28 @@ export function ColumnAutomationViewPopup({
   return (
     <ColumnAutomationFooterSlotProvider slot={footerSlotValue}>
       <PopupShell testId="column-automation-view" canvas fixed onDismiss={onClose}>
-        <PopupHeader title={title} onClose={onClose}>
+        <PopupHeader
+          title={title}
+          onClose={onClose}
+          actions={
+            history.enabled && editHref ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button asChild variant="ghost" size="icon" className="size-7 text-muted-foreground">
+                    <Link
+                      href={editHref}
+                      aria-label={COLUMN_AUTOMATIONS_COPY.editLabel}
+                      data-testid="column-automation-view-edit"
+                    >
+                      <Pencil className="size-4" aria-hidden />
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{COLUMN_AUTOMATIONS_COPY.editLabel}</TooltipContent>
+              </Tooltip>
+            ) : null
+          }
+        >
           {hasGeneral || hasAgent ? (
             <FactoryAutomationSettingsTabs
               tab={tab}

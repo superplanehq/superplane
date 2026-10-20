@@ -181,9 +181,43 @@ describe("Verify and Done run history", () => {
         return;
       }
       expect(screen.getByRole("table")).toBeInTheDocument();
+      expect(screen.getByTestId("column-automation-view-edit")).toHaveAttribute(
+        "href",
+        "/org/workspaces/sp/automations/custom?configure=1&agent=1&from=lines",
+      );
       expect(screen.queryByTestId("column-automation-view-canvas")).not.toBeInTheDocument();
     },
   );
+
+  it("keeps the full editor available for custom automations without an Agent form", async () => {
+    useCanvas.mockReturnValue({
+      data: {
+        metadata: { id: "custom", factoryId: "factory" },
+        spec: { nodes: [{ id: "notify", type: "TYPE_ACTION", component: "http" }], edges: [] },
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    renderPage(
+      <ColumnAutomationViewHost
+        organizationId="org"
+        factoryId="factory"
+        factoryKey="SP"
+        lineId="line-1"
+        canvasId="custom"
+        columnKey="done"
+        title="Notify team"
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open run run-intake-1" }));
+    expect(screen.getByTestId("column-automation-view-edit")).toHaveAttribute(
+      "href",
+      "/org/workspaces/sp/automations/custom?configure=1&agent=1&from=lines&lineId=line-1",
+    );
+  });
 
   it("keeps scheduled Backlog intake on its current view", () => {
     renderPage(
