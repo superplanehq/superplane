@@ -1,7 +1,7 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, History, Settings, Workflow } from "lucide-react";
 import { SettingsAutomationHeaderRow } from "./SettingsAutomationWorkspace";
-import type { BacklogSettingsTab } from "./useBacklogRunNavigation";
+import type { BacklogSettingsTab } from "@/hooks/useBacklogRunNavigation";
 
 export function BacklogSettingsTabs({
   tab,

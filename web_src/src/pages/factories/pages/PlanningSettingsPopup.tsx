@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { BacklogAutomationHistory } from "./BacklogAutomationHistory";
-import { useBacklogRunNavigation } from "./useBacklogRunNavigation";
+import { useBacklogRunNavigation } from "@/hooks/useBacklogRunNavigation";
 import { PlanningHealthSection, PlanningSettingsFields } from "./PlanningSettingsFields";
 import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";

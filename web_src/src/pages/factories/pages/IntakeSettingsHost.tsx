@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomationsCopy";
-import { dependabotRepositoryValue } from "../lib/dependabotRepository";
+import { dependabotRepositoryValue } from "@/lib/dependabotRepository";
 import { DependabotIntakeConfigBody } from "./DependabotIntakeConfigBody";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";

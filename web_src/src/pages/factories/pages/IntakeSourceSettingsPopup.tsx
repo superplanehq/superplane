@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 
 import { IntakeSourceSettingsFooter } from "./IntakeSourceSettingsFooter";
 import { BacklogAutomationHistory } from "./BacklogAutomationHistory";
-import { useBacklogRunNavigation } from "./useBacklogRunNavigation";
+import { useBacklogRunNavigation } from "@/hooks/useBacklogRunNavigation";
 import { NodeConfigRepositoryLine } from "./NodeConfigPanel";
 import {
   INTAKE_SETTINGS_COPY,

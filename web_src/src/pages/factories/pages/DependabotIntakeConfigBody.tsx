@@ -6,7 +6,7 @@ import { useState, type Dispatch, type SetStateAction } from "react";
 import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
 import { INTAKE_SETTINGS_COPY, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import { NodeConfigRepositoryLine } from "./NodeConfigPanel";
-import { dependabotRepositoryValue } from "../lib/dependabotRepository";
+import { dependabotRepositoryValue } from "@/lib/dependabotRepository";
 
 export function DependabotIntakeConfigBody({
   node,
