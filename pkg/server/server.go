@@ -505,7 +505,43 @@ func buildGRPCServices(
 	})
 }
 
-func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string) {
+type processShutdown struct {
+	mu                sync.Mutex
+	stopRunner        func()
+	stopNotifications context.CancelFunc
+}
+
+func (s *processShutdown) setRunner(stopRunner func(), stopNotifications context.CancelFunc) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopRunner = stopRunner
+	s.stopNotifications = stopNotifications
+}
+
+func (s *processShutdown) wait() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
+	<-signals
+	signal.Stop(signals)
+	s.stop()
+}
+
+func (s *processShutdown) stop() {
+	s.mu.Lock()
+	stopRunner := s.stopRunner
+	stopNotifications := s.stopNotifications
+	s.mu.Unlock()
+
+	if stopNotifications != nil {
+		stopNotifications()
+	}
+	if stopRunner != nil {
+		stopRunner()
+	}
+	closeProductAnalytics()
+}
+
+func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string, shutdown *processShutdown) {
 	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
 	if err != nil {
 		log.Fatalf("failed to create runner API server: %v", err)
@@ -516,21 +552,9 @@ func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLog
 	notificationsCtx, stopNotifications := context.WithCancel(context.Background())
 	defer stopNotifications()
 	server.StartControlNotifications(notificationsCtx, uuid.NewString())
-	serveDone := make(chan error, 1)
-	go func() { serveDone <- server.Serve(address) }()
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
-	select {
-	case err := <-serveDone:
-		if err != nil {
-			log.Fatal(err)
-		}
-	case <-signals:
-		stopNotifications()
-		shutdownRunnerAPI(server)
-		closeProductAnalytics()
-		os.Exit(0)
+	shutdown.setRunner(func() { shutdownRunnerAPI(server) }, stopNotifications)
+	if err := server.Serve(address); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -539,6 +563,7 @@ func registerRunnerAPI(
 	jwtSigner *jwt.Signer,
 	encryptor crypto.Encryptor,
 	activeLogStoreName string,
+	shutdown *processShutdown,
 ) {
 	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
 	if err != nil {
@@ -548,17 +573,7 @@ func registerRunnerAPI(
 	publicServer.Router.PathPrefix("/runner/v1").Handler(server.Handler())
 	notificationsCtx, stopNotifications := context.WithCancel(context.Background())
 	server.StartControlNotifications(notificationsCtx, uuid.NewString())
-
-	go func() {
-		signals := make(chan os.Signal, 1)
-		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
-		defer signal.Stop(signals)
-		<-signals
-		stopNotifications()
-		shutdownRunnerAPI(server)
-		closeProductAnalytics()
-		os.Exit(0)
-	}()
+	shutdown.setRunner(func() { shutdownRunnerAPI(server) }, stopNotifications)
 }
 
 func shutdownRunnerAPI(server *runnerapi.Server) {
@@ -584,6 +599,7 @@ func startPublicAPI(
 	licenseService *licensing.Service,
 	grpcServices *grpc.Services,
 	activeLogStoreName string,
+	shutdown *processShutdown,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
 
@@ -640,7 +656,7 @@ func startPublicAPI(
 
 	if os.Getenv("START_RUNNER_API") == "yes" {
 		log.Println("Registering Runner API routes on Public API")
-		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName)
+		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName, shutdown)
 	}
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
@@ -879,6 +895,7 @@ func Start() {
 	agentProvider, agentService := buildAgentService(authService)
 
 	var grpcServices *grpc.Services
+	shutdown := &processShutdown{}
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		services, err := buildGRPCServices(
 			baseURL,
@@ -910,9 +927,10 @@ func Start() {
 			licenseService,
 			grpcServices,
 			activeLogStoreName,
+			shutdown,
 		)
 	} else if os.Getenv("START_RUNNER_API") == "yes" {
-		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName)
+		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName, shutdown)
 	}
 
 	startWorkers(
@@ -925,8 +943,7 @@ func Start() {
 	)
 
 	log.Println("SuperPlane is UP.")
-
-	select {}
+	shutdown.wait()
 }
 
 func initializeProductAnalytics() {
