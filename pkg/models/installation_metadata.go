@@ -28,6 +28,7 @@ type InstallationMetadata struct {
 	AllowPrivateNetworkAccess bool
 	SignupsEnabled            bool
 	OwnerSetupStep            *string `gorm:"type:text"`
+	ShareOwnerIdentity        bool
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 }
@@ -131,6 +132,22 @@ func SetOwnerSetupStepIfOpen(tx *gorm.DB, step string) (bool, error) {
 	})
 
 	return updated, err
+}
+
+// SetShareOwnerIdentity records whether weekly install reports may include
+// the owner email and the first organization name.
+func SetShareOwnerIdentity(tx *gorm.DB, share bool) error {
+	if _, err := findOrCreateInstallationMetadata(tx); err != nil {
+		return err
+	}
+
+	return tx.Model(&InstallationMetadata{}).
+		Where("id = ?", installationMetadataID).
+		Updates(map[string]any{
+			"share_owner_identity": share,
+			"updated_at":           time.Now(),
+		}).
+		Error
 }
 
 func UpdateInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) error {

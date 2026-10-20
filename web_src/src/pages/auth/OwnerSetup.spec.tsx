@@ -161,6 +161,45 @@ describe("OwnerSetup", () => {
     vi.unstubAllGlobals();
   });
 
+  it("submits the checked install report on the owner account step", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "required", beacon_enabled: true },
+    });
+    renderOwnerSetup();
+
+    const report = await screen.findByTestId("owner-setup-install-report");
+    expect(report).toBeChecked();
+
+    fireEvent.change(screen.getByPlaceholderText("First name"), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
+    fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "ada@example.com" } });
+    fireEvent.change(screen.getByPlaceholderText("Password"), { target: { value: "Secret1x" } });
+    fireEvent.change(screen.getByPlaceholderText("Confirm password"), { target: { value: "Secret1x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+      const post = calls.find((call) => String(call[0]).endsWith("/api/v1/setup-owner") && call[1]?.method === "POST");
+      expect(post?.[1]?.body).toBe(
+        JSON.stringify({
+          email: "ada@example.com",
+          first_name: "Ada",
+          last_name: "Lovelace",
+          password: "Secret1x",
+          share_owner_identity: true,
+        }),
+      );
+    });
+  });
+
+  it("hides the install report when the beacon is off", async () => {
+    stubOwnerSetupFetch();
+    renderOwnerSetup();
+
+    expect(await screen.findByRole("heading", { name: "Create the owner account" })).toBeInTheDocument();
+    expect(screen.queryByTestId("owner-setup-install-report")).not.toBeInTheDocument();
+  });
+
   it("shows the gold arrow preview without onboarding labels", async () => {
     stubOwnerSetupFetch();
     renderOwnerSetup();
