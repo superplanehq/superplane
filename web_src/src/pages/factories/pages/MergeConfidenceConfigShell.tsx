@@ -9,7 +9,7 @@ import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "re
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
-import { ImplementRunHistory } from "./implementRunHistory/ImplementRunHistory";
+import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
 import { ImplementConfiguration } from "./ImplementConfiguration";
 import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
@@ -265,9 +265,8 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     );
   }
   if (historyContext && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
-    return (
-      <ImplementRunHistory {...historyContext} selectedRunId={selectedRunId} onSelectRun={onSelectedRunIdChange} />
-    );
+    const history = { ...historyContext, selectedRunId, onSelectRun: onSelectedRunIdChange };
+    return <FactoryAutomationRunHistory {...history} />;
   }
   return (
     <div

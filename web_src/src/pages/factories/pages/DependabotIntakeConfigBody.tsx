@@ -6,6 +6,7 @@ import { useState, type Dispatch, type SetStateAction } from "react";
 import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
 import { INTAKE_SETTINGS_COPY, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import { NodeConfigRepositoryLine } from "./NodeConfigPanel";
+import { dependabotRepositoryValue } from "@/lib/dependabotRepository";
 
 export function DependabotIntakeConfigBody({
   node,
@@ -75,12 +76,4 @@ async function saveDraft(
   } catch (error) {
     setSubmitError(getApiErrorMessage(error, INTAKE_SETTINGS_COPY.saveError));
   }
-}
-
-function dependabotRepositoryValue(node: SuperplaneComponentsNode, fallback: string | undefined): unknown {
-  const configured = node.configuration?.repository;
-  if (typeof configured === "string" && configured.trim() !== "") {
-    return configured;
-  }
-  return fallback;
 }
