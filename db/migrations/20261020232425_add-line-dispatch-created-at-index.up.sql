@@ -1,0 +1,2 @@
+CREATE INDEX CONCURRENTLY idx_factory_work_order_line_dispatches_created_at
+ON public.factory_work_order_line_dispatches (created_at);
