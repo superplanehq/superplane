@@ -1,20 +1,16 @@
+import { BacklogSettingsTabs } from "./BacklogSettingsTabs";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Settings, Workflow } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import { BacklogAutomationHistory } from "./BacklogAutomationHistory";
+import { useBacklogRunNavigation } from "@/hooks/useBacklogRunNavigation";
 import { PlanningHealthSection, PlanningSettingsFields } from "./PlanningSettingsFields";
-import {
-  SettingsAutomationCanvasEdit,
-  SettingsAutomationHeaderRow,
-  SettingsAutomationWorkspace,
-} from "./SettingsAutomationWorkspace";
+import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
   PLANNING_SETTINGS_COPY,
-  planningSettingsTabs,
   type PlanningAutoStartLine,
   type PlanningDraftSettings,
   type PlanningSettingsTab,
@@ -22,6 +18,8 @@ import {
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 interface PlanningSettingsPopupProps {
+  organizationId?: string;
+  factoryId?: string;
   settings: PlanningDraftSettings;
   lines?: PlanningAutoStartLine[];
   title?: string;
@@ -42,6 +40,8 @@ interface PlanningSettingsPopupProps {
 }
 
 export function PlanningSettingsPopup({
+  organizationId,
+  factoryId,
   settings,
   lines = [],
   title = PLANNING_SETTINGS_COPY.title,
@@ -60,17 +60,17 @@ export function PlanningSettingsPopup({
   fixed = true,
   initialTab = "general",
 }: PlanningSettingsPopupProps) {
-  const tabs = planningSettingsTabs(Boolean(agent));
   const [draft, setDraft] = useState(settings);
-  const [tab, setTab] = useState<PlanningSettingsTab>(() => (tabs.includes(initialTab) ? initialTab : "general"));
-  const hasAgent = Boolean(agent);
-
-  useEffect(() => {
-    const next = planningSettingsTabs(hasAgent);
-    if (!next.includes(tab)) {
-      setTab("general");
-    }
-  }, [tab, hasAgent]);
+  const history = useBacklogRunNavigation({
+    organizationId,
+    factoryId,
+    graph: automationGraph,
+    agent,
+    parameter: "planningSettings",
+    initialTab,
+    hasAgent: Boolean(agent),
+  });
+  const { tab, setTab } = history;
 
   // Reset the draft only when the stored values change. Hosts often build a
   // new settings object on every render, and that alone must not erase
@@ -91,30 +91,27 @@ export function PlanningSettingsPopup({
   return (
     <PopupShell testId="planning-settings" canvas fixed={fixed} onDismiss={onClose}>
       <PopupHeader title={title} onClose={onClose}>
-        <SettingsAutomationHeaderRow
-          tabs={
-            <Tabs value={tab} onValueChange={(value) => setTab(value as PlanningSettingsTab)}>
-              <TabsList aria-label={PLANNING_SETTINGS_COPY.tabsLabel}>
-                <TabsTrigger value="general" data-testid="planning-settings-tab-general">
-                  <Settings />
-                  {PLANNING_SETTINGS_COPY.generalTab}
-                </TabsTrigger>
-                {tabs.includes("agent") ? (
-                  <TabsTrigger value="agent" data-testid="planning-settings-tab-agent">
-                    <Bot />
-                    {PLANNING_SETTINGS_COPY.agentTab}
-                  </TabsTrigger>
-                ) : null}
-                <TabsTrigger value="automation" data-testid="planning-settings-tab-automation">
-                  <Workflow />
-                  {PLANNING_SETTINGS_COPY.automationTab}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          }
+        <BacklogSettingsTabs
+          tab={tab}
+          onTabChange={setTab}
+          hasAgent={Boolean(agent)}
+          historyEnabled={history.enabled}
+          label={PLANNING_SETTINGS_COPY.tabsLabel}
+          testId="planning-settings"
         />
       </PopupHeader>
-      {tab === "automation" ? (
+      {tab === "runs" ? (
+        <BacklogAutomationHistory
+          organizationId={history.organizationId}
+          factoryId={history.factoryId}
+          canvasId={canvasId}
+          selectedRunId={history.selectedRunId}
+          onSelectRun={history.setSelectedRunId}
+          loading={automationLoading}
+          error={automationError}
+          onRetry={onRetryAutomation}
+        />
+      ) : tab === "automation" ? (
         <PlanningAutomationTab
           graph={automationGraph}
           canvasId={canvasId}

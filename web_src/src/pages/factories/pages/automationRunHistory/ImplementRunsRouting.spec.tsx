@@ -14,8 +14,8 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({ ...access, has: (id: string) => id === "factory_run_history" && access.enabled }),
 }));
 
-vi.mock("./ImplementRunHistory", () => ({
-  ImplementRunHistory: ({ onSelectRun }: { onSelectRun: (id: string | null) => void }) => (
+vi.mock("./FactoryAutomationRunHistory", () => ({
+  FactoryAutomationRunHistory: ({ onSelectRun }: { onSelectRun: (id: string | null) => void }) => (
     <button data-testid="connected-history" onClick={() => onSelectRun("selected-run")}>
       Open run
     </button>
