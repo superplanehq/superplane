@@ -37,9 +37,10 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
 	orderID := resolvedOrder.ID
-	runKind := "rerun"
-	if resolvedOrder.State == models.FactoryWorkOrderStateDraft {
-		runKind = "initial"
+	hasPriorDispatch, priorErr := resolvedOrder.HasLineDispatch(db)
+	runKind := "initial"
+	if hasPriorDispatch {
+		runKind = "rerun"
 	}
 
 	lineName := strings.TrimSpace(req.GetLineName())
@@ -78,15 +79,19 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	if dispatch, findErr := order.FindActiveLineDispatch(db); findErr == nil {
 		dispatchID = productanalytics.StableEventID(productanalytics.EventFactoryTaskStarted, dispatch.ID.String())
 	}
-	captureFactoryProductEvent(
-		ctx,
-		db,
-		factory,
-		order.ID,
-		productanalytics.EventFactoryTaskStarted,
-		dispatchID,
-		productanalytics.Properties{"run_kind": runKind},
-	)
+	if priorErr != nil {
+		log.WithError(priorErr).Warn("Skipped factory task started analytics")
+	} else {
+		captureFactoryProductEvent(
+			ctx,
+			db,
+			factory,
+			order.ID,
+			productanalytics.EventFactoryTaskStarted,
+			dispatchID,
+			productanalytics.Properties{"run_kind": runKind},
+		)
+	}
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {

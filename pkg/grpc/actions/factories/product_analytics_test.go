@@ -281,18 +281,39 @@ func TestFactoryProductAnalytics(t *testing.T) {
 		initial := requireNamedEvent(t, recorder, productanalytics.EventFactoryTaskStarted)
 		assert.Equal(t, "initial", initial.Properties["run_kind"])
 
-		rerunOrder, err := factoryModel.CreateWorkOrder(db, "Ship again", "", &r.User, nil, nil)
+		openOrder, err := factoryModel.CreateWorkOrder(db, "Open first", "", &r.User, nil, nil)
 		require.NoError(t, err)
 		_, err = UpdateWorkOrderStatus(ctx, orgID, &pb.UpdateWorkOrderStatusRequest{
 			FactoryId: factoryModel.ID.String(),
-			OrderId:   rerunOrder.ID.String(),
+			OrderId:   openOrder.ID.String(),
 			State:     pb.WorkOrder_STATE_OPEN,
 		})
 		require.NoError(t, err)
 		recorder.reset()
 		_, err = DispatchWorkOrder(ctx, orgID, &pb.DispatchWorkOrderRequest{
 			FactoryId: factoryModel.ID.String(),
-			OrderId:   rerunOrder.ID.String(),
+			OrderId:   openOrder.ID.String(),
+			LineName:  line.Name,
+		})
+		require.NoError(t, err)
+		opened := requireNamedEvent(t, recorder, productanalytics.EventFactoryTaskStarted)
+		assert.Equal(t, "initial", opened.Properties["run_kind"])
+
+		stored, err := factoryModel.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		firstDispatch, err := stored.FindActiveLineDispatch(db)
+		require.NoError(t, err)
+		require.NoError(t, firstDispatch.Finish(db, models.CanvasRunResultFailed))
+		_, err = UpdateWorkOrderStatus(ctx, orgID, &pb.UpdateWorkOrderStatusRequest{
+			FactoryId: factoryModel.ID.String(),
+			OrderId:   order.ID.String(),
+			State:     pb.WorkOrder_STATE_DRAFT,
+		})
+		require.NoError(t, err)
+		recorder.reset()
+		_, err = DispatchWorkOrder(ctx, orgID, &pb.DispatchWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			OrderId:   order.ID.String(),
 			LineName:  line.Name,
 		})
 		require.NoError(t, err)

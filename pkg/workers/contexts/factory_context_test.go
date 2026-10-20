@@ -2310,6 +2310,7 @@ func TestFactoryContext_ProductAnalytics(t *testing.T) {
 		require.True(t, inserted)
 		require.Len(t, events, 1)
 		assert.Equal(t, "issue_import", events[0].Properties["creation_source"])
+		assert.Equal(t, models.FactoryIntakeSourceGitHubIssues, events[0].Properties["issue_source"])
 		encoded, err := json.Marshal(events[0])
 		require.NoError(t, err)
 		assert.NotContains(t, string(encoded), "https://github.com/acme/payments/issues/12")

@@ -42,6 +42,10 @@ request titles, errors, tokens, or credentials to an event.
 The server event wrapper accepts only the nine server event names in this
 table. The browser emits only `user_signed_up`.
 
+`run_kind` is `initial` when the task has no earlier line dispatch. A later
+dispatch uses `rerun`, including after the task returns to draft. Automated
+imports set `issue_source` to the intake source enum.
+
 ## Metrics
 
 The user conversion funnel is:

@@ -250,9 +250,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		TaskID:         order.ID.String(),
 		ActorType:      productanalytics.ActorSystem,
 		Source:         productanalytics.SourceAutomation,
-		Properties: productanalytics.Properties{
-			"creation_source": factoryContextCreationSource(order),
-		},
+		Properties:     factoryContextCreationProperties(c.tx, c.canvas.ID, order),
 	})
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), true, nil
@@ -732,6 +730,25 @@ func factoryContextCreationSource(order *models.FactoryWorkOrder) string {
 		return "issue_import"
 	}
 	return "automation"
+}
+
+func factoryContextCreationProperties(tx *gorm.DB, canvasID uuid.UUID, order *models.FactoryWorkOrder) productanalytics.Properties {
+	properties := productanalytics.Properties{
+		"creation_source": factoryContextCreationSource(order),
+	}
+	if properties["creation_source"] != "issue_import" {
+		return properties
+	}
+
+	intake, err := models.FindFactoryIntakeByCanvasID(tx, canvasID)
+	if err != nil {
+		log.WithError(err).Warn("Skipped factory task created issue source")
+		return properties
+	}
+	if intake != nil && strings.TrimSpace(intake.Source) != "" {
+		properties["issue_source"] = intake.Source
+	}
+	return properties
 }
 
 func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentParams) error {

@@ -925,15 +925,8 @@ func Start() {
 	)
 
 	log.Println("SuperPlane is UP.")
-	waitForShutdownSignal()
-	closeProductAnalytics()
-}
 
-func waitForShutdownSignal() {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
-	<-signals
-	signal.Stop(signals)
+	select {}
 }
 
 func initializeProductAnalytics() {

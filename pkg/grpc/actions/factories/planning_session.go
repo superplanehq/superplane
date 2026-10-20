@@ -128,7 +128,7 @@ func sendPlanningSessionMessage(
 		if err := session.SendUserMessage(tx, req.GetText(), userID); err != nil {
 			return err
 		}
-		firstRefinement = planningSessionHasOneUserMessage(tx, session.ID)
+		firstRefinement = isFirstPlanningUserMessage(tx, session.ID)
 		// Taking part in the refinement makes the sender an owner of the draft.
 		if assigned, err = draft.AddAssignee(tx, userID, userID); err != nil {
 			return err
@@ -157,11 +157,8 @@ func sendPlanningSessionMessage(
 	return &pb.SendPlanningSessionMessageResponse{Session: serialized}, nil
 }
 
-func planningSessionHasOneUserMessage(tx *gorm.DB, sessionID uuid.UUID) bool {
-	var userMessages int64
-	err := tx.Model(&models.PlanningSessionMessage{}).
-		Where("session_id = ? AND role = ?", sessionID, models.PlanningSessionMessageRoleUser).
-		Count(&userMessages).Error
+func isFirstPlanningUserMessage(tx *gorm.DB, sessionID uuid.UUID) bool {
+	userMessages, err := models.CountPlanningSessionUserMessages(tx, sessionID)
 	if err != nil {
 		log.WithError(err).Warn("Skipped factory task refined analytics")
 		return false
