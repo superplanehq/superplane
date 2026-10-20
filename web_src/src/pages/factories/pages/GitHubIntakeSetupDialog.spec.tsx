@@ -41,7 +41,7 @@ describe("GitHubIntakeSetupDialog", () => {
     expect(screen.getByRole("heading", { name: GITHUB_INTAKE_SETUP_COPY.headline })).toBeInTheDocument();
     expect(screen.getByText(GITHUB_INTAKE_SETUP_COPY.helper)).toBeInTheDocument();
     expect(screen.getByTestId("github-setup-repository")).toHaveTextContent("acme/payments-service");
-    expect(screen.getByText(GITHUB_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent("newest open issues");
+    expect(screen.getByText(GITHUB_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent("10 newest");
     expect(screen.getByTestId("github-skip-initial-import")).toBeChecked();
   });
 
