@@ -1,8 +1,10 @@
 package factories
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 const expectedImplementationTestingGuidance = "Follow the repository's testing instructions and use its existing test tools and conventions. For bug fixes, add a regression test that reproduces the failure when practical. For behavior changes, add or update tests that verify observable behavior. Avoid tests that only mirror the implementation or assert incidental presentation details. Run the relevant tests, lint, and build checks. Fix failures caused by your changes. Report any checks you could not run and explain why."
@@ -118,4 +121,126 @@ func TestUpgradeOrganizationImplementationTestingGuidance(t *testing.T) {
 	afterSecondRun, err := models.ListCanvasVersionsInTransaction(db, implement.ID)
 	require.NoError(t, err)
 	assert.Equal(t, upgraded, afterSecondRun)
+}
+
+const overlappingUpgradeEditMarker = "customer-edit-survives-overlap"
+
+func TestUpgradeOrganizationImplementationTestingGuidance_OverlappingStartKeepsLaterEdit(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	db := database.DB(ctx)
+	deps := IntakeDependencies{
+		Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService,
+		WebhookBaseURL: "http://localhost:8000",
+	}
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	implementation := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
+	publishImplementationTemplate(t, ctx, r, deps, implementation)
+	implementation, err = models.FindCanvasInTransaction(db, r.Organization.ID, implementation.ID)
+	require.NoError(t, err)
+	stripImplementationPrompt(t, db, implementation, "Customer-authored implementation instructions")
+
+	before, err := models.ListCanvasVersionsInTransaction(db, implementation.ID)
+	require.NoError(t, err)
+
+	holder := database.Conn().Begin()
+	require.NoError(t, holder.Error)
+	finished := make(chan struct{})
+	done := make(chan error, 1)
+	t.Cleanup(func() {
+		_ = holder.Rollback()
+		select {
+		case <-finished:
+		case <-time.After(20 * time.Second):
+			t.Errorf("upgrade did not finish after releasing the canvas lock")
+		}
+	})
+	locked, err := models.LockCanvasForUpdate(holder, r.Organization.ID, implementation.ID)
+	require.NoError(t, err)
+	var holderPID int
+	require.NoError(t, holder.Raw("SELECT pg_backend_pid()").Scan(&holderPID).Error)
+
+	go func() {
+		defer close(finished)
+		_, upgradeErr := UpgradeOrganizationImplementationTestingGuidance(ctx, r.Organization.ID, deps)
+		done <- upgradeErr
+	}()
+
+	require.Eventually(t, func() bool {
+		select {
+		case upgradeErr := <-done:
+			t.Fatalf("upgrade finished before waiting for the canvas lock: %v", upgradeErr)
+		default:
+		}
+		var waiting int
+		err := db.Raw(
+			"SELECT COUNT(*) FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid))",
+			holderPID,
+		).Scan(&waiting).Error
+		return err == nil && waiting > 0
+	}, 15*time.Second, 20*time.Millisecond)
+
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(holder, locked)
+	require.NoError(t, err)
+	require.True(t, setImplementationPrompt(version, implementationTestingGuidance+" "+overlappingUpgradeEditMarker))
+	require.NoError(t, holder.Model(version).Update("nodes", datatypes.NewJSONSlice(version.Nodes)).Error)
+	require.NoError(t, holder.Commit().Error)
+
+	require.NoError(t, <-done)
+	after, err := models.ListCanvasVersionsInTransaction(db, implementation.ID)
+	require.NoError(t, err)
+	if len(after) != len(before) {
+		t.Fatalf("overlapping upgrade published a replacement; versions %d -> %d", len(before), len(after))
+	}
+	assert.Equal(t, before[0].ID, after[0].ID)
+	live := liveCanvasJSON(t, implementation)
+	assert.Contains(t, live, strings.ToLower(implementationTestingGuidance))
+	assert.Contains(t, live, overlappingUpgradeEditMarker)
+}
+
+func publishImplementationTemplate(
+	t *testing.T,
+	ctx context.Context,
+	r *support.ResourceRegistry,
+	deps IntakeDependencies,
+	implementation *models.Canvas,
+) {
+	t.Helper()
+	materialized, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
+		appID: implementation.ID.String(), appName: implementation.Name,
+	})
+	require.NoError(t, err)
+	doc, err := yaml.CanvasFromYAML([]byte(materialized.canvasYAML))
+	require.NoError(t, err)
+	nodes, edges, err := doc.Parse(r.Registry, r.Organization.ID.String())
+	require.NoError(t, err)
+	require.NoError(t, canvasActions.PublishGeneratedCanvasNodesWithOwner(ctx, database.DB(ctx), implementation, nil,
+		"Install Implement", nodes, edges, changesets.CanvasPublisherOptions{
+			Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
+			AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
+		}))
+}
+
+func stripImplementationPrompt(t *testing.T, db *gorm.DB, canvas *models.Canvas, prompt string) {
+	t.Helper()
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	require.True(t, setImplementationPrompt(version, prompt))
+	require.NoError(t, db.Model(version).Update("nodes", datatypes.NewJSONSlice(version.Nodes)).Error)
+}
+
+func setImplementationPrompt(version *models.CanvasVersion, prompt string) bool {
+	for i := range version.Nodes {
+		steps, _ := version.Nodes[i].Configuration["steps"].([]any)
+		for _, step := range steps {
+			item, _ := step.(map[string]any)
+			if item["name"] != "Implementation" {
+				continue
+			}
+			item["prompt"] = prompt
+			return true
+		}
+	}
+	return false
 }

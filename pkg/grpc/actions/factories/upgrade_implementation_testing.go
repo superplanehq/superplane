@@ -18,6 +18,10 @@ const implementationTestingGuidance = "Follow the repository's testing instructi
 // UpgradeOrganizationImplementationTestingGuidance replaces stamped Implement
 // canvases that lack the new paragraph. The first replacement drops customer
 // edits; subsequent starts preserve canvases that already contain the paragraph.
+//
+// The canvas row is locked and reloaded before that check, and the lock is held
+// through publication. Overlapping server starts then see a completed upgrade
+// or a later customer edit instead of publishing a second replacement.
 func UpgradeOrganizationImplementationTestingGuidance(
 	ctx context.Context,
 	organizationID uuid.UUID,
@@ -38,17 +42,21 @@ func UpgradeOrganizationImplementationTestingGuidance(
 			}
 			for j := range canvases {
 				canvas := &canvases[j]
-				version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+				locked, err := models.LockCanvasForUpdate(tx, canvas.OrganizationID, canvas.ID)
 				if err != nil {
-					return fmt.Errorf("load %q: %w", canvas.Name, err)
+					return fmt.Errorf("lock %q: %w", canvas.Name, err)
+				}
+				version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, locked)
+				if err != nil {
+					return fmt.Errorf("load %q: %w", locked.Name, err)
 				}
 				if models.FactoryAppTemplateID(version.Nodes) != "line-implementation" ||
 					hasImplementationTestingGuidance(version.Nodes) {
 					continue
 				}
-				saved, err := resetBuiltInAutomation(ctx, tx, &factories[i], canvas, deps)
+				saved, err := resetBuiltInAutomation(ctx, tx, &factories[i], locked, deps)
 				if err != nil {
-					return fmt.Errorf("upgrade %q: %w", canvas.Name, err)
+					return fmt.Errorf("upgrade %q: %w", locked.Name, err)
 				}
 				if saved {
 					result.Reset++
