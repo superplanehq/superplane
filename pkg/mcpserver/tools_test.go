@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
+	openrouter "github.com/superplanehq/superplane/pkg/components/runner/openrouter"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -151,6 +152,73 @@ func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {
 	assert.Equal(t, "implement", payload["column"])
 	require.NotEmpty(t, payload["id"])
 	require.NotEmpty(t, payload["key"])
+	_, hasModel := payload["model"]
+	assert.False(t, hasModel)
+}
+
+func TestListLineModelsReturnsIdsAndNames(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Models", "", "MDL")
+	require.NoError(t, err)
+	createCustomModelLine(t, r, factoryModel, "ship")
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "list_line_models", map[string]any{})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	modelsList, ok := payload["models"].([]any)
+	require.True(t, ok)
+	require.Len(t, modelsList, 2)
+	assert.Equal(t, map[string]any{"id": "alpha-model", "name": "alpha-model"}, modelsList[0])
+	assert.Equal(t, map[string]any{"id": "zeta-model", "name": "zeta-model"}, modelsList[1])
+}
+
+func TestListLineModelsRequiresLineWhenSeveralExist(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Lines", "", "LNS")
+	require.NoError(t, err)
+	first, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "alpha", "start-a")
+	second, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "beta", "start-b")
+	_, err = factoryModel.CreateLine(db, "beta", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: second.ID, Entrypoint: secondEntry},
+	})
+	require.NoError(t, err)
+	_, err = factoryModel.CreateLine(db, "alpha", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: first.ID, Entrypoint: firstEntry},
+	})
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "list_line_models", map[string]any{})
+	require.EqualError(t, err, "invalid argument\nThis workspace has more than one line. Set line to one of: alpha, beta")
+}
+
+func TestHandOffTaskReturnsChosenModel(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Model Hand Off", "", "MDH")
+	require.NoError(t, err)
+	createCustomModelLine(t, r, factoryModel, "ship")
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "hand_off_task", map[string]any{
+		"title":  "Ship the chosen model",
+		"plan":   "# Use zeta.",
+		"column": "implement",
+		"model":  "zeta-model",
+	})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	assert.Equal(t, "zeta-model", payload["model"])
+	assert.Equal(t, "implement", payload["column"])
 }
 
 func TestCallToolSucceedsWithoutMCPServerFlag(t *testing.T) {
@@ -801,6 +869,37 @@ func taskRowByID(t *testing.T, payload map[string]any, id string) map[string]any
 	}
 	t.Fatalf("task %s not found", id)
 	return nil
+}
+
+func createCustomModelLine(t *testing.T, r *support.ResourceRegistry, factoryModel *models.Factory, lineName string) {
+	t.Helper()
+	db := database.DB(t.Context())
+	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderCustom, datatypes.JSONSlice[string]{"zeta-model", "alpha-model"})
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
+
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start")
+	live, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+	require.NoError(t, err)
+	nodes := append([]models.Node{}, live.Nodes...)
+	nodes = append(nodes, models.Node{
+		ID:   "agent",
+		Name: "agent",
+		Type: models.NodeTypeComponent,
+		Ref:  models.NodeRef{Component: &models.ComponentRef{Name: openrouter.ComponentName}},
+		Configuration: map[string]any{
+			"model":       "alpha-model",
+			"llmProvider": models.UsageProviderCustom,
+			"credentials": map[string]any{"source": "integration"},
+		},
+	})
+	live.Nodes = datatypes.NewJSONSlice(nodes)
+	require.NoError(t, db.Save(live).Error)
+	_, err = factoryModel.CreateLine(db, lineName, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	})
+	require.NoError(t, err)
 }
 
 func memberByEmail(t *testing.T, members []any, email string) map[string]any {

@@ -70,6 +70,7 @@ func Test__HandOffWorkOrder__ImplementWritesSpecAndStartsImplementation(t *testi
 	require.Len(t, result.Order.GetLineDispatches(), 1)
 	dispatch := result.Order.GetLineDispatches()[0]
 	assert.Equal(t, line.Name, dispatch.GetLine().GetName())
+	assert.Empty(t, dispatch.GetModel())
 	require.Len(t, dispatch.GetStepExecutions(), 1)
 	assert.Equal(t, int32(1), dispatch.GetStepExecutions()[0].GetStepIndex())
 	assert.Equal(t, pb.WorkOrderExecution_STATE_PENDING, dispatch.GetStepExecutions()[0].GetState())
@@ -81,6 +82,93 @@ func Test__HandOffWorkOrder__ImplementWritesSpecAndStartsImplementation(t *testi
 	var implRuns int64
 	require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", implApp.ID).Count(&implRuns).Error)
 	assert.EqualValues(t, 1, implRuns)
+}
+
+func Test__HandOffWorkOrder__ImplementStoresChosenModel(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel := seedHandOffFactory(t, r, db)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6", "claude-opus-4-6")
+	app := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "hosted", "claude-sonnet-4-6")
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID: factoryModel.ID.String(),
+		Title:     "Ship refund retries",
+		Plan:      "# Retry refunds",
+		Column:    HandOffColumnImplement,
+		Model:     "  claude-opus-4-6  ",
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Order.GetLineDispatches(), 1)
+	assert.Equal(t, "claude-opus-4-6", result.Order.GetLineDispatches()[0].GetModel())
+
+	order, err := factoryModel.FindWorkOrder(db, uuid.MustParse(result.Order.GetId()))
+	require.NoError(t, err)
+	active, err := order.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, "claude-opus-4-6", active.Model)
+	assert.Empty(t, active.ThinkingLevel)
+}
+
+func Test__HandOffWorkOrder__ImplementRejectsUnknownModel(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel := seedHandOffFactory(t, r, db)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6", "claude-opus-4-6")
+	app := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "hosted", "claude-sonnet-4-6")
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	_, err = HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID: factoryModel.ID.String(),
+		Title:     "Ship refund retries",
+		Plan:      "# Retry refunds",
+		Column:    HandOffColumnImplement,
+		Model:     "sonnet",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	assert.Contains(t, grpcerrors.StatusMessage(err), "Set model to one of: claude-opus-4-6, claude-sonnet-4-6")
+
+	orders, err := factoryModel.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{})
+	require.NoError(t, err)
+	assert.Empty(t, orders)
+}
+
+func Test__HandOffWorkOrder__VerifyRejectsModel(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel := seedHandOffFactory(t, r, db)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "verify", "start")
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	})
+	require.NoError(t, err)
+
+	_, err = HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID:      factoryModel.ID.String(),
+		Title:          "Review refund retries",
+		Plan:           "# Retry refunds",
+		Column:         HandOffColumnVerify,
+		PullRequestURL: "https://github.com/acme/app/pull/42",
+		Model:          "claude-opus-4-6",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	assert.Contains(t, grpcerrors.StatusMessage(err), "Verify does not start an agent, so a model is not used.")
+
+	orders, err := factoryModel.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{})
+	require.NoError(t, err)
+	assert.Empty(t, orders)
 }
 
 func Test__HandOffWorkOrder__ImplementStartsCustomStageWhenDoneFollows(t *testing.T) {
