@@ -4,7 +4,7 @@ import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
 
 export { PLANNING_SETTINGS_COPY };
 
-export type PlanningSettingsTab = "general" | "agent" | "automation";
+export type PlanningSettingsTab = "general" | "agent" | "automation" | "runs";
 
 export type PlanningAutoStartLine = {
   id: string;
@@ -27,7 +27,7 @@ export const DEFAULT_PLANNING_SETTINGS: PlanningDraftSettings = {
 };
 
 export function isPlanningSettingsTab(value: string | null | undefined): value is PlanningSettingsTab {
-  return value === "general" || value === "agent" || value === "automation";
+  return value === "general" || value === "agent" || value === "automation" || value === "runs";
 }
 
 export function planningSettingsTabs(hasAgent: boolean): PlanningSettingsTab[] {

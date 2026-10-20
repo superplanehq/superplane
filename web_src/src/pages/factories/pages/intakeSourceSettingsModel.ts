@@ -4,10 +4,10 @@ import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
-export type IntakeSettingsTab = "general" | "agent" | "automation";
+export type IntakeSettingsTab = "general" | "agent" | "automation" | "runs";
 
 export function isIntakeSettingsTab(value: string | null | undefined): value is IntakeSettingsTab {
-  return value === "general" || value === "agent" || value === "automation";
+  return value === "general" || value === "agent" || value === "automation" || value === "runs";
 }
 
 export function intakeSettingsTabs(hasAgent: boolean): IntakeSettingsTab[] {

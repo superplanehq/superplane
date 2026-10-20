@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
 import type { FactoriesWorkOrder } from "@/api-client";
-import { ImplementRunHistory } from "./ImplementRunHistory";
+import { FactoryAutomationRunHistory } from "./FactoryAutomationRunHistory";
 
 const queries = vi.hoisted(() => ({
   runs: {
@@ -19,10 +19,10 @@ vi.mock("@/hooks/useCanvasData", () => ({
 vi.mock("@/hooks/useFactoryData", () => ({ useFactoryWorkOrders: () => queries.tasks }));
 vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: () => {} }));
 
-describe("ImplementRunHistory", () => {
+describe("FactoryAutomationRunHistory", () => {
   it("shows fetched runs before task links finish loading, then enriches the rows", () => {
     const view = (
-      <ImplementRunHistory
+      <FactoryAutomationRunHistory
         canvasId="canvas"
         organizationId="org"
         factoryId="factory"
@@ -37,7 +37,7 @@ describe("ImplementRunHistory", () => {
     queries.tasks.data = [{ id: "task-1", key: "SP-123", title: "Linked task", sourceRunId: "run-1" }];
     queries.tasks.isLoading = false;
     rerender(
-      <ImplementRunHistory
+      <FactoryAutomationRunHistory
         canvasId="canvas"
         organizationId="org"
         factoryId="factory"

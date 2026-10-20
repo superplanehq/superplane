@@ -81,7 +81,7 @@ describe("isPlanningSettingsTab", () => {
     expect(isPlanningSettingsTab("general")).toBe(true);
     expect(isPlanningSettingsTab("agent")).toBe(true);
     expect(isPlanningSettingsTab("automation")).toBe(true);
-    expect(isPlanningSettingsTab("runs")).toBe(false);
+    expect(isPlanningSettingsTab("runs")).toBe(true);
   });
 });
 

@@ -70,6 +70,9 @@ export function PlanningSettingsHost({
       factoryKey={factoryKey}
       lineId={lineId}
       canvasId={canvasId}
+      canvasLoading={appsQuery.isPending}
+      canvasError={appsQuery.isError}
+      onRetryCanvas={() => void appsQuery.refetch()}
       lines={planningAutoStartLines(factoryQuery.data)}
       settings={planningSettingsFromFactory(factoryQuery.data)}
       title={findBacklogAutomationApp(appsQuery.data ?? [])?.name?.trim() || PLANNING_SETTINGS_COPY.title}
@@ -85,6 +88,9 @@ function PlanningSettingsLoaded({
   factoryKey,
   lineId,
   canvasId,
+  canvasLoading,
+  canvasError,
+  onRetryCanvas,
   lines,
   settings,
   title,
@@ -96,6 +102,9 @@ function PlanningSettingsLoaded({
   factoryKey: string;
   lineId?: string;
   canvasId?: string;
+  canvasLoading: boolean;
+  canvasError: boolean;
+  onRetryCanvas: () => void;
   lines: ReturnType<typeof planningAutoStartLines>;
   settings: ReturnType<typeof planningSettingsFromFactory>;
   title: string;
@@ -114,13 +123,18 @@ function PlanningSettingsLoaded({
 
   return (
     <PlanningSettingsPopup
+      organizationId={organizationId}
+      factoryId={factoryId}
       title={title}
       lines={lines}
       settings={settings}
       automationGraph={automation.graph}
-      automationLoading={automation.isLoading}
-      automationError={automation.isError}
-      onRetryAutomation={() => void automation.refetch()}
+      automationLoading={canvasLoading || automation.isLoading}
+      automationError={canvasError || automation.isError}
+      onRetryAutomation={() => {
+        onRetryCanvas();
+        void automation.refetch();
+      }}
       savePending={updateFactory.isPending}
       saveError={saveError}
       onSave={async (next) => {
