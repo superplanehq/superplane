@@ -74,6 +74,8 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	implementationPrompt, ok := implementationStep(t, agent, "Implementation")["prompt"].(string)
 	require.True(t, ok)
 	assert.Contains(t, implementationPrompt, runner.FactoryCommitIdentityPrompt)
+	assert.Contains(t, implementationPrompt, "3/ "+expectedImplementationTestingGuidance)
+	assert.NotContains(t, implementationPrompt, "Add tests where it makes sense.")
 	assert.Contains(t, implementationPrompt, runner.FactoryImaginedLimitPrompt)
 	for _, step := range agent.Configuration["steps"].([]any) {
 		item := step.(map[string]any)
@@ -746,6 +748,10 @@ func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-bitbucket"},
 	}}, agent.Configuration["environmentFrom"])
+	implementationPrompt, ok := implementationStep(t, agent, "Implementation")["prompt"].(string)
+	require.True(t, ok)
+	assert.Contains(t, implementationPrompt, "3/ "+expectedImplementationTestingGuidance)
+	assert.NotContains(t, implementationPrompt, "Add tests where it makes sense.")
 
 	bitbucket := &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}
 	for nodeID, component := range map[string]string{
