@@ -26,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
@@ -50,6 +51,7 @@ type FactoryContext struct {
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
 	onRunsCancelled         func([]*models.RunCancellationResult)
 	onFileBindCleanup       func(FileBindCleanup)
+	onProductAnalytics      func(productanalytics.Event)
 
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
@@ -120,6 +122,11 @@ type FileBindCleanup struct {
 
 func (c *FactoryContext) WithFileBindCleanup(callback func(FileBindCleanup)) *FactoryContext {
 	c.onFileBindCleanup = callback
+	return c
+}
+
+func (c *FactoryContext) WithProductAnalytics(callback func(productanalytics.Event)) *FactoryContext {
+	c.onProductAnalytics = callback
 	return c
 }
 
@@ -234,6 +241,17 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	c.recordDatadogWebhookTask(order)
 	c.recordLinearWebhookTask(order)
 	EmitWorkOrderCreated(c.tx, f, order)
+	c.captureProductAnalytics(productanalytics.Event{
+		Name:           productanalytics.EventFactoryTaskCreated,
+		EventID:        productanalytics.StableEventID(productanalytics.EventFactoryTaskCreated, order.ID.String()),
+		DistinctID:     productanalytics.SyntheticDistinctID(f.OrganizationID.String(), productanalytics.ActorSystem, "factory"),
+		OrganizationID: f.OrganizationID.String(),
+		FactoryID:      f.ID.String(),
+		TaskID:         order.ID.String(),
+		ActorType:      productanalytics.ActorSystem,
+		Source:         productanalytics.SourceAutomation,
+		Properties:     factoryContextCreationProperties(c.tx, c.canvas.ID, order),
+	})
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), true, nil
 }
@@ -670,7 +688,67 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		ToState:        order.State,
 		Result:         order.Result,
 	})
+	c.captureAutomationClose(order)
 	return workOrderToCore(order), true, nil
+}
+
+func (c *FactoryContext) captureAutomationClose(order *models.FactoryWorkOrder) {
+	var name productanalytics.EventName
+	var properties productanalytics.Properties
+	switch order.Result {
+	case models.FactoryWorkOrderResultRejected, models.FactoryWorkOrderResultManualRejected, models.FactoryWorkOrderResultPRClosed:
+		name = productanalytics.EventFactoryTaskRejected
+		properties = productanalytics.Properties{"rejection_source": "automation"}
+	case models.FactoryWorkOrderResultArchived:
+		name = productanalytics.EventFactoryTaskArchived
+		properties = productanalytics.Properties{"archive_source": "automation"}
+	default:
+		return
+	}
+
+	c.captureProductAnalytics(productanalytics.Event{
+		Name:           name,
+		EventID:        productanalytics.StableEventID(name, order.ID.String(), order.Result),
+		DistinctID:     productanalytics.SyntheticDistinctID(order.OrganizationID.String(), productanalytics.ActorSystem, "factory"),
+		OrganizationID: order.OrganizationID.String(),
+		FactoryID:      order.FactoryID.String(),
+		TaskID:         order.ID.String(),
+		ActorType:      productanalytics.ActorSystem,
+		Source:         productanalytics.SourceAutomation,
+		Properties:     properties,
+	})
+}
+
+func (c *FactoryContext) captureProductAnalytics(event productanalytics.Event) {
+	if c.onProductAnalytics != nil {
+		c.onProductAnalytics(event)
+	}
+}
+
+func factoryContextCreationSource(order *models.FactoryWorkOrder) string {
+	if order.OriginURL != nil && strings.TrimSpace(*order.OriginURL) != "" {
+		return "issue_import"
+	}
+	return "automation"
+}
+
+func factoryContextCreationProperties(tx *gorm.DB, canvasID uuid.UUID, order *models.FactoryWorkOrder) productanalytics.Properties {
+	properties := productanalytics.Properties{
+		"creation_source": factoryContextCreationSource(order),
+	}
+	if properties["creation_source"] != "issue_import" {
+		return properties
+	}
+
+	intake, err := models.FindFactoryIntakeByCanvasID(tx, canvasID)
+	if err != nil {
+		log.WithError(err).Warn("Skipped factory task created issue source")
+		return properties
+	}
+	if intake != nil && strings.TrimSpace(intake.Source) != "" {
+		properties["issue_source"] = intake.Source
+	}
+	return properties
 }
 
 func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentParams) error {

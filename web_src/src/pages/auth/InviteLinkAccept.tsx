@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { useAccount } from "@/contexts/useAccount";
 import { showErrorToast } from "@/lib/toast";
-import { analytics } from "@/lib/analytics";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 
 type AcceptStatus = "idle" | "loading" | "error";
@@ -68,7 +67,6 @@ export default function InviteLinkAccept() {
           throw new Error("Invite link response was missing organization details.");
         }
 
-        analytics.memberAccept(data.organization_id);
         navigate(`/${data.organization_slug}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unable to accept invite link.";

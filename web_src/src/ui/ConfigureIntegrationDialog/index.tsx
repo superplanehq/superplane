@@ -12,7 +12,6 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { useIntegration, useUpdateIntegration, useAvailableIntegrations } from "@/hooks/useIntegrations";
 import { showErrorToast } from "@/lib/toast";
-import { useIntegrationConfigureOpen } from "@/lib/analytics";
 import type { ConfigurationField } from "@/api-client";
 
 interface ConfigureIntegrationDialogProps {
@@ -47,8 +46,6 @@ export function ConfigureIntegrationDialog({
 
   const [name, setName] = useState("");
   const [config, setConfig] = useState<Record<string, unknown>>({});
-
-  useIntegrationConfigureOpen(integration ?? undefined, integrationId, "node_configuration", organizationId);
 
   useEffect(() => {
     if (integration?.spec?.configuration) {

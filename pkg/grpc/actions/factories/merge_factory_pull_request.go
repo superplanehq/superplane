@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -167,6 +168,18 @@ func MergeFactoryPullRequest(
 			false,
 		)
 	}
+	captureFactoryProductEvent(
+		ctx,
+		db,
+		factory,
+		pullRequest.WorkOrderID,
+		productanalytics.EventFactoryTaskMerged,
+		productanalytics.StableEventID(productanalytics.EventFactoryTaskMerged, pullRequest.ID.String()),
+		productanalytics.Properties{
+			"provider":     pullRequest.Provider,
+			"merge_source": "superplane",
+		},
+	)
 
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),

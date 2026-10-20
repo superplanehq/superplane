@@ -42,7 +42,6 @@ vi.mock("@/hooks/useIntegrationCatalog", () => ({
       canUpdateIntegrations: true,
       filterQuery: "",
       setFilterQuery: vi.fn(),
-      isIntegrationSurveyActive: false,
       isModalOpen: false,
       selectedIntegration: null,
       handleCloseModal: vi.fn(),

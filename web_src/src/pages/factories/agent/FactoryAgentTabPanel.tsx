@@ -118,7 +118,7 @@ function ChatConversation({
   isRunInspectionMode,
 }: ChatConversationProps) {
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
-  const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
+  const sendMutation = useSendAgentChatMessage(organizationId);
   const interruptMutation = useInterruptAgentChat(organizationId);
   const outcomeMutation = useDefineAgentOutcome(organizationId);
   const resetMutation = useResetCanvasAgentChat(organizationId, canvasId);

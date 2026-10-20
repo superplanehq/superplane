@@ -642,6 +642,20 @@ func dispatchHasEarlierStep(record FactoryWorkOrderLineDispatchRecord, stepIndex
 // FindActiveLineDispatch is a single indexed lookup ("does an active
 // traversal exist for this work order") replacing a scan over child
 // executions by status.
+func (o *FactoryWorkOrder) HasLineDispatch(tx *gorm.DB) (bool, error) {
+	if o == nil {
+		return false, nil
+	}
+	var count int64
+	err := tx.Model(&FactoryWorkOrderLineDispatch{}).
+		Where("work_order_id = ?", o.ID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (o *FactoryWorkOrder) FindActiveLineDispatch(tx *gorm.DB) (*FactoryWorkOrderLineDispatch, error) {
 	var dispatch FactoryWorkOrderLineDispatch
 	err := tx.
