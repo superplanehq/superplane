@@ -50,8 +50,8 @@ func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 	_, err = ListCodexUsage(context.Background())
 	require.Error(t, err)
 
-	require.NoError(t, db.Model(connection).Updates(map[string]any{"reservation_task_id": nil, "status": models.CodexConnectionStatusReady}).Error)
-	connection.ReservationTaskID = nil
+	require.NoError(t, db.Where("connection_id = ?", connection.ID).Delete(&models.FactoryCodexLease{}).Error)
+	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
 	connection.Status = models.CodexConnectionStatusReady
 	require.NoError(t, connection.BeginLogin(db, uuid.New(), now))
 	response, err = ListCodexUsage(meContext(r))
@@ -59,8 +59,7 @@ func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 	require.Len(t, response.Connections, 1)
 	assert.Empty(t, response.Connections[0].Limits, "new sign-in must not show the previous account quota")
 	assert.Nil(t, response.Connections[0].ObservedAt)
-	require.NoError(t, db.Model(connection).Update("reservation_task_id", nil).Error)
-	connection.ReservationTaskID = nil
+	require.NoError(t, db.Where("connection_id = ?", connection.ID).Delete(&models.FactoryCodexLease{}).Error)
 	require.NoError(t, connection.Disconnect(db, now))
 	response, err = ListCodexUsage(meContext(r))
 	require.NoError(t, err)

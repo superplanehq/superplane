@@ -110,7 +110,11 @@ async function restore(env = process.env, options = {}) {
   const file = authPath(env);
   fs.writeFileSync(file, `${JSON.stringify(bundle)}\n`, { mode: 0o600 });
   fs.chmodSync(file, 0o600);
-  return checkpoint({ env, final: Boolean(options.final) });
+  // A run keeps the lease secret in auth.json. Only a catalog refresh
+  // sends the real bundle back to SuperPlane.
+  if (options.final) {
+    return checkpoint({ env, final: true });
+  }
 }
 
 async function checkpoint(options = {}) {
@@ -260,6 +264,17 @@ function parseDeviceAuth(text) {
   };
 }
 
+async function reportUsage(env = process.env) {
+  let usage;
+  try {
+    usage = await readUsage(env);
+  } catch (_err) {
+    process.stdout.write("Codex usage is unavailable.\n");
+    return;
+  }
+  await requestJSON(env, "POST", "/api/v1/runner/codex-subscription/checkpoint", { usage });
+}
+
 async function login(env = process.env) {
   const home = codexHome(env);
   fs.mkdirSync(home, { recursive: true, mode: 0o700 });
@@ -320,11 +335,16 @@ async function main(argv = process.argv.slice(2)) {
     process.stdout.write("ChatGPT sign-in saved\n");
     return;
   }
+  if (command === "usage") {
+    await reportUsage();
+    process.stdout.write("ChatGPT usage saved\n");
+    return;
+  }
   if (command === "login") {
     await login();
     return;
   }
-  throw new Error("usage: node codex_subscription.js restore|refresh|checkpoint|login");
+  throw new Error("usage: node codex_subscription.js restore|refresh|checkpoint|usage|login");
 }
 
 if (require.main === module) {
@@ -342,6 +362,7 @@ module.exports = {
   redactSecrets,
   restore,
   checkpoint,
+  reportUsage,
   parseDeviceAuth,
   login,
 };

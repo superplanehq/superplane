@@ -237,13 +237,14 @@ func injectSubscriptionCredentials(ctx core.ExecutionContext, environment []runn
 	return append(environment,
 		runner.BrokerEnvironmentVariable{Name: runner.EnvCodexSubscriptionToken, Value: token},
 		runner.BrokerEnvironmentVariable{Name: runner.EnvSuperplaneBaseURL, Value: baseURL},
+		runner.BrokerEnvironmentVariable{Name: runner.EnvCodexRefreshTokenURL, Value: baseURL + runner.CodexSubscriptionRefreshPath},
 	), nil
 }
 
 func withoutCodexCredentials(environment []runner.BrokerEnvironmentVariable) []runner.BrokerEnvironmentVariable {
 	filtered := make([]runner.BrokerEnvironmentVariable, 0, len(environment))
 	for _, item := range environment {
-		if item.Name == envOpenAIAPIKey || item.Name == envOpenAIBaseURL || item.Name == runner.EnvSuperplaneBaseURL || item.Name == runner.EnvCodexSubscriptionToken {
+		if item.Name == envOpenAIAPIKey || item.Name == envOpenAIBaseURL || item.Name == runner.EnvSuperplaneBaseURL || item.Name == runner.EnvCodexSubscriptionToken || item.Name == runner.EnvCodexRefreshTokenURL {
 			continue
 		}
 		filtered = append(filtered, item)
