@@ -36,4 +36,18 @@ func TestCatalogPlanAssignmentAndProtection(t *testing.T) {
 	plan.Key = "changed"
 	require.Error(t, models.SaveBillingPlan(db, &plan))
 	plan.Key = original
+	product := "product_" + uuid.NewString()
+	plan.PolarProductID = &product
+	plan.PriceCents = 3000
+	plan.PerSeat = true
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	stored, err := models.FindBillingPlan(db, plan.Key)
+	require.NoError(t, err)
+	require.Equal(t, int64(3000), stored.PriceCents)
+	require.True(t, stored.PerSeat)
+	plan.PerSeat = false
+	require.ErrorIs(t, models.SaveBillingPlan(db, &plan), models.ErrCatalogPlan)
+	plan.PerSeat = true
+	plan.PriceCents = 2000
+	require.ErrorIs(t, models.SaveBillingPlan(db, &plan), models.ErrCatalogPlan)
 }

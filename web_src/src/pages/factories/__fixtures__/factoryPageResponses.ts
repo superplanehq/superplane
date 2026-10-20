@@ -439,19 +439,19 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     catalogKey: "trial",
     hasPaymentMethod: false,
     availablePlans: [
-      { key: "pay_as_you_go", name: "Pay-as-you-go", basePriceCents: "0", requirePaymentMethod: true },
+      { key: "pay_as_you_go", name: "Pay-as-you-go", priceCents: "0", requirePaymentMethod: true },
       {
         key: "starter",
         name: "Starter",
-        basePriceCents: "2000",
+        priceCents: "2000",
         requirePaymentMethod: true,
         subscriptionRequired: true,
       },
       {
         key: "team",
         name: "Team",
-        basePriceCents: "0",
-        seatPriceCents: "3000",
+        priceCents: "3000",
+        perSeat: true,
         requirePaymentMethod: true,
         subscriptionRequired: true,
       },

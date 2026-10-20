@@ -276,9 +276,9 @@ func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	plans := []models.BillingPlan{
-		{Name: "Base price", Visibility: "public", BasePriceCents: 2000},
-		{Name: "Seat price", Visibility: "public", SeatPriceCents: 3000},
-		{Name: "Private", Visibility: "private", BasePriceCents: 1000},
+		{Name: "Flat price", Visibility: "public", PriceCents: 2000},
+		{Name: "Seat price", Visibility: "public", PriceCents: 3000, PerSeat: true},
+		{Name: "Private", Visibility: "private", PriceCents: 1000},
 	}
 	for i := range plans {
 		plans[i].Key = "catalog_" + strings.ReplaceAll(uuid.NewString(), "-", "")
@@ -302,6 +302,8 @@ func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
 			continue
 		}
 		require.NotNil(t, option, "public plans must remain visible before Polar setup")
+		require.Equal(t, plan.PriceCents, option.PriceCents)
+		require.Equal(t, plan.PerSeat, option.PerSeat)
 		require.True(t, option.SubscriptionRequired, "priced plans must never use card-only activation")
 		_, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, r.Account.ID.String(), "http://localhost")
 		require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))

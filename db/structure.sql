@@ -290,8 +290,6 @@ CREATE TABLE public.billing_plans (
     name text NOT NULL,
     category text NOT NULL,
     visibility text DEFAULT 'private'::text NOT NULL,
-    base_price_cents bigint DEFAULT 0 NOT NULL,
-    seat_price_cents bigint DEFAULT 0 NOT NULL,
     polar_product_id text,
     seat_limit integer,
     parallel_task_limit integer,
@@ -306,7 +304,8 @@ CREATE TABLE public.billing_plans (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     require_payment_method boolean DEFAULT false NOT NULL,
-    CONSTRAINT billing_plans_base_price_cents_check CHECK ((base_price_cents >= 0)),
+    price_cents bigint DEFAULT 0 NOT NULL,
+    per_seat boolean DEFAULT false NOT NULL,
     CONSTRAINT billing_plans_category_check CHECK ((category = ANY (ARRAY['none'::text, 'trial'::text, 'paid'::text]))),
     CONSTRAINT billing_plans_check CHECK (((credit_expiration <> 'after_days'::text) OR (credit_validity_days > 0))),
     CONSTRAINT billing_plans_credit_amount_cents_check CHECK ((credit_amount_cents >= 0)),
@@ -316,8 +315,8 @@ CREATE TABLE public.billing_plans (
     CONSTRAINT billing_plans_markup_bps_check CHECK ((markup_bps >= 0)),
     CONSTRAINT billing_plans_name_check CHECK ((btrim(name) <> ''::text)),
     CONSTRAINT billing_plans_parallel_task_limit_check CHECK ((parallel_task_limit > 0)),
+    CONSTRAINT billing_plans_price_cents_check CHECK ((price_cents >= 0)),
     CONSTRAINT billing_plans_seat_limit_check CHECK ((seat_limit > 0)),
-    CONSTRAINT billing_plans_seat_price_cents_check CHECK ((seat_price_cents >= 0)),
     CONSTRAINT billing_plans_trial_credit_cents_check CHECK ((trial_credit_cents >= 0)),
     CONSTRAINT billing_plans_trial_length_days_check CHECK ((trial_length_days > 0)),
     CONSTRAINT billing_plans_visibility_check CHECK ((visibility = ANY (ARRAY['public'::text, 'private'::text])))
@@ -5923,7 +5922,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261020132828	f
+20261020183712	f
 \.
 
 
@@ -5959,7 +5958,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20261020135744	f
+20261020183817	f
 \.
 
 

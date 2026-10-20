@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -236,6 +237,17 @@ function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
           <div className="grid gap-4 sm:grid-cols-2">
             <PlanNumbers plan={plan} section={section} onChange={onChange} />
             {section === "Pricing" && (
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="plan-per-seat"
+                  checked={plan.per_seat}
+                  disabled={linked || legacy}
+                  onCheckedChange={(per_seat) => update({ per_seat })}
+                />
+                <Label htmlFor="plan-per-seat">Per seat</Label>
+              </div>
+            )}
+            {section === "Pricing" && (
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
                   <Label htmlFor="plan-polar-product">Polar product ID</Label>
@@ -329,21 +341,12 @@ function planNumberFields(linked: boolean, legacy: boolean) {
     section: string;
   }[] = [
     {
-      key: "base_price_cents",
-      label: "Base price (cents)",
+      key: "price_cents",
+      label: "Price (cents)",
       help: linked
         ? "Pricing is locked because this plan is linked to a Polar product."
-        : "The base plan price in US cents. 100 cents equals $1.",
-      locked: linked,
-      section: "Pricing",
-    },
-    {
-      key: "seat_price_cents",
-      label: "Seat price (cents)",
-      help: linked
-        ? "Pricing is locked because this plan is linked to a Polar product."
-        : "The price per seat in US cents, separate from the base price.",
-      locked: linked,
+        : "The plan price in US cents. 100 cents equals $1.",
+      locked: linked || legacy,
       section: "Pricing",
     },
     {

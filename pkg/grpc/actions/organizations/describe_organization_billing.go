@@ -58,7 +58,7 @@ func DescribeOrganizationBilling(
 				continue
 			}
 			checkoutEnabled = checkoutEnabled || item.PolarProductID != nil
-			available = append(available, &pb.BillingPlanOption{Key: item.Key, Name: item.Name, BasePriceCents: item.BasePriceCents, SeatPriceCents: item.SeatPriceCents, RequirePaymentMethod: item.RequirePaymentMethod, SubscriptionRequired: item.PolarProductID != nil || item.BasePriceCents != 0 || item.SeatPriceCents != 0})
+			available = append(available, &pb.BillingPlanOption{Key: item.Key, Name: item.Name, PriceCents: item.PriceCents, PerSeat: item.PerSeat, RequirePaymentMethod: item.RequirePaymentMethod, SubscriptionRequired: item.PolarProductID != nil || item.PriceCents != 0})
 		}
 	}
 	return &pb.DescribeOrganizationBillingResponse{

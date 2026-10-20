@@ -24,8 +24,8 @@ type BillingPlan struct {
 	Category             string    `json:"category"`
 	RequirePaymentMethod bool      `json:"require_payment_method"`
 	Visibility           string    `json:"visibility"`
-	BasePriceCents       int64     `json:"base_price_cents"`
-	SeatPriceCents       int64     `json:"seat_price_cents"`
+	PriceCents           int64     `json:"price_cents"`
+	PerSeat              bool      `json:"per_seat"`
 	PolarProductID       *string   `json:"polar_product_id"`
 	SeatLimit            *int      `json:"seat_limit"`
 	ParallelTaskLimit    *int      `json:"parallel_task_limit"`
@@ -91,7 +91,7 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 		if current.Key != plan.Key {
 			return fmt.Errorf("%w: plan keys cannot change", ErrCatalogPlan)
 		}
-		if current.PolarProductID != nil && (plan.PolarProductID == nil || *current.PolarProductID != *plan.PolarProductID || current.BasePriceCents != plan.BasePriceCents || current.SeatPriceCents != plan.SeatPriceCents) {
+		if current.PolarProductID != nil && (plan.PolarProductID == nil || *current.PolarProductID != *plan.PolarProductID || current.PriceCents != plan.PriceCents || current.PerSeat != plan.PerSeat) {
 			return fmt.Errorf("%w: create a new plan and Polar product to change linked prices", ErrCatalogPlan)
 		}
 		if slices.Contains([]string{"none", "trial", "business_legacy"}, current.Key) && current.Category != plan.Category {
@@ -148,7 +148,7 @@ func validateBillingPlan(p *BillingPlan) error {
 	if !slices.Contains([]string{"none", "trial", "paid"}, p.Category) || !slices.Contains([]string{"public", "private"}, p.Visibility) {
 		return invalid("invalid category or visibility")
 	}
-	if p.BasePriceCents < 0 || p.SeatPriceCents < 0 || p.CreditAmountCents < 0 || p.TrialCreditCents < 0 || p.CreditAmountCents > math.MaxInt64/MicrosPerCent || p.TrialCreditCents > math.MaxInt64/MicrosPerCent {
+	if p.PriceCents < 0 || p.CreditAmountCents < 0 || p.TrialCreditCents < 0 || p.CreditAmountCents > math.MaxInt64/MicrosPerCent || p.TrialCreditCents > math.MaxInt64/MicrosPerCent {
 		return invalid("invalid credit or price amount")
 	}
 	if p.SeatLimit != nil && *p.SeatLimit <= 0 || p.ParallelTaskLimit != nil && *p.ParallelTaskLimit <= 0 || p.MarkupBPS != nil && *p.MarkupBPS < 0 {
@@ -169,7 +169,7 @@ func validateBillingPlan(p *BillingPlan) error {
 	if p.Key == "business_legacy" && (p.CreditFrequency != "billing_period" || p.CreditExpiration != "period_end") {
 		return invalid("legacy Business cadence and expiration are fixed")
 	}
-	if p.Key == "business_legacy" && (p.BasePriceCents != 19900 || p.SeatPriceCents != 0 || p.SeatLimit != nil || p.ParallelTaskLimit != nil) {
+	if p.Key == "business_legacy" && (p.PriceCents != 19900 || p.PerSeat || p.SeatLimit != nil || p.ParallelTaskLimit != nil) {
 		return invalid("legacy Business prices and unlimited limits are fixed")
 	}
 

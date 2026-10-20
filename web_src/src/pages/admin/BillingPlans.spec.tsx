@@ -7,7 +7,7 @@ import { BillingPlans } from "./BillingPlans";
 vi.mock("@/lib/toast", () => ({ showErrorToast: vi.fn() }));
 afterEach(() => vi.unstubAllGlobals());
 
-it("creates a paid plan with no base fee and explains deferred credit delivery", async () => {
+it("creates a per-seat paid plan and explains deferred credit delivery", async () => {
   const requests: unknown[] = [];
   vi.stubGlobal(
     "fetch",
@@ -35,6 +35,8 @@ it("creates a paid plan with no base fee and explains deferred credit delivery",
   expect(screen.getByRole("dialog", { name: "Create plan" })).toBeInTheDocument();
   await user.type(screen.getByLabelText("Key"), "payg");
   await user.type(screen.getByLabelText("Name"), "Pay as you go");
+  await user.type(screen.getByLabelText("Price (cents)", { exact: true }), "3000");
+  await user.click(screen.getByRole("switch", { name: "Per seat" }));
   await user.click(screen.getByRole("checkbox", { name: "Require payment method" }));
   await user.click(await screen.findByRole("checkbox", { name: /Bring your own API key/ }));
   expect(screen.getByText(/Other credit policies are stored for future delivery/)).toBeInTheDocument();
@@ -44,7 +46,8 @@ it("creates a paid plan with no base fee and explains deferred credit delivery",
       expect.objectContaining({
         key: "payg",
         category: "paid",
-        base_price_cents: 0,
+        price_cents: 3000,
+        per_seat: true,
         require_payment_method: true,
         features: ["byo_key"],
       }),
@@ -101,8 +104,8 @@ it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimit
     category: "paid",
     visibility: "public",
     require_payment_method: true,
-    base_price_cents: 0,
-    seat_price_cents: 500,
+    price_cents: 500,
+    per_seat: true,
     polar_product_id: "polar-starter",
     seat_limit: 10,
     parallel_task_limit: 5,
@@ -134,13 +137,12 @@ it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimit
   );
   const editButton = await screen.findByRole("button", { name: "Edit Starter" });
   const planRow = within(screen.getByRole("row", { name: /Starter/ }));
-  expect(planRow.getByText("$0.00 base")).toBeInTheDocument();
-  expect(planRow.getByText("$5.00 / seat")).toBeInTheDocument();
+  expect(planRow.getByText("$5.00 per seat")).toBeInTheDocument();
   await user.click(editButton);
   expect(screen.getByRole("dialog", { name: "Edit Starter" })).toBeInTheDocument();
   expect(screen.getByLabelText("Key", { exact: true })).toBeDisabled();
-  expect(screen.getByLabelText("Base price (cents)", { exact: true })).toBeDisabled();
-  expect(screen.getByLabelText("Seat price (cents)", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Price (cents)", { exact: true })).toBeDisabled();
+  expect(screen.getByRole("switch", { name: "Per seat" })).toBeDisabled();
   expect(screen.getByLabelText("Polar product ID", { exact: true })).toBeDisabled();
   await user.hover(screen.getByRole("button", { name: "Help for Seat limit" }));
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Leave empty for unlimited seats.");

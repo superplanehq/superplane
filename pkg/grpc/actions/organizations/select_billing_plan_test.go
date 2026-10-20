@@ -60,7 +60,7 @@ func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 	defer r.Close()
 	db := database.DB(t.Context())
 	product := "prod_selected_" + uuid.NewString()
-	plan := models.BillingPlan{Key: "paid_" + uuid.NewString()[:8], Name: "Paid", Category: "paid", Visibility: "public", BasePriceCents: 25000, PolarProductID: &product, RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
+	plan := models.BillingPlan{Key: "paid_" + uuid.NewString()[:8], Name: "Paid", Category: "paid", Visibility: "public", PriceCents: 25000, PolarProductID: &product, RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
 	checkoutCalls := 0
 	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {

@@ -100,7 +100,7 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		}
 		return &pb.CreateBusinessCheckoutResponse{CheckoutUrl: session.URL}, nil
 	}
-	if catalog.BasePriceCents != 0 || catalog.SeatPriceCents != 0 {
+	if catalog.PriceCents != 0 {
 		return nil, grpcerrors.FailedPrecondition(nil, "Checkout is not available for this plan. Contact an organization admin.")
 	}
 	if catalog.RequirePaymentMethod {

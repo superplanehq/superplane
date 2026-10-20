@@ -70,9 +70,8 @@ export function BillingPaymentSettings({
                 <div>
                   <p className="font-medium">{plan.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {formatUsdCents(Number(plan.basePriceCents ?? 0))} base price
-                    {Number(plan.seatPriceCents ?? 0) > 0 &&
-                      ` + ${formatUsdCents(Number(plan.seatPriceCents))} per seat`}
+                    {formatUsdCents(Number(plan.priceCents ?? 0))}
+                    {plan.perSeat && " per seat"}
                     {plan.requirePaymentMethod && " · Card required"}
                   </p>
                   {needsCard && <p className="text-sm">Add a payment method before selecting this plan.</p>}

@@ -5,8 +5,8 @@ export type BillingPlan = {
   category: string;
   visibility: string;
   require_payment_method: boolean;
-  base_price_cents: number;
-  seat_price_cents: number;
+  price_cents: number;
+  per_seat: boolean;
   polar_product_id: string | null;
   seat_limit: number | null;
   parallel_task_limit: number | null;

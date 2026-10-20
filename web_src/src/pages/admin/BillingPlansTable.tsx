@@ -23,10 +23,7 @@ export function BillingPlansTable({
             <TableHeader>Visibility</TableHeader>
             <TableHeader>
               Pricing{" "}
-              <BillingHelp
-                label="Pricing"
-                text="The base fee and per-seat price are in US dollars. Usage charges are separate."
-              />
+              <BillingHelp label="Pricing" text="The plan price is in US dollars. Usage charges are separate." />
             </TableHeader>
             <TableHeader>
               Limits{" "}
@@ -62,11 +59,9 @@ export function BillingPlansTable({
               </TableCell>
               <TableCell>
                 <span className="font-medium">
-                  {(plan.base_price_cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} base
+                  {(plan.price_cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                  {plan.per_seat && " per seat"}
                 </span>
-                <div className="text-xs text-muted-foreground">
-                  {(plan.seat_price_cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} / seat
-                </div>
               </TableCell>
               <TableCell>
                 <div>{plan.seat_limit ?? "Unlimited"} seats</div>

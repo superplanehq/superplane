@@ -135,8 +135,8 @@ function BillingPlanChoice({
       >
         <span className="font-medium">{plan.name}</span>
         <span>
-          {formatUsdCents(Number(plan.basePriceCents ?? 0))} base price
-          {Number(plan.seatPriceCents ?? 0) > 0 && ` + ${formatUsdCents(Number(plan.seatPriceCents))} per seat`}
+          {formatUsdCents(Number(plan.priceCents ?? 0))}
+          {plan.perSeat && " per seat"}
         </span>
         <span className="text-sm text-muted-foreground">
           {plan.subscriptionRequired

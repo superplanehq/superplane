@@ -218,7 +218,7 @@ describe("OrganizationSettingsBillingPage", () => {
           organizationBilling: {
             ...defaultFactoriesFixture.organizationBilling,
             subscriptionCheckoutEnabled: false,
-            availablePlans: [{ key: "payg", name: "Pay-as-you-go", requirePaymentMethod: true, basePriceCents: "0" }],
+            availablePlans: [{ key: "payg", name: "Pay-as-you-go", requirePaymentMethod: true, priceCents: "0" }],
           },
         }}
       />,

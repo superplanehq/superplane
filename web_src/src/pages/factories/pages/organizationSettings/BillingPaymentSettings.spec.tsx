@@ -20,8 +20,8 @@ vi.mock("@/hooks/useOrganizationBilling", () => ({
       hasPaymentMethod: false,
       requirePaymentMethod: true,
       availablePlans: [
-        { key: "payg", name: "Pay-as-you-go", requirePaymentMethod: true, basePriceCents: "0" },
-        { key: "pro", name: "Pro", requirePaymentMethod: true, subscriptionRequired: true, basePriceCents: "25000" },
+        { key: "payg", name: "Pay-as-you-go", requirePaymentMethod: true, priceCents: "0" },
+        { key: "pro", name: "Pro", requirePaymentMethod: true, subscriptionRequired: true, priceCents: "25000" },
       ],
     },
     refetch: vi.fn(),

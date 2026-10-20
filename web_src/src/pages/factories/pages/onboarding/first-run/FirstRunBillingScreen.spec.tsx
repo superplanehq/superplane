@@ -51,9 +51,10 @@ beforeEach(() => {
     hasPaymentMethod: false,
     catalogKey: "trial",
     availablePlans: [
-      { key: "free", name: "Free", basePriceCents: "0" },
-      { key: "payg", name: "Pay-as-you-go", basePriceCents: "0", requirePaymentMethod: true },
-      { key: "pro", name: "Pro", basePriceCents: "2000", requirePaymentMethod: true, subscriptionRequired: true },
+      { key: "free", name: "Free", priceCents: "0" },
+      { key: "payg", name: "Pay-as-you-go", priceCents: "0", requirePaymentMethod: true },
+      { key: "team", name: "Team", priceCents: "3000", perSeat: true, subscriptionRequired: true },
+      { key: "pro", name: "Pro", priceCents: "2000", requirePaymentMethod: true, subscriptionRequired: true },
     ],
   };
   describeBilling.mockClear();
@@ -165,4 +166,11 @@ it("waits for a returning subscription without creating another checkout", async
   expect(await screen.findByRole("alert")).toHaveTextContent("The plan is not active yet.");
   expect(selectPlan).not.toHaveBeenCalled();
   expect(finish).not.toHaveBeenCalled();
+});
+
+it("shows one plan price with a per-seat suffix only for seat pricing", async () => {
+  renderBilling();
+  expect(await screen.findByRole("button", { name: /Team/ })).toHaveTextContent("$30.00 per seat");
+  expect(screen.getByRole("button", { name: /Pro/ })).toHaveTextContent("$20.00");
+  expect(screen.queryByText(/base price/)).not.toBeInTheDocument();
 });

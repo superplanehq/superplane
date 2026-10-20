@@ -880,8 +880,8 @@ message DescribeOrganizationBillingResponse {
 message BillingPlanOption {
  string key = 1;
  string name = 2;
- int64 base_price_cents = 3;
- int64 seat_price_cents = 4;
+ int64 price_cents = 3;
+ bool per_seat = 4;
  bool require_payment_method = 5;
  bool subscription_required = 6;
 }
