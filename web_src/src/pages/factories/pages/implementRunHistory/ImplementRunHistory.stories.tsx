@@ -302,7 +302,17 @@ export const LoadingRunnerLogs: Story = {
   parameters: {
     msw: {
       handlers: [
-        http.get(`${api}/runner-logs`, async () => {
+        http.get(
+          `${api}/runner-logs`,
+          () =>
+            new HttpResponse(null, {
+              headers: {
+                "X-SuperPlane-Log-State": "archived",
+                "X-SuperPlane-Log-URL": `${api}/archived-runner-logs`,
+              },
+            }),
+        ),
+        http.get(`${api}/archived-runner-logs`, async () => {
           await delay(2500);
           return new HttpResponse('{"type":"line","text":"Archived runner output loaded."}\n', {
             headers: { "Content-Type": "application/x-ndjson", "X-SuperPlane-Log-State": "archived" },
