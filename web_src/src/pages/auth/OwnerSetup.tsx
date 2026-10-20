@@ -3,11 +3,9 @@ import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/Fleet
 import { Button } from "@/components/ui/button";
 import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
-import { posthog, isPostHogEnabled } from "@/posthog";
 import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import type { FirstRunChrome } from "@/pages/factories/pages/onboarding/first-run/firstRunTypes";
 import type { FirstRunSphereProps } from "@/pages/factories/pages/onboarding/first-run/FirstRunSpherePane";
-import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { FleetManagerStep } from "./ownerSetup/FleetManagerStep";
 import { LicenseStep } from "./ownerSetup/LicenseStep";
 import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
@@ -18,7 +16,6 @@ import { useOwnerAccountForm } from "./ownerSetup/useOwnerAccountForm";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
-const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
 const OWNER_SETUP_STEPS = 8;
 const OWNER_SETUP_PREVIEW: FirstRunSphereProps = {
   level: 0,
@@ -30,7 +27,7 @@ const OWNER_SETUP_PREVIEW: FirstRunSphereProps = {
   },
 };
 
-type OwnerSetupStep = "owner" | "license" | "smtp" | "fleet-intro" | `fleet-${FleetManagerWizardStep}` | "survey";
+type OwnerSetupStep = "owner" | "license" | "smtp" | "fleet-intro" | `fleet-${FleetManagerWizardStep}`;
 
 const RESUMABLE_STEPS: OwnerSetupStep[] = [
   "license",
@@ -128,8 +125,8 @@ async function resolveOwnerSetupEntry(): Promise<OwnerSetupEntry> {
 }
 
 // Forward and back save the new step so a refresh resumes the same page.
-// Clearing the step closes the wizard; the survey and the organization
-// landing are not resumable setup pages.
+// Clearing the step closes the wizard. The organization landing is not a
+// resumable setup page.
 async function persistSetupProgress(step: string): Promise<boolean> {
   try {
     const response = await fetch("/api/v1/setup-owner/progress", {
@@ -242,33 +239,6 @@ function OwnerFleetSetupSteps({
   );
 }
 
-function continueAfterOwnerSetup(args: {
-  orgSlug: string;
-  setActiveSurvey: (survey: PostHogSurvey | null) => void;
-  setStep: (step: OwnerSetupStep) => void;
-}) {
-  if (!isPostHogEnabled()) {
-    window.location.href = newOrganizationLandingPath(args.orgSlug);
-    return;
-  }
-
-  posthog.getActiveMatchingSurveys((surveys) => {
-    const usableSurveys = (surveys as PostHogSurvey[]).filter(
-      (survey) => Array.isArray(survey.questions) && survey.questions.length > 0,
-    );
-
-    const selectedSurvey = usableSurveys.find((survey) => survey.name === OWNER_SETUP_SURVEY_NAME) ?? usableSurveys[0];
-
-    if (!selectedSurvey) {
-      window.location.href = newOrganizationLandingPath(args.orgSlug);
-      return;
-    }
-
-    args.setActiveSurvey(selectedSurvey);
-    args.setStep("survey");
-  });
-}
-
 interface OwnerSetupEntryActions {
   setEmail: (email: string) => void;
   setPendingOrganizationSlug: (slug: string | null) => void;
@@ -297,8 +267,6 @@ function ownerSetupChrome(args: {
   email: string;
   goToStep: (step: OwnerSetupStep) => void;
 }): FirstRunChrome | undefined {
-  if (args.step === "survey") return undefined;
-
   const afterOwner = args.step !== "owner";
   const backTarget = ownerSetupBackTarget(args.step);
 
@@ -315,7 +283,6 @@ const OwnerSetup: React.FC = () => {
   const [phase, setPhase] = useState<"loading" | "ready">("loading");
   const [step, setStep] = useState<OwnerSetupStep>("owner");
   const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
-  const [activeSurvey, setActiveSurvey] = useState<PostHogSurvey | null>(null);
   const activeFleetStep = fleetWizardStep(step);
   const fleetSetup = useFleetManagerSetup(
     activeFleetStep !== null,
@@ -325,7 +292,9 @@ const OwnerSetup: React.FC = () => {
   const { closeError, isClosing, finishInstallation } = useFinishInstallation({
     organizationSlug: pendingOrganizationSlug,
     saveSetupProgress,
-    onClosed: (orgSlug) => continueAfterOwnerSetup({ orgSlug, setActiveSurvey, setStep }),
+    onClosed: (orgSlug) => {
+      window.location.href = newOrganizationLandingPath(orgSlug);
+    },
   });
 
   useReportPageReady(true);
@@ -427,10 +396,6 @@ const OwnerSetup: React.FC = () => {
         finishInstallation={finishInstallation}
         setStep={goToStep}
       />
-
-      {step === "survey" && activeSurvey && pendingOrganizationSlug && (
-        <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationSlug)} />
-      )}
     </FirstRunShell>
   );
 };

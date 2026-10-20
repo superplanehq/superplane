@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -28,6 +29,7 @@ func UpdateFactoryOnboarding(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
+	wasComplete := factory.IsOnboardingComplete()
 
 	patch, err := factoryOnboardingPatchFromRequest(req)
 	if err != nil {
@@ -57,6 +59,23 @@ func UpdateFactoryOnboarding(
 
 	if err := ensureFactoryMergeabilityWebhook(ctx, db, deps, factory); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+
+	if !wasComplete && factory.IsOnboardingComplete() {
+		config := factory.OnboardingConfigValue()
+		captureFactoryProductEvent(
+			ctx,
+			db,
+			factory,
+			uuid.Nil,
+			productanalytics.EventFactoryOnboardingCompleted,
+			productanalytics.StableEventID(productanalytics.EventFactoryOnboardingCompleted, factory.ID.String()),
+			productanalytics.Properties{
+				"vcs_provider":  config.EffectiveVCSProvider(),
+				"issues_source": config.IssuesSource,
+				"agent_harness": config.AgentHarness,
+			},
+		)
 	}
 
 	lines, err := factory.ListLines(db)

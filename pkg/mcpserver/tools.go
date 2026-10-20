@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/grpc/codes"
 )
@@ -689,6 +690,7 @@ func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope st
 
 func toolContext(ctx context.Context, claims *AccessClaims) context.Context {
 	ctx = authentication.SetUserIdInMetadata(ctx, claims.UserID.String())
+	ctx = productanalytics.WithSource(ctx, productanalytics.SourceMCP)
 	return context.WithValue(ctx, authorization.OrganizationContextKey, claims.OrgID.String())
 }
 
