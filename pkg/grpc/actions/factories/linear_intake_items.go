@@ -35,19 +35,38 @@ func newLinearIntakeItemSource(
 }
 
 func (s *linearIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
-	issues, err := s.linear.SearchOpenProjectIssues(s.projectIDs, query, limit)
+	issues, err := s.linear.SearchProjectIssues(s.projectIDs, query, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	items := make([]IntakeItem, 0, len(issues))
-	for _, issue := range issues {
-		if !linearIssueMatchesLabels(issue, s.labels) || !s.ownsIssue(issue) {
+	for _, result := range issues {
+		reason := s.issueDisabledReason(result.Issue)
+		if reason != "" && !result.ExactMatch {
 			continue
 		}
-		items = append(items, linearIssueItem(issue))
+		item := linearIssueItem(result.Issue)
+		item.DisabledReason = reason
+		items = append(items, item)
 	}
 	return items, nil
+}
+
+func (s *linearIntakeItemSource) issueDisabledReason(issue linear.Issue) string {
+	reasons := []string{}
+	if issue.Project == nil {
+		reasons = append(reasons, "This issue has no project.")
+	} else if !s.ownsIssue(issue) {
+		reasons = append(reasons, "This issue is not in the selected projects.")
+	}
+	if issue.State != nil && (issue.State.Type == "completed" || issue.State.Type == "canceled") {
+		reasons = append(reasons, "This issue is closed or canceled.")
+	}
+	if !linearIssueMatchesLabels(issue, s.labels) {
+		reasons = append(reasons, "This issue has no matching intake labels.")
+	}
+	return strings.Join(reasons, " ")
 }
 
 func (s *linearIntakeItemSource) IssueFiles(ctx context.Context, issueID, description string) ([]linear.IssueFile, []linear.IssueLink, error) {
@@ -61,7 +80,7 @@ func (s *linearIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem,
 	}
 
 	issue, err := s.linear.GetIssue(issueID)
-	if err != nil || issue == nil || !s.ownsIssue(*issue) {
+	if err != nil || issue == nil || s.issueDisabledReason(*issue) != "" {
 		return nil, errIntakeItemNotFound
 	}
 

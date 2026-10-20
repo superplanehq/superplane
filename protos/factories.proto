@@ -1746,6 +1746,8 @@ message FactoryIntakeItem {
   string body = 4;
   string url = 5;
   google.protobuf.Timestamp created_at = 6;
+  // Nonempty when an exact search match cannot be imported by this intake.
+  string disabled_reason = 7;
 }
 
 message SearchFactoryIntakeItemsRequest {
