@@ -158,7 +158,7 @@ describe("MergeConfidenceConfigModal", () => {
     expect(Boolean(screen.queryByRole("region", { name: "Steps" }))).toBe(!enabled);
     expect(Boolean(screen.queryByRole("button", { name: "Collapse step" }))).toBe(!enabled);
     expect(screen.getByDisplayValue("sonnet")).toBeInTheDocument();
-    const concurrency = screen.getByRole("spinbutton", { name: enabled ? "Parallel runs" : "Concurrency" });
+    const concurrency = screen.getByRole("spinbutton", { name: enabled ? "Maximum simultaneous runs" : "Concurrency" });
     expect(concurrency).toHaveValue(5);
     await user.clear(concurrency);
     await user.type(concurrency, "3");
