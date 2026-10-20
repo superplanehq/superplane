@@ -11,6 +11,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -124,6 +125,17 @@ func UpdateWorkOrderStatus(
 		}
 		if err := notification.Publish(); err != nil {
 			log.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+		}
+		if eventName, properties, ok := factoryCloseEvent(result); ok {
+			captureFactoryProductEvent(
+				ctx,
+				db,
+				factory,
+				order.ID,
+				eventName,
+				productanalytics.StableEventID(eventName, order.ID.String(), result),
+				properties,
+			)
 		}
 	}
 

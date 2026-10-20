@@ -44,6 +44,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/public"
 	"github.com/superplanehq/superplane/pkg/public/runnerapi"
 	registry "github.com/superplanehq/superplane/pkg/registry"
@@ -528,6 +529,7 @@ func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLog
 	case <-signals:
 		stopNotifications()
 		shutdownRunnerAPI(server)
+		closeProductAnalytics()
 		os.Exit(0)
 	}
 }
@@ -554,6 +556,7 @@ func registerRunnerAPI(
 		<-signals
 		stopNotifications()
 		shutdownRunnerAPI(server)
+		closeProductAnalytics()
 		os.Exit(0)
 	}()
 }
@@ -740,6 +743,7 @@ func Start() {
 	configureLogging()
 	setupOtel()
 	startPprofServer()
+	initializeProductAnalytics()
 
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
@@ -923,6 +927,21 @@ func Start() {
 	log.Println("SuperPlane is UP.")
 
 	select {}
+}
+
+func initializeProductAnalytics() {
+	client, err := productanalytics.New(os.Getenv("POSTHOG_KEY"))
+	if err != nil {
+		log.WithError(err).Warn("Failed to initialize product analytics")
+		return
+	}
+	productanalytics.SetCurrent(client)
+}
+
+func closeProductAnalytics() {
+	if err := productanalytics.CloseCurrent(); err != nil {
+		log.WithError(err).Warn("Failed to flush product analytics")
+	}
 }
 
 func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {

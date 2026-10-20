@@ -44,7 +44,7 @@ describe("useSendAgentChatMessage", () => {
       pageParams: [""],
     });
 
-    const { result } = renderHook(() => useSendAgentChatMessage("org-1", "canvas-1"), {
+    const { result } = renderHook(() => useSendAgentChatMessage("org-1"), {
       wrapper: wrapper(queryClient),
     });
 
@@ -107,7 +107,7 @@ describe("useSendAgentChatMessage", () => {
       pageParams: [""],
     });
 
-    const { result } = renderHook(() => useSendAgentChatMessage("org-1", "canvas-1"), {
+    const { result } = renderHook(() => useSendAgentChatMessage("org-1"), {
       wrapper: wrapper(queryClient),
     });
 

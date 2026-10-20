@@ -26,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -2242,6 +2243,131 @@ func onWorkOrderEventWorkOrder(t *testing.T, event models.CanvasEvent) map[strin
 	workOrder, ok := data["workOrder"].(map[string]any)
 	require.True(t, ok, "workOrder payload: %s", raw)
 	return workOrder
+}
+
+func TestFactoryContext_ProductAnalytics(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+
+	t.Run("automation creation uses a system identity", func(t *testing.T) {
+		events := []productanalytics.Event{}
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).WithProductAnalytics(func(event productanalytics.Event) {
+			events = append(events, event)
+		})
+		_, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+			Title:       "From automation",
+			Description: "Do not send this prompt",
+		})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.Len(t, events, 1)
+		assert.Equal(t, productanalytics.EventFactoryTaskCreated, events[0].Name)
+		assert.Equal(t, "automation", events[0].Properties["creation_source"])
+		assert.Equal(t, productanalytics.ActorSystem, events[0].ActorType)
+		assert.Equal(t, productanalytics.SourceAutomation, events[0].Source)
+		assert.NotEqual(t, r.Account.ID.String(), events[0].DistinctID)
+		encoded, err := json.Marshal(events[0])
+		require.NoError(t, err)
+		assert.NotContains(t, string(encoded), "From automation")
+		assert.NotContains(t, string(encoded), "Do not send this prompt")
+	})
+
+	t.Run("failed creation emits nothing", func(t *testing.T) {
+		events := []productanalytics.Event{}
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).WithProductAnalytics(func(event productanalytics.Event) {
+			events = append(events, event)
+		})
+		_, _, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "   "})
+		require.Error(t, err)
+		assert.Empty(t, events)
+	})
+
+	t.Run("issue intake uses import source without the ticket url", func(t *testing.T) {
+		intakeFactory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		intakeCanvas, intakeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, intakeFactory.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"html_url": "https://github.com/acme/payments/issues/12",
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = intakeFactory.CreateIntake(database.Conn(), intakeCanvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		events := []productanalytics.Event{}
+		ctx := NewFactoryContext(database.Conn(), intakeCanvas, intakeExecution).WithProductAnalytics(func(event productanalytics.Event) {
+			events = append(events, event)
+		})
+		created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+		require.True(t, inserted)
+		require.Len(t, events, 1)
+		assert.Equal(t, "issue_import", events[0].Properties["creation_source"])
+		assert.Equal(t, models.FactoryIntakeSourceGitHubIssues, events[0].Properties["issue_source"])
+		encoded, err := json.Marshal(events[0])
+		require.NoError(t, err)
+		assert.NotContains(t, string(encoded), "https://github.com/acme/payments/issues/12")
+		assert.NotEmpty(t, created.ID)
+
+		duplicateCanvas, duplicateExecution, _ := setupFactoryAppExecutionWithPayload(t, r, intakeFactory.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"html_url": "https://github.com/acme/payments/issues/12",
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = intakeFactory.CreateIntake(database.Conn(), duplicateCanvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		events = nil
+		_, inserted, err = NewFactoryContext(database.Conn(), duplicateCanvas, duplicateExecution).
+			WithProductAnalytics(func(event productanalytics.Event) {
+				events = append(events, event)
+			}).
+			CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+		assert.False(t, inserted)
+		assert.Empty(t, events)
+	})
+
+	t.Run("same status emits nothing and archive uses the system identity", func(t *testing.T) {
+		order, created, err := NewFactoryContext(database.Conn(), canvas, nodeExecution).CreateWorkOrder(core.WorkOrderParams{Title: "Archive later"})
+		require.NoError(t, err)
+		require.True(t, created)
+
+		events := []productanalytics.Event{}
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).WithProductAnalytics(func(event productanalytics.Event) {
+			events = append(events, event)
+		})
+		_, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+			OrderID: order.ID,
+			State:   models.FactoryWorkOrderStateDraft,
+		})
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Empty(t, events)
+
+		_, changed, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+			OrderID: order.ID,
+			State:   models.FactoryWorkOrderStateClosed,
+			Result:  models.FactoryWorkOrderResultArchived,
+		})
+		require.NoError(t, err)
+		require.True(t, changed)
+		require.Len(t, events, 1)
+		assert.Equal(t, productanalytics.EventFactoryTaskArchived, events[0].Name)
+		assert.Equal(t, "automation", events[0].Properties["archive_source"])
+		assert.Equal(t, productanalytics.ActorSystem, events[0].ActorType)
+		assert.NotEqual(t, r.Account.ID.String(), events[0].DistinctID)
+	})
 }
 
 func setupFactoryAppExecution(

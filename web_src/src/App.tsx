@@ -30,7 +30,7 @@ import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
-import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
+import WelcomeRedirect from "./pages/auth/WelcomeRedirect";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
   AutomationsPage,
@@ -267,7 +267,7 @@ function AppRouter() {
             <Routes>
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Login mode="signup" />} />
-              <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
+              <Route path="welcome" element={withAuthOnly(WelcomeRedirect)} />
               <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>

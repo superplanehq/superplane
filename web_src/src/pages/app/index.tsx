@@ -55,7 +55,6 @@ import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
-import { analytics } from "@/lib/analytics";
 import { appPath } from "@/lib/appPaths";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -178,7 +177,6 @@ import {
   clearRunDetailNodeSearchParams,
   buildCanvasLogEntries,
   getCanvasLogNodesSignature,
-  getNodeAnalyticsProps,
   getRunningRunsCount,
   isCanvasLoadNotFoundError,
   isCanvasPrepLoading,
@@ -725,7 +723,6 @@ export function AppPage({
   const canvasContentVersionIdRef = useRef<string>("");
   const queuedCanvasSaveRef = useRef<QueuedCanvasSaveRequest | null>(null);
   const isDrainingCanvasSaveQueueRef = useRef(false);
-  const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const consoleMutationGenerationRef = useRef(0);
   const handleRemoteStagingUpdatedRef = useRef<() => Promise<void>>(async () => {});
@@ -822,12 +819,6 @@ export function AppPage({
       navigate(`/${organizationId}`, { replace: true });
     }
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
-  useEffect(() => {
-    if (hasTrackedCanvasView.current) return;
-    if (!canvas || !canvasId || !organizationId || canvasLoading) return;
-    hasTrackedCanvasView.current = true;
-    analytics.canvasView(canvasId, canvas.spec?.nodes?.length ?? 0, canvas.spec?.edges?.length ?? 0, organizationId);
-  }, [canvas, canvasId, organizationId, canvasLoading]);
   // Initialize store from workflow.status on workflow load.
   // On canvas switch with cached data, the store initializes immediately from the
   // cache (no loading gap) and then re-initializes once when the background refetch
@@ -875,7 +866,6 @@ export function AppPage({
       });
     }
 
-    hasTrackedCanvasView.current = false;
     setActiveCanvasVersion(null);
     hasSyncedVersionFromURLRef.current = false;
     setLastSavedWorkflowSnapshot(null);
@@ -1673,18 +1663,6 @@ export function AppPage({
     setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "live", tab: "latest" });
   }, []);
 
-  const handleRunItemOpen = useCallback(
-    (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => {
-      const node = nodeId ? canvas?.spec?.nodes?.find((n) => n.id === nodeId) : undefined;
-      const { nodeRef } = node ? getNodeAnalyticsProps(node, availableIntegrations) : { nodeRef: undefined };
-      analytics.canvasRunItemOpen(nodeRef, executionStatus, organizationId ?? "");
-      if (errorMessage) {
-        analytics.canvasComponentError(nodeRef, errorMessage, organizationId ?? "");
-      }
-    },
-    [canvas, availableIntegrations, organizationId],
-  );
-
   const { resyncStagedEditorState } = useCanvasStagingResync({
     organizationId,
     canvasId,
@@ -2196,15 +2174,6 @@ export function AppPage({
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      const configuringNode = canvasNodesById.get(nodeId);
-      if (configuringNode) {
-        const fieldCount = Object.values(updatedConfiguration).filter(
-          (v) => v !== null && v !== undefined && v !== "",
-        ).length;
-        const { nodeType, integration } = getNodeAnalyticsProps(configuringNode, availableIntegrations);
-        analytics.nodeConfigure(nodeType, integration, fieldCount, organizationId);
-      }
-
       // Save snapshot before making changes
 
       // Update the node's configuration, name, and app installation ref in local cache only
@@ -2256,14 +2225,12 @@ export function AppPage({
     [
       canvas,
       canvasNodes,
-      canvasNodesById,
       organizationId,
       canvasId,
       activeCanvasVersionId,
       handleSaveWorkflow,
       isReadOnly,
       applyLocalWorkflowUpdate,
-      availableIntegrations,
     ],
   );
   const debouncedAnnotationAutoSave = useMemo(
@@ -2552,9 +2519,6 @@ export function AppPage({
           newNode.component = buildingBlock.name;
         }
 
-        const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(newNode, availableIntegrations);
-        analytics.nodeAdd(nodeType, integration, nodeRef, organizationId);
-
         const newEdges: ComponentsEdge[] = sourceConnection
           ? [
               {
@@ -2571,7 +2535,7 @@ export function AppPage({
       });
       return newNodeId;
     },
-    [canvas, organizationId, canvasId, availableIntegrations, commitTopologyMutation],
+    [canvas, organizationId, canvasId, commitTopologyMutation],
   );
 
   const handlePlaceholderAdd = useCallback(
@@ -2694,7 +2658,6 @@ export function AppPage({
         channel: sourceHandle || "default",
       };
 
-      analytics.edgeCreate(organizationId);
       await commitTopologyMutation((workflow) => appendWorkflowFragment(workflow, [], [newEdge]));
     },
     [canvas, organizationId, canvasId, commitTopologyMutation],
@@ -2705,32 +2668,18 @@ export function AppPage({
 
       // Save snapshot before making changes
 
-      const specNodes = canvas.spec?.nodes || [];
-      const nodeBeingDeleted = specNodes.find((n) => n.id === nodeId);
-      if (nodeBeingDeleted) {
-        const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(nodeBeingDeleted, availableIntegrations);
-        analytics.nodeRemove(nodeType, integration, nodeRef, organizationId);
-      }
-
       await commitTopologyMutation((workflow) => removeWorkflowNodes(workflow, new Set([nodeId])));
     },
-    [canvas, organizationId, canvasId, availableIntegrations, commitTopologyMutation],
+    [canvas, organizationId, canvasId, commitTopologyMutation],
   );
   const handleNodesDelete = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
       const nodeIdSet = new Set(nodeIds);
-      const specNodes = canvas.spec?.nodes || [];
-      specNodes
-        .filter((n) => nodeIds.includes(n.id || ""))
-        .forEach((node) => {
-          const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(node, availableIntegrations);
-          analytics.nodeRemove(nodeType, integration, nodeRef, organizationId);
-        });
       await commitTopologyMutation((workflow) => removeWorkflowNodes(workflow, nodeIdSet));
     },
-    [canvas, organizationId, canvasId, availableIntegrations, commitTopologyMutation],
+    [canvas, organizationId, canvasId, commitTopologyMutation],
   );
   const handleAutoLayoutNodes = useCallback(
     async (nodeIds: string[]) => {
@@ -2742,8 +2691,6 @@ export function AppPage({
         components,
         direction: resolveCanvasFlowDirection(canvas.metadata?.factoryId),
       });
-
-      analytics.autoLayout(updatedWorkflow.spec?.nodes?.length ?? 0, organizationId);
 
       applyLocalWorkflowUpdate(updatedWorkflow);
 
@@ -2788,7 +2735,6 @@ export function AppPage({
         };
       });
 
-      analytics.edgeRemove(organizationId);
       await commitTopologyMutation((workflow) => removeWorkflowEdges(workflow, edgesToRemove));
     },
     [canvas, organizationId, canvasId, commitTopologyMutation],
@@ -2886,18 +2832,12 @@ export function AppPage({
             },
           }),
         );
-
-        const node = canvasNodesById.get(nodeId);
-        if (node && organizationId) {
-          const { nodeType, integration } = getNodeAnalyticsProps(node, availableIntegrations);
-          analytics.eventEmit(nodeType, integration, organizationId);
-        }
       } catch (error) {
         showErrorToast("Failed to re-emit event");
         throw error;
       }
     },
-    [canvasId, canvasNodesById, availableIntegrations, organizationId],
+    [canvasId],
   );
 
   const handleNodeDuplicate = useCallback(
@@ -3928,7 +3868,6 @@ export function AppPage({
           getHasMoreQueue={getHasMoreQueue}
           getLoadingMoreQueue={getLoadingMoreQueue}
           onReEmit={canUpdateCanvas && showLiveActivity ? handleReEmit : undefined}
-          onRunItemOpen={showLiveActivity ? handleRunItemOpen : undefined}
           resolveRunIdForSidebarEvent={liveSidebarRunLookupEnabled ? resolveRunIdForSidebarEvent : undefined}
           fetchRunIdForSidebarEvent={runLookupEnabled ? fetchRunIdForSidebarEvent : undefined}
           onSelectRunFromSidebarEvent={runLookupEnabled ? handleSelectRunFromSidebarEvent : undefined}

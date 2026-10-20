@@ -5,7 +5,6 @@ import type {
   CanvasesCanvasNodeQueueItem,
   ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
-  IntegrationsIntegrationDefinition,
   ActionsAction,
   SuperplaneMeUser,
   TriggersTrigger,
@@ -16,7 +15,6 @@ import type { LogEntry } from "@/ui/CanvasLogSidebar";
 import { getColorClass } from "@/lib/colors";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
 import { prepareComponentNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
-import { getNodeIntegrationName } from "./lib/node-integrations";
 import type { TriggerActionModal, User } from "./mappers/types";
 import {
   buildUserInfo,
@@ -39,17 +37,6 @@ type InfiniteCanvasRunsData = {
 export function getRunningRunsCount(data: InfiniteCanvasRunsData | undefined, visible: boolean): number {
   if (!visible) return 0;
   return data?.pages?.[0]?.totalCount ?? 0;
-}
-
-export function getNodeAnalyticsProps(
-  node: ComponentsNode,
-  availableIntegrations: IntegrationsIntegrationDefinition[],
-): { nodeType: string; integration: string | undefined; nodeRef: string | undefined } {
-  return {
-    nodeType: node.type === "TYPE_TRIGGER" ? "trigger" : node.type === "TYPE_WIDGET" ? "annotation" : "action",
-    integration: getNodeIntegrationName(node, availableIntegrations),
-    nodeRef: node.component,
-  };
 }
 
 export function getCanvasLogNodesSignature(nodes: ComponentsNode[]): string {

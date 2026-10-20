@@ -21,7 +21,6 @@ import {
   type AgentMessage,
   type AgentOutgoingImage,
 } from "@/components/CanvasToolSidebar/types";
-import { analytics } from "@/lib/analytics";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 export const agentChatKeys = {
@@ -92,7 +91,7 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
   });
 }
 
-export function useSendAgentChatMessage(organizationId: string | undefined, canvasId: string | undefined) {
+export function useSendAgentChatMessage(organizationId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -121,7 +120,6 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
       return fromApiMessage(response.data?.message, chatId, organizationId);
     },
     onMutate: ({ chatId, content, images }) => {
-      const submittedAt = Date.now();
       const optimisticMessage: AgentMessage = {
         id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         role: "user",
@@ -136,18 +134,9 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
         createdAt: new Date().toISOString(),
       };
       upsertAgentMessageInCache(queryClient, chatId, optimisticMessage);
-      analytics.agentMessageSendSubmitted(chatId, canvasId, organizationId);
-      return { optimisticMessageId: optimisticMessage.id, submittedAt };
+      return { optimisticMessageId: optimisticMessage.id };
     },
     onSuccess: (data, variables, context) => {
-      if (context?.submittedAt) {
-        analytics.agentMessageSendAcknowledged(
-          variables.chatId,
-          canvasId,
-          organizationId,
-          Date.now() - context.submittedAt,
-        );
-      }
       if (!data) {
         if (context?.optimisticMessageId) {
           removeAgentMessageFromCache(queryClient, variables.chatId, context.optimisticMessageId);
@@ -168,9 +157,6 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
     onError: (_error, variables, context) => {
       if (context?.optimisticMessageId) {
         removeAgentMessageFromCache(queryClient, variables.chatId, context.optimisticMessageId);
-      }
-      if (context?.submittedAt) {
-        analytics.agentMessageSendFailed(variables.chatId, canvasId, organizationId, Date.now() - context.submittedAt);
       }
     },
   });

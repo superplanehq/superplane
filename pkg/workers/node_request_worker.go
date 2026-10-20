@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -159,13 +160,17 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 	onFileBindCleanup := func(job contexts.FileBindCleanup) {
 		pendingFileBindCleanups = append(pendingFileBindCleanups, job)
 	}
+	pendingProductAnalytics := []productanalytics.Event{}
+	onProductAnalytics := func(event productanalytics.Event) {
+		pendingProductAnalytics = append(pendingProductAnalytics, event)
+	}
 
 	runCancellations := &RunCancellationNotifier{}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err == nil {
-			return w.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup)
+			return w.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
 		}
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -184,6 +189,9 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 	}
 
 	contexts.ApplyFileBindCleanups(pendingFileBindCleanups, nil)
+	for _, event := range pendingProductAnalytics {
+		productanalytics.Capture(event)
+	}
 
 	for _, event := range newEvents {
 		messages.PublishCanvasEventCreatedMessage(&event)
@@ -244,10 +252,11 @@ func (w *NodeRequestWorker) processRequest(
 	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
+	onProductAnalytics func(productanalytics.Event),
 ) error {
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
-		return w.invokeHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup)
+		return w.invokeHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
 	}
 
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
@@ -262,12 +271,13 @@ func (w *NodeRequestWorker) invokeHook(
 	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
+	onProductAnalytics func(productanalytics.Event),
 ) error {
 	if request.ExecutionID == nil {
 		return w.invokeNodeHook(logger, tx, request, onNewEvents)
 	}
 
-	return w.invokeComponentHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup)
+	return w.invokeComponentHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
 }
 
 func (w *NodeRequestWorker) invokeNodeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
@@ -447,6 +457,7 @@ func (w *NodeRequestWorker) invokeComponentHook(
 	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
+	onProductAnalytics func(productanalytics.Event),
 ) error {
 	if request.ExecutionID == nil {
 		return fmt.Errorf("execution id is required for component hook")
@@ -462,7 +473,7 @@ func (w *NodeRequestWorker) invokeComponentHook(
 		return request.Complete(tx)
 	}
 
-	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup)
+	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
 }
 
 func (w *NodeRequestWorker) invokeExecutionComponentHook(
@@ -475,6 +486,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
+	onProductAnalytics func(productanalytics.Event),
 ) error {
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
@@ -532,6 +544,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
+			WithProductAnalytics(onProductAnalytics).
 			WithRemoteImageIngest(w.encryptor, w.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),

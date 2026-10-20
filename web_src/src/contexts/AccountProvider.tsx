@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { posthog } from "@/posthog";
 import { consumePendingSignupAnalyticsPreference, hasConfirmedSignupAnalyticsPreference } from "@/lib/signupAnalytics";
+import { getUtmEventProperties } from "@/lib/utmAttribution";
 import { trackGoogleSignup } from "@/lib/googleTagManager";
 
 import { AccountContext, type AccountContextType } from "./accountContextState";
@@ -95,15 +96,21 @@ function identifySignedInAccount(accountData: SignedInAccount) {
 
   posthog.identify(accountData.id, accountProperties);
 
-  if (signupPreference) {
-    posthog.capture("auth:signup", {
-      product_updates_opt_in: signupPreference.productUpdatesOptIn,
-      $set: {
+  if (signupPreference || signupResult === "created") {
+    const signupProperties: Record<string, unknown> = {
+      ...getUtmEventProperties(),
+    };
+    if (signupPreference) {
+      signupProperties.product_updates_opt_in = signupPreference.productUpdatesOptIn;
+      signupProperties.$set = {
         product_updates_opt_in: signupPreference.productUpdatesOptIn,
-      },
-    });
-  } else if (signupResult === "created") {
-    posthog.capture("auth:signup");
+      };
+    }
+    if (Object.keys(signupProperties).length === 0) {
+      posthog.capture("user_signed_up");
+    } else {
+      posthog.capture("user_signed_up", signupProperties);
+    }
   }
 
   if (signupResult) {
