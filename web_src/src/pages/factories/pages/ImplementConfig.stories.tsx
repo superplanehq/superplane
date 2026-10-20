@@ -5,6 +5,8 @@ import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import type { IntegrationsCapabilityDefinition, SuperplaneComponentsNode } from "@/api-client";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
+import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
+import { storybookSelectableLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
@@ -17,7 +19,25 @@ const organizationId = "implement-config-org";
 const factoryId = "implement-config-workspace";
 const canvasId = "implement-config";
 const features = [FEATURE_FACTORY_RUN_HISTORY];
-const action = { name: "runnerClaudeCode", label: "Run Claude Code", configuration: PLANNING_REVIEW_RUNNER_FIELDS };
+const action = {
+  name: "runnerSuperPlane",
+  label: "Run SuperPlane Agent",
+  configuration: PLANNING_REVIEW_RUNNER_FIELDS.filter((field) => field.name !== "credentials").map((field) =>
+    field.name === "model"
+      ? { ...field, type: "hosted-model", typeOptions: { hostedModel: { provider: HOSTED_MODEL_ALL_PROVIDERS } } }
+      : field,
+  ),
+};
+const models = [
+  ...storybookSelectableLlmModels(),
+  {
+    source: { id: "hosted", name: "SuperPlane" },
+    provider: { id: "openrouter", name: "OpenRouter" },
+    model: { id: "x-ai/grok-4.7", name: "x-ai/grok-4.7" },
+    key: "hosted::openrouter::x-ai/grok-4.7",
+    label: "x-ai/grok-4.7",
+  },
+];
 const pullRequestAction: IntegrationsCapabilityDefinition = {
   name: "github.createPullRequest",
   label: "Create Pull Request",
@@ -40,7 +60,11 @@ const handlers = [
     HttpResponse.json({ features: features.map((id) => ({ id, label: id, released: false })) }),
   ),
   http.get("/api/v1/actions", () => HttpResponse.json({ actions: [action] })),
-  http.get("/api/v1/actions/runnerClaudeCode", () => HttpResponse.json({ action })),
+  http.get(`/api/v1/actions/${action.name}`, () => HttpResponse.json({ action })),
+  http.get(`/api/v1/organizations/${organizationId}/selectable-llm-models`, () => HttpResponse.json({ models })),
+  http.get(`/api/v1/organizations/${organizationId}/workspace-usage`, () =>
+    HttpResponse.json({ defaultHostedProvider: "openrouter", defaultHostedModel: "x-ai/grok-4.7" }),
+  ),
   http.get("/api/v1/triggers", () => HttpResponse.json({ triggers: [{ name: "onRun", label: "On Run" }] })),
   http.get("/api/v1/widgets", () => HttpResponse.json({ widgets: [] })),
   http.get("/api/v1/integrations", () =>
@@ -67,14 +91,15 @@ function ImplementConfigPreview({
   executionTimeoutSeconds?: number;
 }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  const { credentials: _credentials, ...agentConfiguration } = PLANNING_REVIEW_DRAFT.components[0].configuration;
   const [specNodes, setSpecNodes] = useState<SuperplaneComponentsNode[]>(() => [
     { id: "onrun-implement", name: "Start implementation", type: "TYPE_TRIGGER", component: "onRun" },
     {
       id: IMPLEMENT_AGENT_NODE_ID,
       name: "Implement From Task Description",
       type: "TYPE_ACTION",
-      component: "runnerClaudeCode",
-      configuration: { ...structuredClone(PLANNING_REVIEW_DRAFT.components[0].configuration), executionTimeoutSeconds },
+      component: action.name,
+      configuration: { ...structuredClone(agentConfiguration), model: "", executionTimeoutSeconds },
       concurrency: { max: 5, key: "" },
     },
     {
@@ -144,7 +169,17 @@ const meta = {
 } satisfies Meta<typeof ImplementConfigPreview>;
 export default meta;
 type Story = StoryObj<typeof meta>;
-export const Configuration: Story = {};
+export const Configuration: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const picker = await canvas.findByTestId("field-model-hosted-model");
+    await userEvent.click(picker);
+    const page = within(canvasElement.ownerDocument.body);
+    await expect(page.getByTestId("field-model-hosted-model-list")).toBeVisible();
+    await expect(page.getByTestId("field-model-hosted-thinking")).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+  },
+};
 export const InvalidDuration: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
