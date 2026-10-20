@@ -25,9 +25,14 @@ import (
 )
 
 const (
-	// intakeSeedSize is how many items a new intake analyzes at once. A source
-	// with few open items gives fewer, so the seed is an upper bound.
+	// intakeSeedSize is how many open Dependabot alerts a new intake imports.
+	// A repository with fewer open alerts gives fewer, so the seed is an upper bound.
 	intakeSeedSize = 30
+
+	// intakeGitHubIssueSeedSize is how many open GitHub issues a new intake
+	// imports. The wizard tells the user this number. Each imported issue
+	// starts a planning session, so the first batch stays small.
+	intakeGitHubIssueSeedSize = 10
 
 	// intakeSentrySeedSize is how many unresolved Sentry issues a new intake
 	// imports. The wizard tells the user this number.
@@ -220,7 +225,7 @@ func seedGitHubIssues(
 	}
 
 	repository, _ := binding.Configuration["repository"].(string)
-	payloads, err := newestGitHubIssueEvents(ctx, client, repository, intakeSeedSize)
+	payloads, err := newestGitHubIssueEvents(ctx, client, repository, intakeGitHubIssueSeedSize)
 	if err != nil {
 		return intakeSeedResult{}, err
 	}
