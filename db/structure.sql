@@ -1104,6 +1104,7 @@ CREATE TABLE public.installation_metadata (
     allow_private_network_access boolean DEFAULT false NOT NULL,
     signups_enabled boolean DEFAULT true NOT NULL,
     owner_setup_step text,
+    share_owner_identity boolean DEFAULT false NOT NULL,
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -3713,6 +3714,13 @@ CREATE INDEX idx_factory_work_order_comments_work_order_created ON public.factor
 
 
 --
+-- Name: idx_factory_work_order_events_status_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_events_status_created_at ON public.factory_work_order_events USING btree (created_at) WHERE (type = 'order.status.updated'::text);
+
+
+--
 -- Name: idx_factory_work_order_events_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3755,6 +3763,13 @@ CREATE INDEX idx_factory_work_order_line_dispatches_active ON public.factory_wor
 
 
 --
+-- Name: idx_factory_work_order_line_dispatches_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_line_dispatches_created_at ON public.factory_work_order_line_dispatches USING btree (created_at);
+
+
+--
 -- Name: idx_factory_work_order_line_dispatches_factory_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3787,6 +3802,13 @@ CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
+
+
+--
+-- Name: idx_factory_work_orders_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_created_at ON public.factory_work_orders USING btree (created_at);
 
 
 --
@@ -5792,7 +5814,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261019185616	f
+20261020231702	f
 \.
 
 
