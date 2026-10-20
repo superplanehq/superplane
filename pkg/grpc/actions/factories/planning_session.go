@@ -110,6 +110,7 @@ func sendPlanningSessionMessage(
 	}
 	db := database.DB(ctx)
 	assigned := false
+	firstRefinement := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		draft, err := lockAnalysisSessionAndDraft(tx, session)
 		if err != nil {
@@ -127,6 +128,7 @@ func sendPlanningSessionMessage(
 		if err := session.SendUserMessage(tx, req.GetText(), userID); err != nil {
 			return err
 		}
+		firstRefinement = planningSessionHasOneUserMessage(tx, session.ID)
 		// Taking part in the refinement makes the sender an owner of the draft.
 		if assigned, err = draft.AddAssignee(tx, userID, userID); err != nil {
 			return err
@@ -145,7 +147,9 @@ func sendPlanningSessionMessage(
 		publishDraftAssigneesUpdated(session)
 	}
 	messages.PublishPlanningBoardStatus(session)
-	captureFirstPlanningRefinement(ctx, db, factoryModel, session, interaction)
+	if firstRefinement {
+		capturePlanningRefinement(ctx, db, factoryModel, session, interaction)
+	}
 	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
@@ -153,7 +157,19 @@ func sendPlanningSessionMessage(
 	return &pb.SendPlanningSessionMessageResponse{Session: serialized}, nil
 }
 
-func captureFirstPlanningRefinement(
+func planningSessionHasOneUserMessage(tx *gorm.DB, sessionID uuid.UUID) bool {
+	var userMessages int64
+	err := tx.Model(&models.PlanningSessionMessage{}).
+		Where("session_id = ? AND role = ?", sessionID, models.PlanningSessionMessageRoleUser).
+		Count(&userMessages).Error
+	if err != nil {
+		log.WithError(err).Warn("Skipped factory task refined analytics")
+		return false
+	}
+	return userMessages == 1
+}
+
+func capturePlanningRefinement(
 	ctx context.Context,
 	db *gorm.DB,
 	factory *models.Factory,
@@ -161,18 +177,6 @@ func captureFirstPlanningRefinement(
 	interaction string,
 ) {
 	if session == nil {
-		return
-	}
-
-	var userMessages int64
-	err := db.Model(&models.PlanningSessionMessage{}).
-		Where("session_id = ? AND role = ?", session.ID, models.PlanningSessionMessageRoleUser).
-		Count(&userMessages).Error
-	if err != nil {
-		log.WithError(err).Warn("Skipped factory task refined analytics")
-		return
-	}
-	if userMessages != 1 {
 		return
 	}
 
