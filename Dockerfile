@@ -183,6 +183,7 @@ FROM ${RUNNER_IMAGE} AS runner
 
 ARG SUPERPLANE_VERSION=dev
 ARG SOURCE_REVISION=unknown
+ENV SUPERPLANE_VERSION=${SUPERPLANE_VERSION}
 
 LABEL org.opencontainers.image.title="superplane" \
   org.opencontainers.image.description="SuperPlane" \

@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
 
@@ -21,10 +22,11 @@ const (
 )
 
 type SetupOwnerRequest struct {
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Password  string `json:"password"`
+	Email              string `json:"email"`
+	FirstName          string `json:"first_name"`
+	LastName           string `json:"last_name"`
+	Password           string `json:"password"`
+	ShareOwnerIdentity bool   `json:"share_owner_identity"`
 }
 
 type SetupOwnerResponse struct {
@@ -110,6 +112,10 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if err := models.SetShareOwnerIdentity(tx, req.ShareOwnerIdentity); err != nil {
+			return err
+		}
+
 		// Account creation is not the end of the wizard: the owner still
 		// goes through license, SMTP, and fleet steps. Record the next step
 		// so a refresh resumes the wizard instead of reopening the form.
@@ -140,21 +146,23 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 }
 
 type SetupOwnerStatusResponse struct {
-	Status string `json:"status"`
-	Step   string `json:"step,omitempty"`
+	Status        string `json:"status"`
+	Step          string `json:"step,omitempty"`
+	BeaconEnabled bool   `json:"beacon_enabled"`
 }
 
 // setupOwnerStatus reports the owner setup wizard state to any caller.
 // It must not expose organization data: an anonymous caller only learns
 // whether the wizard is available, required, in progress, or closed.
 func (s *Server) setupOwnerStatus(w http.ResponseWriter, r *http.Request) {
+	beaconEnabled := telemetry.BeaconEnabled()
 	if !middleware.OwnerSetupEnabled() {
-		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusDisabled})
+		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusDisabled, BeaconEnabled: beaconEnabled})
 		return
 	}
 
 	if middleware.IsOwnerSetupRequired() {
-		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusRequired})
+		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusRequired, BeaconEnabled: beaconEnabled})
 		return
 	}
 
@@ -166,11 +174,11 @@ func (s *Server) setupOwnerStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if step == "" {
-		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusComplete})
+		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusComplete, BeaconEnabled: beaconEnabled})
 		return
 	}
 
-	respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusInProgress, Step: step})
+	respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusInProgress, Step: step, BeaconEnabled: beaconEnabled})
 }
 
 type SetupOwnerProgressRequest struct {
@@ -225,10 +233,11 @@ func (s *Server) updateSetupOwnerProgress(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	beaconEnabled := telemetry.BeaconEnabled()
 	if req.Step == "" {
-		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusComplete})
+		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusComplete, BeaconEnabled: beaconEnabled})
 		return
 	}
 
-	respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusInProgress, Step: req.Step})
+	respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusInProgress, Step: req.Step, BeaconEnabled: beaconEnabled})
 }
