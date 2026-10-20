@@ -15,6 +15,60 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSubscriptionScriptReportsUsageWithoutAuthBundle(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v1/runner/codex-subscription/checkpoint", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		_ = json.NewEncoder(w).Encode(map[string]any{"accepted": true, "version": 2})
+	}))
+	t.Cleanup(server.Close)
+	taskDir := t.TempDir()
+	binDir := filepath.Join(taskDir, "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "codex"), []byte(`#!/usr/bin/env node
+const readline = require("readline");
+readline.createInterface({ input: process.stdin }).on("line", (line) => {
+  const request = JSON.parse(line);
+  if (request.method === "initialize") {
+    process.stdout.write(JSON.stringify({ id: request.id, result: {} }) + "\n");
+  }
+  if (request.method === "account/rateLimits/read") {
+    process.stdout.write(JSON.stringify({ id: request.id, result: { rateLimits: { limitId: "codex", primary: { usedPercent: 10, windowDurationMins: 300, resetsAt: 1900000000 } } } }) + "\n");
+  }
+  if (request.method === "model/list") {
+    process.stdout.write(JSON.stringify({ id: request.id, result: { data: [{ id: "gpt-5.4", model: "gpt-5.4", displayName: "GPT-5.4", isDefault: true }] } }) + "\n");
+  }
+});
+`), 0o755))
+	_, callerFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	script := `
+const { reportUsage } = require(process.env.CODEX_SUBSCRIPTION_MODULE);
+const fs = require("fs");
+fs.mkdirSync(process.env.CODEX_HOME, { recursive: true });
+fs.writeFileSync(process.env.CODEX_HOME + "/auth.json", JSON.stringify({ access_token: "access-token-value", refresh_token: "refresh-token-value", id_token: "id-token-value" }));
+reportUsage().catch((err) => { process.stderr.write(err.message + "\n"); process.exit(1); });
+`
+	cmd := exec.Command("node", "-e", script)
+	cmd.Env = append(os.Environ(),
+		"PATH="+binDir+":"+os.Getenv("PATH"),
+		"CODEX_SUBSCRIPTION_MODULE="+filepath.Join(filepath.Dir(callerFile), "codex_subscription.js"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"CODEX_HOME="+filepath.Join(taskDir, "codex-home"),
+		"SUPERPLANE_BASE_URL="+server.URL,
+		"SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=runner-token",
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	_, hasBundle := body["bundle"]
+	assert.False(t, hasBundle)
+	assert.NotContains(t, string(out), "refresh-token-value")
+	usage, ok := body["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.NotEmpty(t, usage["limits"])
+}
+
 func TestSubscriptionScriptRestoresCheckpointsAndHidesTokens(t *testing.T) {
 	refreshToken := "refresh-token-value"
 	var mu sync.Mutex

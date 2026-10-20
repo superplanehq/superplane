@@ -483,9 +483,9 @@ async function runPrompt(promptFile, model, thinking) {
   });
   if (exitCode === 0 && subscription && subscription.subscriptionEnabled()) {
     try {
-      await subscription.checkpoint({ final: false });
+      await subscription.reportUsage();
     } catch (err) {
-      writeStderr(`${err && err.message ? err.message : "ChatGPT subscription credentials were not saved"}\n`);
+      writeStderr(`${err && err.message ? err.message : "ChatGPT usage was not saved"}\n`);
       return 1;
     }
   }

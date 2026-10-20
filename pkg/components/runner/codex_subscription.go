@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -13,6 +14,11 @@ import (
 const (
 	CodexSubscriptionTokenPurpose = "codex_subscription"
 	EnvCodexSubscriptionToken     = "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN"
+	EnvCodexRefreshTokenURL       = "CODEX_REFRESH_TOKEN_URL_OVERRIDE"
+	CodexSubscriptionRefreshPath  = "/api/v1/runner/codex-subscription/refresh"
+	CodexOAuthClientID            = "app_EMoamEEZ73f0CkXaXp7hrann"
+	CodexOAuthTokenURL            = "https://auth.openai.com/oauth/token"
+	CodexAccessRefreshWindow      = 10 * time.Minute
 	maxCodexAuthBundleBytes       = 256 * 1024
 )
 
@@ -141,4 +147,99 @@ func codexAccountLabel(document map[string]any) string {
 
 func looksLikeCodexToken(value string) bool {
 	return len(value) > 40 || strings.HasPrefix(value, "eyJ")
+}
+
+// CodexRunnerAuthBundle copies a stored auth bundle for one runner.
+// The OpenAI refresh token is replaced by that runner's lease secret.
+func CodexRunnerAuthBundle(raw []byte, leaseSecret string, now time.Time) ([]byte, error) {
+	document, err := decodeCodexAuthDocument(raw)
+	if err != nil {
+		return nil, err
+	}
+	previous := codexBundleString(document, "refresh_token")
+	replaceCodexAuthValue(document, "refresh_token", leaseSecret)
+	document["last_refresh"] = now.UTC().Format(time.RFC3339Nano)
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		return nil, fmt.Errorf("chatgpt subscription credentials are invalid")
+	}
+	if previous != "" && previous != leaseSecret && strings.Contains(string(encoded), previous) {
+		return nil, fmt.Errorf("chatgpt subscription credentials are invalid")
+	}
+	return encoded, nil
+}
+
+// ReplaceCodexAuthTokens writes a refreshed token set into a stored auth bundle.
+func ReplaceCodexAuthTokens(raw []byte, accessToken, refreshToken, idToken string) ([]byte, error) {
+	document, err := decodeCodexAuthDocument(raw)
+	if err != nil {
+		return nil, err
+	}
+	if accessToken != "" {
+		replaceCodexAuthValue(document, "access_token", accessToken)
+	}
+	if refreshToken != "" {
+		replaceCodexAuthValue(document, "refresh_token", refreshToken)
+	}
+	if idToken != "" {
+		replaceCodexAuthValue(document, "id_token", idToken)
+	}
+	document["last_refresh"] = time.Now().UTC().Format(time.RFC3339Nano)
+	return json.Marshal(document)
+}
+
+// CodexAccessTokenExpiry reads the exp claim from an access token.
+func CodexAccessTokenExpiry(accessToken string) (time.Time, bool) {
+	parts := strings.Split(accessToken, ".")
+	if len(parts) < 2 {
+		return time.Time{}, false
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return time.Time{}, false
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return time.Time{}, false
+	}
+	switch exp := claims["exp"].(type) {
+	case float64:
+		return time.Unix(int64(exp), 0).UTC(), true
+	default:
+		return time.Time{}, false
+	}
+}
+
+// CodexAuthToken returns one string field from a stored auth bundle.
+func CodexAuthToken(raw []byte, name string) string {
+	document, err := decodeCodexAuthDocument(raw)
+	if err != nil {
+		return ""
+	}
+	return codexBundleString(document, name)
+}
+
+func decodeCodexAuthDocument(raw []byte) (map[string]any, error) {
+	var document map[string]any
+	if err := json.Unmarshal(raw, &document); err != nil || document == nil {
+		return nil, fmt.Errorf("chatgpt subscription credentials are invalid")
+	}
+	return document, nil
+}
+
+func replaceCodexAuthValue(value any, name, replacement string) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if key == name {
+				typed[key] = replacement
+				continue
+			}
+			replaceCodexAuthValue(child, name, replacement)
+		}
+	case []any:
+		for _, child := range typed {
+			replaceCodexAuthValue(child, name, replacement)
+		}
+	}
 }

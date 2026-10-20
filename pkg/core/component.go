@@ -54,7 +54,7 @@ type ExecutionContext struct {
 	CodexSubscription CodexSubscriptionContext
 }
 
-// CodexSubscriptionLease is one exclusive reservation of a factory ChatGPT connection.
+// CodexSubscriptionLease is one run using a factory ChatGPT connection.
 type CodexSubscriptionLease struct {
 	ConnectionID uuid.UUID
 	FactoryID    uuid.UUID
