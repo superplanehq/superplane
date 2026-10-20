@@ -56,7 +56,6 @@ export function OrganizationSettingsBillingPage() {
       <BillingPageBody
         billingContactMessage={model.billingContactMessage}
         billingEnabled={model.billingEnabled}
-        businessCheckoutPending={model.billing.businessCheckoutPending}
         canManageBilling={model.canManageBilling}
         checkoutPending={model.billing.checkoutPending}
         creditPurchaseAllowed={model.creditPurchaseAllowed}
@@ -68,6 +67,7 @@ export function OrganizationSettingsBillingPage() {
         isLoading={model.isLoading}
         packs={packs}
         plan={model.plan}
+        catalogName={model.catalogName}
         planSource={model.planSource}
         cancelAtPeriodEnd={model.cancelAtPeriodEnd}
         subscriptionPending={model.cancelPending || model.keepPending}
@@ -82,7 +82,6 @@ export function OrganizationSettingsBillingPage() {
         trialEndsAt={model.trialEndsAt}
         welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
         onAddCredit={model.billing.startCheckout}
-        onSubscribe={model.billing.startBusinessCheckout}
         onCancelSubscription={model.onCancelSubscription}
         onKeepSubscription={model.onKeepSubscription}
         onManageInvoices={model.billing.openInvoices}
@@ -94,7 +93,6 @@ export function OrganizationSettingsBillingPage() {
 type BillingPageBodyProps = {
   billingContactMessage?: string;
   billingEnabled: boolean;
-  businessCheckoutPending: boolean;
   canManageBilling: boolean;
   checkoutPending: boolean;
   creditPurchaseAllowed: boolean;
@@ -106,6 +104,7 @@ type BillingPageBodyProps = {
   isLoading: boolean;
   packs: OrganizationsHostedCreditProduct[];
   plan?: string;
+  catalogName?: string;
   planSource?: string;
   cancelAtPeriodEnd: boolean;
   subscriptionPending: boolean;
@@ -120,7 +119,6 @@ type BillingPageBodyProps = {
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
   onAddCredit: (productId: string) => void | Promise<void>;
-  onSubscribe: () => void | Promise<void>;
   onCancelSubscription: () => void | Promise<void>;
   onKeepSubscription: () => void | Promise<void>;
   onManageInvoices: () => void | Promise<void>;
@@ -129,7 +127,6 @@ type BillingPageBodyProps = {
 function BillingPageBody({
   billingContactMessage,
   billingEnabled,
-  businessCheckoutPending,
   canManageBilling,
   checkoutPending,
   creditPurchaseAllowed,
@@ -141,6 +138,7 @@ function BillingPageBody({
   isLoading,
   packs,
   plan,
+  catalogName,
   planSource,
   cancelAtPeriodEnd,
   subscriptionPending,
@@ -155,7 +153,6 @@ function BillingPageBody({
   trialEndsAt,
   welcomeCreditExpiresAt,
   onAddCredit,
-  onSubscribe,
   onCancelSubscription,
   onKeepSubscription,
   onManageInvoices,
@@ -181,13 +178,14 @@ function BillingPageBody({
   return (
     <>
       <BillingPlansSection
+        plan={plan}
+        catalogName={catalogName}
         canManageBilling={canManageBilling}
         creditPurchaseAllowed={creditPurchaseAllowed}
         planSource={planSource}
         cancelAtPeriodEnd={cancelAtPeriodEnd}
         currentPeriodEnd={currentPeriodEnd}
-        pending={businessCheckoutPending || subscriptionPending}
-        onSubscribe={onSubscribe}
+        pending={subscriptionPending}
         onCancel={onCancelSubscription}
         onKeep={onKeepSubscription}
       />

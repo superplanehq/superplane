@@ -53,7 +53,7 @@ describe("LinesPage hosted credit banner", () => {
     expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
     expect(screen.queryByTestId("workspace-page-header-above-title")).not.toBeInTheDocument();
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute(
       "href",
       expect.stringContaining("/settings/organization/billing"),
     );
@@ -76,7 +76,7 @@ describe("LinesPage hosted credit banner", () => {
     expect(kicker).toHaveTextContent("$0.00");
     expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute(
       "href",
       expect.stringContaining("/settings/organization/billing"),
     );
@@ -123,7 +123,7 @@ describe("LinesPage hosted credit banner", () => {
     expect(kicker).toHaveTextContent("No plan");
     expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute(
       "href",
       expect.stringContaining("/settings/organization/billing"),
     );

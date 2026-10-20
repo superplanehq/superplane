@@ -106,7 +106,7 @@ func BusinessProductID() string {
 }
 
 func SubscriptionCheckoutEnabled() bool {
-	return Configured() && BusinessProductID() != ""
+	return false
 }
 
 func NewClientFromEnv() *Client {

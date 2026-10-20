@@ -61,7 +61,7 @@ func TestAdminLLMSettings(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
 
-	t.Run("admin can load defaults and update welcome grant", func(t *testing.T) {
+	t.Run("admin can load defaults and update markup", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "GET",
 			path:       "/admin/api/installation/llm-settings",
@@ -78,8 +78,8 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.Len(t, settings.Providers, 3)
 
 		body, err := json.Marshal(map[string]any{
-			"welcome_grant_cents": 2500,
-			"markup_bps":          1000,
+
+			"markup_bps": 1000,
 		})
 		require.NoError(t, err)
 		response = execRequest(server, requestParams{
@@ -91,7 +91,7 @@ func TestAdminLLMSettings(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
-		assert.Equal(t, int64(2500), settings.WelcomeGrantCents)
+		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
 		assert.Equal(t, 1000, settings.MarkupBPS)
 	})
 
@@ -416,6 +416,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 					{
 						"id":                   "sub_admin_sync",
 						"status":               "active",
+						"product_id":           "prod_business",
 						"current_period_start": periodStart.Format(time.RFC3339),
 						"current_period_end":   periodEnd.Format(time.RFC3339),
 						"customer_id":          "cust_polar_1",
@@ -451,7 +452,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 	t.Run("PUT rejects Polar-managed organizations", func(t *testing.T) {
 		now := time.Now()
 		end := now.AddDate(0, 1, 0)
-		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
+		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 			ID:          "sub_admin_put",
 			Status:      models.PolarSubscriptionStatusActive,
 			PeriodStart: &now,

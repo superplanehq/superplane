@@ -46,7 +46,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
     expect(screen.queryByTestId("workspace-page-header-above-title")).not.toBeInTheDocument();
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "billing"),
     );
@@ -103,7 +103,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     expect(kicker).toHaveTextContent("$0.00");
     expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "billing"),
     );
@@ -142,10 +142,10 @@ describe("WorkOrdersPage hosted credit banner", () => {
     const kicker = await screen.findByTestId("hosted-credit-header-kicker", {}, { timeout: 8000 });
     expect(kicker).toHaveAttribute("data-kind", "lapsed");
     expect(kicker).toHaveTextContent("No plan");
-    expect(kicker).toHaveTextContent("Subscribe");
+    expect(kicker).toHaveTextContent("View billing");
     expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "billing"),
     );
@@ -168,7 +168,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     expect(kicker).toHaveTextContent("Trial ended");
     expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "billing"),
     );

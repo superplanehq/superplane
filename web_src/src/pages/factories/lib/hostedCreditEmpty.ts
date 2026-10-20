@@ -13,6 +13,8 @@ export interface HostedCreditBannerInput {
   billingEnabled?: boolean;
   welcomeCreditExpiresAt?: string;
   plan?: string;
+  catalogCategory?: string;
+  catalogName?: string;
   trialEndsAt?: string;
   subscriptionCheckoutEnabled?: boolean;
   creditPurchaseAllowed?: boolean;
@@ -36,9 +38,13 @@ export function isWelcomeCreditExpired(value: string | undefined, now: Date = ne
 }
 
 export function isHostedCreditTrialOrg(
-  args: Pick<HostedCreditBannerInput, "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "trialEndsAt">,
+  args: Pick<
+    HostedCreditBannerInput,
+    "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "trialEndsAt" | "catalogCategory"
+  >,
 ): boolean {
-  if (args.plan === "business" || args.plan === "none") {
+  if (args.catalogCategory) return args.catalogCategory === "trial";
+  if (args.plan != null && args.plan !== "trial") {
     return false;
   }
   if (args.plan === "trial") {
@@ -80,7 +86,7 @@ export function hostedCreditBannerKind(args: HostedCreditBannerInput): HostedCre
     return null;
   }
 
-  if (!hasHadHostedCredit(args, purchased) && args.plan !== "business") {
+  if (!hasHadHostedCredit(args, purchased) && !args.creditPurchaseAllowed) {
     return null;
   }
 
@@ -115,14 +121,19 @@ export function hostedCreditHeaderKickerLabel(kind: HostedCreditHeaderKickerKind
 
 /** Action that the header chip calls. Low and empty credit send the user to billing to add credit. */
 export function hostedCreditHeaderKickerActionLabel(kind: HostedCreditHeaderKickerKind): string {
-  return kind === "low" || kind === "empty" ? "Add credits" : "Subscribe";
+  return kind === "low" || kind === "empty" ? "Add credits" : "View billing";
 }
 
 export function organizationPlanLabel(
-  args: Pick<HostedCreditBannerInput, "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "trialEndsAt"> & {
+  args: Pick<
+    HostedCreditBannerInput,
+    "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "trialEndsAt" | "catalogCategory"
+  > & {
     now?: Date;
+    catalogName?: string;
   },
 ): string | undefined {
+  if (args.catalogName && args.plan !== "trial" && args.plan !== "none") return args.catalogName;
   if (args.plan === "business") {
     return "Business";
   }
@@ -201,7 +212,7 @@ export function hostedCreditBillingBalanceCopy(args: HostedCreditBillingBalanceI
   if (args.plan === "none") {
     return {
       badge: null,
-      description: "Hosted runs cannot start. Subscribe to Business to continue.",
+      description: "Hosted runs cannot start. Contact an installation admin to change your plan.",
     };
   }
 
@@ -224,16 +235,16 @@ export function hostedCreditBillingBalanceCopy(args: HostedCreditBillingBalanceI
 
 function trialBillingDescription(expired: boolean, expiresAt: Date | null): string {
   if (expired) {
-    return "The trial has ended. Hosted runs cannot start. Subscribe to Business to continue.";
+    return "The trial has ended. Hosted runs cannot start. Contact an installation admin to change your plan.";
   }
   if (expiresAt) {
     return (
       `This is trial usage for machines and managed models. ` +
       `The trial ends on ${expiresAt.toLocaleDateString()}. ` +
-      `Subscribe to Business to keep hosted runs.`
+      `Contact an installation admin to keep hosted runs.`
     );
   }
-  return "Subscribe to Business to keep hosted runs.";
+  return "Contact an installation admin to keep hosted runs.";
 }
 
 function emptyHostedCreditDescription(billingEnabled: boolean): string {

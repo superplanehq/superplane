@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -40,6 +41,11 @@ func DescribeOrganizationBilling(
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
 	return &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
+		CatalogId:                   plan.PlanID.String(),
+		CatalogKey:                  plan.Catalog.Key,
+		CatalogName:                 plan.Catalog.Name,
+		CatalogCategory:             plan.Catalog.Category,
+		HostedExecutionAllowed:      !models.BillingEnabled() || plan.AllowsHostedExecution(time.Now()),
 		PlanSource:                  plan.PlanSource,
 		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
 		TrialEndsAt:                 protoTimestamp(plan.TrialEndsAt),

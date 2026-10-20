@@ -44,6 +44,8 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         purchasedCreditCents: spend.data?.purchasedCreditCents,
         welcomeCreditExpiresAt: spend.data?.welcomeCreditExpiresAt,
         plan: billing.data?.plan,
+        catalogCategory: billing.data?.catalogCategory,
+        catalogName: billing.data?.catalogName,
         trialEndsAt: billing.data?.trialEndsAt,
       })
     : undefined;

@@ -1,71 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  billingBusinessPlanAction,
   billingCanCancelBusiness,
   billingCanKeepBusiness,
   billingCancelBusinessConfirmCopy,
   billingSubscriptionEndsCopy,
   billingUsagePercentUsed,
 } from "./billingPlans";
-
-describe("billingBusinessPlanAction", () => {
-  it("shows the upgrade action when the organization cannot buy credit", () => {
-    expect(
-      billingBusinessPlanAction({
-        canManageBilling: true,
-        creditPurchaseAllowed: false,
-      }),
-    ).toBe("subscribe");
-  });
-
-  it("shows Current plan when credit purchase is allowed", () => {
-    expect(
-      billingBusinessPlanAction({
-        canManageBilling: true,
-        creditPurchaseAllowed: true,
-      }),
-    ).toBe("current");
-  });
-
-  it("shows ending when Business is set to cancel at period end", () => {
-    expect(
-      billingBusinessPlanAction({
-        canManageBilling: true,
-        creditPurchaseAllowed: true,
-        cancelAtPeriodEnd: true,
-      }),
-    ).toBe("ending");
-  });
-
-  it("hides the upgrade action for members who cannot manage billing", () => {
-    expect(
-      billingBusinessPlanAction({
-        canManageBilling: false,
-        creditPurchaseAllowed: false,
-      }),
-    ).toBe("hidden");
-  });
-
-  it("keeps Current plan for members when the organization is on Business", () => {
-    expect(
-      billingBusinessPlanAction({
-        canManageBilling: false,
-        creditPurchaseAllowed: true,
-      }),
-    ).toBe("current");
-  });
-
-  it("shows ending for members when Business is set to cancel at period end", () => {
-    expect(
-      billingBusinessPlanAction({
-        canManageBilling: false,
-        creditPurchaseAllowed: true,
-        cancelAtPeriodEnd: true,
-      }),
-    ).toBe("ending");
-  });
-});
 
 describe("billingCanCancelBusiness", () => {
   it("shows cancel only for Polar Business that is not already ending", () => {
@@ -137,7 +78,7 @@ describe("billingSubscriptionEndsCopy", () => {
   it("names the period end date", () => {
     const periodEnd = "2026-10-09T12:00:00.000Z";
     expect(billingSubscriptionEndsCopy(periodEnd)).toBe(
-      `Business ends on ${new Date(periodEnd).toLocaleDateString()}. Hosted runs continue until that date.`,
+      `Subscription ends on ${new Date(periodEnd).toLocaleDateString()}. Hosted runs continue until that date.`,
     );
   });
 });
@@ -146,7 +87,7 @@ describe("billingCancelBusinessConfirmCopy", () => {
   it("names the period end date in the confirm text", () => {
     const periodEnd = "2026-10-09T12:00:00.000Z";
     expect(billingCancelBusinessConfirmCopy(periodEnd)).toBe(
-      `Business stays active until ${new Date(periodEnd).toLocaleDateString()}. SuperPlane will not renew after that date.`,
+      `The subscription stays active until ${new Date(periodEnd).toLocaleDateString()}. SuperPlane will not renew after that date.`,
     );
   });
 });

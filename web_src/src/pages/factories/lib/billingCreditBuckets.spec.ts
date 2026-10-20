@@ -100,7 +100,7 @@ describe("billingCreditBucketsView", () => {
     });
 
     expect(included.remainingLabel).toBe("$0.00 remaining");
-    expect(included.footer).toBe("Included with Business.");
+    expect(included.footer).toBe("Included credit from plan grants and manual adjustments.");
   });
 
   it("shows SuperPlane grant after top-up when remaining grant is greater than zero", () => {

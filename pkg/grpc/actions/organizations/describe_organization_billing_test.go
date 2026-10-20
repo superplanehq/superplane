@@ -21,6 +21,7 @@ import (
 
 func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	t.Setenv(models.BillingEnabledEnv, "no")
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
@@ -45,6 +46,7 @@ func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 
 func Test__SyncOrganizationBilling(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 
 	t.Run("invalid organization id", func(t *testing.T) {
 		_, err := SyncOrganizationBilling(context.Background(), "not-a-uuid", &pb.SyncOrganizationBillingRequest{})
@@ -72,6 +74,7 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 					{
 						"id":                   "sub_grpc_sync",
 						"status":               "active",
+						"product_id":           "prod_business",
 						"current_period_start": periodStart.Format(time.RFC3339),
 						"current_period_end":   periodEnd.Format(time.RFC3339),
 						"customer_id":          "cust_polar_1",
@@ -114,6 +117,7 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 
 func Test__DescribeOrganizationBillingLapsesExpiredTrial(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	ended := time.Now().Add(-time.Hour)
 	require.NoError(t, database.Conn().Model(&models.OrganizationBillingPlan{}).
 		Where("organization_id = ?", r.Organization.ID).
@@ -134,10 +138,11 @@ func Test__DescribeOrganizationBillingLapsesExpiredTrial(t *testing.T) {
 
 func Test__CancelOrganizationSubscription(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	db := database.Conn()
 	periodStart := time.Now().UTC().Truncate(time.Second)
 	periodEnd := periodStart.AddDate(0, 1, 0)
-	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 		ID:          "sub_grpc_cancel",
 		Status:      models.PolarSubscriptionStatusActive,
 		PeriodStart: &periodStart,
@@ -167,6 +172,7 @@ func Test__CancelOrganizationSubscription(t *testing.T) {
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"id":                   "sub_grpc_cancel",
 				"status":               "active",
+				"product_id":           "prod_business",
 				"cancel_at_period_end": true,
 				"current_period_start": periodStart.Format(time.RFC3339),
 				"current_period_end":   periodEnd.Format(time.RFC3339),
@@ -190,10 +196,11 @@ func Test__CancelOrganizationSubscription(t *testing.T) {
 
 func Test__ResumeOrganizationSubscription(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	db := database.Conn()
 	periodStart := time.Now().UTC().Truncate(time.Second)
 	periodEnd := periodStart.AddDate(0, 1, 0)
-	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 		ID:                "sub_grpc_resume",
 		Status:            models.PolarSubscriptionStatusActive,
 		PeriodStart:       &periodStart,
@@ -209,6 +216,7 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"id":                   "sub_grpc_resume",
 				"status":               "active",
+				"product_id":           "prod_business",
 				"cancel_at_period_end": false,
 				"current_period_start": periodStart.Format(time.RFC3339),
 				"current_period_end":   periodEnd.Format(time.RFC3339),
@@ -233,4 +241,17 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 func TestBusinessCheckoutSuccessURLIncludesCheckoutID(t *testing.T) {
 	id := uuid.New()
 	assert.Equal(t, "https://app.superplane.com/"+id.String()+"/organization/billing?subscribed=1&checkout_id={CHECKOUT_ID}", businessCheckoutSuccessURL("https://app.superplane.com/", id))
+}
+
+func TestBusinessCheckoutStaysClosedWithPolarConfigured(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+	server := polarAPIServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("closed checkout must not call Polar")
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	usePolarTestServer(t, server)
+	_, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 }

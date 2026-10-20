@@ -842,6 +842,11 @@ message DescribeOrganizationBillingResponse {
   int64 welcome_remaining_cents = 14;
   int64 admin_remaining_cents = 15;
   bool cancel_at_period_end = 16;
+ string catalog_id = 17;
+ string catalog_key = 18;
+ string catalog_name = 19;
+ bool hosted_execution_allowed = 20;
+ string catalog_category = 21;
 }
 
 message CreateBusinessCheckoutRequest {

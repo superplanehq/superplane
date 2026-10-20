@@ -183,5 +183,5 @@ function includedUsageFooter(plan: string | undefined, periodEnd: Date | null): 
   if (plan === "business" && periodEnd) {
     return `Resets ${periodEnd.toLocaleDateString()}`;
   }
-  return "Included with Business.";
+  return "Included credit from plan grants and manual adjustments.";
 }

@@ -40,6 +40,9 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 		return err
 	}
 	tx = tx.WithContext(ctx)
+	if err := models.BindLegacyBillingProduct(tx, BusinessProductID()); err != nil {
+		return err
+	}
 	if _, err := models.FindOrganizationByIDInTransaction(tx, orgID.String()); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return permanentApplyError("organization not found")
@@ -64,6 +67,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 			orgID,
 			models.PolarSubscriptionApply{
 				ID:                data.ID,
+				ProductID:         data.ProductID,
 				Status:            status,
 				PeriodStart:       periodStart,
 				PeriodEnd:         periodEnd,
@@ -90,17 +94,31 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 }
 
 func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) error {
-	if !SubscriptionCheckoutEnabled() {
+	if !Configured() {
 		return nil
 	}
 
-	items, err := NewClientFromEnv().ListSubscriptions(ctx, orgID.String(), BusinessProductID())
+	if err := models.BindLegacyBillingProduct(tx, BusinessProductID()); err != nil {
+		return err
+	}
+	items, err := NewClientFromEnv().ListSubscriptions(ctx, orgID.String(), "")
 	if err != nil {
 		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to list Polar subscriptions")
 		return nil
 	}
 
-	selected := selectBusinessSubscription(items)
+	known := make([]SubscriptionData, 0, len(items))
+	for _, item := range items {
+		_, err := models.FindBillingPlanByProduct(tx, item.ProductID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		known = append(known, item)
+	}
+	selected := selectBusinessSubscription(known)
 	if selected == nil {
 		return nil
 	}
@@ -148,7 +166,7 @@ func ResumeOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid
 }
 
 func setOrganizationSubscriptionCancelAtPeriodEnd(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, cancelAtPeriodEnd bool) error {
-	if !SubscriptionCheckoutEnabled() {
+	if !Configured() {
 		return ErrSubscriptionCheckoutDisabled
 	}
 

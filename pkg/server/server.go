@@ -744,6 +744,9 @@ func Start() {
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
 
+	if err := models.BindLegacyBillingProduct(database.Conn(), os.Getenv("POLAR_BUSINESS_PRODUCT_ID")); err != nil {
+		log.Fatalf("bind legacy billing product: %v", err)
+	}
 	if err := models.LoadCurrentPriceBook(database.Conn()); err != nil {
 		log.WithError(err).Warn("failed to load usage price book; using in-memory rates")
 	}

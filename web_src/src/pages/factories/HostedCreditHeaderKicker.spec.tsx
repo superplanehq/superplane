@@ -8,7 +8,7 @@ import { welcomeCreditHeaderLabel } from "./lib/hostedCreditEmpty";
 const billingHref = "/org/workspaces/RF/settings/organization/billing";
 
 describe("HostedCreditHeaderKicker", () => {
-  it("shows remaining trial days and a Subscribe action", () => {
+  it("shows remaining trial days and a View billing action", () => {
     const expiresAt = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
     render(
       <MemoryRouter>
@@ -25,8 +25,8 @@ describe("HostedCreditHeaderKicker", () => {
     expect(kicker).toHaveTextContent("Trial");
     expect(kicker).toHaveTextContent(welcomeCreditHeaderLabel(expiresAt));
     expect(kicker).toHaveTextContent("$41.24");
-    expect(kicker).toHaveTextContent("Subscribe");
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
+    expect(kicker).toHaveTextContent("View billing");
+    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute("href", billingHref);
   });
 
   it("keeps the violet palette for the trial chip", () => {
@@ -51,7 +51,7 @@ describe("HostedCreditHeaderKicker", () => {
     expect(screen.getByTestId("hosted-credit-header-kicker")).toHaveTextContent("14 days");
   });
 
-  it("shows a no-plan chip with a Subscribe action", () => {
+  it("shows a no-plan chip with a View billing action", () => {
     render(
       <MemoryRouter>
         <HostedCreditHeaderKicker kind="lapsed" spendingHref={billingHref} remainingCreditCents={5000} />
@@ -61,12 +61,12 @@ describe("HostedCreditHeaderKicker", () => {
     const kicker = screen.getByTestId("hosted-credit-header-kicker");
     expect(kicker).toHaveAttribute("data-kind", "lapsed");
     expect(kicker).toHaveTextContent("No plan");
-    expect(kicker).toHaveTextContent("Subscribe");
+    expect(kicker).toHaveTextContent("View billing");
     expect(kicker).not.toHaveTextContent("$50.00");
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute("href", billingHref);
+    expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute("href", billingHref);
   });
 
-  it("shows a trial-ended chip with a Subscribe action", () => {
+  it("shows a trial-ended chip with a View billing action", () => {
     render(
       <MemoryRouter>
         <HostedCreditHeaderKicker kind="trial-expired" spendingHref={billingHref} />
@@ -76,7 +76,7 @@ describe("HostedCreditHeaderKicker", () => {
     const kicker = screen.getByTestId("hosted-credit-header-kicker");
     expect(kicker).toHaveAttribute("data-kind", "trial-expired");
     expect(kicker).toHaveTextContent("Trial ended");
-    expect(kicker).toHaveTextContent("Subscribe");
+    expect(kicker).toHaveTextContent("View billing");
   });
 
   it("shows the remaining balance on a low-credit chip with an Add credits action", () => {
@@ -158,7 +158,7 @@ describe("HostedCreditHeaderKicker", () => {
   );
 
   describe("compact", () => {
-    it("keeps trial status, days, and balance, and hides Subscribe", () => {
+    it("keeps trial status, days, and balance, and hides View billing", () => {
       const expiresAt = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
       render(
         <MemoryRouter>
@@ -175,20 +175,20 @@ describe("HostedCreditHeaderKicker", () => {
       expect(kicker).toHaveTextContent("Trial");
       expect(kicker).toHaveTextContent(welcomeCreditHeaderLabel(expiresAt));
       expect(kicker).toHaveTextContent("$41.24");
-      expect(kicker).not.toHaveTextContent("Subscribe");
+      expect(kicker).not.toHaveTextContent("View billing");
       expect(kicker).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
       expect(kicker).not.toHaveClass("shrink-0");
       expect(kicker.querySelector(".truncate")).not.toBeNull();
       expect(
         screen.getByRole("link", {
-          name: `Trial, ${welcomeCreditHeaderLabel(expiresAt)}, $41.24, Subscribe`,
+          name: `Trial, ${welcomeCreditHeaderLabel(expiresAt)}, $41.24, View billing`,
         }),
       ).toHaveAttribute("href", billingHref);
     });
 
     it.each([
-      ["trial-expired", "Trial ended", "Subscribe"],
-      ["lapsed", "No plan", "Subscribe"],
+      ["trial-expired", "Trial ended", "View billing"],
+      ["lapsed", "No plan", "View billing"],
       ["empty", "No credit", "Add credits"],
     ] as const)("hides the %s action pill and keeps the billing link", (kind, label, actionLabel) => {
       render(

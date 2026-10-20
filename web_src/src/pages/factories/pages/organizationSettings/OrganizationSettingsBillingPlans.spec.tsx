@@ -155,8 +155,8 @@ describe("OrganizationSettingsBillingPage plans", () => {
     expect(screen.getByTestId("billing-credit-trial")).toHaveTextContent(`Expires on ${WELCOME_EXPIRY_LABEL}`);
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
     expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel subscription" })).not.toBeInTheDocument();
 
     const balance = screen.getByTestId("billing-credit-balance");
     expect(balance).toHaveTextContent("Trial");
@@ -177,17 +177,17 @@ describe("OrganizationSettingsBillingPage plans", () => {
       />,
     );
 
-    await user.click(await screen.findByRole("button", { name: "Cancel Business" }));
+    await user.click(await screen.findByRole("button", { name: "Cancel subscription" }));
     expect(screen.getByTestId("billing-cancel-subscription-dialog")).toHaveTextContent(
-      `Business stays active until ${new Date(BUSINESS_PERIOD_END).toLocaleDateString()}. SuperPlane will not renew after that date.`,
+      `The subscription stays active until ${new Date(BUSINESS_PERIOD_END).toLocaleDateString()}. SuperPlane will not renew after that date.`,
     );
     await user.click(screen.getByTestId("billing-cancel-subscription-confirm"));
     expect(await screen.findByTestId("billing-subscription-ends")).toHaveTextContent(
       billingSubscriptionEndsCopy(BUSINESS_PERIOD_END) ?? "",
     );
     expect(screen.getByTestId("billing-current-plan")).toHaveTextContent("Current plan");
-    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Keep Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Cancel subscription" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Keep subscription" })).toBeEnabled();
   }, 10000);
 
   it("keeps Polar Business when the owner reverses cancel", async () => {
@@ -205,8 +205,8 @@ describe("OrganizationSettingsBillingPage plans", () => {
     expect(await screen.findByTestId("billing-subscription-ends")).toHaveTextContent(
       billingSubscriptionEndsCopy(BUSINESS_PERIOD_END) ?? "",
     );
-    await user.click(screen.getByRole("button", { name: "Keep Business" }));
-    expect(await screen.findByRole("button", { name: "Cancel Business" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Keep subscription" }));
+    expect(await screen.findByRole("button", { name: "Cancel subscription" })).toBeEnabled();
     expect(screen.queryByTestId("billing-subscription-ends")).not.toBeInTheDocument();
   }, 10000);
 
@@ -222,7 +222,7 @@ describe("OrganizationSettingsBillingPage plans", () => {
     );
 
     expect(await screen.findByTestId("billing-current-plan")).toHaveTextContent("Current plan");
-    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel subscription" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("billing-subscription-ends")).not.toBeInTheDocument();
   }, 10000);
 
@@ -242,7 +242,7 @@ describe("OrganizationSettingsBillingPage plans", () => {
       billingSubscriptionEndsCopy(BUSINESS_PERIOD_END) ?? "",
     );
     expect(screen.getByTestId("billing-current-plan")).toHaveTextContent("Current plan");
-    expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Keep Business" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel subscription" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Keep subscription" })).not.toBeInTheDocument();
   }, 10000);
 });

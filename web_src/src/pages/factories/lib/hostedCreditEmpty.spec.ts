@@ -56,7 +56,7 @@ describe("hostedCreditBillingBalanceCopy", () => {
       description:
         `This is trial usage for machines and managed models. ` +
         `The trial ends on ${new Date(inFourteenDays).toLocaleDateString()}. ` +
-        `Subscribe to Business to keep hosted runs.`,
+        `Contact an installation admin to keep hosted runs.`,
     });
   });
 
@@ -75,7 +75,7 @@ describe("hostedCreditBillingBalanceCopy", () => {
       description:
         `This is trial usage for machines and managed models. ` +
         `The trial ends on ${new Date(inFourteenDays).toLocaleDateString()}. ` +
-        `Subscribe to Business to keep hosted runs.`,
+        `Contact an installation admin to keep hosted runs.`,
     });
   });
 
@@ -91,7 +91,7 @@ describe("hostedCreditBillingBalanceCopy", () => {
       }),
     ).toEqual({
       badge: "Trial",
-      description: "The trial has ended. Hosted runs cannot start. Subscribe to Business to continue.",
+      description: "The trial has ended. Hosted runs cannot start. Contact an installation admin to change your plan.",
     });
   });
 
@@ -247,9 +247,9 @@ describe("hostedCreditHeaderKickerActionLabel", () => {
   });
 
   it("keeps Subscribe for trial and no-plan states", () => {
-    expect(hostedCreditHeaderKickerActionLabel("trial")).toBe("Subscribe");
-    expect(hostedCreditHeaderKickerActionLabel("trial-expired")).toBe("Subscribe");
-    expect(hostedCreditHeaderKickerActionLabel("lapsed")).toBe("Subscribe");
+    expect(hostedCreditHeaderKickerActionLabel("trial")).toBe("View billing");
+    expect(hostedCreditHeaderKickerActionLabel("trial-expired")).toBe("View billing");
+    expect(hostedCreditHeaderKickerActionLabel("lapsed")).toBe("View billing");
   });
 });
 

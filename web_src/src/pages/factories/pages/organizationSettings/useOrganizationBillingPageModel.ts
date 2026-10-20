@@ -43,6 +43,7 @@ export type OrganizationBillingPageModel = {
   subscriptionCheckoutEnabled: boolean;
   creditPurchaseAllowed: boolean;
   plan?: string;
+  catalogName?: string;
   trialEndsAt?: string;
   billing: HostedCreditBillingActions;
   creditRefreshStatus: HostedCreditRefreshStatus;
@@ -90,6 +91,7 @@ function creditMetricsFromSpend(spend: OrganizationsDescribeOrganizationWorkspac
 function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse | undefined) {
   return {
     plan: billing?.plan,
+    catalogName: billing?.catalogName,
     trialEndsAt: billing?.trialEndsAt,
     currentPeriodEnd: billing?.currentPeriodEnd,
     includedRemaining: parseWorkOrderMetric(billing?.includedRemainingCents),
@@ -167,6 +169,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     subscriptionCheckoutEnabled: flags.subscriptionCheckoutEnabled,
     creditPurchaseAllowed: flags.creditPurchaseAllowed,
     plan: flags.plan,
+    catalogName: flags.catalogName,
     trialEndsAt: flags.trialEndsAt,
     billing,
     creditRefreshStatus,

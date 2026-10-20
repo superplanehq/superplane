@@ -35,7 +35,7 @@ export function BillingCancelBusinessDialog({
     >
       <DialogContent data-testid="billing-cancel-subscription-dialog">
         <DialogHeader>
-          <DialogTitle>Cancel Business?</DialogTitle>
+          <DialogTitle>Cancel subscription?</DialogTitle>
           <DialogDescription>{billingCancelBusinessConfirmCopy(currentPeriodEnd)}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -63,7 +63,7 @@ export function BillingCancelBusinessDialog({
               })();
             }}
           >
-            {pending ? "Canceling Business..." : BILLING_CANCEL_LABEL}
+            {pending ? "Canceling subscription..." : BILLING_CANCEL_LABEL}
           </Button>
         </DialogFooter>
       </DialogContent>
