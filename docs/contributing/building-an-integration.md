@@ -23,7 +23,7 @@ Document your findings in the ticket or in the PR description.
 ## 3. Build the integration
 
 - **Backend**: Implement in [pkg/integrations](https://github.com/superplanehq/superplane/tree/main/pkg/integrations).
-- **Frontend**: Add mappers in [web_src/src/pages/workflowv2/mappers](https://github.com/superplanehq/superplane/tree/main/web_src/src/pages/workflowv2/mappers).
+- **Frontend**: Add mappers in [web_src/src/pages/app/mappers](https://github.com/superplanehq/superplane/tree/main/web_src/src/pages/app/mappers).
 - **Docs**: Write docs in the integration package. Generate with `make gen.components.docs`.
 - **Tests**: Add unit tests in `pkg/integrations/<name>/`.
 
