@@ -25,9 +25,10 @@ import (
 )
 
 const (
-	// intakeSeedSize is how many open Dependabot alerts a new intake imports.
-	// A repository with fewer open alerts gives fewer, so the seed is an upper bound.
-	intakeSeedSize = 30
+	// intakeDependabotSeedSize is how many open Dependabot alerts a new intake
+	// imports. A repository with fewer open alerts gives fewer, so the seed is
+	// an upper bound.
+	intakeDependabotSeedSize = 30
 
 	// intakeGitHubIssueSeedSize is how many open GitHub issues a new intake
 	// imports. The wizard tells the user this number. Each imported issue
@@ -250,7 +251,7 @@ func seedDependabotAlerts(
 	}
 
 	repository, _ := binding.Configuration["repository"].(string)
-	alerts, _, err := client.ListOpenDependabotAlerts(ctx, repository, intakeSeedSize)
+	alerts, _, err := client.ListOpenDependabotAlerts(ctx, repository, intakeDependabotSeedSize)
 	if err != nil {
 		return intakeSeedResult{}, ghdependabot.UnavailableError(fmt.Errorf("failed to list Dependabot alerts of %s: %w", repository, err))
 	}
