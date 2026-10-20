@@ -37,6 +37,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	factoryActions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/llm"
@@ -860,6 +861,12 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
+	upgradeImplementationTestingGuidance(context.Background(), factoryActions.IntakeDependencies{
+		Registry:       registry,
+		Encryptor:      encryptorInstance,
+		AuthService:    authService,
+		WebhookBaseURL: webhooksBaseURL,
+	})
 	migrationsEnabled := keyStore != nil && !encryptionConfig.legacyWrites
 	if migrationsEnabled {
 		if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
@@ -923,6 +930,21 @@ func Start() {
 	log.Println("SuperPlane is UP.")
 
 	select {}
+}
+
+func upgradeImplementationTestingGuidance(ctx context.Context, deps factoryActions.IntakeDependencies) {
+	organizations, _, err := models.ListAllOrganizations(database.DB(ctx), "", 0, 0, "", "")
+	if err != nil {
+		log.WithError(err).Error("Failed to list organizations for the Implement testing upgrade")
+		return
+	}
+	for _, organization := range organizations {
+		_, err := factoryActions.UpgradeOrganizationImplementationTestingGuidance(ctx, organization.ID, deps)
+		if err != nil {
+			log.WithError(err).WithField("organization_id", organization.ID).
+				Error("Failed to upgrade Implement testing guidance")
+		}
+	}
 }
 
 func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
