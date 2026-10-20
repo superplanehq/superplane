@@ -11,43 +11,43 @@ import { DEFAULT_GITHUB_INTAKE_SETTINGS, DEFAULT_SENTRY_INTAKE_SETTINGS } from "
 import { lineIntakeSourceById } from "./lineIntakeModel";
 import { planningReviewDraftFromCanvas } from "../lib/columnCanvasAgent";
 import {
-  backlogHistoryHandlers,
-  backlogStoryCanvas,
-  backlogStoryCanvasId,
-  backlogStoryFactory,
-  backlogStoryOrganization,
-  backlogStoryRunId,
+  factoryHistoryHandlers,
+  factoryHistoryStoryCanvas,
+  factoryHistoryStoryCanvasId,
+  factoryHistoryStoryFactory,
+  factoryHistoryStoryOrganization,
+  factoryHistoryStoryRunId,
   type BacklogStorySource,
-} from "./automationRunHistory/backlogRunHistoryFixtures";
+} from "./automationRunHistory/factoryRunHistoryFixtures";
 
 function BacklogPreview({ source, detail = false }: { source: BacklogStorySource; detail?: boolean }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
-  const canvasId = backlogStoryCanvasId(source);
+  const canvasId = factoryHistoryStoryCanvasId(source);
   const parameter = source === "planning" ? "planningSettings" : "settings";
-  const initialPath = `/?${parameter}=runs${detail ? `&automationRun=${backlogStoryRunId}` : ""}`;
+  const initialPath = `/?${parameter}=runs${detail ? `&automationRun=${factoryHistoryStoryRunId}` : ""}`;
   return (
     <QueryClientProvider client={client}>
       <ComponentStoryShell initialPath={initialPath} className="h-screen bg-background">
         {source === "planning" ? (
           <PlanningSettingsPopup
-            organizationId={backlogStoryOrganization}
-            factoryId={backlogStoryFactory}
+            organizationId={factoryHistoryStoryOrganization}
+            factoryId={factoryHistoryStoryFactory}
             canvasId={canvasId}
             settings={DEFAULT_PLANNING_SETTINGS}
             onSave={(next) => console.log("Save Planning settings", next)}
             onClose={() => console.log("Close Planning")}
             agent={{
-              draft: planningReviewDraftFromCanvas(backlogStoryCanvas(source), "refine-task") ?? undefined,
-              organizationId: backlogStoryOrganization,
-              factoryId: backlogStoryFactory,
+              draft: planningReviewDraftFromCanvas(factoryHistoryStoryCanvas(source), "refine-task") ?? undefined,
+              organizationId: factoryHistoryStoryOrganization,
+              factoryId: factoryHistoryStoryFactory,
               automationId: canvasId,
               onSave: (next) => console.log("Save Planning agent", next),
             }}
           />
         ) : (
           <IntakeSettingsHost
-            organizationId={backlogStoryOrganization}
-            factoryId={backlogStoryFactory}
+            organizationId={factoryHistoryStoryOrganization}
+            factoryId={factoryHistoryStoryFactory}
             factoryKey="SUPER"
             repository="superplanehq/superplane"
             intake={{
@@ -85,7 +85,7 @@ type Story = StoryObj<typeof meta>;
 
 async function checkHistory({ canvasElement }: { canvasElement: HTMLElement }) {
   const canvas = within(canvasElement.ownerDocument.body);
-  const openRun = await canvas.findByRole("button", { name: `Open run ${backlogStoryRunId}` });
+  const openRun = await canvas.findByRole("button", { name: `Open run ${factoryHistoryStoryRunId}` });
   await expect(canvas.queryByRole("tab", { name: "Automation" })).not.toBeInTheDocument();
   await userEvent.click(openRun);
   await userEvent.click(await canvas.findByRole("button", { name: /^(Evaluate incoming task|Plan task)/ }));
@@ -97,29 +97,29 @@ async function checkHistory({ canvasElement }: { canvasElement: HTMLElement }) {
 export const GitHub: Story = {
   name: "GitHub",
   args: { source: "github-issues" },
-  parameters: { msw: { handlers: backlogHistoryHandlers("github-issues") } },
+  parameters: { msw: { handlers: factoryHistoryHandlers("github-issues") } },
   play: checkHistory,
 };
 export const Sentry: Story = {
   args: { source: "sentry-exceptions" },
-  parameters: { msw: { handlers: backlogHistoryHandlers("sentry-exceptions") } },
+  parameters: { msw: { handlers: factoryHistoryHandlers("sentry-exceptions") } },
   play: checkHistory,
 };
 export const Dependabot: Story = {
   args: { source: "dependabot-alerts" },
-  parameters: { msw: { handlers: backlogHistoryHandlers("dependabot-alerts") } },
+  parameters: { msw: { handlers: factoryHistoryHandlers("dependabot-alerts") } },
   play: checkHistory,
 };
 export const Planning: Story = {
   args: { source: "planning" },
-  parameters: { msw: { handlers: backlogHistoryHandlers("planning") } },
+  parameters: { msw: { handlers: factoryHistoryHandlers("planning") } },
   play: checkHistory,
 };
 export const RunPermalink: Story = {
   args: { source: "planning", detail: true },
-  parameters: { msw: { handlers: backlogHistoryHandlers("planning") } },
+  parameters: { msw: { handlers: factoryHistoryHandlers("planning") } },
 };
 export const FeatureDisabled: Story = {
   args: { source: "github-issues" },
-  parameters: { msw: { handlers: backlogHistoryHandlers("github-issues", false) } },
+  parameters: { msw: { handlers: factoryHistoryHandlers("github-issues", false) } },
 };

@@ -1,11 +1,11 @@
-import { BacklogSettingsTabs } from "./BacklogSettingsTabs";
+import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import { IntakeSourceSettingsFooter } from "./IntakeSourceSettingsFooter";
-import { BacklogAutomationHistory } from "./BacklogAutomationHistory";
-import { useBacklogRunNavigation } from "@/hooks/useBacklogRunNavigation";
+import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
+import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
 import { NodeConfigRepositoryLine } from "./NodeConfigPanel";
 import {
   INTAKE_SETTINGS_COPY,
@@ -87,7 +87,7 @@ export function IntakeSourceSettingsPopup({
   initialTab = "general",
 }: IntakeSourceSettingsPopupProps) {
   const { draft, onDraftChange, getDraft } = useIntakeSettingsDraft(settings);
-  const history = useBacklogRunNavigation({
+  const history = useFactoryAutomationNavigation({
     organizationId,
     factoryId,
     graph: automationGraph,
@@ -106,7 +106,7 @@ export function IntakeSourceSettingsPopup({
         onClose={onClose}
         leading={<IntakeSourceTitleLogo sourceId={sourceId} />}
       >
-        <BacklogSettingsTabs
+        <FactoryAutomationSettingsTabs
           tab={tab}
           onTabChange={setTab}
           hasAgent={Boolean(agent)}
@@ -116,7 +116,7 @@ export function IntakeSourceSettingsPopup({
         />
       </PopupHeader>
       {tab === "runs" ? (
-        <BacklogAutomationHistory
+        <FactoryAutomationHistory
           organizationId={history.organizationId}
           factoryId={history.factoryId}
           canvasId={canvasId}
