@@ -126,8 +126,21 @@ func Tools() []Tool {
 			},
 		},
 		{
+			Name:        "list_line_models",
+			Description: "List the model ids you can send to hand_off_task. Each model has an id and a name. Send the id. The model applies only to Implement. line is required when the workspace has more than one line.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"line": map[string]any{
+						"type":        "string",
+						"description": "Line name. Required when the workspace has more than one line.",
+					},
+				},
+			},
+		},
+		{
 			Name:        "hand_off_task",
-			Description: "Create an open task from this MCP client and move it to Implement or Verify. Store plan as the spec the implement agent reads. Implement starts the implementation stage. Verify tracks an open pull request and does not start an agent. It does not wait for an agent.",
+			Description: "Create an open task from this MCP client and move it to Implement or Verify. Store plan as the spec the implement agent reads. Implement starts the implementation stage. Verify tracks an open pull request and does not start an agent. Set model to an id from list_line_models. The model applies only to Implement. Omit model to keep the column default. It does not wait for an agent.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -137,6 +150,7 @@ func Tools() []Tool {
 					"column":           map[string]any{"type": "string", "enum": []string{"implement", "verify"}, "description": "Board column to hand the task to."},
 					"pull_request_url": map[string]any{"type": "string", "description": "Open pull request URL (GitHub or Bitbucket). Required when column is verify."},
 					"line":             map[string]any{"type": "string", "description": "Line name. Required when the workspace has more than one line."},
+					"model":            map[string]any{"type": "string", "description": "Model id from list_line_models. Applies only to Implement. Omit it to keep the column default."},
 				},
 				"required": []string{"title", "plan", "column"},
 			},
@@ -184,6 +198,8 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 		return rt.sendTaskMessage(ctx, claims, args)
 	case "create_task":
 		return rt.createTask(ctx, claims, args)
+	case "list_line_models":
+		return rt.listLineModels(ctx, claims, args)
 	case "hand_off_task":
 		return rt.handOffTask(ctx, claims, args)
 	case "assign_task":
@@ -435,6 +451,10 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	description, _ := args["description"].(string)
 	pullRequestURL, _ := args["pull_request_url"].(string)
 	line, _ := args["line"].(string)
+	model, err := optionalStringArg(args, "model")
+	if err != nil {
+		return ToolResult{}, err
+	}
 
 	clientName := ClientDisplayName(database.DB(ctx), claims.ClientID)
 	result, err := factories.HandOffWorkOrder(toolContext(ctx, claims), rt.Intake, claims.OrgID.String(), factories.HandOffWorkOrderRequest{
@@ -445,6 +465,7 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 		Column:         column,
 		PullRequestURL: strings.TrimSpace(pullRequestURL),
 		LineName:       strings.TrimSpace(line),
+		Model:          model,
 		MCPClientID:    claims.ClientID,
 		MCPClientName:  clientName,
 	})
@@ -461,7 +482,39 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	if result.PullRequestURL != "" {
 		payload["pull_request_url"] = result.PullRequestURL
 	}
+	if chosen := activeLineDispatchModel(order.GetLineDispatches()); chosen != "" {
+		payload["model"] = chosen
+	}
 	return TextResult(mustJSON(payload)), nil
+}
+
+func (rt *Runtime) listLineModels(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
+	if err := rt.authorize(ctx, claims, "work_orders:read"); err != nil {
+		return ToolResult{}, err
+	}
+	line, err := optionalStringArg(args, "line")
+	if err != nil {
+		return ToolResult{}, err
+	}
+	listed, err := factories.ListHandOffLineModels(toolContext(ctx, claims), claims.OrgID.String(), claims.FactoryID.String(), line)
+	if err != nil {
+		return ToolResult{}, actionError(err)
+	}
+	rows := make([]lineModelRow, 0, len(listed))
+	for _, model := range listed {
+		rows = append(rows, lineModelRow{ID: model.ID, Name: model.Name})
+	}
+	return TextResult(mustJSON(map[string]any{"models": rows})), nil
+}
+
+func activeLineDispatchModel(dispatches []*pb.WorkOrderLineDispatch) string {
+	for _, dispatch := range dispatches {
+		if dispatch == nil || dispatch.GetState() != pb.WorkOrderLineDispatch_STATE_ACTIVE {
+			continue
+		}
+		return strings.TrimSpace(dispatch.GetModel())
+	}
+	return ""
 }
 
 func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
@@ -558,6 +611,11 @@ type memberRow struct {
 	Name        string `json:"name"`
 	Email       string `json:"email"`
 	GitHubLogin string `json:"github_login"`
+}
+
+type lineModelRow struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 func assigneeRefs(users []*pb.UserRef) []assigneeRef {
