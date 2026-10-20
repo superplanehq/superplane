@@ -1911,7 +1911,7 @@ message WorkOrder {
 
 // WorkOrderSummary is the list row for a work order.
 // DescribeWorkOrder returns WorkOrder, which adds files, the usage
-// breakdown, the source run, and the full checks. Both carry
+// breakdown and the full checks. Both carry the source run and
 // PlanningSessionSummary.
 message WorkOrderSummary {
   string id = 1;
@@ -1939,6 +1939,8 @@ message WorkOrderSummary {
   // MCP client that created this task through a hand-off. Empty for
   // tasks that did not come from an MCP client.
   WorkOrderMcpClient mcp_client = 21;
+  // Canvas run that created this task. Needed to link intake history rows.
+  string source_run_id = 22;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
