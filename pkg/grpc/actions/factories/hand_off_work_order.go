@@ -145,11 +145,6 @@ func HandOffWorkOrder(
 	if len(line.Steps) == 0 {
 		return nil, factoryErrorToStatus(models.ErrFactoryLineHasNoSteps, "failed to hand off work order")
 	}
-	if column == HandOffColumnImplement && model != "" {
-		if err := ensureHandOffModelAllowed(db, factory, line, model); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to hand off work order")
-		}
-	}
 
 	stages, err := classifyHandOffStages(db, factory, line)
 	if err != nil {
@@ -162,6 +157,11 @@ func HandOffWorkOrder(
 		implementIndex, err = resolveImplementationStageIndex(stages)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to hand off work order")
+		}
+		if model != "" {
+			if err := ensureHandOffModelAllowed(db, factory, line.Steps[implementIndex].AppID, model); err != nil {
+				return nil, factoryErrorToStatus(err, "failed to hand off work order")
+			}
 		}
 	} else {
 		verifyIndex, err = resolveVerifyStageIndex(stages)
@@ -533,7 +533,15 @@ func ListHandOffLineModels(ctx context.Context, organizationID, factoryID, lineN
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list line models")
 	}
-	ids, err := listLineRunnerModels(db, orgID, factory.ID, line.Name)
+	stages, err := classifyHandOffStages(db, factory, line)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list line models")
+	}
+	implementIndex, err := resolveImplementationStageIndex(stages)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list line models")
+	}
+	ids, err := listRunnerModelsForApps(db, orgID, factory.ID, []uuid.UUID{line.Steps[implementIndex].AppID})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list line models")
 	}
@@ -546,15 +554,15 @@ func ListHandOffLineModels(ctx context.Context, organizationID, factoryID, lineN
 	return listed, nil
 }
 
-func ensureHandOffModelAllowed(tx *gorm.DB, factory *models.Factory, line *models.FactoryLine, model string) error {
-	allowed, err := listLineRunnerModels(tx, factory.OrganizationID, factory.ID, line.Name)
+func ensureHandOffModelAllowed(tx *gorm.DB, factory *models.Factory, appID uuid.UUID, model string) error {
+	allowed, err := listRunnerModelsForApps(tx, factory.OrganizationID, factory.ID, []uuid.UUID{appID})
 	if err != nil {
 		return err
 	}
 	if slices.Contains(allowed, model) {
 		return nil
 	}
-	return invalidArgument("This model is not available on this line. Set model to one of: " + strings.Join(allowed, ", "))
+	return invalidArgument("This model is not available for Implement. Set model to one of: " + strings.Join(allowed, ", "))
 }
 
 func resolveHandOffLine(tx *gorm.DB, factory *models.Factory, lineName string) (*models.FactoryLine, error) {

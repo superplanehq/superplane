@@ -2490,7 +2490,7 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		return superPlaneAcceptsDispatchModel(b.tx, workflow.OrganizationID, workflow.FactoryID, model)
 	}
 
-	provider, ok := runnerProviderForComponent(node.ComponentName())
+	provider, ok := runnerProviderForDispatch(node.ComponentName(), resolved, node.Configuration.Data())
 	if !ok {
 		return false, nil
 	}
@@ -2537,6 +2537,16 @@ func superPlaneAcceptsDispatchModel(
 		models.UsageFundingSourceHosted,
 		hosted.Model,
 	)
+}
+
+func runnerProviderForDispatch(component string, configurations ...map[string]any) (string, bool) {
+	for _, configuration := range configurations {
+		provider, _ := configuration["llmProvider"].(string)
+		if strings.TrimSpace(provider) == models.UsageProviderCustom {
+			return models.UsageProviderCustom, true
+		}
+	}
+	return runnerProviderForComponent(component)
 }
 
 func runnerProviderForComponent(component string) (string, bool) {

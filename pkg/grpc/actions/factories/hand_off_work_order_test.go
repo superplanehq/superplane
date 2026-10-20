@@ -136,7 +136,51 @@ func Test__HandOffWorkOrder__ImplementRejectsUnknownModel(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	assert.Contains(t, grpcerrors.StatusMessage(err), "This model is not available for Implement.")
 	assert.Contains(t, grpcerrors.StatusMessage(err), "Set model to one of: claude-opus-4-6, claude-sonnet-4-6")
+
+	orders, err := factoryModel.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{})
+	require.NoError(t, err)
+	assert.Empty(t, orders)
+}
+
+func Test__HandOffWorkOrder__ImplementRejectsModelFromAnotherStage(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel := seedHandOffFactory(t, r, db)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6", "claude-opus-4-6")
+	seedHostedModels(t, db, models.UsageProviderOpenAI, "gpt-5")
+
+	plan := createLineAppWithRunner(t, r, factoryModel.ID, runnerCodex, "hosted", "gpt-5")
+	implement := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "hosted", "claude-sonnet-4-6")
+	require.NoError(t, implement.StampFactoryAppTemplate(db, "start", lineImplementationTemplateID, 1))
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: plan.ID, Entrypoint: "start"},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	listed, err := ListHandOffLineModels(ctx, r.Organization.ID.String(), factoryModel.ID.String(), "ship")
+	require.NoError(t, err)
+	ids := make([]string, 0, len(listed))
+	for _, model := range listed {
+		ids = append(ids, model.ID)
+	}
+	assert.Equal(t, []string{"claude-opus-4-6", "claude-sonnet-4-6"}, ids)
+	assert.NotContains(t, ids, "gpt-5")
+
+	_, err = HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID: factoryModel.ID.String(),
+		Title:     "Ship refund retries",
+		Plan:      "# Retry refunds",
+		Column:    HandOffColumnImplement,
+		Model:     "gpt-5",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	assert.Contains(t, grpcerrors.StatusMessage(err), "This model is not available for Implement.")
+	assert.NotContains(t, grpcerrors.StatusMessage(err), "gpt-5")
 
 	orders, err := factoryModel.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{})
 	require.NoError(t, err)

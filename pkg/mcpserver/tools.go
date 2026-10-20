@@ -127,7 +127,7 @@ func Tools() []Tool {
 		},
 		{
 			Name:        "list_line_models",
-			Description: "List the model ids you can send to hand_off_task. Each model has an id and a name. Send the id. The model applies only to Implement. line is required when the workspace has more than one line.",
+			Description: "List the model ids you can send to hand_off_task for Implement. Each model has an id and a name. Send the id. The list includes only the Implement stage. line is required when the workspace has more than one line.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
