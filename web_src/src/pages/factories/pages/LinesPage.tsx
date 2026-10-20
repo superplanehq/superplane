@@ -708,6 +708,7 @@ export function LinesPage() {
           factoryKey={routeSegment}
           lineId={selectedLine.id}
           canvasId={automationViewCanvasId}
+          columnKey={viewedAutomation?.columnKey}
           title={viewedAutomation?.name?.trim() || "Automation"}
           onClose={closeAutomationView}
           onDelete={canDeleteViewedCustom ? deleteViewedCustomAutomation : undefined}

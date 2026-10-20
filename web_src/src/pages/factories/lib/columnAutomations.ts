@@ -479,7 +479,7 @@ export function columnAutomationOpenPath(
   return factoryColumnAutomationViewPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
 }
 
-export type ColumnAutomationViewTab = "general" | "agent" | "automation";
+export type ColumnAutomationViewTab = "general" | "agent" | "automation" | "runs";
 
 /** Tab order: form first, then agent, then the canvas. */
 export function columnAutomationViewTabs(input: { hasGeneral: boolean; hasAgent: boolean }): ColumnAutomationViewTab[] {

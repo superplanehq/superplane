@@ -56,7 +56,7 @@ describe("Implement Runs routing", () => {
       organizationReady: true,
       expected: true,
     },
-    { nodeId: "assess-risk", enabled: true, isLoading: false, organizationReady: true, expected: false },
+    { nodeId: "on-pr-risk", enabled: true, isLoading: false, organizationReady: true, expected: true },
   ])(
     "gates Implement history while preserving the old view: %j",
     ({ nodeId, enabled, isLoading, organizationReady, expected }) => {

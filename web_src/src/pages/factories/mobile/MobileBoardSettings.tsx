@@ -42,7 +42,7 @@ export function MobileBoardSettings({
   intakes: ConfiguredLineIntakeSource[];
   canUpdate: boolean;
   onboarding?: FactoryOnboarding;
-  apps: Array<{ id?: string; name?: string }>;
+  apps: Array<{ id?: string; name?: string; columnKey?: string }>;
 }) {
   const navigate = useNavigate();
   const { search } = useLocation();
@@ -50,6 +50,7 @@ export function MobileBoardSettings({
   const intakeId = intakeIdFromSearch(search);
   const canvasId = columnAutomationViewCanvasIdFromSearch(search);
   const planningTab = planningSettingsTabFromSearch(search);
+  const automation = automationDetails(apps, canvasId);
   const settingsIntake = isIntakeSearchOpen(search)
     ? intakes.find((intake) => intake.intakeId === intakeId)
     : undefined;
@@ -74,7 +75,8 @@ export function MobileBoardSettings({
           factoryKey={routeSegment}
           lineId={lineId}
           canvasId={canvasId}
-          title={automationTitle(apps, canvasId)}
+          columnKey={automation.columnKey}
+          title={automation.title}
           onClose={close}
         />
       ) : null}
@@ -112,8 +114,9 @@ export function MobileBoardSettings({
   );
 }
 
-function automationTitle(apps: Array<{ id?: string; name?: string }>, canvasId: string): string {
-  return apps.find((app) => app.id === canvasId)?.name?.trim() || "Automation";
+function automationDetails(apps: Array<{ id?: string; name?: string; columnKey?: string }>, canvasId: string | null) {
+  const app = apps.find((app) => app.id === canvasId);
+  return { title: app?.name?.trim() || "Automation", columnKey: app?.columnKey };
 }
 
 function planningSettingsTab(value: string | null) {
