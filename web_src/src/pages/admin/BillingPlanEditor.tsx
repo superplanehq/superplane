@@ -1,0 +1,404 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { BillingHelp } from "./BillingHelp";
+import type { BillingPlan, FeatureDefinition } from "./billingPlansApi";
+type PlanFieldsProps = { plan: BillingPlan; onChange: (plan: BillingPlan) => void };
+
+export function BillingPlanEditor({
+  plan,
+  features,
+  onChange,
+  onSave,
+  onCancel,
+  saving,
+}: {
+  plan: BillingPlan;
+  features: FeatureDefinition[];
+  onChange: (plan: BillingPlan) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const [returnFocus] = useState(() => document.activeElement);
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !saving) onCancel();
+      }}
+    >
+      <DialogContent
+        size="large"
+        className="flex max-h-[90vh] w-[calc(100%-2rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0"
+        showCloseButton={!saving}
+        onCloseAutoFocus={(event) => {
+          if (returnFocus instanceof HTMLElement) {
+            event.preventDefault();
+            returnFocus.focus();
+          }
+        }}
+      >
+        <DialogHeader className="border-b px-6 py-5">
+          <DialogTitle>{plan.id ? `Edit ${plan.name}` : "Create plan"}</DialogTitle>
+          <DialogDescription>Configure pricing, limits, credits, and feature access.</DialogDescription>
+        </DialogHeader>
+        <form
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSave();
+          }}
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <fieldset disabled={saving} className="space-y-6 p-6">
+              <PlanDetails plan={plan} onChange={onChange} />
+              <PlanPolicies plan={plan} onChange={onChange} />
+              <PlanAccessFields plan={plan} features={features} onChange={onChange} />
+            </fieldset>
+          </div>
+          <DialogFooter className="shrink-0 border-t bg-muted/20 px-6 py-4">
+            <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving..." : "Save plan"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PlanSelect({
+  label,
+  help,
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  help: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <Label>{label}</Label>
+        <BillingHelp label={label} text={help} />
+      </div>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger className="w-full capitalize" aria-label={label}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option} value={option} className="capitalize">
+              {option.replace(/_/g, " ")}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function PlanAccessFields({
+  plan,
+  features,
+  onChange,
+}: {
+  plan: BillingPlan;
+  features: FeatureDefinition[];
+  onChange: (plan: BillingPlan) => void;
+}) {
+  const update = (patch: Partial<BillingPlan>) => onChange({ ...plan, ...patch });
+  return (
+    <>
+      <div className="space-y-2 border-t pt-5">
+        <Label className="flex items-center gap-2">
+          <Checkbox
+            checked={plan.require_payment_method}
+            onChange={(event) => update({ require_payment_method: event.target.checked })}
+          />
+          Require payment method
+        </Label>
+        <p className="text-sm text-muted-foreground">
+          Require a saved card before usage. Card setup does not charge the customer.
+        </p>
+      </div>
+      <fieldset className="space-y-3 border-t pt-5">
+        <legend className="text-sm font-semibold">Plan features</legend>
+        {features.length === 0 && (
+          <p className="text-sm text-muted-foreground">Create features in the Features tab to add them to a plan.</p>
+        )}
+        {features.map((feature) => (
+          <Label key={feature.key} className="flex items-center gap-3 rounded-lg border p-3">
+            <Checkbox
+              checked={plan.features.includes(feature.key)}
+              onChange={(event) =>
+                update({
+                  features: event.target.checked
+                    ? [...plan.features, feature.key]
+                    : plan.features.filter((key) => key !== feature.key),
+                })
+              }
+            />
+            <span className="space-y-1">
+              <span className="block">{feature.label}</span>
+              <span className="block text-xs font-normal text-muted-foreground">
+                <code>{feature.key}</code>
+                {!feature.gated && " · Available to all organizations"}
+              </span>
+            </span>
+          </Label>
+        ))}
+      </fieldset>
+    </>
+  );
+}
+
+function PlanDetails({ plan, onChange }: PlanFieldsProps) {
+  const update = (patch: Partial<BillingPlan>) => onChange({ ...plan, ...patch });
+  return (
+    <section className="space-y-4" aria-labelledby="plan-details-heading">
+      <h3 id="plan-details-heading" className="text-sm font-semibold">
+        Plan details
+      </h3>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="plan-name">Name</Label>
+          <Input id="plan-name" required value={plan.name} onChange={(event) => update({ name: event.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="plan-key">Key</Label>
+            <BillingHelp label="Key" text="A unique plan identifier. The key cannot change after creation." />
+          </div>
+          <Input
+            id="plan-key"
+            required
+            value={plan.key}
+            disabled={!!plan.id}
+            onChange={(event) => update({ key: event.target.value })}
+          />
+        </div>
+        <PlanSelect
+          label="Category"
+          help="Choose whether this plan has no billing, provides a trial, or supports paid usage."
+          value={plan.category}
+          options={["none", "trial", "paid"]}
+          disabled={!!plan.id && ["none", "trial", "business_legacy"].includes(plan.key)}
+          onChange={(category) => update({ category })}
+        />
+        <PlanSelect
+          label="Visibility"
+          help="Public plans appear in the customer plan list. Private plans are assigned by an administrator."
+          value={plan.visibility}
+          options={["public", "private"]}
+          onChange={(visibility) => update({ visibility })}
+        />
+      </div>
+    </section>
+  );
+}
+function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
+  const update = (patch: Partial<BillingPlan>) => onChange({ ...plan, ...patch });
+  const linked = !!plan.id && !!plan.polar_product_id;
+  const legacy = plan.key === "business_legacy";
+  return (
+    <>
+      {["Pricing", "Usage limits", "Credits and trial"].map((section) => (
+        <section key={section} className="space-y-4 border-t pt-5" aria-label={section}>
+          <h3 className="text-sm font-semibold">{section}</h3>
+          {section === "Credits and trial" && (
+            <div className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
+              Automatic credit delivery is available only for trials and legacy Business. Other credit policies are
+              stored for future delivery.
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <PlanNumbers plan={plan} section={section} onChange={onChange} />
+            {section === "Pricing" && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="plan-polar-product">Polar product ID</Label>
+                  <BillingHelp
+                    label="Polar product ID"
+                    text="Links the plan to a Polar product. Once linked, the product ID and prices cannot change here."
+                  />
+                </div>
+                <Input
+                  id="plan-polar-product"
+                  disabled={linked}
+                  value={plan.polar_product_id ?? ""}
+                  onChange={(event) => update({ polar_product_id: event.target.value || null })}
+                />
+              </div>
+            )}
+            {section === "Credits and trial" && (
+              <>
+                <PlanSelect
+                  label="Credit frequency"
+                  help={
+                    legacy
+                      ? "Legacy Business credit frequency cannot change."
+                      : "One-time credit is granted once per organization and plan. Recurring credit follows subscription periods, or monthly periods for admin plans."
+                  }
+                  value={plan.credit_frequency}
+                  disabled={legacy}
+                  options={["none", "once", "billing_period"]}
+                  onChange={(credit_frequency) => update({ credit_frequency })}
+                />
+                <PlanSelect
+                  label="Credit expiration"
+                  help={
+                    legacy
+                      ? "Legacy Business credit expiration cannot change."
+                      : "Credit can expire at the period end, after a set number of days, or never."
+                  }
+                  value={plan.credit_expiration}
+                  disabled={legacy}
+                  options={["period_end", "after_days", "never"]}
+                  onChange={(credit_expiration) => update({ credit_expiration })}
+                />
+              </>
+            )}
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
+function PlanNumbers({ plan, section, onChange }: PlanFieldsProps & { section: string }) {
+  const update = (patch: Partial<BillingPlan>) => onChange({ ...plan, ...patch });
+  const numberFields = planNumberFields(!!plan.id && !!plan.polar_product_id, plan.key === "business_legacy");
+  return (
+    <>
+      {numberFields
+        .filter((field) => field.section === section)
+        .map(({ key, label, help, nullable, locked, placeholder }) => (
+          <div key={key} className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor={`plan-${key}`}>{label}</Label>
+              <BillingHelp label={label} text={help} />
+            </div>
+            <Input
+              id={`plan-${key}`}
+              type="number"
+              min={0}
+              step={1}
+              disabled={locked}
+              placeholder={placeholder}
+              value={String(plan[key] ?? "")}
+              onChange={(event) =>
+                update({
+                  [key]: nullable && event.target.value === "" ? null : Number(event.target.value),
+                })
+              }
+            />
+          </div>
+        ))}
+    </>
+  );
+}
+function planNumberFields(linked: boolean, legacy: boolean) {
+  const fields: {
+    key: keyof BillingPlan;
+    label: string;
+    help: string;
+    nullable?: boolean;
+    placeholder?: string;
+    locked?: boolean;
+    section: string;
+  }[] = [
+    {
+      key: "base_price_cents",
+      label: "Base price (cents)",
+      help: linked
+        ? "Pricing is locked because this plan is linked to a Polar product."
+        : "The base plan price in US cents. 100 cents equals $1.",
+      locked: linked,
+      section: "Pricing",
+    },
+    {
+      key: "seat_price_cents",
+      label: "Seat price (cents)",
+      help: linked
+        ? "Pricing is locked because this plan is linked to a Polar product."
+        : "The price per seat in US cents, separate from the base price.",
+      locked: linked,
+      section: "Pricing",
+    },
+    {
+      key: "markup_bps",
+      label: "Markup (basis points)",
+      help: "100 basis points equals 1%. Leave empty to use the installation default.",
+      nullable: true,
+      placeholder: "Installation default",
+      section: "Pricing",
+    },
+    {
+      key: "seat_limit",
+      label: "Seat limit",
+      help: "Maximum organization members. Leave empty for unlimited seats.",
+      nullable: true,
+      placeholder: "Unlimited",
+      section: "Usage limits",
+    },
+    {
+      key: "parallel_task_limit",
+      label: "Parallel task limit",
+      help: "Saved for future use. This limit does not restrict task execution.",
+      nullable: true,
+      placeholder: "Unlimited",
+      section: "Usage limits",
+    },
+    {
+      key: "credit_amount_cents",
+      label: "Included credit (cents)",
+      help: "Credit included with the plan, in US cents. Changes apply to future grants.",
+      section: "Credits and trial",
+    },
+    {
+      key: "credit_validity_days",
+      label: "Credit validity (days)",
+      help: legacy
+        ? "Legacy Business credit validity cannot change."
+        : "Days before credit expires when credit expiration is set to after days.",
+      nullable: true,
+      placeholder: "Not set",
+      locked: legacy,
+      section: "Credits and trial",
+    },
+    {
+      key: "trial_credit_cents",
+      label: "Trial credit (cents)",
+      help: "Credit granted for a trial, in US cents.",
+      section: "Credits and trial",
+    },
+    {
+      key: "trial_length_days",
+      label: "Trial length (days)",
+      help: "Number of days before a trial ends.",
+      section: "Credits and trial",
+    },
+  ];
+  return fields;
+}

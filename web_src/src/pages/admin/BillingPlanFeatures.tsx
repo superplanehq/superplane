@@ -1,4 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Plus, Pencil } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/Table/table";
+import { BillingHelp } from "./BillingHelp";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -13,6 +25,7 @@ export function BillingPlanFeatures({
   features: FeatureDefinition[];
   onSaved: () => Promise<void>;
 }) {
+  const returnFocus = useRef<HTMLButtonElement>(null);
   const [editing, setEditing] = useState<FeatureDefinition | null>(null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -34,43 +47,142 @@ export function BillingPlanFeatures({
     }
   };
   return (
-    <section aria-label="Feature catalog" className="space-y-4 rounded border p-4">
-      <h2 className="font-semibold">Feature catalog</h2>
-      <p>Define features here, then select them in a plan. Use the string key to check feature access in code.</p>
-      <Button
-        onClick={() => {
-          setCreating(true);
-          setEditing({ key: "", label: "", gated: true });
-        }}
-      >
-        Create feature
-      </Button>
-      {features.length === 0 && <p>No features. Create a feature to add it to plans.</p>}
-      {features.map((feature) => (
-        <div key={feature.key} className="flex items-center gap-3">
-          <span className="grow">
-            {feature.label} · <code>{feature.key}</code>
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setCreating(false);
-              setEditing({ ...feature });
-            }}
-          >
-            Edit {feature.label}
-          </Button>
+    <section aria-label="Feature catalog" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h2 className="font-semibold">Feature catalog</h2>
+          <p className="text-sm text-muted-foreground">Define features, then select them in a plan.</p>
         </div>
-      ))}
-      {editing && (
-        <form
-          className="space-y-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void save();
+        <Button
+          onClick={(event) => {
+            returnFocus.current = event.currentTarget;
+            setCreating(true);
+            setEditing({ key: "", label: "", gated: true });
           }}
         >
-          <div>
+          <Plus aria-hidden="true" />
+          Create feature
+        </Button>
+      </div>
+      <div className="overflow-hidden rounded-lg border px-6">
+        <Table aria-label="Features" bleed>
+          <TableHead>
+            <TableRow>
+              <TableHeader>Feature</TableHeader>
+              <TableHeader>
+                Key{" "}
+                <BillingHelp
+                  label="Feature key"
+                  text="Use this stable identifier to check feature access in code. The key cannot change after creation."
+                />
+              </TableHeader>
+              <TableHeader>
+                Access{" "}
+                <BillingHelp
+                  label="Feature access"
+                  text="Restricted features require plan selection or an organization grant. All organizations have access to unrestricted features."
+                />
+              </TableHeader>
+              <TableHeader>
+                <span className="sr-only">Actions</span>
+              </TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {features.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  No features. Create a feature to add it to plans.
+                </TableCell>
+              </TableRow>
+            )}
+            {features.map((feature) => (
+              <TableRow key={feature.key} className="hover:bg-muted/30">
+                <TableCell className="font-medium">{feature.label}</TableCell>
+                <TableCell>
+                  <code className="text-xs text-muted-foreground">{feature.key}</code>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">{feature.gated ? "Restricted" : "All organizations"}</Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label={`Edit ${feature.label}`}
+                    onClick={(event) => {
+                      returnFocus.current = event.currentTarget;
+                      setCreating(false);
+                      setEditing({ ...feature });
+                    }}
+                  >
+                    <Pencil aria-hidden="true" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      {editing && (
+        <FeatureEditor
+          editing={editing}
+          creating={creating}
+          saving={saving}
+          returnFocus={returnFocus.current}
+          onChange={setEditing}
+          onSave={() => void save()}
+          onCancel={() => setEditing(null)}
+        />
+      )}
+    </section>
+  );
+}
+
+function FeatureEditor({
+  editing,
+  creating,
+  saving,
+  returnFocus,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  editing: FeatureDefinition;
+  creating: boolean;
+  saving: boolean;
+  returnFocus: HTMLButtonElement | null;
+  onChange: (feature: FeatureDefinition) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !saving) onCancel();
+      }}
+    >
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto"
+        showCloseButton={!saving}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocus?.focus();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>{creating ? "Create feature" : `Edit ${editing.label}`}</DialogTitle>
+          <DialogDescription>Control how organizations receive access to this feature.</DialogDescription>
+        </DialogHeader>
+        <form
+          className="space-y-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSave();
+          }}
+        >
+          <div className="space-y-2">
             <Label htmlFor="feature-key">Feature key</Label>
             <Input
               id="feature-key"
@@ -78,42 +190,44 @@ export function BillingPlanFeatures({
               disabled={!creating || saving}
               required
               pattern="[a-z][a-z0-9_]*"
-              onChange={(event) => setEditing({ ...editing, key: event.target.value })}
+              onChange={(event) => onChange({ ...editing, key: event.target.value })}
             />
-            <p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
               Use lowercase letters, numbers, and underscores. Start with a letter. The key cannot change after
               creation.
             </p>
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="feature-label">Feature name</Label>
             <Input
               id="feature-label"
               value={editing.label}
               required
               disabled={saving}
-              onChange={(event) => setEditing({ ...editing, label: event.target.value })}
+              onChange={(event) => onChange({ ...editing, label: event.target.value })}
             />
           </div>
           <Label className="flex items-center gap-2">
             <Checkbox
               checked={editing.gated}
               disabled={saving}
-              onChange={(event) => setEditing({ ...editing, gated: event.target.checked })}
+              onChange={(event) => onChange({ ...editing, gated: event.target.checked })}
             />
             Require plan selection or an organization grant
           </Label>
-          <p>If cleared, all organizations have access. Changes apply immediately.</p>
-          <div className="flex gap-2">
+          <p className="text-xs text-muted-foreground">
+            If cleared, all organizations have access. Changes apply immediately.
+          </p>
+          <DialogFooter className="border-t pt-4">
+            <Button type="button" variant="outline" disabled={saving} onClick={() => onCancel()}>
+              Cancel
+            </Button>
             <Button type="submit" disabled={saving}>
               {saving ? "Saving..." : "Save feature"}
             </Button>
-            <Button type="button" variant="outline" disabled={saving} onClick={() => setEditing(null)}>
-              Cancel
-            </Button>
-          </div>
+          </DialogFooter>
         </form>
-      )}
-    </section>
+      </DialogContent>
+    </Dialog>
   );
 }
