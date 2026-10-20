@@ -192,6 +192,27 @@ describe("OwnerSetup", () => {
     });
   });
 
+  it("submits a cleared install report as opted out", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "required", beacon_enabled: true },
+    });
+    renderOwnerSetup();
+
+    fireEvent.click(await screen.findByTestId("owner-setup-install-report"));
+    fireEvent.change(screen.getByPlaceholderText("First name"), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
+    fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "ada@example.com" } });
+    fireEvent.change(screen.getByPlaceholderText("Password"), { target: { value: "Secret1x" } });
+    fireEvent.change(screen.getByPlaceholderText("Confirm password"), { target: { value: "Secret1x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+      const post = calls.find((call) => String(call[0]).endsWith("/api/v1/setup-owner") && call[1]?.method === "POST");
+      expect(JSON.parse(String(post?.[1]?.body)).share_owner_identity).toBe(false);
+    });
+  });
+
   it("hides the install report when the beacon is off", async () => {
     stubOwnerSetupFetch();
     renderOwnerSetup();

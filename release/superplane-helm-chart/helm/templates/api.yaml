@@ -179,7 +179,7 @@ spec:
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
             - name: SUPERPLANE_VERSION
-              value: {{ .Values.image.tag | quote }}
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
             {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
 {{- if .Values.fleetManagerSetup.enabled }}
             - name: FLEET_MANAGER_SETUP_CONFIG_PATH
