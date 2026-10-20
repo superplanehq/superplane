@@ -178,6 +178,12 @@ export const Configuration: Story = {
     await expect(page.getByTestId("field-model-hosted-model-list")).toBeVisible();
     await expect(page.getByTestId("field-model-hosted-thinking")).toBeVisible();
     await userEvent.keyboard("{Escape}");
+    const runsTab = canvas.getByTestId("merge-confidence-config-tab-runs");
+    await userEvent.click(runsTab);
+    await expect(runsTab).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.queryByRole("group", { name: "Default model" })).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByTestId("merge-confidence-config-tab-automation"));
+    await expect(canvas.getByTestId("field-model-hosted-model")).toBeVisible();
   },
 };
 export const InvalidDuration: Story = {

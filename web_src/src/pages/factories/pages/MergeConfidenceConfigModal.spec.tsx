@@ -166,7 +166,7 @@ describe("MergeConfidenceConfigModal", () => {
 
     if (enabled) {
       expect(screen.queryByRole("navigation", { name: "Automation settings" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
       expect(screen.queryByRole("textbox", { name: /^Name/ })).not.toBeInTheDocument();
       expect(screen.queryByText("Key")).not.toBeInTheDocument();
       expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
@@ -175,7 +175,7 @@ describe("MergeConfidenceConfigModal", () => {
       expect(screen.queryByText("Start implementation")).not.toBeInTheDocument();
       expect(screen.queryByText("Implement From Task Description")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add step" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Run history" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "false");
       expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeChecked();
       await user.click(screen.getByRole("switch", { name: "Create draft pull requests" }));
       expect(onSaveNode).toHaveBeenCalledTimes(1);
@@ -202,6 +202,11 @@ describe("MergeConfidenceConfigModal", () => {
         }),
       ),
     );
+    await user.click(screen.getByRole("tab", { name: "Runs" }));
+    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("group", { name: "Default model" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Configuration" }));
+    expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
   });
 
   it("opens the first component beside the automation", () => {
