@@ -10,7 +10,7 @@ const isValidRedirectPath = (path: string | null): path is string => {
   return !path.startsWith("/welcome");
 };
 
-export const getWelcomeSurveyRedirectPath = (rawRedirect: string | null): string => {
+export const getWelcomeRedirectPath = (rawRedirect: string | null): string => {
   if (!rawRedirect) {
     return "/";
   }

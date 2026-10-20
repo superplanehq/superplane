@@ -14,6 +14,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -91,6 +92,15 @@ func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndP
 }
 
 func SendPlanningSessionMessage(ctx context.Context, organizationID string, req *pb.SendPlanningSessionMessageRequest) (*pb.SendPlanningSessionMessageResponse, error) {
+	return sendPlanningSessionMessage(ctx, organizationID, req, "message")
+}
+
+func sendPlanningSessionMessage(
+	ctx context.Context,
+	organizationID string,
+	req *pb.SendPlanningSessionMessageRequest,
+	interaction string,
+) (*pb.SendPlanningSessionMessageResponse, error) {
 	session, factoryModel, userID, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
@@ -135,6 +145,7 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		publishDraftAssigneesUpdated(session)
 	}
 	messages.PublishPlanningBoardStatus(session)
+	captureFirstPlanningRefinement(ctx, db, factoryModel, session, interaction)
 	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
@@ -142,12 +153,50 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 	return &pb.SendPlanningSessionMessageResponse{Session: serialized}, nil
 }
 
+func captureFirstPlanningRefinement(
+	ctx context.Context,
+	db *gorm.DB,
+	factory *models.Factory,
+	session *models.FactoryPlanningSession,
+	interaction string,
+) {
+	if session == nil {
+		return
+	}
+
+	var userMessages int64
+	err := db.Model(&models.PlanningSessionMessage{}).
+		Where("session_id = ? AND role = ?", session.ID, models.PlanningSessionMessageRoleUser).
+		Count(&userMessages).Error
+	if err != nil {
+		log.WithError(err).Warn("Skipped factory task refined analytics")
+		return
+	}
+	if userMessages != 1 {
+		return
+	}
+
+	taskID := uuid.Nil
+	if session.DraftWorkOrderID != nil {
+		taskID = *session.DraftWorkOrderID
+	}
+	captureFactoryProductEvent(
+		ctx,
+		db,
+		factory,
+		taskID,
+		productanalytics.EventFactoryTaskRefined,
+		productanalytics.StableEventID(productanalytics.EventFactoryTaskRefined, session.ID.String()),
+		productanalytics.Properties{"interaction": interaction},
+	)
+}
+
 func AnswerPlanningSessionSurvey(ctx context.Context, organizationID string, req *pb.AnswerPlanningSessionSurveyRequest) (*pb.AnswerPlanningSessionSurveyResponse, error) {
-	response, err := SendPlanningSessionMessage(ctx, organizationID, &pb.SendPlanningSessionMessageRequest{
+	response, err := sendPlanningSessionMessage(ctx, organizationID, &pb.SendPlanningSessionMessageRequest{
 		FactoryId: req.GetFactoryId(),
 		SessionId: req.GetSessionId(),
 		Text:      req.GetText(),
-	})
+	}, "survey_answer")
 	if err != nil {
 		return nil, err
 	}

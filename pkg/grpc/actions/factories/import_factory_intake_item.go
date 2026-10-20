@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -208,6 +209,18 @@ func ImportFactoryIntakeItem(
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)
+	captureFactoryProductEvent(
+		ctx,
+		db,
+		factory,
+		order.ID,
+		productanalytics.EventFactoryTaskCreated,
+		productanalytics.StableEventID(productanalytics.EventFactoryTaskCreated, order.ID.String()),
+		productanalytics.Properties{
+			"creation_source": "issue_import",
+			"issue_source":    intake.Source,
+		},
+	)
 
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),
