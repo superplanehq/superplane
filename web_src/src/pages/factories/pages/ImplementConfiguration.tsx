@@ -1,9 +1,9 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useId, useRef, useState } from "react";
 
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
+import { ImplementSettingRow } from "./ImplementSettingRow";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 
 type SaveSettings = (update: NodeConfigurationUpdate) => Promise<void> | void;
@@ -76,17 +76,12 @@ function PullRequestSettings({ node, onSave }: { node: SuperplaneComponentsNode;
   };
 
   return (
-    <section aria-labelledby={`${id}-title`} className="flex flex-col gap-4 border-t border-border pt-6">
-      <h3 id={`${id}-title`} className="workspace-section-title">
-        Pull requests
-      </h3>
-      <div className="flex items-center justify-between gap-6">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={id}>Create draft pull requests</Label>
-          <p id={`${id}-help`} className="text-[12px] text-muted-foreground">
-            Keep new pull requests in draft until you mark them ready for review.
-          </p>
-        </div>
+    <div className="flex flex-col gap-2">
+      <ImplementSettingRow
+        label="Create draft pull requests"
+        description="Pull requests stay in draft until you mark them ready."
+        htmlFor={id}
+      >
         <Switch
           id={id}
           aria-describedby={`${id}-help`}
@@ -94,12 +89,12 @@ function PullRequestSettings({ node, onSave }: { node: SuperplaneComponentsNode;
           disabled={pending !== null}
           onCheckedChange={(checked) => void save(checked)}
         />
-      </div>
+      </ImplementSettingRow>
       {failed ? (
         <p role="alert" className="text-sm text-destructive">
           SuperPlane could not save this setting. Try again.
         </p>
       ) : null}
-    </section>
+    </div>
   );
 }
