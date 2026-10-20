@@ -1,7 +1,7 @@
 import { AutomationRunHistory } from "@/ui/AutomationRunHistory/AutomationRunHistory";
 import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
 
-export function BacklogAutomationHistory({
+export function FactoryAutomationHistory({
   organizationId,
   factoryId,
   canvasId,

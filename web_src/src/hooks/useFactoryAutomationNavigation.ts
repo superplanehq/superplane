@@ -3,27 +3,29 @@ import { useSearchParams } from "react-router";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 
-export type BacklogSettingsTab = "general" | "agent" | "automation" | "runs";
+export type FactoryAutomationSettingsTab = "general" | "agent" | "automation" | "runs";
 type HistoryScope = { organizationId?: string; factoryId?: string };
 
 /** Preserve legacy tabs without the flag; share flagged tabs and runs through the URL. */
-export function useBacklogRunNavigation({
+export function useFactoryAutomationNavigation({
   organizationId,
   factoryId,
   graph,
   agent,
   parameter,
-  initialTab = "general",
+  initialTab,
   hasAgent,
+  hasGeneral = true,
   eligible = true,
 }: {
   organizationId?: string;
   factoryId?: string;
   graph?: HistoryScope;
   agent?: HistoryScope;
-  parameter: "settings" | "planningSettings";
-  initialTab?: BacklogSettingsTab;
+  parameter: "settings" | "planningSettings" | "prFeedbackSettings" | "automationTab";
+  initialTab?: FactoryAutomationSettingsTab;
   hasAgent: boolean;
+  hasGeneral?: boolean;
   eligible?: boolean;
 }) {
   const scope = historyScope(organizationId, factoryId, graph, agent);
@@ -33,11 +35,9 @@ export function useBacklogRunNavigation({
   const [legacyTab, setLegacyTab] = useState(initialTab);
   const selectedRunId = params.get("automationRun");
   const requested = enabled ? (params.get(parameter) ?? (selectedRunId ? "runs" : initialTab)) : legacyTab;
-  let tab: BacklogSettingsTab = "general";
-  if (requested === "agent" && hasAgent) tab = "agent";
-  if (requested === "automation" || requested === "runs") tab = enabled ? "runs" : "automation";
+  const tab = resolveSettingsTab(requested, { hasGeneral, hasAgent, historyEnabled: enabled });
 
-  const setTab = (next: BacklogSettingsTab) => {
+  const setTab = (next: FactoryAutomationSettingsTab) => {
     if (!enabled) {
       setLegacyTab(next);
       return;
@@ -72,4 +72,16 @@ function historyScope(
     organizationId: organizationId ?? graph?.organizationId ?? agent?.organizationId,
     factoryId: factoryId ?? graph?.factoryId ?? agent?.factoryId,
   };
+}
+
+function resolveSettingsTab(
+  requested: string | null | undefined,
+  { hasGeneral, hasAgent, historyEnabled }: { hasGeneral: boolean; hasAgent: boolean; historyEnabled: boolean },
+): FactoryAutomationSettingsTab {
+  if (requested === "general" && hasGeneral) return "general";
+  if (requested === "agent" && hasAgent) return "agent";
+  if (requested === "automation" || requested === "runs") return historyEnabled ? "runs" : "automation";
+  if (hasGeneral) return "general";
+  if (historyEnabled) return "runs";
+  return hasAgent ? "agent" : "automation";
 }

@@ -181,7 +181,7 @@ function compareRunsNewestFirst(left: FactoryAutomationRunCard, right: FactoryAu
 
 /**
  * Finds the task for this canvas run, if any.
- * Line and PR steps match on execution run id. Intake matches on
+ * Line steps and pull request activities match on execution run id. Intake matches on
  * sourceRunId after Create Task. Backlog analysis matches the work
  * order id in the trigger payload. A unique task title matches when
  * a run has no stored id link yet. Trigger-only runs have no task.
@@ -200,6 +200,17 @@ export function findWorkOrderForAutomationRun(
   );
   if (byStep) {
     return byStep;
+  }
+
+  const byPullRequest = workOrders.find((order) =>
+    order.pullRequests?.some(
+      (pullRequest) =>
+        pullRequest.activities?.some((activity) => activity.run?.id === runId) ||
+        pullRequest.runs?.some((activity) => activity.run?.id === runId),
+    ),
+  );
+  if (byPullRequest) {
+    return byPullRequest;
   }
 
   const bySource = workOrders.find((order) => workOrderSourceRunId(order) === runId);
