@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { useState } from "react";
+import { expect, userEvent, within } from "storybook/test";
 import type { IntegrationsCapabilityDefinition, SuperplaneComponentsNode } from "@/api-client";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
@@ -59,9 +60,11 @@ const handlers = [
 function ImplementConfigPreview({
   page = true,
   draftPullRequests = false,
+  executionTimeoutSeconds = 3600,
 }: {
   page?: boolean;
   draftPullRequests?: boolean;
+  executionTimeoutSeconds?: number;
 }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   const [specNodes, setSpecNodes] = useState<SuperplaneComponentsNode[]>(() => [
@@ -71,7 +74,7 @@ function ImplementConfigPreview({
       name: "Implement From Task Description",
       type: "TYPE_ACTION",
       component: "runnerClaudeCode",
-      configuration: structuredClone(PLANNING_REVIEW_DRAFT.components[0].configuration),
+      configuration: { ...structuredClone(PLANNING_REVIEW_DRAFT.components[0].configuration), executionTimeoutSeconds },
       concurrency: { max: 5, key: "" },
     },
     {
@@ -142,8 +145,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Configuration: Story = {};
-export const Popup: Story = { args: { page: false } };
-export const PullRequestSettings: Story = { args: { draftPullRequests: true } };
+export const InvalidDuration: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const duration = await canvas.findByRole("spinbutton", { name: "Maximum run duration (minutes)" });
+    await userEvent.clear(duration);
+    await userEvent.tab();
+    await expect(canvas.getByRole("alert")).toBeVisible();
+  },
+};
 export const FeatureDisabled: Story = {
   parameters: {
     msw: {
