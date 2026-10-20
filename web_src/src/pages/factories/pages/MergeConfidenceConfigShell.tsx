@@ -9,6 +9,7 @@ import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "re
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { ImplementRunHistory } from "./implementRunHistory/ImplementRunHistory";
+import { ImplementConfiguration } from "./ImplementConfiguration";
 import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
@@ -86,20 +87,39 @@ export function MergeConfidenceConfigShell(props: MergeConfidenceConfigShellProp
 }
 
 function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
+  const features = useExperimentalFeature(props.organizationId);
+  const simplifiedImplement = Boolean(
+    features.has(FEATURE_FACTORY_RUN_HISTORY) &&
+      props.graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID),
+  );
   return (
     <>
       <PopupHeader
-        title={props.title}
+        title={simplifiedImplement && props.tab === "runs" ? `${props.title} run history` : props.title}
         onClose={props.onClose}
         actions={
-          props.onDelete ? (
-            <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
-          ) : null
+          <>
+            {simplifiedImplement && props.showRunsTab ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => props.onTabChange(props.tab === "runs" ? "automation" : "runs")}
+              >
+                {props.tab === "runs" ? "Back to settings" : "Run history"}
+              </Button>
+            ) : null}
+            {props.onDelete ? (
+              <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
+            ) : null}
+          </>
         }
       >
-        <SettingsAutomationHeaderRow
-          tabs={<ConfigTabs tab={props.tab} showRunsTab={props.showRunsTab} onTabChange={props.onTabChange} />}
-        />
+        {!simplifiedImplement ? (
+          <SettingsAutomationHeaderRow
+            tabs={<ConfigTabs tab={props.tab} showRunsTab={props.showRunsTab} onTabChange={props.onTabChange} />}
+          />
+        ) : null}
       </PopupHeader>
       <MergeConfidenceConfigBody {...configBodyProps(props)} />
       {props.onDelete ? (
@@ -182,6 +202,11 @@ function implementHistoryContext({
   return { canvasId, organizationId, factoryId };
 }
 
+function implementSettingsNode({ tab, graph }: ReturnType<typeof configBodyProps>) {
+  if (tab !== "automation") return undefined;
+  return graph?.specNodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID);
+}
+
 function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
   const {
     containerRef,
@@ -210,6 +235,19 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     layoutFitNonce,
   } = props;
   const features = useExperimentalFeature(organizationId);
+  const implementAgent = implementSettingsNode(props);
+  if (implementAgent && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
+    return (
+      <ImplementConfiguration
+        agent={implementAgent}
+        nodes={graph?.specNodes ?? []}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        onSave={onSaveNode}
+      />
+    );
+  }
   const historyContext = implementHistoryContext(props);
   if (historyContext && features.isLoading) {
     return (
