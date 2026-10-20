@@ -1,7 +1,6 @@
 package dokploy
 
 import (
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -59,10 +58,6 @@ func (d *ListApplications) Configuration() []configuration.Field {
 
 func (d *ListApplications) Setup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (d *ListApplications) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (d *ListApplications) Execute(ctx core.ExecutionContext) error {
