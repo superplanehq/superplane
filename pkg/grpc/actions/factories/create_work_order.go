@@ -13,6 +13,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -75,6 +76,19 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)
+	creationSource := "manual"
+	if productanalytics.SourceFromContext(ctx, productanalytics.SourceAPI) == productanalytics.SourceMCP {
+		creationSource = "mcp"
+	}
+	captureFactoryProductEvent(
+		ctx,
+		db,
+		factory,
+		order.ID,
+		productanalytics.EventFactoryTaskCreated,
+		productanalytics.StableEventID(productanalytics.EventFactoryTaskCreated, order.ID.String()),
+		productanalytics.Properties{"creation_source": creationSource},
+	)
 
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),
