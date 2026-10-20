@@ -11,7 +11,7 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
 import { ImplementConfiguration } from "./ImplementConfiguration";
-import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
+import { IMPLEMENT_AGENT_NODE_ID, columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
 import { MergeConfidenceActionsMenu, MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
@@ -188,7 +188,7 @@ function ConfigTabs({
   );
 }
 
-function implementHistoryContext({
+function automationHistoryContext({
   tab,
   canvasId,
   organizationId,
@@ -196,7 +196,7 @@ function implementHistoryContext({
   graph,
 }: ReturnType<typeof configBodyProps>) {
   if (tab !== "runs" || !canvasId || !organizationId || !factoryId) return null;
-  if (!graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID)) return null;
+  if (!columnAutomationUsesSplitConfig(graph?.specNodes?.map((node) => node.id) ?? [])) return null;
   return { canvasId, organizationId, factoryId };
 }
 
@@ -246,7 +246,7 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
       />
     );
   }
-  const historyContext = implementHistoryContext(props);
+  const historyContext = automationHistoryContext(props);
   if (historyContext && features.isLoading) {
     return (
       <p role="status" className="p-6 text-sm text-muted-foreground">

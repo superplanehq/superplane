@@ -1,11 +1,11 @@
-import { BacklogSettingsTabs } from "./BacklogSettingsTabs";
+import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useState } from "react";
 
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import { BacklogAutomationHistory } from "./BacklogAutomationHistory";
-import { useBacklogRunNavigation } from "@/hooks/useBacklogRunNavigation";
+import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
+import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
 import { PlanningHealthSection, PlanningSettingsFields } from "./PlanningSettingsFields";
 import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
@@ -61,7 +61,7 @@ export function PlanningSettingsPopup({
   initialTab = "general",
 }: PlanningSettingsPopupProps) {
   const [draft, setDraft] = useState(settings);
-  const history = useBacklogRunNavigation({
+  const history = useFactoryAutomationNavigation({
     organizationId,
     factoryId,
     graph: automationGraph,
@@ -91,7 +91,7 @@ export function PlanningSettingsPopup({
   return (
     <PopupShell testId="planning-settings" canvas fixed={fixed} onDismiss={onClose}>
       <PopupHeader title={title} onClose={onClose}>
-        <BacklogSettingsTabs
+        <FactoryAutomationSettingsTabs
           tab={tab}
           onTabChange={setTab}
           hasAgent={Boolean(agent)}
@@ -101,7 +101,7 @@ export function PlanningSettingsPopup({
         />
       </PopupHeader>
       {tab === "runs" ? (
-        <BacklogAutomationHistory
+        <FactoryAutomationHistory
           organizationId={history.organizationId}
           factoryId={history.factoryId}
           canvasId={canvasId}
