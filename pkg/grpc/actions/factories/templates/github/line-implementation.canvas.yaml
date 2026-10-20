@@ -94,7 +94,7 @@ spec:
 
               1/ Focus on clean code.
               2/ Make long term fixes, not fast patches.
-              3/ Add tests where it makes sense.
+              3/ Follow the repository's testing instructions and use its existing test tools and conventions. For bug fixes, add a regression test that reproduces the failure when practical. For behavior changes, add or update tests that verify observable behavior. Avoid tests that only mirror the implementation or assert incidental presentation details. Run the relevant tests, lint, and build checks. Fix failures caused by your changes. Report any checks you could not run and explain why.
               4/ For UI work, implement and wire the change into the production page or component.
               5/ A Storybook story, preview, or fixture does not replace the product implementation unless the task explicitly requests a prototype.
               6/ Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers.
