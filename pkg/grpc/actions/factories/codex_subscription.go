@@ -143,8 +143,7 @@ func refreshFactoryCodexCatalog(
 		}
 
 		taskID := uuid.New()
-		connection, err = models.ReserveFactoryCodexConnection(tx, organizationID, factory.ID, taskID, time.Now())
-		if err != nil {
+		if err := connection.BeginCatalogRefresh(tx, taskID, time.Now()); err != nil {
 			return err
 		}
 		token, err := runner.MintCodexSubscriptionToken(jwt.NewSigner(secret), runner.CodexSubscriptionScope{
@@ -230,11 +229,14 @@ func CancelFactoryCodexConnection(
 		if lockErr != nil {
 			return lockErr
 		}
-		if connection.ReservationTaskID == nil {
+		if err := connection.AttachLoginLease(tx); err != nil {
+			return err
+		}
+		if connection.LoginLease == nil {
 			return nil
 		}
 		tasks := contexts.NewRunnerTaskContext(tx, encryptor, orgID)
-		if cancelErr := tasks.RequestCancel(connection.ReservationTaskID.String()); cancelErr != nil && !errors.Is(cancelErr, models.ErrRunnerTaskNotFound) {
+		if cancelErr := tasks.RequestCancel(connection.LoginLease.TaskID.String()); cancelErr != nil && !errors.Is(cancelErr, models.ErrRunnerTaskNotFound) {
 			return cancelErr
 		}
 		return models.ReleaseConfirmedCodexReservations(tx, time.Now())
@@ -329,7 +331,10 @@ func loadCodexConnection(
 			connection = nil
 			return nil
 		}
-		return lockErr
+		if lockErr != nil {
+			return lockErr
+		}
+		return connection.AttachLoginLease(tx)
 	})
 	if err != nil {
 		return nil, false, uuid.Nil, factoryErrorToStatus(err, "failed to describe ChatGPT subscription")
@@ -408,8 +413,8 @@ func serializeCodexConnection(
 	view.AccountLabel = connection.AccountLabel
 	view.ReservationHeld = connection.Reserved()
 	view.AvailableModels = models.CompactModelIDs(codexModelIDs(connection.AvailableModels))
-	if connection.ReservationTaskID != nil {
-		view.ActiveTaskId = connection.ReservationTaskID.String()
+	if connection.LoginLease != nil {
+		view.ActiveTaskId = connection.LoginLease.TaskID.String()
 	}
 	if eligible && callerID == connection.OwnerUserID && connection.Status == models.CodexConnectionStatusPending {
 		view.VerificationUrl = connection.VerificationURL

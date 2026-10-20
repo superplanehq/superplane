@@ -89,6 +89,7 @@ func TestInjectSubscriptionCredentialsPreservesPlanningEnvironment(t *testing.T)
 	assert.Equal(t, "planning-token", values[runner.EnvSuperplaneRunToken])
 	assert.Equal(t, "http://host.docker.internal:8000", values[runner.EnvSuperplaneBaseURL])
 	assert.NotEmpty(t, values[runner.EnvCodexSubscriptionToken])
+	assert.Equal(t, values[runner.EnvSuperplaneBaseURL]+runner.CodexSubscriptionRefreshPath, values[runner.EnvCodexRefreshTokenURL])
 	assert.NotContains(t, values, envOpenAIAPIKey)
 	assert.NotContains(t, values, envOpenAIBaseURL)
 }
@@ -160,7 +161,8 @@ func TestBuildCodexBrokerTaskRestoresSubscriptionWithSelectedModel(t *testing.T)
 	require.GreaterOrEqual(t, len(task.Commands), 4)
 	assert.Equal(t, "Prepare Codex", task.Commands[0].Name)
 	assert.Equal(t, "Restore ChatGPT sign-in", task.Commands[1].Name)
-	assert.Equal(t, "Save ChatGPT sign-in", task.Commands[len(task.Commands)-1].Name)
+	assert.Equal(t, "Save ChatGPT usage", task.Commands[len(task.Commands)-1].Name)
+	assert.Contains(t, task.Commands[len(task.Commands)-1].Command, "usage")
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js"`)
 	assert.Contains(t, task.Commands[2].Command, "gpt-5.4")
 	assert.Contains(t, requireTaskFile(t, task.Files, "codex_subscription.js").Content, "auth.json")
@@ -239,7 +241,7 @@ func TestApplyPlanningFollowUpKeepsSubscriptionCheckpointLast(t *testing.T) {
 
 	require.Len(t, got.Commands, len(base.Commands)+1)
 	assert.Equal(t, "Wait for the next message", got.Commands[len(got.Commands)-2].Name)
-	assert.Equal(t, "Save ChatGPT sign-in", got.Commands[len(got.Commands)-1].Name)
+	assert.Equal(t, "Save ChatGPT usage", got.Commands[len(got.Commands)-1].Name)
 }
 
 func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {

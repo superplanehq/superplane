@@ -512,7 +512,7 @@ func (w *NodeExecutor) executeActionNode(
 			w.encryptor,
 			workflow.OrganizationID,
 		),
-		CodexSubscription: contexts.NewCodexSubscriptionContext(tx, workflow),
+		CodexSubscription: contexts.NewCodexSubscriptionContext(tx, workflow, w.encryptor),
 		Logger:            logger,
 	}
 	if node.AppInstallationID != nil {
@@ -535,7 +535,7 @@ func (w *NodeExecutor) executeActionNode(
 	if err := action.Execute(ctx); err != nil {
 		var busy *models.CodexConnectionBusyError
 		if errors.As(err, &busy) {
-			// Keep the execution pending until the previous runner releases its credentials.
+			// Keep the execution pending while ChatGPT sign-in holds the subscription.
 			return err
 		}
 		logger = withFactoryOrder(logger, tx, execution.RunID)

@@ -112,8 +112,8 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 			Kind:    runner.LiveLogKindSetup,
 		}}, commands[1:]...)
 		commands = append(commands, runner.BrokerCommand{
-			Name:    "Save ChatGPT sign-in",
-			Command: `node "$SUPERPLANE_TASK_DIR/codex_subscription.js" checkpoint --final`,
+			Name:    "Save ChatGPT usage",
+			Command: `node "$SUPERPLANE_TASK_DIR/codex_subscription.js" usage`,
 			Kind:    runner.LiveLogKindSetup,
 		})
 	}
@@ -143,7 +143,7 @@ func applyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvi
 	}
 	task.Files = runner.AppendAttachmentSetupFiles(runner.AppendAttachmentLimitFile(append(task.Files, runner.FollowUpLoopFile())))
 	followUp := planningFollowUpCommand(spec)
-	if len(task.Commands) > 0 && task.Commands[len(task.Commands)-1].Name == "Save ChatGPT sign-in" {
+	if len(task.Commands) > 0 && task.Commands[len(task.Commands)-1].Name == "Save ChatGPT usage" {
 		last := task.Commands[len(task.Commands)-1]
 		task.Commands = append(append(task.Commands[:len(task.Commands)-1], followUp), last)
 		return task
