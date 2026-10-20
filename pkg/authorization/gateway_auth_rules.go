@@ -929,6 +929,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/select-plan"}: {
+			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/payment-method-session"}: {
+			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/sync"}: {
 			Resource:   "org",
 			Action:     "read",

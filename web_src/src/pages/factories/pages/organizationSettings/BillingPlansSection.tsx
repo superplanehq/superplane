@@ -76,7 +76,7 @@ export function BillingPlansSection({
         )}
       </div>
       <p className="mt-3 text-sm text-muted-foreground">
-        New subscriptions are unavailable. Contact an installation admin to change your plan.
+        Select an available plan in Payment method. Contact an installation admin if the plan you need is unavailable.
       </p>
       <p className="mt-3">
         <a href={SUPERPLANE_PRICING_URL} target="_blank" rel="noreferrer">

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	agentservice "github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"gorm.io/gorm"
 )
@@ -34,6 +35,9 @@ func DefineAgentOutcome(ctx context.Context, svc AgentsService, orgID, userID st
 	if err := svc.DefineOutcome(ctx, org, user, chatID, req.Description, req.Rubric, maxIter); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "agent chat not found")
+		}
+		if errors.Is(err, models.ErrPaymentMethodRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, err.Error())
 		}
 		if errors.Is(err, agentservice.ErrSessionBusy) {
 			return nil, grpcerrors.FailedPrecondition(nil, "agent is still processing the previous turn")

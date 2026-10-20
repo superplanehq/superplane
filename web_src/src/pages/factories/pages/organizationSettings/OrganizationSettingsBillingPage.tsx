@@ -30,6 +30,7 @@ import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { BillingCreditHistoryCard } from "./BillingCreditHistoryCard";
 import { BillingInvoicesCard } from "./BillingInvoicesCard";
+import { BillingPaymentSettings } from "./BillingPaymentSettings";
 import { BillingPlansSection } from "./BillingPlansSection";
 import { HostedCreditTopUpBanner } from "./HostedCreditTopUpBanner";
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
@@ -53,6 +54,9 @@ export function OrganizationSettingsBillingPage() {
 
   return (
     <FactorySettingsPageFrame title="Billing">
+      {!model.isLoading && !model.error && (
+        <BillingPaymentSettings organizationId={organizationId} canManageBilling={model.canManageBilling} />
+      )}
       <BillingPageBody
         billingContactMessage={model.billingContactMessage}
         billingEnabled={model.billingEnabled}

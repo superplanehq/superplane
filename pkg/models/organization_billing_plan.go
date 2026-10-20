@@ -35,6 +35,7 @@ const (
 )
 
 var (
+	ErrPaymentMethodRequired      = errors.New("add a payment method in organization billing before usage")
 	ErrHostedSubscriptionRequired = errors.New("an active paid plan is required for SuperPlane-hosted runs")
 	ErrInvalidBillingPlan         = errors.New("billing plan is invalid")
 	ErrPolarManagedBillingPlan    = errors.New("this organization uses Polar for billing. Cancel or change the subscription in Polar")

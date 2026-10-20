@@ -58,7 +58,11 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 		TrialCreditCents: catalog.TrialCreditCents, TrialLengthDays: catalog.TrialLengthDays, MarkupBPS: markup,
 		HostedExecutionAllowed: plan.AllowsHostedExecution(time.Now()), CreditPurchaseAllowed: plan.AllowsCreditPurchase(),
 	}
-	for _, feature := range Definitions {
+	definitions, err := models.ListPlanFeatureDefinitions(tx)
+	if err != nil {
+		return nil, err
+	}
+	for _, feature := range definitions {
 		result.Features[feature.Key] = !models.BillingEnabled() || !feature.Gated || slices.Contains(catalog.Features, feature.Key) || enabled[feature.Key]
 	}
 	if !models.BillingEnabled() {

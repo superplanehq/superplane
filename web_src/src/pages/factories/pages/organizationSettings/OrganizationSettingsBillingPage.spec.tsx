@@ -209,17 +209,22 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
   }, 10000);
 
-  it.each([true, false])("keeps new subscription checkout closed with flag %s", async (subscriptionCheckoutEnabled) => {
+  it("shows public catalog plans independently of the legacy checkout flag", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
-          organizationBilling: { ...defaultFactoriesFixture.organizationBilling, subscriptionCheckoutEnabled },
+          organizationBilling: {
+            ...defaultFactoriesFixture.organizationBilling,
+            subscriptionCheckoutEnabled: false,
+            availablePlans: [{ key: "payg", name: "Pay-as-you-go", requirePaymentMethod: true, basePriceCents: "0" }],
+          },
         }}
       />,
     );
-    expect(await screen.findByText(/New subscriptions are unavailable/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Select Pay-as-you-go" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add payment method" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
   });
 

@@ -8,11 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { showErrorToast } from "@/lib/toast";
 import { billingCatalogRequest, type BillingPlan, type FeatureDefinition } from "./billingPlansApi";
 
+import { BillingPlanFeatures } from "./BillingPlanFeatures";
+
 const emptyPlan: BillingPlan = {
   key: "",
   name: "",
   category: "paid",
   visibility: "private",
+  require_payment_method: false,
   base_price_cents: 0,
   seat_price_cents: 0,
   polar_product_id: null,
@@ -91,6 +94,7 @@ export function BillingPlans() {
       )}
       {loading && <p>Loading billing plans...</p>}
       {!loading && plans.length === 0 && !error && <p>No billing plans. Create a plan to start.</p>}
+      {!loading && !error && <BillingPlanFeatures features={features} onSaved={load} />}
       <Button onClick={() => setEditing({ ...emptyPlan })}>Create plan</Button>
       <div className="space-y-2">
         {plans.map((plan) => (
@@ -230,7 +234,7 @@ function BillingPlanEditor({
           onChange={(credit_expiration) => update({ credit_expiration })}
         />
       </div>
-      <PlanFeatureFields plan={plan} features={features} onChange={onChange} />
+      <PlanAccessFields plan={plan} features={features} onChange={onChange} />
       <div className="flex gap-2">
         <Button disabled={saving} onClick={onSave}>
           {saving ? "Saving..." : "Save plan"}
@@ -275,7 +279,7 @@ function PlanSelect({
   );
 }
 
-function PlanFeatureFields({
+function PlanAccessFields({
   plan,
   features,
   onChange,
@@ -286,24 +290,38 @@ function PlanFeatureFields({
 }) {
   const update = (patch: Partial<BillingPlan>) => onChange({ ...plan, ...patch });
   return (
-    <fieldset className="space-y-2">
-      <legend>Plan features</legend>
-      {features.map((feature) => (
-        <Label key={feature.key} className="flex items-center gap-2">
+    <>
+      <div className="space-y-2">
+        <Label className="flex items-center gap-2">
           <Checkbox
-            checked={plan.features.includes(feature.key)}
-            onChange={(event) =>
-              update({
-                features: event.target.checked
-                  ? [...plan.features, feature.key]
-                  : plan.features.filter((key) => key !== feature.key),
-              })
-            }
+            checked={plan.require_payment_method}
+            onChange={(event) => update({ require_payment_method: event.target.checked })}
           />
-          {feature.label}
-          {!feature.gated && " (available to all organizations)"}
+          Require payment method
         </Label>
-      ))}
-    </fieldset>
+        <p className="text-sm text-muted-foreground">
+          Require a saved card before usage. Card setup does not charge the customer.
+        </p>
+      </div>
+      <fieldset className="space-y-2">
+        <legend>Plan features</legend>
+        {features.map((feature) => (
+          <Label key={feature.key} className="flex items-center gap-2">
+            <Checkbox
+              checked={plan.features.includes(feature.key)}
+              onChange={(event) =>
+                update({
+                  features: event.target.checked
+                    ? [...plan.features, feature.key]
+                    : plan.features.filter((key) => key !== feature.key),
+                })
+              }
+            />
+            {feature.label} · <code>{feature.key}</code>
+            {!feature.gated && " (available to all organizations)"}
+          </Label>
+        ))}
+      </fieldset>
+    </>
   );
 }

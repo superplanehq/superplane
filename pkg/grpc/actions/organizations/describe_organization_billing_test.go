@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,6 +68,10 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 		periodStart := time.Now().UTC().Truncate(time.Second)
 		periodEnd := periodStart.AddDate(0, 1, 0)
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			if strings.HasSuffix(req.URL.Path, "/payment-methods") {
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
+				return
+			}
 			assert.Equal(t, "/subscriptions/", req.URL.Path)
 			assert.Equal(t, r.Organization.ID.String(), req.URL.Query().Get("external_customer_id"))
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
@@ -167,6 +172,10 @@ func Test__CancelOrganizationSubscription(t *testing.T) {
 
 	t.Run("cancels at period end", func(t *testing.T) {
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			if strings.HasSuffix(req.URL.Path, "/payment-methods") {
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
+				return
+			}
 			assert.Equal(t, http.MethodPatch, req.Method)
 			assert.Equal(t, "/subscriptions/sub_grpc_cancel", req.URL.Path)
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
@@ -211,6 +220,10 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 
 	t.Run("keeps Business", func(t *testing.T) {
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			if strings.HasSuffix(req.URL.Path, "/payment-methods") {
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
+				return
+			}
 			assert.Equal(t, http.MethodPatch, req.Method)
 			assert.Equal(t, "/subscriptions/sub_grpc_resume", req.URL.Path)
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
@@ -254,4 +267,46 @@ func TestBusinessCheckoutStaysClosedWithPolarConfigured(t *testing.T) {
 	usePolarTestServer(t, server)
 	_, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+}
+
+func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	plans := []models.BillingPlan{
+		{Name: "Base price", Visibility: "public", BasePriceCents: 2000},
+		{Name: "Seat price", Visibility: "public", SeatPriceCents: 3000},
+		{Name: "Private", Visibility: "private", BasePriceCents: 1000},
+	}
+	for i := range plans {
+		plans[i].Key = "catalog_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+		plans[i].Category = "paid"
+		plans[i].CreditFrequency = "none"
+		plans[i].CreditExpiration = "never"
+		require.NoError(t, models.SaveBillingPlan(db, &plans[i]))
+	}
+	response, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	for _, plan := range plans {
+		var option *pb.BillingPlanOption
+		for _, available := range response.AvailablePlans {
+			if available.Key == plan.Key {
+				option = available
+				break
+			}
+		}
+		if plan.Visibility == "private" {
+			require.Nil(t, option)
+			continue
+		}
+		require.NotNil(t, option, "public plans must remain visible before Polar setup")
+		require.True(t, option.SubscriptionRequired, "priced plans must never use card-only activation")
+		_, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, r.Account.ID.String(), "http://localhost")
+		require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+		current, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.NotEqual(t, plan.ID, current.PlanID)
+	}
 }

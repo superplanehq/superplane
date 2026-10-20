@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -580,4 +582,32 @@ func actionFailureLog(t *testing.T, buffer *bytes.Buffer) map[string]any {
 	}
 	require.NotNil(t, failure, "expected a failed to execute action log")
 	return failure
+}
+
+func TestNodeExecutorRejectsUsageWithoutRequiredCard(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	plan := models.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, "/customers/external/"+r.Organization.ID.String()+"/payment-methods", req.URL.Path)
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
+	}))
+	defer server.Close()
+	t.Setenv("POLAR_ACCESS_TOKEN", "test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "start", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}})},
+		{NodeID: "action", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+	}, []models.Edge{{SourceID: "start", TargetID: "action", Channel: "default"}})
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "action", event.ID, event.ID)
+	require.NoError(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID))
+	saved, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionResultFailed, saved.Result)
+	require.Contains(t, saved.ResultMessage, "payment method")
 }

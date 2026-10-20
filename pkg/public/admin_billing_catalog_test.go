@@ -5,9 +5,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -23,6 +25,8 @@ func TestAdminCatalogAuthorizationAndAssignment(t *testing.T) {
 		{"PUT", "/admin/api/billing-plans/00000000-0000-0000-0000-000000000000", "{}"},
 		{"DELETE", "/admin/api/billing-plans/00000000-0000-0000-0000-000000000000", ""},
 		{"GET", "/admin/api/feature-definitions", ""},
+		{"POST", "/admin/api/feature-definitions", "{}"},
+		{"PUT", "/admin/api/feature-definitions/custom_feature", "{}"},
 		{"PUT", "/admin/api/organizations/" + r.Organization.ID.String() + "/features", "{}"},
 	} {
 		response := execRequest(server, requestParams{method: route.method, path: route.path, authCookie: regularToken, body: []byte(route.body), contentType: "application/json"})
@@ -41,4 +45,63 @@ func TestAdminCatalogAuthorizationAndAssignment(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, response.Code)
 	require.NoError(t, database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBillingPlan{}).Error)
 	require.NoError(t, models.DeleteBillingPlan(database.Conn(), plan.ID))
+}
+
+func TestAdminCustomFeaturePlanAccess(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	request := func(method, path, body string) *httptest.ResponseRecorder {
+		return execRequest(server, requestParams{method: method, path: "/admin/api/" + path, authCookie: token, body: []byte(body), contentType: "application/json"})
+	}
+	response := request("POST", "feature-definitions", `{"key":"custom_reports","label":"Custom reports"}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	var feature struct {
+		Key   string
+		Gated bool
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &feature))
+	require.True(t, feature.Gated)
+	t.Cleanup(func() {
+		require.NoError(t, database.Conn().Where("key = ?", "custom_reports").Delete(&models.PlanFeatureDefinition{}).Error)
+	})
+	response = request("POST", "feature-definitions", `{"key":"custom_reports","label":"Duplicate"}`)
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	response = request("POST", "feature-definitions", `{"key":"Invalid key","label":"Invalid"}`)
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	response = request("GET", "feature-definitions", "")
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, response.Body.String(), `"custom_reports"`)
+	enabled, err := entitlements.HasFeature(database.Conn(), r.Organization.ID, "custom_reports")
+	require.NoError(t, err)
+	require.False(t, enabled)
+	response = request("POST", "billing-plans", `{"key":"custom_reports_plan","name":"Reports","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never","features":["custom_reports"]}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	var plan models.BillingPlan
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+	t.Cleanup(func() {
+		require.NoError(t, database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBillingPlan{}).Error)
+		require.NoError(t, models.DeleteBillingPlan(database.Conn(), plan.ID))
+	})
+	response = request("PUT", "organizations/"+r.Organization.ID.String()+"/billing-plan", `{"plan":"custom_reports_plan"}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	enabled, err = entitlements.HasFeature(database.Conn(), r.Organization.ID, "custom_reports")
+	require.NoError(t, err)
+	require.True(t, enabled)
+	enabled, err = entitlements.HasFeature(database.Conn(), r.Organization.ID, "unknown_feature")
+	require.NoError(t, err)
+	require.False(t, enabled)
+	plan.Features = []string{}
+	body, err := json.Marshal(plan)
+	require.NoError(t, err)
+	response = request("PUT", "billing-plans/"+plan.ID.String(), string(body))
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	enabled, err = entitlements.HasFeature(database.Conn(), r.Organization.ID, "custom_reports")
+	require.NoError(t, err)
+	require.False(t, enabled)
+	response = request("PUT", "feature-definitions/custom_reports", `{"key":"renamed","label":"Reports updated","gated":true}`)
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	response = request("PUT", "feature-definitions/custom_reports", `{"key":"custom_reports","label":"Reports updated","gated":false}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	enabled, err = entitlements.HasFeature(database.Conn(), r.Organization.ID, "custom_reports")
+	require.NoError(t, err)
+	require.True(t, enabled)
 }

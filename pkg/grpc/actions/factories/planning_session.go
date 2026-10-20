@@ -2,12 +2,14 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -99,6 +101,12 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
 	db := database.DB(ctx)
+	if err := polar.AssertOrganizationPaymentMethod(db, session.OrganizationID); err != nil {
+		if errors.Is(err, models.ErrPaymentMethodRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, err.Error())
+		}
+		return nil, grpcerrors.Internal(err, "Could not verify the payment method.")
+	}
 	assigned := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		draft, err := lockAnalysisSessionAndDraft(tx, session)

@@ -38,8 +38,13 @@ func (s *Server) adminSaveBillingPlan(w http.ResponseWriter, r *http.Request) {
 		}
 		plan.ID = parsed
 	}
+	definitions, err := models.ListPlanFeatureDefinitions(database.DB(r.Context()))
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
 	for _, key := range plan.Features {
-		if !slices.ContainsFunc(entitlements.Definitions, func(feature entitlements.Feature) bool { return feature.Key == key }) {
+		if !slices.ContainsFunc(definitions, func(feature models.PlanFeatureDefinition) bool { return feature.Key == key }) {
 			http.Error(w, "Unknown feature", 400)
 			return
 		}
@@ -64,8 +69,34 @@ func (s *Server) adminDeleteBillingPlan(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) adminListFeatureDefinitions(w http.ResponseWriter, _ *http.Request) {
-	respondJSON(w, entitlements.Definitions)
+func (s *Server) adminListFeatureDefinitions(w http.ResponseWriter, r *http.Request) {
+	definitions, err := models.ListPlanFeatureDefinitions(database.DB(r.Context()))
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	respondJSON(w, definitions)
+}
+
+func (s *Server) adminSaveFeatureDefinition(w http.ResponseWriter, r *http.Request) {
+	feature := models.PlanFeatureDefinition{Gated: true}
+	if err := json.NewDecoder(r.Body).Decode(&feature); err != nil {
+		http.Error(w, "Invalid feature definition", http.StatusBadRequest)
+		return
+	}
+	if key := mux.Vars(r)["featureKey"]; key != "" && feature.Key != key {
+		http.Error(w, "Feature keys cannot change", http.StatusBadRequest)
+		return
+	}
+	save := models.UpdatePlanFeatureDefinition
+	if r.Method == http.MethodPost {
+		save = models.CreatePlanFeatureDefinition
+	}
+	if err := save(database.DB(r.Context()), &feature); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	respondJSON(w, feature)
 }
 
 func (s *Server) adminOrganizationFeatures(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +111,12 @@ func (s *Server) adminOrganizationFeatures(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "Invalid feature grant", 400)
 			return
 		}
-		if !slices.ContainsFunc(entitlements.Definitions, func(feature entitlements.Feature) bool { return feature.Key == grant.FeatureKey }) {
+		definitions, err := models.ListPlanFeatureDefinitions(db)
+		if err != nil {
+			writeCatalogError(w, err)
+			return
+		}
+		if !slices.ContainsFunc(definitions, func(feature models.PlanFeatureDefinition) bool { return feature.Key == grant.FeatureKey }) {
 			http.Error(w, "Unknown feature", 400)
 			return
 		}
@@ -105,7 +141,7 @@ func (s *Server) adminOrganizationFeatures(w http.ResponseWriter, r *http.Reques
 
 func writeCatalogError(w http.ResponseWriter, err error) {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		http.Error(w, "Billing plan not found", 404)
+		http.Error(w, "Billing catalog entry not found", 404)
 		return
 	}
 	if errors.Is(err, models.ErrCatalogPlan) {

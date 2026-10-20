@@ -71,6 +71,21 @@ vi.mock("./useGitHubOnboarding", () => ({
   useGitHubInstallationChecks: vi.fn(),
 }));
 
+const billingState = { enabled: false };
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
+  useOrganizationBilling: () => ({
+    data: { billingEnabled: billingState.enabled },
+    isPending: false,
+    refetch: async () => ({ data: { billingEnabled: billingState.enabled } }),
+  }),
+}));
+vi.mock("./first-run/FirstRunBillingScreen", () => ({
+  FirstRunBillingScreen: ({ onContinue }: { onContinue: () => void }) => (
+    <button onClick={onContinue}>Finish with selected plan</button>
+  ),
+}));
+
 const navigateSpy = vi.fn();
 
 let accountOrganizations: Array<{ id: string; name: string; slug?: string }>;
@@ -183,6 +198,7 @@ describe("FirstRunSetup chrome", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
     navigateSpy.mockClear();
+    billingState.enabled = false;
     localStorage.clear();
   });
 
@@ -449,4 +465,20 @@ describe("FirstRunSetup chrome", () => {
     expect(continueButton).toHaveTextContent(FIRST_RUN_COPY.agent.loading);
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
+});
+
+it("opens plan selection before provisioning when billing is enabled", async () => {
+  billingState.enabled = true;
+  const user = userEvent.setup();
+  const model = pageModel({
+    hostedAgentReady: true,
+    hostedModelsAvailable: true,
+    setup: { ...withRepository(), issuesChoice: "vcs" },
+  });
+  renderSetup(model);
+  await user.click(screen.getByTestId("first-run-analyze-tickets"));
+  expect(await screen.findByRole("button", { name: "Finish with selected plan" })).toBeInTheDocument();
+  expect(model.finish).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Finish with selected plan" }));
+  await waitFor(() => expect(model.finish).toHaveBeenCalled());
 });

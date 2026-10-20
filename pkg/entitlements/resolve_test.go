@@ -6,16 +6,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-	"slices"
 	"testing"
 )
 
 func TestResolveCatalogAccessAndMarkup(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
-	original := slices.Clone(Definitions)
-	t.Cleanup(func() { Definitions = original })
-	Definitions[1].Gated = true
+	var original models.PlanFeatureDefinition
+	require.NoError(t, db.First(&original, "key = ?", "byo_key").Error)
+	t.Cleanup(func() { require.NoError(t, models.UpdatePlanFeatureDefinition(db, &original)) })
+	require.NoError(t, models.UpdatePlanFeatureDefinition(db, &models.PlanFeatureDefinition{Key: "byo_key", Label: "Bring your own API key", Gated: true}))
 	seats, parallel, markup := 3, 2, 250
 	p := models.BillingPlan{Key: "test_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", SeatLimit: &seats, ParallelTaskLimit: &parallel, MarkupBPS: &markup, CreditFrequency: "once", CreditExpiration: "never", CreditAmountCents: 1000}
 	require.NoError(t, models.SaveBillingPlan(db, &p))
@@ -58,7 +58,9 @@ func TestResolveCatalogAccessAndMarkup(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, resolved.SeatLimit)
 	require.Nil(t, resolved.ParallelTaskLimit)
-	for _, feature := range Definitions {
+	definitions, err := models.ListPlanFeatureDefinitions(db)
+	require.NoError(t, err)
+	for _, feature := range definitions {
 		require.True(t, resolved.Features[feature.Key])
 	}
 }

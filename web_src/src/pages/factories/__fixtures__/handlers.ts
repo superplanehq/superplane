@@ -1535,6 +1535,35 @@ function hostedCreditCheckoutRoute(): FactoriesRoute {
   };
 }
 
+function billingPlanSelectionRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/select-plan"),
+    resolve: (_match, method, body) => {
+      if (method !== "POST") return null;
+      const plan = fixture.organizationBilling?.availablePlans?.find((option) => option.key === body?.planKey);
+      if (!plan) return { status: 400, json: { message: "Select an available plan." } };
+      if (plan.subscriptionRequired)
+        return { status: 503, json: { message: "Subscription checkout is unavailable in this preview." } };
+      if (plan.requirePaymentMethod && !fixture.organizationBilling?.hasPaymentMethod)
+        return { status: 400, json: { message: "Add a payment card before continuing." } };
+      fixture.organizationBilling = {
+        ...fixture.organizationBilling,
+        catalogKey: plan.key,
+        catalogName: plan.name,
+        requirePaymentMethod: plan.requirePaymentMethod,
+      };
+      return { json: {} };
+    },
+  };
+}
+
+function paymentMethodSessionRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/payment-method-session"),
+    resolve: () => ({ status: 503, json: { message: "Card setup is unavailable in this preview." } }),
+  };
+}
+
 function billingPortalSessionRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/billing-portal-session"),
@@ -1645,6 +1674,8 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     organizationBillingRoute(fixture),
     businessCheckoutRoute(),
     billingPortalSessionRoute(),
+    billingPlanSelectionRoute(fixture),
+    paymentMethodSessionRoute(),
   ];
 }
 

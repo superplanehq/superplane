@@ -305,6 +305,7 @@ CREATE TABLE public.billing_plans (
     features jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    require_payment_method boolean DEFAULT false NOT NULL,
     CONSTRAINT billing_plans_base_price_cents_check CHECK ((base_price_cents >= 0)),
     CONSTRAINT billing_plans_category_check CHECK ((category = ANY (ARRAY['none'::text, 'trial'::text, 'paid'::text]))),
     CONSTRAINT billing_plans_check CHECK (((credit_expiration <> 'after_days'::text) OR (credit_validity_days > 0))),
@@ -1365,6 +1366,19 @@ CREATE TABLE public.organizations (
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
     created_by_account_id uuid
+);
+
+
+--
+-- Name: plan_feature_definitions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.plan_feature_definitions (
+    key text NOT NULL,
+    label text NOT NULL,
+    gated boolean DEFAULT true NOT NULL,
+    CONSTRAINT plan_feature_definitions_key_check CHECK ((key ~ '^[a-z][a-z0-9_]*$'::text)),
+    CONSTRAINT plan_feature_definitions_label_check CHECK ((btrim(label) <> ''::text))
 );
 
 
@@ -2837,6 +2851,14 @@ ALTER TABLE ONLY public.organization_llm_settings
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: plan_feature_definitions plan_feature_definitions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.plan_feature_definitions
+    ADD CONSTRAINT plan_feature_definitions_pkey PRIMARY KEY (key);
 
 
 --
@@ -5901,7 +5923,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261020121125	f
+20261020132828	f
 \.
 
 
@@ -5937,7 +5959,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260925150940	f
+20261020135744	f
 \.
 
 

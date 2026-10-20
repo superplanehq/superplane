@@ -4,6 +4,7 @@ export type BillingPlan = {
   name: string;
   category: string;
   visibility: string;
+  require_payment_method: boolean;
   base_price_cents: number;
   seat_price_cents: number;
   polar_product_id: string | null;

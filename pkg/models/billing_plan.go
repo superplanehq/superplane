@@ -18,26 +18,27 @@ var ErrCatalogPlan = errors.New("invalid billing catalog plan")
 var catalogKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 type BillingPlan struct {
-	ID                 uuid.UUID `json:"id" gorm:"primaryKey"`
-	Key                string    `json:"key"`
-	Name               string    `json:"name"`
-	Category           string    `json:"category"`
-	Visibility         string    `json:"visibility"`
-	BasePriceCents     int64     `json:"base_price_cents"`
-	SeatPriceCents     int64     `json:"seat_price_cents"`
-	PolarProductID     *string   `json:"polar_product_id"`
-	SeatLimit          *int      `json:"seat_limit"`
-	ParallelTaskLimit  *int      `json:"parallel_task_limit"`
-	CreditAmountCents  int64     `json:"credit_amount_cents"`
-	CreditFrequency    string    `json:"credit_frequency"`
-	CreditExpiration   string    `json:"credit_expiration"`
-	CreditValidityDays *int      `json:"credit_validity_days"`
-	TrialCreditCents   int64     `json:"trial_credit_cents"`
-	TrialLengthDays    int       `json:"trial_length_days"`
-	MarkupBPS          *int      `json:"markup_bps"`
-	Features           []string  `json:"features" gorm:"serializer:json;type:jsonb"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                   uuid.UUID `json:"id" gorm:"primaryKey"`
+	Key                  string    `json:"key"`
+	Name                 string    `json:"name"`
+	Category             string    `json:"category"`
+	RequirePaymentMethod bool      `json:"require_payment_method"`
+	Visibility           string    `json:"visibility"`
+	BasePriceCents       int64     `json:"base_price_cents"`
+	SeatPriceCents       int64     `json:"seat_price_cents"`
+	PolarProductID       *string   `json:"polar_product_id"`
+	SeatLimit            *int      `json:"seat_limit"`
+	ParallelTaskLimit    *int      `json:"parallel_task_limit"`
+	CreditAmountCents    int64     `json:"credit_amount_cents"`
+	CreditFrequency      string    `json:"credit_frequency"`
+	CreditExpiration     string    `json:"credit_expiration"`
+	CreditValidityDays   *int      `json:"credit_validity_days"`
+	TrialCreditCents     int64     `json:"trial_credit_cents"`
+	TrialLengthDays      int       `json:"trial_length_days"`
+	MarkupBPS            *int      `json:"markup_bps"`
+	Features             []string  `json:"features" gorm:"serializer:json;type:jsonb"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 type OrganizationFeatureGrant struct {

@@ -74,6 +74,7 @@ type CheckoutSession struct {
 }
 
 type CustomerSession struct {
+	Token      string
 	PortalURL  string
 	CustomerID string
 }
@@ -308,6 +309,7 @@ func (c *Client) CreateCustomerSession(ctx context.Context, req CustomerSessionR
 		return nil, fmt.Errorf("polar customer session did not return a portal url")
 	}
 	return &CustomerSession{
+		Token:      payload.Token,
 		PortalURL:  payload.CustomerPortalURL,
 		CustomerID: payload.CustomerID,
 	}, nil
@@ -659,6 +661,7 @@ type checkoutJSON struct {
 }
 
 type customerSessionJSON struct {
+	Token             string `json:"token"`
 	CustomerPortalURL string `json:"customer_portal_url"`
 	CustomerID        string `json:"customer_id"`
 }
