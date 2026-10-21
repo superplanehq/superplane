@@ -37,7 +37,7 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 	}
 	var before, after string
 	require.NoError(t, tx.Raw(`SELECT jsonb_agg(to_jsonb(o) ORDER BY organization_id)::text FROM organization_billing_plans o`).Scan(&before).Error)
-	migration, err := os.ReadFile("../../db/migrations/20261020121125_plan-catalog.up.sql")
+	migration, err := os.ReadFile("../../db/migrations/20261021165509_plan-catalog.up.sql")
 	require.NoError(t, err)
 	require.NoError(t, tx.Exec(string(migration)).Error)
 	require.NoError(t, tx.Raw(`SELECT jsonb_agg(to_jsonb(o)-'plan_id' ORDER BY organization_id)::text FROM organization_billing_plans o`).Scan(&after).Error)
@@ -51,8 +51,8 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 	require.NoError(t, tx.Raw(`SELECT trial_credit_cents FROM billing_plans WHERE key='trial'`).Scan(&amount).Error)
 	require.Equal(t, int64(2300), amount)
 	for _, path := range []string{
-		"../../db/migrations/20261020132828_require-plan-payment-method.up.sql",
-		"../../db/migrations/20261020183712_simplify-plan-pricing.up.sql",
+		"../../db/migrations/20261021165512_require-plan-payment-method.up.sql",
+		"../../db/migrations/20261021165513_simplify-plan-pricing.up.sql",
 		"../../db/data_migrations/20261020183817_convert-plan-pricing.up.sql",
 		"../../db/data_migrations/20261021145656_seed-manual-business.up.sql",
 	} {
@@ -91,7 +91,7 @@ func TestPricingMigrationPreservesRegularPrices(t *testing.T) {
 	require.NoError(t, tx.Exec(`CREATE TABLE billing_plans(key text, base_price_cents bigint, seat_price_cents bigint);
  INSERT INTO billing_plans VALUES ('free',0,0),('business_legacy',19900,3000);`).Error)
 	for _, path := range []string{
-		"../../db/migrations/20261020183712_simplify-plan-pricing.up.sql",
+		"../../db/migrations/20261021165513_simplify-plan-pricing.up.sql",
 		"../../db/data_migrations/20261020183817_convert-plan-pricing.up.sql",
 	} {
 		migration, err := os.ReadFile(path)
