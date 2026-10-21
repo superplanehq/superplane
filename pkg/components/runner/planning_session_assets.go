@@ -67,12 +67,13 @@ func PlanningSessionProtocolFile() BrokerTaskFile {
 // PlanningSessionProtocolMarkdown returns the hardcoded refinement system
 // protocol. Runners append this. The canvas prompt must not replace it.
 func PlanningSessionProtocolMarkdown() string {
-	return strings.TrimSpace(analysisProtocolReviewMarkdown)
+	return strings.TrimSpace(analysisProtocolReviewMarkdown) +
+		"\n\n# Managed refinement guidance\n\n" + PlanningSessionUserPromptMarkdown()
 }
 
-// PlanningSessionUserPromptMarkdown is the Refine Task prompt: tone, the
-// 1 through 3 sub-parameters, and plan shape. Factories can edit that node
-// prompt. A saved canvas prompt is not rewritten.
+// PlanningSessionUserPromptMarkdown supplies the full refinement guidance to
+// both the managed protocol and the optional system skill. The canvas prompt
+// only supplies the task. User additions are appended separately at dispatch.
 func PlanningSessionUserPromptMarkdown() string {
 	return strings.TrimSpace(analysisUserPromptReviewMarkdown)
 }
@@ -84,7 +85,7 @@ func PlanningSessionUserPromptReviewMarkdown() string {
 
 // PlanningSessionProtocolMarkdownFile ships the review protocol to runners.
 func PlanningSessionProtocolMarkdownFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "analysis_protocol_review.md", Content: analysisProtocolReviewMarkdown, Mode: "0644"}
+	return BrokerTaskFile{Path: "analysis_protocol_review.md", Content: PlanningSessionProtocolMarkdown(), Mode: "0644"}
 }
 
 func PlanningSessionReviewProtocolMarkdownFile() BrokerTaskFile {
@@ -140,6 +141,13 @@ func FollowUpLoopFile() BrokerTaskFile {
 func AppendPlanningSessionContinuation(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, files []BrokerTaskFile) []BrokerTaskFile {
 	if !HasPlanningSessionToken(environment) {
 		return files
+	}
+	// Follow-up turns start fresh agent conversations. Keep project instructions
+	// in a separate task file so every turn receives them, even without rewind text.
+	if instructions := additionalInstructionsText(ctx.Configuration); instructions != "" {
+		files = appendUniqueTaskFiles(files, BrokerTaskFile{
+			Path: "planning_additional_instructions.md", Content: instructions, Mode: "0644",
+		})
 	}
 	if file := PlanningSessionContinuationFile(ctx); file != nil {
 		return append(files, *file)

@@ -569,11 +569,11 @@ func intakeRunnerConfiguration(agent *intakeAgent, vcsName string) map[string]an
 	return configuration
 }
 
-// intakeRefinementPrompt returns the Refine Task node prompt. New and reset
-// Backlog templates use the 1 through 3 review pack. A saved canvas prompt
-// is left unchanged.
+// intakeRefinementPrompt supplies the task to the managed planning protocol.
+// Runners inject the planning and scoring rules separately. New and reset
+// Backlog templates use this prompt; saved canvases stay unchanged.
 func intakeRefinementPrompt() string {
-	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
+	return "Review and score this task\n\n{{ root().data.workOrder }}"
 }
 
 var intakeThresholdPattern = regexp.MustCompile(`>=\s*(\d+)`)

@@ -8,6 +8,7 @@ export function FactoryAutomationSettingsTabs({
   onTabChange,
   hasAgent,
   hasGeneral = true,
+  generalLabel = "General",
   historyEnabled,
   label,
   testId,
@@ -16,6 +17,7 @@ export function FactoryAutomationSettingsTabs({
   onTabChange: (tab: FactoryAutomationSettingsTab) => void;
   hasAgent: boolean;
   hasGeneral?: boolean;
+  generalLabel?: string;
   historyEnabled: boolean;
   label: string;
   testId: "intake-settings" | "planning-settings" | "pr-feedback-settings" | "column-automation-view";
@@ -29,7 +31,7 @@ export function FactoryAutomationSettingsTabs({
             {hasGeneral ? (
               <TabsTrigger value="general" data-testid={`${testId}-tab-general`}>
                 <Settings aria-hidden />
-                General
+                {generalLabel}
               </TabsTrigger>
             ) : null}
             {hasAgent ? (
