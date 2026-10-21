@@ -8,6 +8,7 @@ import {
   DEFAULT_SETUP_FLEET_ID,
   fleetImage,
   fleetsMatchConfiguration,
+  fleetsMatchDockerVm,
   generateFleetManagerValues,
   installationRunnerVersion,
   loadFleetManagerDraft,
@@ -51,6 +52,7 @@ function withRecommendedMachineTypes(
   fields: Record<string, string>,
   provider: FleetManagerProvider,
 ): Record<string, string> {
+  if (provider === "docker") return fields;
   const key = `machineType.${DEFAULT_SETUP_FLEET_ID}`;
   return { ...fields, [key]: resolveSetupMachineType(provider, fields[key]) };
 }
@@ -76,7 +78,10 @@ function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDra
       ? [metadata.defaultRunnerVersion]
       : [];
   const restoredDraft = loadFleetManagerDraft();
-  const draft = restoredDraft ? mergeTerraformInfrastructure(restoredDraft, metadata) : defaultDraft(metadata);
+  let draft = restoredDraft ? mergeTerraformInfrastructure(restoredDraft, metadata) : defaultDraft(metadata);
+  if (draft.provider === "docker" && metadata.installationType !== "single-host") {
+    draft = draftForProvider(draft, "aws", metadata);
+  }
   return pinSetupFleet({ ...draft, runnerVersion: installationRunnerVersion(metadata) }, metadata);
 }
 
@@ -100,7 +105,7 @@ function draftForProvider(
 }
 
 function missingImageErrors(draft: FleetManagerDraft, metadata: FleetManagerSetupMetadata): string[] {
-  if (metadata.infrastructureDefaults.source !== "terraform") return [];
+  if (draft.provider === "docker" || metadata.infrastructureDefaults.source !== "terraform") return [];
   return draft.selectedFleetIds.flatMap((fleetId) => {
     const preset = metadata.fleetPresets.find((candidate) => candidate.id === fleetId);
     if (!preset || fleetImage(draft.fields, preset.spec.architecture)) return [];
@@ -243,7 +248,7 @@ export function useFleetManagerSetup(enabled = true, organizationId = "") {
 
   const values = useMemo(
     () =>
-      metadata && draft && token.plaintext
+      metadata && draft && token.plaintext && draft.provider !== "docker"
         ? generateFleetManagerValues({ metadata, ...draft, installationAdminToken: token.plaintext })
         : "",
     [draft, metadata, token.plaintext],
@@ -262,6 +267,7 @@ export function useFleetManagerSetup(enabled = true, organizationId = "") {
     draft,
     loadError,
     values,
+    installationToken: token.plaintext,
     tokenError: token.tokenError,
     isPreparingInstallation: token.isPreparingInstallation,
     validationErrors,
@@ -325,7 +331,12 @@ export function useFleetManagerVerification(
         }
 
         const body = (await response.json()) as { fleets?: InstalledFleet[] };
-        if (fleetsMatchConfiguration(body.fleets ?? [], draft, metadata.fleetPresets)) {
+        const installed = body.fleets ?? [];
+        const matches =
+          draft.provider === "docker"
+            ? fleetsMatchDockerVm(installed, metadata.stableRunnerVersion ?? "")
+            : fleetsMatchConfiguration(installed, draft, metadata.fleetPresets);
+        if (matches) {
           clearFleetManagerDraft();
           setStatus("verified");
           return;
