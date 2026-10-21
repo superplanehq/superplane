@@ -217,6 +217,7 @@ func TruncateTables() error {
 			secrets,
 			account_magic_codes,
 			account_password_auth,
+			built_in_automation_resets,
 			accounts,
 			account_providers,
 			users,

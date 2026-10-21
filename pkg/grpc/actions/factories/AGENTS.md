@@ -18,6 +18,9 @@ the current template.
   setting controls generated filters or gates.
 - Keep admin reset distinct from the user-facing restore-defaults action.
   Keep organization reset atomic when saved settings cannot be applied.
+- An installation reset of one automation runs that same organization reset
+  for the selected automation only. Continue with the other organizations when
+  one organization cannot apply its saved settings.
 
 Run `make test PKG_TEST_PACKAGES=./pkg/grpc/actions/factories` from the repository
 root, plus the Go checks required by the root `AGENTS.md`.
