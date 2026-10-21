@@ -3,6 +3,12 @@ import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@
 import { Button } from "@/components/ui/button";
 import { billingCatalogRequest, type FeatureDefinition, type OrganizationFeatures } from "./billingPlansApi";
 
+function accessSource(feature: FeatureDefinition, granted: boolean, enabled: boolean): string {
+  if (granted) return "Manual grant";
+  if (!feature.gated) return "All organizations";
+  return enabled ? "Plan" : "No access";
+}
+
 export function OrganizationFeatureGrants({ orgId }: { orgId: string }) {
   const [definitions, setDefinitions] = useState<FeatureDefinition[]>([]);
   const [state, setState] = useState<OrganizationFeatures | null>(null);
@@ -92,13 +98,7 @@ export function OrganizationFeatureGrants({ orgId }: { orgId: string }) {
             {definitions.map((feature) => {
               const granted = state.grants.some((grant) => grant.feature_key === feature.key && grant.enabled);
               const enabled = state.effective.features[feature.key];
-              const source = granted
-                ? "Manual grant"
-                : !feature.gated
-                  ? "All organizations"
-                  : enabled
-                    ? "Plan"
-                    : "No access";
+              const source = accessSource(feature, granted, enabled);
               return (
                 <TableRow key={feature.key}>
                   <TableCell className="font-medium">{feature.label}</TableCell>
