@@ -71,8 +71,9 @@ func PlanningSessionProtocolMarkdown() string {
 }
 
 // PlanningSessionUserPromptMarkdown is the Refine Task prompt: tone, the
-// 1 through 3 sub-parameters, and plan shape. Factories can edit that node
-// prompt. A saved canvas prompt is not rewritten.
+// 1 through 3 sub-parameters, and plan shape. Built-in Planning uses this
+// managed definition. User additions are stored in additionalInstructions.
+// Existing canvases receive template changes through admin reset.
 func PlanningSessionUserPromptMarkdown() string {
 	return strings.TrimSpace(analysisUserPromptReviewMarkdown)
 }

@@ -39,6 +39,7 @@ func TestRunSuperPlaneDispatchesAdditionalInstructions(t *testing.T) {
 					{"name": "Implementation", "type": "prompt", "prompt": "Implement the task"},
 					{"name": "Push", "type": "bash", "command": "git push"},
 					{"name": "Write PR", "type": "prompt", "prompt": "Write the PR"},
+					{"name": "Plan Task", "type": "prompt", "prompt": runner.PlanningSessionUserPromptMarkdown()},
 				},
 			}
 			resolved, err := workercontexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
@@ -47,7 +48,7 @@ func TestRunSuperPlaneDispatchesAdditionalInstructions(t *testing.T) {
 			req := executeSuperPlaneWithConfig(t, resolved, core.DefaultHostedLLMModel{
 				Provider: models.UsageProviderAnthropic, Model: "claude-sonnet-4-6",
 			}, core.HostedLLMAccess{APIKey: "sk-hosted", AllowedModels: []string{"claude-sonnet-4-6"}})
-			for _, path := range []string{"prompts/01-implementation.txt", "prompts/03-write-pr.txt"} {
+			for _, path := range []string{"prompts/01-implementation.txt", "prompts/03-write-pr.txt", "prompts/04-plan-task.txt"} {
 				prompt := requireTaskFile(t, req.Files, path).Content
 				if strings.TrimSpace(instructions) == "" {
 					assert.NotContains(t, prompt, "Additional instructions")
@@ -56,7 +57,10 @@ func TestRunSuperPlaneDispatchesAdditionalInstructions(t *testing.T) {
 				assert.Contains(t, prompt, instructions)
 				assert.Equal(t, 1, strings.Count(prompt, instructions))
 				assert.Contains(t, prompt, "repository instructions")
+				assert.Contains(t, prompt, "managed planning and scoring rules")
+				assert.NotContains(t, prompt, "Additional instructions for this implementation")
 			}
+			assert.Contains(t, requireTaskFile(t, req.Files, "prompts/04-plan-task.txt").Content, runner.PlanningSessionUserPromptMarkdown())
 			assert.Equal(t, "git push", requireTaskFile(t, req.Files, "steps/02-push.sh").Content)
 			assert.Equal(t, instructions, resolved["additionalInstructions"])
 			assert.Equal(t, "Implement the task", configuration["steps"].([]map[string]any)[0]["prompt"])
