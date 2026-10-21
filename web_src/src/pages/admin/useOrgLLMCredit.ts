@@ -19,7 +19,10 @@ export type OrganizationLLMCredit = {
   warning: boolean;
 };
 
+export type BillingCatalogPlan = { key: string; name: string };
+
 export type OrganizationBillingPlan = {
+  catalog_key?: string;
   plan: string;
   plan_source: string;
   polar_subscription_status: string;
@@ -191,7 +194,29 @@ async function loadOrganizationCreditState(
   showErrorToast("Failed to load billing plan");
 }
 
-function useOrgBillingPlan(orgId: string) {
+function useOrgBillingPlan(orgId: string, enabled: boolean) {
+  const [catalog, setCatalog] = useState<BillingCatalogPlan[]>([]);
+  const [catalogError, setCatalogError] = useState("");
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    setCatalog([]);
+    setCatalogError("");
+    fetch("/admin/api/billing-plans", { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Failed to load billing plans");
+        return (await response.json()) as BillingCatalogPlan[];
+      })
+      .then((plans) => {
+        if (!cancelled) setCatalog(plans);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogError("Failed to load billing plans. Refresh and try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
   const [plan, setPlan] = useState<OrganizationBillingPlan | null>(null);
   const [planValue, setPlanValue] = useState("trial");
   const [trialEndsOn, setTrialEndsOn] = useState("");
@@ -199,13 +224,14 @@ function useOrgBillingPlan(orgId: string) {
 
   const applyPlan = useCallback((nextPlan: OrganizationBillingPlan) => {
     setPlan(nextPlan);
-    setPlanValue(nextPlan.plan || "none");
+    setPlanValue(nextPlan.catalog_key || nextPlan.plan || "none");
     setTrialEndsOn(prefilledTrialEndDate(nextPlan.trial_ends_at));
   }, []);
 
   const clearPlan = useCallback(() => setPlan(null), []);
 
   const savePlan = async () => {
+    if (catalogError || !catalog.some((entry) => entry.key === planValue && entry.key !== "business_legacy")) return;
     if (planValue === "trial" && !isFutureUtcTrialEnd(trialEndsOn)) {
       return;
     }
@@ -221,6 +247,8 @@ function useOrgBillingPlan(orgId: string) {
   };
 
   return {
+    catalog,
+    catalogError,
     plan,
     planValue,
     setPlanValue,
@@ -278,7 +306,7 @@ export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolea
   const [balanceInputs, setBalanceInputs] = useState<CreditBalanceInputs>(EMPTY_BALANCE_INPUTS);
   const [note, setNote] = useState("");
   const [savingBalance, setSavingBalance] = useState<CreditBalanceBucket | null>(null);
-  const billingPlan = useOrgBillingPlan(orgId);
+  const billingPlan = useOrgBillingPlan(orgId, options.billingEnabled);
   const markup = useOrgMarkupOverride(orgId, setCredit);
   const { applyPlan, clearPlan } = billingPlan;
   const { resetMarkup } = markup;

@@ -155,7 +155,7 @@ func Test__AdjustCreditBalanceRejectsTrialWithoutLiveWelcome(t *testing.T) {
 	expireWelcomeGrant(t, db, r.Organization.ID)
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
 		Where("organization_id = ?", r.Organization.ID).
-		Update("plan", models.BillingPlanNone).Error)
+		Updates(map[string]any{"plan": models.BillingPlanNone, "plan_id": db.Model(&models.BillingPlan{}).Select("id").Where("key = ?", "none")}).Error)
 
 	_, err := models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
 		OrganizationID: r.Organization.ID,

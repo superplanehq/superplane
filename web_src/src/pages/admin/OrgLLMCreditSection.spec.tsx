@@ -45,6 +45,14 @@ const credit: OrganizationLLMCredit = {
   warning: false,
 };
 
+const catalog = [
+  { key: "trial", name: "Trial", category: "trial" },
+  { key: "business_legacy", name: "Business", category: "paid" },
+  { key: "business_manual", name: "Business Manual", category: "paid" },
+  { key: "pay_as_you_go", name: "Pay-as-you-go", category: "paid" },
+  { key: "none", name: "None", category: "none" },
+];
+
 const grants = [
   {
     id: "grant-2",
@@ -71,6 +79,7 @@ function billingPlan(
 ) {
   return {
     plan,
+    catalog_key: plan === "business" ? (polarManaged ? "business_legacy" : "business_manual") : plan,
     plan_source: polarManaged ? "polar" : "system",
     polar_subscription_status: polarManaged ? "active" : "",
     polar_managed: polarManaged,
@@ -91,8 +100,10 @@ function mockOrgCreditFetch(
     creditData?: typeof credit;
     onPutBalance?: (body: unknown) => Response;
     onGetGrants?: () => Response;
+    catalogStatus?: number;
   } = {},
 ) {
+  const { catalogStatus = 200 } = options;
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith("/llm-credit/balances") && init?.method === "PUT") {
@@ -104,6 +115,9 @@ function mockOrgCreditFetch(
     }
     if (url.endsWith("/llm-credit")) {
       return jsonResponse(options.creditData ?? credit);
+    }
+    if (url.endsWith("/billing-plans")) {
+      return jsonResponse(catalog, catalogStatus);
     }
     if (url.includes("/billing-plan")) {
       if (options.planStatus) {
@@ -124,6 +138,39 @@ afterEach(() => {
 });
 
 describe("OrgLLMCreditSection billing plan", () => {
+  it("selects and saves a catalog plan by its key", async () => {
+    const fetchMock = mockOrgCreditFetch();
+    const user = userEvent.setup();
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    await user.click(await screen.findByTestId("admin-org-billing-plan"));
+    expect(await screen.findByRole("option", { name: "Business" })).toHaveAttribute("aria-disabled", "true");
+    await user.click(screen.getByRole("option", { name: "Pay-as-you-go" }));
+    await user.click(screen.getByTestId("admin-org-billing-plan-save"));
+
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+      expect(String(put?.[0])).toBe("/admin/api/organizations/org-1/billing-plan");
+      expect(JSON.parse(String(put?.[1]?.body))).toEqual({ plan: "pay_as_you_go" });
+    });
+  });
+
+  it("shows the assigned catalog key when the legacy plan field differs", async () => {
+    mockOrgCreditFetch({ plan: { ...billingPlan(false, null, "business"), catalog_key: "business_manual" } });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-billing-plan")).toHaveTextContent("Business Manual");
+  });
+
+  it("blocks plan changes when the catalog cannot load", async () => {
+    mockOrgCreditFetch({ catalogStatus: 500 });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load billing plans");
+    expect(screen.getByTestId("admin-org-billing-plan")).toBeDisabled();
+    expect(screen.getByTestId("admin-org-billing-plan-save")).toBeDisabled();
+  });
+
   it("keeps Save plan when Polar is not set up", async () => {
     mockOrgCreditFetch();
     render(<OrgLLMCreditSection orgId="org-1" />);
@@ -176,6 +223,7 @@ describe("OrgLLMCreditSection billing plan", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
+        if (url.endsWith("/billing-plans")) return jsonResponse(catalog);
         if (url.includes("/billing-plan")) {
           return new Response(JSON.stringify(billingPlan(false, trialEndsAt, "trial")), {
             status: 200,
@@ -193,7 +241,7 @@ describe("OrgLLMCreditSection billing plan", () => {
     expect(screen.getByText(ADMIN_TRIAL_ENDS_HELP)).toBeInTheDocument();
 
     await user.click(screen.getByTestId("admin-org-billing-plan"));
-    await user.click(await screen.findByRole("option", { name: "Business" }));
+    await user.click(await screen.findByRole("option", { name: "Business Manual" }));
 
     expect(screen.queryByTestId("admin-org-trial-ends-input")).not.toBeInTheDocument();
     expect(screen.getByTestId("admin-org-trial-ends")).toHaveTextContent(trialDate);
@@ -211,6 +259,7 @@ describe("OrgLLMCreditSection billing plan", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
+        if (url.endsWith("/billing-plans")) return jsonResponse(catalog);
         if (url.includes("/billing-plan")) {
           return new Response(JSON.stringify(billingPlan(true, "2026-12-20T23:59:59Z", "business")), {
             status: 200,
@@ -256,6 +305,7 @@ describe("OrgLLMCreditSection billing plan", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
+        if (url.endsWith("/billing-plans")) return jsonResponse(catalog);
         if (url.includes("/billing-plan")) {
           return new Response(JSON.stringify(billingPlan(false, `${futureUtcDate(40)}T23:59:59Z`, "trial")), {
             status: 200,

@@ -44,6 +44,15 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 	if event == nil {
 		return permanentApplyError("order event is required")
 	}
+	if productID := event.Data.productID(); productID != "" {
+		_, err := models.FindBillingPlanByProduct(tx, productID)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
 	isPack, err := orderIsCreditPack(ctx, event.Data, lookup)
 	if err != nil {
 		return err

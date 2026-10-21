@@ -11,6 +11,7 @@ import (
 var localBillingNonWelcomeGrantKinds = []string{
 	LLMCreditGrantKindAdmin,
 	LLMCreditGrantKindIncluded,
+	LLMCreditGrantKindIncludedAdjustment,
 	LLMCreditGrantKindTopup,
 	LLMCreditGrantKindTopupRefund,
 	LLMCreditGrantKindTrialAdjustment,
@@ -52,12 +53,17 @@ func ResetLocalAfterOnboarding(tx *gorm.DB) error {
 // deletes that organization's spend ledger.
 func ResetOrganizationBillingTrial(tx *gorm.DB, orgID uuid.UUID) error {
 	now := time.Now()
-	trialEnd := now.Add(DefaultWelcomeGrantTTL)
+	catalog, err := FindBillingPlan(tx, BillingPlanTrial)
+	if err != nil {
+		return err
+	}
+	trialEnd := now.AddDate(0, 0, catalog.TrialLengthDays)
 
 	result := tx.Exec(`
 		UPDATE organization_billing_plans
 		SET
 			plan = ?,
+ plan_id = ?,
 			plan_source = ?,
 			polar_subscription_id = NULL,
 			polar_subscription_status = '',
@@ -69,7 +75,7 @@ func ResetOrganizationBillingTrial(tx *gorm.DB, orgID uuid.UUID) error {
 			trial_ends_at = ?,
 			updated_at = ?
 		WHERE organization_id = ?
-	`, BillingPlanTrial, BillingPlanSourceSystem, now, trialEnd, now, orgID)
+	`, BillingPlanTrial, catalog.ID, BillingPlanSourceSystem, now, trialEnd, now, orgID)
 	if result.Error != nil {
 		return fmt.Errorf("reset billing plan: %w", result.Error)
 	}

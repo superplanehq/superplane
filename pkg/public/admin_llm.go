@@ -121,6 +121,7 @@ type organizationLLMMarkupRequest struct {
 }
 
 type organizationBillingPlanResponse struct {
+	CatalogKey              string  `json:"catalog_key"`
 	Plan                    string  `json:"plan"`
 	PlanSource              string  `json:"plan_source"`
 	PolarSubscriptionStatus string  `json:"polar_subscription_status"`
@@ -551,6 +552,15 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 	respondJSON(w, response)
 }
 
+func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
+	plans, err := models.ListBillingPlans(database.DB(r.Context()))
+	if err != nil {
+		http.Error(w, "Failed to load billing plans", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, plans)
+}
+
 func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
 	if !models.BillingEnabled() {
 		http.Error(w, "Billing is not available", http.StatusNotFound)
@@ -620,6 +630,7 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 		return organizationBillingPlanResponse{}, err
 	}
 	return organizationBillingPlanResponse{
+		CatalogKey:              plan.Catalog.Key,
 		Plan:                    plan.Plan,
 		PlanSource:              plan.PlanSource,
 		PolarSubscriptionStatus: plan.PolarSubscriptionStatus,
