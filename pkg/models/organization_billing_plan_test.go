@@ -193,7 +193,7 @@ func Test__OrganizationBillingIsPolarManaged(t *testing.T) {
 	assert.False(t, models.OrganizationBillingIsPolarManaged(paid))
 }
 
-func Test__SetAdminOrganizationPlanBusinessGrantsIncludedUsage(t *testing.T) {
+func Test__SetAdminOrganizationPlanBusinessHasNoIncludedUsageByDefault(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	db := database.Conn()
@@ -211,14 +211,14 @@ func Test__SetAdminOrganizationPlanBusinessGrantsIncludedUsage(t *testing.T) {
 
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
+	assert.Zero(t, summary.IncludedRemainingMicros)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
 
 	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, "business_manual", nil)
 	require.NoError(t, err)
 	summary, err = models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
+	assert.Zero(t, summary.IncludedRemainingMicros)
 	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, "business_legacy", nil)
 	require.ErrorIs(t, err, models.ErrInvalidBillingPlan)
 }
@@ -226,7 +226,11 @@ func Test__SetAdminOrganizationPlanBusinessGrantsIncludedUsage(t *testing.T) {
 func Test__SetAdminOrganizationPlanBusinessGrantsIncludedWhenPeriodWasMissing(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
-	db := database.Conn()
+	db := database.Conn().Begin()
+	require.NoError(t, db.Error)
+	defer db.Rollback()
+	require.NoError(t, db.Model(&models.BillingPlan{}).Where("key = ?", models.BillingPlanBusinessManual).
+		Update("credit_amount_cents", models.DefaultIncludedGrantCents).Error)
 
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
 		Where("organization_id = ?", r.Organization.ID).
@@ -276,6 +280,9 @@ func Test__SetAdminOrganizationPlanTrialExpiresIncludedUsage(t *testing.T) {
 	db := database.Conn()
 
 	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
+	require.NoError(t, err)
+	_, err = models.AddIncludedLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(500),
+		"included-"+r.Organization.ID.String(), time.Now().AddDate(0, 1, 0))
 	require.NoError(t, err)
 
 	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, nil)

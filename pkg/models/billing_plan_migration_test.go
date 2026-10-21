@@ -52,6 +52,7 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 	require.Equal(t, int64(2300), amount)
 	for _, path := range []string{
 		"../../db/data_migrations/20261021171448_seed-billing-catalog.up.sql",
+		"../../db/data_migrations/20261021215654_remove-business-manual-price-and-usage.up.sql",
 	} {
 		migration, err := os.ReadFile(path)
 		require.NoError(t, err)
@@ -75,8 +76,8 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 	require.NoError(t, tx.Table("billing_plans").Where("key = ?", "business_manual").Take(&manual).Error)
 	require.Equal(t, "Business Manual", manual.Name)
 	require.Nil(t, manual.PolarProductID)
-	require.Equal(t, int64(5000), manual.CreditAmountCents)
-	require.Equal(t, int64(19900), manual.PriceCents)
+	require.Zero(t, manual.CreditAmountCents)
+	require.Zero(t, manual.PriceCents)
 	require.False(t, manual.PerSeat)
 	var payAsYouGo struct {
 		RequirePaymentMethod bool
