@@ -53,8 +53,8 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 	for _, path := range []string{
 		"../../db/migrations/20261021165512_require-plan-payment-method.up.sql",
 		"../../db/migrations/20261021165513_simplify-plan-pricing.up.sql",
-		"../../db/data_migrations/20261020183817_convert-plan-pricing.up.sql",
-		"../../db/data_migrations/20261021145656_seed-manual-business.up.sql",
+		"../../db/data_migrations/20261021171445_convert-plan-pricing.up.sql",
+		"../../db/data_migrations/20261021171448_seed-manual-business.up.sql",
 	} {
 		migration, err := os.ReadFile(path)
 		require.NoError(t, err)
@@ -92,7 +92,7 @@ func TestPricingMigrationPreservesRegularPrices(t *testing.T) {
  INSERT INTO billing_plans VALUES ('free',0,0),('business_legacy',19900,3000);`).Error)
 	for _, path := range []string{
 		"../../db/migrations/20261021165513_simplify-plan-pricing.up.sql",
-		"../../db/data_migrations/20261020183817_convert-plan-pricing.up.sql",
+		"../../db/data_migrations/20261021171445_convert-plan-pricing.up.sql",
 	} {
 		migration, err := os.ReadFile(path)
 		require.NoError(t, err)
