@@ -832,6 +832,8 @@ func TestBuildDiscussionPRFeedbackCanvasBitbucket(t *testing.T) {
 	assert.Equal(t, `Sure, looking into this. Follow along: [{{ $["Find Pull Request"].data.workOrder.key }}]({{ $["Find Pull Request"].data.workOrder.url }})`, acknowledge.Configuration["body"])
 	edges := yamlEdgeChannels(canvas)
 	assert.Contains(t, edges, "found:"+prFeedbackFindNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
+	assert.Contains(t, edges, "default:"+prFeedbackAcknowledgeCommentNodeID+"->"+prFeedbackActivityNodeID)
+	assert.NotContains(t, edges, "found:"+prFeedbackFindNodeID+"->"+prFeedbackActivityNodeID)
 	assert.NotContains(t, edges, "default:"+prFeedbackCommentTriggerNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
 
 	for _, node := range canvas.Spec.Nodes {
