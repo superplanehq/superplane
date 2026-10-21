@@ -272,11 +272,7 @@ func Test__WelcomeGrantSkippedWhenAmountIsZero(t *testing.T) {
 	_ = support.Setup(t)
 	db := database.Conn()
 
-	_, err := models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:   0,
-		MarkupBPS:           models.DefaultMarkupBPS,
-		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
-	})
+	err := db.Model(&models.BillingPlan{}).Where("key = ?", "trial").Update("trial_credit_cents", 0).Error
 	require.NoError(t, err)
 
 	account, err := models.CreateAccount("Zero Welcome", "zero-welcome@example.com")
@@ -458,11 +454,7 @@ func Test__AssertHostedCreditAvailable(t *testing.T) {
 
 	require.NoError(t, models.AssertHostedCreditAvailable(db, r.Organization.ID))
 
-	_, err := models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:   0,
-		MarkupBPS:           models.DefaultMarkupBPS,
-		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
-	})
+	err := db.Model(&models.BillingPlan{}).Where("key = ?", "trial").Update("trial_credit_cents", 0).Error
 	require.NoError(t, err)
 
 	org, err := models.CreateOrganization(support.RandomName("empty-credit"), "")
@@ -641,6 +633,7 @@ func restoreInstallationLLMSettings(t *testing.T) {
 
 func resetInstallationLLMSettings(t *testing.T) {
 	t.Helper()
+	require.NoError(t, database.Conn().Model(&models.BillingPlan{}).Where("key = ?", "trial").Updates(map[string]any{"trial_credit_cents": models.DefaultWelcomeGrantCents, "trial_length_days": 14}).Error)
 	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
 		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
 		MarkupBPS:           models.DefaultMarkupBPS,

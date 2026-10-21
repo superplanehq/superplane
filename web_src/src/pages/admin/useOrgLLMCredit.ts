@@ -1,3 +1,4 @@
+import { billingCatalogRequest, type BillingPlan } from "./billingPlansApi";
 import type { OrganizationsOrganizationCreditGrant } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { bpsToPercentInput, centsToDollarInput, parseDollarInputToCents, percentInputToBps } from "@/lib/hostedCredit";
@@ -21,6 +22,10 @@ export type OrganizationLLMCredit = {
 
 export type OrganizationBillingPlan = {
   plan: string;
+  catalog_key?: string;
+  catalog_name?: string;
+  credit_expiration?: string;
+  credit_validity_days?: number | null;
   plan_source: string;
   polar_subscription_status: string;
   polar_managed: boolean;
@@ -28,17 +33,19 @@ export type OrganizationBillingPlan = {
   current_period_end: string | null;
 };
 
-export type CreditBalanceBucket = "trial" | "topup" | "grant";
+export type CreditBalanceBucket = "trial" | "topup" | "grant" | "included";
 
 export type CreditBalanceInputs = Record<CreditBalanceBucket, string>;
 
 export const CREDIT_BALANCE_CHANGED_COPY = "The balance changed. Reload and try again.";
 
-const EMPTY_BALANCE_INPUTS: CreditBalanceInputs = { trial: "", topup: "", grant: "" };
+const EMPTY_BALANCE_INPUTS: CreditBalanceInputs = { trial: "", topup: "", grant: "", included: "" };
 const TRIAL_LENGTH_DAYS = 14;
 
 export function creditRemainingCents(credit: OrganizationLLMCredit, bucket: CreditBalanceBucket): number {
   switch (bucket) {
+    case "included":
+      return credit.included_remaining_cents ?? 0;
     case "trial":
       return credit.welcome_remaining_cents ?? 0;
     case "topup":
@@ -50,6 +57,7 @@ export function creditRemainingCents(credit: OrganizationLLMCredit, bucket: Cred
 
 function balanceInputsFromCredit(credit: OrganizationLLMCredit): CreditBalanceInputs {
   return {
+    included: centsToDollarInput(creditRemainingCents(credit, "included")),
     trial: centsToDollarInput(creditRemainingCents(credit, "trial")),
     topup: centsToDollarInput(creditRemainingCents(credit, "topup")),
     grant: centsToDollarInput(creditRemainingCents(credit, "grant")),
@@ -147,7 +155,14 @@ async function fetchOrganizationCreditGrants(orgId: string): Promise<Organizatio
 
 async function putOrganizationCreditBalance(
   orgId: string,
-  body: { bucket: CreditBalanceBucket; target_cents: number; expected_remaining_cents: number; note: string },
+  body: {
+    bucket: CreditBalanceBucket;
+    target_cents: number;
+    expected_remaining_cents: number;
+    note: string;
+    expiration?: string;
+    expires_at?: string;
+  },
 ): Promise<OrganizationLLMCredit> {
   const response = await fetch(`/admin/api/organizations/${orgId}/llm-credit/balances`, {
     method: "PUT",
@@ -191,15 +206,23 @@ async function loadOrganizationCreditState(
   showErrorToast("Failed to load billing plan");
 }
 
-function useOrgBillingPlan(orgId: string) {
+function useOrgBillingPlan(orgId: string, enabled: boolean) {
   const [plan, setPlan] = useState<OrganizationBillingPlan | null>(null);
+  const [catalog, setCatalog] = useState<BillingPlan[]>([]);
+  const [catalogError, setCatalogError] = useState("");
+  useEffect(() => {
+    if (!enabled) return;
+    billingCatalogRequest<BillingPlan[]>("billing-plans")
+      .then(setCatalog)
+      .catch(() => setCatalogError("Failed to load billing plans. Refresh and try again."));
+  }, [enabled]);
   const [planValue, setPlanValue] = useState("trial");
   const [trialEndsOn, setTrialEndsOn] = useState("");
   const [savingPlan, setSavingPlan] = useState(false);
 
   const applyPlan = useCallback((nextPlan: OrganizationBillingPlan) => {
     setPlan(nextPlan);
-    setPlanValue(nextPlan.plan || "none");
+    setPlanValue(nextPlan.catalog_key || nextPlan.plan || "none");
     setTrialEndsOn(prefilledTrialEndDate(nextPlan.trial_ends_at));
   }, []);
 
@@ -222,6 +245,8 @@ function useOrgBillingPlan(orgId: string) {
 
   return {
     plan,
+    catalog,
+    catalogError,
     planValue,
     setPlanValue,
     trialEndsOn,
@@ -277,11 +302,20 @@ export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolea
   const [loading, setLoading] = useState(true);
   const [balanceInputs, setBalanceInputs] = useState<CreditBalanceInputs>(EMPTY_BALANCE_INPUTS);
   const [note, setNote] = useState("");
+  const [includedExpiresAt, setIncludedExpiresAt] = useState("");
   const [savingBalance, setSavingBalance] = useState<CreditBalanceBucket | null>(null);
-  const billingPlan = useOrgBillingPlan(orgId);
+  const billingPlan = useOrgBillingPlan(orgId, options.billingEnabled);
   const markup = useOrgMarkupOverride(orgId, setCredit);
   const { applyPlan, clearPlan } = billingPlan;
   const { resetMarkup } = markup;
+  useEffect(() => {
+    const plan = billingPlan.plan;
+    let expiry: Date | null = null;
+    if (plan?.credit_expiration === "period_end" && plan.current_period_end) expiry = new Date(plan.current_period_end);
+    if (plan?.credit_expiration === "after_days" && plan.credit_validity_days)
+      expiry = new Date(Date.now() + plan.credit_validity_days * 86400000);
+    setIncludedExpiresAt(expiry && expiry.getTime() > Date.now() ? expiry.toISOString().slice(0, 16) : "");
+  }, [billingPlan.plan]);
 
   const applyCredit = useCallback(
     (data: OrganizationLLMCredit) => {
@@ -344,6 +378,12 @@ export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolea
         target_cents: targetCents,
         expected_remaining_cents: creditRemainingCents(credit, bucket),
         note: note.trim(),
+        ...(bucket === "included"
+          ? {
+              expiration: includedExpiresAt ? "at" : "never",
+              ...(includedExpiresAt ? { expires_at: `${includedExpiresAt}:00Z` } : {}),
+            }
+          : {}),
       });
       applyCredit(next);
       setBalanceInput(bucket, centsToDollarInput(creditRemainingCents(next, bucket)));
@@ -369,6 +409,8 @@ export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolea
     reloadGrants: loadGrants,
     loading,
     balanceInputs,
+    includedExpiresAt,
+    setIncludedExpiresAt,
     setBalanceInput,
     note,
     setNote,

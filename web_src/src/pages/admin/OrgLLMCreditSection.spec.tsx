@@ -71,7 +71,8 @@ function billingPlan(
 ) {
   return {
     plan,
-    plan_source: polarManaged ? "polar" : "system",
+    catalog_key: plan === "business" ? (polarManaged ? "business_legacy" : "business_manual") : plan,
+    plan_source: polarManaged ? "polar" : plan === "business" ? "admin" : "system",
     polar_subscription_status: polarManaged ? "active" : "",
     polar_managed: polarManaged,
     trial_ends_at: trialEndsAt,
@@ -95,6 +96,8 @@ function mockOrgCreditFetch(
 ) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    const catalogResponse = mockBillingCatalogResponse(url);
+    if (catalogResponse) return catalogResponse;
     if (url.endsWith("/llm-credit/balances") && init?.method === "PUT") {
       const body = JSON.parse(String(init.body));
       return options.onPutBalance ? options.onPutBalance(body) : jsonResponse(options.creditData ?? credit);
@@ -170,6 +173,15 @@ describe("OrgLLMCreditSection billing plan", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+        if (url.endsWith("/billing-plans"))
+          return jsonResponse([
+            { key: "trial", name: "Trial" },
+            { key: "business_legacy", name: "Business" },
+            { key: "business_manual", name: "Business Manual" },
+            { key: "none", name: "None" },
+          ]);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
         if (url.includes("/llm-credit") && !url.includes("/grants")) {
           return new Response(JSON.stringify(credit), {
             status: 200,
@@ -193,7 +205,8 @@ describe("OrgLLMCreditSection billing plan", () => {
     expect(screen.getByText(ADMIN_TRIAL_ENDS_HELP)).toBeInTheDocument();
 
     await user.click(screen.getByTestId("admin-org-billing-plan"));
-    await user.click(await screen.findByRole("option", { name: "Business" }));
+    expect((await screen.findByRole("option", { name: /^Business$/ })).getAttribute("aria-disabled")).toBe("true");
+    await user.click(await screen.findByRole("option", { name: "Business Manual" }));
 
     expect(screen.queryByTestId("admin-org-trial-ends-input")).not.toBeInTheDocument();
     expect(screen.getByTestId("admin-org-trial-ends")).toHaveTextContent(trialDate);
@@ -205,6 +218,15 @@ describe("OrgLLMCreditSection billing plan", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+        if (url.endsWith("/billing-plans"))
+          return jsonResponse([
+            { key: "trial", name: "Trial" },
+            { key: "business_legacy", name: "Business" },
+            { key: "business_manual", name: "Business Manual" },
+            { key: "none", name: "None" },
+          ]);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
         if (url.includes("/llm-credit") && !url.includes("/grants")) {
           return new Response(JSON.stringify(credit), {
             status: 200,
@@ -242,6 +264,15 @@ describe("OrgLLMCreditSection billing plan", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        if (url.endsWith("/billing-plans"))
+          return jsonResponse([
+            { key: "trial", name: "Trial" },
+            { key: "business_legacy", name: "Business" },
+            { key: "business_manual", name: "Business Manual" },
+            { key: "none", name: "None" },
+          ]);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
         const method = init?.method ?? "GET";
         if (method === "PUT") {
           requests.push({ url, body: typeof init?.body === "string" ? init.body : null });
@@ -313,7 +344,7 @@ describe("OrgLLMCreditSection balances", () => {
     const trial = await screen.findByTestId("admin-org-credit-trial-target");
     await user.clear(trial);
     await user.type(trial, "10");
-    expect(screen.getByTestId("admin-org-credit-trial-change")).toHaveTextContent("Ledger change: -$35.00");
+    expect(screen.getByTestId("admin-org-credit-trial-change")).toHaveTextContent("Balance change: -$35.00");
     await user.type(screen.getByTestId("admin-org-credit-note"), "Correct trial");
     await user.click(screen.getByTestId("admin-org-credit-trial-save"));
 
@@ -459,5 +490,44 @@ describe("OrgLLMCreditSection balances", () => {
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Trial adjustment")).toBeInTheDocument();
     expect(screen.queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
+  });
+});
+
+function mockBillingCatalogResponse(url: string): Response | null {
+  if (url.endsWith("/billing-plans"))
+    return jsonResponse([
+      { key: "trial", name: "Trial" },
+      { key: "business_legacy", name: "Business" },
+      { key: "business_manual", name: "Business Manual" },
+      { key: "none", name: "None" },
+    ]);
+  if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+  if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
+  return null;
+}
+
+it("sends the exact included balance with an expiration and note", async () => {
+  const user = userEvent.setup();
+  const fetchMock = mockOrgCreditFetch();
+  render(<OrgLLMCreditSection orgId="org-1" />);
+  const target = await screen.findByTestId("admin-org-credit-included-target");
+  await user.clear(target);
+  await user.type(target, "25");
+  const expiration = `${futureUtcDate(5)}T12:30`;
+  fireEvent.change(screen.getByLabelText("Included credit expiration (UTC)"), { target: { value: expiration } });
+  await user.type(screen.getByTestId("admin-org-credit-note"), "Restore included credit");
+  await user.click(screen.getByTestId("admin-org-credit-included-save"));
+  await waitFor(() => {
+    const call = fetchMock.mock.calls.find(
+      ([input, init]) => String(input).endsWith("/llm-credit/balances") && init?.method === "PUT",
+    );
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({
+      bucket: "included",
+      target_cents: 2500,
+      expected_remaining_cents: 0,
+      note: "Restore included credit",
+      expiration: "at",
+      expires_at: `${expiration}:00Z`,
+    });
   });
 });

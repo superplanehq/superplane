@@ -1,3 +1,5 @@
+import type { BillingPlan } from "./billingPlansApi";
+import { OrganizationFeatureGrants } from "./OrganizationFeatureGrants";
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Input, InputGroup } from "@/components/Input/input";
@@ -26,18 +28,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export const ADMIN_POLAR_MANAGED_PLAN_COPY =
   "This organization uses Polar for billing. Cancel or change the subscription in Polar.";
-export const ADMIN_LOCAL_PLAN_COPY = "No Polar subscription. Set Trial, Business, or None for this organization.";
+export const ADMIN_LOCAL_PLAN_COPY = "Select a catalog plan. Business subscriptions are managed in Polar.";
 export const ADMIN_PLAN_UNKNOWN_COPY = "SuperPlane could not load the billing plan. Refresh the page and try again.";
 export const ADMIN_SET_BALANCE_HELP_COPY =
   "Enter the new remaining balance. SuperPlane adds the difference to the credit history as an adjustment.";
 export const ADMIN_NO_ACTIVE_TRIAL_COPY = "This organization has no active trial credit.";
-export const ADMIN_INCLUDED_USAGE_COPY = "The Business subscription sets this value.";
+export const ADMIN_INCLUDED_USAGE_COPY = "Plan grants and manual adjustments set this balance.";
 export const ADMIN_TRIAL_ENDS_LABEL = "Trial ends";
 export const ADMIN_TRIAL_ENDS_HELP = "Trial credit stays usable until this date. Dates use UTC.";
 export const ADMIN_TRIAL_ENDS_ERROR = "Choose a future date.";
 export const ADMIN_CREDIT_HISTORY_ERROR_COPY = "SuperPlane could not load the credit history.";
 
 const EDITABLE_BALANCES: Array<{ bucket: CreditBalanceBucket; label: string; action: string }> = [
+  { bucket: "included", label: "Included credit", action: "Set included credit" },
   { bucket: "trial", label: "Trial credit", action: "Set trial credit" },
   { bucket: "topup", label: "Top-up credit", action: "Set top-up credit" },
   { bucket: "grant", label: "SuperPlane grant", action: "Set SuperPlane grant" },
@@ -59,6 +62,7 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
         <Text className="text-gray-500 text-sm dark:text-gray-400">Loading hosted credit...</Text>
       ) : credit.credit ? (
         <OrgHostedCreditCard
+          orgId={orgId}
           {...credit}
           credit={credit.credit}
           polarManaged={credit.plan?.polar_managed === true}
@@ -73,6 +77,8 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
 }
 
 function OrgBillingPlanField(args: {
+  catalog: BillingPlan[];
+  catalogError: string;
   polarManaged: boolean;
   planKnown: boolean;
   planValue: string;
@@ -91,14 +97,17 @@ function OrgBillingPlanField(args: {
   return (
     <div className="mb-4 max-w-sm">
       <Label className="mb-2 block text-left">Billing plan</Label>
-      <Select disabled={planLocked} value={args.planValue} onValueChange={args.setPlanValue}>
+      {args.catalogError && <p role="alert">{args.catalogError}</p>}
+      <Select disabled={planLocked || !!args.catalogError} value={args.planValue} onValueChange={args.setPlanValue}>
         <SelectTrigger data-testid="admin-org-billing-plan">
           <SelectValue placeholder="Select a plan" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="trial">Trial</SelectItem>
-          <SelectItem value="business">Business</SelectItem>
-          <SelectItem value="none">None</SelectItem>
+          {args.catalog.map((plan) => (
+            <SelectItem key={plan.key} value={plan.key} disabled={plan.key === "business_legacy"}>
+              {plan.name}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -158,6 +167,11 @@ function billingPlanHelp(planKnown: boolean, polarManaged: boolean): string {
 }
 
 function OrgHostedCreditCard(args: {
+  orgId: string;
+  catalog: BillingPlan[];
+  catalogError: string;
+  includedExpiresAt: string;
+  setIncludedExpiresAt: (value: string) => void;
   credit: OrganizationLLMCredit;
   grants: OrganizationsOrganizationCreditGrant[];
   polarManaged: boolean;
@@ -191,6 +205,8 @@ function OrgHostedCreditCard(args: {
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
       {args.showPlanControls ? (
         <OrgBillingPlanField
+          catalog={args.catalog}
+          catalogError={args.catalogError}
           polarManaged={args.polarManaged}
           planKnown={args.planKnown}
           planValue={args.planValue}
@@ -226,6 +242,16 @@ function OrgHostedCreditCard(args: {
             />
           ))}
         </div>
+        <div className="mt-4">
+          <Label htmlFor="included-expiration">Included credit expiration (UTC)</Label>
+          <Input
+            id="included-expiration"
+            type="datetime-local"
+            value={args.includedExpiresAt}
+            onChange={(event) => args.setIncludedExpiresAt(event.target.value)}
+          />
+          <Text>For an increase, choose a future UTC expiration. Leave empty for no scheduled expiration.</Text>
+        </div>
         <Label htmlFor="admin-org-credit-note" className="mb-2 mt-4 block text-left">
           Note (optional)
         </Label>
@@ -244,6 +270,9 @@ function OrgHostedCreditCard(args: {
         savingMarkup={args.savingMarkup}
         saveMarkup={args.saveMarkup}
       />
+      {args.showPlanControls && (
+        <OrganizationFeatureGrants key={args.savedPlan?.catalog_key || args.savedPlan?.plan} orgId={args.orgId} />
+      )}
       <CreditHistory grants={args.grants} loadFailed={args.grantsLoadFailed} onRetry={() => void args.reloadGrants()} />
     </div>
   );
@@ -315,7 +344,7 @@ function MarkupOverrideField(args: {
         />
       </InputGroup>
       <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        Leave empty to use the installation markup. Organization members cannot see this value.
+        Leave empty to use the plan or installation markup. Organization members cannot see this value.
       </Text>
       <Button
         type="button"
@@ -418,7 +447,7 @@ function balanceChangeCopy(changeCents: number | null): string {
   if (changeCents === 0) {
     return "No change.";
   }
-  return `Ledger change: ${formatCreditGrantAmount(changeCents)}`;
+  return `Balance change: ${formatCreditGrantAmount(changeCents)}`;
 }
 
 function trialBalanceLocked(
