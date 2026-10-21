@@ -85,6 +85,11 @@ spec:
               Task description:
               {{ task().description }}{{ task().spec != "" ? "\n\nSpec:\n" + task().spec : "" }}
 
+              Repository instructions:
+
+              Read the applicable repository instructions before making changes. Check AGENTS.md, CLAUDE.md, contribution documentation, and instructions for the affected paths. Discover and read applicable SKILL.md files, including skills referenced by those instructions.
+              Follow repository conventions for implementation, testing, and commit messages. Repository instructions take precedence over the general defaults below. The automation still controls branch creation, pushing, commit identity, and pull request creation. Do not replace repository-owned instructions or skills with workspace copies.
+
               1/ Create a new branch. Do not commit on {{ task().default_branch }}.
               2/ Implement the task. Keep the change focused.
               3/ Commit on the working branch with clear messages.
@@ -94,11 +99,20 @@ spec:
 
               1/ Focus on clean code.
               2/ Make long term fixes, not fast patches.
-              3/ Add tests where it makes sense.
+              3/ Follow the testing and verification guidance below.
               4/ For UI work, implement and wire the change into the production page or component.
               5/ A Storybook story, preview, or fixture does not replace the product implementation unless the task explicitly requests a prototype.
-              6/ Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers.
+              6/ The runner manages commit identity and trailers. Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers.
               7/ Do not invent a token budget, a time budget, a step limit, or a remaining context size. The application does not set one unless the task text sets one. Do not stop early, skip work, or change the setup because of an imagined limit. If the task text sets a limit, follow that limit.
+
+              Testing and verification:
+
+              1/ Follow the repository's testing instructions. Use its existing tools and conventions.
+              2/ For bug fixes, add a regression test that reproduces the failure when practical.
+              3/ For behavior changes, add or update tests that verify observable behavior.
+              4/ Avoid tests that only mirror implementation details or assert incidental layout, classes, or wording. Purely cosmetic changes do not need new tests unless repository instructions require them. Add coverage if behavior or accessibility changes.
+              5/ Run the relevant tests, lint, and build checks specified by the repository. Fix failures caused by your changes.
+              6/ Report which checks passed or failed. State which checks you could not run and explain why. Do not claim verification you did not perform.
 
           - name: Commit and Push
             type: bash
@@ -127,14 +141,16 @@ spec:
 
               Task title: {{ task().title }}
 
-              1/ Compare the current branch with {{ task().default_branch }} and review the commits you made.
-              2/ The title must follow conventional commits structure. Use only feat, fix, chore, or docs.
-              3/ The description must start with a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
-              4/ Do not add GitHub closing keywords (Closes, Fixes, Resolves). The automation adds them.
-              5/ Do not hard-wrap lines. Write each paragraph as a single line. Use blank lines only to separate paragraphs, headings, list items, or other Markdown elements. GitHub renders single newlines as line breaks.
-              6/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
+              Read the applicable repository instructions for commit and pull request writing. Check AGENTS.md, CLAUDE.md, contribution documentation, and applicable SKILL.md files. Read referenced skills instead of assuming that their availability means their instructions were followed.
 
-              Write clearly, for humans, in ASD-STE100 / Simplified Technical English
+              1/ Compare the current branch with {{ task().default_branch }} and review the commits you made.
+              2/ Follow repository conventions for the title, description, writing style, and formatting. Discover and use the applicable pull request template. These instructions take precedence over the fallback below.
+              3/ If the repository provides no guidance, write a short, descriptive title and a concise description of the problem and resulting behavior. Include relevant verification and known limitations. Use sections only when they help the reader. Do not require a Conventional Commits title or sections for each part of the system.
+              4/ Do not add GitHub closing keywords (Closes, Fixes, Resolves). The automation adds them.
+              5/ If the repository has no formatting rules, use clear Markdown with each paragraph on one line. Separate paragraphs, headings, and list items with blank lines.
+              6/ Include only verification results you can substantiate. Do not claim that tests, lint, or builds passed without evidence. State any checks that could not run and why.
+              7/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
+              8/ Do not create or update the pull request yourself. The automation uses these files to create or update it.
           - name: Push output
             type: bash
             workingDirectory: repo
