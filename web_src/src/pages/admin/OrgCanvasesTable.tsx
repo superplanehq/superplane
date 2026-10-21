@@ -126,7 +126,8 @@ function ResetBuiltInAutomations({ orgId }: { orgId: string }) {
         credentials: "include",
       });
       if (!response.ok) {
-        setError("Could not reset built-in automations.");
+        const details = response.status === 400 ? (await response.text()).trim() : "";
+        setError(details || "Could not reset built-in automations.");
         return;
       }
       const data: { reset?: number } = await response.json();
@@ -154,14 +155,25 @@ function ResetBuiltInAutomations({ orgId }: { orgId: string }) {
         Reset built-in automations
       </Button>
       {message ? <Text className="text-xs text-gray-500 dark:text-gray-400">{message}</Text> : null}
-      <Dialog open={open} onClose={() => (pending ? undefined : setOpen(false))} size="md">
+      <Dialog
+        open={open}
+        onClose={() => (pending ? undefined : setOpen(false))}
+        size="md"
+        role="dialog"
+        aria-label="Reset built-in automations"
+        aria-modal="true"
+      >
         <DialogTitle>Reset built-in automations?</DialogTitle>
         <DialogDescription>
           <p>
-            This replaces the built-in automations in this organization with the current templates. Repositories and
-            integrations stay connected. Custom automations stay unchanged.
+            This replaces the built-in automations in this organization with the current templates. User settings,
+            repositories, and integrations stay unchanged. Custom automations stay unchanged.
           </p>
-          {error ? <p className="mt-2 text-red-600 dark:text-red-400">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="mt-2 text-red-600 dark:text-red-400">
+              {error}
+            </p>
+          ) : null}
         </DialogDescription>
         <DialogActions>
           <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>

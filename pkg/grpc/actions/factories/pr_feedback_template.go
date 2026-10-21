@@ -79,6 +79,8 @@ type prFeedbackBuildRequest struct {
 	RunnerIntegrationNames []string
 	Binding                *intakeBinding
 	Agent                  *intakeAgent
+	AgentSettings          map[string]*factoryAgentSettings
+	TriggerSettings        map[string]*factoryTriggerSettings
 	// VCSProvider selects the Git host. Empty means GitHub.
 	VCSProvider string
 	// OmitCommitIdentity drops the git user and DCO steps. The factory git
@@ -286,7 +288,9 @@ func withPRFeedbackConcurrency(canvas *yaml.Canvas) *yaml.Canvas {
 		if canvas.Spec.Nodes[i].Type != yaml.NodeTypeAction {
 			continue
 		}
-		canvas.Spec.Nodes[i].Concurrency = prFeedbackConcurrency()
+		if canvas.Spec.Nodes[i].Concurrency == nil {
+			canvas.Spec.Nodes[i].Concurrency = prFeedbackConcurrency()
+		}
 	}
 	return canvas
 }
@@ -379,6 +383,7 @@ func prFeedbackDiscussionFlowNodes(
 	flow prFeedbackDiscussionFlowRequest,
 	request prFeedbackBuildRequest,
 ) prFeedbackDiscussionFlowSpec {
+	flow.Trigger = request.TriggerSettings[flow.Trigger.ID].configure(flow.Trigger)
 	flow.Trigger.Position = yaml.Position{X: 80, Y: flow.Y}
 	return prFeedbackDiscussionFlowSpec{
 		triggerID: flow.Trigger.ID,
@@ -410,14 +415,14 @@ func prFeedbackDiscussionFlowNodes(
 				},
 				Position: yaml.Position{X: 640, Y: flow.Y},
 			},
-			{
+			request.AgentSettings[flow.RunnerID].configure(yaml.Node{
 				ID:            flow.RunnerID,
 				Name:          prFeedbackRunnerNodeName,
 				Type:          yaml.NodeTypeAction,
 				Component:     request.Agent.component(),
 				Configuration: prFeedbackRunnerConfiguration(request),
 				Position:      yaml.Position{X: 920, Y: flow.Y},
-			},
+			}),
 		},
 		edges: []yaml.Edge{
 			{Channel: "default", SourceID: flow.Trigger.ID, TargetID: flow.FindID},

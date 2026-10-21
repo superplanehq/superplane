@@ -24,7 +24,8 @@ type BuiltInAutomationReset struct {
 
 // ResetOrganizationBuiltInAutomations replaces every built-in automation in
 // the organization with its current template and saves that canvas. Custom
-// automations are left unchanged. Repositories and integrations stay connected.
+// automations are left unchanged. Builders carry supported user settings into
+// the current templates; prompts and workflow structure come from those templates.
 func ResetOrganizationBuiltInAutomations(
 	ctx context.Context,
 	organizationID uuid.UUID,
@@ -46,7 +47,7 @@ func ResetOrganizationBuiltInAutomations(
 			for j := range canvasesForFactory {
 				saved, resetErr := resetBuiltInAutomation(ctx, tx, &factoryList[i], &canvasesForFactory[j], deps)
 				if resetErr != nil {
-					return fmt.Errorf("reset %q: %w", canvasesForFactory[j].Name, resetErr)
+					return fmt.Errorf("reset %q in factory %q: %w", canvasesForFactory[j].Name, factoryList[i].Name, resetErr)
 				}
 				if saved {
 					result.Reset++
@@ -72,7 +73,7 @@ func resetBuiltInAutomation(
 	if err != nil {
 		return false, err
 	}
-	materialized, err := materializeLiveAutomationDefaults(tx, factory, canvas, version)
+	materialized, err := materializeLiveAutomationDefaults(tx, factory, canvas, version, factoryAutomationSettingsFromVersion(version))
 	if notBuiltInAutomation(err) {
 		return false, nil
 	}
@@ -82,6 +83,9 @@ func resetBuiltInAutomation(
 
 	doc, err := yaml.CanvasFromYAML([]byte(materialized.canvasYAML))
 	if err != nil {
+		return false, err
+	}
+	if err := validateBuiltInResetSettings(doc, deps.Registry); err != nil {
 		return false, err
 	}
 	nodes, edges, err := doc.Parse(deps.Registry, canvas.OrganizationID.String())
