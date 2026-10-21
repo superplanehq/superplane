@@ -121,9 +121,9 @@ func (p *OnPRReview) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return http.StatusOK, nil, nil
 	}
 
-	allowed := isAllowedBot(eventType, data, config.AllowedBots)
-	if config.IgnoreBots && isBotAuthor(eventType, data) && !allowed {
-		ctx.Logger.Info("Ignoring event - author is a bot")
+	ignore, bypassFilter := prCommentAuthorDecision(config, eventType, data)
+	if ignore {
+		ctx.Logger.Info("Ignoring event - author is excluded")
 		return http.StatusOK, nil, nil
 	}
 
@@ -133,8 +133,8 @@ func (p *OnPRReview) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return code, nil, err
 	}
 
-	matched := allowed
-	if !allowed {
+	matched := bypassFilter
+	if !bypassFilter {
 		bodies := reviewFilterBodies(data, comments)
 		matched, code, err = applyContentFilter(config.ContentFilter, bodies...)
 		if err != nil {
@@ -142,7 +142,7 @@ func (p *OnPRReview) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 			return code, nil, fmt.Errorf("failed to apply PR review content filter: %w", err)
 		}
 	} else {
-		ctx.Logger.Info("Author is an allowed bot - bypassing content filter")
+		ctx.Logger.Info("Author bypasses the content filter")
 	}
 
 	if !matched {

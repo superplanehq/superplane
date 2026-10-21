@@ -122,21 +122,21 @@ func (p *OnPRComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 		return http.StatusOK, nil, nil
 	}
 
-	allowed := isAllowedBot(eventType, data, config.AllowedBots)
-	if config.IgnoreBots && isBotAuthor(eventType, data) && !allowed {
-		ctx.Logger.Info("Ignoring event - author is a bot")
+	ignore, bypassFilter := prCommentAuthorDecision(config, eventType, data)
+	if ignore {
+		ctx.Logger.Info("Ignoring event - author is excluded")
 		return http.StatusOK, nil, nil
 	}
 
-	matched := allowed
-	if !allowed {
+	matched := bypassFilter
+	if !bypassFilter {
 		matched, code, err = applyPRCommentContentFilter(config.ContentFilter, eventType, data)
 		if err != nil {
 			ctx.Logger.Errorf("Failed to apply PR comment content filter: %v", err)
 			return code, nil, err
 		}
 	} else {
-		ctx.Logger.Info("Author is an allowed bot - bypassing content filter")
+		ctx.Logger.Info("Author bypasses the content filter")
 	}
 
 	if !matched {

@@ -18,12 +18,14 @@ import (
 const (
 	prCommentScopeAll     = "all"
 	prCommentScopeReplies = "replies"
+	superPlaneGitHubLogin = "superplaneagent"
 )
 
 type prCommentTriggerConfiguration struct {
 	Repository               string   `json:"repository" mapstructure:"repository"`
 	ContentFilter            string   `json:"contentFilter" mapstructure:"contentFilter"`
 	IgnoreBots               bool     `json:"ignoreBots" mapstructure:"ignoreBots"`
+	AddressAllBots           bool     `json:"addressAllBots" mapstructure:"addressAllBots"`
 	AllowedBots              []string `json:"allowedBots" mapstructure:"allowedBots"`
 	IncludeReviewSubmissions *bool    `json:"includeReviewSubmissions" mapstructure:"includeReviewSubmissions"`
 	CommentScope             string   `json:"commentScope" mapstructure:"commentScope"`
@@ -291,6 +293,29 @@ func isBotAuthor(eventType string, data map[string]any) bool {
 
 	userType, _ := user["type"].(string)
 	return strings.EqualFold(userType, "Bot")
+}
+
+func isSuperPlaneGitHubAuthor(eventType string, data map[string]any) bool {
+	if !isBotAuthor(eventType, data) {
+		return false
+	}
+	return normalizeBotName(authorLogin(eventType, data)) == superPlaneGitHubLogin
+}
+
+// prCommentAuthorDecision reports whether the author is excluded, and whether
+// a remaining author bypasses the mention filter.
+func prCommentAuthorDecision(config prCommentTriggerConfiguration, eventType string, data map[string]any) (ignore bool, bypassFilter bool) {
+	if isSuperPlaneGitHubAuthor(eventType, data) {
+		return true, false
+	}
+	if config.AddressAllBots && isBotAuthor(eventType, data) {
+		return false, true
+	}
+	allowed := isAllowedBot(eventType, data, config.AllowedBots)
+	if config.IgnoreBots && isBotAuthor(eventType, data) && !allowed {
+		return true, false
+	}
+	return false, allowed
 }
 
 func authorLogin(eventType string, data map[string]any) string {

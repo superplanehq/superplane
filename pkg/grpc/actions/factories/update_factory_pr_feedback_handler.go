@@ -158,6 +158,7 @@ func applyPRFeedbackSettings(
 					configuration["contentFilter"] = updated.Mention
 					configuration["ignoreBots"] = updated.IgnoreBots
 					configuration["allowedBots"] = allowedBotsNodeValue(updated.AllowedBots)
+					configuration["addressAllBots"] = updated.AddressAllBots
 				}
 				nodes[i].Configuration = configuration
 				continue
@@ -181,6 +182,13 @@ func applyPRFeedbackSettings(
 					configuration = map[string]any{}
 				}
 				configuration["environmentFrom"] = runnerEnvironmentFrom
+				if !graph.isChecks() {
+					refreshDiscussionRunnerPrompt(configuration, prFeedbackBuildRequest{
+						Mention:        updated.Mention,
+						AddressAllBots: updated.AddressAllBots,
+						VCSProvider:    provider,
+					})
+				}
 				if provider == models.ProviderBitbucket {
 					refreshBitbucketRunnerSteps(configuration, graph.isChecks())
 				}
