@@ -12,7 +12,7 @@ import { dependabotRepositoryValue } from "@/lib/dependabotRepository";
 import { DependabotIntakeConfigBody } from "./DependabotIntakeConfigBody";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 import { SentryIntakeConfigBody } from "./SentryIntakeConfigBody";
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
@@ -272,7 +272,7 @@ function useIntakeSplitSettings({
       factoryKey,
       runHrefFor: intakeRunHref(organizationId, factoryKey, intake.appId, lineId),
       onClose,
-      onSaveNode: (update: NodeConfigurationUpdate) => agent.saveNode(update, { notify: false }),
+      onSaveNode: (update: NodeConfigurationSave) => agent.saveNode(update, { notify: false }),
       onDelete: actions.removeIntake,
       deletePending: deleteIntake.isPending,
       deleteError: actions.deleteError,

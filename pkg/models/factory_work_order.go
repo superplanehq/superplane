@@ -74,6 +74,7 @@ type FactoryWorkOrder struct {
 	Number          int64
 	Title           string
 	Description     string
+	RefinementModel *string
 	State           string
 	Result          string
 	CreatedByID     *uuid.UUID
@@ -172,6 +173,18 @@ func (o *FactoryWorkOrder) MCPClient() *WorkOrderMCPClient {
 		name = DefaultMCPClientName
 	}
 	return &WorkOrderMCPClient{ID: id, Name: name}
+}
+
+func (o *FactoryWorkOrder) SetRefinementModel(tx *gorm.DB, model string) error {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return nil
+	}
+	if err := tx.Model(o).Update("refinement_model", model).Error; err != nil {
+		return err
+	}
+	o.RefinementModel = &model
+	return nil
 }
 
 func (o *FactoryWorkOrder) SetMCPClient(tx *gorm.DB, id, name string) error {

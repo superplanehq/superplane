@@ -2,6 +2,7 @@ package productanalytics
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	posthog "github.com/posthog/posthog-go"
@@ -76,7 +77,69 @@ func TestNoopClientDoesNotEnableAnalytics(t *testing.T) {
 
 	assert.False(t, client.Enabled())
 	client.Capture(Event{Name: EventFactoryTaskCreated})
+	client.IdentifyOrganizationGroup(OrganizationGroupIdentity{
+		ID:        "organization-123",
+		Name:      "Acme",
+		AccountID: "account-123",
+	})
 	assert.NoError(t, client.Close())
+}
+
+func TestClientIdentifyOrganizationGroup(t *testing.T) {
+	queue := &recordingQueue{}
+	client := newClient(queue)
+	createdAt := time.Now().In(time.FixedZone("UTC+2", 2*60*60))
+
+	client.IdentifyOrganizationGroup(OrganizationGroupIdentity{
+		ID:        "organization-123",
+		Name:      "Acme",
+		Slug:      "acme",
+		CreatedAt: &createdAt,
+		AccountID: "account-123",
+	})
+
+	require.Len(t, queue.messages, 1)
+	message, ok := queue.messages[0].(posthog.GroupIdentify)
+	require.True(t, ok)
+	assert.Equal(t, OrganizationGroup, message.Type)
+	assert.Equal(t, "organization-123", message.Key)
+	assert.Equal(t, "account-123", message.DistinctId)
+	assert.Equal(t, "Acme", message.Properties["name"])
+	assert.Equal(t, "acme", message.Properties["slug"])
+	assert.Equal(t, createdAt.UTC().Format(time.RFC3339), message.Properties["created_at"])
+}
+
+func TestClientIdentifyOrganizationGroupSkipsMissingAccount(t *testing.T) {
+	queue := &recordingQueue{}
+	client := newClient(queue)
+
+	client.IdentifyOrganizationGroup(OrganizationGroupIdentity{
+		ID:   "organization-123",
+		Name: "Acme",
+		Slug: "acme",
+	})
+
+	assert.Empty(t, queue.messages)
+}
+
+func TestClientIdentifyOrganizationGroupOmitsAbsentFields(t *testing.T) {
+	queue := &recordingQueue{}
+	client := newClient(queue)
+
+	client.IdentifyOrganizationGroup(OrganizationGroupIdentity{
+		ID:        "organization-123",
+		Name:      "Acme",
+		AccountID: "account-123",
+	})
+
+	require.Len(t, queue.messages, 1)
+	message, ok := queue.messages[0].(posthog.GroupIdentify)
+	require.True(t, ok)
+	assert.Equal(t, "Acme", message.Properties["name"])
+	_, hasSlug := message.Properties["slug"]
+	assert.False(t, hasSlug)
+	_, hasCreatedAt := message.Properties["created_at"]
+	assert.False(t, hasCreatedAt)
 }
 
 func TestClientCloseFlushesQueue(t *testing.T) {

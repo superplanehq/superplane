@@ -47,6 +47,7 @@ export function PlanningReviewForm({
   restoreError,
   onRetryRestore,
   restoreRetryDisabled = false,
+  disabled = false,
 }: {
   draft: PlanningReviewDraft;
   onChange: (next: PlanningReviewDraft) => void;
@@ -64,6 +65,7 @@ export function PlanningReviewForm({
   restoreError?: string;
   onRetryRestore?: () => void;
   restoreRetryDisabled?: boolean;
+  disabled?: boolean;
 }) {
   const updateComponent = (id: string, next: PlanningReviewComponent) => {
     onChange({
@@ -91,6 +93,7 @@ export function PlanningReviewForm({
           restoreError={restoreError}
           onRetryRestore={onRetryRestore}
           restoreRetryDisabled={restoreRetryDisabled}
+          disabled={disabled}
           onChange={(next) => updateComponent(component.id, next)}
         />
       ))}
@@ -113,6 +116,7 @@ function AgentPanel({
   restoreError,
   onRetryRestore,
   restoreRetryDisabled,
+  disabled,
   onChange,
 }: {
   appearance: "card" | "fields";
@@ -129,6 +133,7 @@ function AgentPanel({
   restoreError?: string;
   onRetryRestore?: () => void;
   restoreRetryDisabled: boolean;
+  disabled: boolean;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
   const features = useExperimentalFeature(organizationId);
@@ -206,6 +211,7 @@ function AgentPanel({
       allowExpressions={view === "full"}
       autocompleteExampleObj={EXPRESSION_CONTEXT}
       fieldPath="model"
+      readOnly={disabled}
     />
   ) : null;
 
@@ -217,6 +223,7 @@ function AgentPanel({
       type="number"
       min={1}
       value={component.concurrency.max}
+      disabled={disabled}
       onChange={(event) =>
         onChange({ ...component, concurrency: { ...component.concurrency, max: event.target.value } })
       }
@@ -272,6 +279,7 @@ function AgentPanel({
         {view === "implementation" ? (
           <ImplementRunDuration
             seconds={component.configuration.executionTimeoutSeconds}
+            disabled={disabled}
             onChange={(seconds) => setConfigurationField("executionTimeoutSeconds", seconds)}
           />
         ) : modelControl ? (
