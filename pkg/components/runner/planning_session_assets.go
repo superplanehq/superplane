@@ -67,13 +67,13 @@ func PlanningSessionProtocolFile() BrokerTaskFile {
 // PlanningSessionProtocolMarkdown returns the hardcoded refinement system
 // protocol. Runners append this. The canvas prompt must not replace it.
 func PlanningSessionProtocolMarkdown() string {
-	return strings.TrimSpace(analysisProtocolReviewMarkdown)
+	return strings.TrimSpace(analysisProtocolReviewMarkdown) +
+		"\n\n# Managed refinement guidance\n\n" + PlanningSessionUserPromptMarkdown()
 }
 
-// PlanningSessionUserPromptMarkdown provides the full refinement instructions
-// for the system skill. Runners inject the planning protocol separately; the
-// built-in canvas prompt only supplies the task. User additions are stored in
-// additionalInstructions and appended at dispatch.
+// PlanningSessionUserPromptMarkdown supplies the full refinement guidance to
+// both the managed protocol and the optional system skill. The canvas prompt
+// only supplies the task. User additions are appended separately at dispatch.
 func PlanningSessionUserPromptMarkdown() string {
 	return strings.TrimSpace(analysisUserPromptReviewMarkdown)
 }
@@ -85,7 +85,7 @@ func PlanningSessionUserPromptReviewMarkdown() string {
 
 // PlanningSessionProtocolMarkdownFile ships the review protocol to runners.
 func PlanningSessionProtocolMarkdownFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "analysis_protocol_review.md", Content: analysisProtocolReviewMarkdown, Mode: "0644"}
+	return BrokerTaskFile{Path: "analysis_protocol_review.md", Content: PlanningSessionProtocolMarkdown(), Mode: "0644"}
 }
 
 func PlanningSessionReviewProtocolMarkdownFile() BrokerTaskFile {
