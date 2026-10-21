@@ -395,16 +395,13 @@ func assertLivePRFeedbackAcknowledge(
 	}
 	assert.Truef(t, foundNode, "missing acknowledge node %s", nodeID)
 
-	var foundEdge bool
+	var foundTargets []string
 	for _, edge := range edges {
-		if edge.TargetID != nodeID {
-			continue
+		if edge.SourceID == findNodeID && edge.Channel == "found" {
+			foundTargets = append(foundTargets, edge.TargetID)
 		}
-		assert.Equal(t, findNodeID, edge.SourceID)
-		assert.Equal(t, "found", edge.Channel)
-		foundEdge = true
 	}
-	assert.Truef(t, foundEdge, "missing acknowledge edge %s -> %s", findNodeID, nodeID)
+	assert.Equal(t, []string{nodeID}, foundTargets)
 }
 
 func assertLivePRFeedbackConcurrency(t *testing.T, canvasID uuid.UUID, nodes []models.Node) {

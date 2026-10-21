@@ -229,17 +229,17 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 
 		assert.Equal(t, []string{
 			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackFindNodeID,
-			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
-			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackRunnerNodeID,
 			"found:" + prFeedbackFindNodeID + "->" + prFeedbackAcknowledgeCommentNodeID,
+			"default:" + prFeedbackAcknowledgeCommentNodeID + "->" + prFeedbackActivityNodeID,
+			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackRunnerNodeID,
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackReviewFindNodeID,
-			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackReviewActivityNodeID,
-			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
 			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackAcknowledgeReviewNodeID,
+			"default:" + prFeedbackAcknowledgeReviewNodeID + "->" + prFeedbackReviewActivityNodeID,
+			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackReplyFindNodeID,
-			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackReplyActivityNodeID,
-			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
 			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackAcknowledgeReviewReplyNodeID,
+			"default:" + prFeedbackAcknowledgeReviewReplyNodeID + "->" + prFeedbackReplyActivityNodeID,
+			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
 		}, yamlEdgeChannels(canvas))
 
 		for _, node := range canvas.Spec.Nodes {
