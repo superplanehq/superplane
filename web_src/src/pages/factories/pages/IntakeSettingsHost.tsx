@@ -45,7 +45,7 @@ interface IntakeSettingsHostProps {
 export function IntakeSettingsHost(props: IntakeSettingsHostProps) {
   const features = useExperimentalFeature(props.organizationId);
   if (features.has(FEATURE_FACTORY_RUN_HISTORY)) {
-    return <SourceIntakeSettings {...props} />;
+    return <SourceIntakeSettings key={props.intake.intakeId} {...props} />;
   }
   if (props.intake.source.id === "dependabot-alerts") {
     return <DependabotIntakeSettings {...props} />;
@@ -53,7 +53,7 @@ export function IntakeSettingsHost(props: IntakeSettingsHostProps) {
   if (props.intake.source.id === "sentry-exceptions") {
     return <SentryIntakeSettings {...props} />;
   }
-  return <SourceIntakeSettings {...props} />;
+  return <SourceIntakeSettings key={props.intake.intakeId} {...props} />;
 }
 
 function DependabotIntakeSettings(props: IntakeSettingsHostProps) {
@@ -154,9 +154,9 @@ function SourceIntakeSettings({
   const editAutomationHref = intake.appId
     ? factoryAppConfigurePath(organizationId, factoryKey, intake.appId, { from: "lines", lineId })
     : undefined;
-  const saveError = updateIntake.error
-    ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError)
-    : undefined;
+  const saveError =
+    actions.pauseError ??
+    (updateIntake.error ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError) : undefined);
   const watchedRepository =
     intake.source.id === "dependabot-alerts"
       ? dependabotRepositoryValue(
@@ -168,6 +168,8 @@ function SourceIntakeSettings({
   return (
     <IntakeSourceSettingsPopup
       settings={intake.settings}
+      paused={actions.paused}
+      onPausedChange={intake.source.id === "github-issues" ? actions.changePaused : undefined}
       sourceId={intake.source.id}
       organizationId={organizationId}
       factoryId={factoryId}
@@ -304,9 +306,26 @@ function useIntakeSettingsActions({
   onClose: () => void;
 }) {
   const [deleteError, setDeleteError] = useState<string>();
+  const [pauseError, setPauseError] = useState<string>();
+  const [paused, setPaused] = useState(intake.paused);
+  useEffect(() => setPaused(intake.paused), [intake.intakeId, intake.paused]);
+  const changePaused = useCallback(
+    async (next: boolean) => {
+      setPauseError(undefined);
+      try {
+        await updateIntake.mutateAsync({ intakeId: intake.intakeId, paused: next });
+        setPaused(next);
+      } catch (error) {
+        setPauseError(getApiErrorMessage(error, "SuperPlane could not update the intake. Try again."));
+        throw error;
+      }
+    },
+    [intake.intakeId, updateIntake],
+  );
 
   const saveSettings = useCallback(
     async (next: IntakeSourceSettings) => {
+      setPauseError(undefined);
       const normalized = normalizeIntakeSourceSettings(next, intake.source.id);
       await updateIntake.mutateAsync({
         intakeId: intake.intakeId,
@@ -331,7 +350,7 @@ function useIntakeSettingsActions({
     }
   }, [deleteIntake, intake.intakeId, onClose]);
 
-  return { deleteError, saveSettings, removeIntake };
+  return { deleteError, saveSettings, removeIntake, paused, changePaused, pauseError };
 }
 
 function datadogServiceRebind(
