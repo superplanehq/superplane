@@ -321,6 +321,10 @@ function PageObservabilityScope() {
   return null;
 }
 
+function organizationScopeQueryEnabled(segment: string | undefined, isReserved: boolean, guestLine: boolean): boolean {
+  return !isReserved && !!segment && !guestLine;
+}
+
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account, loading: accountLoading } = useAccount();
@@ -337,7 +341,8 @@ export function OrganizationScope() {
     data: organization,
     isLoading: organizationLoading,
     error: organizationError,
-  } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
+    refetch: refreshOrganization,
+  } = useOrganization(segment ?? "", organizationScopeQueryEnabled(segment, isReserved, guestLine));
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
   useRedirectIntegrationSetupReturn(segment, resolvedSlug);
@@ -361,7 +366,14 @@ export function OrganizationScope() {
     uidRedirectPath,
     path: `${location.pathname}${location.search}`,
   });
-  useIdentifyOrganizationGroup(account?.id, organization?.metadata);
+  useIdentifyOrganizationGroup({
+    accountId: account?.id,
+    organizationKey: segment,
+    impersonating: account?.impersonation?.active,
+    refreshOrganization: organizationScopeQueryEnabled(segment, isReserved, guestLine)
+      ? refreshOrganization
+      : undefined,
+  });
 
   if (isReserved) {
     return <Navigate to="/" replace />;

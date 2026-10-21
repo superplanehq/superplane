@@ -88,7 +88,7 @@ func TestNoopClientDoesNotEnableAnalytics(t *testing.T) {
 func TestClientIdentifyOrganizationGroup(t *testing.T) {
 	queue := &recordingQueue{}
 	client := newClient(queue)
-	createdAt := time.Date(2026, 10, 1, 15, 4, 5, 0, time.FixedZone("UTC+2", 2*60*60))
+	createdAt := time.Now().In(time.FixedZone("UTC+2", 2*60*60))
 
 	client.IdentifyOrganizationGroup(OrganizationGroupIdentity{
 		ID:        "organization-123",
