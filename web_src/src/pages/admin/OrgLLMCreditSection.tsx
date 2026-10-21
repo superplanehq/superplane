@@ -16,6 +16,7 @@ import {
   formatUtcTrialEnd,
   useOrgLLMCredit,
   utcCalendarDate,
+  type BillingCatalogPlan,
   type CreditBalanceBucket,
   type CreditBalanceInputs,
   type OrganizationBillingPlan,
@@ -26,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export const ADMIN_POLAR_MANAGED_PLAN_COPY =
   "This organization uses Polar for billing. Cancel or change the subscription in Polar.";
-export const ADMIN_LOCAL_PLAN_COPY = "No Polar subscription. Set Trial, Business, or None for this organization.";
+export const ADMIN_LOCAL_PLAN_COPY = "Select a catalog plan. Business subscriptions are managed in Polar.";
 export const ADMIN_PLAN_UNKNOWN_COPY = "SuperPlane could not load the billing plan. Refresh the page and try again.";
 export const ADMIN_SET_BALANCE_HELP_COPY =
   "Enter the new remaining balance. SuperPlane adds the difference to the credit history as an adjustment.";
@@ -73,6 +74,8 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
 }
 
 function OrgBillingPlanField(args: {
+  catalog: BillingCatalogPlan[];
+  catalogError: string;
   polarManaged: boolean;
   planKnown: boolean;
   planValue: string;
@@ -84,21 +87,25 @@ function OrgBillingPlanField(args: {
   savingPlan: boolean;
   savePlan: () => void;
 }) {
-  const planLocked = !args.planKnown || args.polarManaged;
-  const showTrialEndField = args.planKnown && !args.polarManaged && args.planValue === "trial";
+  const planEditable = args.planKnown && !args.polarManaged;
+  const catalogLocked = !!args.catalogError || args.catalog.length === 0;
+  const showTrialEndField = planEditable && args.planValue === "trial";
   const savedTrialEnd = formatUtcTrialEnd(args.savedTrialEndsAt);
-  const showTrialEnd = args.planKnown && !args.polarManaged && (showTrialEndField || savedTrialEnd != null);
+  const showTrialEnd = planEditable && (showTrialEndField || savedTrialEnd != null);
   return (
     <div className="mb-4 max-w-sm">
       <Label className="mb-2 block text-left">Billing plan</Label>
-      <Select disabled={planLocked} value={args.planValue} onValueChange={args.setPlanValue}>
+      {args.catalogError && <p role="alert">{args.catalogError}</p>}
+      <Select disabled={!planEditable || catalogLocked} value={args.planValue} onValueChange={args.setPlanValue}>
         <SelectTrigger data-testid="admin-org-billing-plan">
           <SelectValue placeholder="Select a plan" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="trial">Trial</SelectItem>
-          <SelectItem value="business">Business</SelectItem>
-          <SelectItem value="none">None</SelectItem>
+          {args.catalog.map((plan) => (
+            <SelectItem key={plan.key} value={plan.key} disabled={plan.key === "business_legacy"}>
+              {plan.name}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -132,17 +139,17 @@ function OrgBillingPlanField(args: {
           )}
         </div>
       ) : null}
-      {planLocked ? null : (
+      {planEditable ? (
         <Button
           type="button"
           className="mt-3"
           data-testid="admin-org-billing-plan-save"
           onClick={args.savePlan}
-          disabled={args.savingPlan}
+          disabled={args.savingPlan || catalogLocked || args.planValue === "business_legacy"}
         >
           {args.savingPlan ? "Saving..." : "Save plan"}
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -158,6 +165,8 @@ function billingPlanHelp(planKnown: boolean, polarManaged: boolean): string {
 }
 
 function OrgHostedCreditCard(args: {
+  catalog: BillingCatalogPlan[];
+  catalogError: string;
   credit: OrganizationLLMCredit;
   grants: OrganizationsOrganizationCreditGrant[];
   polarManaged: boolean;
@@ -191,6 +200,8 @@ function OrgHostedCreditCard(args: {
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
       {args.showPlanControls ? (
         <OrgBillingPlanField
+          catalog={args.catalog}
+          catalogError={args.catalogError}
           polarManaged={args.polarManaged}
           planKnown={args.planKnown}
           planValue={args.planValue}
