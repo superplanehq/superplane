@@ -193,6 +193,8 @@ export const InvalidDuration: Story = {
     await userEvent.clear(duration);
     await userEvent.tab();
     await expect(canvas.getByRole("alert")).toBeVisible();
+    await expect(canvas.getByRole("alert")).toHaveTextContent("Enter a duration from 1 second to 1440 minutes.");
+    await expect(canvas.getByTestId("implement-settings-save")).toBeDisabled();
   },
 };
 export const FeatureDisabled: Story = {
