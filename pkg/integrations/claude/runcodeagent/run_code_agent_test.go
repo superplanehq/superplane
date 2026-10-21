@@ -159,6 +159,15 @@ func Test__RunCodeAgent__buildEnvironmentConfig(t *testing.T) {
 	assert.Contains(t, ghe.Networking.AllowedHosts, "acme.ghe.com")
 	assert.Contains(t, ghe.Networking.AllowedHosts, "*.acme.ghe.com")
 	assert.NotContains(t, ghe.Networking.AllowedHosts, "*.ghe.com")
+
+	leftoverPR := buildEnvironmentConfig(Spec{
+		Networking: networkingLimited,
+		SourceMode: sourceModeRepository,
+		Repository: "owner/repo",
+		PrURL:      "https://acme.ghe.com/other/app/pull/1",
+	})
+	assert.Contains(t, leftoverPR.Networking.AllowedHosts, "github.com")
+	assert.NotContains(t, leftoverPR.Networking.AllowedHosts, "acme.ghe.com")
 	require.NotNil(t, limited.Networking.AllowPackageManagers)
 	assert.True(t, *limited.Networking.AllowPackageManagers)
 }
@@ -174,6 +183,18 @@ func Test__RunCodeAgent__buildPrompt__repository(t *testing.T) {
 	// Acting as bot (default): no git identity config, no trailer suppression.
 	assert.NotContains(t, got, "git config user.name")
 	assert.NotContains(t, got, "Co-Authored-By")
+}
+
+func Test__RunCodeAgent__buildPrompt__repositoryIgnoresPrURLHost(t *testing.T) {
+	spec := Spec{
+		SourceMode: "repository",
+		Repository: "owner/repo",
+		PrURL:      "https://acme.ghe.com/other/app/pull/1",
+		Task:       "fix the bug",
+	}
+	got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
+	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git")
+	assert.NotContains(t, got, "acme.ghe.com")
 }
 
 func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
