@@ -17,6 +17,10 @@ func (rt *Runtime) getTaskReport(ctx context.Context, claims *AccessClaims, args
 	if err := rt.authorize(ctx, claims, "work_orders:read"); err != nil {
 		return ToolResult{}, err
 	}
+	factoryID, err := resolveWorkspace(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	task, err := stringArg(args, "task")
 	if err != nil {
 		return ToolResult{}, err
@@ -30,7 +34,7 @@ func (rt *Runtime) getTaskReport(ctx context.Context, claims *AccessClaims, args
 		return ToolResult{}, err
 	}
 
-	report, err := factories.BuildTaskReport(toolContext(ctx, claims), claims.OrgID.String(), claims.FactoryID.String(), task, models.TaskRunHistoryQuery{
+	report, err := factories.BuildTaskReport(toolContext(ctx, claims), claims.OrgID.String(), factoryID.String(), task, models.TaskRunHistoryQuery{
 		Limit:  limit,
 		Before: before,
 	})

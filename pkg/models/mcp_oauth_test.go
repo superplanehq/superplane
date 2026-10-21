@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestListMCPOAuthRefreshTokensForFactory(t *testing.T) {
@@ -22,10 +23,10 @@ func TestListMCPOAuthRefreshTokensForFactory(t *testing.T) {
 	require.NoError(t, err)
 	now := time.Now()
 
-	newer := insertRefreshToken(t, r, factory.ID, "superplane-local", now.Add(time.Hour), now.Add(-time.Minute))
-	older := insertRefreshToken(t, r, factory.ID, "other-client", now.Add(time.Hour), now.Add(-time.Hour))
-	insertRefreshToken(t, r, factory.ID, "expired-client", now.Add(-time.Minute), now.Add(-2*time.Hour))
-	insertRefreshToken(t, r, otherFactory.ID, "other-factory", now.Add(time.Hour), now)
+	newer := insertRefreshToken(t, r, []uuid.UUID{factory.ID}, "superplane-local", now.Add(time.Hour), now.Add(-time.Minute))
+	older := insertRefreshToken(t, r, []uuid.UUID{factory.ID}, "other-client", now.Add(time.Hour), now.Add(-time.Hour))
+	insertRefreshToken(t, r, []uuid.UUID{factory.ID}, "expired-client", now.Add(-time.Minute), now.Add(-2*time.Hour))
+	insertRefreshToken(t, r, []uuid.UUID{otherFactory.ID}, "other-factory", now.Add(time.Hour), now)
 
 	tokens, err := models.ListMCPOAuthRefreshTokensForFactory(db, r.Organization.ID, factory.ID, now)
 	require.NoError(t, err)
@@ -42,7 +43,7 @@ func TestFindMCPOAuthRefreshTokenForFactory(t *testing.T) {
 	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	now := time.Now()
-	token := insertRefreshToken(t, r, factory.ID, "superplane-local", now.Add(time.Hour), now)
+	token := insertRefreshToken(t, r, []uuid.UUID{factory.ID}, "superplane-local", now.Add(time.Hour), now)
 
 	found, err := models.FindMCPOAuthRefreshTokenForFactory(db, r.Organization.ID, factory.ID, token.ID)
 	require.NoError(t, err)
@@ -74,7 +75,7 @@ func TestListMCPOAuthClientsByClientIDs(t *testing.T) {
 func insertRefreshToken(
 	t *testing.T,
 	r *support.ResourceRegistry,
-	factoryID uuid.UUID,
+	factoryIDs []uuid.UUID,
 	clientID string,
 	expiresAt time.Time,
 	createdAt time.Time,
@@ -85,7 +86,7 @@ func insertRefreshToken(
 		ClientID:       clientID,
 		UserID:         r.User,
 		OrganizationID: r.Organization.ID,
-		FactoryID:      factoryID,
+		FactoryIDs:     models.NewMCPOAuthFactoryIDs(factoryIDs),
 		Resource:       "http://localhost:8000/mcp",
 		Scopes:         datatypes.NewJSONSlice([]string{"work_orders:read"}),
 		ExpiresAt:      expiresAt,
@@ -95,62 +96,126 @@ func insertRefreshToken(
 	return token
 }
 
+func TestListMCPOAuthRefreshTokensForFactoryMatchesMultiWorkspaceGrants(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	first, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	second, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	third, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	token := insertRefreshToken(t, r, []uuid.UUID{first.ID, second.ID}, "superplane-local", now.Add(time.Hour), now)
+
+	for _, factory := range []*models.Factory{first, second} {
+		tokens, err := models.ListMCPOAuthRefreshTokensForFactory(db, r.Organization.ID, factory.ID, now)
+		require.NoError(t, err)
+		require.Len(t, tokens, 1)
+		assert.Equal(t, token.ID, tokens[0].ID)
+	}
+
+	tokens, err := models.ListMCPOAuthRefreshTokensForFactory(db, r.Organization.ID, third.ID, now)
+	require.NoError(t, err)
+	assert.Empty(t, tokens)
+
+	tokens, err = models.ListMCPOAuthRefreshTokensForFactory(db, uuid.New(), first.ID, now)
+	require.NoError(t, err)
+	assert.Empty(t, tokens)
+}
+
 func TestHasMCPOAuthRefreshTokenForClient(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	first, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	second, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	third, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	now := time.Now()
-	insertRefreshToken(t, r, factory.ID, "superplane-local", now.Add(time.Hour), now)
+	insertRefreshToken(t, r, []uuid.UUID{first.ID, second.ID}, "superplane-local", now.Add(time.Hour), now)
 
-	ok, err := models.HasMCPOAuthRefreshTokenForClient(db, r.Organization.ID, factory.ID, r.User, "superplane-local", now)
-	require.NoError(t, err)
-	assert.True(t, ok)
-
-	ok, err = models.HasMCPOAuthRefreshTokenForClient(db, r.Organization.ID, factory.ID, r.User, "other-client", now)
-	require.NoError(t, err)
-	assert.False(t, ok)
+	tests := []struct {
+		name       string
+		orgID      uuid.UUID
+		factoryIDs []uuid.UUID
+		clientID   string
+		want       bool
+	}{
+		{"one granted workspace", r.Organization.ID, []uuid.UUID{first.ID}, "superplane-local", true},
+		{"every granted workspace", r.Organization.ID, []uuid.UUID{second.ID, first.ID}, "superplane-local", true},
+		{"one workspace not granted", r.Organization.ID, []uuid.UUID{first.ID, third.ID}, "superplane-local", false},
+		{"other client", r.Organization.ID, []uuid.UUID{first.ID}, "other-client", false},
+		{"other organization", uuid.New(), []uuid.UUID{first.ID}, "superplane-local", false},
+		{"no workspace", r.Organization.ID, nil, "superplane-local", false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ok, err := models.HasMCPOAuthRefreshTokenForClient(db, test.orgID, test.factoryIDs, r.User, test.clientID, now)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, ok)
+		})
+	}
 }
 
-func TestDeleteMCPOAuthRefreshTokensForClient(t *testing.T) {
+func TestRemoveFactoryFromMCPOAuthGrant(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	first, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	second, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	now := time.Now()
-	first := insertRefreshToken(t, r, factory.ID, "superplane-local", now.Add(time.Hour), now)
-	insertRefreshToken(t, r, factory.ID, "superplane-local", now.Add(time.Hour), now.Add(time.Second))
-	other := insertRefreshToken(t, r, factory.ID, "other-client", now.Add(time.Hour), now)
+	both := []uuid.UUID{first.ID, second.ID}
+	shared := insertRefreshToken(t, r, both, "superplane-local", now.Add(time.Hour), now)
+	onlyFirst := insertRefreshToken(t, r, []uuid.UUID{first.ID}, "superplane-local", now.Add(time.Hour), now)
+	otherClient := insertRefreshToken(t, r, both, "other-client", now.Add(time.Hour), now)
+	sharedCode := insertAuthCode(t, r, both, "superplane-local", now.Add(time.Minute))
+	otherClientCode := insertAuthCode(t, r, both, "other-client", now.Add(time.Minute))
 
-	require.NoError(t, models.DeleteMCPOAuthRefreshTokensForClient(db, r.Organization.ID, factory.ID, r.User, "superplane-local"))
-	_, err = models.FindMCPOAuthRefreshTokenForFactory(db, r.Organization.ID, factory.ID, first.ID)
-	assert.ErrorIs(t, err, models.ErrMCPOAuthRefreshNotFound)
-	found, err := models.FindMCPOAuthRefreshTokenForFactory(db, r.Organization.ID, factory.ID, other.ID)
+	require.NoError(t, models.RemoveFactoryFromMCPOAuthGrant(db, r.Organization.ID, first.ID, r.User, "superplane-local"))
+
+	var kept models.MCPOAuthRefreshToken
+	require.NoError(t, db.First(&kept, "id = ?", shared.ID).Error)
+	assert.Equal(t, []uuid.UUID{second.ID}, kept.FactoryUUIDs())
+	assert.ErrorIs(t, db.First(&models.MCPOAuthRefreshToken{}, "id = ?", onlyFirst.ID).Error, gorm.ErrRecordNotFound)
+	var untouched models.MCPOAuthRefreshToken
+	require.NoError(t, db.First(&untouched, "id = ?", otherClient.ID).Error)
+	assert.Equal(t, both, untouched.FactoryUUIDs())
+
+	code, err := models.FindMCPOAuthCode(db, sharedCode.CodeHash, now)
 	require.NoError(t, err)
-	assert.Equal(t, other.ID, found.ID)
-}
-
-func TestDeleteMCPOAuthCodesForClient(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	assert.Equal(t, []uuid.UUID{second.ID}, code.FactoryUUIDs())
+	code, err = models.FindMCPOAuthCode(db, otherClientCode.CodeHash, now)
 	require.NoError(t, err)
-	now := time.Now()
-	keep := insertAuthCode(t, r, factory.ID, "other-client", now.Add(time.Minute))
-	drop := insertAuthCode(t, r, factory.ID, "superplane-local", now.Add(time.Minute))
+	assert.Equal(t, both, code.FactoryUUIDs())
 
-	require.NoError(t, models.DeleteMCPOAuthCodesForClient(db, r.Organization.ID, factory.ID, r.User, "superplane-local"))
-	_, err = models.FindMCPOAuthCode(db, drop.CodeHash, now)
+	require.NoError(t, models.RemoveFactoryFromMCPOAuthGrant(db, r.Organization.ID, second.ID, r.User, "superplane-local"))
+	assert.ErrorIs(t, db.First(&models.MCPOAuthRefreshToken{}, "id = ?", shared.ID).Error, gorm.ErrRecordNotFound)
+	_, err = models.FindMCPOAuthCode(db, sharedCode.CodeHash, now)
 	assert.ErrorIs(t, err, models.ErrMCPOAuthCodeNotFound)
-	found, err := models.FindMCPOAuthCode(db, keep.CodeHash, now)
+}
+
+func TestRemoveFactoryFromMCPOAuthGrantStaysInOrganization(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	assert.Equal(t, keep.ID, found.ID)
+	now := time.Now()
+	token := insertRefreshToken(t, r, []uuid.UUID{factory.ID}, "superplane-local", now.Add(time.Hour), now)
+
+	require.NoError(t, models.RemoveFactoryFromMCPOAuthGrant(db, uuid.New(), factory.ID, r.User, "superplane-local"))
+
+	found, err := models.FindMCPOAuthRefreshTokenForFactory(db, r.Organization.ID, factory.ID, token.ID)
+	require.NoError(t, err)
+	assert.Equal(t, token.ID, found.ID)
 }
 
 func insertAuthCode(
 	t *testing.T,
 	r *support.ResourceRegistry,
-	factoryID uuid.UUID,
+	factoryIDs []uuid.UUID,
 	clientID string,
 	expiresAt time.Time,
 ) *models.MCPOAuthCode {
@@ -164,7 +229,7 @@ func insertAuthCode(
 		CodeChallengeMethod: "S256",
 		UserID:              r.User,
 		OrganizationID:      r.Organization.ID,
-		FactoryID:           factoryID,
+		FactoryIDs:          models.NewMCPOAuthFactoryIDs(factoryIDs),
 		Scopes:              datatypes.NewJSONSlice([]string{"work_orders:read"}),
 		ExpiresAt:           expiresAt,
 	}
