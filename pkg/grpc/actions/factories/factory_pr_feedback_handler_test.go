@@ -58,7 +58,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		assert.Equal(t, prFeedbackDefaultName, handler.GetName())
 		assert.True(t, handler.GetHealthy())
 		assert.Equal(t, "acme/app", handler.GetSettings().GetSubject().GetRepository())
-		assert.Equal(t, prFeedbackDefaultMention, handler.GetSettings().GetDiscussion().GetMention())
+		assert.Equal(t, "@superplaneagent", handler.GetSettings().GetDiscussion().GetMention())
 		assert.True(t, handler.GetSettings().GetDiscussion().GetIgnoreBots())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))

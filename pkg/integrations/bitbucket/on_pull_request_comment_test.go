@@ -288,3 +288,28 @@ func Test__MatchBitbucketContentFilter(t *testing.T) {
 	assert.True(t, matchBitbucketContentFilter("/solve", event))
 	assert.False(t, matchBitbucketContentFilter("/deploy", event))
 }
+
+func Test__MatchBitbucketContentFilter__AgentMentionAlias(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		filter string
+		body   string
+		want   bool
+	}{
+		{"new mention matches itself", "@SuperPlane", "please @SuperPlane fix this", true},
+		{"new mention matches the old login", "@SuperPlane", "please @superplaneagent fix this", true},
+		{"old filter matches the new mention", "@superplaneagent", "please @SuperPlane fix this", true},
+		{"old filter matches itself", "@superplaneagent", "please @superplaneagent fix this", true},
+		{"case does not matter", "@SUPERPLANE", "ping @superplane", true},
+		{"a longer nickname does not match", "@SuperPlane", "please @superplaneagent-old fix this", false},
+		{"a longer nickname does not match the old filter", "@superplaneagent", "please @superplaneagent-old fix this", false},
+		{"a custom filter has no alias", "@ada", "please @superplaneagent fix this", false},
+		{"a custom filter still matches itself", "@ada", "please @ada fix this", true},
+		{"a picked account reference does not match", "@SuperPlane", "please @{712020:abc-def} fix this", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			event := map[string]any{"comment": map[string]any{"body": test.body}}
+			assert.Equal(t, test.want, matchBitbucketContentFilter(test.filter, event))
+		})
+	}
+}

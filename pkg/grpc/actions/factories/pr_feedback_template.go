@@ -32,6 +32,7 @@ const (
 	prFeedbackDefaultName         = "Address PR feedback"
 	prFeedbackDefaultDescription  = "Address pull request comments and reviews after a mention."
 	prFeedbackDefaultMention      = "@superplaneagent"
+	prFeedbackBitbucketMention    = "@SuperPlane"
 	prFeedbackCommentScopeReplies = "replies"
 
 	prFeedbackRunnerNodeName = "Address PR feedback"
@@ -97,6 +98,15 @@ func prFeedbackVCSProvider(request prFeedbackBuildRequest) string {
 		return models.ProviderBitbucket
 	}
 	return models.ProviderGitHub
+}
+
+// prFeedbackMentionFor returns the mention a new discussion handler requires.
+// GitHub uses the bot login. Bitbucket uses the app display name.
+func prFeedbackMentionFor(provider string) string {
+	if strings.EqualFold(strings.TrimSpace(provider), models.ProviderBitbucket) {
+		return prFeedbackBitbucketMention
+	}
+	return prFeedbackDefaultMention
 }
 
 func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
@@ -713,7 +723,7 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 			"",
 			"Use the Bitbucket token in BITBUCKET_TOKEN.",
 			"When BITBUCKET_EMAIL is set, send HTTP basic authentication with that email and BITBUCKET_TOKEN.",
-			"Read pull request comments that mention the workspace agent.",
+			"Read pull request comments that mention @SuperPlane or @superplaneagent.",
 			"Use inline file and line context on code-anchored comments.",
 			"Ignore replies that SuperPlane Agent already wrote.",
 			"",

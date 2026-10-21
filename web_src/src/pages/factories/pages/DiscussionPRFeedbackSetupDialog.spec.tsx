@@ -267,6 +267,43 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
     expect(onCreated).toHaveBeenCalledWith("handler-1");
   });
 
+  it("requires @SuperPlane on a Bitbucket factory", async () => {
+    const user = userEvent.setup();
+    render(
+      <DiscussionPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/app"
+        vcsProvider="bitbucket"
+        source={discussionSource}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: /Require @SuperPlane/ })).toBeChecked();
+    expect(screen.queryByRole("radio", { name: /Require @superplaneagent/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Humans must mention @SuperPlane for pull request feedback.")).toBeInTheDocument();
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute(
+      "data-comment",
+      "@SuperPlane fix this and make no mistakes",
+    );
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveTextContent("@SuperPlane");
+    await user.click(screen.getByTestId("discussion-setup-continue"));
+    await user.click(screen.getByTestId("discussion-setup-finish"));
+
+    expect(mocks.createHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          discussion: expect.objectContaining({
+            mention: "@SuperPlane",
+          }),
+        }),
+      }),
+    );
+  });
+
   it("lets a Bitbucket workspace type bot names without an empty catalog", async () => {
     const user = userEvent.setup();
     render(

@@ -314,6 +314,14 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, prompt, "Summarize the changes in this comment.")
 		assert.Contains(t, prompt, "If you upload visual evidence, include it in the same comment.")
 		assert.Contains(t, prompt, "Do not post a separate visual evidence comment.")
+		assert.Contains(t, prompt, "Read pull request conversation comments that mention @superplaneagent.")
+		assert.NotContains(t, prompt, "@SuperPlane")
+	})
+
+	t.Run("a bitbucket discussion prompt names both typed mentions", func(t *testing.T) {
+		prompt := prFeedbackPromptFor(prFeedbackBuildRequest{VCSProvider: models.ProviderBitbucket})
+		assert.Contains(t, prompt, "Read pull request comments that mention @SuperPlane or @superplaneagent.")
+		assert.NotContains(t, prompt, "Read pull request conversation comments that mention @superplaneagent.")
 	})
 
 	t.Run("an empty mention is written as an empty content filter", func(t *testing.T) {

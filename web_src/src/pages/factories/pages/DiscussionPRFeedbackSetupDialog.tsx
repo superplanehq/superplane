@@ -7,6 +7,7 @@ import { PRFeedbackSetupWizardShell } from "./PRFeedbackSetupWizardChrome";
 import { ReviewBotPicker } from "./ReviewBotPicker";
 import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
 import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackSource } from "./prFeedbackSettingsModel";
+import { mentionRequireHelper, mentionRequireOption } from "./prFeedbackSettingsCopy";
 import {
   useDiscussionPRFeedbackSetup,
   type DiscussionBotMode,
@@ -41,6 +42,7 @@ export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetup
         <DiscussionPRFeedbackSetupPreview
           step={setup.step}
           mentionRequired={setup.mentionRequired}
+          mention={setup.mention}
           botMode={setup.botMode}
           selectedBots={setup.allowedBots}
           catalog={setup.catalog}
@@ -107,8 +109,8 @@ function MentionStep({ setup }: { setup: DiscussionPRFeedbackSetupModel }) {
         name="discussion-setup-mention"
         value="require"
         checked={setup.mentionRequired}
-        title={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireOption}
-        helper={PR_FEEDBACK_SETTINGS_COPY.wizardMentionRequireHelper}
+        title={mentionRequireOption(setup.mention)}
+        helper={mentionRequireHelper(setup.mention)}
         onChange={() => setup.setMentionRequired(true)}
       />
       <IntakeSettingsRadioOption

@@ -13,6 +13,14 @@ import {
 import { normalizeReviewBotLogin, type ReviewBotOption } from "./reviewBotPickerModel";
 
 export const DISCUSSION_MENTION = "@superplaneagent";
+export const BITBUCKET_DISCUSSION_MENTION = "@SuperPlane";
+
+export function discussionMentionFor(vcsProvider?: string): string {
+  if (factoryVCSProvider(vcsProvider) === "bitbucket") {
+    return BITBUCKET_DISCUSSION_MENTION;
+  }
+  return DISCUSSION_MENTION;
+}
 
 export type DiscussionBotMode = "ignore" | "address";
 
@@ -67,6 +75,7 @@ export function useDiscussionPRFeedbackSetup(
   const [error, setError] = useState<string>();
   const [catalogApplied, setCatalogApplied] = useState(false);
   const supportsReviewBots = factoryVCSProvider(vcsProvider) !== "bitbucket";
+  const mention = discussionMentionFor(vcsProvider);
 
   const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
   const catalogQuery = useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
@@ -112,7 +121,7 @@ export function useDiscussionPRFeedbackSetup(
         settings: {
           subject: repository ? { repository } : undefined,
           discussion: {
-            mention: mentionRequired ? DISCUSSION_MENTION : "",
+            mention: mentionRequired ? mention : "",
             ignoreBots: bots.ignoreBots,
             allowedBots: bots.allowedBots,
           },
@@ -129,6 +138,7 @@ export function useDiscussionPRFeedbackSetup(
     setStep,
     mentionRequired,
     setMentionRequired,
+    mention,
     botMode,
     setBotMode,
     allowedBots,
