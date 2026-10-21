@@ -49,7 +49,7 @@ blocks:
                 --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
                 --pipeline-id "$SEMAPHORE_PIPELINE_ID" \
                 --directory "$release_dir" \
-                --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
+                --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt,runner.oci.tar \
                 --output "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum release-manifest.json >release-manifest.sha256)
               bash release/component-release-artifact.sh \
