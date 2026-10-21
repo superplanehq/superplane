@@ -366,7 +366,7 @@ func TestProviderDeletionConfirmation(t *testing.T) {
 		deleteError    error
 		wantConfirmed  bool
 	}{
-		{name: "deleted resource", resourceExists: true, wantConfirmed: true},
+		{name: "deletion accepted but resource still listed", resourceExists: true, terminatedAgo: 2 * time.Minute},
 		{name: "failed deletion", resourceExists: true, deleteError: errors.New("provider unavailable")},
 		{name: "absent resource after grace", terminatedAgo: 2 * time.Minute, wantConfirmed: true},
 		{name: "absent resource during grace", terminatedAgo: time.Second},
