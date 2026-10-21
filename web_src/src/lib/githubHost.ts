@@ -22,9 +22,10 @@ export function githubHostFromIntegration(integration: HostedGitHubIntegration |
   if (integration?.metadata?.integrationName !== "github") {
     return "";
   }
-  const fromProperty = trimmedHost(integration.status?.properties?.find((property) => property.name === "host")?.value);
-  if (!isDotComHost(fromProperty)) {
-    return fromProperty;
+  const hostProperty = integration.status?.properties?.find((property) => property.name === "host");
+  if (hostProperty) {
+    const fromProperty = trimmedHost(hostProperty.value);
+    return isDotComHost(fromProperty) ? "" : fromProperty;
   }
   const fromConfig = trimmedHost(integration.spec?.configuration?.host);
   if (!isDotComHost(fromConfig)) {

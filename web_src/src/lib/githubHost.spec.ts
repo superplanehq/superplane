@@ -33,6 +33,16 @@ describe("githubHostFromIntegration", () => {
     ).toBe("acme.ghe.com");
   });
 
+  it("treats an empty host property as github.com even when configuration has a tenant", () => {
+    expect(
+      githubHostFromIntegration({
+        metadata: { integrationName: "github" },
+        spec: { configuration: { host: "acme.ghe.com" } },
+        status: { properties: [{ name: "host", value: "" }] },
+      }),
+    ).toBe("");
+  });
+
   it("ignores other integrations", () => {
     expect(
       githubHostFromIntegration({
