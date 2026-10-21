@@ -5,14 +5,39 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
-const githubAPIBaseURL = "https://api.github.com"
+func githubHostFromURL(raw string) githubcommon.Host {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Hostname() == "" || !githubcommon.IsKnownGitHubWebHostname(parsed.Hostname()) {
+		return githubcommon.DotCom()
+	}
+	host, err := githubcommon.ParseHost(parsed.Hostname())
+	if err != nil {
+		return githubcommon.DotCom()
+	}
+	return host
+}
+
+func githubHostFromRepository(repository string) githubcommon.Host {
+	if strings.Contains(repository, "://") {
+		return githubHostFromURL(repository)
+	}
+	return githubcommon.DotCom()
+}
+
+func githubHostFromSpec(spec Spec) githubcommon.Host {
+	if strings.TrimSpace(spec.PrURL) != "" {
+		return githubHostFromURL(spec.PrURL)
+	}
+	return githubHostFromRepository(spec.Repository)
+}
 
 // pullRequestInfo is the subset of a GitHub pull request we need to drive PR mode.
 type pullRequestInfo struct {
@@ -23,6 +48,7 @@ type pullRequestInfo struct {
 	HeadRepo string // owner/repo of the head (may be a fork)
 	BaseRef  string
 	BaseRepo string // owner/repo of the base
+	Host     githubcommon.Host
 }
 
 // isFork reports whether the PR was opened from a fork.
@@ -30,19 +56,25 @@ func (p *pullRequestInfo) isFork() bool {
 	return p.HeadRepo != "" && p.BaseRepo != "" && !strings.EqualFold(p.HeadRepo, p.BaseRepo)
 }
 
-var prURLRegexp = regexp.MustCompile(`^https?://github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)`)
-
-// parsePRURL extracts owner, repo, and number from a GitHub PR URL.
 func parsePRURL(prURL string) (owner, repo string, number int, err error) {
-	m := prURLRegexp.FindStringSubmatch(strings.TrimSpace(prURL))
-	if m == nil {
-		return "", "", 0, fmt.Errorf("invalid pull request URL %q (expected https://github.com/owner/repo/pull/N)", prURL)
+	raw := strings.TrimSpace(prURL)
+	parsed, parseErr := url.Parse(raw)
+	if parseErr != nil || parsed.Hostname() == "" || !githubcommon.IsKnownGitHubWebHostname(parsed.Hostname()) {
+		return "", "", 0, fmt.Errorf("invalid pull request URL %q (expected a GitHub pull request URL)", prURL)
 	}
-	number, err = strconv.Atoi(m[3])
+	host := githubHostFromURL(raw)
+	if !host.IsWebHostname(parsed.Hostname()) {
+		return "", "", 0, fmt.Errorf("invalid pull request URL %q (expected a GitHub pull request URL)", prURL)
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[2] != "pull" {
+		return "", "", 0, fmt.Errorf("invalid pull request URL %q (expected %s/owner/repo/pull/N)", prURL, host.WebURL())
+	}
+	number, err = strconv.Atoi(parts[3])
 	if err != nil {
 		return "", "", 0, fmt.Errorf("invalid pull request number in %q", prURL)
 	}
-	return m[1], strings.TrimSuffix(m[2], ".git"), number, nil
+	return parts[0], strings.TrimSuffix(parts[1], ".git"), number, nil
 }
 
 type githubUserResponse struct {
@@ -54,8 +86,8 @@ type githubUserResponse struct {
 
 // resolveGitHubUser returns the commit author name and email for the user that
 // owns the token, so commits can be attributed to them rather than the agent.
-func resolveGitHubUser(httpCtx core.HTTPContext, token string) (name, email string, err error) {
-	body, err := githubGet(httpCtx, githubAPIBaseURL+"/user", token)
+func resolveGitHubUser(httpCtx core.HTTPContext, token string, host githubcommon.Host) (name, email string, err error) {
+	body, err := githubGet(httpCtx, host.APIURLEnv()+"/user", token)
 	if err != nil {
 		return "", "", err
 	}
@@ -73,7 +105,7 @@ func resolveGitHubUser(httpCtx core.HTTPContext, token string) (name, email stri
 	email = out.Email
 	if email == "" {
 		// GitHub's no-reply address always accepts pushes and links to the account.
-		email = fmt.Sprintf("%d+%s@users.noreply.github.com", out.ID, out.Login)
+		email = fmt.Sprintf("%d+%s@users.noreply.%s", out.ID, out.Login, host.WebHostname())
 	}
 	return name, email, nil
 }
@@ -129,7 +161,7 @@ func resolvePullRequest(httpCtx core.HTTPContext, prURL, token string) (*pullReq
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/repos/%s/%s/pulls/%d", githubAPIBaseURL, owner, repo, number)
+	url := fmt.Sprintf("%s/repos/%s/%s/pulls/%d", githubHostFromURL(prURL).APIURLEnv(), owner, repo, number)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build pull request lookup: %w", err)
@@ -165,6 +197,7 @@ func resolvePullRequest(httpCtx core.HTTPContext, prURL, token string) (*pullReq
 		HTMLURL: out.HTMLURL,
 		HeadRef: out.Head.Ref,
 		BaseRef: out.Base.Ref,
+		Host:    githubHostFromURL(prURL),
 	}
 	if out.Head.Repo != nil {
 		info.HeadRepo = out.Head.Repo.FullName
