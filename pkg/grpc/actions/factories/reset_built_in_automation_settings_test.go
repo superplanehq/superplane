@@ -26,12 +26,14 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	cases := []struct {
-		provider string
-		max      int
-		canvas   *models.Canvas
+		provider     string
+		max          int
+		instructions string
+		canvas       *models.Canvas
 	}{
-		{provider: models.ProviderGitHub, max: 7},
-		{provider: models.ProviderBitbucket, max: 9},
+		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests."},
+		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request."},
+		{provider: models.ProviderGitHub, max: 3, instructions: ""},
 	}
 	for i := range cases {
 		tc := &cases[i]
@@ -42,6 +44,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Concurrency = &yaml.ConcurrencySpec{Max: &tc.max, Key: "team"}
 			agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 			agent.Configuration["thinkingLevel"] = "low"
+			agent.Configuration["additionalInstructions"] = tc.instructions
 			agent.Configuration["executionTimeoutSeconds"] = 0
 			agent.Configuration["disabledAgentResourceIds"] = []any{}
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
@@ -59,6 +62,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			assert.Equal(t, "runnerSuperPlane", agent.ComponentName())
 			assert.Equal(t, models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"), agent.Configuration["model"])
 			assert.Equal(t, "low", agent.Configuration["thinkingLevel"])
+			assert.Equal(t, tc.instructions, agent.Configuration["additionalInstructions"])
 			assert.EqualValues(t, 0, agent.Configuration["executionTimeoutSeconds"])
 			assert.Equal(t, []any{}, agent.Configuration["disabledAgentResourceIds"])
 			assert.Equal(t, map[string]any{"github-resource": []any{"delete_issue"}}, agent.Configuration["disabledAgentResourceTools"])

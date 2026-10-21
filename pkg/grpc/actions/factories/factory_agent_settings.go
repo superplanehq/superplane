@@ -18,6 +18,7 @@ var factoryAgentSettingFields = []string{
 	"machineType", "executionTimeoutSeconds", "workingDirectory", "maxTurns",
 	"includeVisualEvidence", "disabledAgentResourceIds", "disabledAgentResourceTools",
 	"enabledAgentResourceTools", "skipSetupCommands", "environmentFrom",
+	"additionalInstructions",
 }
 
 type factoryAgentSettings struct {

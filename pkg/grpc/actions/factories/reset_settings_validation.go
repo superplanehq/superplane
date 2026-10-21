@@ -67,6 +67,9 @@ func validateBuiltInResetNode(node yaml.Node, registry *registry.Registry) error
 		return fmt.Errorf("maximum simultaneous runs must be at least 1")
 	}
 	for _, field := range factoryAgentSettingFields {
+		if field == "additionalInstructions" {
+			continue // User instructions are literal text, not expressions.
+		}
 		value, _ := node.Configuration[field].(string)
 		if configuration.ExpressionPlaceholderRegex.MatchString(value) {
 			return nil

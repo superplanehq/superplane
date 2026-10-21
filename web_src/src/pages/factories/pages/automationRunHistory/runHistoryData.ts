@@ -84,6 +84,7 @@ function executionActivity(
   nodes: SuperplaneComponentsNode[],
 ): RunActivity {
   const node = nodes.find((node) => node.id === execution.nodeId);
+  const instructions = execution.configuration?.additionalInstructions;
   return {
     id: execution.id!,
     name: node?.name || execution.nodeId || "Execution",
@@ -92,5 +93,6 @@ function executionActivity(
     error: execution.result === "RESULT_FAILED" ? execution.resultMessage || undefined : undefined,
     logs: { state: "empty" },
     outputs: execution.outputs && Object.keys(execution.outputs).length ? execution.outputs : undefined,
+    additionalInstructions: typeof instructions === "string" && instructions.trim() ? instructions : undefined,
   };
 }
