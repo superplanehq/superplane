@@ -615,6 +615,14 @@ func runnerHasStep(t *testing.T, node yaml.Node, name string) bool {
 }
 
 func withoutPRFeedbackAcknowledgeComment(spec models.LiveCanvasSpec) models.LiveCanvasSpec {
+	nextID := ""
+	for _, edge := range spec.Edges {
+		if edge.SourceID == prFeedbackAcknowledgeCommentNodeID {
+			nextID = edge.TargetID
+			break
+		}
+	}
+
 	nodes := make([]models.Node, 0, len(spec.Nodes))
 	for _, node := range spec.Nodes {
 		if node.ID == prFeedbackAcknowledgeCommentNodeID {
@@ -624,8 +632,14 @@ func withoutPRFeedbackAcknowledgeComment(spec models.LiveCanvasSpec) models.Live
 	}
 	edges := make([]models.Edge, 0, len(spec.Edges))
 	for _, edge := range spec.Edges {
-		if edge.TargetID == prFeedbackAcknowledgeCommentNodeID {
+		if edge.SourceID == prFeedbackAcknowledgeCommentNodeID {
 			continue
+		}
+		if edge.TargetID == prFeedbackAcknowledgeCommentNodeID {
+			if nextID == "" {
+				continue
+			}
+			edge.TargetID = nextID
 		}
 		edges = append(edges, edge)
 	}
