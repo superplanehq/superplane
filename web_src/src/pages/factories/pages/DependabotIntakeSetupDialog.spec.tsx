@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
+vi.mock("@/hooks/useFactoryGitHubHost", () => ({
+  useFactoryGitHubHost: () => "",
+}));
+
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useCreateFactoryIntake: () => ({ mutateAsync: mocks.createIntake, isPending: false }),
   useImportFactoryIntakeItem: () => ({ mutateAsync: mocks.importItem, isPending: false }),

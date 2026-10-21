@@ -21,6 +21,7 @@ interface DependabotIntakeImportStepProps {
   organizationId: string;
   factoryId: string;
   repository: string;
+  githubHost?: string | null;
   dependabotSeverities: string[];
   importProgress?: { done: number; total: number };
   error?: string;
@@ -83,6 +84,7 @@ export function DependabotIntakeImportStep(props: DependabotIntakeImportStepProp
           <PackageListHeader
             items={items}
             repository={props.repository}
+            githubHost={props.githubHost}
             packageCount={packages.length}
             allSelected={allSelected}
             disabled={finishing}
@@ -164,6 +166,7 @@ export function DependabotIntakeImportStep(props: DependabotIntakeImportStepProp
 function PackageListHeader({
   items,
   repository,
+  githubHost,
   packageCount,
   allSelected,
   disabled,
@@ -171,6 +174,7 @@ function PackageListHeader({
 }: {
   items: ReturnType<typeof useSearchDependabotIntakeSetupItems>;
   repository: string;
+  githubHost?: string | null;
   packageCount: number;
   allSelected: boolean;
   disabled: boolean;
@@ -186,7 +190,7 @@ function PackageListHeader({
   if (items.isError) {
     const message = getApiErrorMessage(items.error, COPY.loadError);
     const securitySettingsUrl =
-      message === COPY.alertsDisabledMessage ? githubRepositorySecurityAnalysisUrl(repository) : undefined;
+      message === COPY.alertsDisabledMessage ? githubRepositorySecurityAnalysisUrl(repository, githubHost) : undefined;
 
     return (
       <div className="flex items-start justify-between gap-3">

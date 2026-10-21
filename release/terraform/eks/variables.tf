@@ -137,6 +137,18 @@ variable "superplane_image_tag" {
   }
 }
 
+variable "github_enterprise_allowed_hosts" {
+  description = "Optional comma-separated GitHub Enterprise Cloud host allowlist. Empty allows any host that SuperPlane accepts."
+  type        = string
+  default     = ""
+}
+
+variable "github_enterprise_extra_ca_certs_secret" {
+  description = "Optional Kubernetes secret name with a CA bundle for GitHub Enterprise TLS. Empty skips the mount."
+  type        = string
+  default     = ""
+}
+
 variable "runner_active_log_volume_capacity" {
   description = "Nominal Kubernetes PV/PVC capacity for runner active logs. EFS grows elastically and does not reserve this capacity."
   type        = string
