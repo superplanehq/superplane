@@ -1,12 +1,29 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { useId, useRef, useState } from "react";
+import { useId } from "react";
 
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
+import { ImplementDurationDraftProvider } from "./ImplementDurationDraft";
 import { ImplementSettingRow } from "./ImplementSettingRow";
+import { findImplementPullRequest, useImplementSettingsDraft } from "./implementSettingsDraft";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 type SaveSettings = (update: NodeConfigurationUpdate) => Promise<void> | void;
+
+type ImplementSettingsController = {
+  agentDraft: PlanningReviewDraft;
+  pullRequest?: SuperplaneComponentsNode;
+  durationMinutes: string;
+  durationInvalid: boolean;
+  saving: boolean;
+  saveError?: string;
+  onAgentDraftChange: (draft: PlanningReviewDraft) => void;
+  onPullRequestDraftChange: (draft: boolean) => void;
+  onDurationStateChange: (state: { minutes: string; invalid: boolean }) => void;
+  onSave: () => void;
+};
 
 export function ImplementConfiguration({
   agent,
@@ -15,6 +32,59 @@ export function ImplementConfiguration({
   factoryId,
   factoryKey,
   onSave,
+  onClose,
+  controller,
+}: {
+  agent: SuperplaneComponentsNode;
+  nodes?: SuperplaneComponentsNode[];
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  onSave?: SaveSettings;
+  onClose?: () => void;
+  controller?: ImplementSettingsController;
+}) {
+  if (controller) {
+    return (
+      <ImplementConfigurationView
+        agent={agent}
+        agentDraft={controller.agentDraft}
+        pullRequest={controller.pullRequest}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        durationMinutes={controller.durationMinutes}
+        durationInvalid={controller.durationInvalid}
+        saving={controller.saving}
+        saveError={controller.saveError}
+        onAgentDraftChange={controller.onAgentDraftChange}
+        onPullRequestDraftChange={controller.onPullRequestDraftChange}
+        onDurationStateChange={controller.onDurationStateChange}
+        onSave={controller.onSave}
+      />
+    );
+  }
+  return (
+    <OwnedImplementConfiguration
+      agent={agent}
+      nodes={nodes ?? []}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      onSave={onSave ?? (() => undefined)}
+      onClose={onClose}
+    />
+  );
+}
+
+function OwnedImplementConfiguration({
+  agent,
+  nodes,
+  organizationId,
+  factoryId,
+  factoryKey,
+  onSave,
+  onClose,
 }: {
   agent: SuperplaneComponentsNode;
   nodes: SuperplaneComponentsNode[];
@@ -22,79 +92,140 @@ export function ImplementConfiguration({
   factoryId?: string;
   factoryKey?: string;
   onSave: SaveSettings;
+  onClose?: () => void;
 }) {
-  const saveRef = useRef(onSave);
-  saveRef.current = onSave;
-  const saveQueue = useRef(Promise.resolve());
-  const save: SaveSettings = (update) => {
-    const next = saveQueue.current.catch(() => undefined).then(() => saveRef.current(update));
-    saveQueue.current = next;
-    return next;
-  };
-  const pullRequest = nodes.find((node) =>
-    ["github.createPullRequest", "bitbucket.createPullRequest"].includes(node.component ?? ""),
-  );
-
+  const settings = useImplementSettingsDraft([agent, ...nodes], true);
+  if (!settings.draft) return null;
   return (
-    <section aria-label="Implement configuration" className="min-h-0 flex-1 overflow-y-auto bg-background">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-8 sm:px-10">
-        <AgentRunnerSettings
-          key={agent.id}
-          node={agent}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          onSave={save}
-          view="implementation"
-        />
-        {pullRequest ? <PullRequestSettings key={pullRequest.id} node={pullRequest} onSave={save} /> : null}
-      </div>
-    </section>
+    <ImplementConfigurationView
+      agent={settings.draft.agentBase}
+      agentDraft={settings.draft.agentDraft}
+      pullRequest={settings.draft.pullRequestNode ?? findImplementPullRequest(nodes)}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      durationMinutes={settings.draft.durationMinutes}
+      durationInvalid={settings.draft.durationInvalid}
+      saving={settings.saving}
+      saveError={settings.saveError}
+      onAgentDraftChange={settings.updateAgentDraft}
+      onPullRequestDraftChange={settings.updatePullRequestDraft}
+      onDurationStateChange={settings.updateDuration}
+      onSave={() => void settings.save(onSave, onClose ?? (() => undefined))}
+    />
   );
 }
 
-function PullRequestSettings({ node, onSave }: { node: SuperplaneComponentsNode; onSave: SaveSettings }) {
-  const id = useId();
-  const [pending, setPending] = useState<boolean | null>(null);
-  const [failed, setFailed] = useState(false);
-  const save = async (draft: boolean) => {
-    setPending(draft);
-    setFailed(false);
-    try {
-      await onSave({
-        nodeId: node.id ?? "",
-        name: node.name ?? "",
-        configuration: { ...node.configuration, draft },
-        integration: node.integration,
-        concurrency: node.concurrency,
-      });
-    } catch {
-      setFailed(true);
-    } finally {
-      setPending(null);
-    }
-  };
-
+function ImplementConfigurationView({
+  agent,
+  agentDraft,
+  pullRequest,
+  organizationId,
+  factoryId,
+  factoryKey,
+  durationMinutes,
+  durationInvalid,
+  saving,
+  saveError,
+  onAgentDraftChange,
+  onPullRequestDraftChange,
+  onDurationStateChange,
+  onSave,
+}: {
+  agent: SuperplaneComponentsNode;
+  agentDraft: PlanningReviewDraft;
+  pullRequest?: SuperplaneComponentsNode;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  durationMinutes: string;
+  durationInvalid: boolean;
+  saving: boolean;
+  saveError?: string;
+  onAgentDraftChange: (draft: PlanningReviewDraft) => void;
+  onPullRequestDraftChange: (draft: boolean) => void;
+  onDurationStateChange: (state: { minutes: string; invalid: boolean }) => void;
+  onSave: () => void;
+}) {
   return (
-    <div className="flex flex-col gap-2">
-      <ImplementSettingRow
-        label="Create draft pull requests"
-        description="Pull requests stay in draft until you mark them ready."
-        htmlFor={id}
-      >
-        <Switch
-          id={id}
-          aria-describedby={`${id}-help`}
-          checked={pending ?? node.configuration?.draft === true}
-          disabled={pending !== null}
-          onCheckedChange={(checked) => void save(checked)}
+    <ImplementDurationDraftProvider
+      minutes={durationMinutes}
+      invalid={durationInvalid}
+      onChange={onDurationStateChange}
+    >
+      <div className="flex min-h-0 flex-1 flex-col bg-background">
+        <section aria-label="Implement configuration" className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-8 sm:px-10">
+            <AgentRunnerSettings
+              key={agent.id}
+              node={agent}
+              draft={agentDraft}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              factoryKey={factoryKey}
+              onSave={() => undefined}
+              onDraftChange={onAgentDraftChange}
+              view="implementation"
+            />
+            {pullRequest ? <PullRequestSettings node={pullRequest} onDraftChange={onPullRequestDraftChange} /> : null}
+          </div>
+        </section>
+        <ImplementSettingsFooter
+          saving={saving}
+          saveError={saveError}
+          disabled={saving || durationInvalid}
+          onSave={onSave}
         />
-      </ImplementSettingRow>
-      {failed ? (
-        <p role="alert" className="text-sm text-destructive">
-          SuperPlane could not save this setting. Try again.
+      </div>
+    </ImplementDurationDraftProvider>
+  );
+}
+
+function ImplementSettingsFooter({
+  saving,
+  saveError,
+  disabled,
+  onSave,
+}: {
+  saving: boolean;
+  saveError?: string;
+  disabled: boolean;
+  onSave: () => void;
+}) {
+  return (
+    <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
+      {saveError ? (
+        <p className="workspace-body-text mr-auto text-destructive" role="alert">
+          {saveError}
         </p>
       ) : null}
-    </div>
+      <Button type="button" disabled={disabled} onClick={onSave} data-testid="implement-settings-save">
+        {saving ? "Saving" : "Save"}
+      </Button>
+    </footer>
+  );
+}
+
+function PullRequestSettings({
+  node,
+  onDraftChange,
+}: {
+  node: SuperplaneComponentsNode;
+  onDraftChange: (draft: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <ImplementSettingRow
+      label="Create draft pull requests"
+      description="Pull requests stay in draft until you mark them ready."
+      htmlFor={id}
+    >
+      <Switch
+        id={id}
+        aria-describedby={`${id}-help`}
+        checked={node.configuration?.draft === true}
+        onCheckedChange={onDraftChange}
+      />
+    </ImplementSettingRow>
   );
 }

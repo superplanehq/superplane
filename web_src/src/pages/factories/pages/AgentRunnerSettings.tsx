@@ -32,6 +32,8 @@ export function AgentRunnerSettings({
   factoryId,
   factoryKey,
   onSave,
+  draft,
+  onDraftChange,
   view = "step",
 }: {
   node: SuperplaneComponentsNode;
@@ -39,7 +41,78 @@ export function AgentRunnerSettings({
   factoryId?: string;
   factoryKey?: string;
   onSave: SaveAgent;
+  draft?: PlanningReviewDraft;
+  onDraftChange?: (draft: PlanningReviewDraft) => void;
   view?: "step" | "implementation";
+}) {
+  if (view === "implementation") {
+    return (
+      <ImplementationAgentFields
+        node={node}
+        draft={draft}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        onDraftChange={onDraftChange}
+      />
+    );
+  }
+  return (
+    <StepAgentRunnerSettings
+      node={node}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      onSave={onSave}
+      view={view}
+    />
+  );
+}
+
+function ImplementationAgentFields({
+  node,
+  draft,
+  organizationId,
+  factoryId,
+  factoryKey,
+  onDraftChange,
+}: {
+  node: SuperplaneComponentsNode;
+  draft?: PlanningReviewDraft;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  onDraftChange?: (draft: PlanningReviewDraft) => void;
+}) {
+  return (
+    <PlanningReviewForm
+      appearance="fields"
+      view="implementation"
+      showResources={false}
+      showConcurrency={showsImplementAgentControls(node)}
+      draft={draft ?? draftFromNode(node, "implementation")}
+      onChange={(next) => onDraftChange?.(next)}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+    />
+  );
+}
+
+function StepAgentRunnerSettings({
+  node,
+  organizationId,
+  factoryId,
+  factoryKey,
+  onSave,
+  view,
+}: {
+  node: SuperplaneComponentsNode;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  onSave: SaveAgent;
+  view: "step" | "implementation";
 }) {
   const initial = draftFromNode(node, view);
   const [draft, setDraft] = useState(initial);
