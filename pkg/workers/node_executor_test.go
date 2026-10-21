@@ -490,6 +490,33 @@ func Test__NodeExecutor_HostedCreditFailureOutsideFactoryStep(t *testing.T) {
 	assert.Equal(t, models.SuperPlaneRunnerNoCreditMessage, updatedExecution.ResultMessage)
 }
 
+func TestNodeExecutorWaitsForCodexSubscriptionReservation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	step := dispatchFactoryExecutionForUsageTest(t, r)
+	busy := &models.CodexConnectionBusyError{TaskID: uuid.New()}
+	reserved := true
+	execution := createFactoryStepNodeExecution(t, r, step, func(ctx core.ExecutionContext) error {
+		if reserved {
+			return fmt.Errorf("reserve subscription: %w", busy)
+		}
+		return ctx.ExecutionState.Pass()
+	})
+	executor := newTestNodeExecutor(t, r)
+
+	require.ErrorIs(t, executor.LockAndProcessNodeExecution(execution.ID), busy)
+	pending, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, pending.State)
+	assert.Empty(t, pending.Result)
+
+	reserved = false
+	require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
+	finished, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionResultPassed, finished.Result)
+}
+
 // createFactoryStepNodeExecution creates a pending node execution that
 // belongs to the run of the given factory step.
 func createFactoryStepNodeExecution(

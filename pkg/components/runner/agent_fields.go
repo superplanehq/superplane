@@ -8,9 +8,10 @@ import (
 )
 
 type AgentCredentialsOptions struct {
-	SecretLabel      string
-	IntegrationName  string
-	IntegrationLabel string
+	SecretLabel       string
+	IntegrationName   string
+	IntegrationLabel  string
+	AllowSubscription bool
 }
 
 func AgentCredentialsField(opts AgentCredentialsOptions) configuration.Field {
@@ -23,6 +24,9 @@ func AgentCredentialsField(opts AgentCredentialsOptions) configuration.Field {
 			label = "Integration"
 		}
 		options = append(options, configuration.FieldOption{Label: label, Value: CredentialsSourceIntegration})
+	}
+	if opts.AllowSubscription {
+		options = append(options, configuration.FieldOption{Label: "ChatGPT subscription", Value: CredentialsSourceSubscription})
 	}
 
 	schema := []configuration.Field{

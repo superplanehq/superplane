@@ -1,0 +1,622 @@
+package models
+
+import (
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/features"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+const (
+	CodexConnectionStatusPending           = "pending"
+	CodexConnectionStatusFinishing         = "finishing"
+	CodexConnectionStatusReady             = "ready"
+	CodexConnectionStatusReconnectRequired = "reconnect_required"
+	CodexConnectionStatusDisconnected      = "disconnected"
+)
+
+var (
+	ErrCodexConnectionNotFound    = errors.New("chatgpt subscription connection not found")
+	ErrCodexConnectionNotEligible = errors.New("this organization must have one member to use a ChatGPT subscription")
+	ErrCodexConnectionNotReady    = errors.New("connect ChatGPT before this task can run")
+	ErrCodexConnectionStale       = errors.New("the ChatGPT sign-in update is out of date")
+	ErrCodexConnectionActive      = errors.New("stop the running tasks before you disconnect ChatGPT")
+	ErrCodexConnectionUnavailable = errors.New("ChatGPT subscription is not available for this organization")
+)
+
+// CodexConnectionBusyError names the task that holds the subscription.
+type CodexConnectionBusyError struct {
+	TaskID uuid.UUID
+}
+
+func (e *CodexConnectionBusyError) Error() string {
+	if e == nil || e.TaskID == uuid.Nil {
+		return "ChatGPT subscription is in use by another task."
+	}
+	return fmt.Sprintf("ChatGPT subscription is in use by task %s.", e.TaskID)
+}
+
+// FactoryCodexConnection is one factory-bound ChatGPT subscription.
+// The ciphertext is the native Codex auth bundle, bound to this row ID.
+type FactoryCodexConnection struct {
+	ID                     uuid.UUID
+	OrganizationID         uuid.UUID
+	FactoryID              uuid.UUID
+	OwnerUserID            uuid.UUID
+	Status                 string
+	ResumeStatus           string
+	VerificationURL        string
+	VerificationCode       string
+	AccountLabel           string
+	BundleCiphertext       []byte
+	CredentialVersion      int64
+	FinalCheckpointVersion int64
+	ReservationGeneration  int64
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	LoginLease             *FactoryCodexLease `gorm:"-"`
+}
+
+func (FactoryCodexConnection) TableName() string {
+	return "factory_codex_connections"
+}
+
+// Reserved reports an exclusive sign-in.
+// Run leases do not mark the connection reserved.
+func (c *FactoryCodexConnection) Reserved() bool {
+	return c != nil && c.LoginLease != nil
+}
+
+func FindFactoryCodexConnection(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*FactoryCodexConnection, error) {
+	var connection FactoryCodexConnection
+	err := tx.
+		Where("organization_id = ? AND factory_id = ?", organizationID, factoryID).
+		First(&connection).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrCodexConnectionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &connection, nil
+}
+
+func LockFactoryCodexConnection(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*FactoryCodexConnection, error) {
+	var connection FactoryCodexConnection
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("organization_id = ? AND factory_id = ?", organizationID, factoryID).
+		First(&connection).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrCodexConnectionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &connection, nil
+}
+
+func CreateFactoryCodexConnection(
+	tx *gorm.DB,
+	organizationID, factoryID, ownerUserID uuid.UUID,
+	now time.Time,
+) (*FactoryCodexConnection, error) {
+	connection := &FactoryCodexConnection{
+		ID:             uuid.New(),
+		OrganizationID: organizationID,
+		FactoryID:      factoryID,
+		OwnerUserID:    ownerUserID,
+		Status:         CodexConnectionStatusDisconnected,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	if err := tx.Create(connection).Error; err != nil {
+		return nil, err
+	}
+	return connection, nil
+}
+
+// BeginLogin holds the connection for a new device-login task.
+// The login lease stays until the login runner VM is confirmed deleted.
+func (c *FactoryCodexConnection) BeginLogin(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := c.relock(tx); err != nil {
+			return err
+		}
+		if busy, err := c.busyLease(tx); err != nil {
+			return err
+		} else if busy != nil {
+			return &CodexConnectionBusyError{TaskID: busy.TaskID}
+		}
+		switch c.Status {
+		case CodexConnectionStatusPending, CodexConnectionStatusFinishing:
+			return &CodexConnectionBusyError{}
+		case CodexConnectionStatusReady,
+			CodexConnectionStatusReconnectRequired,
+			CodexConnectionStatusDisconnected:
+		default:
+			return fmt.Errorf("cannot start ChatGPT sign-in from status %s", c.Status)
+		}
+
+		resume := c.Status
+		if _, err := c.createLease(tx, taskID, CodexLeasePurposeLogin, nil, now); err != nil {
+			return err
+		}
+		result := tx.Model(c).
+			Where("id = ? AND status = ?", c.ID, resume).
+			Updates(map[string]any{
+				"status":            CodexConnectionStatusPending,
+				"resume_status":     resume,
+				"verification_url":  "",
+				"verification_code": "",
+				"updated_at":        now,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrCodexConnectionStale
+		}
+		c.ResumeStatus = resume
+		c.Status = CodexConnectionStatusPending
+		c.VerificationURL = ""
+		c.VerificationCode = ""
+		c.UpdatedAt = now
+		return nil
+	})
+}
+
+func (c *FactoryCodexConnection) RecordDeviceCode(
+	tx *gorm.DB,
+	taskID uuid.UUID,
+	generation int64,
+	verificationURL, verificationCode string,
+	now time.Time,
+) error {
+	if _, err := c.requireLoginLease(tx, taskID, generation); err != nil {
+		return err
+	}
+	if c.Status != CodexConnectionStatusPending {
+		return ErrCodexConnectionStale
+	}
+	result := tx.Model(c).
+		Where("id = ? AND status = ?", c.ID, CodexConnectionStatusPending).
+		Updates(map[string]any{
+			"verification_url":  verificationURL,
+			"verification_code": verificationCode,
+			"updated_at":        now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrCodexConnectionStale
+	}
+	c.VerificationURL = verificationURL
+	c.VerificationCode = verificationCode
+	c.UpdatedAt = now
+	return nil
+}
+
+// StoreBundle saves a newer auth bundle for the active reservation.
+// Login stays in finishing until the runner VM is confirmed deleted.
+func (c *FactoryCodexConnection) StoreBundle(
+	tx *gorm.DB,
+	taskID uuid.UUID,
+	generation, version int64,
+	ciphertext []byte,
+	accountLabel string,
+	final bool,
+	now time.Time,
+) error {
+	if _, err := c.requireLoginLease(tx, taskID, generation); err != nil {
+		return err
+	}
+	if version != c.CredentialVersion+1 {
+		return ErrCodexConnectionStale
+	}
+	status := c.Status
+	if status == CodexConnectionStatusPending {
+		status = CodexConnectionStatusFinishing
+	}
+	finalVersion := c.FinalCheckpointVersion
+	if final {
+		finalVersion = version
+	}
+	result := tx.Model(c).
+		Where("id = ? AND credential_version = ?", c.ID, c.CredentialVersion).
+		Updates(map[string]any{
+			"status":                   status,
+			"bundle_ciphertext":        ciphertext,
+			"account_label":            accountLabel,
+			"credential_version":       version,
+			"final_checkpoint_version": finalVersion,
+			"verification_url":         "",
+			"verification_code":        "",
+			"updated_at":               now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrCodexConnectionStale
+	}
+	c.Status = status
+	c.BundleCiphertext = ciphertext
+	c.AccountLabel = accountLabel
+	c.CredentialVersion = version
+	c.FinalCheckpointVersion = finalVersion
+	c.VerificationURL = ""
+	c.VerificationCode = ""
+	c.UpdatedAt = now
+	return nil
+}
+
+// ReserveFactoryCodexConnection adds one run lease.
+// Any number of run leases may exist. A login lease blocks new runs.
+func ReserveFactoryCodexConnection(
+	tx *gorm.DB,
+	organizationID, factoryID, taskID uuid.UUID,
+	now time.Time,
+	encryptor crypto.Encryptor,
+) (*FactoryCodexConnection, error) {
+	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
+		return nil, err
+	}
+	var connection *FactoryCodexConnection
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		locked, err := LockFactoryCodexConnection(tx, organizationID, factoryID)
+		if err != nil {
+			if errors.Is(err, ErrCodexConnectionNotFound) {
+				return ErrCodexConnectionNotReady
+			}
+			return err
+		}
+		login, err := FindCodexLoginLease(tx, locked.ID)
+		if err != nil {
+			return err
+		}
+		if locked.Status != CodexConnectionStatusReady || locked.CredentialVersion < 1 || len(locked.BundleCiphertext) == 0 {
+			if login != nil {
+				return &CodexConnectionBusyError{TaskID: login.TaskID}
+			}
+			return ErrCodexConnectionNotReady
+		}
+		if login != nil {
+			return &CodexConnectionBusyError{TaskID: login.TaskID}
+		}
+		if _, err := locked.createLease(tx, taskID, CodexLeasePurposeRun, encryptor, now); err != nil {
+			return err
+		}
+		locked.UpdatedAt = now
+		connection = locked
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return connection, nil
+}
+
+func (c *FactoryCodexConnection) Disconnect(tx *gorm.DB, now time.Time) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := c.relock(tx); err != nil {
+			return err
+		}
+		count, err := CountCodexLeases(tx, c.ID)
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return ErrCodexConnectionActive
+		}
+		generation := c.ReservationGeneration + 1
+		result := tx.Model(c).
+			Where("id = ? AND reservation_generation = ?", c.ID, c.ReservationGeneration).
+			Updates(map[string]any{
+				"status":                   CodexConnectionStatusDisconnected,
+				"resume_status":            "",
+				"verification_url":         "",
+				"verification_code":        "",
+				"account_label":            "",
+				"bundle_ciphertext":        nil,
+				"credential_version":       0,
+				"final_checkpoint_version": 0,
+				"reservation_generation":   generation,
+				"updated_at":               now,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrCodexConnectionActive
+		}
+		c.Status = CodexConnectionStatusDisconnected
+		c.ResumeStatus = ""
+		c.VerificationURL = ""
+		c.VerificationCode = ""
+		c.AccountLabel = ""
+		c.BundleCiphertext = nil
+		c.CredentialVersion = 0
+		c.FinalCheckpointVersion = 0
+		c.ReservationGeneration = generation
+		c.LoginLease = nil
+		c.UpdatedAt = now
+		return nil
+	})
+}
+
+// MarkCodexConnectionUncertain keeps a login lease and requires a new sign-in.
+// A lost run does not change the shared subscription.
+func MarkCodexConnectionUncertain(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
+	lease, err := FindCodexLeaseByTask(tx, taskID)
+	if err != nil || lease == nil || !lease.Login() {
+		return err
+	}
+	return tx.Model(&FactoryCodexConnection{}).
+		Where("id = ?", lease.ConnectionID).
+		Updates(map[string]any{
+			"status":     CodexConnectionStatusReconnectRequired,
+			"updated_at": now,
+		}).Error
+}
+
+// ReleaseCodexReservationForTask releases the lease for one runner task.
+// A run lease ends when the task is terminal. A login lease also waits until
+// its VM is confirmed deleted.
+func ReleaseCodexReservationForTask(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
+	lease, err := FindCodexLeaseByTask(tx, taskID)
+	if err != nil || lease == nil {
+		return err
+	}
+	return releaseConfirmedCodexLease(tx, lease.ID, now)
+}
+
+func ReleaseConfirmedCodexReservations(tx *gorm.DB, now time.Time) error {
+	var ids []uuid.UUID
+	err := tx.Model(&FactoryCodexLease{}).Pluck("id", &ids).Error
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := releaseConfirmedCodexLease(tx, id, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error {
+	var lease FactoryCodexLease
+	err := tx.Where("id = ?", id).First(&lease).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var connection FactoryCodexConnection
+	err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", lease.ConnectionID).
+		First(&connection).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", lease.ID).
+		First(&lease).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	task, err := FindRunnerTask(tx, lease.TaskID)
+	if err != nil {
+		if errors.Is(err, ErrRunnerTaskNotFound) {
+			if lease.Login() {
+				return connection.finishLoginLease(tx, &lease, CodexConnectionStatusReconnectRequired, now)
+			}
+			return deleteCodexLease(tx, &lease)
+		}
+		return err
+	}
+	if !task.IsTerminal() {
+		if !lease.Login() || now.Before(lease.CreatedAt.Add(CodexLoginTimeout)) {
+			return nil
+		}
+		if err := task.RequestCancel(tx, now); err != nil {
+			return err
+		}
+		if !task.IsTerminal() {
+			return nil
+		}
+	}
+	if !lease.Login() {
+		return deleteCodexLease(tx, &lease)
+	}
+	if task.RunnerID != nil {
+		runner, runnerErr := FindRunner(tx, *task.RunnerID)
+		if runnerErr != nil && !errors.Is(runnerErr, ErrRunnerNotFound) {
+			return runnerErr
+		}
+		if runnerErr == nil && runner.ProviderDeletedAt == nil {
+			if task.State == RunnerTaskStateLost && connection.Status != CodexConnectionStatusReconnectRequired {
+				return MarkCodexConnectionUncertain(tx, task.ID, now)
+			}
+			return nil
+		}
+	}
+	return connection.finishLoginLease(tx, &lease, codexLoginLeaseOutcome(&connection, &lease, task), now)
+}
+
+func codexLoginLeaseOutcome(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) string {
+	checkpointSaved := connection.FinalCheckpointVersion > lease.StartedVersion &&
+		connection.FinalCheckpointVersion == connection.CredentialVersion
+	if checkpointSaved {
+		return CodexConnectionStatusReady
+	}
+	if connection.CredentialVersion > lease.StartedVersion {
+		return CodexConnectionStatusReconnectRequired
+	}
+	switch task.State {
+	case RunnerTaskStateSucceeded:
+		return CodexConnectionStatusReconnectRequired
+	case RunnerTaskStateLost:
+		return CodexConnectionStatusReconnectRequired
+	case RunnerTaskStateCanceled:
+		if connection.ResumeStatus != "" {
+			return connection.ResumeStatus
+		}
+		if connection.CredentialVersion > 0 {
+			return CodexConnectionStatusReconnectRequired
+		}
+		return CodexConnectionStatusDisconnected
+	case RunnerTaskStateFailed:
+		if connection.ResumeStatus != "" {
+			return connection.ResumeStatus
+		}
+		return CodexConnectionStatusReconnectRequired
+	default:
+		return CodexConnectionStatusReconnectRequired
+	}
+}
+
+func (c *FactoryCodexConnection) finishLoginLease(tx *gorm.DB, lease *FactoryCodexLease, status string, now time.Time) error {
+	if lease == nil {
+		return nil
+	}
+	if err := deleteCodexLease(tx, lease); err != nil {
+		return err
+	}
+	generation := c.ReservationGeneration + 1
+	result := tx.Model(c).
+		Where("id = ?", c.ID).
+		Updates(map[string]any{
+			"status":                 status,
+			"resume_status":          "",
+			"reservation_generation": generation,
+			"verification_url":       "",
+			"verification_code":      "",
+			"updated_at":             now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	c.Status = status
+	c.ResumeStatus = ""
+	c.LoginLease = nil
+	c.ReservationGeneration = generation
+	c.VerificationURL = ""
+	c.VerificationCode = ""
+	c.UpdatedAt = now
+	return nil
+}
+
+func deleteCodexLease(tx *gorm.DB, lease *FactoryCodexLease) error {
+	result := tx.Where("id = ?", lease.ID).Delete(&FactoryCodexLease{})
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
+func (c *FactoryCodexConnection) requireLoginLease(tx *gorm.DB, taskID uuid.UUID, generation int64) (*FactoryCodexLease, error) {
+	lease, err := FindCodexLeaseForTask(tx, c.ID, taskID, generation)
+	if err != nil {
+		return nil, err
+	}
+	if !lease.Login() {
+		return nil, ErrCodexConnectionStale
+	}
+	return lease, nil
+}
+
+// StoreRefreshedBundle saves tokens refreshed by SuperPlane for every run.
+func (c *FactoryCodexConnection) StoreRefreshedBundle(tx *gorm.DB, ciphertext []byte, accountLabel string, now time.Time) error {
+	version := c.CredentialVersion + 1
+	result := tx.Model(c).
+		Where("id = ? AND credential_version = ?", c.ID, c.CredentialVersion).
+		Updates(map[string]any{
+			"bundle_ciphertext":  ciphertext,
+			"account_label":      accountLabel,
+			"credential_version": version,
+			"updated_at":         now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrCodexConnectionStale
+	}
+	c.BundleCiphertext = ciphertext
+	c.AccountLabel = accountLabel
+	c.CredentialVersion = version
+	c.UpdatedAt = now
+	return nil
+}
+
+// MarkReconnectRequired records that the stored refresh token can no longer be used.
+func (c *FactoryCodexConnection) MarkReconnectRequired(tx *gorm.DB, now time.Time) error {
+	result := tx.Model(c).
+		Where("id = ?", c.ID).
+		Updates(map[string]any{
+			"status":     CodexConnectionStatusReconnectRequired,
+			"updated_at": now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	c.Status = CodexConnectionStatusReconnectRequired
+	c.UpdatedAt = now
+	return nil
+}
+
+func requireCodexSubscriptionEligible(tx *gorm.DB, organizationID uuid.UUID) error {
+	organization, err := FindOrganizationByIDInTransaction(tx, organizationID.String())
+	if err != nil {
+		return err
+	}
+	if !organization.HasExperimentalFeature(features.FeatureCodexSubscriptions) {
+		return ErrCodexConnectionUnavailable
+	}
+	count, err := CountActiveHumanUsersByOrganizationInTransaction(tx, organizationID.String())
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return ErrCodexConnectionNotEligible
+	}
+	return nil
+}
+
+// SoleHumanOrganizationMember returns the only active human member.
+func SoleHumanOrganizationMember(tx *gorm.DB, organizationID uuid.UUID) (*User, error) {
+	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
+		return nil, err
+	}
+	var users []User
+	err := tx.
+		Where("organization_id = ? AND type = ?", organizationID, UserTypeHuman).
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	if len(users) != 1 {
+		return nil, ErrCodexConnectionNotEligible
+	}
+	return &users[0], nil
+}

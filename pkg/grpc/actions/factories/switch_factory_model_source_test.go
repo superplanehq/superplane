@@ -452,3 +452,18 @@ func Test__SwitchFactoryModelSource__CustomProviderRequiresTokenWhenURLChanges(t
 	assert.Equal(t, "openai", saved.Configuration.Data()["apiType"])
 	assert.NotEqual(t, keptKey, saved.Configuration.Data()["apiKey"])
 }
+
+func TestSwitchFactoryModelSourceRejectsChatGPTSubscription(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	enabled := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &enabled}))
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+
+	_, _, err = switchFactoryModelSource(t.Context(), db, nil, reloaded, "hosted", "", "", "")
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+}

@@ -59,6 +59,13 @@ func (c *integratedTaskClient) CreateTask(params CreateTaskParams) (string, erro
 		return "", err
 	}
 	id := uuid.New()
+	if strings.TrimSpace(params.TaskID) != "" {
+		parsed, parseErr := uuid.Parse(params.TaskID)
+		if parseErr != nil {
+			return "", fmt.Errorf("invalid runner task ID: %w", parseErr)
+		}
+		id = parsed
+	}
 	timeout := params.TimeoutSeconds
 	if timeout <= 0 {
 		timeout = DefaultExecutionTimeoutSeconds
