@@ -11,12 +11,25 @@ import {
   issuesChoiceForTicketSource,
   resolveTicketSelection,
 } from "./first-run/firstRunTicketSource";
-import { type IntegrationId, type IssuesChoiceId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
 import {
-  onboardingAgentGate,
-  type OnboardingAgentCredentialChoice,
-  type OnboardingAgentGate,
-} from "./onboardingAgentReadiness";
+  type FirstRunHostChoice,
+  type IntegrationId,
+  type IssuesChoiceId,
+  type WizardStepId,
+} from "./onboardingFixtures";
+import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { resolvedOnboardingGithubEnterprise, writeOnboardingGithubEnterprise } from "./onboardingGithubEnterprise";
+import {
+  SCREEN_FOR_STEP,
+  STEP_FOR_SCREEN,
+  screenWithModelSource,
+  screenWithoutAgent,
+  screenWithoutIncompleteBacklog,
+  screenWithVcsConnection,
+  type FirstRunScreen,
+} from "./firstRunScreens";
+import { useFirstRunGitHubEnterprise } from "./useFirstRunGitHubEnterprise";
+import { onboardingAgentGate, type OnboardingAgentGate } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
 import { onboardingStepPath } from "./onboardingStepPath";
 import {
@@ -38,21 +51,7 @@ import {
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
-export type FirstRunScreen = "welcome" | "host" | "connect" | "choose" | "tickets" | "agent";
-const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
-  vcs: "connect",
-  repo: "choose",
-  issues: "tickets",
-  agent: "agent",
-  name: "agent",
-};
-const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
-  host: "vcs",
-  connect: "vcs",
-  choose: "repo",
-  tickets: "issues",
-  agent: "agent",
-};
+export type { FirstRunScreen };
 
 /** Null means no step was requested, so the flow resumes from saved progress. */
 function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen | null {
@@ -77,79 +76,12 @@ function resumeFirstRunScreen(args: {
   return "welcome";
 }
 
-// A linked GitHub identity opens repository selection. Sign-in stores that
-// identity, so a later workspace does not ask the person to connect again.
-function screenWithGitHubConnection(
-  screen: FirstRunScreen,
-  github: {
-    pending: boolean;
-    identity: boolean;
-    ready: boolean;
-    stayOnConnect: boolean;
-    appConfigured: boolean;
-    accountConnectionRequired: boolean;
-  },
-): FirstRunScreen {
-  if (github.pending) return screen;
-  if (!github.accountConnectionRequired) {
-    if (!github.appConfigured) return screen === "choose" ? "connect" : screen;
-    if (screen === "welcome" || (screen === "connect" && !github.stayOnConnect)) return "choose";
-    return screen;
-  }
-  if (screen === "welcome") return screen;
-  if (!github.identity) return "connect";
-  if (screen === "connect" && github.ready && !github.stayOnConnect) return "choose";
-  if (screen === "choose" && !github.ready) return "connect";
-  return screen;
-}
-
-// The host screen comes before any connection. A Bitbucket workspace does not
-// need GitHub, and its repository screen connects Bitbucket itself.
-function screenWithVcsConnection(
-  screen: FirstRunScreen,
-  vcsHost: VcsHostId | null,
-  github: Parameters<typeof screenWithGitHubConnection>[1],
-): FirstRunScreen {
-  if (screen === "host") return screen;
-  if (vcsHost === "bitbucket") {
-    return screen === "connect" ? "choose" : screen;
-  }
-  return screenWithGitHubConnection(screen, github);
-}
-
-function screenWithoutAgent(screen: FirstRunScreen, agentGate: OnboardingAgentGate): FirstRunScreen {
-  if (screen !== "agent" || agentGate === "show" || agentGate === "first") return screen;
-  return "tickets";
-}
-
-// The model source comes before the backlog, so the ticket screen waits for it.
-function screenWithModelSource(
-  screen: FirstRunScreen,
-  agentGate: OnboardingAgentGate,
-  credentialChoice: OnboardingAgentCredentialChoice | null,
-): FirstRunScreen {
-  if (screen !== "tickets" || agentGate !== "first" || credentialChoice) return screen;
-  return "agent";
-}
-
-function screenWithoutIncompleteBacklog(
-  screen: FirstRunScreen,
-  agentGate: OnboardingAgentGate,
-  issuesChoice: IssuesChoiceId | null,
-  jiraProjectId: string,
-  linearProjectIds: string[],
-): FirstRunScreen {
-  if (screen !== "agent" || agentGate !== "show") return screen;
-  if (issuesChoice === "jira" && !jiraProjectId) return "tickets";
-  if (issuesChoice === "linear" && linearProjectIds.length === 0) return "tickets";
-  return screen;
-}
-
 function useFirstRunNavigation(
   model: OnboardingPageModel,
   agentGate: OnboardingAgentGate,
   connection: GitHubConnectionState,
-  github: { ready: boolean; returned: boolean },
+  github: { ready: boolean; returned: boolean; enterpriseReady: boolean },
+  githubEnterprise: boolean,
 ) {
   const [searchParams] = useSearchParams();
   const [requestedScreen, setRequestedScreen] = useState<FirstRunScreen | null>(() =>
@@ -174,14 +106,19 @@ function useFirstRunNavigation(
     setRequestedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
 
-  const availableScreen = screenWithVcsConnection(openedScreen, model.setup.vcsHost, {
-    pending: connection.onboarding.isPending,
-    identity: Boolean(connection.identity),
-    ready: github.ready,
-    stayOnConnect,
-    appConfigured: connection.appConfigured,
-    accountConnectionRequired: connection.accountConnectionRequired,
-  });
+  const availableScreen = screenWithVcsConnection(
+    openedScreen,
+    model.setup.vcsHost,
+    {
+      pending: githubEnterprise ? false : connection.onboarding.isPending,
+      identity: Boolean(connection.identity),
+      ready: githubEnterprise ? github.enterpriseReady : github.ready,
+      stayOnConnect,
+      appConfigured: githubEnterprise ? github.enterpriseReady : connection.appConfigured,
+      accountConnectionRequired: githubEnterprise ? false : connection.accountConnectionRequired,
+    },
+    githubEnterprise,
+  );
 
   const goToScreen = (next: FirstRunScreen) => {
     const step = STEP_FOR_SCREEN[next];
@@ -240,6 +177,7 @@ function saveSelectedRepository(args: {
   model: OnboardingPageModel;
   connection: GitHubConnectionState;
   forgeConfigured: boolean;
+  githubEnterprise: boolean;
 }): Promise<boolean> {
   const selectedRepo = args.model.setup.selectedRepo;
   if (!selectedRepo) return Promise.resolve(false);
@@ -247,6 +185,10 @@ function saveSelectedRepository(args: {
     args.model.setup.commitRepoStep();
     if (args.forgeConfigured) return args.model.selectBitbucketForgeRepository(selectedRepo);
     return args.model.selectBitbucketRepository(selectedRepo);
+  }
+  if (args.githubEnterprise) {
+    args.model.setup.commitRepoStep();
+    return args.model.selectGitHubEnterpriseRepository(selectedRepo);
   }
   const repository = args.connection.repositories.find((candidate) => candidate.fullName === selectedRepo);
   if (!repository) return Promise.resolve(false);
@@ -273,6 +215,67 @@ function continueFromTicketSource(args: {
   });
 }
 
+function connectGitHubEnterpriseAction(args: {
+  blocking: FirstRunBlocking;
+  locationPath: string;
+  setGitHubEnterprise: (enabled: boolean, host?: string) => void;
+  setGitHubEnterpriseError: (message: string | undefined) => void;
+  connectGitHubEnterpriseApp: (host: string, returnTo: string) => Promise<boolean>;
+}) {
+  return (host: string) =>
+    args.blocking.runUntilNavigation("opening-github", async () => {
+      args.setGitHubEnterpriseError(undefined);
+      args.setGitHubEnterprise(true, host);
+      const returnPath = onboardingStepPath(args.locationPath, "repo");
+      try {
+        return await args.connectGitHubEnterpriseApp(host, returnPath);
+      } catch (error) {
+        args.setGitHubEnterpriseError(githubOnboardingMessage(error, FIRST_RUN_COPY.githubEnterprise.connectError));
+        return false;
+      }
+    });
+}
+
+function useGitHubEnterpriseChoice(factoryId: string, githubIntegrationId: string, githubHost?: string) {
+  const remembered = resolvedOnboardingGithubEnterprise({
+    factoryId,
+    vcsIntegrationId: githubIntegrationId,
+    hostFromIntegration: githubHost,
+  });
+  const [githubEnterprise, setGitHubEnterpriseEnabled] = useState(remembered.enabled);
+  const [githubEnterpriseHost, setGitHubEnterpriseHost] = useState(remembered.host);
+  const [githubEnterpriseError, setGitHubEnterpriseError] = useState<string>();
+  const setGitHubEnterprise = (enabled: boolean, host = "") => {
+    writeOnboardingGithubEnterprise(factoryId, enabled, host);
+    setGitHubEnterpriseEnabled(enabled);
+    if (!enabled) {
+      setGitHubEnterpriseHost("");
+      setGitHubEnterpriseError(undefined);
+      return;
+    }
+    if (host) setGitHubEnterpriseHost(host);
+  };
+  useEffect(() => {
+    const restored = resolvedOnboardingGithubEnterprise({
+      factoryId,
+      vcsIntegrationId: githubIntegrationId,
+      hostFromIntegration: githubHost,
+    });
+    if (!restored.enabled || githubEnterprise) return;
+    writeOnboardingGithubEnterprise(factoryId, true, restored.host, restored.integrationId);
+    setGitHubEnterpriseEnabled(true);
+    if (restored.host) setGitHubEnterpriseHost(restored.host);
+  }, [factoryId, githubEnterprise, githubHost, githubIntegrationId]);
+  return {
+    githubEnterprise,
+    githubEnterpriseHost,
+    githubEnterpriseError,
+    githubEnterpriseIntegrationId: remembered.integrationId,
+    setGitHubEnterprise,
+    setGitHubEnterpriseError,
+  };
+}
+
 function useFirstRunCommands(args: {
   model: OnboardingPageModel;
   agentGate: OnboardingAgentGate;
@@ -281,21 +284,41 @@ function useFirstRunCommands(args: {
   blocking: FirstRunBlocking;
   forgeConfigured: boolean;
   installScope: GitHubInstallScope;
+  factoryId: string;
+  githubEnterprise: boolean;
+  setGitHubEnterprise: (enabled: boolean, host?: string) => void;
+  setGitHubEnterpriseError: (message: string | undefined) => void;
+  connectGitHubEnterpriseApp: (host: string, returnTo: string) => Promise<boolean>;
 }) {
   const { model, agentGate, connection, navigation, blocking, forgeConfigured, installScope } = args;
   const location = useLocation();
-  const saveRepository = () => saveSelectedRepository({ model, connection, forgeConfigured });
+  const saveRepository = () =>
+    saveSelectedRepository({ model, connection, forgeConfigured, githubEnterprise: args.githubEnterprise });
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
       if (await saveRepository()) {
         navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
       }
     });
-  const chooseVcsHost = (host: VcsHostId) => {
+  const chooseVcsHost = (host: FirstRunHostChoice) => {
     if (host === "gitlab") return;
+    if (host === "github-enterprise") {
+      args.setGitHubEnterprise(true);
+      model.setup.selectVcsHost("github");
+      navigation.goToScreen("ghe-host");
+      return;
+    }
+    args.setGitHubEnterprise(false);
     model.setup.selectVcsHost(host);
     navigation.goToScreen(host === "bitbucket" ? "choose" : "connect");
   };
+  const connectGitHubEnterprise = connectGitHubEnterpriseAction({
+    blocking,
+    locationPath: `${location.pathname}${location.search}`,
+    setGitHubEnterprise: args.setGitHubEnterprise,
+    setGitHubEnterpriseError: args.setGitHubEnterpriseError,
+    connectGitHubEnterpriseApp: args.connectGitHubEnterpriseApp,
+  });
   const connectBitbucket = () => {
     void model.requestConnect("bitbucket");
   };
@@ -359,6 +382,7 @@ function useFirstRunCommands(args: {
   return {
     chooseVcsHost,
     connectBitbucket,
+    connectGitHubEnterprise,
     connectGitHub,
     connectGitHubIssues,
     createGitHubApp,
@@ -375,10 +399,17 @@ function useFirstRunCommands(args: {
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
+  const enterprise = useGitHubEnterpriseChoice(factoryId, model.githubIntegrationId, model.githubHost);
+  const { githubEnterprise, githubEnterpriseHost, githubEnterpriseError, githubEnterpriseIntegrationId } = enterprise;
   const setupFinished = model.provisionedDestination != null;
   const blocking = useFirstRunBlockingAction();
-  const { connection, githubReady, githubReturned, installScope, checkingGitHub } = useFirstRunGitHub({
+  const githubEnterpriseApp = useFirstRunGitHubEnterprise({
     organizationId,
+    factoryId,
+    onCreated: model.bindGitHubEnterpriseIntegration,
+  });
+  const { connection, githubReady, githubReturned, installScope, checkingGitHub } = useFirstRunGitHub({
+    organizationId: githubEnterprise ? "" : organizationId,
     factoryId,
     setupFinished,
     connectedBefore: Boolean(model.setup.selectedRepo),
@@ -390,10 +421,17 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
-  const navigation = useFirstRunNavigation(model, agentGate, connection, {
-    ready: githubReady,
-    returned: githubReturned,
-  });
+  const navigation = useFirstRunNavigation(
+    model,
+    agentGate,
+    connection,
+    {
+      ready: githubReady,
+      returned: githubReturned,
+      enterpriseReady: Boolean(githubEnterpriseIntegrationId),
+    },
+    githubEnterprise,
+  );
   const commands = useFirstRunCommands({
     model,
     agentGate,
@@ -402,6 +440,11 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     blocking,
     forgeConfigured: bitbucketConnect.configured,
     installScope,
+    factoryId,
+    githubEnterprise,
+    setGitHubEnterprise: enterprise.setGitHubEnterprise,
+    setGitHubEnterpriseError: enterprise.setGitHubEnterpriseError,
+    connectGitHubEnterpriseApp: githubEnterpriseApp.connect,
   });
   const [bitbucketSwitchFailed, setBitbucketSwitchFailed] = useState(false);
   const selectBitbucketIdentity = (providerUserId: string) =>
@@ -419,6 +462,10 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ...commands,
     selectBitbucketIdentity,
     vcsHost: model.setup.vcsHost,
+    githubEnterprise,
+    githubEnterpriseHost,
+    githubEnterpriseError,
+    githubEnterpriseIntegrationId,
     bitbucketForgeConfigured: bitbucketConnect.configured,
     bitbucketOnboardingPending: bitbucketConnect.pending,
     bitbucketRepositories: bitbucketConnect.repositories,

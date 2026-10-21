@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
@@ -95,6 +96,9 @@ func resolveIntakeBinding(
 			return nil, invalidArgument("workspace GitHub integration is not ready")
 		}
 		return nil, nil
+	}
+	if source == models.FactoryIntakeSourceDependabotAlerts && githubcommon.HostFromModel(integration).IsGHES() {
+		return nil, invalidArgument("Dependabot alerts are not available on GitHub Enterprise Server")
 	}
 
 	return &intakeBinding{
