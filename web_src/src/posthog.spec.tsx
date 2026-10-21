@@ -3,16 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { init, identify, capture, reset, setOnce } = vi.hoisted(() => ({
+const { init, identify, capture, reset, setOnce, group } = vi.hoisted(() => ({
   init: vi.fn(),
   identify: vi.fn(),
   capture: vi.fn(),
   reset: vi.fn(),
   setOnce: vi.fn(),
+  group: vi.fn(),
 }));
 
 vi.mock("posthog-js", () => ({
-  default: { init, identify, capture, reset, people: { set_once: setOnce } },
+  default: { init, identify, capture, reset, group, people: { set_once: setOnce } },
 }));
 
 vi.mock("react-router", () => ({
@@ -45,7 +46,7 @@ import { AccountProvider } from "@/contexts/AccountProvider";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { confirmSignupAnalyticsPreference, savePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
-import { initPostHog } from "@/posthog";
+import { initPostHog, identifyOrganizationGroup } from "@/posthog";
 
 const mockAccount = {
   id: "user-123",
@@ -305,5 +306,24 @@ describe("logout", () => {
     await user.click(screen.getByLabelText("Open organization menu"));
     await user.click(screen.getByText("Sign Out"));
     expect(reset).toHaveBeenCalledOnce();
+  });
+});
+
+describe("organization group", () => {
+  beforeEach(() => {
+    group.mockClear();
+  });
+
+  it("calls group with the organization id and name", () => {
+    identifyOrganizationGroup({
+      id: "org-abc123",
+      name: "Acme Corp",
+      slug: "acme",
+    });
+
+    expect(group).toHaveBeenCalledWith("organization", "org-abc123", {
+      name: "Acme Corp",
+      slug: "acme",
+    });
   });
 });
