@@ -64,6 +64,7 @@ describe("OrganizationsList", () => {
     expect(screen.getByText("7")).toBeInTheDocument();
     expect(screen.getByText("8")).toBeInTheDocument();
     expect(screen.getByText("$0.00")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Reset one automation" })).not.toBeInTheDocument();
   });
 
   it("opens the organization when any cell in the row is clicked", async () => {
