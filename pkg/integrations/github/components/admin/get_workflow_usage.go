@@ -262,7 +262,7 @@ func workflowUsageRepositories(ctx core.SetupContext, metadata common.Metadata) 
 		result = append(result, common.Repository{
 			ID:   repository.RepositoryID,
 			Name: name,
-			URL:  "https://github.com/" + fullName,
+			URL:  common.DotCom().RepoURL(fullName),
 		})
 	}
 	return result, nil
@@ -273,8 +273,11 @@ func workflowUsageRepositoryMatches(repository common.Repository, requestedName 
 		return true
 	}
 
-	fullName := strings.TrimSuffix(strings.TrimPrefix(repository.URL, "https://github.com/"), "/")
-	return strings.EqualFold(fullName, requestedName)
+	owner, name, ok := common.DotCom().ParseRepoURL(repository.URL)
+	if !ok {
+		return false
+	}
+	return strings.EqualFold(owner+"/"+name, requestedName)
 }
 
 // aggregateUsageData processes the billing usage report and aggregates usage data.

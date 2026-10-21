@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useFactoryGitHubHost } from "@/hooks/useFactoryGitHubHost";
 import { useCreateFactoryIntake, useImportFactoryIntakeItem } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
@@ -41,6 +42,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
   const createIntake = useCreateFactoryIntake(props.organizationId, props.factoryId);
   const importItem = useImportFactoryIntakeItem(props.organizationId, props.factoryId);
   const repository = props.repository || DEPENDABOT_INTAKE_SETUP_COPY.repositoryFallback;
+  const githubHost = useFactoryGitHubHost();
   const dependabotSeverities = normalizeDependabotSeverities(settings.dependabotSeverities);
 
   const finishWizard = async (packageIds: string[]) => {
@@ -86,6 +88,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
           organizationId={props.organizationId}
           factoryId={props.factoryId}
           repository={repository}
+          githubHost={githubHost}
           dependabotSeverities={dependabotSeverities}
           importProgress={importProgress}
           error={error}
