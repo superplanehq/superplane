@@ -34,6 +34,7 @@ function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFe
     repository: "acme/app",
     mention: "@bot",
     ignoreBots: true,
+    addressAllBots: false,
     allowedBots: [],
     checkNames: [],
     maximumAttempts: 3,
@@ -298,7 +299,7 @@ describe("prFeedbackSettingsToApi", () => {
   it("sends discussion or check settings for the selected source", () => {
     expect(prFeedbackSettingsToApi(discussionDraft())).toEqual({
       subject: { repository: "acme/app" },
-      discussion: { mention: "@bot", ignoreBots: true, allowedBots: [] },
+      discussion: { mention: "@bot", ignoreBots: true, allowedBots: [], addressAllBots: false },
     });
     expect(
       prFeedbackSettingsToApi(

@@ -120,6 +120,7 @@ func createPRFeedbackCanvas(
 		Repository:             settings.Repository,
 		Mention:                settings.Mention,
 		IgnoreBots:             settings.IgnoreBots,
+		AddressAllBots:         settings.AddressAllBots,
 		AllowedBots:            settings.AllowedBots,
 		CheckNames:             settings.CheckNames,
 		MaximumAttempts:        settings.MaximumAttempts,

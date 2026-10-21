@@ -13,6 +13,7 @@ type prFeedbackSettings struct {
 	Repository             string
 	Mention                string
 	IgnoreBots             bool
+	AddressAllBots         bool
 	AllowedBots            []string
 	CheckNames             []string
 	MaximumAttempts        int
@@ -102,6 +103,7 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 		}
 		settings.Mention = strings.TrimSpace(prFeedbackNodeString(node, "contentFilter"))
 		settings.IgnoreBots = prFeedbackNodeBool(node, "ignoreBots", settings.IgnoreBots)
+		settings.AddressAllBots = prFeedbackNodeBool(node, "addressAllBots", false)
 		settings.AllowedBots = prFeedbackNodeStringSlice(node, "allowedBots")
 		break
 	}
@@ -161,9 +163,10 @@ func serializePRFeedbackSettings(settings prFeedbackSettings) *pb.FactoryPRFeedb
 			Repository: settings.Repository,
 		},
 		Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
-			Mention:     settings.Mention,
-			IgnoreBots:  settings.IgnoreBots,
-			AllowedBots: settings.AllowedBots,
+			Mention:        settings.Mention,
+			IgnoreBots:     settings.IgnoreBots,
+			AllowedBots:    settings.AllowedBots,
+			AddressAllBots: settings.AddressAllBots,
 		},
 		Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
 			Names:                settings.CheckNames,
@@ -256,6 +259,7 @@ func parsePRFeedbackSettings(current prFeedbackSettings, requested *pb.FactoryPR
 	if requested.GetDiscussion() != nil {
 		updated.Mention = strings.TrimSpace(requested.GetDiscussion().GetMention())
 		updated.IgnoreBots = requested.GetDiscussion().GetIgnoreBots()
+		updated.AddressAllBots = requested.GetDiscussion().GetAddressAllBots()
 		updated.AllowedBots = requested.GetDiscussion().GetAllowedBots()
 	}
 	if requested.GetChecks() != nil {
