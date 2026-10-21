@@ -74,7 +74,7 @@ func CreateHostedCreditCheckout(
 		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
 	}
 	if !plan.AllowsCreditPurchase() {
-		return nil, grpcerrors.FailedPrecondition(nil, "Subscribe to Business to purchase hosted credit.")
+		return nil, grpcerrors.FailedPrecondition(nil, "An active paid plan is required to purchase hosted credit.")
 	}
 	productID := strings.TrimSpace(req.GetProductId())
 	if productID == "" {

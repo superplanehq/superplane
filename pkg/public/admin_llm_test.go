@@ -415,6 +415,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 				"items": []map[string]any{
 					{
 						"id":                   "sub_admin_sync",
+						"product_id":           "prod_business",
 						"status":               "active",
 						"current_period_start": periodStart.Format(time.RFC3339),
 						"current_period_end":   periodEnd.Format(time.RFC3339),
@@ -451,7 +452,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 	t.Run("PUT rejects Polar-managed organizations", func(t *testing.T) {
 		now := time.Now()
 		end := now.AddDate(0, 1, 0)
-		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
+		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 			ID:          "sub_admin_put",
 			Status:      models.PolarSubscriptionStatusActive,
 			PeriodStart: &now,

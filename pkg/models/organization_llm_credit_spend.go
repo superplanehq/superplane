@@ -32,7 +32,7 @@ func grantCreditBucket(kind string) creditBucket {
 	switch kind {
 	case LLMCreditGrantKindWelcome, LLMCreditGrantKindTrialAdjustment:
 		return creditBucketWelcome
-	case LLMCreditGrantKindIncluded:
+	case LLMCreditGrantKindIncluded, LLMCreditGrantKindIncludedAdjustment:
 		return creditBucketIncluded
 	case LLMCreditGrantKindTopup, LLMCreditGrantKindTopupRefund, LLMCreditGrantKindTopupAdjustment:
 		return creditBucketPurchased
@@ -49,7 +49,7 @@ func isPurchasedGrantKind(kind string) bool {
 
 func isCreditAdjustmentKind(kind string) bool {
 	switch kind {
-	case LLMCreditGrantKindTrialAdjustment, LLMCreditGrantKindTopupAdjustment, LLMCreditGrantKindAdminAdjustment:
+	case LLMCreditGrantKindIncludedAdjustment, LLMCreditGrantKindTrialAdjustment, LLMCreditGrantKindTopupAdjustment, LLMCreditGrantKindAdminAdjustment:
 		return true
 	default:
 		return false
