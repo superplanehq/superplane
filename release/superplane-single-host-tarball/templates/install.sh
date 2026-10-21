@@ -6,7 +6,7 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 #
 # The logo is generated using:
-# script -q /dev/null npx oh-my-logo "SuperPlane" purple --filled > release/single-host/templates/superplane-logo.txt
+# script -q /dev/null npx oh-my-logo "SuperPlane" purple --filled > release/superplane-single-host-tarball/templates/superplane-logo.txt
 #
 
 cat "${PWD}/superplane-logo.txt"
@@ -376,7 +376,7 @@ write_rabbitmq_env
 
 if [[ ! -f fleet-manager.env ]]; then
   umask 077
-  printf '%s\n' "# Run ./enable-runners.sh <installation_admin_token> to start runners." >fleet-manager.env
+  printf '%s\n' "# Open setup, select This VM, and run the command from that page." >fleet-manager.env
   chmod 600 fleet-manager.env
 fi
 
@@ -418,4 +418,4 @@ echo ""
 echo "SuperPlane is starting via docker compose."
 echo "Visit https://${SANITIZED_DOMAIN} in your browser."
 echo "Runners use runner ${RUNNER_VERSION} and Fleet Manager ${FLEET_MANAGER_VERSION}."
-echo "To start runners, create an installation admin API token and run ./enable-runners.sh <token>."
+echo "To start runners, open setup, select This VM, and run the command from that page."
