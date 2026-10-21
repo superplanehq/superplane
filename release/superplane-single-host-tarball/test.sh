@@ -64,6 +64,13 @@ fi
 
 env_mode="$(stat -c %a superplane.env 2>/dev/null || stat -f %OLp superplane.env)"
 test "${env_mode}" = "600"
+rabbit_mode="$(stat -c %a rabbitmq.env 2>/dev/null || stat -f %OLp rabbitmq.env)"
+test "${rabbit_mode}" = "600"
+grep -Eq '^RABBITMQ_DEFAULT_USER=superplane$' rabbitmq.env
+if grep -Eq 'JWT_SECRET|ENCRYPTION_KEY|DB_PASSWORD' rabbitmq.env; then
+  echo "Error: rabbitmq.env contains app secrets" >&2
+  exit 1
+fi
 test -f fleet-manager.yaml
 grep -q "runnerVersion: ${RUNNER_VERSION}" fleet-manager.yaml
 grep -q "network: superplane_default" fleet-manager.yaml
@@ -104,6 +111,27 @@ if printf '%s\n' "${rendered}" | grep -Eq 'published:.*5672|published:.*15672'; 
   exit 1
 fi
 printf '%s\n' "${rendered}" | grep -q 'max-size: 50m'
+rabbit_block="$(printf '%s\n' "${rendered}" | awk '
+  $0 ~ "^  rabbitmq:" { flag = 1 }
+  flag && $0 ~ "^  [a-z]" && $0 !~ "^  rabbitmq:" { flag = 0 }
+  flag { print }
+')"
+printf '%s\n' "${rabbit_block}" | grep -q 'RABBITMQ_DEFAULT_USER'
+if printf '%s\n' "${rabbit_block}" | grep -Eq 'JWT_SECRET|ENCRYPTION_KEY|DB_PASSWORD'; then
+  echo "Error: RabbitMQ receives app secrets" >&2
+  exit 1
+fi
+
+cd "${work_dir}"
+SUPERPLANE_DOMAIN=localhost SUPERPLANE_CONFIG_ONLY=yes bash superplane/install.sh >/dev/null
+grep -q 'tls internal' superplane/Caddyfile
+SUPERPLANE_DOMAIN=superplane.example.com SUPERPLANE_CONFIG_ONLY=yes bash superplane/install.sh >/dev/null
+if grep -q 'tls internal' superplane/Caddyfile; then
+  echo "Error: public domain kept the local Caddyfile" >&2
+  exit 1
+fi
+grep -q '{$SUPERPLANE_DOMAIN}' superplane/Caddyfile
+cd superplane
 
 guest_dir="$(mktemp -d)"
 tar -C "${guest_dir}" -xzf "${REPO_ROOT}/build/superplane-single-host-tarball-${VERSION}/superplane-single-host.tar.gz"

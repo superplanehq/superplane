@@ -82,7 +82,7 @@ services:
     hostname: rabbitmq
     restart: always
     env_file:
-      - superplane.env
+      - rabbitmq.env
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:

@@ -115,7 +115,22 @@ wait_for_health
 echo "Stopping the app process..."
 # docker kill is a manual stop, so the restart policy does not apply.
 # Kill pid 1 inside the container. Docker then applies restart: always.
+app_id="$(docker compose ps -aq app)"
+restarts_before="$(docker inspect --format '{{.RestartCount}}' "${app_id}")"
 docker compose exec -T app bash -c 'kill -9 1' || true
+restarted="no"
+for _ in $(seq 1 30); do
+  restarts_after="$(docker inspect --format '{{.RestartCount}}' "${app_id}")"
+  if [[ "${restarts_after}" -gt "${restarts_before}" ]]; then
+    restarted="yes"
+    break
+  fi
+  sleep 1
+done
+if [[ "${restarted}" != "yes" ]]; then
+  echo "Error: app container did not restart" >&2
+  exit 1
+fi
 wait_for_health
 
 env_mode="$(stat -c %a superplane.env 2>/dev/null || stat -f %OLp superplane.env)"

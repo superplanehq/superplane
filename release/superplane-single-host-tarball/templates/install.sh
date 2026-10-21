@@ -9,7 +9,7 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # script -q /dev/null npx oh-my-logo "SuperPlane" purple --filled > release/single-host/templates/superplane-logo.txt
 #
 
-cat "$(dirname "${BASH_SOURCE[0]:-$0}")/superplane-logo.txt"
+cat "${PWD}/superplane-logo.txt"
 
 ENV_FILE="superplane.env"
 RUNNER_VERSION="__RUNNER_VERSION__"
@@ -139,17 +139,34 @@ fleets:
 EOF
 }
 
-write_localhost_caddyfile() {
+write_caddyfile() {
   local domain="$1"
-  if [[ "${domain}" != "localhost" && "${domain}" != "127.0.0.1" ]]; then
-    return 0
-  fi
-  cat >Caddyfile <<EOF
+  if [[ "${domain}" == "localhost" || "${domain}" == "127.0.0.1" ]]; then
+    cat >Caddyfile <<EOF
 ${domain} {
   tls internal
   reverse_proxy app:8000
 }
 EOF
+    return 0
+  fi
+  if [[ -f Caddyfile ]] && ! grep -q 'tls internal' Caddyfile; then
+    return 0
+  fi
+  cat >Caddyfile <<'EOF'
+{$SUPERPLANE_DOMAIN} {
+  reverse_proxy app:8000
+}
+EOF
+}
+
+write_rabbitmq_env() {
+  umask 077
+  cat >rabbitmq.env <<EOF
+RABBITMQ_DEFAULT_USER=$(env_value RABBITMQ_DEFAULT_USER)
+RABBITMQ_DEFAULT_PASS=$(env_value RABBITMQ_DEFAULT_PASS)
+EOF
+  chmod 600 rabbitmq.env
 }
 
 ensure_oidc_keys() {
@@ -354,7 +371,8 @@ fi
 
 ensure_oidc_keys
 write_fleet_manager_config
-write_localhost_caddyfile "${SANITIZED_DOMAIN}"
+write_caddyfile "${SANITIZED_DOMAIN}"
+write_rabbitmq_env
 
 if [[ ! -f fleet-manager.env ]]; then
   umask 077
