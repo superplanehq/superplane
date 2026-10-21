@@ -24,6 +24,19 @@ describe("resolveConsoleAvatar", () => {
     });
   });
 
+  it("uses the avatar URL from a GitHub Enterprise user", () => {
+    expect(
+      resolveConsoleAvatar({
+        name: "Alex Rivera",
+        username: "alex",
+        avatar_url: "https://avatars.acme.ghe.com/u/12?v=4",
+      }),
+    ).toEqual({
+      src: "https://avatars.acme.ghe.com/u/12?v=4",
+      name: "Alex Rivera",
+    });
+  });
+
   it("falls back to initials when no username is available", () => {
     expect(resolveConsoleAvatar({ name: "cloud-robot", email: "bot@example.com" }, { name: "cloud-robot" })).toEqual({
       initials: "C",
