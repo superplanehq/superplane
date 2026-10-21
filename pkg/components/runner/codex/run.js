@@ -131,7 +131,7 @@ function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
     .toLowerCase();
-  if (["low", "medium", "high"].includes(level)) {
+  if (["minimal", "low", "medium", "high", "xhigh"].includes(level)) {
     return ["-c", `model_reasoning_effort=${tomlString(level)}`];
   }
   return [];
@@ -451,10 +451,12 @@ async function runPrompt(promptFile, model, thinking) {
   if (tokenTotal(usage) > 0) {
     telemetry.updateCurrentUsage(usage);
   }
+  const rollout = readRolloutContext(childEnv.CODEX_HOME, readSessionID(sp));
   const payload = {
     type: "result",
     result: formatter.lastText() || lastResult.result || lastResult.text || "",
-    model: lastResult.model || model,
+    model: rollout.model || lastResult.model || model,
+    thinkingLevel: rollout.effort || thinking,
     usage,
   };
   telemetry.attachToResult(payload);
@@ -479,6 +481,14 @@ async function runPrompt(promptFile, model, thinking) {
         : 1,
     duration_ms: Date.now() - startedAt,
   });
+  if (exitCode === 0 && subscription && subscription.subscriptionEnabled()) {
+    try {
+      await subscription.reportUsage();
+    } catch (err) {
+      writeStderr(`${err && err.message ? err.message : "ChatGPT usage was not saved"}\n`);
+      return 1;
+    }
+  }
   return exitCode;
 }
 
@@ -536,6 +546,36 @@ function extractUsage(event) {
   return usage;
 }
 
+function readRolloutContext(home, sessionID) {
+  const sessions = home && path.join(home, "sessions");
+  if (!sessions || !sessionID || !fs.existsSync(sessions)) {
+    return {};
+  }
+  try {
+    const suffix = `-${sessionID}.jsonl`;
+    const files = fs
+      .readdirSync(sessions, { recursive: true })
+      .filter((file) => path.basename(file).startsWith("rollout-") && file.endsWith(suffix))
+      .sort();
+    const context = {};
+    for (const file of files) {
+      for (const line of fs.readFileSync(path.join(sessions, file), "utf8").split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const record = JSON.parse(line);
+          if (record.type !== "turn_context" || !record.payload) continue;
+          if (typeof record.payload.model === "string") context.model = record.payload.model;
+          if (typeof record.payload.effort === "string") context.effort = record.payload.effort;
+        } catch (_err) {
+          // Rollout files are internal Codex state. Ignore records from formats we do not know.
+        }
+      }
+    }
+    return context;
+  } catch (_err) {
+    return {};
+  }
+}
 
 function accumulateLLMUsage(payload) {
   const taskDir = process.env.SUPERPLANE_TASK_DIR;

@@ -28,10 +28,37 @@ describe("useFactoryCodexConnection", () => {
     vi.mocked(factoriesStartFactoryCodexConnection).mockResolvedValue({ data: {} } as never);
   });
 
+  it("refreshes a ready legacy connection with no model catalog", async () => {
+    vi.mocked(factoriesDescribeFactoryCodexConnection).mockResolvedValue({
+      data: { connection: { status: "ready", availableModels: [] } },
+    } as never);
+
+    renderHook(() => useFactoryCodexConnection("org-1", "factory-1", true), { wrapper });
+
+    await waitFor(() => expect(factoriesStartFactoryCodexConnection).toHaveBeenCalledTimes(1));
+    expect(factoriesStartFactoryCodexConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { factoryId: "factory-1" },
+        body: { refreshCatalog: true },
+      }),
+    );
+  });
+
+  it("does not refresh a connection that already has models", async () => {
+    vi.mocked(factoriesDescribeFactoryCodexConnection).mockResolvedValue({
+      data: { connection: { status: "ready", availableModels: ["gpt-5.6-sol"] } },
+    } as never);
+
+    const result = renderHook(() => useFactoryCodexConnection("org-1", "factory-1", true), { wrapper });
+    await waitFor(() => expect(result.result.current.query.isSuccess).toBe(true));
+
+    expect(factoriesStartFactoryCodexConnection).not.toHaveBeenCalled();
+  });
+
   it("detects a saved sign-in after an initial status request fails", async () => {
     vi.mocked(factoriesDescribeFactoryCodexConnection)
       .mockRejectedValueOnce(new Error("temporarily unavailable"))
-      .mockResolvedValue({ data: { connection: { status: "ready" } } } as never);
+      .mockResolvedValue({ data: { connection: { status: "ready", availableModels: ["gpt-5.6-sol"] } } } as never);
 
     const result = renderHook(() => useFactoryCodexConnection("org-1", "factory-1", true), { wrapper });
 
@@ -42,7 +69,7 @@ describe("useFactoryCodexConnection", () => {
   it("checks for a completed sign-in when the start response is lost", async () => {
     vi.mocked(factoriesDescribeFactoryCodexConnection)
       .mockResolvedValueOnce({ data: { connection: { status: "disconnected" } } } as never)
-      .mockResolvedValue({ data: { connection: { status: "ready" } } } as never);
+      .mockResolvedValue({ data: { connection: { status: "ready", availableModels: ["gpt-5.6-sol"] } } } as never);
     vi.mocked(factoriesStartFactoryCodexConnection).mockRejectedValue(new Error("response lost"));
 
     const result = renderHook(() => useFactoryCodexConnection("org-1", "factory-1", true), { wrapper });
