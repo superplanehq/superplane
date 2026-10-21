@@ -69,7 +69,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		assert.Len(t, liveVersion.Nodes, 15)
-		assert.Len(t, liveVersion.Edges, 12)
+		assert.Len(t, liveVersion.Edges, 15)
 		for _, node := range liveVersion.Nodes {
 			assert.NotEqual(t, "noop", node.ComponentName())
 		}

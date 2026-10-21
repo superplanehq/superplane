@@ -354,11 +354,18 @@ func (flow prFeedbackDiscussionFlowSpec) withAcknowledgeFrom(sourceID, channel s
 		}
 		nextID := flow.edges[i].TargetID
 		flow.edges[i].TargetID = node.ID
-		flow.edges = slices.Insert(flow.edges, i+1, yaml.Edge{
-			Channel:  "default",
-			SourceID: node.ID,
-			TargetID: nextID,
-		})
+		flow.edges = slices.Insert(flow.edges, i+1,
+			yaml.Edge{
+				Channel:  "default",
+				SourceID: node.ID,
+				TargetID: nextID,
+			},
+			yaml.Edge{
+				Channel:  "failed",
+				SourceID: node.ID,
+				TargetID: nextID,
+			},
+		)
 		return flow
 	}
 	flow.edges = append(flow.edges, yaml.Edge{

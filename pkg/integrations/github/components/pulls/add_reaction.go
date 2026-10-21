@@ -61,7 +61,9 @@ func (c *AddReaction) Documentation() string {
 
 If the component creates a reaction, it returns the GitHub reaction object, including id, content, user, and timestamp.
 
-If the resolved comment ID is blank, the component finishes with success and emits an empty result. Later nodes on the same path still run.`
+If the resolved comment ID is blank, the component finishes with success and emits an empty result. Later nodes on the same path still run.
+
+If GitHub rejects the reaction, the component emits the failed channel. A canvas can continue from that channel.`
 }
 
 func (c *AddReaction) Icon() string {
@@ -73,7 +75,10 @@ func (c *AddReaction) Color() string {
 }
 
 func (c *AddReaction) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		core.DefaultOutputChannel,
+		{Name: core.FailedOutputChannel, Label: "Failed"},
+	}
 }
 
 func (c *AddReaction) Configuration() []configuration.Field {
@@ -195,7 +200,7 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 
 	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
-		return fmt.Errorf("failed to initialize GitHub client: %w", err)
+		return emitReactionFailure(ctx, fmt.Errorf("failed to initialize GitHub client: %w", err))
 	}
 
 	reaction := &github.Reaction{}
@@ -203,12 +208,12 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 	case ReactionTargetIssueComment:
 		reaction, _, err = client.CreateIssueReaction(context.Background(), config.Repository, commentID, config.Content)
 		if err != nil {
-			return fmt.Errorf("failed to create issue reaction: %w", err)
+			return emitReactionFailure(ctx, fmt.Errorf("failed to create issue reaction: %w", err))
 		}
 	case ReactionTargetReviewComment:
 		reaction, _, err = client.CreateReviewCommentReaction(context.Background(), config.Repository, commentID, config.Content)
 		if err != nil {
-			return fmt.Errorf("failed to create review comment reaction: %w", err)
+			return emitReactionFailure(ctx, fmt.Errorf("failed to create review comment reaction: %w", err))
 		}
 	}
 
@@ -216,6 +221,14 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 		core.DefaultOutputChannel.Name,
 		"github.reaction",
 		[]any{reaction},
+	)
+}
+
+func emitReactionFailure(ctx core.ExecutionContext, err error) error {
+	return ctx.ExecutionState.Emit(
+		core.FailedOutputChannel,
+		"github.reaction",
+		[]any{map[string]any{"error": err.Error()}},
 	)
 }
 
