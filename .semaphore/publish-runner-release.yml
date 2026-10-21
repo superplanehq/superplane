@@ -12,6 +12,12 @@ agent:
     os_image: ubuntu2204
 
 global_job_config:
+  env_vars:
+    - name: RUNNER_IMAGE_REPO
+      value: ghcr.io/superplanehq/runner
+    # Quay republished v1.22.3 and removed the old digest. Pin the immutable tag.
+    - name: SKOPEO_CONTAINER_IMAGE
+      value: quay.io/skopeo/stable:v1.22.3-immutable@sha256:c0ee1f4edca5c01cb8d5611124f92f3cc47196ecab68aee5d0f90834e00574d5
   prologue:
     commands:
       - checkout
@@ -22,6 +28,12 @@ global_job_config:
 blocks:
   - name: "Publish"
     task:
+      secrets:
+        - name: ghcr-push-token
+      epilogue:
+        always:
+          commands:
+            - rm -rf -- /tmp/ghcr-auth
       jobs:
         - name: "Publish immutable Runner release"
           commands:
@@ -36,7 +48,7 @@ blocks:
                 --sha "$SEMAPHORE_GIT_SHA" \
                 --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
                 --directory "$release_dir" \
-                --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
+                --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt,runner.oci.tar \
                 --manifest "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum --check checksums.txt)
               test -n "${GITHUB_TOKEN:-}"
@@ -59,6 +71,16 @@ blocks:
                 --directory "$release_dir" \
                 --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
                 --release-id-file /tmp/github-release-id
+            - docker pull "$SKOPEO_CONTAINER_IMAGE"
+            - mkdir -m 700 /tmp/ghcr-auth
+            - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/fleet-manager/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
+            - |
+              set -euo pipefail
+              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json
+              bash release/runner/publish-image.sh \
+                "$RELEASE_VERSION" \
+                "build/runner/$RELEASE_VERSION/runner.oci.tar" \
+                "$SEMAPHORE_GIT_SHA"
             - |
               set -euo pipefail
               release_notes_args=()

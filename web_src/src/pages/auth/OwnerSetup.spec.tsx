@@ -53,6 +53,8 @@ const fleetManagerMetadata = {
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
   runnerVersions: ["v0.1.0"],
+  stableRunnerVersion: "v0.2.0",
+  installationType: "",
   fleetPresets: [
     {
       id: "e1-large-amd64",
@@ -88,6 +90,7 @@ interface OwnerSetupFetchStubs {
   status?: unknown;
   account?: { status: number; body?: unknown };
   organizations?: unknown;
+  fleetManager?: typeof fleetManagerMetadata;
 }
 
 function stubAccountResponse(stubs: OwnerSetupFetchStubs) {
@@ -105,7 +108,7 @@ function stubOwnerSetupFetch(stubs: OwnerSetupFetchStubs = {}) {
     ["/api/v1/setup-owner", () => jsonResponse({ organization_id: "org-1", organization_slug: "acme" })],
     ["/account", () => stubAccountResponse(stubs)],
     ["/organizations", () => jsonResponse(stubs.organizations ?? [])],
-    ["/admin/api/installation/fleet-manager/setup", () => jsonResponse(fleetManagerMetadata)],
+    ["/admin/api/installation/fleet-manager/setup", () => jsonResponse(stubs.fleetManager ?? fleetManagerMetadata)],
   ];
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -197,7 +200,7 @@ describe("OwnerSetup", () => {
 
     fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
 
-    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /fleet manager setup/i })).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-progress")).toBeInTheDocument();
 
@@ -211,7 +214,7 @@ describe("OwnerSetup", () => {
     await reachFleetStep();
 
     fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
-    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
@@ -226,7 +229,7 @@ describe("OwnerSetup", () => {
     for (const heading of [
       "Create the chart values",
       "Configure the default fleet",
-      "Choose a cloud provider",
+      "Choose where runners run",
       OWNER_SETUP_COPY.fleet.headline,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: "Back" }));
@@ -237,6 +240,57 @@ describe("OwnerSetup", () => {
     expect(await screen.findByRole("heading", { name: OWNER_SETUP_COPY.smtp.headline })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
+  });
+
+  it("shows the single-VM runner command with the created token", async () => {
+    stubOwnerSetupFetch({ fleetManager: { ...fleetManagerMetadata, installationType: "single-host" } });
+    renderOwnerSetup();
+    await reachFleetStep();
+
+    expect(await screen.findByText(OWNER_SETUP_COPY.fleet.singleHostBody)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
+    expect(await screen.findByRole("heading", { name: "Runners on this VM" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "AWS" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "This VM" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByRole("heading", { name: "Start runners on this VM" })).toBeInTheDocument();
+    expect(screen.getByText("./enable-runners.sh 'owner-setup-token'")).toBeInTheDocument();
+    expect(screen.queryByText(/helm upgrade --install fleet-manager/)).not.toBeInTheDocument();
+  });
+
+  it("leaves a cloud install off the This VM command", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-docker" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "This VM" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/enable-runners.sh/)).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/setup-owner/progress",
+        expect.objectContaining({ method: "PATCH", body: JSON.stringify({ step: "fleet-provider" }) }),
+      ),
+    );
+  });
+
+  it("leaves a single-host install off the cloud chart steps", async () => {
+    stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-fleets" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+      fleetManager: { ...fleetManagerMetadata, installationType: "single-host" },
+    });
+    renderOwnerSetup();
+
+    expect(await screen.findByRole("heading", { name: "Runners on this VM" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Configure the default fleet" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "AWS" })).not.toBeInTheDocument();
   });
 
   it("resumes the stored fleet step for the signed-in admin", async () => {

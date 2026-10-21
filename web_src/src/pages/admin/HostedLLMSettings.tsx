@@ -23,7 +23,7 @@ export function HostedLLMSettings() {
   const model = useHostedLLMSettings();
 
   return (
-    <section className="border-t border-slate-200 py-6 dark:border-gray-700/70">
+    <section className="py-6">
       <div className="max-w-2xl">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Hosted LLM</p>
         <h2 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">SuperPlane-hosted models</h2>

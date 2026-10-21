@@ -11,23 +11,48 @@ if [ "${1-}" = "" ]; then
 fi
 
 VERSION="$1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+VALUES_FILE="${REPO_ROOT}/release/superplane-helm-chart/helm/values.yaml"
 
-BUILD_ROOT="build/superplane-single-host-tarball-${VERSION}"
+RUNNER_VERSION="$(awk '$1 == "runnerVersion:" { print $2; exit }' "${VALUES_FILE}")"
+FLEET_MANAGER_VERSION="$(awk '$1 == "fleetManagerVersion:" { print $2; exit }' "${VALUES_FILE}")"
+if [[ -z "${RUNNER_VERSION}" || -z "${FLEET_MANAGER_VERSION}" ]]; then
+  echo "Error: runnerVersion and fleetManagerVersion are required in ${VALUES_FILE}" >&2
+  exit 1
+fi
+
+BUILD_ROOT="${REPO_ROOT}/build/superplane-single-host-tarball-${VERSION}"
 TARGET_DIR="${BUILD_ROOT}/superplane"
-TEMPLATES_DIR="release/superplane-single-host-tarball/templates"
+TEMPLATES_DIR="${SCRIPT_DIR}/templates"
 
 echo "* Building single-host release for version ${VERSION}"
+echo "* Runner ${RUNNER_VERSION}, Fleet Manager ${FLEET_MANAGER_VERSION}"
 echo "* Target directory: ${TARGET_DIR}"
 
 rm -rf "${BUILD_ROOT}"
 mkdir -p "${TARGET_DIR}"
 
+inject() {
+  local source="$1"
+  local destination="$2"
+  sed \
+    -e "s/__SUPERPLANE_VERSION__/${VERSION}/g" \
+    -e "s/__RUNNER_VERSION__/${RUNNER_VERSION}/g" \
+    -e "s/__FLEET_MANAGER_VERSION__/${FLEET_MANAGER_VERSION}/g" \
+    "${source}" >"${destination}"
+}
+
 echo "* Injecting docker-compose.yml"
-sed "s/__SUPERPLANE_VERSION__/${VERSION}/g" "${TEMPLATES_DIR}/docker-compose.yml" > "${TARGET_DIR}/docker-compose.yml"
+inject "${TEMPLATES_DIR}/docker-compose.yml" "${TARGET_DIR}/docker-compose.yml"
 
 echo "* Injecting install.sh"
-cp "${TEMPLATES_DIR}/install.sh" "${TARGET_DIR}/install.sh"
+inject "${TEMPLATES_DIR}/install.sh" "${TARGET_DIR}/install.sh"
 chmod +x "${TARGET_DIR}/install.sh"
+
+echo "* Injecting enable-runners.sh"
+inject "${TEMPLATES_DIR}/enable-runners.sh" "${TARGET_DIR}/enable-runners.sh"
+chmod +x "${TARGET_DIR}/enable-runners.sh"
 
 echo "* Injecting Caddyfile"
 cp "${TEMPLATES_DIR}/Caddyfile" "${TARGET_DIR}/Caddyfile"
@@ -36,7 +61,10 @@ echo "* Injecting superplane-logo.txt"
 cp "${TEMPLATES_DIR}/superplane-logo.txt" "${TARGET_DIR}/superplane-logo.txt"
 
 echo "* Generating SBOM"
-release/generate-sbom.sh "${VERSION}"
+(
+  cd "${REPO_ROOT}"
+  bash release/generate-sbom.sh "${VERSION}"
+)
 
 echo "* Creating superplane-single-host.tar.gz"
 (
