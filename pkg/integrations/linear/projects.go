@@ -3,6 +3,7 @@ package linear
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -21,7 +22,8 @@ type workspaceProjectNode struct {
 	Name  string `json:"name"`
 	Teams struct {
 		Nodes []struct {
-			ID string `json:"id"`
+			ID  string `json:"id"`
+			Key string `json:"key"`
 		} `json:"nodes"`
 	} `json:"teams"`
 }
@@ -49,7 +51,7 @@ query WorkspaceProjects($first: Int!, $after: String) {
     nodes {
       id
       name
-      teams(first: 50) { nodes { id } }
+      teams(first: 50) { nodes { id key } }
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -71,7 +73,7 @@ query ProjectsByID($ids: [ID!]!, $first: Int!, $after: String) {
     nodes {
       id
       name
-      teams(first: 50) { nodes { id } }
+      teams(first: 50) { nodes { id key } }
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -182,11 +184,35 @@ func (c *Client) ListOpenProjectIssues(projectIDs []string, limit int) ([]Issue,
 	return c.SearchOpenProjectIssues(projectIDs, "", limit)
 }
 
-// SearchOpenProjectIssues returns open issues in the given projects whose
-// title or description contains query. An empty query lists the newest open
-// issues. An identifier such as ENG-142 is included when that issue belongs
-// to one of the projects.
+// ProjectIssueSearchResult includes exact identifier matches even outside the
+// selected projects or open states, so callers can explain intake restrictions.
+type ProjectIssueSearchResult struct {
+	Issue
+	ExactMatch bool
+	// ExplicitIdentifier excludes identifiers inferred from a bare number.
+	ExplicitIdentifier bool
+}
+
+// SearchOpenProjectIssues returns open issues in the selected projects.
+// Complete identifiers (including ENG-12) mean an exact issue number, not a
+// numeric prefix. Incomplete identifiers such as ENG- use text search only.
 func (c *Client) SearchOpenProjectIssues(projectIDs []string, query string, limit int) ([]Issue, error) {
+	results, err := c.SearchProjectIssues(projectIDs, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	issues := make([]Issue, 0, len(results))
+	for _, result := range results {
+		if !result.ExactMatch || (issueInProjects(result.Issue, normalizeIDs(projectIDs)) && !issueIsClosed(result.Issue)) {
+			issues = append(issues, result.Issue)
+		}
+	}
+	return issues, nil
+}
+
+// SearchProjectIssues combines scoped title/description search with direct
+// identifier lookup. Exact matches come first, including issues outside scope.
+func (c *Client) SearchProjectIssues(projectIDs []string, query string, limit int) ([]ProjectIssueSearchResult, error) {
 	ids := normalizeIDs(projectIDs)
 	if len(ids) == 0 {
 		return nil, fmt.Errorf("at least one project is required")
@@ -197,7 +223,6 @@ func (c *Client) SearchOpenProjectIssues(projectIDs []string, query string, limi
 	if limit > pageSize {
 		limit = pageSize
 	}
-
 	query = strings.TrimSpace(query)
 	document := openProjectIssuesQuery
 	variables := map[string]any{"ids": ids, "first": limit}
@@ -205,26 +230,90 @@ func (c *Client) SearchOpenProjectIssues(projectIDs []string, query string, limi
 		document = searchProjectIssuesQuery
 		variables["query"] = query
 	}
-
 	response := struct {
 		Issues connection[Issue] `json:"issues"`
 	}{}
 	if err := c.execute(document, variables, &response); err != nil {
 		return nil, err
 	}
-	issues := response.Issues.Nodes
-	if query == "" || !looksLikeIssueIdentifier(query) {
-		return issues, nil
+	identifiers, err := c.projectIssueIdentifiers(ids, query)
+	if err != nil {
+		return nil, err
 	}
+	results := make([]ProjectIssueSearchResult, 0, limit)
+	seen := map[string]bool{}
+	if len(identifiers) > 0 {
+		exact := struct {
+			Issues connection[Issue] `json:"issues"`
+		}{}
+		if err := c.execute(identifierIssuesQuery, map[string]any{"identifiers": identifiers, "first": limit}, &exact); err != nil {
+			return nil, err
+		}
+		for _, issue := range exact.Issues.Nodes {
+			if seen[issue.ID] {
+				continue
+			}
+			results = append(results, ProjectIssueSearchResult{
+				Issue:              issue,
+				ExactMatch:         true,
+				ExplicitIdentifier: !issueNumberPattern.MatchString(query),
+			})
+			seen[issue.ID] = true
+		}
+	}
+	for _, issue := range response.Issues.Nodes {
+		if seen[issue.ID] {
+			continue
+		}
+		results = append(results, ProjectIssueSearchResult{Issue: issue})
+		seen[issue.ID] = true
+	}
+	if len(results) > limit {
+		results = results[:limit]
+	}
+	return results, nil
+}
 
-	issue, err := c.GetIssue(query)
-	if err != nil || issue == nil || !issueInProjects(*issue, ids) || issueIsClosed(*issue) {
-		return issues, nil
+// Linear's ID comparator accepts human-readable identifiers as well as UUIDs.
+// Keep this lookup unscoped so the intake can explain excluded exact matches.
+const identifierIssuesQuery = `
+query IdentifierIssues($identifiers: [ID!]!, $first: Int!) {
+ issues(first: $first, filter: { id: { in: $identifiers } }) {
+  nodes {` + issueFields + `}
+ }
+}`
+
+var issueIdentifierPattern = regexp.MustCompile(`(?i)\b([a-z][a-z0-9]*)[- ]([0-9]+)\b`)
+var issueNumberPattern = regexp.MustCompile(`^[0-9]+$`)
+
+func (c *Client) projectIssueIdentifiers(projectIDs []string, query string) ([]string, error) {
+	if ref, ok := IssueRefFromURL(query); ok {
+		query = ref.Identifier
 	}
-	if slices.ContainsFunc(issues, func(existing Issue) bool { return existing.ID == issue.ID }) {
-		return issues, nil
+	if match := issueIdentifierPattern.FindStringSubmatch(query); match != nil {
+		return []string{strings.ToUpper(match[1]) + "-" + match[2]}, nil
 	}
-	return append([]Issue{*issue}, issues...), nil
+	if !issueNumberPattern.MatchString(query) {
+		return nil, nil
+	}
+	// A bare number is ambiguous across teams. Try every team of the intake's
+	// projects, including issues that have since moved outside those projects.
+	nodes, err := collectPages(c, projectsByIDQuery, map[string]any{
+		"ids": projectIDs, "first": pageSize,
+	}, decodeWorkspaceProjects)
+	if err != nil {
+		return nil, err
+	}
+	identifiers := []string{}
+	for _, project := range nodes {
+		for _, team := range project.Teams.Nodes {
+			key := strings.ToUpper(strings.TrimSpace(team.Key))
+			if key != "" {
+				identifiers = append(identifiers, key+"-"+query)
+			}
+		}
+	}
+	return normalizeIDs(identifiers), nil
 }
 
 func normalizeIDs(ids []string) []string {
@@ -237,19 +326,6 @@ func normalizeIDs(ids []string) []string {
 		normalized = append(normalized, id)
 	}
 	return normalized
-}
-
-func looksLikeIssueIdentifier(query string) bool {
-	team, number, ok := strings.Cut(query, "-")
-	if !ok || team == "" || number == "" {
-		return false
-	}
-	for _, char := range number {
-		if char < '0' || char > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 func issueInProjects(issue Issue, projectIDs []string) bool {

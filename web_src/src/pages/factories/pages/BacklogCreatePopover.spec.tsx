@@ -73,6 +73,20 @@ describe("BacklogCreatePopover", () => {
     expect(onImportItem).toHaveBeenCalledWith(items[0]);
   });
 
+  it("explains why an exact match cannot be imported and disables selection", async () => {
+    const onImportItem = vi.fn();
+    const item = { ...githubItems[0], key: "ENG-123", disabledReason: "This issue has no project." };
+    render(popover({ items: [item], focusedIntakeId: "intake-github", onImportItem }));
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    const row = screen.getByRole("button", { name: /ENG-123/ });
+    expect(row).toBeDisabled();
+    expect(within(row).getByText("This issue has no project.")).toBeInTheDocument();
+    await user.click(row);
+    expect(onImportItem).not.toHaveBeenCalled();
+    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+  });
+
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
   });
