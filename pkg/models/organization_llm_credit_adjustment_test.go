@@ -142,7 +142,7 @@ func Test__AdjustCreditBalanceRejectsInvalidInput(t *testing.T) {
 
 	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
 		OrganizationID: r.Organization.ID,
-		Bucket:         "included",
+		Bucket:         "invalid",
 		TargetMicros:   models.CentsToMicros(100),
 	})
 	require.ErrorIs(t, err, models.ErrCreditBalanceBucket)
@@ -374,4 +374,52 @@ func describeCredit(t *testing.T, db *gorm.DB, orgID uuid.UUID) models.Organizat
 	summary, err := models.DescribeOrganizationLLMCredit(db, orgID)
 	require.NoError(t, err)
 	return summary
+}
+
+func TestIncludedBalanceAfterExhaustionAndExpiration(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+	// Spend before the first included grant so a simple target-current delta would be insufficient.
+	require.NoError(t, db.Model(&models.OrganizationLLMCreditGrant{}).Where("organization_id = ?", r.Organization.ID).Update("expires_at", time.Now().Add(-time.Hour)).Error)
+	execution := dispatchWorkOrderExecution(t, r)
+	recordHostedPromptUsage(t, db, r.Organization.ID, requireExecutionRunID(t, execution))
+	before := describeCredit(t, db, r.Organization.ID)
+	require.Positive(t, before.BilledMicros)
+	adjustment := models.CreditBalanceAdjustment{OrganizationID: r.Organization.ID, Bucket: models.CreditBalanceBucketIncluded, TargetMicros: models.CentsToMicros(300), ExpectedMicros: 0, ActorAccountID: &r.Account.ID, Note: "Support correction"}
+	_, err := models.AdjustOrganizationLLMCreditBalance(db, adjustment)
+	require.ErrorIs(t, err, models.ErrCreditExpiration)
+	choice := "at"
+	expiry := time.Now().Add(time.Hour)
+	adjustment.ExpirationChoice = &choice
+	adjustment.ExpiresAt = &expiry
+	grant, err := models.AdjustOrganizationLLMCreditBalance(db, adjustment)
+	require.NoError(t, err)
+	require.Equal(t, models.LLMCreditGrantKindIncludedAdjustment, grant.Kind)
+	require.Equal(t, &r.Account.ID, grant.ActorAccountID)
+	require.Equal(t, "Support correction", grant.Note)
+	require.Equal(t, models.CentsToMicros(300), describeCredit(t, db, r.Organization.ID).IncludedRemainingMicros)
+	_, err = models.AdjustOrganizationLLMCreditBalance(db, adjustment)
+	require.ErrorIs(t, err, models.ErrCreditBalanceChanged)
+	adjustment.ExpectedMicros = models.CentsToMicros(300)
+	adjustment.TargetMicros = models.CentsToMicros(100)
+	reduction, err := models.AdjustOrganizationLLMCreditBalance(db, adjustment)
+	require.NoError(t, err)
+	require.Negative(t, reduction.AmountMicros)
+	require.Equal(t, models.CentsToMicros(100), describeCredit(t, db, r.Organization.ID).IncludedRemainingMicros)
+	require.NoError(t, db.Model(&models.OrganizationLLMCreditGrant{}).Where("id = ?", grant.ID).Update("expires_at", time.Now().Add(-time.Minute)).Error)
+	require.Zero(t, describeCredit(t, db, r.Organization.ID).IncludedRemainingMicros)
+	adjustment.ExpectedMicros = 0
+	adjustment.TargetMicros = models.CentsToMicros(50)
+	choice = "never"
+	adjustment.ExpiresAt = nil
+	grant, err = models.AdjustOrganizationLLMCreditBalance(db, adjustment)
+	require.NoError(t, err)
+	require.Nil(t, grant.ExpiresAt)
+	require.Equal(t, models.CentsToMicros(50), describeCredit(t, db, r.Organization.ID).IncludedRemainingMicros)
+	plan, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.False(t, plan.AllowsCreditPurchase())
+	require.NoError(t, models.ExpireOpenIncludedGrants(db, r.Organization.ID))
+	require.Zero(t, describeCredit(t, db, r.Organization.ID).IncludedRemainingMicros)
 }

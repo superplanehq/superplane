@@ -1,4 +1,5 @@
 import type {
+  OrganizationsDescribeOrganizationBillingResponse,
   FactoriesDescribeFactoryVelocityResponse,
   FactoriesFactory,
   FactoriesFactoryIntake,
@@ -345,24 +346,7 @@ export interface FactoriesFixture {
     expiresAt?: string;
   }>;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
-  organizationBilling?: {
-    plan?: string;
-    planSource?: string;
-    polarSubscriptionStatus?: string;
-    trialEndsAt?: string;
-    currentPeriodStart?: string;
-    currentPeriodEnd?: string;
-    remainingCreditCents?: string;
-    includedRemainingCents?: string;
-    purchasedRemainingCents?: string;
-    welcomeRemainingCents?: string;
-    adminRemainingCents?: string;
-    billingEnabled?: boolean;
-    subscriptionCheckoutEnabled?: boolean;
-    creditPurchaseAllowed?: boolean;
-    hasBillingCustomer?: boolean;
-    cancelAtPeriodEnd?: boolean;
-  };
+  organizationBilling?: OrganizationsDescribeOrganizationBillingResponse;
   /** Count of POST /billing/sync calls in this fixture session. */
   billingSyncCalls?: number;
   /** Plan returned from Polar sync; applied to organizationBilling after the first sync. */

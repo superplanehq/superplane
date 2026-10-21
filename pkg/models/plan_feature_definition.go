@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -12,6 +13,21 @@ type PlanFeatureDefinition struct {
 	Key   string `json:"key" gorm:"primaryKey"`
 	Label string `json:"label"`
 	Gated bool   `json:"gated"`
+}
+
+// FeatureOrganization lists saved access sources without resolving billing state.
+type FeatureOrganization struct {
+	ID           uuid.UUID                `json:"id"`
+	Name         string                   `json:"name"`
+	Slug         string                   `json:"slug"`
+	EnabledGrant bool                     `json:"enabled_grant"`
+	Plan         *FeatureOrganizationPlan `json:"plan" gorm:"embedded;embeddedPrefix:plan_"`
+}
+
+type FeatureOrganizationPlan struct {
+	ID   uuid.UUID `json:"id"`
+	Key  string    `json:"key"`
+	Name string    `json:"name"`
 }
 
 func ListPlanFeatureDefinitions(tx *gorm.DB) ([]PlanFeatureDefinition, error) {
@@ -46,6 +62,26 @@ func UpdatePlanFeatureDefinition(tx *gorm.DB, feature *PlanFeatureDefinition) er
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func ListFeatureOrganizations(tx *gorm.DB, featureKey, search string, limit, offset int) ([]FeatureOrganization, int64, error) {
+	var feature PlanFeatureDefinition
+	if err := tx.Where("key = ?", featureKey).First(&feature).Error; err != nil {
+		return nil, 0, err
+	}
+	query := organizationsMatchingSearch(tx, search).
+		Joins("LEFT JOIN organization_feature_grants AS grants ON grants.organization_id = organizations.id AND grants.feature_key = ? AND grants.enabled = true", featureKey).
+		Joins("LEFT JOIN organization_billing_plans AS assigned ON assigned.organization_id = organizations.id").
+		Joins("LEFT JOIN billing_plans AS plans ON plans.id = assigned.plan_id AND jsonb_exists(plans.features, ?)", featureKey).
+		Where("grants.organization_id IS NOT NULL OR plans.id IS NOT NULL")
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	items := []FeatureOrganization{}
+	err := query.Select("organizations.id, organizations.name, organizations.slug, (grants.organization_id IS NOT NULL) AS enabled_grant, plans.id AS plan_id, plans.key AS plan_key, plans.name AS plan_name").
+		Order("organizations.name, organizations.id").Limit(limit).Offset(offset).Scan(&items).Error
+	return items, total, err
 }
 
 func validatePlanFeatureDefinition(feature *PlanFeatureDefinition) error {
