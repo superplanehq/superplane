@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -75,4 +76,49 @@ func Test__LinearIntakeItemSource__SearchScope(t *testing.T) {
 			})
 		}
 	}
+}
+
+func Test__LinearIntakeItemSource__Search__ExcludedExactMatchesDoNotShrinkThePage(t *testing.T) {
+	const limit = 10
+	textNodes := make([]string, 0, limit)
+	wantIDs := make([]string, 0, limit)
+	for i := 0; i < limit; i++ {
+		id := fmt.Sprintf("text-%d", i)
+		wantIDs = append(wantIDs, id)
+		textNodes = append(textNodes, fmt.Sprintf(
+			`{"id":"%s","identifier":"ENG-%d","title":"note 1","project":{"id":"p1"},"labels":{"nodes":[{"name":"bug"}]}}`,
+			id, 200+i,
+		))
+	}
+	excluded := []string{
+		`{"id":"closed-exact","identifier":"ENG-1","title":"Closed","project":{"id":"p1"},"state":{"type":"completed"},"labels":{"nodes":[{"name":"bug"}]}}`,
+		`{"id":"other-project","identifier":"OPS-1","title":"Other project","project":{"id":"p2"},"labels":{"nodes":[{"name":"bug"}]}}`,
+		`{"id":"wrong-label","identifier":"SUP-1","title":"Wrong label","project":{"id":"p1"},"labels":{"nodes":[{"name":"chore"}]}}`,
+	}
+	response := func(body string) *http.Response {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}
+	}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		response(`{"data":{"issues":{"nodes":[` + strings.Join(textNodes, ",") + `]}}}`),
+		response(`{"data":{"projects":{"nodes":[{"id":"p1","teams":{"nodes":[{"key":"ENG"},{"key":"OPS"},{"key":"SUP"}]}}],"pageInfo":{"hasNextPage":false}}}}`),
+		response(`{"data":{"issues":{"nodes":[` + strings.Join(excluded, ",") + `]}}}`),
+	}}
+	client, err := linear.NewClient(httpContext, &contexts.IntegrationContext{CurrentSecrets: map[string]core.IntegrationSecret{
+		linear.OAuthAccessToken: {Name: linear.OAuthAccessToken, Value: []byte("token")},
+	}})
+	require.NoError(t, err)
+
+	items, err := (&linearIntakeItemSource{
+		linear:     client,
+		projectIDs: []string{"p1"},
+		labels:     []string{"bug"},
+	}).Search(context.Background(), "1", limit)
+	require.NoError(t, err)
+	require.Len(t, items, limit)
+	gotIDs := make([]string, 0, len(items))
+	for _, item := range items {
+		assert.Empty(t, item.DisabledReason)
+		gotIDs = append(gotIDs, item.ID)
+	}
+	assert.Equal(t, wantIDs, gotIDs)
 }

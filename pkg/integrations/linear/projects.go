@@ -212,6 +212,8 @@ func (c *Client) SearchOpenProjectIssues(projectIDs []string, query string, limi
 
 // SearchProjectIssues combines scoped title/description search with direct
 // identifier lookup. Exact matches come first, including issues outside scope.
+// Bare-number exact matches do not take a result slot. Callers drop the ones
+// that fail intake checks, and a short page hides further matches.
 func (c *Client) SearchProjectIssues(projectIDs []string, query string, limit int) ([]ProjectIssueSearchResult, error) {
 	ids := normalizeIDs(projectIDs)
 	if len(ids) == 0 {
@@ -240,8 +242,9 @@ func (c *Client) SearchProjectIssues(projectIDs []string, query string, limit in
 	if err != nil {
 		return nil, err
 	}
-	results := make([]ProjectIssueSearchResult, 0, limit)
+	exactMatches := make([]ProjectIssueSearchResult, 0, limit)
 	seen := map[string]bool{}
+	explicitIdentifier := !issueNumberPattern.MatchString(query)
 	if len(identifiers) > 0 {
 		exact := struct {
 			Issues connection[Issue] `json:"issues"`
@@ -253,25 +256,42 @@ func (c *Client) SearchProjectIssues(projectIDs []string, query string, limit in
 			if seen[issue.ID] {
 				continue
 			}
-			results = append(results, ProjectIssueSearchResult{
+			exactMatches = append(exactMatches, ProjectIssueSearchResult{
 				Issue:              issue,
 				ExactMatch:         true,
-				ExplicitIdentifier: !issueNumberPattern.MatchString(query),
+				ExplicitIdentifier: explicitIdentifier,
 			})
 			seen[issue.ID] = true
 		}
 	}
+	textMatches := make([]ProjectIssueSearchResult, 0, len(response.Issues.Nodes))
 	for _, issue := range response.Issues.Nodes {
 		if seen[issue.ID] {
 			continue
 		}
-		results = append(results, ProjectIssueSearchResult{Issue: issue})
+		textMatches = append(textMatches, ProjectIssueSearchResult{Issue: issue})
 		seen[issue.ID] = true
 	}
-	if len(results) > limit {
-		results = results[:limit]
+	return mergeProjectIssueSearchResults(exactMatches, textMatches, limit), nil
+}
+
+// Explicit identifier matches occupy result slots. Bare-number exact matches
+// stay in the list without replacing title or description matches.
+func mergeProjectIssueSearchResults(exactMatches, textMatches []ProjectIssueSearchResult, limit int) []ProjectIssueSearchResult {
+	occupied := 0
+	for _, result := range exactMatches {
+		if result.ExplicitIdentifier {
+			occupied++
+		}
 	}
-	return results, nil
+	textRoom := limit - occupied
+	if textRoom < 0 {
+		textRoom = 0
+	}
+	if len(textMatches) > textRoom {
+		textMatches = textMatches[:textRoom]
+	}
+	return append(exactMatches, textMatches...)
 }
 
 // Linear's ID comparator accepts human-readable identifiers as well as UUIDs.

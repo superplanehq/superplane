@@ -49,6 +49,9 @@ func (s *linearIntakeItemSource) Search(_ context.Context, query string, limit i
 		item := linearIssueItem(result.Issue)
 		item.DisabledReason = reason
 		items = append(items, item)
+		if limit > 0 && len(items) >= limit {
+			return items, nil
+		}
 	}
 	return items, nil
 }
