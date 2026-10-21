@@ -183,6 +183,7 @@ func TestSetupOwnerStatusRequired(t *testing.T) {
 
 func TestSetupOwnerStatusReportsBeacon(t *testing.T) {
 	t.Setenv("SUPERPLANE_BEACON_ENABLED", "yes")
+	t.Setenv("SUPERPLANE_INSTALLATION_TYPE", "kubernetes")
 	server := setupOwnerTestServer(t)
 
 	status := getSetupOwnerStatus(t, server, "")

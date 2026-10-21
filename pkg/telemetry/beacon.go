@@ -55,7 +55,16 @@ func beaconSender() {
 }
 
 func BeaconEnabled() bool {
-	return os.Getenv(beaconEnabledEnv) == "yes"
+	if os.Getenv(beaconEnabledEnv) != "yes" {
+		return false
+	}
+
+	switch os.Getenv(installationTypeEnv) {
+	case "", "development", "demo":
+		return false
+	default:
+		return true
+	}
 }
 
 func installationVersion() string {

@@ -169,7 +169,7 @@ func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error
 	var metadata InstallationMetadata
 	err := tx.Where("id = ?", installationMetadataID).First(&metadata).Error
 	if err == nil {
-		return &metadata, nil
+		return installationMetadataWithID(tx, &metadata)
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
@@ -192,5 +192,30 @@ func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error
 		return nil, err
 	}
 
-	return &metadata, nil
+	return installationMetadataWithID(tx, &metadata)
+}
+
+func installationMetadataWithID(tx *gorm.DB, metadata *InstallationMetadata) (*InstallationMetadata, error) {
+	if validInstallationID(metadata.InstallationID) {
+		return metadata, nil
+	}
+
+	next := uuid.NewString()
+	result := tx.Model(&InstallationMetadata{}).
+		Where("id = ? AND installation_id = ?", installationMetadataID, metadata.InstallationID).
+		Update("installation_id", next)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	if err := tx.Where("id = ?", installationMetadataID).First(metadata).Error; err != nil {
+		return nil, err
+	}
+
+	return metadata, nil
+}
+
+func validInstallationID(value string) bool {
+	parsed, err := uuid.Parse(value)
+	return err == nil && parsed != uuid.Nil
 }

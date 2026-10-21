@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -18,9 +19,32 @@ func TestGetInstallationMetadata(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, metadata)
 	assert.Equal(t, installationMetadataID, metadata.ID)
-	assert.NotEmpty(t, metadata.InstallationID)
+	_, err = uuid.Parse(metadata.InstallationID)
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.Nil.String(), metadata.InstallationID)
 	assert.False(t, metadata.AllowPrivateNetworkAccess)
 	assert.True(t, metadata.SignupsEnabled)
+
+	again, err := GetInstallationID(database.Conn())
+	require.NoError(t, err)
+	assert.Equal(t, metadata.InstallationID, again)
+}
+
+func TestGetInstallationMetadataReplacesSharedInstallationID(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	require.NoError(t, database.Conn().Exec(
+		`INSERT INTO installation_metadata (id, installation_id) VALUES (1, '')`,
+	).Error)
+
+	first, err := GetInstallationID(database.Conn())
+	require.NoError(t, err)
+	_, err = uuid.Parse(first)
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.Nil.String(), first)
+
+	second, err := GetInstallationID(database.Conn())
+	require.NoError(t, err)
+	assert.Equal(t, first, second)
 }
 
 func TestUpdateInstallationMetadata(t *testing.T) {

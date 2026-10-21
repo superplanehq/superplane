@@ -14,6 +14,31 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestBeaconEnabledForRealInstallations(t *testing.T) {
+	tests := []struct {
+		name    string
+		enabled string
+		kind    string
+		wantOn  bool
+	}{
+		{name: "kubernetes", enabled: "yes", kind: "kubernetes", wantOn: true},
+		{name: "single host", enabled: "yes", kind: "single-host", wantOn: true},
+		{name: "custom install", enabled: "yes", kind: "on-prem", wantOn: true},
+		{name: "development", enabled: "yes", kind: "development", wantOn: false},
+		{name: "demo", enabled: "yes", kind: "demo", wantOn: false},
+		{name: "missing type", enabled: "yes", kind: "", wantOn: false},
+		{name: "flag off", enabled: "no", kind: "kubernetes", wantOn: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(beaconEnabledEnv, test.enabled)
+			t.Setenv(installationTypeEnv, test.kind)
+			assert.Equal(t, test.wantOn, BeaconEnabled())
+		})
+	}
+}
+
 func TestBuildBeaconPayload(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
@@ -77,7 +102,11 @@ func TestBuildBeaconPayload(t *testing.T) {
 	payload, err := buildBeaconPayload(db, "kubernetes", since)
 	require.NoError(t, err)
 	assert.Equal(t, "kubernetes", payload.InstallationType)
-	assert.NotEmpty(t, payload.InstallationID)
+	_, err = uuid.Parse(payload.InstallationID)
+	require.NoError(t, err)
+	again, err := buildBeaconPayload(db, "kubernetes", since)
+	require.NoError(t, err)
+	assert.Equal(t, payload.InstallationID, again.InstallationID)
 	assert.False(t, payload.InstalledAt.IsZero())
 	assert.Equal(t, developmentVersion, payload.Version)
 	assert.Equal(t, int64(4), payload.TasksCreated7d)
