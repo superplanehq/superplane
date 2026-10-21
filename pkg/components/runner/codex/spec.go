@@ -32,7 +32,7 @@ func decodeRunCodexSpec(raw any) (RunCodexSpec, error) {
 	if spec.ExecutionTimeoutSeconds <= 0 {
 		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
 	}
-	if thinking, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel); err == nil {
+	if thinking, err := runner.NormalizeCodexThinkingLevel(spec.ThinkingLevel); err == nil {
 		spec.ThinkingLevel = thinking
 	}
 	return spec, nil
@@ -62,7 +62,7 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
 	}
-	_, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel)
+	_, err := runner.NormalizeCodexThinkingLevel(spec.ThinkingLevel)
 	return err
 }
 
@@ -111,6 +111,11 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 			Command: `node "$SUPERPLANE_TASK_DIR/codex_subscription.js" restore`,
 			Kind:    runner.LiveLogKindSetup,
 		}}, commands[1:]...)
+		commands = append(commands, runner.BrokerCommand{
+			Name:    "Save ChatGPT usage",
+			Command: `node "$SUPERPLANE_TASK_DIR/codex_subscription.js" usage`,
+			Kind:    runner.LiveLogKindSetup,
+		})
 	}
 	return CodexBrokerTask{Commands: commands, Files: files}
 }
@@ -138,6 +143,11 @@ func applyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvi
 	}
 	task.Files = runner.AppendAttachmentSetupFiles(runner.AppendAttachmentLimitFile(append(task.Files, runner.FollowUpLoopFile())))
 	followUp := planningFollowUpCommand(spec)
+	if len(task.Commands) > 0 && task.Commands[len(task.Commands)-1].Name == "Save ChatGPT usage" {
+		last := task.Commands[len(task.Commands)-1]
+		task.Commands = append(append(task.Commands[:len(task.Commands)-1], followUp), last)
+		return task
+	}
 	task.Commands = append(task.Commands, followUp)
 	return task
 }

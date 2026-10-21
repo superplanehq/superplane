@@ -21,6 +21,7 @@ import {
 import { ModelSourceBody } from "./llmModelSourceBody";
 import { byokProviderProductName, ORGANIZATION_LLM_MODELS_COPY as COPY } from "./organizationLLMModelsCopy";
 import { workspaceModelSource } from "./workspaceModelSource";
+import { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
 
 type BYOKQuery = ReturnType<typeof useBYOKLLMModels>;
 
@@ -50,17 +51,21 @@ export function FactorySettingsOrganizationLLMModelsPage() {
   });
   const byokLoading = providers.some((provider) => byokQueries[provider].isLoading);
 
+  const subscription = useCodexSubscriptionCatalog(
+    organizationId,
+    factoryId,
+    factory.onboarding?.codexSubscription === true,
+  );
+
   const source = workspaceModelSource(factory.onboarding?.agentHarness, connected.length > 0);
-  const currentProvider = resolveCurrentProvider(factory.onboarding, connected, byokQueries);
+  const currentProvider = subscription.connected
+    ? null
+    : resolveCurrentProvider(factory.onboarding, connected, byokQueries);
   const [dialog, setDialog] = useState<LLMModelsSwitchDialog>(null);
   const [switchedNotice, setSwitchedNotice] = useState<string | null>(null);
   const switchSource = useSwitchFactoryModelSource(organizationId, factoryId);
 
   usePageTitle([COPY.pageTitle, "Settings", factory.name ?? "Workspace"]);
-
-  const choose = (target: LLMModelsSwitchTarget) => {
-    setDialog({ target, step: "warn" });
-  };
 
   const saveSwitch = async (
     target: LLMModelsSwitchTarget,
@@ -94,7 +99,7 @@ export function FactorySettingsOrganizationLLMModelsPage() {
           data-testid="llm-models-list"
           action={
             <Badge variant="outline" data-testid="llm-models-source-badge">
-              {source === "hosted" ? COPY.hostedBadge : COPY.ownKeyBadge}
+              {modelSourceBadge(source, subscription.connected)}
             </Badge>
           }
         >
@@ -108,7 +113,9 @@ export function FactorySettingsOrganizationLLMModelsPage() {
             byokLoading={byokLoading}
             canUpdate={canUpdate}
             integrationsHref={integrationsHref}
-            onChoose={choose}
+            subscriptionModels={subscription.connected ? subscription.models : undefined}
+            subscriptionLoading={subscription.loading}
+            onChoose={(target) => setDialog({ target, step: "warn" })}
           />
         </FactorySettingsCard>
       </div>
@@ -145,6 +152,22 @@ export function FactorySettingsOrganizationLLMModelsPage() {
       />
     </FactorySettingsPageFrame>
   );
+}
+
+function useCodexSubscriptionCatalog(organizationId: string, factoryId: string, selected: boolean) {
+  const codex = useFactoryCodexConnection(organizationId, factoryId, true);
+  const connection = codex.query.data;
+  const connected = selected && connection?.status === "ready";
+  const models = connection?.availableModels ?? [];
+  const loading =
+    connected && models.length === 0 && (connection?.reservationHeld === true || codex.refreshCatalog.isPending);
+
+  return { connected, models, loading };
+}
+
+function modelSourceBadge(source: "hosted" | "own-key", usesCodexSubscription: boolean): string {
+  if (source === "hosted") return COPY.hostedBadge;
+  return usesCodexSubscription ? COPY.subscriptionBadge : COPY.ownKeyBadge;
 }
 
 function resolveCurrentProvider(

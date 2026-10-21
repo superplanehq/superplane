@@ -43,8 +43,19 @@ import {
 import { BillingProductSettingsRoute } from "@/pages/factories/pages/settings/BillingProductSettingsRoute";
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
 import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
+import { FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCodexUsagePage";
+import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 
 export const factorySettingsSectionRoutes = [
+  <Route
+    key="factory-settings-account-codex-usage"
+    path="account/codex-usage"
+    element={
+      <RequireExperimentalFeature featureId={FEATURE_CODEX_SUBSCRIPTIONS}>
+        <FactorySettingsAccountCodexUsagePage />
+      </RequireExperimentalFeature>
+    }
+  />,
   <Route key="factory-settings-index" index element={<FactorySettingsIndexRoute />} />,
   <Route
     key="factory-settings-account-general"
