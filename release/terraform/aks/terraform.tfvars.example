@@ -14,10 +14,10 @@ letsencrypt_email = "admin@example.com"
 # SuperPlane
 # -----------------------------------------------------------------------------
 
-# Empty image tag uses the chart appVersion (for example v1.0.0-rc1).
+# Empty image tag uses the chart appVersion (for example v1.0.0-rc3).
 # superplane_image_tag = ""
 # image_registry = "ghcr.io/superplanehq"
-# superplane_chart_version = "1.0.0-rc1"
+# superplane_chart_version = "1.0.0-rc3"
 # cert_manager_chart_version  = "v1.21.2"
 # ingress_nginx_chart_version = "4.15.1"
 #
