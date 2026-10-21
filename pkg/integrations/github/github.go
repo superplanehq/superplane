@@ -105,7 +105,8 @@ func (g *GitHub) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Description: "GitHub hostname. Empty means public GitHub.",
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "__never__", Values: []string{"shown"}},
+				// Sentinel field name. The generic form has no "never" value, so this stays hidden.
+				{Field: "never", Values: []string{"shown"}},
 			},
 		},
 	}
