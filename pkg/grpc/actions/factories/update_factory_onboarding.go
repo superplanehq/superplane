@@ -133,7 +133,7 @@ func ensureOnboardingDiscussionHandler(
 				return nil
 			}
 		}
-		_, err = CreateFactoryPRFeedbackHandler(ctx, deps, organizationID, &pb.CreateFactoryPRFeedbackHandlerRequest{
+		_, err = createFactoryPRFeedbackHandler(ctx, deps, organizationID, tx, &pb.CreateFactoryPRFeedbackHandlerRequest{
 			FactoryId: factory.ID.String(),
 			Settings: &pb.FactoryPRFeedbackHandler_Settings{
 				Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{

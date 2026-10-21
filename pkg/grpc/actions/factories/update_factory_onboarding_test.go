@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -377,6 +378,33 @@ func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Zero(t, discussionHandlerCount(t, db, factory.ID))
+	})
+
+	t.Run("completion does not request another connection", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+		appID, lineID := createOnboardingResources(t, r, factory)
+		req := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
+		complete := true
+		req.Complete = &complete
+
+		sqlDB, err := database.Conn().DB()
+		require.NoError(t, err)
+		previousOpen := sqlDB.Stats().MaxOpenConnections
+		sqlDB.SetMaxOpenConns(1)
+		sqlDB.SetMaxIdleConns(1)
+		t.Cleanup(func() {
+			sqlDB.SetMaxOpenConns(previousOpen)
+			sqlDB.SetMaxIdleConns(previousOpen)
+		})
+
+		ctx, cancel := context.WithTimeout(onboardingContext(r), 15*time.Second)
+		defer cancel()
+		_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		assertDiscussionHandler(t, db, factory, "github", 1)
 	})
 }
 
