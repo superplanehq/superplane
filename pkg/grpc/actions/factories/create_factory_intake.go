@@ -118,6 +118,9 @@ func CreateFactoryIntake(
 	case models.FactoryIntakeSourceLinearIssues:
 		settings = defaultLinearIntakeSettings()
 	}
+	if err := validateIntakeDefaultOwner(db, orgID, source, req.GetSettings()); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
 	settings = parseIntakeSettings(settings, req.GetSettings())
 	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {
 		settings.ConfidencePct = DefaultIntakeConfidencePct

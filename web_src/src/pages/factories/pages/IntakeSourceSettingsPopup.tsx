@@ -17,6 +17,7 @@ import {
 import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
 import { DatadogIntakeFilterFields } from "./DatadogIntakeFilterFields";
 import { LinearIntakeFilterFields } from "./LinearIntakeFilterFields";
+import { IntakeDefaultOwnerField } from "./IntakeDefaultOwnerField";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
@@ -368,6 +369,14 @@ function IntakeGeneralTab({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
           {sourceId === "dependabot-alerts" && repository ? <NodeConfigRepositoryLine value={repository} /> : null}
+          {sourceId === "github-issues" && organizationId ? (
+            <IntakeDefaultOwnerField
+              organizationId={organizationId}
+              value={draft.defaultOwnerId}
+              disabled={savePending}
+              onChange={(defaultOwnerId) => onDraftChange((current) => ({ ...current, defaultOwnerId }))}
+            />
+          ) : null}
           <GitHubIntakeFilterFields
             sourceId={sourceId}
             settings={draft}

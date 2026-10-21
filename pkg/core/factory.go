@@ -60,8 +60,9 @@ type FactoryContext interface {
 }
 
 type WorkOrderParams struct {
-	Title       string
-	Description string
+	DefaultOwnerID string
+	Title          string
+	Description    string
 }
 
 // FindWorkOrderParams configures FactoryContext.FindWorkOrder. By selects
