@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   githubApiOrigin,
+  githubHostFromHint,
   githubHostFromIntegration,
   githubProfileUrl,
   githubRepoWebUrl,
@@ -49,6 +50,12 @@ describe("github web URLs", () => {
     expect(githubRepoWebUrl("acme/api")).toBe("https://github.com/acme/api");
     expect(githubProfileUrl("alex")).toBe("https://github.com/alex");
     expect(githubWebHostFromUrl("https://github.com/acme/api/pull/12")).toBe("");
+    expect(
+      githubHostFromHint({
+        html_url: "https://github.com/acme/app",
+        url: "https://api.github.com/repos/acme/app",
+      }),
+    ).toBe("");
   });
 
   it("uses the tenant host", () => {
@@ -57,6 +64,9 @@ describe("github web URLs", () => {
     expect(githubRepoWebUrl("acme/api", "acme.ghe.com")).toBe("https://acme.ghe.com/acme/api");
     expect(githubProfileUrl("alex", "acme.ghe.com")).toBe("https://acme.ghe.com/alex");
     expect(githubWebHostFromUrl("https://acme.ghe.com/acme/api/pull/12")).toBe("acme.ghe.com");
+    expect(githubHostFromHint("https://acme.ghe.com/acme/app")).toBe("acme.ghe.com");
+    expect(githubHostFromHint({ html_url: "https://acme.ghe.com/acme/app" })).toBe("acme.ghe.com");
+    expect(githubHostFromHint("github.com")).toBe("");
   });
 });
 
