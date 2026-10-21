@@ -278,7 +278,7 @@ describe("PRFeedbackSettingsPopup discussion", () => {
     expect(screen.queryByTestId("pr-feedback-mention")).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Start from any human comment/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).not.toBeChecked();
-    expect(screen.getByRole("radio", { name: /Address bot comments/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Choose bots/ })).toBeChecked();
     expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "true");
   });
 
@@ -287,11 +287,11 @@ describe("PRFeedbackSettingsPopup discussion", () => {
     const { onSave } = renderChecksPopup(vi.fn(), discussionDraft(), "org-1", "gh-1");
 
     expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).toBeChecked();
-    expect(screen.getByRole("radio", { name: /Ignore bot comments/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Ignore bots/ })).toBeChecked();
     expect(screen.queryByTestId("discussion-setup-bots-list")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: /Start from any human comment/ }));
-    await user.click(screen.getByRole("radio", { name: /Address bot comments/ }));
+    await user.click(screen.getByRole("radio", { name: /Choose bots/ }));
     expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "false");
     await user.click(screen.getByTestId("discussion-setup-bot-coderabbitai"));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
@@ -308,7 +308,7 @@ describe("PRFeedbackSettingsPopup discussion", () => {
   it("shows a bot name field for Bitbucket instead of an empty catalog", async () => {
     const user = userEvent.setup();
     renderChecksPopup(vi.fn(), discussionDraft(), "org-1", "gh-1", "bitbucket");
-    await user.click(screen.getByRole("radio", { name: /Address bot comments/ }));
+    await user.click(screen.getByRole("radio", { name: /Choose bots/ }));
     expect(screen.queryByTestId("discussion-setup-bots-empty")).not.toBeInTheDocument();
     expect(screen.queryByTestId("discussion-setup-bots-picker")).not.toBeInTheDocument();
     expect(screen.queryByTestId("discussion-setup-bot-coderabbitai")).not.toBeInTheDocument();

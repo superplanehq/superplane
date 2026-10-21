@@ -201,12 +201,9 @@ export function PRFeedbackDiscussionFields({
       </section>
 
       <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
-            {PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
-          </h3>
-          <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsIntro}</p>
-        </div>
+        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
+          {PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
+        </h3>
         <div
           className="flex flex-col gap-2"
           role="radiogroup"
@@ -255,12 +252,20 @@ function DiscussionBotChoices({
 }) {
   return (
     <>
+      {showAddressAllBots ? (
+        <IntakeSettingsRadioOption
+          name="pr-feedback-bot-mode"
+          value="all"
+          checked={botMode === "all"}
+          title={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsLabel}
+          onChange={() => onChange("all")}
+        />
+      ) : null}
       <IntakeSettingsRadioOption
         name="pr-feedback-bot-mode"
         value="ignore"
         checked={botMode === "ignore"}
         title={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreOption}
-        helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreHelper}
         onChange={() => onChange("ignore")}
       />
       <IntakeSettingsRadioOption
@@ -268,19 +273,8 @@ function DiscussionBotChoices({
         value="address"
         checked={botMode === "address"}
         title={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressOption}
-        helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressHelper}
         onChange={() => onChange("address")}
       />
-      {showAddressAllBots ? (
-        <IntakeSettingsRadioOption
-          name="pr-feedback-bot-mode"
-          value="all"
-          checked={botMode === "all"}
-          title={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsLabel}
-          helper={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsHelper}
-          onChange={() => onChange("all")}
-        />
-      ) : null}
     </>
   );
 }

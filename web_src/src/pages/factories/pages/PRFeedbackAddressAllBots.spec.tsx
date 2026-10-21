@@ -76,10 +76,9 @@ describe("PR feedback all-bot comments", () => {
     const user = userEvent.setup();
     const { onSave } = renderSettings();
 
-    expect(screen.getByRole("radio", { name: /Address all bot comments/ })).toBeChecked();
-    expect(screen.getByText("SuperPlane comments do not start a run.")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "All bots" })).toBeChecked();
 
-    await user.click(screen.getByRole("radio", { name: /Ignore bot comments/ }));
+    await user.click(screen.getByRole("radio", { name: "Ignore bots" }));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ addressAllBots: false, allowedBots: [] }));
@@ -89,7 +88,7 @@ describe("PR feedback all-bot comments", () => {
     const user = userEvent.setup();
     const { onSave } = renderSettings();
 
-    await user.click(screen.getByRole("radio", { name: /^Address bot comments/ }));
+    await user.click(screen.getByRole("radio", { name: "Choose bots" }));
     await user.click(screen.getByTestId("discussion-setup-bot-coderabbitai"));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
 
