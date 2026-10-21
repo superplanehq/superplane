@@ -121,6 +121,7 @@ type SubscriptionWebhookEvent struct {
 }
 
 type SubscriptionData struct {
+	ProductID          string        `json:"product_id"`
 	ID                 string        `json:"id"`
 	Status             string        `json:"status"`
 	CancelAtPeriodEnd  bool          `json:"cancel_at_period_end"`

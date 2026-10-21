@@ -21,6 +21,7 @@ import (
 
 func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	t.Setenv(models.BillingEnabledEnv, "no")
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
@@ -45,6 +46,7 @@ func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 
 func Test__SyncOrganizationBilling(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 
 	t.Run("invalid organization id", func(t *testing.T) {
 		_, err := SyncOrganizationBilling(context.Background(), "not-a-uuid", &pb.SyncOrganizationBillingRequest{})
@@ -71,6 +73,7 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 				"items": []map[string]any{
 					{
 						"id":                   "sub_grpc_sync",
+						"product_id":           "prod_business",
 						"status":               "active",
 						"current_period_start": periodStart.Format(time.RFC3339),
 						"current_period_end":   periodEnd.Format(time.RFC3339),
@@ -114,6 +117,7 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 
 func Test__DescribeOrganizationBillingLapsesExpiredTrial(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	ended := time.Now().Add(-time.Hour)
 	require.NoError(t, database.Conn().Model(&models.OrganizationBillingPlan{}).
 		Where("organization_id = ?", r.Organization.ID).
@@ -134,10 +138,11 @@ func Test__DescribeOrganizationBillingLapsesExpiredTrial(t *testing.T) {
 
 func Test__CancelOrganizationSubscription(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	db := database.Conn()
 	periodStart := time.Now().UTC().Truncate(time.Second)
 	periodEnd := periodStart.AddDate(0, 1, 0)
-	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 		ID:          "sub_grpc_cancel",
 		Status:      models.PolarSubscriptionStatusActive,
 		PeriodStart: &periodStart,
@@ -166,6 +171,7 @@ func Test__CancelOrganizationSubscription(t *testing.T) {
 			assert.Equal(t, "/subscriptions/sub_grpc_cancel", req.URL.Path)
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"id":                   "sub_grpc_cancel",
+				"product_id":           "prod_business",
 				"status":               "active",
 				"cancel_at_period_end": true,
 				"current_period_start": periodStart.Format(time.RFC3339),
@@ -190,10 +196,11 @@ func Test__CancelOrganizationSubscription(t *testing.T) {
 
 func Test__ResumeOrganizationSubscription(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	db := database.Conn()
 	periodStart := time.Now().UTC().Truncate(time.Second)
 	periodEnd := periodStart.AddDate(0, 1, 0)
-	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 		ID:                "sub_grpc_resume",
 		Status:            models.PolarSubscriptionStatusActive,
 		PeriodStart:       &periodStart,
@@ -208,6 +215,7 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 			assert.Equal(t, "/subscriptions/sub_grpc_resume", req.URL.Path)
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"id":                   "sub_grpc_resume",
+				"product_id":           "prod_business",
 				"status":               "active",
 				"cancel_at_period_end": false,
 				"current_period_start": periodStart.Format(time.RFC3339),
