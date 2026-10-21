@@ -229,7 +229,7 @@ it("locks legacy Business pricing and usage limits in the editor", async () => {
     </MemoryRouter>,
   );
   await user.click(await screen.findByRole("button", { name: "Edit Business" }));
-  expect(screen.getByLabelText("Price (cents)", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Price (USD)", { exact: true })).toBeDisabled();
   expect(screen.getByLabelText("Seat limit", { exact: true })).toBeDisabled();
   expect(screen.getByLabelText("Parallel task limit", { exact: true })).toBeDisabled();
 });
