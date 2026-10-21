@@ -68,6 +68,10 @@ export function OrganizationSettingsBillingPage() {
         isLoading={model.isLoading}
         packs={packs}
         plan={model.plan}
+        planCategory={model.planCategory}
+        planName={model.planName}
+        planPriceCents={model.planPriceCents}
+        planPerSeat={model.planPerSeat}
         planSource={model.planSource}
         cancelAtPeriodEnd={model.cancelAtPeriodEnd}
         subscriptionPending={model.cancelPending || model.keepPending}
@@ -106,6 +110,10 @@ type BillingPageBodyProps = {
   isLoading: boolean;
   packs: OrganizationsHostedCreditProduct[];
   plan?: string;
+  planCategory?: string;
+  planName?: string;
+  planPriceCents?: string;
+  planPerSeat?: boolean;
   planSource?: string;
   cancelAtPeriodEnd: boolean;
   subscriptionPending: boolean;
@@ -141,6 +149,10 @@ function BillingPageBody({
   isLoading,
   packs,
   plan,
+  planCategory,
+  planName,
+  planPriceCents,
+  planPerSeat,
   planSource,
   cancelAtPeriodEnd,
   subscriptionPending,
@@ -181,6 +193,9 @@ function BillingPageBody({
   return (
     <>
       <BillingPlansSection
+        planName={planName}
+        planPriceCents={planPriceCents}
+        planPerSeat={planPerSeat}
         canManageBilling={canManageBilling}
         creditPurchaseAllowed={creditPurchaseAllowed}
         planSource={planSource}
@@ -203,6 +218,8 @@ function BillingPageBody({
         includedRemaining={includedRemaining}
         packs={packs}
         plan={plan}
+        planName={planName}
+        planCategory={planCategory}
         purchased={purchased}
         purchasedRemaining={purchasedRemaining}
         remaining={remaining}
@@ -233,6 +250,8 @@ type HostedCreditRemainingCardProps = {
   includedRemaining: number;
   packs: OrganizationsHostedCreditProduct[];
   plan?: string;
+  planName?: string;
+  planCategory?: string;
   purchased: number;
   purchasedRemaining: number;
   remaining: number;
@@ -256,6 +275,8 @@ function HostedCreditRemainingCard({
   includedRemaining,
   packs,
   plan,
+  planName,
+  planCategory,
   purchased,
   purchasedRemaining,
   remaining,
@@ -273,6 +294,7 @@ function HostedCreditRemainingCard({
     billingEnabled,
     welcomeCreditExpiresAt,
     plan,
+    planCategory,
     trialEndsAt,
     creditPurchaseAllowed,
   });
@@ -284,6 +306,8 @@ function HostedCreditRemainingCard({
     adminRemainingCents: adminRemaining,
     adminGrantCents: adminCreditGrantCents(grants),
     plan,
+    planName,
+    planCategory,
     trialEndsAt,
     welcomeCreditExpiresAt,
     currentPeriodEnd,
