@@ -35,3 +35,19 @@ export { posthog };
 export function isPostHogEnabled(win: PostHogWindow = posthogWindow()): boolean {
   return !!win.SUPERPLANE_POSTHOG_KEY;
 }
+
+export function identifyOrganizationGroup(organization: { id: string; name: string; slug?: string }): void {
+  const id = organization.id.trim();
+  const name = organization.name.trim();
+  if (!id || !name) {
+    return;
+  }
+
+  const properties: { name: string; slug?: string } = { name };
+  const slug = organization.slug?.trim();
+  if (slug) {
+    properties.slug = slug;
+  }
+
+  posthog.group("organization", id, properties);
+}

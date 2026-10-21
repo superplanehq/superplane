@@ -9,12 +9,17 @@ import { organizationKeys } from "@/hooks/useOrganizationData";
 
 import { OrganizationScope } from "./App";
 
-const { organizationsDescribeOrganization } = vi.hoisted(() => ({
+const { organizationsDescribeOrganization, identifyOrganizationGroup } = vi.hoisted(() => ({
   organizationsDescribeOrganization: vi.fn(),
+  identifyOrganizationGroup: vi.fn(),
 }));
 
 vi.mock("@/api-client/sdk.gen", () => ({
   organizationsDescribeOrganization,
+}));
+
+vi.mock("@/posthog", () => ({
+  identifyOrganizationGroup,
 }));
 
 const accountContextValue: AccountContextType = {
@@ -94,6 +99,7 @@ describe("OrganizationScope", () => {
   beforeEach(() => {
     childRenderCount = 0;
     organizationsDescribeOrganization.mockReset();
+    identifyOrganizationGroup.mockReset();
     hangOrganizationRequest();
   });
 
@@ -167,6 +173,19 @@ describe("OrganizationScope", () => {
     } as OrganizationsOrganization);
 
     expect(screen.getByText("Org home: org-uid-123")).toBeInTheDocument();
+  });
+
+  it("identifies a resolved organization with its id, not the URL slug", () => {
+    renderScope("/acme", {
+      metadata: { id: "org-uid-123", name: "Acme", slug: "acme" },
+    } as OrganizationsOrganization);
+
+    expect(identifyOrganizationGroup).toHaveBeenCalledWith({
+      id: "org-uid-123",
+      name: "Acme",
+      slug: "acme",
+    });
+    expect(identifyOrganizationGroup).not.toHaveBeenCalledWith(expect.objectContaining({ id: "acme" }));
   });
 
   it("redirects reserved segments home instead of treating them as an organization", () => {
