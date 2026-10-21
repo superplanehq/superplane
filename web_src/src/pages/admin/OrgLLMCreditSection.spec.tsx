@@ -103,17 +103,21 @@ function mockOrgCreditFetch(
     catalogStatus?: number;
   } = {},
 ) {
-  const { catalogStatus = 200 } = options;
+  const {
+    catalogStatus = 200,
+    onPutBalance = () => jsonResponse(options.creditData ?? credit),
+    onGetGrants = () => jsonResponse({ grants }),
+  } = options;
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith("/feature-definitions")) return jsonResponse([]);
     if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
     if (url.endsWith("/llm-credit/balances") && init?.method === "PUT") {
       const body = JSON.parse(String(init.body));
-      return options.onPutBalance ? options.onPutBalance(body) : jsonResponse(options.creditData ?? credit);
+      return onPutBalance(body);
     }
     if (url.endsWith("/llm-credit/grants")) {
-      return options.onGetGrants ? options.onGetGrants() : jsonResponse({ grants });
+      return onGetGrants();
     }
     if (url.endsWith("/llm-credit")) {
       return jsonResponse(options.creditData ?? credit);
@@ -216,37 +220,7 @@ describe("OrgLLMCreditSection billing plan", () => {
   it("shows the trial end and date field only for Trial", async () => {
     const trialDate = futureUtcDate(40);
     const trialEndsAt = `${trialDate}T23:59:59Z`;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
-        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
-        if (url.endsWith("/billing-plans"))
-          return jsonResponse([
-            { key: "trial", name: "Trial" },
-            { key: "business_legacy", name: "Business" },
-            { key: "business_manual", name: "Business Manual" },
-            { key: "none", name: "None" },
-          ]);
-        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
-        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
-        if (url.includes("/llm-credit") && !url.includes("/grants")) {
-          return new Response(JSON.stringify(credit), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (url.endsWith("/billing-plans")) return jsonResponse(catalog);
-        if (url.includes("/billing-plan")) {
-          return new Response(JSON.stringify(billingPlan(false, trialEndsAt, "trial")), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        return new Response("not found", { status: 404 });
-      }),
-    );
+    mockOrgCreditFetch({ plan: billingPlan(false, trialEndsAt, "trial") });
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
 
@@ -264,37 +238,7 @@ describe("OrgLLMCreditSection billing plan", () => {
   });
 
   it("hides the trial end when Polar manages billing", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
-        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
-        if (url.endsWith("/billing-plans"))
-          return jsonResponse([
-            { key: "trial", name: "Trial" },
-            { key: "business_legacy", name: "Business" },
-            { key: "business_manual", name: "Business Manual" },
-            { key: "none", name: "None" },
-          ]);
-        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
-        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
-        if (url.includes("/llm-credit") && !url.includes("/grants")) {
-          return new Response(JSON.stringify(credit), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (url.endsWith("/billing-plans")) return jsonResponse(catalog);
-        if (url.includes("/billing-plan")) {
-          return new Response(JSON.stringify(billingPlan(true, "2026-12-20T23:59:59Z", "business")), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        return new Response("not found", { status: 404 });
-      }),
-    );
+    mockOrgCreditFetch({ plan: billingPlan(true, `${futureUtcDate(40)}T23:59:59Z`, "business") });
     render(<OrgLLMCreditSection orgId="org-1" />);
 
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeDisabled();
