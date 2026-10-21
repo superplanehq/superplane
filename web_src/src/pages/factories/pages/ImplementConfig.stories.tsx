@@ -85,12 +85,17 @@ function ImplementConfigPreview({
   page = true,
   draftPullRequests = false,
   executionTimeoutSeconds = 3600,
+  additionalInstructions = "",
+  failSave = false,
 }: {
   page?: boolean;
   draftPullRequests?: boolean;
   executionTimeoutSeconds?: number;
+  additionalInstructions?: string;
+  failSave?: boolean;
 }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  const [shouldFailSave, setShouldFailSave] = useState(failSave);
   const { credentials: _credentials, ...agentConfiguration } = PLANNING_REVIEW_DRAFT.components[0].configuration;
   const [specNodes, setSpecNodes] = useState<SuperplaneComponentsNode[]>(() => [
     { id: "onrun-implement", name: "Start implementation", type: "TYPE_TRIGGER", component: "onRun" },
@@ -99,7 +104,12 @@ function ImplementConfigPreview({
       name: "Implement From Task Description",
       type: "TYPE_ACTION",
       component: action.name,
-      configuration: { ...structuredClone(agentConfiguration), model: "", executionTimeoutSeconds },
+      configuration: {
+        ...structuredClone(agentConfiguration),
+        model: "",
+        executionTimeoutSeconds,
+        additionalInstructions,
+      },
       concurrency: { max: 5, key: "" },
     },
     {
@@ -146,6 +156,10 @@ function ImplementConfigPreview({
           onClose={() => console.log("Close Implement settings")}
           onDelete={() => console.log("Delete Implement automation")}
           onSaveNode={(update) => {
+            if (shouldFailSave) {
+              setShouldFailSave(false);
+              return Promise.reject(new Error("Could not save settings"));
+            }
             const updates = Array.isArray(update) ? update : [update];
             console.log("Save Implement settings", updates);
             setSpecNodes((nodes) =>
@@ -212,5 +226,21 @@ export const FeatureDisabled: Story = {
         ...handlers,
       ],
     },
+  },
+};
+export const WithInstructions: Story = {
+  args: {
+    additionalInstructions:
+      "Avoid new production dependencies unless the task requires them.\nFor API changes, include a request and response example in the pull request description.",
+  },
+};
+export const InstructionsSaveError: Story = {
+  args: { failSave: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const instructions = await canvas.findByRole("textbox", { name: "Additional instructions" });
+    await userEvent.type(instructions, "Use existing test helpers.");
+    await userEvent.click(canvas.getByTestId("implement-settings-save"));
+    await expect(canvas.getByRole("alert")).toBeVisible();
   },
 };
