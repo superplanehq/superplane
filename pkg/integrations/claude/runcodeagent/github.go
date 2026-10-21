@@ -33,7 +33,7 @@ func githubHostFromRepository(repository string) githubcommon.Host {
 }
 
 func githubHostFromSpec(spec Spec) githubcommon.Host {
-	if strings.TrimSpace(spec.PrURL) != "" {
+	if spec.SourceMode == sourceModePR {
 		return githubHostFromURL(spec.PrURL)
 	}
 	return githubHostFromRepository(spec.Repository)
