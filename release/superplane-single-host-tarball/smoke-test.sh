@@ -114,10 +114,11 @@ wait_for_health
 
 echo "Stopping the app process..."
 # docker kill is a manual stop, so the restart policy does not apply.
-# Kill pid 1 inside the container. Docker then applies restart: always.
+# PID 1 is the entrypoint shell, and a signal to that process does not stop it.
+# Kill the server. The entrypoint exits and Docker applies restart: always.
 app_id="$(docker compose ps -aq app)"
 restarts_before="$(docker inspect --format '{{.RestartCount}}' "${app_id}")"
-docker compose exec -T app bash -c 'kill -9 1' || true
+docker compose exec -T app bash -c 'pid=$(ps -o pid,args | awk "/\/app\/build\/superplane\$/ { print \$1; exit }"); test -n "$pid"; kill -9 "$pid"' || true
 restarted="no"
 for _ in $(seq 1 30); do
   restarts_after="$(docker inspect --format '{{.RestartCount}}' "${app_id}")"
@@ -140,8 +141,9 @@ if [[ "${env_mode}" != "600" ]]; then
 fi
 
 for port in 5672 15672; do
-  published="$(docker compose port rabbitmq "${port}" || true)"
-  if [[ -n "${published}" ]]; then
+  published="$(docker compose port rabbitmq "${port}" 2>/dev/null || true)"
+  # An unpublished port is empty or ":0". A host binding contains a non-zero port.
+  if [[ "${published}" =~ :[1-9] ]]; then
     echo "Error: RabbitMQ port ${port} is published on the host (${published})" >&2
     exit 1
   fi

@@ -20,10 +20,8 @@ Fleet Manager and the runner image are separate release artifacts:
 - `ghcr.io/superplanehq/fleet-manager:<version>-docker` includes the Docker CLI
 - `ghcr.io/superplanehq/runner:<version>` is the tool image for runner containers
 
-`.semaphore/prepare-superplane-release.yml` runs
-`release/superplane-single-host-tarball/smoke-test.sh` before it promotes the
-release. The smoke test installs the tarball with the release image and checks
-health, secret reuse, and restart.
+The release pipeline publishes the archive. It does not boot it. Boot the
+archive on a machine before you rely on a new release.
 
 To test the archive without starting containers:
 

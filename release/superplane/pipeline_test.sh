@@ -30,10 +30,7 @@ ruby -ryaml -e '
   %w[superplane-cli- install.sh].each do |asset|
     raise "SuperPlane assembly must not include #{asset}" if assemble.include?(asset)
   end
-  smoke = blocks.fetch("Smoke Test Single Host")
-  raise "smoke test must follow assembly" unless smoke.fetch("dependencies") == ["Assemble Release"]
-  smoke_commands = smoke.dig("task", "jobs", 0, "commands").join("\n")
-  raise "smoke test must run smoke-test.sh" unless smoke_commands.include?("release/superplane-single-host-tarball/smoke-test.sh")
+  raise "release prepare must not boot the single-host archive" if blocks.key?("Smoke Test Single Host")
 
   publish = YAML.safe_load(File.read(ARGV[1]))
   publish_blocks = publish.fetch("blocks").to_h { |block| [block.fetch("name"), block] }
