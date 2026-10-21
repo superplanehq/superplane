@@ -32,14 +32,93 @@ export function AgentRunnerSettings({
   factoryId,
   factoryKey,
   onSave,
+  draft,
+  onDraftChange,
   view = "step",
+  disabled = false,
 }: {
   node: SuperplaneComponentsNode;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
   onSave: SaveAgent;
+  draft?: PlanningReviewDraft;
+  onDraftChange?: (draft: PlanningReviewDraft) => void;
   view?: "step" | "implementation";
+  disabled?: boolean;
+}) {
+  if (view === "implementation") {
+    return (
+      <ImplementationAgentFields
+        node={node}
+        draft={draft}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        onDraftChange={onDraftChange}
+        disabled={disabled}
+      />
+    );
+  }
+  return (
+    <StepAgentRunnerSettings
+      node={node}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      onSave={onSave}
+      view={view}
+    />
+  );
+}
+
+function ImplementationAgentFields({
+  node,
+  draft,
+  organizationId,
+  factoryId,
+  factoryKey,
+  onDraftChange,
+  disabled = false,
+}: {
+  node: SuperplaneComponentsNode;
+  draft?: PlanningReviewDraft;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  onDraftChange?: (draft: PlanningReviewDraft) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <PlanningReviewForm
+      appearance="fields"
+      view="implementation"
+      showResources={false}
+      showConcurrency={showsImplementAgentControls(node)}
+      draft={draft ?? draftFromNode(node, "implementation")}
+      onChange={(next) => onDraftChange?.(next)}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      disabled={disabled}
+    />
+  );
+}
+
+function StepAgentRunnerSettings({
+  node,
+  organizationId,
+  factoryId,
+  factoryKey,
+  onSave,
+  view,
+}: {
+  node: SuperplaneComponentsNode;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  onSave: SaveAgent;
+  view: "step" | "implementation";
 }) {
   const initial = draftFromNode(node, view);
   const [draft, setDraft] = useState(initial);
