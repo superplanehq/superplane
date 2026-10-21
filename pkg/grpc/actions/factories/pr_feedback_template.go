@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
@@ -50,8 +51,9 @@ const (
 	prFeedbackReviewFlowY  = 360
 	prFeedbackReplyFlowY   = 640
 
-	prFeedbackAcknowledgeX       = 360
-	prFeedbackAcknowledgeOffsetY = 120
+	prFeedbackAcknowledgeX = 640
+	prFeedbackActivityX    = 920
+	prFeedbackRunnerX      = 1200
 
 	// A node with no concurrency spec runs one execution at a time across
 	// every pull request. Waiting for checks or addressing comments on one
@@ -332,17 +334,40 @@ type prFeedbackDiscussionFlowRequest struct {
 }
 
 type prFeedbackDiscussionFlowSpec struct {
-	triggerID string
-	nodes     []yaml.Node
-	edges     []yaml.Edge
+	findID string
+	nodes  []yaml.Node
+	edges  []yaml.Edge
 }
 
+// withAcknowledge reacts only after Find Pull Request emits found.
+// The reaction stays on that path, so the canvas remains one line.
+// A mention on a pull request that is not a factory task does not reach it.
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedbackDiscussionFlowSpec {
-	return flow.withAcknowledgeFrom(flow.triggerID, "default", node)
+	return flow.withAcknowledgeFrom(flow.findID, "found", node)
 }
 
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledgeFrom(sourceID, channel string, node yaml.Node) prFeedbackDiscussionFlowSpec {
 	flow.nodes = append(flow.nodes, node)
+	for i := range flow.edges {
+		if flow.edges[i].SourceID != sourceID || flow.edges[i].Channel != channel {
+			continue
+		}
+		nextID := flow.edges[i].TargetID
+		flow.edges[i].TargetID = node.ID
+		flow.edges = slices.Insert(flow.edges, i+1,
+			yaml.Edge{
+				Channel:  "default",
+				SourceID: node.ID,
+				TargetID: nextID,
+			},
+			yaml.Edge{
+				Channel:  "failed",
+				SourceID: node.ID,
+				TargetID: nextID,
+			},
+		)
+		return flow
+	}
 	flow.edges = append(flow.edges, yaml.Edge{
 		Channel:  channel,
 		SourceID: sourceID,
@@ -376,7 +401,7 @@ func prFeedbackAcknowledgeReactionNode(
 }
 
 func prFeedbackAcknowledgePosition(flowY int) yaml.Position {
-	return yaml.Position{X: prFeedbackAcknowledgeX, Y: flowY - prFeedbackAcknowledgeOffsetY}
+	return yaml.Position{X: prFeedbackAcknowledgeX, Y: flowY}
 }
 
 func prFeedbackDiscussionFlowNodes(
@@ -386,7 +411,7 @@ func prFeedbackDiscussionFlowNodes(
 	flow.Trigger = request.TriggerSettings[flow.Trigger.ID].configure(flow.Trigger)
 	flow.Trigger.Position = yaml.Position{X: 80, Y: flow.Y}
 	return prFeedbackDiscussionFlowSpec{
-		triggerID: flow.Trigger.ID,
+		findID: flow.FindID,
 		nodes: []yaml.Node{
 			flow.Trigger,
 			{
@@ -413,7 +438,7 @@ func prFeedbackDiscussionFlowNodes(
 					"description":   flow.Description,
 					"access":        "exclusive",
 				},
-				Position: yaml.Position{X: 640, Y: flow.Y},
+				Position: yaml.Position{X: prFeedbackActivityX, Y: flow.Y},
 			},
 			request.AgentSettings[flow.RunnerID].configure(yaml.Node{
 				ID:            flow.RunnerID,
@@ -421,7 +446,7 @@ func prFeedbackDiscussionFlowNodes(
 				Type:          yaml.NodeTypeAction,
 				Component:     request.Agent.component(),
 				Configuration: prFeedbackRunnerConfiguration(request),
-				Position:      yaml.Position{X: 920, Y: flow.Y},
+				Position:      yaml.Position{X: prFeedbackRunnerX, Y: flow.Y},
 			}),
 		},
 		edges: []yaml.Edge{

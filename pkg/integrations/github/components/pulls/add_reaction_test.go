@@ -84,7 +84,7 @@ func Test__AddReaction__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "invalid target")
 	})
 
-	t.Run("emits nothing when comment ID is blank", func(t *testing.T) {
+	t.Run("continues when comment ID is blank", func(t *testing.T) {
 		state := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
@@ -101,7 +101,7 @@ func Test__AddReaction__Execute(t *testing.T) {
 		assert.True(t, state.Passed)
 		assert.Equal(t, core.DefaultOutputChannel.Name, state.Channel)
 		assert.Equal(t, "github.reaction", state.Type)
-		assert.Empty(t, state.Payloads)
+		assert.Len(t, state.Payloads, 1)
 	})
 
 	t.Run("fails when comment ID is not a number", func(t *testing.T) {
@@ -154,6 +154,32 @@ func Test__AddReaction__Execute(t *testing.T) {
 		payload := state.Payloads[0].(map[string]any)
 		reaction := payload["data"].(*github.Reaction)
 		assert.Equal(t, "eyes", reaction.GetContent())
+	})
+
+	t.Run("emits the failed channel when GitHub rejects the reaction", func(t *testing.T) {
+		state := &contexts.ExecutionStateContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusUnprocessableEntity, `{"message":"Reaction does not exist"}`),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: state,
+			Configuration: map[string]any{
+				"target":     ReactionTargetIssueComment,
+				"commentId":  "42",
+				"content":    "eyes",
+				"repository": "hello",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, core.FailedOutputChannel, state.Channel)
+		assert.Equal(t, "github.reaction", state.Type)
+		require.Len(t, state.Payloads, 1)
 	})
 
 	t.Run("fails when configuration decode fails", func(t *testing.T) {
