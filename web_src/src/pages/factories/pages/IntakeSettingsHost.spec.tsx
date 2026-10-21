@@ -1,9 +1,10 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
   connectedJiraIntake,
+  GITHUB_INTAKE,
   DATADOG_INTAKE,
   DEPENDABOT_INTAKE,
   DEPENDABOT_INTAKE_CANVAS,
@@ -43,9 +44,53 @@ describe("IntakeSettingsHost", () => {
         .map((tab) => tab.textContent),
     ).toEqual(["General", "Automation"]);
     expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("intake-source-settings-automatic-intake")).toBeChecked();
     expect(within(dialog).getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
     expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument();
+  });
+
+  it("pauses and resumes GitHub intake without saving or losing filter edits", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderHost({ onClose });
+    await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
+    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
+    await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "bug" }));
+    await user.click(screen.getByTestId("intake-source-settings-automatic-intake"));
+    await waitFor(() => expect(updateIntake).toHaveBeenLastCalledWith({ intakeId: "intake-github", paused: true }));
+    await waitFor(() => expect(screen.getByTestId("intake-source-settings-automatic-intake")).not.toBeChecked());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Remove bug" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("intake-source-settings-automatic-intake"));
+    await waitFor(() => expect(updateIntake).toHaveBeenLastCalledWith({ intakeId: "intake-github", paused: false }));
+    await waitFor(() => expect(screen.getByTestId("intake-source-settings-automatic-intake")).toBeChecked());
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+    await waitFor(() =>
+      expect(updateIntake).toHaveBeenLastCalledWith({
+        intakeId: "intake-github",
+        settings: expect.objectContaining({ labels: ["bug"], reopenedIssues: false }),
+      }),
+    );
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a paused GitHub intake paused after a failed resume and supports retry", async () => {
+    updateIntake.mockClear();
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderHost({ intake: { ...GITHUB_INTAKE, paused: true }, onClose });
+    expect(screen.getByTestId("intake-source-settings-automatic-intake")).not.toBeChecked();
+    updateIntake.mockRejectedValueOnce(new Error("Network error"));
+    await user.click(screen.getByTestId("intake-source-settings-automatic-intake"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Network error");
+    expect(screen.getByTestId("intake-source-settings-automatic-intake")).not.toBeChecked();
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-source-settings-automatic-intake"));
+    await waitFor(() => expect(screen.getByTestId("intake-source-settings-automatic-intake")).toBeChecked());
+    expect(updateIntake).toHaveBeenCalledTimes(2);
+    expect(updateIntake).toHaveBeenLastCalledWith({ intakeId: "intake-github", paused: false });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("shows the automation of the intake canvas from the Automation tab", async () => {
@@ -187,7 +232,7 @@ describe("IntakeSettingsHost", () => {
     });
 
     expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-automatic-intake")).not.toBeInTheDocument();
     expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
     expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
     await user.click(screen.getByTestId("jira-completion-column-select"));

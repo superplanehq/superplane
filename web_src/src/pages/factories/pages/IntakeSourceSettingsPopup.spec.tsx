@@ -418,12 +418,11 @@ describe("IntakeSourceSettingsPopup", () => {
     "productive-tasks",
     "datadog",
     "linear-issues",
-  ] as const)("hides connection, project, and pause controls for a %s intake", (sourceId) => {
+  ] as const)("hides connection and unavailable automatic intake controls for a %s intake", (sourceId) => {
     renderPopup({ sourceId });
 
     expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-settings-resume")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-automatic-intake")).not.toBeInTheDocument();
   });
 
   it.each([
