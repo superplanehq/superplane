@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "bun:test";
 
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
 import {
   afterOnboardingPath,
   afterWorkspaceProvisioned,
@@ -47,7 +48,7 @@ describe("finishOnboardingError", () => {
     ).toBe("Connect Jira, then choose a project.");
   });
 
-  it("requires a Linear connection and project when the ticket source is Linear", () => {
+  it("requires a Linear connection and team when the ticket source is Linear", () => {
     expect(
       finishOnboardingError({
         appRepository: "acme/web",
@@ -58,10 +59,10 @@ describe("finishOnboardingError", () => {
         hostedModelsLoading: false,
         plan: readyPlan,
         issuesChoice: "linear",
-        linearReady: false,
-        linearProjectIds: [],
+        linearReady: true,
+        linearScope: { ...EMPTY_LINEAR_INTAKE_SCOPE, projectIds: ["project-1"] },
       }),
-    ).toBe("Connect Linear, then choose a project.");
+    ).toBe("Connect Linear, then choose a team.");
   });
 
   it("names Bitbucket when a Bitbucket workspace has no connection", () => {
@@ -214,15 +215,19 @@ describe("provisionWorkspace", () => {
         issuesChoice: "linear",
         createIntake,
         updateOnboarding,
-        linear: { integrationId: "linear-1", projectIds: ["project-1"] },
+        linear: { integrationId: "linear-1", scope: { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" } },
       }),
     );
 
     expect(createIntake).toHaveBeenCalledWith({
       source: "SOURCE_LINEAR_ISSUES",
       integrationId: "linear-1",
-      resourceId: "project-1",
-      settings: { linearProjectIds: ["project-1"] },
+      settings: {
+        linearTeamId: "team-1",
+        linearProjectIds: [],
+        linearIncludeIssuesWithoutProject: true,
+        linearLabels: [],
+      },
     });
     const issuesSourceCalls = updateOnboarding.mock.calls
       .map(([input]) => input.issuesSource)

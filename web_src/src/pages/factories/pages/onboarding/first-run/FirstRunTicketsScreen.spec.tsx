@@ -2,8 +2,25 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../../linearIntakeScope";
+import { LINEAR_INTAKE_SETUP_COPY } from "../../linearIntakeSetupCopy";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
+
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: (_organizationId: string, _integrationId: string, resourceType: string) => ({
+    data:
+      resourceType === "team"
+        ? [{ id: "team-1", name: "Platform (PLT)" }]
+        : resourceType === "project"
+          ? [{ id: "project-1", name: "Checkout" }]
+          : [{ id: "label-1", name: "bug" }],
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
 
 describe("FirstRunTicketsScreen", () => {
   it("keeps analysis stopped until a ticket system is selected", async () => {
@@ -98,11 +115,11 @@ describe("FirstRunTicketsScreen", () => {
     expect(onConnectJira).toHaveBeenCalledTimes(1);
   });
 
-  it("lets the user select Linear and keeps scan stopped until a project is chosen", async () => {
+  it("lets the user select Linear and keeps scan stopped until a team is chosen", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
     const onConnectLinear = vi.fn();
-    const onToggleLinearProject = vi.fn();
+    const onChangeLinearScope = vi.fn();
     const onAnalyzeTickets = vi.fn();
 
     const { rerender } = render(
@@ -112,7 +129,7 @@ describe("FirstRunTicketsScreen", () => {
         onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={onAnalyzeTickets}
         onConnectLinear={onConnectLinear}
-        onToggleLinearProject={onToggleLinearProject}
+        onChangeLinearScope={onChangeLinearScope}
       />,
     );
 
@@ -130,68 +147,40 @@ describe("FirstRunTicketsScreen", () => {
         ticketSource="linear"
         linearAvailable
         linearConnected
-        linearProjects={[{ id: "project-1", name: "Platform" }]}
-        linearProjectIds={[]}
+        organizationId="org-1"
+        linearIntegrationId="linear-1"
+        linearScope={EMPTY_LINEAR_INTAKE_SCOPE}
         onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={onAnalyzeTickets}
-        onToggleLinearProject={onToggleLinearProject}
+        onChangeLinearScope={onChangeLinearScope}
       />,
     );
 
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearProjectHeading)).toBeInTheDocument();
-    await user.click(screen.getByTestId("linear-project-project-1"));
-    expect(onToggleLinearProject).toHaveBeenCalledWith("project-1");
+    expect(screen.queryByRole("group", { name: LINEAR_INTAKE_SETUP_COPY.projectsLabel })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("linear-team-team-1"));
+    expect(onChangeLinearScope).toHaveBeenCalledWith({ ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" });
 
     rerender(
       <FirstRunTicketsScreen
         ticketSource="linear"
         linearAvailable
         linearConnected
-        linearProjects={[{ id: "project-1", name: "Platform" }]}
-        linearProjectIds={["project-1"]}
+        organizationId="org-1"
+        linearIntegrationId="linear-1"
+        linearScope={{ ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" }}
         onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={onAnalyzeTickets}
-        onToggleLinearProject={onToggleLinearProject}
+        onChangeLinearScope={onChangeLinearScope}
       />,
     );
 
+    // A team is enough. Projects and labels only narrow it.
+    expect(screen.getByRole("group", { name: LINEAR_INTAKE_SETUP_COPY.projectsLabel })).toBeInTheDocument();
     const analyze = screen.getByTestId("first-run-analyze-tickets");
     expect(analyze).toBeEnabled();
     await user.click(analyze);
     expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps scan stopped while Linear projects are still loading", () => {
-    render(
-      <FirstRunTicketsScreen
-        ticketSource="linear"
-        linearAvailable
-        linearConnected
-        linearProjectsLoading
-        linearProjectIds={["project-gone"]}
-        onSelectTicketSource={vi.fn()}
-        onAnalyzeTickets={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
-  });
-
-  it("keeps scan stopped when Linear projects fail to load", () => {
-    render(
-      <FirstRunTicketsScreen
-        ticketSource="linear"
-        linearAvailable
-        linearConnected
-        linearProjectsError
-        linearProjectIds={["project-gone"]}
-        onSelectTicketSource={vi.fn()}
-        onAnalyzeTickets={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   });
 
   it("keeps scan stopped until Jira is connected and a project is chosen", async () => {

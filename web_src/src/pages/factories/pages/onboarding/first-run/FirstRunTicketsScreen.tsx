@@ -1,4 +1,5 @@
 import { LoadingButton } from "@/components/ui/loading-button";
+import { EMPTY_LINEAR_INTAKE_SCOPE, type LinearIntakeScope } from "../../linearIntakeScope";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketChoices } from "./firstRunTicketChoices";
@@ -32,10 +33,9 @@ type FirstRunTicketsScreenProps = {
   jiraProjectsError?: boolean;
   jiraProjectId?: string;
   linearConnected?: boolean;
-  linearProjects?: FirstRunJiraProject[];
-  linearProjectsLoading?: boolean;
-  linearProjectsError?: boolean;
-  linearProjectIds?: string[];
+  organizationId?: string;
+  linearIntegrationId?: string;
+  linearScope?: LinearIntakeScope;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
   onConnectGitHub?: () => void;
@@ -43,8 +43,7 @@ type FirstRunTicketsScreenProps = {
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
   onConnectLinear?: () => void;
-  onToggleLinearProject?: (id: string) => void;
-  onRetryLinearProjects?: () => void;
+  onChangeLinearScope?: (scope: LinearIntakeScope) => void;
 };
 
 const TICKET_SCREEN_DEFAULTS = {
@@ -63,10 +62,9 @@ const TICKET_SCREEN_DEFAULTS = {
   jiraProjectsError: false,
   jiraProjectId: "",
   linearConnected: false,
-  linearProjects: [] as FirstRunJiraProject[],
-  linearProjectsLoading: false,
-  linearProjectsError: false,
-  linearProjectIds: [] as string[],
+  organizationId: "",
+  linearIntegrationId: "",
+  linearScope: EMPTY_LINEAR_INTAKE_SCOPE,
 };
 
 function ticketScanAllowed(args: {
@@ -77,13 +75,10 @@ function ticketScanAllowed(args: {
   linearAvailable: boolean;
   linearChoiceBlock: FirstRunFlaggedChoiceBlock | null;
   linearConnected: boolean;
-  linearProjectIds: string[];
-  linearProjectsLoading: boolean;
-  linearProjectsError: boolean;
+  linearScope: LinearIntakeScope;
 }): boolean {
   const linearSelectionBlocked =
     Boolean(args.linearChoiceBlock) || (args.ticketSource === "linear" && !args.linearAvailable);
-  if (args.ticketSource === "linear" && (args.linearProjectsLoading || args.linearProjectsError)) return false;
   return (
     !linearSelectionBlocked &&
     canAnalyzeTicketSource({
@@ -92,7 +87,7 @@ function ticketScanAllowed(args: {
       jiraConnected: args.jiraConnected,
       jiraProjectId: args.jiraProjectId,
       linearConnected: args.linearConnected,
-      linearProjectIds: args.linearProjectIds,
+      linearScope: args.linearScope,
     })
   );
 }
@@ -131,10 +126,9 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     jiraProjectsError,
     jiraProjectId,
     linearConnected,
-    linearProjects,
-    linearProjectsLoading,
-    linearProjectsError,
-    linearProjectIds,
+    organizationId,
+    linearIntegrationId,
+    linearScope,
     onSelectTicketSource,
     onAnalyzeTickets,
     onConnectGitHub,
@@ -142,8 +136,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     onSelectJiraProject,
     onRetryJiraProjects,
     onConnectLinear,
-    onToggleLinearProject,
-    onRetryLinearProjects,
+    onChangeLinearScope,
   } = { ...TICKET_SCREEN_DEFAULTS, ...props };
   const copy = FIRST_RUN_COPY.tickets;
   const canAnalyze = ticketScanAllowed({
@@ -154,9 +147,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     linearAvailable,
     linearChoiceBlock,
     linearConnected,
-    linearProjectIds,
-    linearProjectsLoading,
-    linearProjectsError,
+    linearScope,
   });
   const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
 
@@ -180,18 +171,16 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
           linearAvailable={linearAvailable}
           linearFeatureLoading={linearFeatureLoading}
           linearConnected={linearConnected}
-          linearProjects={linearProjects}
-          linearProjectsLoading={linearProjectsLoading}
-          linearProjectsError={linearProjectsError}
-          linearProjectIds={linearProjectIds}
+          organizationId={organizationId}
+          linearIntegrationId={linearIntegrationId}
+          linearScope={linearScope}
           onSelectTicketSource={onSelectTicketSource}
           onConnectGitHub={onConnectGitHub}
           onConnectJira={onConnectJira}
           onSelectJiraProject={onSelectJiraProject}
           onRetryJiraProjects={onRetryJiraProjects}
           onConnectLinear={onConnectLinear}
-          onToggleLinearProject={onToggleLinearProject}
-          onRetryLinearProjects={onRetryLinearProjects}
+          onChangeLinearScope={onChangeLinearScope}
         />
         <FirstRunChoiceNotice
           block={linearChoiceBlock}

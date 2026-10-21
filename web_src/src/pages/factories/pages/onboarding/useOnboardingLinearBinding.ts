@@ -1,7 +1,8 @@
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCallback, useEffect, useState } from "react";
 
-import { readOnboardingLinearProjects, writeOnboardingLinearProjects } from "./onboardingLinearProjects";
+import { EMPTY_LINEAR_INTAKE_SCOPE, type LinearIntakeScope } from "../linearIntakeScope";
+import { readOnboardingLinearScope, writeOnboardingLinearScope } from "./onboardingLinearScope";
 
 export function useOnboardingLinearBinding(
   organizationId: string,
@@ -9,51 +10,52 @@ export function useOnboardingLinearBinding(
   linearSelection?: { id: string; ready: boolean },
 ) {
   const linearIntegrationId = linearSelection?.ready ? linearSelection.id : "";
-  const [linearProjectIds, setLinearProjectIds] = useState(() =>
-    readOnboardingLinearProjects(factoryId, linearIntegrationId),
-  );
-  const linearProjectsQuery = useIntegrationResources(organizationId, linearIntegrationId, "project", undefined, {
+  const [linearScope, setLinearScope] = useState(() => readOnboardingLinearScope(factoryId, linearIntegrationId));
+  const teamsQuery = useIntegrationResources(organizationId, linearIntegrationId, "team", undefined, {
     enabled: Boolean(linearIntegrationId),
   });
+  const projectsQuery = useIntegrationResources(
+    organizationId,
+    linearIntegrationId,
+    "project",
+    { team: linearScope.teamId },
+    { enabled: Boolean(linearIntegrationId && linearScope.teamId) },
+  );
 
   useEffect(() => {
-    setLinearProjectIds(readOnboardingLinearProjects(factoryId, linearIntegrationId));
+    setLinearScope(readOnboardingLinearScope(factoryId, linearIntegrationId));
   }, [factoryId, linearIntegrationId]);
 
-  const projectsReady = Boolean(linearIntegrationId) && !linearProjectsQuery.isPending && !linearProjectsQuery.isError;
-  useEffect(() => {
-    if (!projectsReady) return;
-    const available = new Set(
-      (linearProjectsQuery.data ?? []).map((project) => project.id).filter((id): id is string => Boolean(id)),
-    );
-    setLinearProjectIds((current) => {
-      const next = current.filter((id) => available.has(id));
-      if (next.length === current.length && next.every((id, index) => id === current[index])) return current;
-      writeOnboardingLinearProjects(factoryId, linearIntegrationId, next);
-      return next;
-    });
-  }, [projectsReady, linearProjectsQuery.data, factoryId, linearIntegrationId]);
-
-  const toggleLinearProject = useCallback(
-    (projectId: string) => {
-      setLinearProjectIds((current) => {
-        const next = current.includes(projectId) ? current.filter((id) => id !== projectId) : [...current, projectId];
-        writeOnboardingLinearProjects(factoryId, linearIntegrationId, next);
-        return next;
-      });
+  const saveScope = useCallback(
+    (next: LinearIntakeScope) => {
+      writeOnboardingLinearScope(factoryId, linearIntegrationId, next);
+      setLinearScope(next);
     },
     [factoryId, linearIntegrationId],
   );
 
+  // Drop a saved team or project that Linear no longer returns. Keep it while
+  // the list loads or fails, so a slow answer does not erase the choice.
+  const teamsReady = Boolean(linearIntegrationId) && !teamsQuery.isPending && !teamsQuery.isError;
+  useEffect(() => {
+    if (!teamsReady || !linearScope.teamId) return;
+    const available = (teamsQuery.data ?? []).some((team) => team.id === linearScope.teamId);
+    if (!available) saveScope(EMPTY_LINEAR_INTAKE_SCOPE);
+  }, [teamsReady, teamsQuery.data, linearScope.teamId, saveScope]);
+
+  const projectsReady = Boolean(linearScope.teamId) && !projectsQuery.isPending && !projectsQuery.isError;
+  useEffect(() => {
+    if (!projectsReady) return;
+    const available = new Set(
+      (projectsQuery.data ?? []).map((project) => project.id).filter((id): id is string => Boolean(id)),
+    );
+    const projectIds = linearScope.projectIds.filter((id) => available.has(id));
+    if (projectIds.length !== linearScope.projectIds.length) saveScope({ ...linearScope, projectIds });
+  }, [projectsReady, projectsQuery.data, linearScope, saveScope]);
+
   return {
     linearIntegrationId,
-    linearProjectIds,
-    toggleLinearProject,
-    linearProjects: linearProjectsQuery.data ?? [],
-    linearProjectsLoading: linearProjectsQuery.isPending,
-    linearProjectsError: linearProjectsQuery.isError,
-    retryLinearProjects: () => {
-      void linearProjectsQuery.refetch();
-    },
+    linearScope,
+    changeLinearScope: saveScope,
   };
 }

@@ -150,6 +150,16 @@ export const DATADOG_INTAKE: ConfiguredLineIntakeSource = {
   resourceId: "checkout",
 };
 
+export const LINEAR_INTAKE: ConfiguredLineIntakeSource = {
+  intakeId: "intake-linear",
+  appId: "app-linear-intake",
+  healthy: true,
+  paused: false,
+  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearTeamId: "team-1" },
+  source: lineIntakeSourceById("linear-issues")!,
+  integrationId: "linear-1",
+};
+
 export function connectedJiraIntake(overrides: Partial<ConfiguredLineIntakeSource> = {}): ConfiguredLineIntakeSource {
   return {
     ...JIRA_INTAKE,
@@ -235,6 +245,9 @@ function integrationResourceResult(_organizationId: string, integrationId: strin
       { id: "qa", name: "QA" },
       { id: "done", name: "Done" },
     ]);
+  }
+  if (resourceType === "team") {
+    return resourceResult([{ id: "team-1", name: "Platform (PLT)" }]);
   }
   if (resourceType === "service") {
     return resourceResult([
