@@ -77,6 +77,37 @@ export function githubWebHostFromUrl(url: string | undefined): string {
   return web === GITHUB_DOTCOM_WEB_HOST ? "" : web;
 }
 
+/** Tenant host from a hostname, URL, or GitHub repository/user object. Empty means github.com. */
+export function githubHostFromHint(value: unknown): string {
+  if (typeof value === "string") {
+    return hostFromStringHint(value);
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "";
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of ["html_url", "url", "clone_url"] as const) {
+    const host = typeof record[key] === "string" ? hostFromStringHint(record[key]) : "";
+    if (host) {
+      return host;
+    }
+  }
+  return "";
+}
+
+function hostFromStringHint(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const hostname = trimmed.includes("://") ? hostnameFromUrl(trimmed) : trimmed.toLowerCase();
+  if (!isGitHubWebHostname(hostname) && !isKnownGitHubHostname(hostname)) {
+    return "";
+  }
+  const web = githubWebHostname(hostname);
+  return web === GITHUB_DOTCOM_WEB_HOST ? "" : web;
+}
+
 export function isGitHubWebHostname(hostname: string, host?: string | null): boolean {
   const value = hostname.trim().toLowerCase();
   if (!value) {
@@ -106,7 +137,12 @@ export function isKnownGitHubHostname(hostname: string): boolean {
 
 function githubWebHostname(host?: string | null): string {
   const hostname = (host ?? "").trim().toLowerCase();
-  if (!hostname || hostname === GITHUB_DOTCOM_WEB_HOST || hostname === `www.${GITHUB_DOTCOM_WEB_HOST}`) {
+  if (
+    !hostname ||
+    hostname === GITHUB_DOTCOM_WEB_HOST ||
+    hostname === `www.${GITHUB_DOTCOM_WEB_HOST}` ||
+    hostname === "api.github.com"
+  ) {
     return GITHUB_DOTCOM_WEB_HOST;
   }
   if (hostname.startsWith("api.") && hostname.endsWith(GHE_COM_SUFFIX)) {
