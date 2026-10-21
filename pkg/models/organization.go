@@ -264,6 +264,16 @@ func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
 	}
 }
 
+// ListOrganizations returns every organization that is not deleted.
+func ListOrganizations(tx *gorm.DB) ([]Organization, error) {
+	var organizations []Organization
+	err := tx.Order("name ASC").Order("id ASC").Find(&organizations).Error
+	if err != nil {
+		return nil, err
+	}
+	return organizations, nil
+}
+
 func ListOrganizationsByIDs(ids []string) ([]Organization, error) {
 	var organizations []Organization
 

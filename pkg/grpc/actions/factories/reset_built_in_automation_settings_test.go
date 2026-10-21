@@ -106,11 +106,11 @@ func resetTestPublishCanvas(t *testing.T, r *support.ResourceRegistry, canvas *m
 	t.Helper()
 	doc.Metadata.ID, doc.Metadata.Name = canvas.ID.String(), canvas.Name
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	nodes, edges, err := doc.Parse(r.Registry, r.Organization.ID.String())
+	nodes, edges, err := doc.Parse(r.Registry, canvas.OrganizationID.String())
 	require.NoError(t, err)
 	require.NoError(t, canvases.PublishGeneratedCanvasNodesWithOwner(ctx, database.DB(t.Context()), canvas, nil, "Install test template", nodes, edges,
-		changesets.CanvasPublisherOptions{Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
-	reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+		changesets.CanvasPublisherOptions{Registry: r.Registry, OrgID: canvas.OrganizationID, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
+	reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), canvas.OrganizationID, canvas.ID)
 	require.NoError(t, err)
 	*canvas = *reloaded
 }

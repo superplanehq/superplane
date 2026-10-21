@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { hasSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/ui/switch";
 import React, { useCallback, useEffect, useState } from "react";
 import { HostedLLMSettings } from "./HostedLLMSettings";
+import { ResetBuiltInAutomation } from "./ResetBuiltInAutomation";
 
 type InstallationSettingsResponse = {
   allow_private_network_access: boolean;
@@ -200,7 +202,7 @@ const SignupAccessSection = ({
   const effectiveEnabled = enabled && !blockedByEnvironment;
 
   return (
-    <section className="border-t border-slate-200 py-6 dark:border-gray-700/70">
+    <section className="py-6">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -279,7 +281,7 @@ const NetworkPolicySection = ({
   onChange,
   onSave,
 }: NetworkPolicySectionProps) => (
-  <section className="border-t border-slate-200 py-6 dark:border-gray-700/70">
+  <section className="py-6">
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
       <div className="max-w-2xl">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Network policy</p>
@@ -432,7 +434,7 @@ const SMTPFields = ({ form, passwordConfigured, onFieldChange }: SMTPFieldsProps
 );
 
 const SMTPSection = ({ form, hasChanges, passwordConfigured, saving, onFieldChange, onSave }: SMTPSectionProps) => (
-  <section className="border-t border-slate-200 py-6 dark:border-gray-700/70">
+  <section className="py-6">
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
       <div className="max-w-2xl">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Email delivery</p>
@@ -636,48 +638,65 @@ const InstallationSettings: React.FC = () => {
 
   return (
     <div>
-      <div className="pb-2">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Installation Settings</h1>
-        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Configure installation-wide network policy, email delivery, and SuperPlane-hosted LLM credentials.
-        </Text>
-      </div>
+      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Installation Settings</h1>
 
-      <div className="mt-5 bg-white px-6 dark:bg-gray-900">
-        {showSignupAccessSection ? (
-          <SignupAccessSection
-            enabled={signupsEnabled}
-            blockedByEnvironment={settings?.signups_blocked_by_environment ?? false}
-            hasChanges={derivedState.hasSignupChanges}
-            saving={savingSignups}
-            onChange={setSignupsEnabled}
-            onSave={saveSignupSettings}
-          />
-        ) : null}
+      <Tabs defaultValue="automations" className="mt-5">
+        <TabsList aria-label="Installation settings">
+          <TabsTrigger value="automations">Automations</TabsTrigger>
+          <TabsTrigger value="email">Email</TabsTrigger>
+          <TabsTrigger value="hosted-llm">Hosted LLM</TabsTrigger>
+          <TabsTrigger value="network">Network</TabsTrigger>
+          {showSignupAccessSection ? <TabsTrigger value="signups">Signups</TabsTrigger> : null}
+        </TabsList>
 
-        <NetworkPolicySection
-          allowPrivateNetworkAccess={allowPrivateNetworkAccess}
-          blockedHosts={derivedState.blockedHosts}
-          blockedHTTPHostsOverridden={settings?.blocked_http_hosts_overridden ?? false}
-          hasChanges={derivedState.hasNetworkChanges}
-          privateRanges={derivedState.privateRanges}
-          privateIPRangesOverridden={settings?.private_ip_ranges_overridden ?? false}
-          saving={savingNetwork}
-          onChange={setAllowPrivateNetworkAccess}
-          onSave={saveNetworkSettings}
-        />
+        <div className="mt-3 bg-white px-6 dark:bg-gray-900">
+          {showSignupAccessSection ? (
+            <TabsContent value="signups">
+              <SignupAccessSection
+                enabled={signupsEnabled}
+                blockedByEnvironment={settings?.signups_blocked_by_environment ?? false}
+                hasChanges={derivedState.hasSignupChanges}
+                saving={savingSignups}
+                onChange={setSignupsEnabled}
+                onSave={saveSignupSettings}
+              />
+            </TabsContent>
+          ) : null}
 
-        <SMTPSection
-          form={smtpForm}
-          hasChanges={derivedState.hasSMTPChanges}
-          passwordConfigured={settings?.smtp_password_configured ?? false}
-          saving={savingSMTP}
-          onFieldChange={setSMTPField}
-          onSave={saveSMTPSettings}
-        />
+          <TabsContent value="network">
+            <NetworkPolicySection
+              allowPrivateNetworkAccess={allowPrivateNetworkAccess}
+              blockedHosts={derivedState.blockedHosts}
+              blockedHTTPHostsOverridden={settings?.blocked_http_hosts_overridden ?? false}
+              hasChanges={derivedState.hasNetworkChanges}
+              privateRanges={derivedState.privateRanges}
+              privateIPRangesOverridden={settings?.private_ip_ranges_overridden ?? false}
+              saving={savingNetwork}
+              onChange={setAllowPrivateNetworkAccess}
+              onSave={saveNetworkSettings}
+            />
+          </TabsContent>
 
-        <HostedLLMSettings />
-      </div>
+          <TabsContent value="email">
+            <SMTPSection
+              form={smtpForm}
+              hasChanges={derivedState.hasSMTPChanges}
+              passwordConfigured={settings?.smtp_password_configured ?? false}
+              saving={savingSMTP}
+              onFieldChange={setSMTPField}
+              onSave={saveSMTPSettings}
+            />
+          </TabsContent>
+
+          <TabsContent value="hosted-llm">
+            <HostedLLMSettings />
+          </TabsContent>
+
+          <TabsContent value="automations">
+            <ResetBuiltInAutomation />
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   );
 };

@@ -301,6 +301,17 @@ CREATE TABLE public.bitbucket_forge_installations (
 
 
 --
+-- Name: built_in_automation_resets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.built_in_automation_resets (
+    template_id character varying(255) NOT NULL,
+    account_id uuid,
+    reset_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: canvas_memories; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2232,6 +2243,14 @@ ALTER TABLE ONLY public.application_encryption_migrations
 
 ALTER TABLE ONLY public.bitbucket_forge_installations
     ADD CONSTRAINT bitbucket_forge_installations_pkey PRIMARY KEY (installation_id);
+
+
+--
+-- Name: built_in_automation_resets built_in_automation_resets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.built_in_automation_resets
+    ADD CONSTRAINT built_in_automation_resets_pkey PRIMARY KEY (template_id);
 
 
 --
@@ -4267,6 +4286,13 @@ CREATE INDEX index_accounts_on_deleted_at ON public.accounts USING btree (delete
 
 
 --
+-- Name: index_built_in_automation_resets_on_account_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_built_in_automation_resets_on_account_id ON public.built_in_automation_resets USING btree (account_id);
+
+
+--
 -- Name: index_mcp_oauth_clients_on_client_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4607,6 +4633,14 @@ ALTER TABLE ONLY public.app_messages
 
 ALTER TABLE ONLY public.application_encryption_migrations
     ADD CONSTRAINT application_encryption_migrations_target_key_id_fkey FOREIGN KEY (target_key_id) REFERENCES public.application_encryption_keys(id);
+
+
+--
+-- Name: built_in_automation_resets built_in_automation_resets_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.built_in_automation_resets
+    ADD CONSTRAINT built_in_automation_resets_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id) ON DELETE SET NULL;
 
 
 --
@@ -5793,7 +5827,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261021094405	f
+20261021144834	f
 \.
 
 
