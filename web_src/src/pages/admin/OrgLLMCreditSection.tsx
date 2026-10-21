@@ -1,3 +1,5 @@
+import type { BillingPlan } from "./billingPlansApi";
+import { OrganizationFeatureGrants } from "./OrganizationFeatureGrants";
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Input, InputGroup } from "@/components/Input/input";
@@ -16,7 +18,6 @@ import {
   formatUtcTrialEnd,
   useOrgLLMCredit,
   utcCalendarDate,
-  type BillingCatalogPlan,
   type CreditBalanceBucket,
   type CreditBalanceInputs,
   type OrganizationBillingPlan,
@@ -32,13 +33,14 @@ export const ADMIN_PLAN_UNKNOWN_COPY = "SuperPlane could not load the billing pl
 export const ADMIN_SET_BALANCE_HELP_COPY =
   "Enter the new remaining balance. SuperPlane adds the difference to the credit history as an adjustment.";
 export const ADMIN_NO_ACTIVE_TRIAL_COPY = "This organization has no active trial credit.";
-export const ADMIN_INCLUDED_USAGE_COPY = "The Business subscription sets this value.";
+export const ADMIN_INCLUDED_USAGE_COPY = "Plan grants and manual adjustments set this balance.";
 export const ADMIN_TRIAL_ENDS_LABEL = "Trial ends";
 export const ADMIN_TRIAL_ENDS_HELP = "Trial credit stays usable until this date. Dates use UTC.";
 export const ADMIN_TRIAL_ENDS_ERROR = "Choose a future date.";
 export const ADMIN_CREDIT_HISTORY_ERROR_COPY = "SuperPlane could not load the credit history.";
 
 const EDITABLE_BALANCES: Array<{ bucket: CreditBalanceBucket; label: string; action: string }> = [
+  { bucket: "included", label: "Included credit", action: "Set included credit" },
   { bucket: "trial", label: "Trial credit", action: "Set trial credit" },
   { bucket: "topup", label: "Top-up credit", action: "Set top-up credit" },
   { bucket: "grant", label: "SuperPlane grant", action: "Set SuperPlane grant" },
@@ -60,6 +62,7 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
         <Text className="text-gray-500 text-sm dark:text-gray-400">Loading hosted credit...</Text>
       ) : credit.credit ? (
         <OrgHostedCreditCard
+          orgId={orgId}
           {...credit}
           credit={credit.credit}
           polarManaged={credit.plan?.polar_managed === true}
@@ -74,7 +77,7 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
 }
 
 function OrgBillingPlanField(args: {
-  catalog: BillingCatalogPlan[];
+  catalog: BillingPlan[];
   catalogError: string;
   polarManaged: boolean;
   planKnown: boolean;
@@ -175,8 +178,11 @@ function billingPlanHelp(planKnown: boolean, polarManaged: boolean): string {
 }
 
 function OrgHostedCreditCard(args: {
-  catalog: BillingCatalogPlan[];
+  orgId: string;
+  catalog: BillingPlan[];
   catalogError: string;
+  includedExpiresAt: string;
+  setIncludedExpiresAt: (value: string) => void;
   credit: OrganizationLLMCredit;
   grants: OrganizationsOrganizationCreditGrant[];
   polarManaged: boolean;
@@ -247,6 +253,16 @@ function OrgHostedCreditCard(args: {
             />
           ))}
         </div>
+        <div className="mt-4">
+          <Label htmlFor="included-expiration">Included credit expiration (UTC)</Label>
+          <Input
+            id="included-expiration"
+            type="datetime-local"
+            value={args.includedExpiresAt}
+            onChange={(event) => args.setIncludedExpiresAt(event.target.value)}
+          />
+          <Text>For an increase, choose a future UTC expiration. Leave empty for no scheduled expiration.</Text>
+        </div>
         <Label htmlFor="admin-org-credit-note" className="mb-2 mt-4 block text-left">
           Note (optional)
         </Label>
@@ -265,6 +281,9 @@ function OrgHostedCreditCard(args: {
         savingMarkup={args.savingMarkup}
         saveMarkup={args.saveMarkup}
       />
+      {args.showPlanControls && (
+        <OrganizationFeatureGrants key={args.savedPlan?.catalog_key || args.savedPlan?.plan} orgId={args.orgId} />
+      )}
       <CreditHistory grants={args.grants} loadFailed={args.grantsLoadFailed} onRetry={() => void args.reloadGrants()} />
     </div>
   );
@@ -336,7 +355,7 @@ function MarkupOverrideField(args: {
         />
       </InputGroup>
       <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        Leave empty to use the installation markup. Organization members cannot see this value.
+        Leave empty to use the plan or installation markup. Organization members cannot see this value.
       </Text>
       <Button
         type="button"
@@ -439,7 +458,7 @@ function balanceChangeCopy(changeCents: number | null): string {
   if (changeCents === 0) {
     return "No change.";
   }
-  return `Ledger change: ${formatCreditGrantAmount(changeCents)}`;
+  return `Balance change: ${formatCreditGrantAmount(changeCents)}`;
 }
 
 function trialBalanceLocked(
