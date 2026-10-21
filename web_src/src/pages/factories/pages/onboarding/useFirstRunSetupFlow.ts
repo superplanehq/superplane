@@ -31,6 +31,7 @@ import {
 import { useFirstRunGitHubEnterprise } from "./useFirstRunGitHubEnterprise";
 import { onboardingAgentGate, type OnboardingAgentGate } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
+import { chooseFirstRunVcsHost } from "./chooseFirstRunVcsHost";
 import { onboardingStepPath } from "./onboardingStepPath";
 import {
   clearGitHubInstallStarted,
@@ -300,18 +301,14 @@ function useFirstRunCommands(args: {
         navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
       }
     });
-  const chooseVcsHost = (host: FirstRunHostChoice) => {
-    if (host === "gitlab") return;
-    if (host === "github-enterprise") {
-      args.setGitHubEnterprise(true);
-      model.setup.selectVcsHost("github");
-      navigation.goToScreen("ghe-host");
-      return;
-    }
-    args.setGitHubEnterprise(false);
-    model.setup.selectVcsHost(host);
-    navigation.goToScreen(host === "bitbucket" ? "choose" : "connect");
-  };
+  const chooseVcsHost = (host: FirstRunHostChoice) =>
+    chooseFirstRunVcsHost({
+      host,
+      githubEnterprise: args.githubEnterprise,
+      setup: model.setup,
+      setGitHubEnterprise: args.setGitHubEnterprise,
+      goToScreen: navigation.goToScreen,
+    });
   const connectGitHubEnterprise = connectGitHubEnterpriseAction({
     blocking,
     locationPath: `${location.pathname}${location.search}`,

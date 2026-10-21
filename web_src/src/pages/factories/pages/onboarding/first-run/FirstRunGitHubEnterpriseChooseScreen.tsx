@@ -66,6 +66,7 @@ export function FirstRunGitHubEnterpriseChooseScreen({
   onContinue: () => void;
 }) {
   const busy = loading || saving;
+  const selectedInList = Boolean(selectedRepository && repositories.includes(selectedRepository));
   return (
     <FirstRunShell
       testId="first-run-github-enterprise-choose"
@@ -92,13 +93,13 @@ export function FirstRunGitHubEnterpriseChooseScreen({
           <LoadingButton
             type="button"
             className="w-full"
-            disabled={!selectedRepository || busy}
+            disabled={!selectedInList || busy}
             loading={saving}
             loadingText={chooseCopy.saving}
             onClick={onContinue}
             data-testid="first-run-continue-to-tickets"
           >
-            {selectedRepository ? chooseCopy.continueReady : chooseCopy.continue}
+            {selectedInList ? chooseCopy.continueReady : chooseCopy.continue}
           </LoadingButton>
           <p className="text-[12px] text-muted-foreground">{chooseCopy.moreLater}</p>
         </div>

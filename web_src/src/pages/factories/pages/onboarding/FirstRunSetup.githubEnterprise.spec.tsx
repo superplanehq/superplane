@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -136,6 +136,35 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
   beforeEach(() => {
     sessionStorage.clear();
     connectGitHubEnterprise.mockClear();
+  });
+
+  it("clears a github.com repository when switching to Enterprise", async () => {
+    const user = userEvent.setup();
+    const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+    act(() => {
+      hook.result.current.selectVcsHost("github");
+      hook.result.current.selectRepo("acme/dotcom");
+    });
+    renderSetup(hook.result.current, "/org-1/workspaces/PAY/setup");
+
+    await user.click(screen.getByTestId("first-run-get-started"));
+    await user.click(within(screen.getByTestId("first-run-host-github-enterprise")).getByRole("button"));
+    expect(hook.result.current.selectedRepo).toBeNull();
+  });
+
+  it("does not continue with a repository missing from the Enterprise list", () => {
+    writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
+    const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+    const connected = new Set<IntegrationId>(["github"]);
+    Object.defineProperty(hook.result.current, "connected", { get: () => connected });
+    act(() => {
+      hook.result.current.selectVcsHost("github");
+      hook.result.current.selectRepo("acme/dotcom");
+    });
+
+    renderSetup(hook.result.current, "/org-1/workspaces/PAY/setup?step=repo");
+
+    expect(screen.getByTestId("first-run-continue-to-tickets")).toBeDisabled();
   });
 
   it("opens the hostname screen from GitHub Enterprise Cloud", async () => {

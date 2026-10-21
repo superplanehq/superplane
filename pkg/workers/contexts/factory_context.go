@@ -1159,26 +1159,10 @@ func (c *FactoryContext) GitHubHost() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	onboarding := factory.OnboardingConfigValue()
-	if strings.EqualFold(onboarding.EffectiveVCSProvider(), models.ProviderBitbucket) {
-		return "", nil
-	}
-	rawID := strings.TrimSpace(onboarding.VCSIntegrationID)
-	if rawID == "" {
-		return "", nil
-	}
-	integrationID, err := uuid.Parse(rawID)
+	host, err := githubcommon.HostFromFactoryOnboarding(c.tx, c.canvas.OrganizationID, factory.OnboardingConfigValue())
 	if err != nil {
-		return "", nil
-	}
-	integration, err := models.FindIntegrationInTransaction(c.tx, c.canvas.OrganizationID, integrationID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", nil
-		}
 		return "", err
 	}
-	host := githubcommon.HostFromModel(integration)
 	if host.IsDotCom() {
 		return "", nil
 	}

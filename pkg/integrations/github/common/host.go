@@ -1,13 +1,16 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const (
@@ -188,6 +191,30 @@ func HostFromModel(i *models.Integration) Host {
 		return DotCom()
 	}
 	return host
+}
+
+// HostFromFactoryOnboarding reads the GitHub host from the workspace VCS integration.
+// Empty onboarding or a missing integration is github.com.
+func HostFromFactoryOnboarding(tx *gorm.DB, orgID uuid.UUID, onboarding models.FactoryOnboardingConfig) (Host, error) {
+	if strings.EqualFold(onboarding.EffectiveVCSProvider(), models.ProviderBitbucket) {
+		return DotCom(), nil
+	}
+	rawID := strings.TrimSpace(onboarding.VCSIntegrationID)
+	if rawID == "" || tx == nil {
+		return DotCom(), nil
+	}
+	integrationID, err := uuid.Parse(rawID)
+	if err != nil {
+		return DotCom(), nil
+	}
+	integration, err := models.FindIntegrationInTransaction(tx, orgID, integrationID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return DotCom(), nil
+		}
+		return Host{}, err
+	}
+	return HostFromModel(integration), nil
 }
 
 func (h Host) IsDotCom() bool {
