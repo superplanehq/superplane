@@ -118,7 +118,8 @@ echo "Stopping the app process..."
 # Kill the server. The entrypoint exits and Docker applies restart: always.
 app_id="$(docker compose ps -aq app)"
 restarts_before="$(docker inspect --format '{{.RestartCount}}' "${app_id}")"
-docker compose exec -T app bash -c 'pid=$(ps -o pid,args | awk "/\/app\/build\/superplane\$/ { print \$1; exit }"); test -n "$pid"; kill -9 "$pid"' || true
+# The release image does not install procps, so find the server in /proc.
+docker compose exec -T app bash -c 'pid=""; for d in /proc/[0-9]*; do cmd=$(tr "\0" " " < "$d/cmdline" 2>/dev/null || true); case "$cmd" in /app/build/superplane*) pid="${d#/proc/}"; break;; esac; done; test -n "$pid"; kill -9 "$pid"' || true
 restarted="no"
 for _ in $(seq 1 30); do
   restarts_after="$(docker inspect --format '{{.RestartCount}}' "${app_id}")"
