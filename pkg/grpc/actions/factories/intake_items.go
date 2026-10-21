@@ -1002,7 +1002,7 @@ func gitHubIssueItem(issue *github.Issue) IntakeItem {
 
 func parseGitHubIssueURL(rawURL string) (repository string, number int, ok bool) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
+	if err != nil || !common.IsKnownGitHubWebHostname(parsed.Hostname()) {
 		return "", 0, false
 	}
 

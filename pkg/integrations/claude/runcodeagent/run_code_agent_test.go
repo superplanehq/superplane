@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -55,7 +56,7 @@ func Test__RunCodeAgent__Setup__validation(t *testing.T) {
 		{"missing task", func(c map[string]any) { delete(c, "task") }, "task is required"},
 		{"missing token", func(c map[string]any) { delete(c, "githubToken") }, "githubToken is required"},
 		{"repo mode missing repository", func(c map[string]any) { delete(c, "repository") }, "repository is required"},
-		{"invalid repository", func(c map[string]any) { c["repository"] = "nonsense" }, "owner/repo or an https"},
+		{"invalid repository", func(c map[string]any) { c["repository"] = "nonsense" }, "owner/repo or a GitHub HTTPS URL"},
 		{"pr mode missing prUrl", func(c map[string]any) { c["sourceMode"] = "pr"; delete(c, "repository") }, "prUrl is required"},
 	}
 	for _, tc := range cases {
@@ -91,7 +92,7 @@ func Test__RunCodeAgent__Setup__structuredOutputMetadata(t *testing.T) {
 }
 
 func Test__RunCodeAgent__validateRepository(t *testing.T) {
-	valid := []string{"owner/repo", "https://github.com/owner/repo.git", "{{ event.repo }}"}
+	valid := []string{"owner/repo", "https://github.com/owner/repo.git", "https://acme.ghe.com/owner/repo.git", "{{ event.repo }}"}
 	for _, v := range valid {
 		assert.NoError(t, validateRepository(v), v)
 	}
@@ -108,10 +109,14 @@ func Test__RunCodeAgent__validateRepository(t *testing.T) {
 }
 
 func Test__RunCodeAgent__authenticatedCloneURL(t *testing.T) {
-	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git", authenticatedCloneURL("owner/repo"))
-	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/o/r.git", authenticatedCloneURL("https://github.com/o/r.git"))
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git", authenticatedCloneURL("owner/repo", githubcommon.DotCom()))
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/o/r.git", authenticatedCloneURL("https://github.com/o/r.git", githubcommon.DotCom()))
+	enterprise, err := githubcommon.ParseHost("acme.ghe.com")
+	require.NoError(t, err)
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@acme.ghe.com/owner/repo.git", authenticatedCloneURL("owner/repo", enterprise))
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@acme.ghe.com/o/r.git", authenticatedCloneURL("https://acme.ghe.com/o/r.git", enterprise))
 	// A non-github URL must never receive the token.
-	assert.Equal(t, "https://evil.com/o/r.git", authenticatedCloneURL("https://evil.com/o/r.git"))
+	assert.Equal(t, "https://evil.com/o/r.git", authenticatedCloneURL("https://evil.com/o/r.git", githubcommon.DotCom()))
 }
 
 func Test__RunCodeAgent__parsePRURL(t *testing.T) {
@@ -122,6 +127,15 @@ func Test__RunCodeAgent__parsePRURL(t *testing.T) {
 	assert.Equal(t, 42, number)
 
 	_, _, _, err = parsePRURL("https://github.com/acme/widgets/issues/42")
+	require.Error(t, err)
+
+	owner, repo, number, err = parsePRURL("https://acme.ghe.com/acme/widgets/pull/9")
+	require.NoError(t, err)
+	assert.Equal(t, "acme", owner)
+	assert.Equal(t, "widgets", repo)
+	assert.Equal(t, 9, number)
+
+	_, _, _, err = parsePRURL("https://attacker.example/acme/app/pull/1")
 	require.Error(t, err)
 }
 
@@ -140,6 +154,20 @@ func Test__RunCodeAgent__buildEnvironmentConfig(t *testing.T) {
 	assert.Equal(t, "limited", limited.Networking.Type)
 	assert.Contains(t, limited.Networking.AllowedHosts, "github.com")
 	assert.Contains(t, limited.Networking.AllowedHosts, "registry.internal")
+
+	ghe := buildEnvironmentConfig(Spec{Networking: networkingLimited, Repository: "https://acme.ghe.com/acme/app.git"})
+	assert.Contains(t, ghe.Networking.AllowedHosts, "acme.ghe.com")
+	assert.Contains(t, ghe.Networking.AllowedHosts, "*.acme.ghe.com")
+	assert.NotContains(t, ghe.Networking.AllowedHosts, "*.ghe.com")
+
+	leftoverPR := buildEnvironmentConfig(Spec{
+		Networking: networkingLimited,
+		SourceMode: sourceModeRepository,
+		Repository: "owner/repo",
+		PrURL:      "https://acme.ghe.com/other/app/pull/1",
+	})
+	assert.Contains(t, leftoverPR.Networking.AllowedHosts, "github.com")
+	assert.NotContains(t, leftoverPR.Networking.AllowedHosts, "acme.ghe.com")
 	require.NotNil(t, limited.Networking.AllowPackageManagers)
 	assert.True(t, *limited.Networking.AllowPackageManagers)
 }
@@ -157,6 +185,18 @@ func Test__RunCodeAgent__buildPrompt__repository(t *testing.T) {
 	assert.NotContains(t, got, "Co-Authored-By")
 }
 
+func Test__RunCodeAgent__buildPrompt__repositoryIgnoresPrURLHost(t *testing.T) {
+	spec := Spec{
+		SourceMode: "repository",
+		Repository: "owner/repo",
+		PrURL:      "https://acme.ghe.com/other/app/pull/1",
+		Task:       "fix the bug",
+	}
+	got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
+	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git")
+	assert.NotContains(t, got, "acme.ghe.com")
+}
+
 func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
 	attr := commitAttribution{AuthorName: "Octo Cat", AuthorEmail: "1+octocat@users.noreply.github.com"}
@@ -169,10 +209,25 @@ func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 func Test__RunCodeAgent__buildPrompt__pr(t *testing.T) {
 	pr := &pullRequestInfo{BaseRepo: "owner/repo", HeadRef: "feature-x", HTMLURL: "https://github.com/owner/repo/pull/9"}
 	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", commitAttribution{}, nil)
+	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git")
 	assert.Contains(t, got, "git switch feature-x")
 	assert.Contains(t, got, "do NOT open a new pull request")
 	assert.Contains(t, got, "address review")
 	assert.Contains(t, got, "https://github.com/owner/repo/pull/9")
+}
+
+func Test__RunCodeAgent__buildPrompt__enterprisePR(t *testing.T) {
+	host, err := githubcommon.ParseHost("acme.ghe.com")
+	require.NoError(t, err)
+	pr := &pullRequestInfo{
+		BaseRepo: "owner/repo",
+		HeadRef:  "feature-x",
+		HTMLURL:  "https://acme.ghe.com/owner/repo/pull/9",
+		Host:     host,
+	}
+	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", commitAttribution{}, nil)
+	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@acme.ghe.com/owner/repo.git")
+	assert.NotContains(t, got, "@github.com/owner/repo.git")
 }
 
 func Test__RunCodeAgent__buildPrompt__resolvesIssue(t *testing.T) {
