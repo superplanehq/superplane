@@ -203,6 +203,9 @@ Further reading:
   handling useful. Load
   [.agents/skills/test-audit/SKILL.md](.agents/skills/test-audit/SKILL.md)
   when you write, change, review, or sweep tests.
+- When adding or changing a built-in automation setting, including its UI,
+  preserve it through admin reset and add regression coverage. Follow
+  [pkg/grpc/actions/factories/AGENTS.md](pkg/grpc/actions/factories/AGENTS.md).
 - Before adding a test, identify the observable behavior and a credible
   regression that existing coverage does not catch.
 - Do not pin cosmetic CSS classes, wrapper structure, or copied display

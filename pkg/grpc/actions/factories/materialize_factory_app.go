@@ -94,7 +94,7 @@ func MaterializeFactoryAutomationDefaults(
 		return nil, factoryErrorToStatus(err, "failed to materialize factory automation defaults")
 	}
 
-	result, err := materializeLiveAutomationDefaults(db, factory, canvas, version)
+	result, err := materializeLiveAutomationDefaults(db, factory, canvas, version, nil)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory automation defaults")
 	}
@@ -111,14 +111,15 @@ func materializeLiveAutomationDefaults(
 	factory *models.Factory,
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
+	settings *factoryAutomationSettings,
 ) (*materializedFactoryTemplate, error) {
 	intake, intakeErr := models.FindFactoryIntakeByCanvasID(tx, canvas.ID)
 	switch {
 	case intakeErr == nil && intake.FactoryID == factory.ID:
-		return materializeIntakeDefaults(tx, canvas, version, intake)
+		return materializeIntakeDefaults(tx, canvas, version, intake, settings)
 	case intakeErr != nil && !errors.Is(intakeErr, models.ErrFactoryIntakeNotFound):
 		return nil, intakeErr
 	default:
-		return materializeNonIntakeFactoryAppDefaults(tx, factory, canvas, version)
+		return materializeNonIntakeFactoryAppDefaults(tx, factory, canvas, version, settings)
 	}
 }
