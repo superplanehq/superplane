@@ -1,6 +1,4 @@
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ImplementSettingRow } from "./ImplementSettingRow";
 import { Switch } from "@/components/ui/switch";
 
 import {
@@ -20,49 +18,9 @@ export function PlanningSettingsFields({
   lines: PlanningAutoStartLine[];
   onUpdate: PlanningUpdate;
 }) {
-  return (
-    <>
-      <PlanningToggleRow
-        title={PLANNING_SETTINGS_COPY.planningLabel}
-        description={PLANNING_SETTINGS_COPY.planningReviewHelper}
-        checked={draft.enabled}
-        onCheckedChange={(enabled) => onUpdate("enabled", enabled)}
-        testId="planning-settings-enabled"
-      />
-      <AutoStartSection draft={draft} lines={lines} onUpdate={onUpdate} />
-    </>
-  );
-}
-
-export function PlanningHealthSection({ enabled }: { enabled: boolean }) {
-  return (
-    <section data-testid="planning-settings-health">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">{PLANNING_SETTINGS_COPY.healthLabel}</h3>
-        <Badge variant="outline">
-          {enabled ? PLANNING_SETTINGS_COPY.healthReady : PLANNING_SETTINGS_COPY.healthDisabled}
-        </Badge>
-      </div>
-      <p className="workspace-body-text mt-1 text-muted-foreground">
-        {enabled ? PLANNING_SETTINGS_COPY.healthReadyHelper : PLANNING_SETTINGS_COPY.healthDisabledHelper}
-      </p>
-    </section>
-  );
-}
-
-function AutoStartSection({
-  draft,
-  lines,
-  onUpdate,
-}: {
-  draft: PlanningDraftSettings;
-  lines: PlanningAutoStartLine[];
-  onUpdate: PlanningUpdate;
-}) {
   const unavailable = !draft.enabled || lines.length === 0;
   const selected = lines.find((line) => line.id === draft.autoStartLineId);
   const checked = Boolean(selected);
-  const showLineSelect = lines.length > 1 && checked;
 
   return (
     <div data-testid="planning-settings-auto-start">
@@ -80,34 +38,6 @@ function AutoStartSection({
         }}
         testId="planning-settings-auto-start-toggle"
       />
-      {showLineSelect ? (
-        <div className="max-w-xs pb-1">
-          <Label htmlFor="planning-settings-auto-start-line" className="sr-only">
-            {PLANNING_SETTINGS_COPY.autoStartStartOnLabel}
-          </Label>
-          <Select
-            value={draft.autoStartLineId}
-            disabled={unavailable}
-            onValueChange={(lineId) => onUpdate("autoStartLineId", lineId)}
-          >
-            <SelectTrigger
-              id="planning-settings-auto-start-line"
-              className="h-8"
-              aria-label={PLANNING_SETTINGS_COPY.autoStartStartOnLabel}
-              data-testid="planning-settings-auto-start-line"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {lines.map((line) => (
-                <SelectItem key={line.id} value={line.id}>
-                  {line.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -138,18 +68,16 @@ function PlanningToggleRow({
   testId: string;
 }) {
   return (
-    <div className="flex items-start justify-between gap-6 py-3" data-testid={testId}>
-      <div className="min-w-0 space-y-0.5">
-        <p className="text-[13px] font-medium text-foreground">{title}</p>
-        <p className="text-[12px] leading-5 text-muted-foreground">{description}</p>
-      </div>
-      <Switch
-        checked={checked}
-        disabled={disabled}
-        onCheckedChange={onCheckedChange}
-        aria-label={title}
-        className="mt-0.5"
-      />
+    <div data-testid={testId}>
+      <ImplementSettingRow label={title} description={description} htmlFor={`${testId}-switch`}>
+        <Switch
+          id={`${testId}-switch`}
+          checked={checked}
+          disabled={disabled}
+          onCheckedChange={onCheckedChange}
+          aria-describedby={`${testId}-switch-help`}
+        />
+      </ImplementSettingRow>
     </div>
   );
 }
