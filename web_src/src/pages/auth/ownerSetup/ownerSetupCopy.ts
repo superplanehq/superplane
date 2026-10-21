@@ -18,8 +18,9 @@ export const OWNER_SETUP_COPY = {
   },
   fleet: {
     headline: "Set up runner fleets",
-    body: "Use the standalone Fleet Manager chart to connect runner infrastructure to this SuperPlane installation.",
-    helper: "SuperPlane uses your Terraform outputs to prepare values. You can review every value before installation.",
+    body: "Connect runners to this installation. Install Fleet Manager on a cloud account.",
+    singleHostBody: "Connect runners to this installation. Fleet Manager runs on this VM.",
+    helper: "The next page shows the install command. You can skip this and set up fleets later.",
     continue: "Set up fleets",
     skip: "Skip for now",
   },

@@ -5,11 +5,19 @@ import { OWNER_SETUP_COPY } from "./ownerSetupCopy";
 
 const copy = OWNER_SETUP_COPY.fleet;
 
-export function FleetManagerStep({ onContinue, onSkip }: { onContinue: () => void; onSkip: () => void }) {
+export function FleetManagerStep({
+  singleHost = false,
+  onContinue,
+  onSkip,
+}: {
+  singleHost?: boolean;
+  onContinue: () => void;
+  onSkip: () => void;
+}) {
   return (
     <div data-testid="owner-setup-fleet">
       <FirstRunHeading headline={copy.headline} size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">{copy.body}</p>
+        <p className="text-[15px] leading-6 text-muted-foreground">{singleHost ? copy.singleHostBody : copy.body}</p>
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4 text-left">

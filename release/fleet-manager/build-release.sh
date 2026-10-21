@@ -115,6 +115,22 @@ bash "${SCRIPT_DIR}/verify-oci-archive.sh" \
   "${VERSION}" \
   "${GIT_SHA}"
 
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --progress=plain \
+  --provenance=mode=max \
+  --build-arg "FLEET_MANAGER_VERSION=${VERSION}" \
+  --build-arg "SOURCE_REVISION=${GIT_SHA}" \
+  --target docker \
+  --output "type=oci,dest=${OUTPUT_DIR}/fleet-manager-docker.oci.tar" \
+  -f release/fleet-manager/Dockerfile \
+  .
+
+bash "${SCRIPT_DIR}/verify-oci-archive.sh" \
+  "${OUTPUT_DIR}/fleet-manager-docker.oci.tar" \
+  "${VERSION}" \
+  "${GIT_SHA}"
+
 rm -rf "${STAGING_DIR}"
 trap - EXIT
 

@@ -14,7 +14,7 @@ SOURCE_SHA="$4"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKOPEO=(bash "${SCRIPT_DIR}/run-skopeo.sh")
 
-if [[ "${IMAGE}" != *:"${VERSION}" ]]; then
+if [[ "${IMAGE}" != *:"${VERSION}" && "${IMAGE}" != *:"${VERSION}-docker" ]]; then
   echo "Error: ${IMAGE} does not use the expected version tag ${VERSION}" >&2
   exit 1
 fi
