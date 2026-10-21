@@ -160,13 +160,15 @@ export async function provisionWorkspace(args: {
       save: (name) => args.updateFactory({ name }),
     });
   }
+  const subscription = args.agentPlan.credentialsSource === "subscription";
   await args.updateOnboarding({
     vcsIntegrationId: args.vcs.id,
-    agentIntegrationId: args.agentIntegrationId ?? "",
+    agentIntegrationId: subscription ? "" : (args.agentIntegrationId ?? ""),
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
     issuesSource: apiIssuesSource(args.issuesChoice),
-    agentHarness: args.agentPlan.harness,
+    agentHarness: subscription ? "AGENT_HARNESS_CODEX" : args.agentPlan.harness,
+    ...(subscription ? { codexSubscription: true } : {}),
   });
   // Onboarding installs the Implement app with the real default branch (main,
   // master, staging, ...) instead of hardcoding "main", so Create Branch and

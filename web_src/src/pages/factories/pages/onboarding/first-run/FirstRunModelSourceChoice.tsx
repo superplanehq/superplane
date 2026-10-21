@@ -7,14 +7,15 @@ import type { OnboardingAgentCredentialChoice } from "../onboardingAgentReadines
 import { ConnectOptionRow } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 
-/** Organization BYOK: hosted models stay the choice. An own key is a text link. */
 export function FirstRunModelSourceChoice({
   disabled,
   modelSource,
+  subscriptionOffered = false,
   onSelectModelSource,
 }: {
   disabled: boolean;
   modelSource: OnboardingAgentCredentialChoice | null;
+  subscriptionOffered?: boolean;
   onSelectModelSource: (source: OnboardingAgentCredentialChoice) => void;
 }) {
   const copy = FIRST_RUN_COPY.agent;
@@ -27,7 +28,7 @@ export function FirstRunModelSourceChoice({
           icon={<img src={SuperplaneLogo} alt="" className={cn("size-5", DARK_SURFACE_MARK_INVERT_CLASS)} />}
           title={copy.hostedModels}
           detail={copy.hostedModelsHelper}
-          selected={modelSource !== "own-key"}
+          selected={!modelSource || modelSource === "hosted"}
           disabled={disabled}
           onSelect={() => onSelectModelSource("hosted")}
         />
@@ -38,9 +39,10 @@ export function FirstRunModelSourceChoice({
             ownKeySelected ? "font-medium text-foreground underline" : "text-muted-foreground",
           )}
           aria-pressed={ownKeySelected}
+          aria-expanded={ownKeySelected || modelSource === "subscription"}
           onClick={() => onSelectModelSource("own-key")}
         >
-          {copy.ownKey}
+          {subscriptionOffered ? copy.ownKeyOrSubscription : copy.ownKey}
         </button>
       </div>
     </fieldset>

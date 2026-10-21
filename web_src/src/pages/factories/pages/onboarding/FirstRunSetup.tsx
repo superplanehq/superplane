@@ -1,4 +1,3 @@
-import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
@@ -7,38 +6,28 @@ import { posthog } from "@/posthog";
 import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { AgentStep, type OnboardingAgentModelPicker } from "./AgentStep";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
 import { FirstRunBitbucketChooseScreen } from "./first-run/FirstRunBitbucketChooseScreen";
 import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
 import { FirstRunHostScreen } from "./first-run/FirstRunHostScreen";
-import { FirstRunModelSourceChoice } from "./first-run/FirstRunModelSourceChoice";
+import { FirstRunAgentScreen } from "./first-run/FirstRunAgentScreen";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
-import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
+import { FIRST_RUN_STEP_COUNT } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
 import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
-import {
-  agentFinishReady,
-  isAgentProviderConnected,
-  type OnboardingAgentCredentialChoice,
-} from "./onboardingAgentReadiness";
-import { WIZARD_STEPS } from "./onboardingFixtures";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
 import {
   useFirstRunSetupFlow,
   type FirstRunScreen,
   type FirstRunSetupFlow,
-  type IntegrationId,
   type OnboardingPageModel,
 } from "./useFirstRunSetupFlow";
-import type { OnboardingSetupApi } from "./useOnboardingSetupState";
-
 const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   welcome: 0,
   host: 1,
@@ -70,12 +59,6 @@ const BACK_SCREEN_AGENT_FIRST: Partial<Record<FirstRunScreen, FirstRunScreen>> =
   tickets: "agent",
 };
 
-/**
- * The first-run screens have no coding agent screen. This screen keeps the
- * wizard step copy, because provisioning needs a connected agent.
- */
-const AGENT_STEP: { id: "agent"; label: string; purpose: string } = WIZARD_STEPS[3];
-
 function firstNameOf(name: string | undefined): string | undefined {
   const first = name?.trim().split(/\s+/)[0];
   return first || undefined;
@@ -84,116 +67,6 @@ function firstNameOf(name: string | undefined): string | undefined {
 function signOut() {
   posthog.reset();
   window.location.href = "/logout";
-}
-
-type AgentModelSource = {
-  offered: boolean;
-  choice: OnboardingAgentCredentialChoice | null;
-  onSelect: (choice: OnboardingAgentCredentialChoice) => void;
-};
-
-function agentScreenBody(modelSource: AgentModelSource, customProvider: boolean): string {
-  if (modelSource.choice === "own-key") {
-    return customProvider ? FIRST_RUN_COPY.agent.ownKeyBodyWithCustom : FIRST_RUN_COPY.agent.ownKeyBody;
-  }
-  if (modelSource.offered) return FIRST_RUN_COPY.agent.modelSourceBody;
-  return AGENT_STEP.purpose;
-}
-
-function AgentScreen({
-  organizationId,
-  setup,
-  chrome,
-  sphere,
-  saving,
-  loading,
-  hostedAgentReady,
-  showCustomProvider,
-  modelSource,
-  onRequestConnect,
-  modelPicker,
-  onContinue,
-}: {
-  organizationId: string;
-  setup: OnboardingSetupApi;
-  chrome: FirstRunChrome;
-  sphere?: FirstRunSphereProps;
-  saving: boolean;
-  loading: boolean;
-  hostedAgentReady: boolean;
-  showCustomProvider: boolean;
-  modelSource: AgentModelSource;
-  onRequestConnect: (id: IntegrationId) => void;
-  modelPicker?: OnboardingAgentModelPicker;
-  onContinue: () => void;
-}) {
-  const credentialChoice = modelSource.offered && !modelSource.choice ? "hosted" : modelSource.choice;
-  const canFinish = agentFinishReady({
-    modelSourceChoice: modelSource.offered,
-    credentialChoice,
-    providerConnected: isAgentProviderConnected(setup.connected),
-    agentReady: setup.agentReady,
-    hostedAgentReady,
-  });
-  const showProviders = !modelSource.offered || modelSource.choice === "own-key";
-  return (
-    <FirstRunShell
-      testId="first-run-agent"
-      chrome={chrome}
-      busy={saving || loading}
-      width="wide"
-      sphere={sphere}
-      visual="preview"
-    >
-      <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource, showCustomProvider)}</p>
-      </FirstRunHeading>
-
-      <div className="mt-8 space-y-4">
-        {loading ? (
-          <p className="text-[13px] text-muted-foreground" role="status">
-            {FIRST_RUN_COPY.agent.loading}
-          </p>
-        ) : null}
-        {modelSource.offered ? (
-          <FirstRunPanel>
-            <FirstRunModelSourceChoice
-              disabled={saving || loading}
-              modelSource={modelSource.choice}
-              onSelectModelSource={modelSource.onSelect}
-            />
-          </FirstRunPanel>
-        ) : null}
-        {showProviders ? (
-          <fieldset disabled={saving || loading} className="mx-0 min-w-0 border-0 p-0">
-            <FirstRunPanel>
-              <AgentStep
-                organizationId={organizationId}
-                setup={setup}
-                showHostedCredit={modelSource.choice !== "own-key"}
-                showCustomProvider={showCustomProvider}
-                onRequestConnect={onRequestConnect}
-                modelPicker={modelPicker}
-              />
-            </FirstRunPanel>
-          </fieldset>
-        ) : null}
-        <div className="space-y-3">
-          <LoadingButton
-            type="button"
-            className="w-full"
-            disabled={!canFinish || loading || Boolean(modelPicker && !modelPicker.value)}
-            loading={saving}
-            loadingText={FIRST_RUN_COPY.finish.saving}
-            onClick={onContinue}
-            data-testid="first-run-finish-setup"
-          >
-            {modelSource.offered ? FIRST_RUN_COPY.tickets.continue : FIRST_RUN_COPY.finish.action}
-          </LoadingButton>
-        </div>
-      </div>
-    </FirstRunShell>
-  );
 }
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
@@ -496,7 +369,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   }
 
   return (
-    <AgentScreen
+    <FirstRunAgentScreen
       organizationId={organizationId}
       setup={setup}
       chrome={chromeFor("agent")}
@@ -509,6 +382,15 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         offered: flow.agentBeforeTickets,
         choice: flow.credentialChoice,
         onSelect: flow.selectCredentialChoice,
+      }}
+      codex={{
+        offered: Boolean(model.codexSubscriptionOffered),
+        connection: model.codexConnection,
+        ready: Boolean(model.codexSubscriptionReady),
+        starting: Boolean(model.codexStarting),
+        canceling: Boolean(model.codexCanceling),
+        onStart: model.startCodexConnection,
+        onCancel: model.cancelCodexConnection,
       }}
       onRequestConnect={model.requestConnect}
       modelPicker={model.agentModelPicker}
