@@ -39,7 +39,11 @@ vi.mock("@/hooks/useMe", () => ({
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ has: () => true, enabledExperimentalFeatures: [], isLoading: false }),
+  useExperimentalFeature: () => ({
+    has: (feature: string) => feature !== "new_billing" || billingState.newBilling,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
@@ -69,6 +73,22 @@ vi.mock("./useGitHubOnboarding", () => ({
     configureInstallation: { mutateAsync: vi.fn() },
   }),
   useGitHubInstallationChecks: vi.fn(),
+}));
+
+const billingState = { enabled: false, newBilling: false };
+const refetchBilling = vi.fn(async () => ({ data: { billingEnabled: billingState.enabled } }));
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
+  useOrganizationBilling: () => ({
+    data: { billingEnabled: billingState.enabled },
+    isPending: false,
+    refetch: refetchBilling,
+  }),
+}));
+vi.mock("./first-run/FirstRunBillingScreen", () => ({
+  FirstRunBillingScreen: ({ onContinue }: { onContinue: () => void }) => (
+    <button onClick={onContinue}>Finish with selected plan</button>
+  ),
 }));
 
 const navigateSpy = vi.fn();
@@ -183,6 +203,9 @@ describe("FirstRunSetup chrome", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
     navigateSpy.mockClear();
+    billingState.enabled = false;
+    billingState.newBilling = false;
+    refetchBilling.mockClear();
     localStorage.clear();
   });
 
@@ -448,5 +471,39 @@ describe("FirstRunSetup chrome", () => {
     expect(continueButton).toBeDisabled();
     expect(continueButton).toHaveTextContent(FIRST_RUN_COPY.agent.loading);
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
+  });
+
+  it("opens plan selection before provisioning when new billing is enabled", async () => {
+    billingState.enabled = true;
+    billingState.newBilling = true;
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      setup: { ...withRepository(), issuesChoice: "vcs" },
+    });
+    renderSetup(model);
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
+    expect(await screen.findByRole("button", { name: "Finish with selected plan" })).toBeInTheDocument();
+    expect(model.finish).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Finish with selected plan" }));
+    await waitFor(() => expect(model.finish).toHaveBeenCalled());
+  });
+
+  it.each(["issues", "billing"])("finishes with the legacy trial when new billing is off at step %s", async (step) => {
+    billingState.enabled = true;
+    billingState.newBilling = false;
+    refetchBilling.mockClear();
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      setup: { ...withRepository(), issuesChoice: "vcs" },
+    });
+    renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
+    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
+    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
+    expect(refetchBilling).not.toHaveBeenCalled();
   });
 });

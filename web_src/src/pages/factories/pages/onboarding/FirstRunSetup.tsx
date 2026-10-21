@@ -8,6 +8,7 @@ import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep, type OnboardingAgentModelPicker } from "./AgentStep";
+import { FirstRunBillingScreen } from "./first-run/FirstRunBillingScreen";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
 import { FirstRunBitbucketChooseScreen } from "./first-run/FirstRunBitbucketChooseScreen";
 import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
@@ -46,6 +47,7 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   choose: 2,
   tickets: 3,
   agent: 4,
+  billing: 5,
 };
 
 // A bring-your-own-key organization chooses the model source before the backlog.
@@ -107,6 +109,7 @@ function AgentScreen({
   sphere,
   saving,
   loading,
+  hasBillingStep,
   hostedAgentReady,
   showCustomProvider,
   modelSource,
@@ -120,6 +123,7 @@ function AgentScreen({
   sphere?: FirstRunSphereProps;
   saving: boolean;
   loading: boolean;
+  hasBillingStep: boolean;
   hostedAgentReady: boolean;
   showCustomProvider: boolean;
   modelSource: AgentModelSource;
@@ -188,7 +192,7 @@ function AgentScreen({
             onClick={onContinue}
             data-testid="first-run-finish-setup"
           >
-            {modelSource.offered ? FIRST_RUN_COPY.tickets.continue : FIRST_RUN_COPY.finish.action}
+            {modelSource.offered || hasBillingStep ? FIRST_RUN_COPY.tickets.continue : FIRST_RUN_COPY.finish.action}
           </LoadingButton>
         </div>
       </div>
@@ -197,6 +201,7 @@ function AgentScreen({
 }
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
+  if (target === "billing") return () => flow.goToScreen(flow.ticketsFinishSetup ? "tickets" : "agent");
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   // Bitbucket has no separate connect screen.
   if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
@@ -236,9 +241,9 @@ function TicketsScreenHost({
       chrome={chrome}
       sphere={sphere}
       continueLabel={
-        flow.ticketsFinishSetup && !initialWorkspace && model.setup.skipInitialImport
+        flow.ticketsFinishSetup && !flow.hasBillingStep && !initialWorkspace && model.setup.skipInitialImport
           ? FIRST_RUN_COPY.finish.action
-          : ticketsContinueLabel(flow.ticketsFinishSetup)
+          : ticketsContinueLabel(flow.ticketsFinishSetup && !flow.hasBillingStep)
       }
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
@@ -450,8 +455,11 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       onLogOut: signOut,
       organizationSwitch: otherOrganizations.length > 0 ? { currentOrganizationRouteId: organizationId } : undefined,
       workspaceSwitch: hasOtherWorkspace ? { organizationId, currentFactoryId: factoryId, factories } : undefined,
-      stepIndex: (flow.agentBeforeTickets ? STEP_INDEX_FOR_SCREEN_AGENT_FIRST : STEP_INDEX_FOR_SCREEN)[target],
-      stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
+      stepIndex:
+        target === "billing"
+          ? FIRST_RUN_STEP_COUNT - Number(flow.skipAgentScreen)
+          : (flow.agentBeforeTickets ? STEP_INDEX_FOR_SCREEN_AGENT_FIRST : STEP_INDEX_FOR_SCREEN)[target],
+      stepCount: FIRST_RUN_STEP_COUNT - Number(flow.skipAgentScreen) + Number(flow.hasBillingStep),
       onBack: backActionFor(target, flow),
       busy: flow.busy,
     };
@@ -462,7 +470,11 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunAnalysisHost
         organizationId={destination.organizationId}
         factoryId={factoryId}
-        chrome={{ displayName: firstNameOf(account?.name), email: account?.email, onLogOut: signOut, stepIndex: 4 }}
+        chrome={{
+          ...chromeFor("billing"),
+          onBack: undefined,
+          stepIndex: FIRST_RUN_STEP_COUNT - 1 - Number(flow.skipAgentScreen) + Number(flow.hasBillingStep),
+        }}
         selectedRepo={setup.selectedRepo}
         onGoToBoard={() => navigate(afterOnboardingPath(destination), { replace: true })}
       />
@@ -492,6 +504,18 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     );
   }
 
+  if (flow.screen === "billing") {
+    return (
+      <FirstRunBillingScreen
+        organizationId={organizationId}
+        chrome={chromeFor("billing")}
+        saving={flow.busy}
+        sphere={sphereFor("billing", setup.selectedRepo, model.githubOwner)}
+        onContinue={flow.finishSetup}
+      />
+    );
+  }
+
   if (flow.screen === "tickets") {
     return (
       <TicketsScreenHost
@@ -513,6 +537,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
       saving={flow.busy}
       loading={model.agentLoading}
+      hasBillingStep={flow.hasBillingStep}
       hostedAgentReady={model.hostedAgentReady}
       showCustomProvider={model.customProvider}
       modelSource={{
