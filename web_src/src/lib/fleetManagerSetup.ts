@@ -20,6 +20,8 @@ export type FleetManagerSetupMetadata = {
   chartRepository: string;
   imageRepository: string;
   runnerVersions: string[];
+  stableRunnerVersion?: string;
+  installationType?: string;
   fleetPresets: Array<{ id: string; spec: FleetSpec }>;
   infrastructureDefaults: {
     source: "terraform" | "manual";

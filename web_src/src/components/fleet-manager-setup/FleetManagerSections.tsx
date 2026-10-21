@@ -194,10 +194,19 @@ export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetu
   const terraformNoteIdPrefix = useId();
   if (!setup.metadata || !setup.draft) return null;
   const terraformProvider = setup.metadata.infrastructureDefaults.provider;
+  const providers = PROVIDERS.filter(
+    (provider) => provider.id !== "docker" || setup.metadata?.installationType === "single-host",
+  );
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" role="radiogroup" aria-label="Where runners run">
-      {PROVIDERS.map(({ id, name, Logo }) => (
+    <div
+      className={
+        providers.length > 3 ? "grid grid-cols-2 gap-3 sm:grid-cols-4" : "grid grid-cols-2 gap-3 sm:grid-cols-3"
+      }
+      role="radiogroup"
+      aria-label="Where runners run"
+    >
+      {providers.map(({ id, name, Logo }) => (
         <ProviderCard
           key={id}
           id={id}

@@ -78,7 +78,10 @@ function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDra
       ? [metadata.defaultRunnerVersion]
       : [];
   const restoredDraft = loadFleetManagerDraft();
-  const draft = restoredDraft ? mergeTerraformInfrastructure(restoredDraft, metadata) : defaultDraft(metadata);
+  let draft = restoredDraft ? mergeTerraformInfrastructure(restoredDraft, metadata) : defaultDraft(metadata);
+  if (draft.provider === "docker" && metadata.installationType !== "single-host") {
+    draft = draftForProvider(draft, "aws", metadata);
+  }
   return pinSetupFleet({ ...draft, runnerVersion: installationRunnerVersion(metadata) }, metadata);
 }
 
@@ -331,7 +334,7 @@ export function useFleetManagerVerification(
         const installed = body.fleets ?? [];
         const matches =
           draft.provider === "docker"
-            ? fleetsMatchDockerVm(installed, draft.runnerVersion)
+            ? fleetsMatchDockerVm(installed, metadata.stableRunnerVersion ?? "")
             : fleetsMatchConfiguration(installed, draft, metadata.fleetPresets);
         if (matches) {
           clearFleetManagerDraft();

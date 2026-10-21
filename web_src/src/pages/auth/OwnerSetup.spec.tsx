@@ -53,6 +53,8 @@ const fleetManagerMetadata = {
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
   runnerVersions: ["v0.1.0"],
+  stableRunnerVersion: "v0.2.0",
+  installationType: "single-host",
   fleetPresets: [
     {
       id: "e1-large-amd64",

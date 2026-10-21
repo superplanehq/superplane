@@ -7,10 +7,12 @@ import { FleetManagerProviderSection, type FleetManagerSetupState } from "./Flee
 function buildSetup({
   provider = "aws",
   terraformProvider = "aws",
-}: { provider?: string; terraformProvider?: string } = {}) {
+  installationType = "single-host",
+}: { provider?: string; terraformProvider?: string; installationType?: string } = {}) {
   const setProvider = vi.fn();
   const setup = {
     metadata: {
+      installationType,
       infrastructureDefaults: { provider: terraformProvider },
     },
     draft: { provider },
@@ -58,6 +60,14 @@ describe("FleetManagerProviderSection", () => {
     expect(tooltip).toHaveTextContent("GCP");
     expect(tooltip).not.toHaveTextContent("Loaded from Terraform");
     expect(screen.getAllByRole("tooltip")).toHaveLength(1);
+  });
+
+  it("hides This VM unless the installation is single-host", () => {
+    const { setup } = buildSetup({ installationType: "" });
+    render(<FleetManagerProviderSection setup={setup} />);
+
+    expect(screen.queryByRole("button", { name: "This VM" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AWS" })).toBeInTheDocument();
   });
 
   it("selects the provider on click", async () => {

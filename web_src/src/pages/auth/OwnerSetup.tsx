@@ -233,7 +233,11 @@ function OwnerFleetSetupSteps({
       setup={fleetSetup}
       onBack={previousFleetStep}
       onNext={() => {
-        if (activeFleetStep === "provider" && fleetSetup.draft?.provider === "docker") {
+        if (
+          activeFleetStep === "provider" &&
+          fleetSetup.draft?.provider === "docker" &&
+          fleetSetup.metadata?.installationType === "single-host"
+        ) {
           setStep("fleet-docker");
           return;
         }
