@@ -25,6 +25,16 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useDispatchWorkOrder: () => ({ mutateAsync: dispatchMutate, isPending: false }),
 }));
 
+vi.mock("./useWorkOrderRefinementModels", () => ({
+  useWorkOrderRefinementModels: () => ({
+    defaultModel: "sonnet",
+    options: [
+      { value: "sonnet", label: "Claude Sonnet" },
+      { value: "opus", label: "Claude Opus" },
+    ],
+  }),
+}));
+
 vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: meUser.current }),
 }));
@@ -123,6 +133,23 @@ function renderDialog(
 }
 
 describe("CreateWorkOrderDialog", () => {
+  it("sends the selected refinement model from the Planning-on composer", async () => {
+    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
+    renderDialog(factoryWithPlanning(REFUND_FACTORY, { enabled: true, clarity: true, confidence: true }));
+    const user = userEvent.setup();
+    await user.type(screen.getByTestId("work-order-description-input"), "Refine the checkout flow.");
+    await user.click(screen.getByRole("button", { name: "Model: Claude Sonnet" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Claude Opus" }));
+    await user.click(screen.getByTestId("create-work-order-request-create"));
+    expect(createMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "opus", description: "Refine the checkout flow." }),
+    );
+  });
+
+  it("hides the refinement model when Planning is off", () => {
+    renderDialog();
+    expect(screen.queryByRole("button", { name: /^Model:/ })).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     createMutate.mockReset();
     dispatchMutate.mockReset();
