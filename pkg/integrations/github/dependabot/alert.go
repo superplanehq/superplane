@@ -56,6 +56,7 @@ type PackageRef struct {
 	Repository string
 	Ecosystem  string
 	Name       string
+	host       common.Host
 }
 
 // TaskCopy is the backlog title and description for one package.
@@ -69,7 +70,14 @@ type TaskCopy struct {
 func (r PackageRef) OriginURL() string {
 	query := url.Values{}
 	query.Set("q", strings.TrimSpace("is:open package:"+r.Name+" "+ecosystemQualifier(r.Ecosystem)))
-	return "https://github.com/" + r.Repository + "/security/dependabot?" + query.Encode()
+	return r.Host().DependabotOriginURL(r.Repository, query.Encode())
+}
+
+func (r PackageRef) Host() common.Host {
+	if r.host.Kind == "" && r.host.Hostname == "" {
+		return common.DotCom()
+	}
+	return r.host
 }
 
 // OriginLabel names the package in the task origin chip.
@@ -95,7 +103,11 @@ func PackageRefFromAlert(repository string, alert *github.DependabotAlert) (Pack
 	if alert == nil || alert.Dependency == nil || alert.Dependency.Package == nil {
 		return PackageRef{}, false
 	}
-	return newPackageRef(repository, alert.Dependency.Package.GetEcosystem(), alert.Dependency.Package.GetName())
+	ref, ok := newPackageRef(repository, alert.Dependency.Package.GetEcosystem(), alert.Dependency.Package.GetName())
+	if !ok {
+		return PackageRef{}, false
+	}
+	return ref.withHostFromURL(alert.GetHTMLURL()), true
 }
 
 // PackageRefFromEventData reads the package from a canvas root event. The
@@ -114,14 +126,18 @@ func PackageRefFromEventData(eventData any) (PackageRef, bool) {
 		return PackageRef{}, false
 	}
 
-	return newPackageRef(repository, nestedString(alert, "dependency", "package", "ecosystem"), nestedString(alert, "dependency", "package", "name"))
+	ref, ok := newPackageRef(repository, nestedString(alert, "dependency", "package", "ecosystem"), nestedString(alert, "dependency", "package", "name"))
+	if !ok {
+		return PackageRef{}, false
+	}
+	return ref.withHostFromURL(page), true
 }
 
 // PackageRefFromURL reads the package back out of an origin URL built by
 // PackageRef.OriginURL.
 func PackageRefFromURL(rawURL string) (PackageRef, bool) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
+	if err != nil || !common.IsKnownGitHubWebHostname(parsed.Hostname()) {
 		return PackageRef{}, false
 	}
 
@@ -140,7 +156,24 @@ func PackageRefFromURL(rawURL string) (PackageRef, bool) {
 		}
 	}
 
-	return newPackageRef(parts[0]+"/"+parts[1], ecosystem, name)
+	ref, ok := newPackageRef(parts[0]+"/"+parts[1], ecosystem, name)
+	if !ok {
+		return PackageRef{}, false
+	}
+	return ref.withHostFromURL(rawURL), true
+}
+
+func (r PackageRef) withHostFromURL(rawURL string) PackageRef {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Hostname() == "" {
+		return r
+	}
+	host, err := common.ParseHost(parsed.Hostname())
+	if err != nil {
+		return r
+	}
+	r.host = host
+	return r
 }
 
 // TaskTitle names the package the task fixes. It does not name a manifest or
@@ -351,11 +384,10 @@ func alertFromEventData(eventData any) (map[string]any, bool) {
 	return alert, ok
 }
 
-// repositoryFromAlertURL reads owner/repo from an alert page such as
-// https://github.com/acme/payments/security/dependabot/7.
+// repositoryFromAlertURL reads owner/repo from an alert page URL.
 func repositoryFromAlertURL(rawURL string) (string, bool) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
+	if err != nil || !common.IsKnownGitHubWebHostname(parsed.Hostname()) {
 		return "", false
 	}
 

@@ -23,6 +23,9 @@ import { addedByForSource, sourceTicketLabel, splitRunSourceForOrder } from "./s
 describe("sourceTicketLabel", () => {
   it("uses owner/repo#number for GitHub issues", () => {
     expect(sourceTicketLabel("https://github.com/acme/payments-service/issues/842")).toBe("acme/payments-service#842");
+    expect(sourceTicketLabel("https://acme.ghe.com/acme/payments-service/issues/842")).toBe(
+      "acme/payments-service#842",
+    );
   });
 
   it("uses org#id for Sentry, PagerDuty, and Slack hosts", () => {
