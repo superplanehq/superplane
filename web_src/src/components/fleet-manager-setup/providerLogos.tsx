@@ -1,7 +1,22 @@
+import { Server } from "lucide-react";
+
 type ProviderLogoProps = {
   className?: string;
   testId?: string;
 };
+
+export function ThisVmLogo({ className, testId }: ProviderLogoProps) {
+  return (
+    <span
+      data-testid={testId}
+      aria-hidden="true"
+      className={`flex flex-col items-center gap-2 text-current ${className ?? ""}`}
+    >
+      <Server className="size-8" />
+      <span className="text-sm font-medium">This VM</span>
+    </span>
+  );
+}
 
 /**
  * Monochrome AWS logo: the letters and the smile arrow.

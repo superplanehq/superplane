@@ -128,6 +128,29 @@ blocks:
               bash release/component-release-artifact.sh \
                 push superplane "$RELEASE_VERSION" "$release_dir"
 
+  - name: "Smoke Test Single Host"
+    dependencies: ["Assemble Release"]
+    task:
+      jobs:
+        - name: "Install the release tarball"
+          commands:
+            - bash release/component-release-artifact.sh pull superplane "$RELEASE_VERSION" "build/superplane/$RELEASE_VERSION"
+            - |
+              set -euo pipefail
+              release_dir="build/superplane/$RELEASE_VERSION"
+              image="ghcr.io/superplanehq/superplane:${RELEASE_VERSION}"
+              docker run --rm \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v "${PWD}:${PWD}" \
+                -w "${PWD}" \
+                quay.io/skopeo/stable:v1.22.3-immutable@sha256:c0ee1f4edca5c01cb8d5611124f92f3cc47196ecab68aee5d0f90834e00574d5 \
+                copy \
+                "oci-archive:${release_dir}/superplane-amd64.oci.tar" \
+                "docker-daemon:${image}"
+              bash release/superplane-single-host-tarball/smoke-test.sh \
+                "${release_dir}/superplane-single-host.tar.gz" \
+                "${image}"
+
 promotions:
   - name: Publish SuperPlane Release
     pipeline_file: publish-superplane-release.yml

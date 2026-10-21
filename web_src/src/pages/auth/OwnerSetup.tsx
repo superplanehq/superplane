@@ -33,6 +33,7 @@ const RESUMABLE_STEPS: OwnerSetupStep[] = [
   "license",
   "smtp",
   "fleet-intro",
+  "fleet-docker",
   ...FLEET_MANAGER_WIZARD_STEPS.map((step) => `fleet-${step}` as OwnerSetupStep),
 ];
 
@@ -171,6 +172,7 @@ function ownerSetupStepNumber(step: OwnerSetupStep) {
   if (step === "fleet-provider") return 5;
   if (step === "fleet-fleets") return 6;
   if (step === "fleet-values") return 7;
+  if (step === "fleet-docker") return 6;
   if (step === "fleet-install") return 8;
   return OWNER_SETUP_STEPS;
 }
@@ -185,6 +187,7 @@ function fleetWizardStep(step: OwnerSetupStep): FleetManagerWizardStep | null {
 }
 
 function fleetStepBefore(step: OwnerSetupStep): OwnerSetupStep {
+  if (step === "fleet-docker") return "fleet-provider";
   const active = fleetWizardStep(step);
   if (!active) return "fleet-intro";
   const index = FLEET_MANAGER_WIZARD_STEPS.indexOf(active);
@@ -230,6 +233,10 @@ function OwnerFleetSetupSteps({
       setup={fleetSetup}
       onBack={previousFleetStep}
       onNext={() => {
+        if (activeFleetStep === "provider" && fleetSetup.draft?.provider === "docker") {
+          setStep("fleet-docker");
+          return;
+        }
         const next = FLEET_MANAGER_WIZARD_STEPS[fleetStepIndex + 1];
         if (next) setStep(`fleet-${next}`);
       }}

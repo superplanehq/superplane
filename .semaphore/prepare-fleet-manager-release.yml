@@ -49,7 +49,7 @@ blocks:
                 --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
                 --pipeline-id "$SEMAPHORE_PIPELINE_ID" \
                 --directory "$release_dir" \
-                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,fleet-manager-chart-${RELEASE_VERSION#v}.tgz,checksums.txt,fleet-manager.oci.tar \
+                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,fleet-manager-chart-${RELEASE_VERSION#v}.tgz,checksums.txt,fleet-manager.oci.tar,fleet-manager-docker.oci.tar \
                 --output "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum release-manifest.json >release-manifest.sha256)
               bash release/component-release-artifact.sh \
