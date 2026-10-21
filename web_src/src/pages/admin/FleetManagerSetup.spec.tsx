@@ -38,6 +38,8 @@ const metadata = {
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
   runnerVersions: ["v0.2.0", "v0.1.0"],
+  stableRunnerVersion: "v0.2.0",
+  installationType: "single-host",
   fleetPresets: [
     { id: "e1-large-amd64", spec: fleetSpec },
     { id: "e1-large-arm64", spec: { ...fleetSpec, architecture: "arm64" as const } },
@@ -144,7 +146,7 @@ describe("FleetManagerSetup", () => {
   it("uses the Provider, Fleets, and Install sequence", async () => {
     render(<FleetManagerSetup />);
 
-    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /cloud infrastructure/i })).not.toBeInTheDocument();
@@ -156,6 +158,18 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByText(/The most machines this fleet can run at one time/)).toBeInTheDocument();
     expect(screen.queryByText("e1-large-arm64")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
+  });
+
+  it("shows the single-VM runner command instead of the chart", async () => {
+    const user = userEvent.setup();
+    render(<FleetManagerSetup />);
+
+    await user.click(await screen.findByRole("button", { name: "This VM" }));
+    expect(screen.queryByRole("heading", { name: "Configure the default fleet" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Generate install command" }));
+    expect(await screen.findByText("./enable-runners.sh 'one-time-personal-token'")).toBeInTheDocument();
+    expect(screen.queryByText(/helm upgrade --install fleet-manager/)).not.toBeInTheDocument();
   });
 
   it("switches the machine type list when the cloud changes", async () => {

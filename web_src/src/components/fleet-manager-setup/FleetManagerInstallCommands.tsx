@@ -34,9 +34,8 @@ const EDITOR_OPTIONS = {
 };
 
 function commandHeight(code: string): number {
-  const lines = Math.max(code.split("\n").length, 1);
-  // One extra row covers a single wrapped line so the last command stays visible.
-  return Math.min(lines * 19 + 16 + 19, CODE_MAX_HEIGHT_PX);
+  const visualLines = code.split("\n").reduce((count, line) => count + Math.max(1, Math.ceil(line.length / 56)), 0);
+  return Math.min(Math.max(visualLines, 1) * 19 + 24, CODE_MAX_HEIGHT_PX);
 }
 
 function defineSetupCodeTheme(monaco: Monaco) {

@@ -67,6 +67,7 @@ func TestAdminGetFleetManagerSetup(t *testing.T) {
 	t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
 	t.Setenv("RUNNER_SUPPORTED_VERSIONS", "v1.1.0, v1.2.3, v1.0.0")
 	t.Setenv("FLEET_MANAGER_STABLE_VERSION", "v2.3.4")
+	t.Setenv("SUPERPLANE_INSTALLATION_TYPE", "single-host")
 	useRunnerReleases(t, "http://127.0.0.1:1")
 	server, user, token := setupAdminTestServer(t)
 
@@ -80,6 +81,8 @@ func TestAdminGetFleetManagerSetup(t *testing.T) {
 	var body fleetManagerSetupResponse
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 	assert.Equal(t, "v1.2.3", body.DefaultRunnerVersion)
+	assert.Equal(t, "v1.2.3", body.StableRunnerVersion)
+	assert.Equal(t, "single-host", body.InstallationType)
 	assert.Equal(t, "v2.3.4", body.DefaultFleetManagerVersion)
 	assert.Equal(t, "2.3.4", body.DefaultChartVersion)
 	assert.Equal(t, fleetManagerChartRepository, body.ChartRepository)
@@ -256,6 +259,7 @@ func TestAdminGetFleetManagerSetupMergesPublishedRunnerVersions(t *testing.T) {
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 	assert.Equal(t, []string{"v9.9.9", "v1.4.0", "v1.2.3", "v1.0.0", "v0.9.0"}, body.RunnerVersions)
 	assert.Equal(t, "v1.4.0", body.DefaultRunnerVersion)
+	assert.Equal(t, "v1.2.3", body.StableRunnerVersion)
 }
 
 func TestAdminGetFleetManagerSetupKeepsCachedRunnerVersionsWhenLookupFails(t *testing.T) {
