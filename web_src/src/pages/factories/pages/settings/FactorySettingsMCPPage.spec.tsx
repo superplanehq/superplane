@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import type { FactoriesFactoryMcpClient } from "@/api-client";
 import {
   FEATURE_SUPERPLANE_MCP_SERVER,
   FEATURE_WORKSPACE_AGENT,
@@ -20,40 +19,14 @@ import {
   defaultFactoriesFixture,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
-  STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
 } from "../../__fixtures__/factoryPageResponses";
+import { connectedMcpClient, renderSuperplaneMcpServer } from "./FactorySettingsMCPPage.spec.fixtures";
 
 const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 const settingsAgentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
-const superplaneMcpServerPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/superplane-mcp-server`;
 const mcpConfigurePath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
 const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
-
-function connectedMcpClient(id: string, clientName: string): FactoriesFactoryMcpClient {
-  return {
-    id,
-    clientName,
-    userId: STORYBOOK_ME_USER_ID,
-    userName: STORYBOOK_ME_USER_NAME,
-    userAvatarUrl: "/storybook/leonardo-dicaprio.jpg",
-    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-  };
-}
-
-function renderSuperplaneMcpServer(clients?: FactoriesFactoryMcpClient[]) {
-  render(
-    <FactoriesHarness
-      pathSuffix={superplaneMcpServerPath}
-      factoriesFixture={
-        clients
-          ? { ...defaultFactoriesFixture, mcpClientsByFactoryId: { [PRIMARY_FACTORY_ID]: clients } }
-          : defaultFactoriesFixture
-      }
-      experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
-    />,
-  );
-}
 
 describe("FactorySettingsMCPPage", () => {
   beforeAll(() => {
