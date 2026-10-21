@@ -17,6 +17,7 @@ export function BacklogIntakeSearchRow({
   return (
     <button
       type="button"
+      disabled={Boolean(item.disabledReason)}
       className="flex w-full flex-col rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent"
       data-testid={`lines-backlog-create-item-${item.id}`}
       onClick={() => onImportItem(item)}
@@ -25,6 +26,7 @@ export function BacklogIntakeSearchRow({
         <span className="min-w-0 flex-1 truncate">{item.title}</span>
         <span className="shrink-0 text-[12px] text-muted-foreground">{item.key}</span>
       </span>
+      {item.disabledReason ? <span className="text-[12px] text-muted-foreground">{item.disabledReason}</span> : null}
       {createdAt && createdTimeLabel ? (
         <time
           dateTime={createdAt.toISOString()}
