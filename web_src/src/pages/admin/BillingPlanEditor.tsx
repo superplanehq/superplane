@@ -362,17 +362,23 @@ function planNumberFields(linked: boolean, legacy: boolean) {
     {
       key: "seat_limit",
       label: "Seat limit",
-      help: "Maximum organization members. Leave empty for unlimited seats.",
+      help: legacy
+        ? "Legacy Business seat limit cannot change."
+        : "Maximum organization members. Leave empty for unlimited seats.",
       nullable: true,
       placeholder: "Unlimited",
+      locked: legacy,
       section: "Usage limits",
     },
     {
       key: "parallel_task_limit",
       label: "Parallel task limit",
-      help: "Saved for future use. This limit does not restrict task execution.",
+      help: legacy
+        ? "Legacy Business parallel task limit cannot change."
+        : "Saved for future use. This limit does not restrict task execution.",
       nullable: true,
       placeholder: "Unlimited",
+      locked: legacy,
       section: "Usage limits",
     },
     {

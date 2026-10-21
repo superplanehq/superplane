@@ -167,6 +167,47 @@ it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimit
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
+it("locks legacy Business pricing and usage limits in the editor", async () => {
+  const plan = {
+    id: "legacy-business",
+    key: "business_legacy",
+    name: "Business",
+    category: "paid",
+    visibility: "private",
+    require_payment_method: false,
+    price_cents: 19900,
+    per_seat: false,
+    polar_product_id: null,
+    seat_limit: null,
+    parallel_task_limit: null,
+    credit_amount_cents: 5000,
+    credit_frequency: "billing_period",
+    credit_expiration: "period_end",
+    credit_validity_days: null,
+    trial_credit_cents: 0,
+    trial_length_days: 14,
+    markup_bps: null,
+    features: [],
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async (input: RequestInfo | URL) =>
+        new Response(JSON.stringify(String(input).endsWith("feature-definitions") ? [] : [plan])),
+    ),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await user.click(await screen.findByRole("button", { name: "Edit Business" }));
+  expect(screen.getByLabelText("Price (cents)", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Seat limit", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Parallel task limit", { exact: true })).toBeDisabled();
+});
+
 it("protects Business Manual from deletion and unsupported catalog edits", async () => {
   const plan = {
     id: "manual-business",
