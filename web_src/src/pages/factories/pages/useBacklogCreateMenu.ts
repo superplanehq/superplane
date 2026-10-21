@@ -96,6 +96,9 @@ export function useBacklogCreateMenu(
   };
 
   const importItem = async (item: BacklogIntakeItem) => {
+    if (item.disabledReason) {
+      return;
+    }
     try {
       if (hasCatalog) {
         await createWorkOrder.mutateAsync({ title: item.title, description: item.body });
@@ -146,6 +149,7 @@ function liveBacklogItems(
     title: item.title ?? "",
     body: item.body ?? "",
     createdAt: item.createdAt,
+    disabledReason: item.disabledReason,
   }));
 }
 
