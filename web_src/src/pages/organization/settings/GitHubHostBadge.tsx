@@ -1,4 +1,5 @@
 import type { OrganizationsIntegration } from "@/api-client";
+import { Badge } from "@/components/ui/badge";
 import { githubHostFromIntegration } from "@/lib/githubHost";
 
 export function GitHubHostBadge({ integration }: { integration: OrganizationsIntegration }) {
@@ -8,12 +9,13 @@ export function GitHubHostBadge({ integration }: { integration: OrganizationsInt
   }
 
   return (
-    <span
+    <Badge
       data-testid="github-host-badge"
-      className="max-w-[16rem] truncate rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
+      variant="secondary"
+      className="max-w-[16rem] min-w-0 truncate font-mono font-normal text-muted-foreground"
       title={host}
     >
       {host}
-    </span>
+    </Badge>
   );
 }
