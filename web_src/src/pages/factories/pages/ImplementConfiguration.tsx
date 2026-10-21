@@ -7,10 +7,10 @@ import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import { ImplementDurationDraftProvider } from "./ImplementDurationDraft";
 import { ImplementSettingRow } from "./ImplementSettingRow";
 import { findImplementPullRequest, useImplementSettingsDraft } from "./implementSettingsDraft";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
-type SaveSettings = (update: NodeConfigurationUpdate) => Promise<void> | void;
+type SaveSettings = (update: NodeConfigurationSave) => Promise<void> | void;
 
 type ImplementSettingsController = {
   agentDraft: PlanningReviewDraft;
@@ -154,7 +154,11 @@ function ImplementConfigurationView({
       onChange={onDurationStateChange}
     >
       <div className="flex min-h-0 flex-1 flex-col bg-background">
-        <section aria-label="Implement configuration" className="min-h-0 flex-1 overflow-y-auto">
+        <section
+          aria-label="Implement configuration"
+          inert={saving || undefined}
+          className="min-h-0 flex-1 overflow-y-auto"
+        >
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-8 sm:px-10">
             <AgentRunnerSettings
               key={agent.id}
@@ -166,8 +170,11 @@ function ImplementConfigurationView({
               onSave={() => undefined}
               onDraftChange={onAgentDraftChange}
               view="implementation"
+              disabled={saving}
             />
-            {pullRequest ? <PullRequestSettings node={pullRequest} onDraftChange={onPullRequestDraftChange} /> : null}
+            {pullRequest ? (
+              <PullRequestSettings node={pullRequest} disabled={saving} onDraftChange={onPullRequestDraftChange} />
+            ) : null}
           </div>
         </section>
         <ImplementSettingsFooter
@@ -208,9 +215,11 @@ function ImplementSettingsFooter({
 
 function PullRequestSettings({
   node,
+  disabled = false,
   onDraftChange,
 }: {
   node: SuperplaneComponentsNode;
+  disabled?: boolean;
   onDraftChange: (draft: boolean) => void;
 }) {
   const id = useId();
@@ -224,6 +233,7 @@ function PullRequestSettings({
         id={id}
         aria-describedby={`${id}-help`}
         checked={node.configuration?.draft === true}
+        disabled={disabled}
         onCheckedChange={onDraftChange}
       />
     </ImplementSettingRow>

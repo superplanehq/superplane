@@ -4,7 +4,15 @@ import { useImplementDurationDraft } from "./implementDurationState";
 import { implementDurationMinutes } from "./implementSettingsDraft";
 import { ImplementSettingRow } from "./ImplementSettingRow";
 
-export function ImplementRunDuration({ seconds, onChange }: { seconds: unknown; onChange: (seconds: number) => void }) {
+export function ImplementRunDuration({
+  seconds,
+  disabled = false,
+  onChange,
+}: {
+  seconds: unknown;
+  disabled?: boolean;
+  onChange: (seconds: number) => void;
+}) {
   const duration = useImplementDurationDraft();
   const timeout = typeof seconds === "number" && seconds > 0 ? seconds : 3600;
   const minutes = duration?.minutes ?? implementDurationMinutes(seconds);
@@ -37,6 +45,7 @@ export function ImplementRunDuration({ seconds, onChange }: { seconds: unknown; 
           max={1440}
           step="any"
           value={minutes}
+          disabled={disabled}
           onChange={(event) => commit(event.target.value)}
           onBlur={() => {
             const next = durationSeconds(minutes);

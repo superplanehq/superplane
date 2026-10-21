@@ -197,19 +197,17 @@ describe("MergeConfidenceConfigModal", () => {
       await user.click(save);
       expect(save).toHaveTextContent("Saving");
       expect(save).toBeDisabled();
+      expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeDisabled();
+      expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toBeDisabled();
       await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(1));
       finishSave();
-      await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(2));
-      expect(onSaveNode).toHaveBeenNthCalledWith(
-        1,
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(onSaveNode).toHaveBeenCalledWith([
         expect.objectContaining({
           nodeId: "implementation-agent-no-issue",
           configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
           concurrency: { max: 3, key: "implementation" },
         }),
-      );
-      expect(onSaveNode).toHaveBeenNthCalledWith(
-        2,
         expect.objectContaining({
           nodeId: "create-pr",
           name: "Create Pull Request",
@@ -217,8 +215,7 @@ describe("MergeConfidenceConfigModal", () => {
           integration: { id: "github-connection" },
           concurrency: { max: 1, key: "{{ $.data.branch }}" },
         }),
-      );
-      expect(onClose).toHaveBeenCalled();
+      ]);
       return;
     }
 

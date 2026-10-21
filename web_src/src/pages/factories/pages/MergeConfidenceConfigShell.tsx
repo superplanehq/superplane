@@ -18,7 +18,7 @@ import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
 import { MergeConfidenceActionsMenu, MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { NodeConfigPanel } from "./NodeConfigPanel";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 import {
   SettingsAutomationHeaderRow,
   SettingsAutomationWorkspace,
@@ -53,7 +53,7 @@ interface MergeConfidenceConfigShellProps {
   isResizing: boolean;
   onResizeStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onClosePanel?: () => void;
-  onSaveNode: (update: NodeConfigurationUpdate) => Promise<void> | void;
+  onSaveNode: (update: NodeConfigurationSave) => Promise<void> | void;
   graph?: IntakeAutomationGraph;
   loading: boolean;
   error: boolean;

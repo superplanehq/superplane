@@ -7,7 +7,7 @@ import {
   type CanvasSpecNode,
 } from "../lib/columnCanvasAgent";
 import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave, NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 const IMPLEMENT_SETTINGS_SAVE_ERROR = "Could not save Implement settings.";
@@ -24,7 +24,7 @@ type ImplementSettingsDraft = {
   durationInvalid: boolean;
 };
 
-type SaveNode = (update: NodeConfigurationUpdate) => Promise<void> | void;
+type SaveNode = (update: NodeConfigurationSave) => Promise<void> | void;
 
 export function findImplementPullRequest(nodes: SuperplaneComponentsNode[]) {
   return nodes.find((node) => PULL_REQUEST_COMPONENTS.includes(node.component ?? ""));
@@ -72,6 +72,27 @@ function createImplementSettingsDraft(
     durationMinutes: implementDurationMinutes(agent.configuration?.executionTimeoutSeconds),
     durationInvalid: false,
   };
+}
+
+function pendingNodeUpdates(
+  agentChanged: boolean,
+  agentUpdate: NodeConfigurationUpdate,
+  pullRequestChanged: boolean,
+  pullRequestUpdate: NodeConfigurationUpdate | undefined,
+): NodeConfigurationUpdate[] {
+  return [
+    ...(agentChanged ? [agentUpdate] : []),
+    ...(pullRequestChanged && pullRequestUpdate ? [pullRequestUpdate] : []),
+  ];
+}
+
+function sameEditableSettings(left: ImplementSettingsDraft, right: ImplementSettingsDraft): boolean {
+  return (
+    left.durationMinutes === right.durationMinutes &&
+    left.durationInvalid === right.durationInvalid &&
+    JSON.stringify(left.agentDraft) === JSON.stringify(right.agentDraft) &&
+    JSON.stringify(left.pullRequestNode ?? null) === JSON.stringify(right.pullRequestNode ?? null)
+  );
 }
 
 export function useImplementSettingsDraft(nodes: SuperplaneComponentsNode[] | undefined, enabled: boolean) {
@@ -125,8 +146,9 @@ export function useImplementSettingsDraft(nodes: SuperplaneComponentsNode[] | un
     const pullRequestUpdate = current.pullRequestNode ? implementNodeUpdate(current.pullRequestNode) : undefined;
     const pullRequestSnapshot = pullRequestUpdate ? JSON.stringify(pullRequestUpdate) : undefined;
     const pullRequestChanged = Boolean(pullRequestSnapshot && pullRequestSnapshot !== current.savedPullRequest);
+    const updates = pendingNodeUpdates(agentChanged, agentUpdate, pullRequestChanged, pullRequestUpdate);
 
-    if (!agentChanged && !pullRequestChanged) {
+    if (updates.length === 0) {
       onClose();
       return;
     }
@@ -135,15 +157,15 @@ export function useImplementSettingsDraft(nodes: SuperplaneComponentsNode[] | un
     setSaving(true);
     setSaveError(undefined);
     try {
-      if (agentChanged) {
-        await onSaveNode(agentUpdate);
-        patchDraft({ savedAgent: agentSnapshot });
+      await onSaveNode(updates.length === 1 ? updates[0] : updates);
+      const latest = draftRef.current;
+      patchDraft({
+        ...(agentChanged ? { savedAgent: agentSnapshot } : {}),
+        ...(pullRequestChanged && pullRequestSnapshot ? { savedPullRequest: pullRequestSnapshot } : {}),
+      });
+      if (!latest || sameEditableSettings(current, latest)) {
+        onClose();
       }
-      if (pullRequestChanged && pullRequestUpdate) {
-        await onSaveNode(pullRequestUpdate);
-        patchDraft({ savedPullRequest: pullRequestSnapshot });
-      }
-      onClose();
     } catch {
       setSaveError(IMPLEMENT_SETTINGS_SAVE_ERROR);
     } finally {

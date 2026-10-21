@@ -14,6 +14,8 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { implementConfigGraph } from "./MergeConfidenceConfigModal.spec.fixtures";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
+import { useImplementSettingsDraft } from "./implementSettingsDraft";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 
 vi.mock("@/hooks/useCanvasData", () => {
   const actual = unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData");
@@ -43,7 +45,7 @@ vi.mock("@/hooks/useComponentData", () => ({
 }));
 
 function renderImplementSettings(
-  onSaveNode: (update: { nodeId: string }) => Promise<void> | void,
+  onSaveNode: (update: NodeConfigurationSave) => Promise<void> | void,
   onClose: () => void,
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -87,12 +89,12 @@ describe("Implement settings save", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("retries only the nodes that did not save", async () => {
+  it("saves changed nodes together and retries that write", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    let failPullRequest = true;
-    const onSaveNode = vi.fn(async (update: { nodeId: string }) => {
-      if (failPullRequest && update.nodeId === "create-pr") throw new Error("save failed");
+    let failSave = true;
+    const onSaveNode = vi.fn(async () => {
+      if (failSave) throw new Error("save failed");
     });
     renderImplementSettings(onSaveNode, onClose);
 
@@ -103,14 +105,48 @@ describe("Implement settings save", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not save Implement settings.");
     expect(onClose).not.toHaveBeenCalled();
-    expect(onSaveNode).toHaveBeenCalledTimes(2);
-    failPullRequest = false;
+    expect(onSaveNode).toHaveBeenCalledTimes(1);
+    expect(onSaveNode).toHaveBeenCalledWith([
+      expect.objectContaining({
+        nodeId: "implementation-agent-no-issue",
+        concurrency: { max: 3, key: "implementation" },
+      }),
+      expect.objectContaining({ nodeId: "create-pr", configuration: expect.objectContaining({ draft: false }) }),
+    ]);
+    failSave = false;
     onSaveNode.mockClear();
     await user.click(screen.getByTestId("implement-settings-save"));
 
     await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(1));
-    expect(onSaveNode).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "create-pr" }));
+    expect(onSaveNode).toHaveBeenCalledWith([
+      expect.objectContaining({ nodeId: "implementation-agent-no-issue" }),
+      expect.objectContaining({ nodeId: "create-pr" }),
+    ]);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks fields while save is in progress", async () => {
+    const user = userEvent.setup();
+    let finishSave = () => {};
+    const saving = new Promise<void>((resolve) => {
+      finishSave = resolve;
+    });
+    const onClose = vi.fn();
+    const onSaveNode = vi.fn(() => saving);
+    renderImplementSettings(onSaveNode, onClose);
+
+    await user.click(screen.getByRole("switch", { name: "Create draft pull requests" }));
+    await user.click(screen.getByTestId("implement-settings-save"));
+
+    const configuration = screen.getByRole("region", { name: "Implement configuration" });
+    expect(configuration).toHaveAttribute("inert");
+    expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" })).toBeDisabled();
+    finishSave();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onSaveNode).toHaveBeenCalledTimes(1);
   });
 
   it("discards edits when the screen closes", async () => {
@@ -124,5 +160,52 @@ describe("Implement settings save", () => {
 
     expect(onSaveNode).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the screen open when an edit arrives during save", async () => {
+    const user = userEvent.setup();
+    let finishSave = () => {};
+    const saving = new Promise<void>((resolve) => {
+      finishSave = resolve;
+    });
+    const onClose = vi.fn();
+    const onSaveNode = vi.fn(() => saving);
+    const graph = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Keep this prompt" }]);
+
+    function Harness() {
+      const settings = useImplementSettingsDraft(graph.specNodes, true);
+      return (
+        <>
+          <button type="button" onClick={() => settings.updatePullRequestDraft(false)}>
+            Mark ready
+          </button>
+          <button type="button" onClick={() => settings.updatePullRequestDraft(true)}>
+            Mark draft
+          </button>
+          <button type="button" onClick={() => void settings.save(onSaveNode, onClose)}>
+            Save draft
+          </button>
+          <span>{settings.saving ? "saving" : "idle"}</span>
+        </>
+      );
+    }
+
+    render(<Harness />);
+
+    await user.click(screen.getByRole("button", { name: "Mark ready" }));
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+    expect(await screen.findByText("saving")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Mark draft" }));
+    finishSave();
+
+    expect(await screen.findByText("idle")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    onSaveNode.mockClear();
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onSaveNode).toHaveBeenCalledWith(
+      expect.objectContaining({ nodeId: "create-pr", configuration: expect.objectContaining({ draft: true }) }),
+    );
   });
 });

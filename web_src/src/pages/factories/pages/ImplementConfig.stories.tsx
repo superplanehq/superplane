@@ -146,12 +146,17 @@ function ImplementConfigPreview({
           onClose={() => console.log("Close Implement settings")}
           onDelete={() => console.log("Delete Implement automation")}
           onSaveNode={(update) => {
-            console.log("Save Implement settings", update);
+            const updates = Array.isArray(update) ? update : [update];
+            console.log("Save Implement settings", updates);
             setSpecNodes((nodes) =>
-              nodes.map((node) =>
-                node.id === update.nodeId
-                  ? { ...node, name: update.name, configuration: update.configuration, concurrency: update.concurrency }
-                  : node,
+              updates.reduce(
+                (current, next) =>
+                  current.map((node) =>
+                    node.id === next.nodeId
+                      ? { ...node, name: next.name, configuration: next.configuration, concurrency: next.concurrency }
+                      : node,
+                  ),
+                nodes,
               ),
             );
           }}

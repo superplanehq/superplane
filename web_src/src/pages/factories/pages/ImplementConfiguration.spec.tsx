@@ -6,9 +6,9 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
 import { ImplementConfiguration } from "./ImplementConfiguration";
 import { implementConfigGraph } from "./MergeConfidenceConfigModal.spec.fixtures";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 
-function renderSettings(agent: SuperplaneComponentsNode, onSave: (update: NodeConfigurationUpdate) => void) {
+function renderSettings(agent: SuperplaneComponentsNode, onSave: (update: NodeConfigurationSave) => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(experimentalFeaturesKeys.registry(), { features: [] });
   return render(
