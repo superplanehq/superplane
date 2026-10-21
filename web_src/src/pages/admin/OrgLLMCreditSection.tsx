@@ -15,7 +15,6 @@ import { Wallet } from "lucide-react";
 
 import {
   creditRemainingCents,
-  formatUtcTrialEnd,
   useOrgLLMCredit,
   utcCalendarDate,
   type CreditBalanceBucket,
@@ -33,14 +32,13 @@ export const ADMIN_PLAN_UNKNOWN_COPY = "SuperPlane could not load the billing pl
 export const ADMIN_SET_BALANCE_HELP_COPY =
   "Enter the new remaining balance. SuperPlane adds the difference to the credit history as an adjustment.";
 export const ADMIN_NO_ACTIVE_TRIAL_COPY = "This organization has no active trial credit.";
-export const ADMIN_INCLUDED_USAGE_COPY = "Plan grants and manual adjustments set this balance.";
+export const ADMIN_INCLUDED_USAGE_COPY = "Plan grants set this balance.";
 export const ADMIN_TRIAL_ENDS_LABEL = "Trial ends";
 export const ADMIN_TRIAL_ENDS_HELP = "Trial credit stays usable until this date. Dates use UTC.";
 export const ADMIN_TRIAL_ENDS_ERROR = "Choose a future date.";
 export const ADMIN_CREDIT_HISTORY_ERROR_COPY = "SuperPlane could not load the credit history.";
 
 const EDITABLE_BALANCES: Array<{ bucket: CreditBalanceBucket; label: string; action: string }> = [
-  { bucket: "included", label: "Included credit", action: "Set included credit" },
   { bucket: "trial", label: "Trial credit", action: "Set trial credit" },
   { bucket: "topup", label: "Top-up credit", action: "Set top-up credit" },
   { bucket: "grant", label: "SuperPlane grant", action: "Set SuperPlane grant" },
@@ -68,7 +66,6 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
           polarManaged={credit.plan?.polar_managed === true}
           planKnown={credit.plan != null}
           savedPlan={credit.plan}
-          savedTrialEndsAt={credit.plan?.trial_ends_at ?? null}
           showPlanControls={billingProductEnabled}
         />
       ) : null}
@@ -83,7 +80,6 @@ function OrgBillingPlanField(args: {
   planKnown: boolean;
   planValue: string;
   setPlanValue: (value: string) => void;
-  savedTrialEndsAt: string | null;
   trialEndsOn: string;
   setTrialEndsOn: (value: string) => void;
   trialEndInvalid: boolean;
@@ -92,9 +88,7 @@ function OrgBillingPlanField(args: {
 }) {
   const planEditable = args.planKnown && !args.polarManaged;
   const catalogLocked = !!args.catalogError || args.catalog.length === 0;
-  const showTrialEndField = planEditable && args.planValue === "trial";
-  const savedTrialEnd = formatUtcTrialEnd(args.savedTrialEndsAt);
-  const showTrialEnd = planEditable && (showTrialEndField || savedTrialEnd != null);
+  const showTrialEnd = planEditable && args.planValue === "trial";
   return (
     <div className="mb-4 max-w-sm">
       <Label className="mb-2 block text-left">Billing plan</Label>
@@ -123,27 +117,19 @@ function OrgBillingPlanField(args: {
           <Label className="mb-2 block text-left" htmlFor="admin-org-trial-ends-input">
             {ADMIN_TRIAL_ENDS_LABEL}
           </Label>
-          {showTrialEndField ? (
-            <>
-              <Input
-                id="admin-org-trial-ends-input"
-                type="date"
-                data-testid="admin-org-trial-ends-input"
-                value={args.trialEndsOn}
-                min={utcCalendarDate(new Date())}
-                aria-invalid={args.trialEndInvalid}
-                onChange={(event) => args.setTrialEndsOn(event.target.value)}
-              />
-              <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">{ADMIN_TRIAL_ENDS_HELP}</Text>
-              {args.trialEndInvalid ? (
-                <Text className="mt-1 text-xs text-red-600 dark:text-red-400">{ADMIN_TRIAL_ENDS_ERROR}</Text>
-              ) : null}
-            </>
-          ) : (
-            <Text data-testid="admin-org-trial-ends" className="text-sm text-gray-900 dark:text-gray-100">
-              {savedTrialEnd}
-            </Text>
-          )}
+          <Input
+            id="admin-org-trial-ends-input"
+            type="date"
+            data-testid="admin-org-trial-ends-input"
+            value={args.trialEndsOn}
+            min={utcCalendarDate(new Date())}
+            aria-invalid={args.trialEndInvalid}
+            onChange={(event) => args.setTrialEndsOn(event.target.value)}
+          />
+          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">{ADMIN_TRIAL_ENDS_HELP}</Text>
+          {args.trialEndInvalid ? (
+            <Text className="mt-1 text-xs text-red-600 dark:text-red-400">{ADMIN_TRIAL_ENDS_ERROR}</Text>
+          ) : null}
         </div>
       ) : null}
       {planEditable ? (
@@ -181,8 +167,6 @@ function OrgHostedCreditCard(args: {
   orgId: string;
   catalog: BillingPlan[];
   catalogError: string;
-  includedExpiresAt: string;
-  setIncludedExpiresAt: (value: string) => void;
   credit: OrganizationLLMCredit;
   grants: OrganizationsOrganizationCreditGrant[];
   polarManaged: boolean;
@@ -197,7 +181,6 @@ function OrgHostedCreditCard(args: {
   planValue: string;
   setPlanValue: (value: string) => void;
   savingBalance: CreditBalanceBucket | null;
-  savedTrialEndsAt: string | null;
   trialEndsOn: string;
   setTrialEndsOn: (value: string) => void;
   trialEndInvalid: boolean;
@@ -222,7 +205,6 @@ function OrgHostedCreditCard(args: {
           planKnown={args.planKnown}
           planValue={args.planValue}
           setPlanValue={args.setPlanValue}
-          savedTrialEndsAt={args.savedTrialEndsAt}
           trialEndsOn={args.trialEndsOn}
           setTrialEndsOn={args.setTrialEndsOn}
           trialEndInvalid={args.trialEndInvalid}
@@ -252,16 +234,6 @@ function OrgHostedCreditCard(args: {
               onSave={() => args.saveBalance(bucket)}
             />
           ))}
-        </div>
-        <div className="mt-4">
-          <Label htmlFor="included-expiration">Included credit expiration (UTC)</Label>
-          <Input
-            id="included-expiration"
-            type="datetime-local"
-            value={args.includedExpiresAt}
-            onChange={(event) => args.setIncludedExpiresAt(event.target.value)}
-          />
-          <Text>For an increase, choose a future UTC expiration. Leave empty for no scheduled expiration.</Text>
         </div>
         <Label htmlFor="admin-org-credit-note" className="mb-2 mt-4 block text-left">
           Note (optional)

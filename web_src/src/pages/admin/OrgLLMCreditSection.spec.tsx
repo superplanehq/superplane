@@ -233,8 +233,17 @@ describe("OrgLLMCreditSection billing plan", () => {
     await user.click(await screen.findByRole("option", { name: "Business Manual" }));
 
     expect(screen.queryByTestId("admin-org-trial-ends-input")).not.toBeInTheDocument();
-    expect(screen.getByTestId("admin-org-trial-ends")).toHaveTextContent(trialDate);
+    expect(screen.queryByText(ADMIN_TRIAL_ENDS_LABEL)).not.toBeInTheDocument();
     expect(screen.queryByText(ADMIN_TRIAL_ENDS_HELP)).not.toBeInTheDocument();
+  });
+
+  it("hides a leftover trial end on an assigned paid plan", async () => {
+    mockOrgCreditFetch({ plan: billingPlan(false, `${futureUtcDate(40)}T23:59:59Z`, "business") });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-billing-plan")).toHaveTextContent("Business Manual");
+    expect(screen.queryByText(ADMIN_TRIAL_ENDS_LABEL)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-org-trial-ends-input")).not.toBeInTheDocument();
   });
 
   it("hides the trial end when Polar manages billing", async () => {
@@ -318,13 +327,16 @@ describe("OrgLLMCreditSection billing plan", () => {
 });
 
 describe("OrgLLMCreditSection balances", () => {
-  it("shows the remaining balance of each credit type and the credit history", async () => {
+  it("shows credit balances and history without controls to set included credit", async () => {
     mockOrgCreditFetch();
     render(<OrgLLMCreditSection orgId="org-1" />);
 
     expect(await screen.findByTestId("admin-org-credit-total-remaining")).toHaveTextContent("$95.00");
     expect(screen.getByTestId("admin-org-credit-trial-remaining")).toHaveTextContent("$45.00");
     expect(screen.getByTestId("admin-org-credit-included-remaining")).toHaveTextContent("$0.00");
+    expect(screen.queryByLabelText("Included credit (USD)")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Set included credit" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Included credit expiration (UTC)")).not.toBeInTheDocument();
     expect(screen.getByTestId("admin-org-credit-topup-remaining")).toHaveTextContent("$30.00");
     expect(screen.getByTestId("admin-org-credit-grant-remaining")).toHaveTextContent("$20.00");
     expect(screen.getByTestId("admin-org-credit-trial-target")).toHaveValue("45.00");
@@ -490,31 +502,5 @@ describe("OrgLLMCreditSection balances", () => {
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Trial adjustment")).toBeInTheDocument();
     expect(screen.queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
-  });
-});
-
-it("sends the exact included balance with an expiration and note", async () => {
-  const user = userEvent.setup();
-  const fetchMock = mockOrgCreditFetch();
-  render(<OrgLLMCreditSection orgId="org-1" />);
-  const target = await screen.findByTestId("admin-org-credit-included-target");
-  await user.clear(target);
-  await user.type(target, "25");
-  const expiration = `${futureUtcDate(5)}T12:30`;
-  fireEvent.change(screen.getByLabelText("Included credit expiration (UTC)"), { target: { value: expiration } });
-  await user.type(screen.getByTestId("admin-org-credit-note"), "Restore included credit");
-  await user.click(screen.getByTestId("admin-org-credit-included-save"));
-  await waitFor(() => {
-    const call = fetchMock.mock.calls.find(
-      ([input, init]) => String(input).endsWith("/llm-credit/balances") && init?.method === "PUT",
-    );
-    expect(JSON.parse(String(call?.[1]?.body))).toEqual({
-      bucket: "included",
-      target_cents: 2500,
-      expected_remaining_cents: 0,
-      note: "Restore included credit",
-      expiration: "at",
-      expires_at: `${expiration}:00Z`,
-    });
   });
 });

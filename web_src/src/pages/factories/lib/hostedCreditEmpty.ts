@@ -13,6 +13,7 @@ export interface HostedCreditBannerInput {
   billingEnabled?: boolean;
   welcomeCreditExpiresAt?: string;
   plan?: string;
+  planCategory?: string;
   trialEndsAt?: string;
   subscriptionCheckoutEnabled?: boolean;
   creditPurchaseAllowed?: boolean;
@@ -36,13 +37,16 @@ export function isWelcomeCreditExpired(value: string | undefined, now: Date = ne
 }
 
 export function isHostedCreditTrialOrg(
-  args: Pick<HostedCreditBannerInput, "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "trialEndsAt">,
+  args: Pick<
+    HostedCreditBannerInput,
+    "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "planCategory" | "trialEndsAt"
+  >,
 ): boolean {
-  if (args.plan === "business" || args.plan === "none") {
-    return false;
+  if (args.planCategory) {
+    return args.planCategory === "trial";
   }
-  if (args.plan === "trial") {
-    return true;
+  if (args.plan) {
+    return args.plan === "trial";
   }
   const purchased = parseWorkOrderMetric(args.purchasedCreditCents);
   const expiresAt = parseWelcomeCreditExpiresAt(args.trialEndsAt ?? args.welcomeCreditExpiresAt);
@@ -72,7 +76,7 @@ export function hostedCreditBannerKind(args: HostedCreditBannerInput): HostedCre
     return "trial";
   }
 
-  if (args.plan === "none") {
+  if (args.planCategory === "none" || args.plan === "none") {
     return "lapsed";
   }
 
@@ -119,25 +123,26 @@ export function hostedCreditHeaderKickerActionLabel(kind: HostedCreditHeaderKick
 }
 
 export function organizationPlanLabel(
-  args: Pick<HostedCreditBannerInput, "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "trialEndsAt"> & {
+  args: Pick<
+    HostedCreditBannerInput,
+    "purchasedCreditCents" | "welcomeCreditExpiresAt" | "plan" | "planCategory" | "trialEndsAt"
+  > & {
+    planName?: string;
     now?: Date;
   },
 ): string | undefined {
-  if (args.plan === "business") {
-    return "Business";
-  }
-  if (args.plan === "none") {
+  if (args.planCategory === "none" || args.plan === "none") {
     return "No plan";
   }
   if (!isHostedCreditTrialOrg(args)) {
-    return undefined;
+    return args.planName || (args.plan === "business" ? "Business" : undefined);
   }
   const expiresAt = parseWelcomeCreditExpiresAt(args.trialEndsAt ?? args.welcomeCreditExpiresAt);
   const now = args.now ?? new Date();
   if (expiresAt != null && expiresAt.getTime() <= now.getTime()) {
     return "Trial ended";
   }
-  return "Trial";
+  return args.planName || "Trial";
 }
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -170,6 +175,7 @@ export interface HostedCreditBillingBalanceInput {
   billingEnabled: boolean;
   welcomeCreditExpiresAt?: string;
   plan?: string;
+  planCategory?: string;
   trialEndsAt?: string;
   creditPurchaseAllowed?: boolean;
   now?: Date;
@@ -182,6 +188,7 @@ export function hostedCreditBillingBalanceCopy(args: HostedCreditBillingBalanceI
     purchasedCreditCents: args.purchasedCents,
     welcomeCreditExpiresAt: args.welcomeCreditExpiresAt,
     plan: args.plan,
+    planCategory: args.planCategory,
     trialEndsAt: args.trialEndsAt,
   });
   const expiresAt = parseWelcomeCreditExpiresAt(args.trialEndsAt ?? args.welcomeCreditExpiresAt);
@@ -198,7 +205,7 @@ export function hostedCreditBillingBalanceCopy(args: HostedCreditBillingBalanceI
     };
   }
 
-  if (args.plan === "none") {
+  if (args.planCategory === "none" || args.plan === "none") {
     return {
       badge: null,
       description: "Hosted runs cannot start. Subscribe to Business to continue.",

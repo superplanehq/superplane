@@ -1,9 +1,11 @@
+import { Link } from "react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { bpsToPercentInput, centsToDollarInput, dollarInputToCents, percentInputToBps } from "@/lib/hostedCredit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -147,7 +149,13 @@ function PlanAccessFields({
       <fieldset className="space-y-3 border-t pt-5">
         <legend className="text-sm font-semibold">Plan features</legend>
         {features.length === 0 && (
-          <p className="text-sm text-muted-foreground">Create features in the Features tab to add them to a plan.</p>
+          <p className="text-sm text-muted-foreground">
+            Create features on the{" "}
+            <Link to="/admin/features" className="underline">
+              Features page
+            </Link>{" "}
+            to add them to a plan.
+          </p>
         )}
         {features.map((feature) => (
           <Label key={feature.key} className="flex items-center gap-3 rounded-lg border p-3">
@@ -224,18 +232,11 @@ function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
   const linked = !!plan.id && !!plan.polar_product_id;
   const legacy = plan.key === "business_legacy";
   const manual = plan.key === "business_manual";
-  const fixedCreditPolicy = ["business_legacy", "business_manual"].includes(plan.key);
   return (
     <>
-      {["Pricing", "Usage limits", "Credits and trial"].map((section) => (
+      {["Pricing", "Usage limits", "Trial"].map((section) => (
         <section key={section} className="space-y-4 border-t pt-5" aria-label={section}>
           <h3 className="text-sm font-semibold">{section}</h3>
-          {section === "Credits and trial" && (
-            <div className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
-              Automatic credit delivery is available for trials, Business, and Business Manual. Other credit policies
-              are stored for future delivery.
-            </div>
-          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <PlanNumbers plan={plan} section={section} onChange={onChange} />
             {section === "Pricing" && (
@@ -266,34 +267,6 @@ function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
                 />
               </div>
             )}
-            {section === "Credits and trial" && (
-              <>
-                <PlanSelect
-                  label="Credit frequency"
-                  help={
-                    fixedCreditPolicy
-                      ? "Business credit frequency cannot change."
-                      : "One-time credit is granted once per organization and plan. Recurring credit follows subscription periods, or monthly periods for admin plans."
-                  }
-                  value={plan.credit_frequency}
-                  disabled={fixedCreditPolicy}
-                  options={["none", "once", "billing_period"]}
-                  onChange={(credit_frequency) => update({ credit_frequency })}
-                />
-                <PlanSelect
-                  label="Credit expiration"
-                  help={
-                    fixedCreditPolicy
-                      ? "Business credit expiration cannot change."
-                      : "Credit can expire at the period end, after a set number of days, or never."
-                  }
-                  value={plan.credit_expiration}
-                  disabled={fixedCreditPolicy}
-                  options={["period_end", "after_days", "never"]}
-                  onChange={(credit_expiration) => update({ credit_expiration })}
-                />
-              </>
-            )}
           </div>
         </section>
       ))}
@@ -307,7 +280,7 @@ function PlanNumbers({ plan, section, onChange }: PlanFieldsProps & { section: s
     <>
       {numberFields
         .filter((field) => field.section === section)
-        .map(({ key, label, help, nullable, locked, placeholder }) => (
+        .map(({ key, label, help, nullable, locked, placeholder, unit }) => (
           <div key={key} className="space-y-2">
             <div className="flex items-center gap-1.5">
               <Label htmlFor={`plan-${key}`}>{label}</Label>
@@ -317,13 +290,28 @@ function PlanNumbers({ plan, section, onChange }: PlanFieldsProps & { section: s
               id={`plan-${key}`}
               type="number"
               min={0}
-              step={1}
+              step={unit ? 0.01 : 1}
               disabled={locked}
               placeholder={placeholder}
-              value={String(plan[key] ?? "")}
+              defaultValue={
+                plan[key] == null
+                  ? ""
+                  : unit === "USD"
+                    ? centsToDollarInput(Number(plan[key]))
+                    : unit === "%"
+                      ? bpsToPercentInput(Number(plan[key]))
+                      : String(plan[key])
+              }
               onChange={(event) =>
                 update({
-                  [key]: nullable && event.target.value === "" ? null : Number(event.target.value),
+                  [key]:
+                    nullable && event.target.value === ""
+                      ? null
+                      : unit === "USD"
+                        ? dollarInputToCents(event.target.value)
+                        : unit === "%"
+                          ? percentInputToBps(event.target.value)
+                          : Number(event.target.value),
                 })
               }
             />
@@ -341,20 +329,23 @@ function planNumberFields(linked: boolean, legacy: boolean) {
     placeholder?: string;
     locked?: boolean;
     section: string;
+    unit?: "USD" | "%";
   }[] = [
     {
       key: "price_cents",
-      label: "Price (cents)",
+      label: "Price (USD)",
+      unit: "USD",
       help: linked
         ? "Pricing is locked because this plan is linked to a Polar product."
-        : "The plan price in US cents. 100 cents equals $1.",
+        : "The plan price in US dollars.",
       locked: linked || legacy,
       section: "Pricing",
     },
     {
       key: "markup_bps",
-      label: "Markup (basis points)",
-      help: "100 basis points equals 1%. Leave empty to use the installation default.",
+      label: "Markup (%)",
+      unit: "%",
+      help: "The usage markup percentage. Leave empty to use the installation default.",
       nullable: true,
       placeholder: "Installation default",
       section: "Pricing",
@@ -382,33 +373,17 @@ function planNumberFields(linked: boolean, legacy: boolean) {
       section: "Usage limits",
     },
     {
-      key: "credit_amount_cents",
-      label: "Included credit (cents)",
-      help: "Credit included with the plan, in US cents. Changes apply to future grants.",
-      section: "Credits and trial",
-    },
-    {
-      key: "credit_validity_days",
-      label: "Credit validity (days)",
-      help: legacy
-        ? "Legacy Business credit validity cannot change."
-        : "Days before credit expires when credit expiration is set to after days.",
-      nullable: true,
-      placeholder: "Not set",
-      locked: legacy,
-      section: "Credits and trial",
-    },
-    {
       key: "trial_credit_cents",
-      label: "Trial credit (cents)",
-      help: "Credit granted for a trial, in US cents.",
-      section: "Credits and trial",
+      label: "Trial credit (USD)",
+      unit: "USD",
+      help: "Credit granted for a trial, in US dollars.",
+      section: "Trial",
     },
     {
       key: "trial_length_days",
       label: "Trial length (days)",
       help: "Number of days before a trial ends.",
-      section: "Credits and trial",
+      section: "Trial",
     },
   ];
   return fields;

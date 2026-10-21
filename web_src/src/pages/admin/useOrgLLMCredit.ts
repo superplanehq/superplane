@@ -33,19 +33,17 @@ export type OrganizationBillingPlan = {
   current_period_end: string | null;
 };
 
-export type CreditBalanceBucket = "trial" | "topup" | "grant" | "included";
+export type CreditBalanceBucket = "trial" | "topup" | "grant";
 
 export type CreditBalanceInputs = Record<CreditBalanceBucket, string>;
 
 export const CREDIT_BALANCE_CHANGED_COPY = "The balance changed. Reload and try again.";
 
-const EMPTY_BALANCE_INPUTS: CreditBalanceInputs = { trial: "", topup: "", grant: "", included: "" };
+const EMPTY_BALANCE_INPUTS: CreditBalanceInputs = { trial: "", topup: "", grant: "" };
 const TRIAL_LENGTH_DAYS = 14;
 
 export function creditRemainingCents(credit: OrganizationLLMCredit, bucket: CreditBalanceBucket): number {
   switch (bucket) {
-    case "included":
-      return credit.included_remaining_cents ?? 0;
     case "trial":
       return credit.welcome_remaining_cents ?? 0;
     case "topup":
@@ -57,7 +55,6 @@ export function creditRemainingCents(credit: OrganizationLLMCredit, bucket: Cred
 
 function balanceInputsFromCredit(credit: OrganizationLLMCredit): CreditBalanceInputs {
   return {
-    included: centsToDollarInput(creditRemainingCents(credit, "included")),
     trial: centsToDollarInput(creditRemainingCents(credit, "trial")),
     topup: centsToDollarInput(creditRemainingCents(credit, "topup")),
     grant: centsToDollarInput(creditRemainingCents(credit, "grant")),
@@ -99,17 +96,6 @@ function billingPlanRequest(plan: string, trialEndsOn: string): { plan: string; 
     return { plan };
   }
   return { plan, trial_ends_at: utcTrialEndTimestamp(trialEndsOn) };
-}
-
-export function formatUtcTrialEnd(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return utcCalendarDate(parsed);
 }
 
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -160,8 +146,6 @@ async function putOrganizationCreditBalance(
     target_cents: number;
     expected_remaining_cents: number;
     note: string;
-    expiration?: string;
-    expires_at?: string;
   },
 ): Promise<OrganizationLLMCredit> {
   const response = await fetch(`/admin/api/organizations/${orgId}/llm-credit/balances`, {
@@ -319,20 +303,11 @@ export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolea
   const [loading, setLoading] = useState(true);
   const [balanceInputs, setBalanceInputs] = useState<CreditBalanceInputs>(EMPTY_BALANCE_INPUTS);
   const [note, setNote] = useState("");
-  const [includedExpiresAt, setIncludedExpiresAt] = useState("");
   const [savingBalance, setSavingBalance] = useState<CreditBalanceBucket | null>(null);
   const billingPlan = useOrgBillingPlan(orgId, options.billingEnabled);
   const markup = useOrgMarkupOverride(orgId, setCredit);
   const { applyPlan, clearPlan } = billingPlan;
   const { resetMarkup } = markup;
-  useEffect(() => {
-    const plan = billingPlan.plan;
-    let expiry: Date | null = null;
-    if (plan?.credit_expiration === "period_end" && plan.current_period_end) expiry = new Date(plan.current_period_end);
-    if (plan?.credit_expiration === "after_days" && plan.credit_validity_days)
-      expiry = new Date(Date.now() + plan.credit_validity_days * 86400000);
-    setIncludedExpiresAt(expiry && expiry.getTime() > Date.now() ? expiry.toISOString().slice(0, 16) : "");
-  }, [billingPlan.plan]);
 
   const applyCredit = useCallback(
     (data: OrganizationLLMCredit) => {
@@ -395,12 +370,6 @@ export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolea
         target_cents: targetCents,
         expected_remaining_cents: creditRemainingCents(credit, bucket),
         note: note.trim(),
-        ...(bucket === "included"
-          ? {
-              expiration: includedExpiresAt ? "at" : "never",
-              ...(includedExpiresAt ? { expires_at: `${includedExpiresAt}:00Z` } : {}),
-            }
-          : {}),
       });
       applyCredit(next);
       setBalanceInput(bucket, centsToDollarInput(creditRemainingCents(next, bucket)));
@@ -426,8 +395,6 @@ export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolea
     reloadGrants: loadGrants,
     loading,
     balanceInputs,
-    includedExpiresAt,
-    setIncludedExpiresAt,
     setBalanceInput,
     note,
     setNote,

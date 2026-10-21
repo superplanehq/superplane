@@ -103,6 +103,7 @@ import { FleetManagerSetup as FleetManagerSetupAdmin } from "./pages/admin/Fleet
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
 import { BillingPlans } from "./pages/admin/BillingPlans";
+import { Features } from "./pages/admin/Features";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import LicenseExpiryBanner from "./components/LicenseExpiryBanner";
@@ -279,6 +280,7 @@ function AppRouter() {
                 <Route path="encryption" element={<InstallationEncryptionAdmin />} />
                 <Route path="license" element={<InstallationLicenseAdmin />} />
                 <Route path="billing-plans" element={<BillingPlans />} />
+                <Route path="features" element={<Features />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="fleet-manager-setup" element={<FleetManagerSetupAdmin />} />

@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/Table/table";
+import { FeatureOrganizationsSheet } from "./FeatureOrganizationsSheet";
 import { BillingHelp } from "./BillingHelp";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,6 +27,8 @@ export function BillingPlanFeatures({
   onSaved: () => Promise<void>;
 }) {
   const returnFocus = useRef<HTMLButtonElement>(null);
+  const organizationTrigger = useRef<HTMLButtonElement>(null);
+  const [selected, setSelected] = useState<FeatureDefinition | null>(null);
   const [editing, setEditing] = useState<FeatureDefinition | null>(null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -97,33 +100,30 @@ export function BillingPlanFeatures({
               </TableRow>
             )}
             {features.map((feature) => (
-              <TableRow key={feature.key} className="hover:bg-muted/30">
-                <TableCell className="font-medium">{feature.label}</TableCell>
-                <TableCell>
-                  <code className="text-xs text-muted-foreground">{feature.key}</code>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{feature.gated ? "Restricted" : "All organizations"}</Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={`Edit ${feature.label}`}
-                    onClick={(event) => {
-                      returnFocus.current = event.currentTarget;
-                      setCreating(false);
-                      setEditing({ ...feature });
-                    }}
-                  >
-                    <Pencil aria-hidden="true" />
-                  </Button>
-                </TableCell>
-              </TableRow>
+              <FeatureRow
+                key={feature.key}
+                feature={feature}
+                onViewOrganizations={(trigger) => {
+                  organizationTrigger.current = trigger;
+                  setSelected(feature);
+                }}
+                onEdit={(trigger) => {
+                  returnFocus.current = trigger;
+                  setCreating(false);
+                  setEditing({ ...feature });
+                }}
+              />
             ))}
           </TableBody>
         </Table>
       </div>
+      {selected && (
+        <FeatureOrganizationsSheet
+          feature={selected}
+          returnFocus={organizationTrigger.current}
+          onClose={() => setSelected(null)}
+        />
+      )}
       {editing && (
         <FeatureEditor
           editing={editing}
@@ -136,6 +136,41 @@ export function BillingPlanFeatures({
         />
       )}
     </section>
+  );
+}
+
+function FeatureRow({
+  feature,
+  onEdit,
+  onViewOrganizations,
+}: {
+  feature: FeatureDefinition;
+  onEdit: (trigger: HTMLButtonElement) => void;
+  onViewOrganizations: (trigger: HTMLButtonElement) => void;
+}) {
+  return (
+    <TableRow className="hover:bg-muted/30">
+      <TableCell className="font-medium">{feature.label}</TableCell>
+      <TableCell>
+        <code className="text-xs text-muted-foreground">{feature.key}</code>
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline">{feature.gated ? "Restricted" : "All organizations"}</Badge>
+      </TableCell>
+      <TableCell className="text-right">
+        <Button size="sm" variant="ghost" onClick={(event) => onViewOrganizations(event.currentTarget)}>
+          View organizations
+        </Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label={`Edit ${feature.label}`}
+          onClick={(event) => onEdit(event.currentTarget)}
+        >
+          <Pencil aria-hidden="true" />
+        </Button>
+      </TableCell>
+    </TableRow>
   );
 }
 

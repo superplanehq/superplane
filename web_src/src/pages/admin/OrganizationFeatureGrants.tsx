@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/Table/table";
 import { Button } from "@/components/ui/button";
 import { billingCatalogRequest, type FeatureDefinition, type OrganizationFeatures } from "./billingPlansApi";
 
@@ -14,7 +13,7 @@ export function OrganizationFeatureGrants({ orgId }: { orgId: string }) {
   const [loadedOrg, setLoadedOrg] = useState(orgId);
   if (loadedOrg !== orgId) {
     // Reset grants before they render for a different organization, so stale
-    // checkboxes cannot change the organization that is selected now.
+    // controls cannot change the organization that is selected now.
     setLoadedOrg(orgId);
     setDefinitions([]);
     setState(null);
@@ -62,30 +61,69 @@ export function OrganizationFeatureGrants({ orgId }: { orgId: string }) {
   };
   return (
     <section className="mt-6 space-y-3">
-      <h3 className="font-semibold">Feature grants</h3>
-      <p>Grants add access. Removing a grant keeps access from the plan or an ungated feature.</p>
+      <h3 className="font-semibold">Features</h3>
+      <p className="text-sm text-muted-foreground">
+        Manual grants add access. Removing a grant keeps access included in the plan or available to all organizations.
+      </p>
       {error && (
         <div role="alert">
           {error} <Button onClick={() => setReloadToken((token) => token + 1)}>Try again</Button>
         </div>
       )}
-      {state &&
-        definitions.map((feature) => (
-          <div key={feature.key} className="flex items-center gap-3">
-            <Label className="flex items-center gap-2">
-              <Checkbox
-                disabled={busy}
-                checked={state.grants.some((grant) => grant.feature_key === feature.key && grant.enabled)}
-                onChange={(event) => void save(feature.key, event.target.checked)}
-              />
-              {feature.label}
-            </Label>
-            <span>
-              {state.effective.features[feature.key] ? "Enabled" : "Disabled"}
-              {!feature.gated && " · Available to all organizations"}
-            </span>
-          </div>
-        ))}
+      {state && (
+        <Table>
+          <caption className="sr-only">Organization features</caption>
+          <TableHead>
+            <TableRow>
+              <TableHeader>Feature</TableHeader>
+              <TableHeader>Access</TableHeader>
+              <TableHeader>Source</TableHeader>
+              <TableHeader>
+                <span className="sr-only">Actions</span>
+              </TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {definitions.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4}>No features defined.</TableCell>
+              </TableRow>
+            )}
+            {definitions.map((feature) => {
+              const granted = state.grants.some((grant) => grant.feature_key === feature.key && grant.enabled);
+              const enabled = state.effective.features[feature.key];
+              const source = granted
+                ? "Manual grant"
+                : !feature.gated
+                  ? "All organizations"
+                  : enabled
+                    ? "Plan"
+                    : "No access";
+              return (
+                <TableRow key={feature.key}>
+                  <TableCell className="font-medium">{feature.label}</TableCell>
+                  <TableCell>{enabled ? "Enabled" : "Disabled"}</TableCell>
+                  <TableCell>{source}</TableCell>
+                  <TableCell className="text-right">
+                    {(granted || (feature.gated && !enabled)) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        aria-label={`${granted ? "Remove grant for" : "Add grant for"} ${feature.label}`}
+                        onClick={() => void save(feature.key, !granted)}
+                      >
+                        {granted ? "Remove grant" : "Add grant"}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
     </section>
   );
 }

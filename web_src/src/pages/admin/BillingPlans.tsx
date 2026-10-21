@@ -1,11 +1,9 @@
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useEffect, useState } from "react";
-import { Plus, Info } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showErrorToast } from "@/lib/toast";
 import { billingCatalogRequest, type BillingPlan, type FeatureDefinition } from "./billingPlansApi";
-import { BillingPlanFeatures } from "./BillingPlanFeatures";
 import { BillingPlanEditor } from "./BillingPlanEditor";
 import { BillingPlansTable } from "./BillingPlansTable";
 
@@ -96,15 +94,29 @@ export function BillingPlans() {
           </Button>
         </div>
       )}
-      <BillingCatalog
-        plans={plans}
-        features={features}
-        loading={loading}
-        error={error}
-        onSaved={load}
-        onEdit={setEditing}
-        onDelete={(plan) => void remove(plan)}
-      />
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="font-semibold">Plans</h2>
+            <p className="text-sm text-muted-foreground">Set the pricing and access available to each organization.</p>
+          </div>
+          <Button disabled={loading || !!error} onClick={() => setEditing({ ...emptyPlan })}>
+            <Plus aria-hidden="true" />
+            Create plan
+          </Button>
+        </div>
+        {loading ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">Loading billing plans...</p>
+        ) : (
+          !error && (
+            <BillingPlansTable
+              plans={plans}
+              onEdit={(plan) => setEditing({ ...plan })}
+              onDelete={(plan) => void remove(plan)}
+            />
+          )
+        )}
+      </section>
 
       {editing && (
         <BillingPlanEditor
@@ -117,71 +129,5 @@ export function BillingPlans() {
         />
       )}
     </div>
-  );
-}
-
-function BillingCatalog({
-  plans,
-  features,
-  loading,
-  error,
-  onSaved,
-  onEdit,
-  onDelete,
-}: {
-  plans: BillingPlan[];
-  features: FeatureDefinition[];
-  loading: boolean;
-  error: string;
-  onSaved: () => Promise<void>;
-  onEdit: (plan: BillingPlan) => void;
-  onDelete: (plan: BillingPlan) => void;
-}) {
-  return (
-    <Tabs defaultValue="plans" className="gap-6">
-      <TabsList aria-label="Billing catalog" className="h-9">
-        <TabsTrigger value="plans" className="px-4">
-          Plans <span className="text-xs text-muted-foreground">{plans.length}</span>
-        </TabsTrigger>
-        <TabsTrigger value="features" className="px-4">
-          Features <span className="text-xs text-muted-foreground">{features.length}</span>
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent value="plans" className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="font-semibold">Plans</h2>
-            <p className="text-sm text-muted-foreground">Set the pricing and access available to each organization.</p>
-          </div>
-          <Button disabled={loading || !!error} onClick={() => onEdit({ ...emptyPlan })}>
-            <Plus aria-hidden="true" />
-            Create plan
-          </Button>
-        </div>
-        {loading ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">Loading billing plans...</p>
-        ) : (
-          !error && (
-            <BillingPlansTable
-              plans={plans}
-              onEdit={(plan) => onEdit({ ...plan })}
-              onDelete={(plan) => onDelete(plan)}
-            />
-          )
-        )}
-        <p className="flex items-start gap-2 text-xs text-muted-foreground">
-          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-          Features and markup apply immediately. Parallel task limits are saved but not enforced. Credit changes apply
-          to future grants.
-        </p>
-      </TabsContent>
-      <TabsContent value="features">
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading features...</p>
-        ) : (
-          !error && <BillingPlanFeatures features={features} onSaved={onSaved} />
-        )}
-      </TabsContent>
-    </Tabs>
   );
 }

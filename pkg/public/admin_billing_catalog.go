@@ -141,3 +141,17 @@ func writeCatalogError(w http.ResponseWriter, err error) {
 	}
 	http.Error(w, "Failed to update billing catalog", 500)
 }
+
+func (s *Server) adminListFeatureOrganizations(w http.ResponseWriter, r *http.Request) {
+	search, limit, offset := parsePagination(r)
+	items, total, err := models.ListFeatureOrganizations(database.DB(r.Context()), mux.Vars(r)["featureKey"], search, limit, offset)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Feature not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to load feature organizations", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, paginatedResponse{Items: items, Total: total, Limit: limit, Offset: offset})
+}

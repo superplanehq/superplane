@@ -21,6 +21,7 @@ function hostedCreditChromeState(
       ? hostedCreditBannerKind({
           ...spendData,
           plan: billingData?.plan,
+          planCategory: billingData?.planCategory,
           trialEndsAt: billingData?.trialEndsAt,
           subscriptionCheckoutEnabled: billingData?.subscriptionCheckoutEnabled,
           creditPurchaseAllowed: billingData?.creditPurchaseAllowed,

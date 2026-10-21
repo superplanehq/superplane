@@ -25,6 +25,7 @@ func TestAdminCatalogAuthorizationAndAssignment(t *testing.T) {
 		{"PUT", "/admin/api/billing-plans/00000000-0000-0000-0000-000000000000", "{}"},
 		{"DELETE", "/admin/api/billing-plans/00000000-0000-0000-0000-000000000000", ""},
 		{"GET", "/admin/api/feature-definitions", ""},
+		{"GET", "/admin/api/feature-definitions/byo_key/organizations", ""},
 		{"POST", "/admin/api/feature-definitions", "{}"},
 		{"PUT", "/admin/api/feature-definitions/custom_feature", "{}"},
 		{"PUT", "/admin/api/organizations/" + r.Organization.ID.String() + "/features", "{}"},
