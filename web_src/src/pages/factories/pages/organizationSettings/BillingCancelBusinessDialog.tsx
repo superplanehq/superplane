@@ -8,15 +8,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { BILLING_CANCEL_LABEL, BILLING_KEEP_LABEL, billingCancelBusinessConfirmCopy } from "../../lib/billingPlans";
+import { BILLING_BUSINESS_NAME, billingCancelBusinessConfirmCopy } from "../../lib/billingPlans";
 
 export function BillingCancelBusinessDialog({
+  planName = BILLING_BUSINESS_NAME,
   open,
   pending,
   currentPeriodEnd,
   onOpenChange,
   onConfirm,
 }: {
+  planName?: string;
   open: boolean;
   pending: boolean;
   currentPeriodEnd?: string;
@@ -35,8 +37,8 @@ export function BillingCancelBusinessDialog({
     >
       <DialogContent data-testid="billing-cancel-subscription-dialog">
         <DialogHeader>
-          <DialogTitle>Cancel Business?</DialogTitle>
-          <DialogDescription>{billingCancelBusinessConfirmCopy(currentPeriodEnd)}</DialogDescription>
+          <DialogTitle>Cancel {planName}?</DialogTitle>
+          <DialogDescription>{billingCancelBusinessConfirmCopy(currentPeriodEnd, planName)}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button
@@ -46,7 +48,7 @@ export function BillingCancelBusinessDialog({
             data-testid="billing-cancel-subscription-dismiss"
             onClick={() => onOpenChange(false)}
           >
-            {BILLING_KEEP_LABEL}
+            {`Keep ${planName}`}
           </Button>
           <Button
             type="button"
@@ -63,7 +65,7 @@ export function BillingCancelBusinessDialog({
               })();
             }}
           >
-            {pending ? "Canceling Business..." : BILLING_CANCEL_LABEL}
+            {pending ? `Canceling ${planName}...` : `Cancel ${planName}`}
           </Button>
         </DialogFooter>
       </DialogContent>

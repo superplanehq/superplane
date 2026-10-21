@@ -55,7 +55,7 @@ func Test__ApplyPolarSubscriptionReplacesAdminTrialWithPaid(t *testing.T) {
 	assert.True(t, after.IsActiveBusiness())
 }
 
-func Test__ApplyPolarSubscriptionReplacesAdminBusinessOnCancel(t *testing.T) {
+func Test__ApplyPolarSubscriptionEndsAdminBusinessOnCancel(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	db := database.Conn()
@@ -81,9 +81,9 @@ func Test__ApplyPolarSubscriptionReplacesAdminBusinessOnCancel(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.False(t, grantIncluded)
-	assert.Equal(t, models.BillingPlanTrial, after.Plan)
+	assert.Equal(t, models.BillingPlanNone, after.Plan)
 	assert.Equal(t, models.BillingPlanSourcePolar, after.PlanSource)
-	assert.True(t, after.IsOpenTrial(time.Now()))
+	assert.False(t, after.IsOpenTrial(time.Now()))
 	assert.False(t, after.IsActiveBusiness())
 }
 
@@ -426,7 +426,7 @@ func Test__SetAdminOrganizationPlanNilTrialEndKeepsFourteenDayDefault(t *testing
 	assert.True(t, welcome.ExpiresAt.Equal(*welcomeBefore.ExpiresAt))
 }
 
-func Test__SetAdminOrganizationPlanBusinessAndNoneKeepWelcomeExpiry(t *testing.T) {
+func Test__SetAdminOrganizationPlanBusinessAndNoneClearTrialKeepWelcomeExpiry(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	db := database.Conn()
@@ -438,9 +438,9 @@ func Test__SetAdminOrganizationPlanBusinessAndNoneKeepWelcomeExpiry(t *testing.T
 	business, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, &ignoredEnd)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanBusiness, business.Plan)
-	require.NotNil(t, business.TrialEndsAt)
 	require.NotNil(t, planBefore.TrialEndsAt)
-	assert.True(t, business.TrialEndsAt.Equal(*planBefore.TrialEndsAt))
+	assert.Nil(t, business.TrialStartedAt)
+	assert.Nil(t, business.TrialEndsAt)
 	welcome := requireWelcomeGrant(t, db, r.Organization.ID)
 	require.NotNil(t, welcome.ExpiresAt)
 	assert.True(t, welcome.ExpiresAt.Equal(*welcomeBefore.ExpiresAt))
@@ -448,8 +448,8 @@ func Test__SetAdminOrganizationPlanBusinessAndNoneKeepWelcomeExpiry(t *testing.T
 	none, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, &ignoredEnd)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanNone, none.Plan)
-	require.NotNil(t, none.TrialEndsAt)
-	assert.True(t, none.TrialEndsAt.Equal(*planBefore.TrialEndsAt))
+	assert.Nil(t, none.TrialStartedAt)
+	assert.Nil(t, none.TrialEndsAt)
 	welcome = requireWelcomeGrant(t, db, r.Organization.ID)
 	require.NotNil(t, welcome.ExpiresAt)
 	assert.True(t, welcome.ExpiresAt.Equal(*welcomeBefore.ExpiresAt))
