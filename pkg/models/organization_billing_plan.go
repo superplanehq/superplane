@@ -282,10 +282,6 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 			next.PolarModifiedAt = existing.PolarModifiedAt
 			next.CurrentPeriodStart = existing.CurrentPeriodStart
 			next.CurrentPeriodEnd = existing.CurrentPeriodEnd
-			if catalog.Category != "trial" {
-				next.TrialStartedAt = existing.TrialStartedAt
-				next.TrialEndsAt = existing.TrialEndsAt
-			}
 		}
 		if existing == nil || existing.PlanID != next.PlanID || existing.PlanSource != BillingPlanSourceAdmin {
 			next.CurrentPeriodStart = nil

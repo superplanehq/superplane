@@ -22,6 +22,8 @@ func TestCatalogPlanAssignmentAndProtection(t *testing.T) {
 	assigned, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
 	require.True(t, assigned.IsActiveBusiness())
+	require.Nil(t, assigned.TrialStartedAt)
+	require.Nil(t, assigned.TrialEndsAt)
 	require.Equal(t, plan.ID, assigned.PlanID)
 	markup, err := models.ResolveOrganizationMarkupBPS(db, r.Organization.ID)
 	require.NoError(t, err)
