@@ -398,6 +398,46 @@ func Test__SetAdminOrganizationPlanReopensExpiredTrialCredit(t *testing.T) {
 	assert.Equal(t, welcome.AmountMicros, summary.WelcomeRemainingMicros)
 }
 
+func Test__SetAdminOrganizationPlanCustomTrialSyncsWelcomeExpiry(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	db := database.Conn()
+
+	catalog := models.BillingPlan{
+		Key:              "custom_trial",
+		Name:             "Custom trial",
+		Category:         "trial",
+		Visibility:       "private",
+		CreditFrequency:  "none",
+		CreditExpiration: "never",
+		TrialLengthDays:  30,
+	}
+	require.NoError(t, models.SaveBillingPlan(db, &catalog))
+	t.Cleanup(func() {
+		_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, nil)
+		require.NoError(t, err)
+		require.NoError(t, models.DeleteBillingPlan(db, catalog.ID))
+	})
+
+	ended := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	require.NoError(t, db.Model(&models.OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+		Update("expires_at", ended).Error)
+
+	trialEnd := time.Now().Add(21 * 24 * time.Hour).UTC().Truncate(time.Second)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, catalog.Key, &trialEnd)
+	require.NoError(t, err)
+	assert.Equal(t, catalog.Key, plan.Plan)
+	assert.Equal(t, catalog.ID, plan.PlanID)
+	assert.True(t, plan.IsOpenTrial(time.Now()))
+	require.NotNil(t, plan.TrialEndsAt)
+	assert.True(t, plan.TrialEndsAt.Equal(trialEnd))
+
+	welcome := requireWelcomeGrant(t, db, r.Organization.ID)
+	require.NotNil(t, welcome.ExpiresAt)
+	assert.True(t, welcome.ExpiresAt.Equal(trialEnd))
+}
+
 func Test__SetAdminOrganizationPlanTrialDoesNotCreateWelcomeGrant(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))

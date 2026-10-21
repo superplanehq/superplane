@@ -314,7 +314,7 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 		if err != nil {
 			return err
 		}
-		if planName == BillingPlanTrial && trialEndsAt != nil && saved.TrialEndsAt != nil {
+		if catalog.Category == "trial" && trialEndsAt != nil && saved.TrialEndsAt != nil {
 			if err := SetWelcomeGrantExpiresAt(inner, orgID, *saved.TrialEndsAt); err != nil {
 				return err
 			}

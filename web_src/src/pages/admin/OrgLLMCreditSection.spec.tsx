@@ -76,10 +76,12 @@ function billingPlan(
   polarManaged: boolean,
   trialEndsAt: string | null = null,
   plan = polarManaged ? "business" : "trial",
+  catalogCategory?: string,
 ) {
   return {
     plan,
     catalog_key: plan === "business" ? (polarManaged ? "business_legacy" : "business_manual") : plan,
+    catalog_category: catalogCategory ?? (plan === "trial" ? "trial" : plan === "none" ? "none" : "paid"),
     plan_source: polarManaged ? "polar" : plan === "business" ? "admin" : "system",
     polar_subscription_status: polarManaged ? "active" : "",
     polar_managed: polarManaged,
@@ -274,10 +276,10 @@ describe("OrgLLMCreditSection billing plan", () => {
         if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
         if (url.endsWith("/billing-plans"))
           return jsonResponse([
-            { key: "trial", name: "Trial" },
-            { key: "business_legacy", name: "Business" },
-            { key: "business_manual", name: "Business Manual" },
-            { key: "none", name: "None" },
+            { key: "trial", name: "Trial", category: "trial" },
+            { key: "business_legacy", name: "Business", category: "paid" },
+            { key: "business_manual", name: "Business Manual", category: "paid" },
+            { key: "none", name: "None", category: "none" },
           ]);
         if (url.endsWith("/feature-definitions")) return jsonResponse([]);
         if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
@@ -322,6 +324,53 @@ describe("OrgLLMCreditSection billing plan", () => {
     expect(JSON.parse(requests[0]?.body ?? "{}")).toEqual({
       plan: "trial",
       trial_ends_at: `${futureDate}T23:59:59Z`,
+    });
+  });
+
+  it("edits the trial end and unlocks Set trial credit for a custom trial plan", async () => {
+    const trialEndsAt = `${futureUtcDate(30)}T23:59:59Z`;
+    const requests: Array<{ url: string; body: string | null }> = [];
+    const customTrial = { key: "custom_trial", name: "Custom Trial", category: "trial", require_payment_method: false };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
+        if (url.endsWith("/llm-credit/grants")) return jsonResponse({ grants });
+        if (url.endsWith("/llm-credit")) {
+          return jsonResponse({
+            ...credit,
+            welcome_remaining_cents: 0,
+            welcome_credit_expires_at: "2020-01-01T00:00:00Z",
+          });
+        }
+        if (url.endsWith("/billing-plans")) return jsonResponse([...catalog, customTrial]);
+        if (url.includes("/billing-plan")) {
+          if (init?.method === "PUT") {
+            requests.push({ url, body: typeof init.body === "string" ? init.body : null });
+          }
+          return jsonResponse(billingPlan(false, trialEndsAt, "custom_trial", "trial"));
+        }
+        return new Response("not found", { status: 404 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-billing-plan")).toHaveTextContent("Custom Trial");
+    expect(screen.getByTestId("admin-org-credit-trial-target")).toBeEnabled();
+    expect(screen.queryByText(ADMIN_NO_ACTIVE_TRIAL_COPY)).not.toBeInTheDocument();
+
+    const input = await screen.findByTestId("admin-org-trial-ends-input");
+    expect(input).toHaveValue(futureUtcDate(30));
+    const newDate = futureUtcDate(45);
+    fireEvent.change(input, { target: { value: newDate } });
+    await user.click(screen.getByTestId("admin-org-billing-plan-save"));
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(JSON.parse(requests[0]?.body ?? "{}")).toEqual({
+      plan: "custom_trial",
+      trial_ends_at: `${newDate}T23:59:59Z`,
     });
   });
 });

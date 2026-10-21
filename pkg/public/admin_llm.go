@@ -128,6 +128,7 @@ type organizationBillingPlanResponse struct {
 	CatalogID               uuid.UUID `json:"catalog_id"`
 	CatalogKey              string    `json:"catalog_key"`
 	CatalogName             string    `json:"catalog_name"`
+	CatalogCategory         string    `json:"catalog_category"`
 	Plan                    string    `json:"plan"`
 	PlanSource              string    `json:"plan_source"`
 	PolarSubscriptionStatus string    `json:"polar_subscription_status"`
@@ -614,7 +615,7 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 	}
 
 	planName := strings.TrimSpace(req.Plan)
-	trialEndsAt, err := trialEndForAdminPlan(planName, req.TrialEndsAt)
+	trialEndsAt, err := trialEndForAdminPlan(database.Conn(), planName, req.TrialEndsAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -644,6 +645,7 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 		CatalogID:               plan.PlanID,
 		CatalogKey:              plan.Catalog.Key,
 		CatalogName:             plan.Catalog.Name,
+		CatalogCategory:         plan.Catalog.Category,
 		CreditExpiration:        plan.Catalog.CreditExpiration,
 		CreditValidityDays:      plan.Catalog.CreditValidityDays,
 		Plan:                    plan.Plan,
@@ -655,8 +657,9 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 	}, nil
 }
 
-func trialEndForAdminPlan(planName string, raw *string) (*time.Time, error) {
-	if planName != models.BillingPlanTrial {
+func trialEndForAdminPlan(tx *gorm.DB, planName string, raw *string) (*time.Time, error) {
+	catalog, err := models.FindBillingPlan(tx, planName)
+	if err != nil || catalog.Category != "trial" {
 		return nil, nil
 	}
 	if raw == nil || strings.TrimSpace(*raw) == "" {

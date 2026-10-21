@@ -88,7 +88,8 @@ function OrgBillingPlanField(args: {
 }) {
   const planEditable = args.planKnown && !args.polarManaged;
   const catalogLocked = !!args.catalogError || args.catalog.length === 0;
-  const showTrialEnd = planEditable && args.planValue === "trial";
+  const selectedCategory = args.catalog.find((plan) => plan.key === args.planValue)?.category;
+  const showTrialEnd = planEditable && selectedCategory === "trial";
   return (
     <div className="mb-4 max-w-sm">
       <Label className="mb-2 block text-left">Billing plan</Label>
@@ -441,7 +442,7 @@ function trialBalanceLocked(
 }
 
 function isOpenNonPolarTrial(plan: OrganizationBillingPlan | null, now: Date = new Date()): boolean {
-  if (plan == null || plan.polar_managed || plan.plan !== "trial" || plan.trial_ends_at == null) {
+  if (plan == null || plan.polar_managed || plan.catalog_category !== "trial" || plan.trial_ends_at == null) {
     return false;
   }
   const endsAt = new Date(plan.trial_ends_at);

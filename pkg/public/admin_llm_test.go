@@ -649,3 +649,95 @@ func TestAdminOrganizationBillingPlanTrialEnd(t *testing.T) {
 		}
 	})
 }
+
+func TestAdminOrganizationBillingPlanCustomTrialEnd(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	catalog := models.BillingPlan{
+		Key:              "custom_trial",
+		Name:             "Custom trial",
+		Category:         "trial",
+		Visibility:       "private",
+		CreditFrequency:  "none",
+		CreditExpiration: "never",
+		TrialLengthDays:  30,
+	}
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	t.Cleanup(func() {
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, "none", nil)
+		require.NoError(t, err)
+		require.NoError(t, models.DeleteBillingPlan(database.Conn(), catalog.ID))
+	})
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+
+	t.Run("PUT rejects a missing end", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        []byte(`{"plan":"custom_trial"}`),
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "trial end date is required")
+	})
+
+	t.Run("PUT rejects an end that is not in the future", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"plan":          "custom_trial",
+			"trial_ends_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "choose a future date")
+	})
+
+	t.Run("PUT stores the end and reopens expired welcome credit", func(t *testing.T) {
+		ended := time.Now().Add(-time.Hour)
+		require.NoError(t, database.Conn().Model(&models.OrganizationLLMCreditGrant{}).
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			Update("expires_at", ended).Error)
+
+		trialEnd := time.Now().Add(18 * 24 * time.Hour).UTC().Truncate(time.Second)
+		body, err := json.Marshal(map[string]any{
+			"plan":          "custom_trial",
+			"trial_ends_at": trialEnd.Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, "custom_trial", plan.Plan)
+		assert.Equal(t, "custom_trial", plan.CatalogKey)
+		assert.Equal(t, "trial", plan.CatalogCategory)
+		require.NotNil(t, plan.TrialEndsAt)
+		parsed, err := time.Parse(time.RFC3339, *plan.TrialEndsAt)
+		require.NoError(t, err)
+		assert.True(t, parsed.Equal(trialEnd))
+
+		var welcome models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&welcome).Error)
+		require.NotNil(t, welcome.ExpiresAt)
+		assert.True(t, welcome.ExpiresAt.Equal(trialEnd))
+
+		summary, err := models.DescribeOrganizationLLMCredit(database.Conn(), r.Organization.ID)
+		require.NoError(t, err)
+		assert.Equal(t, welcome.AmountMicros, summary.WelcomeRemainingMicros)
+	})
+}
