@@ -74,13 +74,13 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			assert.NotEqual(t, "noop", node.ComponentName())
 		}
 		assertLivePRFeedbackAcknowledge(t, liveVersion.Nodes, liveVersion.Edges,
-			prFeedbackAcknowledgeCommentNodeID, prFeedbackCommentTriggerNodeID,
+			prFeedbackAcknowledgeCommentNodeID, prFeedbackFindNodeID,
 			prFeedbackCommentAcknowledgeCommentIDExpression(), "issueComment")
 		assertLivePRFeedbackAcknowledge(t, liveVersion.Nodes, liveVersion.Edges,
-			prFeedbackAcknowledgeReviewNodeID, prFeedbackReviewTriggerNodeID,
+			prFeedbackAcknowledgeReviewNodeID, prFeedbackReviewFindNodeID,
 			prFeedbackReviewAcknowledgeCommentIDExpression(), "reviewComment")
 		assertLivePRFeedbackAcknowledge(t, liveVersion.Nodes, liveVersion.Edges,
-			prFeedbackAcknowledgeReviewReplyNodeID, prFeedbackReplyTriggerNodeID,
+			prFeedbackAcknowledgeReviewReplyNodeID, prFeedbackReplyFindNodeID,
 			prFeedbackCommentAcknowledgeCommentIDExpression(), "reviewComment")
 		assertLivePRFeedbackConcurrency(t, canvas.ID, liveVersion.Nodes)
 	})
@@ -375,7 +375,7 @@ func assertLivePRFeedbackAcknowledge(
 	nodes []models.Node,
 	edges []models.Edge,
 	nodeID string,
-	triggerID string,
+	findNodeID string,
 	commentID string,
 	target string,
 ) {
@@ -395,14 +395,13 @@ func assertLivePRFeedbackAcknowledge(
 	}
 	assert.Truef(t, foundNode, "missing acknowledge node %s", nodeID)
 
-	var foundEdge bool
+	var foundTargets []string
 	for _, edge := range edges {
-		if edge.SourceID == triggerID && edge.TargetID == nodeID && edge.Channel == "default" {
-			foundEdge = true
-			break
+		if edge.SourceID == findNodeID && edge.Channel == "found" {
+			foundTargets = append(foundTargets, edge.TargetID)
 		}
 	}
-	assert.Truef(t, foundEdge, "missing acknowledge edge %s -> %s", triggerID, nodeID)
+	assert.Equal(t, []string{nodeID}, foundTargets)
 }
 
 func assertLivePRFeedbackConcurrency(t *testing.T, canvasID uuid.UUID, nodes []models.Node) {

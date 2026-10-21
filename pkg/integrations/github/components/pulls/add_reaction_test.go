@@ -84,7 +84,7 @@ func Test__AddReaction__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "invalid target")
 	})
 
-	t.Run("emits nothing when comment ID is blank", func(t *testing.T) {
+	t.Run("continues when comment ID is blank", func(t *testing.T) {
 		state := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
@@ -101,7 +101,7 @@ func Test__AddReaction__Execute(t *testing.T) {
 		assert.True(t, state.Passed)
 		assert.Equal(t, core.DefaultOutputChannel.Name, state.Channel)
 		assert.Equal(t, "github.reaction", state.Type)
-		assert.Empty(t, state.Payloads)
+		assert.Len(t, state.Payloads, 1)
 	})
 
 	t.Run("fails when comment ID is not a number", func(t *testing.T) {
