@@ -35,6 +35,41 @@ export function readOnboardingGithubEnterprise(factoryId: string): {
   };
 }
 
+export function sessionGithubEnterpriseChoice(factoryId: string): "enterprise" | "dotcom" | "" {
+  if (!factoryId) {
+    return "";
+  }
+  const value = sessionStorage.getItem(flagKey(factoryId));
+  if (value === "1") {
+    return "enterprise";
+  }
+  if (value === "0") {
+    return "dotcom";
+  }
+  return "";
+}
+
+export function resolvedOnboardingGithubEnterprise(args: {
+  factoryId: string;
+  vcsIntegrationId?: string;
+  hostFromIntegration?: string;
+}): { enabled: boolean; host: string; integrationId: string } {
+  const remembered = readOnboardingGithubEnterprise(args.factoryId);
+  const choice = sessionGithubEnterpriseChoice(args.factoryId);
+  if (choice === "enterprise") {
+    return remembered;
+  }
+  if (choice === "dotcom") {
+    return { enabled: false, host: "", integrationId: "" };
+  }
+  const host = args.hostFromIntegration?.trim() ?? "";
+  const integrationId = args.vcsIntegrationId?.trim() ?? "";
+  if (!host || !integrationId) {
+    return { enabled: false, host: "", integrationId: "" };
+  }
+  return { enabled: true, host, integrationId };
+}
+
 export function writeOnboardingGithubEnterprise(
   factoryId: string,
   enabled: boolean,
@@ -45,7 +80,7 @@ export function writeOnboardingGithubEnterprise(
     return;
   }
   if (!enabled) {
-    sessionStorage.removeItem(flagKey(factoryId));
+    sessionStorage.setItem(flagKey(factoryId), "0");
     sessionStorage.removeItem(hostKey(factoryId));
     sessionStorage.removeItem(integrationKey(factoryId));
     return;

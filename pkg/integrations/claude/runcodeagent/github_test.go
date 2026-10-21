@@ -45,6 +45,13 @@ func Test__resolvePullRequest(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("rejects a non-GitHub host before sending the token", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{}
+		_, err := resolvePullRequest(httpCtx, "https://attacker.example/acme/app/pull/1", "tok")
+		require.Error(t, err)
+		assert.Empty(t, httpCtx.Requests)
+	})
+
 	t.Run("API error propagated", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
 			StatusCode: 404, Body: io.NopCloser(strings.NewReader(`{"message":"Not Found"}`)),

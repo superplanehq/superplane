@@ -15,7 +15,7 @@ import (
 
 func githubHostFromURL(raw string) githubcommon.Host {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || parsed.Hostname() == "" {
+	if err != nil || parsed.Hostname() == "" || !githubcommon.IsKnownGitHubWebHostname(parsed.Hostname()) {
 		return githubcommon.DotCom()
 	}
 	host, err := githubcommon.ParseHost(parsed.Hostname())
@@ -48,6 +48,7 @@ type pullRequestInfo struct {
 	HeadRepo string // owner/repo of the head (may be a fork)
 	BaseRef  string
 	BaseRepo string // owner/repo of the base
+	Host     githubcommon.Host
 }
 
 // isFork reports whether the PR was opened from a fork.
@@ -58,8 +59,11 @@ func (p *pullRequestInfo) isFork() bool {
 func parsePRURL(prURL string) (owner, repo string, number int, err error) {
 	raw := strings.TrimSpace(prURL)
 	parsed, parseErr := url.Parse(raw)
+	if parseErr != nil || parsed.Hostname() == "" || !githubcommon.IsKnownGitHubWebHostname(parsed.Hostname()) {
+		return "", "", 0, fmt.Errorf("invalid pull request URL %q (expected a GitHub pull request URL)", prURL)
+	}
 	host := githubHostFromURL(raw)
-	if parseErr != nil || !host.IsWebHostname(parsed.Hostname()) {
+	if !host.IsWebHostname(parsed.Hostname()) {
 		return "", "", 0, fmt.Errorf("invalid pull request URL %q (expected a GitHub pull request URL)", prURL)
 	}
 	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
@@ -193,6 +197,7 @@ func resolvePullRequest(httpCtx core.HTTPContext, prURL, token string) (*pullReq
 		HTMLURL: out.HTMLURL,
 		HeadRef: out.Head.Ref,
 		BaseRef: out.Base.Ref,
+		Host:    githubHostFromURL(prURL),
 	}
 	if out.Head.Repo != nil {
 		info.HeadRepo = out.Head.Repo.FullName

@@ -35,6 +35,7 @@ export const FIRST_RUN_COPY = {
     continue: "Create GitHub App",
     opening: "Opening GitHub…",
     invalidHost: "Enter a GitHub hostname, for example acme.ghe.com.",
+    connectError: "SuperPlane could not connect to GitHub Enterprise. Check the hostname and try again.",
     repositoryHelper: "SuperPlane opens pull requests in this GitHub repository for review.",
     loading: "Loading GitHub repositories…",
     loadError: "SuperPlane could not load the GitHub repositories. Check the connection and try again.",

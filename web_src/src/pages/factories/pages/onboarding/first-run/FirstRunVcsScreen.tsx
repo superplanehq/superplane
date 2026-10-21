@@ -128,6 +128,7 @@ export function FirstRunVcsScreen({
       <FirstRunGitHubEnterpriseHostScreen
         initialHost={flow.githubEnterpriseHost}
         connecting={flow.blockingAction === "opening-github"}
+        connectError={flow.githubEnterpriseError}
         chrome={chrome}
         sphere={sphereFor("connect", setup.selectedRepo)}
         onContinue={(host) => void flow.connectGitHubEnterprise(host)}

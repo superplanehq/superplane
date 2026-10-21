@@ -600,7 +600,7 @@ resource "helm_release" "superplane" {
     for_each = var.github_enterprise_allowed_hosts == "" ? [] : [var.github_enterprise_allowed_hosts]
     content {
       name  = "githubEnterprise.allowedHosts"
-      value = set.value
+      value = replace(set.value, ",", "\\,")
     }
   }
 

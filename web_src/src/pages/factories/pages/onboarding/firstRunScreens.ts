@@ -55,7 +55,7 @@ export function screenWithVcsConnection(
   }
   if (githubEnterprise) {
     if (github.ready) {
-      if (screen === "welcome" || screen === "connect" || screen === "ghe-host") return "choose";
+      if (screen === "welcome" || screen === "connect") return "choose";
       return screen;
     }
     if (screen === "choose" || screen === "connect") return "ghe-host";

@@ -24,7 +24,7 @@ func buildRepositoryPrompt(spec Spec, branch string, attr commitAttribution, sch
 	writeIntro(&b)
 
 	fmt.Fprintf(&b, "1. Clone the repository and enter it:\n")
-	fmt.Fprintf(&b, "     git clone %s repo && cd repo\n", authenticatedCloneURL(spec.Repository))
+	fmt.Fprintf(&b, "     git clone %s repo && cd repo\n", authenticatedCloneURL(spec.Repository, githubHostFromSpec(spec)))
 	if base := strings.TrimSpace(spec.BaseBranch); base != "" {
 		fmt.Fprintf(&b, "     git checkout %s\n", base)
 	}
@@ -52,7 +52,7 @@ func buildPRPrompt(spec Spec, pr *pullRequestInfo, attr commitAttribution, schem
 	fmt.Fprintf(&b, "You are updating the existing pull request %s.\n\n", pr.HTMLURL)
 
 	fmt.Fprintf(&b, "1. Clone the repository and switch to the pull request's branch (it already exists on origin):\n")
-	fmt.Fprintf(&b, "     git clone %s repo && cd repo\n", authenticatedCloneURL(pr.BaseRepo))
+	fmt.Fprintf(&b, "     git clone %s repo && cd repo\n", authenticatedCloneURL(pr.BaseRepo, pr.Host))
 	fmt.Fprintf(&b, "     git switch %s\n", pr.HeadRef)
 	writeIdentity(&b, attr)
 	fmt.Fprintf(&b, "2. Complete this task:\n%s\n", indent(spec.Task))
@@ -97,15 +97,15 @@ func writeFinalMarker(b *strings.Builder, prExpected bool, schema map[string]any
 	b.WriteString("     NO_PR   (if there were no changes to submit)\n")
 }
 
-func authenticatedCloneURL(repository string) string {
+func authenticatedCloneURL(repository string, host githubcommon.Host) string {
 	repository = strings.TrimSpace(repository)
-	host := githubHostFromRepository(repository)
 	if repoOwnerRepoPattern.MatchString(repository) {
 		clone := host.CloneURL(repository)
 		return strings.Replace(clone, "https://", "https://x-access-token:$GITHUB_TOKEN@", 1)
 	}
-	if githubcommon.IsKnownGitHubWebHostname(githubHostFromURL(repository).WebHostname()) &&
-		strings.HasPrefix(repository, host.WebURL()+"/") {
+	fromURL := githubHostFromURL(repository)
+	if githubcommon.IsKnownGitHubWebHostname(fromURL.WebHostname()) &&
+		strings.HasPrefix(repository, fromURL.WebURL()+"/") {
 		return "https://x-access-token:$GITHUB_TOKEN@" + strings.TrimPrefix(repository, "https://")
 	}
 	return repository

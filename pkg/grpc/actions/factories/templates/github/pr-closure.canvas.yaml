@@ -122,7 +122,7 @@ spec:
       type: TYPE_ACTION
       component: if
       configuration:
-        expression: root().data.workOrder.origin != nil && root().data.workOrder.origin.label != "" && len(split(root().data.workOrder.origin.url, "/issues/")) == 2
+        expression: root().data.workOrder.origin != nil && root().data.workOrder.origin.label != "" && len(split(root().data.workOrder.origin.url, "/issues/")) == 2 && (contains(root().data.workOrder.origin.url, "://github.com/") || contains(root().data.workOrder.origin.url, "://www.github.com/") || contains(root().data.workOrder.origin.url, ".ghe.com/"))
       position:
         x: 1132
         'y': 1512

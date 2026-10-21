@@ -4,6 +4,7 @@ import {
   bindGitHubEnterpriseOnboarding,
   githubOnboardingIntegrationId,
   readOnboardingGithubEnterprise,
+  resolvedOnboardingGithubEnterprise,
   writeOnboardingGithubEnterprise,
 } from "./onboardingGithubEnterprise";
 
@@ -43,6 +44,33 @@ describe("onboarding GitHub Enterprise choice", () => {
     writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
     writeOnboardingGithubEnterprise("factory-1", false);
     expect(readOnboardingGithubEnterprise("factory-1")).toEqual({ enabled: false, host: "", integrationId: "" });
+  });
+});
+
+describe("resolvedOnboardingGithubEnterprise", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("restores Enterprise from the saved integration when the tab has no session", () => {
+    expect(
+      resolvedOnboardingGithubEnterprise({
+        factoryId: "factory-1",
+        vcsIntegrationId: "int-ghe",
+        hostFromIntegration: "acme.ghe.com",
+      }),
+    ).toEqual({ enabled: true, host: "acme.ghe.com", integrationId: "int-ghe" });
+  });
+
+  it("keeps an explicit github.com choice for this session", () => {
+    writeOnboardingGithubEnterprise("factory-1", false);
+    expect(
+      resolvedOnboardingGithubEnterprise({
+        factoryId: "factory-1",
+        vcsIntegrationId: "int-ghe",
+        hostFromIntegration: "acme.ghe.com",
+      }),
+    ).toEqual({ enabled: false, host: "", integrationId: "" });
   });
 });
 

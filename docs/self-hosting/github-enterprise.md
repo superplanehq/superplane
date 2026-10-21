@@ -49,4 +49,5 @@ Optional pass-through variables:
 - `github_enterprise_allowed_hosts`
 - `github_enterprise_extra_ca_certs_secret`
 
-Leave them empty to keep the chart defaults.
+Leave them empty to keep the chart defaults. Terraform escapes commas in
+`github_enterprise_allowed_hosts` so Helm does not split the list.

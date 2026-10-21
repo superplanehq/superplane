@@ -21,12 +21,14 @@ function looksLikeGitHubHost(value: string): boolean {
 export function FirstRunGitHubEnterpriseHostScreen({
   initialHost = "",
   connecting = false,
+  connectError,
   chrome,
   sphere,
   onContinue,
 }: {
   initialHost?: string;
   connecting?: boolean;
+  connectError?: string;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onContinue: (host: string) => void;
@@ -74,6 +76,11 @@ export function FirstRunGitHubEnterpriseHostScreen({
             .
           </p>
         </div>
+        {connectError ? (
+          <p className="text-[13px] text-destructive" role="alert">
+            {connectError}
+          </p>
+        ) : null}
         <LoadingButton
           type="submit"
           className="w-full"

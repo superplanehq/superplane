@@ -670,7 +670,7 @@ func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
 	assert.Equal(t, "if", hasGitHubOrigin.Component)
 	assert.Equal(
 		t,
-		`root().data.workOrder.origin != nil && root().data.workOrder.origin.label != "" && len(split(root().data.workOrder.origin.url, "/issues/")) == 2`,
+		`root().data.workOrder.origin != nil && root().data.workOrder.origin.label != "" && len(split(root().data.workOrder.origin.url, "/issues/")) == 2 && (contains(root().data.workOrder.origin.url, "://github.com/") || contains(root().data.workOrder.origin.url, "://www.github.com/") || contains(root().data.workOrder.origin.url, ".ghe.com/"))`,
 		hasGitHubOrigin.Configuration["expression"],
 	)
 

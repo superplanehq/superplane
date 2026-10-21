@@ -25,4 +25,15 @@ describe("FirstRunGitHubEnterpriseHostScreen", () => {
       FIRST_RUN_COPY.githubEnterprise.ipAllowListHref,
     );
   });
+
+  it("shows a connection error so the user can retry", () => {
+    render(
+      <FirstRunGitHubEnterpriseHostScreen
+        connectError={FIRST_RUN_COPY.githubEnterprise.connectError}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(FIRST_RUN_COPY.githubEnterprise.connectError);
+  });
 });

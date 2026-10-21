@@ -147,7 +147,7 @@ func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName st
 	if sentry.PreferHostedInstall(integrationName, config) {
 		return false
 	}
-	if github.HostRequiresPrivateApp(config) {
+	if integrationName == "github" && github.HostRequiresPrivateApp(config) {
 		return true
 	}
 	return reg.UseNewSetupFlow(orgID, integrationName)

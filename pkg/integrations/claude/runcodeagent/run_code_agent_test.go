@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -108,11 +109,14 @@ func Test__RunCodeAgent__validateRepository(t *testing.T) {
 }
 
 func Test__RunCodeAgent__authenticatedCloneURL(t *testing.T) {
-	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git", authenticatedCloneURL("owner/repo"))
-	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/o/r.git", authenticatedCloneURL("https://github.com/o/r.git"))
-	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@acme.ghe.com/o/r.git", authenticatedCloneURL("https://acme.ghe.com/o/r.git"))
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git", authenticatedCloneURL("owner/repo", githubcommon.DotCom()))
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/o/r.git", authenticatedCloneURL("https://github.com/o/r.git", githubcommon.DotCom()))
+	enterprise, err := githubcommon.ParseHost("acme.ghe.com")
+	require.NoError(t, err)
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@acme.ghe.com/owner/repo.git", authenticatedCloneURL("owner/repo", enterprise))
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@acme.ghe.com/o/r.git", authenticatedCloneURL("https://acme.ghe.com/o/r.git", enterprise))
 	// A non-github URL must never receive the token.
-	assert.Equal(t, "https://evil.com/o/r.git", authenticatedCloneURL("https://evil.com/o/r.git"))
+	assert.Equal(t, "https://evil.com/o/r.git", authenticatedCloneURL("https://evil.com/o/r.git", githubcommon.DotCom()))
 }
 
 func Test__RunCodeAgent__parsePRURL(t *testing.T) {
@@ -130,6 +134,9 @@ func Test__RunCodeAgent__parsePRURL(t *testing.T) {
 	assert.Equal(t, "acme", owner)
 	assert.Equal(t, "widgets", repo)
 	assert.Equal(t, 9, number)
+
+	_, _, _, err = parsePRURL("https://attacker.example/acme/app/pull/1")
+	require.Error(t, err)
 }
 
 func Test__RunCodeAgent__extractPRURL(t *testing.T) {
@@ -181,10 +188,25 @@ func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 func Test__RunCodeAgent__buildPrompt__pr(t *testing.T) {
 	pr := &pullRequestInfo{BaseRepo: "owner/repo", HeadRef: "feature-x", HTMLURL: "https://github.com/owner/repo/pull/9"}
 	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", commitAttribution{}, nil)
+	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git")
 	assert.Contains(t, got, "git switch feature-x")
 	assert.Contains(t, got, "do NOT open a new pull request")
 	assert.Contains(t, got, "address review")
 	assert.Contains(t, got, "https://github.com/owner/repo/pull/9")
+}
+
+func Test__RunCodeAgent__buildPrompt__enterprisePR(t *testing.T) {
+	host, err := githubcommon.ParseHost("acme.ghe.com")
+	require.NoError(t, err)
+	pr := &pullRequestInfo{
+		BaseRepo: "owner/repo",
+		HeadRef:  "feature-x",
+		HTMLURL:  "https://acme.ghe.com/owner/repo/pull/9",
+		Host:     host,
+	}
+	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", commitAttribution{}, nil)
+	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@acme.ghe.com/owner/repo.git")
+	assert.NotContains(t, got, "@github.com/owner/repo.git")
 }
 
 func Test__RunCodeAgent__buildPrompt__resolvesIssue(t *testing.T) {

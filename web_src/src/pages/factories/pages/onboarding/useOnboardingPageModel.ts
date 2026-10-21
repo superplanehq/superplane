@@ -11,6 +11,7 @@ import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } f
 import { resolveGithubDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
+import { githubHostFromIntegration } from "@/lib/githubHost";
 import { FEATURE_ORGANIZATION_BYOK, FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
@@ -303,14 +304,26 @@ function onboardingSetupOptions(
   };
 }
 
-function wiredVcsFields(wired: ReturnType<typeof useOnboardingGithubSavesAndFinish>) {
+function wiredVcsFields(
+  wired: ReturnType<typeof useOnboardingGithubSavesAndFinish>,
+  connectedIntegrations: Array<{
+    metadata?: { id?: string | null; integrationName?: string | null };
+    spec?: { configuration?: Record<string, unknown> | null };
+    status?: { properties?: { name?: string | null; value?: string | null }[] | null };
+  }>,
+) {
+  const githubIntegrationId = wired.githubIntegrationId;
+  const githubHost = githubHostFromIntegration(
+    connectedIntegrations.find((item) => item.metadata?.id === githubIntegrationId),
+  );
   return {
     selectCatalogRepository: wired.selectCatalogRepository,
     selectBitbucketRepository: wired.selectBitbucketRepository,
     selectBitbucketForgeRepository: wired.selectBitbucketForgeRepository,
     selectGitHubEnterpriseRepository: wired.selectGitHubEnterpriseRepository,
     bindGitHubEnterpriseIntegration: wired.bindGitHubEnterpriseIntegration,
-    githubIntegrationId: wired.githubIntegrationId,
+    githubIntegrationId,
+    githubHost,
     bitbucketIntegrationId: wired.bitbucketIntegrationId,
   };
 }
@@ -413,7 +426,7 @@ export function useOnboardingPageModel(args: {
     openSection,
     setOpenSection,
     requestConnect,
-    ...wiredVcsFields(wired),
+    ...wiredVcsFields(wired, connectedIntegrations),
     integrationDialogs: createElement(OnboardingConnectDialogs, {
       connectDialogs: connect.dialogs,
       customProviderOpen: customProviderDialogOpen,

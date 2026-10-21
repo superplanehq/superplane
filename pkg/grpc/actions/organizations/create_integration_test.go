@@ -472,4 +472,9 @@ func Test__CreateIntegration(t *testing.T) {
 		_, bindErr := models.FindVCSProviderIntegrationBinding(database.Conn(), stored.ID)
 		assert.ErrorIs(t, bindErr, gorm.ErrRecordNotFound)
 	})
+
+	t.Run("smtp host does not force the GitHub wizard", func(t *testing.T) {
+		assert.False(t, usesSetupWizard(r.Registry, r.Organization.ID, "smtp", map[string]any{"host": "smtp.gmail.com"}))
+		assert.True(t, usesSetupWizard(r.Registry, r.Organization.ID, "github", map[string]any{"host": "acme.ghe.com"}))
+	})
 }

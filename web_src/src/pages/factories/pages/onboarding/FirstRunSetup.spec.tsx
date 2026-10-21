@@ -135,6 +135,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     selectGitHubEnterpriseRepository: vi.fn().mockResolvedValue(true),
     bindGitHubEnterpriseIntegration: vi.fn(),
     githubIntegrationId: "",
+    githubHost: "",
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,

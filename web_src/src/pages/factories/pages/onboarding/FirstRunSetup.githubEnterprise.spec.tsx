@@ -94,6 +94,7 @@ function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageM
     selectGitHubEnterpriseRepository: vi.fn().mockResolvedValue(true),
     bindGitHubEnterpriseIntegration: vi.fn(),
     githubIntegrationId: "int-ghe",
+    githubHost: "",
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
@@ -187,5 +188,20 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
 
     expect(screen.getByTestId("first-run-github-enterprise-choose")).toBeInTheDocument();
     expect(screen.getByText("acme/api")).toBeInTheDocument();
+  });
+
+  it("resumes Enterprise from the saved integration host after the tab is closed", () => {
+    const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+    hook.result.current.selectVcsHost("github");
+
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=repo"]}>
+        <FirstRunSetup
+          model={pageModel(hook.result.current, { githubIntegrationId: "int-ghe", githubHost: "acme.ghe.com" })}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("first-run-github-enterprise-choose")).toBeInTheDocument();
   });
 });
