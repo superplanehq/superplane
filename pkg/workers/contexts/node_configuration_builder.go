@@ -104,7 +104,11 @@ func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[stri
 		return nil, err
 	}
 
-	resolved, err = b.applyLineDispatchOverrides(resolved)
+	if b.nodeID == "refine-task" {
+		resolved, err = b.applyRefinementModel(resolved)
+	} else {
+		resolved, err = b.applyLineDispatchOverrides(resolved)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -2337,11 +2341,53 @@ func (b *NodeConfigurationBuilder) applyLineDispatchOverrides(resolved map[strin
 	return applyLineDispatchThinking(resolved, dispatch.ThinkingLevel), nil
 }
 
+func (b *NodeConfigurationBuilder) applyRefinementModel(resolved map[string]any) (map[string]any, error) {
+	if b.rootEventID == nil || b.tx == nil {
+		return resolved, nil
+	}
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return resolved, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	version, err := models.FindCanvasVersionInTransaction(b.tx, b.workflowID, run.VersionID)
+	if err != nil {
+		return nil, err
+	}
+	if !models.IsBacklogFactoryApp(version.Nodes, version.Edges) {
+		return b.applyLineDispatchOverrides(resolved)
+	}
+	session, err := models.FindPlanningSessionByRun(b.tx, run.ID)
+	if errors.Is(err, models.ErrFactoryPlanningSessionNotFound) {
+		return resolved, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !session.IsAnalysisSession() || session.DraftWorkOrderID == nil {
+		return resolved, nil
+	}
+	order, err := models.FindPlanningWorkOrder(b.tx, session.OrganizationID, session.FactoryID, *session.DraftWorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order.RefinementModel == nil {
+		return resolved, nil
+	}
+	return b.applyModelOverride(resolved, *order.RefinementModel)
+}
+
 func (b *NodeConfigurationBuilder) applyLineDispatchModel(
 	resolved map[string]any,
 	dispatch *models.FactoryWorkOrderLineDispatch,
 ) (map[string]any, error) {
-	override := strings.TrimSpace(dispatch.Model)
+	return b.applyModelOverride(resolved, dispatch.Model)
+}
+
+func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, model string) (map[string]any, error) {
+	override := strings.TrimSpace(model)
 	if override == "" {
 		return resolved, nil
 	}
@@ -2486,79 +2532,5 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		return false, err
 	}
 
-	if node.ComponentName() == models.SuperPlaneRunnerComponent {
-		return superPlaneAcceptsDispatchModel(b.tx, workflow.OrganizationID, workflow.FactoryID, model)
-	}
-
-	provider, ok := runnerProviderForComponent(node.ComponentName())
-	if !ok {
-		return false, nil
-	}
-
-	return models.ModelIsSelectable(
-		b.tx,
-		workflow.OrganizationID,
-		workflow.FactoryID,
-		provider,
-		runnerFundingSourceFromConfig(resolved),
-		model,
-	)
-}
-
-func superPlaneAcceptsDispatchModel(
-	tx *gorm.DB,
-	orgID uuid.UUID,
-	factoryID *uuid.UUID,
-	model string,
-) (bool, error) {
-	if parsed, err := models.ParseSelectableLLMModelKey(model); err == nil {
-		if parsed.Source.ID != models.UsageFundingSourceHosted {
-			return false, nil
-		}
-		return models.ModelIsSelectable(
-			tx,
-			orgID,
-			factoryID,
-			parsed.Provider.ID,
-			models.UsageFundingSourceHosted,
-			parsed.Model.ID,
-		)
-	}
-
-	hosted, err := models.ParseHostedLLMModelKey(model)
-	if err != nil || !hosted.IsSet() {
-		return false, nil
-	}
-	return models.ModelIsSelectable(
-		tx,
-		orgID,
-		factoryID,
-		hosted.Provider,
-		models.UsageFundingSourceHosted,
-		hosted.Model,
-	)
-}
-
-func runnerProviderForComponent(component string) (string, bool) {
-	switch component {
-	case "runnerClaudeCode":
-		return models.UsageProviderAnthropic, true
-	case "runnerCodex":
-		return models.UsageProviderOpenAI, true
-	case "runnerOpenRouter":
-		return models.UsageProviderOpenRouter, true
-	default:
-		return "", false
-	}
-}
-
-func runnerFundingSourceFromConfig(configuration map[string]any) string {
-	credentials, _ := configuration["credentials"].(map[string]any)
-	source, _ := credentials["source"].(string)
-	switch strings.TrimSpace(source) {
-	case "secret", "integration":
-		return models.UsageFundingSourceBYOK
-	default:
-		return models.UsageFundingSourceHosted
-	}
+	return models.RunnerAcceptsModel(b.tx, workflow.OrganizationID, workflow.FactoryID, node.ComponentName(), resolved, model)
 }

@@ -1,39 +1,31 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId } from "react";
 import { Input } from "@/components/ui/input";
+import { useImplementDurationDraft } from "./implementDurationState";
+import { implementDurationMinutes } from "./implementSettingsDraft";
 import { ImplementSettingRow } from "./ImplementSettingRow";
 
-export function ImplementRunDuration({ seconds, onChange }: { seconds: unknown; onChange: (seconds: number) => void }) {
+export function ImplementRunDuration({
+  seconds,
+  disabled = false,
+  onChange,
+}: {
+  seconds: unknown;
+  disabled?: boolean;
+  onChange: (seconds: number) => void;
+}) {
+  const duration = useImplementDurationDraft();
   const timeout = typeof seconds === "number" && seconds > 0 ? seconds : 3600;
-  const [minutes, setMinutes] = useState(String(timeout / 60));
-  const [invalid, setInvalid] = useState(false);
-  const pendingSeconds = useRef<number | null>(null);
-  const changeRef = useRef(onChange);
-  changeRef.current = onChange;
+  const minutes = duration?.minutes ?? implementDurationMinutes(seconds);
+  const invalid = duration?.invalid ?? false;
   const id = useId();
 
-  useEffect(() => {
-    setMinutes(String(timeout / 60));
-    setInvalid(false);
-    pendingSeconds.current = null;
-  }, [timeout]);
-
-  useEffect(
-    () => () => {
-      // Dismissal and navigation can unmount the input without a blur event.
-      if (pendingSeconds.current !== null) changeRef.current(pendingSeconds.current);
-    },
-    [],
-  );
-
-  const save = () => {
-    const next = durationSeconds(minutes);
-    pendingSeconds.current = null;
+  const commit = (value: string) => {
+    const next = durationSeconds(value);
     if (next === null) {
-      setInvalid(true);
+      duration?.setState({ minutes: value, invalid: true });
       return;
     }
-    setInvalid(false);
-    setMinutes(String(next / 60));
+    duration?.setState({ minutes: value, invalid: false });
     if (next !== timeout) onChange(next);
   };
 
@@ -53,13 +45,17 @@ export function ImplementRunDuration({ seconds, onChange }: { seconds: unknown; 
           max={1440}
           step="any"
           value={minutes}
-          onChange={(event) => {
-            setMinutes(event.target.value);
-            setInvalid(false);
-            const next = durationSeconds(event.target.value);
-            pendingSeconds.current = next === timeout ? null : next;
+          disabled={disabled}
+          onChange={(event) => commit(event.target.value)}
+          onBlur={() => {
+            const next = durationSeconds(minutes);
+            if (next === null) {
+              duration?.setState({ minutes, invalid: true });
+              return;
+            }
+            duration?.setState({ minutes: String(next / 60), invalid: false });
+            if (next !== timeout) onChange(next);
           }}
-          onBlur={save}
           onKeyDown={(event) => {
             if (event.key !== "Enter") return;
             event.preventDefault();

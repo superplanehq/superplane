@@ -13,6 +13,9 @@ type analyticsCloseRecorder struct {
 
 func (r *analyticsCloseRecorder) Capture(productanalytics.Event) {}
 
+func (r *analyticsCloseRecorder) IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity) {
+}
+
 func (r *analyticsCloseRecorder) Close() error {
 	r.closed = true
 	return nil

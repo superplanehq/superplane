@@ -1088,6 +1088,10 @@ message Factory {
     // automation is not attached to a board column. Allowed values:
     // "backlog", "verify", "done".
     string column_key = 6;
+    // Saved app template id. "backlog" also marks a Backlog graph that
+    // predates template metadata. Empty for a custom automation.
+    // The id does not change when the canvas name changes.
+    string template_id = 7;
   }
 
   string id = 1;
@@ -1820,6 +1824,7 @@ message CreateWorkOrderRequest {
   string title = 2;
   string description = 3;
   repeated string assignee_ids = 4;
+  string model = 5;
 }
 
 message CreateWorkOrderResponse {

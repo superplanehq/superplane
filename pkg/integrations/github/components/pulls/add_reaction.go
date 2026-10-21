@@ -61,7 +61,7 @@ func (c *AddReaction) Documentation() string {
 
 If the component creates a reaction, it returns the GitHub reaction object, including id, content, user, and timestamp.
 
-If the resolved comment ID is blank, the component finishes with success and emits no reaction object. Downstream nodes that wait for that output do not run.`
+If the resolved comment ID is blank, the component finishes with success and emits an empty result. Later nodes on the same path still run.`
 }
 
 func (c *AddReaction) Icon() string {
@@ -184,7 +184,7 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
 			"github.reaction",
-			[]any{},
+			[]any{map[string]any{}},
 		)
 	}
 

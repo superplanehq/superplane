@@ -1,6 +1,6 @@
 module github.com/superplanehq/superplane
 
-go 1.26.2
+go 1.26.10
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0

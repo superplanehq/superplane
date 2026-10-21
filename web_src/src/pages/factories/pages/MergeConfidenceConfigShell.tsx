@@ -11,13 +11,14 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
 import { ImplementConfiguration } from "./ImplementConfiguration";
+import { useImplementSettingsDraft } from "./implementSettingsDraft";
 import { IMPLEMENT_AGENT_NODE_ID, columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
 import { MergeConfidenceActionsMenu, MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { NodeConfigPanel } from "./NodeConfigPanel";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 import {
   SettingsAutomationHeaderRow,
   SettingsAutomationWorkspace,
@@ -52,7 +53,7 @@ interface MergeConfidenceConfigShellProps {
   isResizing: boolean;
   onResizeStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onClosePanel?: () => void;
-  onSaveNode: (update: NodeConfigurationUpdate) => Promise<void> | void;
+  onSaveNode: (update: NodeConfigurationSave) => Promise<void> | void;
   graph?: IntakeAutomationGraph;
   loading: boolean;
   error: boolean;
@@ -141,6 +142,7 @@ function configBodyProps(props: MergeConfidenceConfigShellProps) {
     widthPercent: props.widthPercent,
     isResizing: props.isResizing,
     onResizeStart: props.onResizeStart,
+    onClose: props.onClose,
     onClosePanel: props.onClosePanel,
     onSaveNode: props.onSaveNode,
     tab: props.tab,
@@ -205,6 +207,34 @@ function implementSettingsNode({ tab, graph }: ReturnType<typeof configBodyProps
   return graph?.specNodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID);
 }
 
+function ImplementSettingsScreen(props: {
+  settings: ReturnType<typeof useImplementSettingsDraft>;
+  body: ReturnType<typeof configBodyProps>;
+}) {
+  const draft = props.settings.draft;
+  if (!draft) return null;
+  return (
+    <ImplementConfiguration
+      agent={draft.agentBase}
+      organizationId={props.body.organizationId}
+      factoryId={props.body.factoryId}
+      factoryKey={props.body.factoryKey}
+      controller={{
+        agentDraft: draft.agentDraft,
+        pullRequest: draft.pullRequestNode,
+        durationMinutes: draft.durationMinutes,
+        durationInvalid: draft.durationInvalid,
+        saving: props.settings.saving,
+        saveError: props.settings.saveError,
+        onAgentDraftChange: props.settings.updateAgentDraft,
+        onPullRequestDraftChange: props.settings.updatePullRequestDraft,
+        onDurationStateChange: props.settings.updateDuration,
+        onSave: () => void props.settings.save(props.body.onSaveNode, props.body.onClose),
+      }}
+    />
+  );
+}
+
 function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
   const {
     containerRef,
@@ -233,18 +263,11 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     layoutFitNonce,
   } = props;
   const features = useExperimentalFeature(organizationId);
+  const runHistoryEnabled = features.has(FEATURE_FACTORY_RUN_HISTORY);
+  const implementSettings = useImplementSettingsDraft(graph?.specNodes, runHistoryEnabled);
   const implementAgent = implementSettingsNode(props);
-  if (implementAgent && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
-    return (
-      <ImplementConfiguration
-        agent={implementAgent}
-        nodes={graph?.specNodes ?? []}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        onSave={onSaveNode}
-      />
-    );
+  if (implementAgent && runHistoryEnabled && implementSettings.draft) {
+    return <ImplementSettingsScreen settings={implementSettings} body={props} />;
   }
   const historyContext = automationHistoryContext(props);
   if (historyContext && features.isLoading) {
