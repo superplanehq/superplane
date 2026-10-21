@@ -1,6 +1,7 @@
 package pulls
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -375,6 +376,47 @@ func Test__ContentFilterMatchesMention(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, matched)
 	})
+}
+
+func TestOnPRReviewAddressAllBots(t *testing.T) {
+	trigger := &OnPRReview{}
+	configuration := map[string]any{
+		"repository":     "hello",
+		"contentFilter":  "@superplaneagent",
+		"ignoreBots":     true,
+		"addressAllBots": true,
+	}
+	cases := []struct {
+		name     string
+		userType string
+		login    string
+		body     string
+		want     int
+	}{
+		{name: "other bot without mention starts a run", userType: "Bot", login: "coderabbitai[bot]", body: "please fix the race", want: 1},
+		{name: "superplane comment does not start a run", userType: "Bot", login: "superplaneagent[bot]", body: "@superplaneagent please", want: 0},
+		{name: "human without mention does not start a run", userType: "User", login: "octocat", body: "please fix the race", want: 0},
+		{name: "human mention starts a run", userType: "User", login: "octocat", body: "@superplaneagent please", want: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := []byte(fmt.Sprintf(
+				`{"action":"submitted","review":{"id":987,"body":%q,"user":{"login":%q,"type":%q}},"pull_request":{"number":42},"repository":{"full_name":"testhq/hello"}}`,
+				tc.body, tc.login, tc.userType,
+			))
+			events := &contexts.EventContext{}
+			code, _, err := trigger.HandleWebhook(reviewWebhookContext(
+				body,
+				signedHeaders(body, "test-secret", "pull_request_review"),
+				events,
+				reviewCommentsHTTPContext(`[]`),
+				configuration,
+			))
+			assert.Equal(t, http.StatusOK, code)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, events.Count())
+		})
+	}
 }
 
 func reviewWebhookContext(

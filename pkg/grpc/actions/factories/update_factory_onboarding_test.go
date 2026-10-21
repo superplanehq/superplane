@@ -2,11 +2,13 @@ package factories
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -15,6 +17,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+
+	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
 func Test__UpdateFactoryOnboarding(t *testing.T) {
@@ -42,7 +46,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		appRepo := "acme/api"
 		issuesSource := pb.FactoryOnboarding_ISSUES_SOURCE_VCS
 
-		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:               factory.ID.String(),
 			VcsIntegrationId: &vcsID,
 			AppRepository:    &appRepo,
@@ -57,7 +61,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 		backlogRepo := "acme/backlog"
 		agentHarness := pb.FactoryOnboarding_AGENT_HARNESS_CLAUDE_CODE
-		response, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:                factory.ID.String(),
 			BacklogRepository: &backlogRepo,
 			AgentHarness:      &agentHarness,
@@ -74,7 +78,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
 
-		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:               factory.ID.String(),
 			VcsIntegrationId: &vcsID,
 		})
@@ -100,12 +104,12 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		complete := true
 		req.Complete = &complete
 
-		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
+		response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		firstCompletedAt := response.Factory.Onboarding.CompletedAt.AsTime()
 
-		response, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:       factory.ID.String(),
 			Complete: &complete,
 		})
@@ -126,7 +130,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		req.Complete = &complete
 
 		upsertHostedOnboardingProvider(t, db)
-		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
+		response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
@@ -147,7 +151,8 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		req.Complete = &complete
 
 		upsertHostedOnboardingProvider(t, db)
-		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, emptyOrg.ID.String(), req)
+		emptyUser := support.CreateUser(t, r, emptyOrg.ID)
+		response, err := UpdateFactoryOnboarding(authentication.SetUserIdInMetadata(context.Background(), emptyUser.ID.String()), onboardingDeps(r), emptyOrg.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
@@ -165,7 +170,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		req.Complete = &complete
 
 		clearHostedLLMProviders(t, db)
-		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
+		_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
 		code, message, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
@@ -183,7 +188,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		complete := true
 		req.Complete = &complete
 
-		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
+		response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Equal(t, agentID, response.Factory.Onboarding.AgentIntegrationId)
@@ -202,7 +207,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		complete := true
 		req.Complete = &complete
 
-		response, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), req)
+		response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Equal(t, agentID, response.Factory.Onboarding.AgentIntegrationId)
@@ -220,7 +225,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 		request := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
 		request.Complete = &complete
-		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), request)
+		_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), request)
 
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -233,7 +238,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 		complete := true
 		appRepo := "acme/api"
-		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:            factory.ID.String(),
 			AppRepository: &appRepo,
 			Complete:      &complete,
@@ -248,7 +253,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 
 		badID := "not-a-uuid"
-		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:               factory.ID.String(),
 			VcsIntegrationId: &badID,
 		})
@@ -263,7 +268,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 		otherOrg := support.CreateOrganization(t, r, r.User)
 		appRepo := "acme/api"
-		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, otherOrg.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), otherOrg.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:            factory.ID.String(),
 			AppRepository: &appRepo,
 		})
@@ -274,7 +279,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 	t.Run("not found -> error", func(t *testing.T) {
 		appRepo := "acme/api"
-		_, err := UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		_, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 			Id:            "00000000-0000-0000-0000-000000000001",
 			AppRepository: &appRepo,
 		})
@@ -282,6 +287,170 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
+}
+
+func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	for _, provider := range []string{"github", models.ProviderBitbucket} {
+		t.Run(provider+" first completion creates one all-bots handler", func(t *testing.T) {
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, provider)
+			agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+			appID, lineID := createOnboardingResources(t, r, factory)
+			req := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
+			complete := true
+			req.Complete = &complete
+
+			response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+			require.NoError(t, err)
+			require.NotNil(t, response.Factory.Onboarding.CompletedAt)
+			assertDiscussionHandler(t, db, factory, provider, 1)
+
+			response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+				Id:       factory.ID.String(),
+				Complete: &complete,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, response.Factory.Onboarding.CompletedAt)
+			assertDiscussionHandler(t, db, factory, provider, 1)
+		})
+	}
+
+	t.Run("overlapping completions create one handler", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+		appID, lineID := createOnboardingResources(t, r, factory)
+		req := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
+		complete := true
+		req.Complete = &complete
+
+		var wg sync.WaitGroup
+		errs := make([]error, 2)
+		wg.Add(len(errs))
+		for i := range errs {
+			go func(i int) {
+				defer wg.Done()
+				_, errs[i] = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+			}(i)
+		}
+		wg.Wait()
+		successes := 0
+		for _, err := range errs {
+			if err == nil {
+				successes++
+			}
+		}
+		require.Greater(t, successes, 0)
+		assertDiscussionHandler(t, db, factory, "github", 1)
+	})
+
+	t.Run("an already complete workspace is unchanged", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+		appID, lineID := createOnboardingResources(t, r, factory)
+		appRepo := "acme/api"
+		backlogRepo := "acme/backlog"
+		issuesSource := models.FactoryOnboardingIssuesSourceSkip
+		agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
+		require.NoError(t, factory.CompleteOnboarding(db, models.FactoryOnboardingPatch{
+			VCSIntegrationID:   &vcsID,
+			AgentIntegrationID: &agentID,
+			AppRepository:      &appRepo,
+			BacklogRepository:  &backlogRepo,
+			IssuesSource:       &issuesSource,
+			AgentHarness:       &agentHarness,
+			ProvisionedAppID:   &appID,
+			ProvisionedLineID:  &lineID,
+		}))
+		complete := true
+
+		_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+			Id:       factory.ID.String(),
+			Complete: &complete,
+		})
+		require.NoError(t, err)
+		assert.Zero(t, discussionHandlerCount(t, db, factory.ID))
+	})
+}
+
+func assertDiscussionHandler(t *testing.T, db *gorm.DB, factory *models.Factory, provider string, want int) {
+	t.Helper()
+	require.Equal(t, int64(want), discussionHandlerCount(t, db, factory.ID))
+	if want == 0 {
+		return
+	}
+	handlers, err := factory.ListPRFeedbackHandlers(db)
+	require.NoError(t, err)
+	require.Len(t, handlers, want)
+	canvas, err := models.FindCanvasInTransaction(db, factory.OrganizationID, handlers[0].CanvasID)
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+	settings := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
+	assert.Equal(t, prFeedbackDefaultMention, settings.Mention)
+	assert.True(t, settings.IgnoreBots)
+	assert.True(t, settings.AddressAllBots)
+	assert.Empty(t, settings.AllowedBots)
+	prompt := discussionRunnerPrompt(t, version.Nodes)
+	assert.Contains(t, prompt, "Read every bot comment, including comments with no mention.")
+	assert.Contains(t, prompt, "Ignore comments SuperPlane already wrote.")
+	assert.Contains(t, prompt, prFeedbackDefaultMention)
+	component := "github.onPRComment"
+	if provider == models.ProviderBitbucket {
+		component = "bitbucket.onPullRequestComment"
+	}
+	trigger := findIntakeNode(version.Nodes, prFeedbackCommentTriggerNodeID)
+	require.NotNil(t, trigger)
+	assert.Equal(t, component, trigger.ComponentName())
+	assert.Equal(t, true, trigger.Configuration["addressAllBots"])
+}
+
+func discussionHandlerCount(t *testing.T, db *gorm.DB, factoryID uuid.UUID) int64 {
+	t.Helper()
+	var count int64
+	require.NoError(t, db.Model(&models.FactoryPRFeedbackHandler{}).
+		Where("factory_id = ? AND source = ?", factoryID, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion).
+		Count(&count).Error)
+	return count
+}
+
+func discussionRunnerPrompt(t *testing.T, nodes []models.Node) string {
+	t.Helper()
+	node := findIntakeNode(nodes, prFeedbackRunnerNodeID)
+	require.NotNil(t, node)
+	steps, ok := node.Configuration["steps"].([]any)
+	require.True(t, ok)
+	for _, item := range steps {
+		step, ok := item.(map[string]any)
+		if !ok || step["name"] != "Address PR feedback" {
+			continue
+		}
+		prompt, _ := step["prompt"].(string)
+		return prompt
+	}
+	t.Fatal("missing discussion prompt")
+	return ""
+}
+
+func onboardingContext(r *support.ResourceRegistry) context.Context {
+	return authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+}
+
+func onboardingDeps(r *support.ResourceRegistry) IntakeDependencies {
+	return IntakeDependencies{
+		Registry:       r.Registry,
+		Encryptor:      r.Encryptor,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "http://localhost:8000",
+	}
 }
 
 func readyOnboardingRequest(factoryID, vcsID, agentID, appID, lineID string) *pb.UpdateFactoryOnboardingRequest {

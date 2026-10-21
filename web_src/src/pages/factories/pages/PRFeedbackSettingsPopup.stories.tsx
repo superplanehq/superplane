@@ -12,6 +12,7 @@ const settings: PRFeedbackDraftSettings = {
   repository: "acme/payments",
   mention: "@superplaneagent",
   ignoreBots: true,
+  addressAllBots: false,
   allowedBots: [],
   checkNames: [],
   maximumAttempts: 3,

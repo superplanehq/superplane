@@ -12,6 +12,8 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
     "Leave this field empty to start a run from any human comment or review. Use @superplaneagent to require a mention.",
   ignoreBotsLabel: "Ignore bot comments",
   ignoreBotsHelper: "Do not start a run when a bot writes the mention.",
+  addressAllBotsLabel: "Address all bot comments",
+  addressAllBotsHelper: "SuperPlane comments do not start a run.",
   allowedBotsLabel: "Allowed bots",
   allowedBotsHelper: "React to comments from these bots even without the mention. Use the bot login.",
   checkNamesLabel: "Status checks",
