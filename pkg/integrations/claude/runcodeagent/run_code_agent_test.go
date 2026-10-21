@@ -55,7 +55,7 @@ func Test__RunCodeAgent__Setup__validation(t *testing.T) {
 		{"missing task", func(c map[string]any) { delete(c, "task") }, "task is required"},
 		{"missing token", func(c map[string]any) { delete(c, "githubToken") }, "githubToken is required"},
 		{"repo mode missing repository", func(c map[string]any) { delete(c, "repository") }, "repository is required"},
-		{"invalid repository", func(c map[string]any) { c["repository"] = "nonsense" }, "owner/repo or an https"},
+		{"invalid repository", func(c map[string]any) { c["repository"] = "nonsense" }, "owner/repo or a GitHub HTTPS URL"},
 		{"pr mode missing prUrl", func(c map[string]any) { c["sourceMode"] = "pr"; delete(c, "repository") }, "prUrl is required"},
 	}
 	for _, tc := range cases {
@@ -91,7 +91,7 @@ func Test__RunCodeAgent__Setup__structuredOutputMetadata(t *testing.T) {
 }
 
 func Test__RunCodeAgent__validateRepository(t *testing.T) {
-	valid := []string{"owner/repo", "https://github.com/owner/repo.git", "{{ event.repo }}"}
+	valid := []string{"owner/repo", "https://github.com/owner/repo.git", "https://acme.ghe.com/owner/repo.git", "{{ event.repo }}"}
 	for _, v := range valid {
 		assert.NoError(t, validateRepository(v), v)
 	}
@@ -110,6 +110,7 @@ func Test__RunCodeAgent__validateRepository(t *testing.T) {
 func Test__RunCodeAgent__authenticatedCloneURL(t *testing.T) {
 	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git", authenticatedCloneURL("owner/repo"))
 	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/o/r.git", authenticatedCloneURL("https://github.com/o/r.git"))
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@acme.ghe.com/o/r.git", authenticatedCloneURL("https://acme.ghe.com/o/r.git"))
 	// A non-github URL must never receive the token.
 	assert.Equal(t, "https://evil.com/o/r.git", authenticatedCloneURL("https://evil.com/o/r.git"))
 }
@@ -123,6 +124,12 @@ func Test__RunCodeAgent__parsePRURL(t *testing.T) {
 
 	_, _, _, err = parsePRURL("https://github.com/acme/widgets/issues/42")
 	require.Error(t, err)
+
+	owner, repo, number, err = parsePRURL("https://acme.ghe.com/acme/widgets/pull/9")
+	require.NoError(t, err)
+	assert.Equal(t, "acme", owner)
+	assert.Equal(t, "widgets", repo)
+	assert.Equal(t, 9, number)
 }
 
 func Test__RunCodeAgent__extractPRURL(t *testing.T) {
@@ -140,6 +147,11 @@ func Test__RunCodeAgent__buildEnvironmentConfig(t *testing.T) {
 	assert.Equal(t, "limited", limited.Networking.Type)
 	assert.Contains(t, limited.Networking.AllowedHosts, "github.com")
 	assert.Contains(t, limited.Networking.AllowedHosts, "registry.internal")
+
+	ghe := buildEnvironmentConfig(Spec{Networking: networkingLimited, Repository: "https://acme.ghe.com/acme/app.git"})
+	assert.Contains(t, ghe.Networking.AllowedHosts, "acme.ghe.com")
+	assert.Contains(t, ghe.Networking.AllowedHosts, "*.acme.ghe.com")
+	assert.NotContains(t, ghe.Networking.AllowedHosts, "*.ghe.com")
 	require.NotNil(t, limited.Networking.AllowPackageManagers)
 	assert.True(t, *limited.Networking.AllowPackageManagers)
 }

@@ -44,6 +44,10 @@ vi.mock("@/hooks/useMe", () => ({
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
+vi.mock("./useFirstRunGitHubEnterprise", () => ({
+  useFirstRunGitHubEnterprise: () => ({ connect: vi.fn() }),
+}));
+
 vi.mock("@/hooks/useIntegrations", () => ({
   useIntegrationResources: () => ({
     data: [
@@ -133,6 +137,9 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
+    selectGitHubEnterpriseRepository: vi.fn().mockResolvedValue(true),
+    bindGitHubEnterpriseIntegration: vi.fn(),
+    githubIntegrationId: "",
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,

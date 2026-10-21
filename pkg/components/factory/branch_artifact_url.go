@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -43,7 +44,7 @@ func branchTreeURL(provider, repository, name string) string {
 	if bitbucketProvider(provider) {
 		return "https://bitbucket.org/" + owner + "/" + rest + "/src/" + encodeBranchPath(branch)
 	}
-	return "https://github.com/" + owner + "/" + rest + "/tree/" + encodeBranchPath(branch)
+	return githubcommon.DotCom().TreeURL(owner+"/"+rest, encodeBranchPath(branch))
 }
 
 // branchRootSegment is the path piece before the branch name.

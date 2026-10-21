@@ -108,8 +108,13 @@ export function isAddIntakeSoon(template: AddIntakeTemplate, hasFeature: (featur
 }
 
 /** Catalog with Coming soon applied when the organization feature is off. */
-export function addIntakeTemplatesForOrg(hasFeature: (featureId: string) => boolean): AddIntakeTemplate[] {
+export function addIntakeTemplatesForOrg(
+  hasFeature: (featureId: string) => boolean,
+  options?: { hideDependabot?: boolean },
+): AddIntakeTemplate[] {
   return ADD_INTAKE_TEMPLATES.filter(
-    (template) => template.id !== "scheduled-intake" || hasFeature(FEATURE_FACTORY_SCHEDULED_INTAKE),
+    (template) =>
+      (template.id !== "scheduled-intake" || hasFeature(FEATURE_FACTORY_SCHEDULED_INTAKE)) &&
+      (!options?.hideDependabot || template.id !== "dependabot-alerts"),
   ).map((template) => (isAddIntakeSoon(template, hasFeature) ? { ...template, soon: true } : template));
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 // buildPrompt wraps the user's task in a deterministic operating procedure that
@@ -98,12 +99,13 @@ func writeFinalMarker(b *strings.Builder, prExpected bool, schema map[string]any
 
 func authenticatedCloneURL(repository string) string {
 	repository = strings.TrimSpace(repository)
+	host := githubHostFromRepository(repository)
 	if repoOwnerRepoPattern.MatchString(repository) {
-		return fmt.Sprintf("https://x-access-token:$GITHUB_TOKEN@github.com/%s.git", repository)
+		clone := host.CloneURL(repository)
+		return strings.Replace(clone, "https://", "https://x-access-token:$GITHUB_TOKEN@", 1)
 	}
-	// Only embed the token for github.com; anything else is returned unchanged
-	// (unauthenticated) so the credential can never reach a non-GitHub host.
-	if strings.HasPrefix(repository, "https://github.com/") {
+	if githubcommon.IsKnownGitHubWebHostname(githubHostFromURL(repository).WebHostname()) &&
+		strings.HasPrefix(repository, host.WebURL()+"/") {
 		return "https://x-access-token:$GITHUB_TOKEN@" + strings.TrimPrefix(repository, "https://")
 	}
 	return repository
