@@ -833,7 +833,6 @@ func TestBuildDiscussionPRFeedbackCanvasBitbucket(t *testing.T) {
 	edges := yamlEdgeChannels(canvas)
 	assert.Contains(t, edges, "found:"+prFeedbackFindNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
 	assert.Contains(t, edges, "default:"+prFeedbackAcknowledgeCommentNodeID+"->"+prFeedbackActivityNodeID)
-	assert.Contains(t, edges, "failed:"+prFeedbackAcknowledgeCommentNodeID+"->"+prFeedbackActivityNodeID)
 	assert.NotContains(t, edges, "found:"+prFeedbackFindNodeID+"->"+prFeedbackActivityNodeID)
 	assert.NotContains(t, edges, "default:"+prFeedbackCommentTriggerNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
 

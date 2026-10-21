@@ -45,9 +45,7 @@ func (c *CreatePullRequestComment) Documentation() string {
 
 ## Output
 
-Emits the comment that Bitbucket returns.
-
-If Bitbucket rejects the comment, the component emits the failed channel. A canvas can continue from that channel.`
+Emits the comment that Bitbucket returns.`
 }
 
 func (c *CreatePullRequestComment) ExampleOutput() map[string]any {
@@ -55,10 +53,7 @@ func (c *CreatePullRequestComment) ExampleOutput() map[string]any {
 }
 
 func (c *CreatePullRequestComment) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{
-		core.DefaultOutputChannel,
-		{Name: core.FailedOutputChannel, Label: "Failed"},
-	}
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (c *CreatePullRequestComment) Configuration() []configuration.Field {
@@ -116,23 +111,15 @@ func (c *CreatePullRequestComment) Execute(ctx core.ExecutionContext) error {
 
 	client, err := newIntegrationClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return emitPullRequestCommentFailure(ctx, fmt.Errorf("failed to initialize Bitbucket client: %w", err))
+		return fmt.Errorf("failed to initialize Bitbucket client: %w", err)
 	}
 
 	comment, err := client.CreatePullRequestCommentWithParent(config.Repository, id, config.Body, config.ParentCommentID)
 	if err != nil {
-		return emitPullRequestCommentFailure(ctx, fmt.Errorf("failed to create pull request comment: %w", err))
+		return fmt.Errorf("failed to create pull request comment: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "bitbucket.pullRequestComment", []any{comment})
-}
-
-func emitPullRequestCommentFailure(ctx core.ExecutionContext, err error) error {
-	return ctx.ExecutionState.Emit(
-		core.FailedOutputChannel,
-		"bitbucket.pullRequestComment",
-		[]any{map[string]any{"error": err.Error()}},
-	)
 }
 
 func decodeCreatePullRequestCommentConfiguration(raw any) (CreatePullRequestCommentConfiguration, error) {
