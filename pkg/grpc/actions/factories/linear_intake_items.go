@@ -43,7 +43,7 @@ func (s *linearIntakeItemSource) Search(_ context.Context, query string, limit i
 	items := make([]IntakeItem, 0, len(issues))
 	for _, result := range issues {
 		reason := s.issueDisabledReason(result.Issue)
-		if reason != "" && !result.ExactMatch {
+		if reason != "" && !result.ExplicitIdentifier {
 			continue
 		}
 		item := linearIssueItem(result.Issue)

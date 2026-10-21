@@ -103,9 +103,12 @@ func Test__Client__SearchProjectIssues__BareNumber(t *testing.T) {
 	require.Len(t, issues, 3)
 	assert.Equal(t, "ENG-123", issues[0].Identifier)
 	assert.True(t, issues[0].ExactMatch)
+	assert.False(t, issues[0].ExplicitIdentifier)
 	assert.Equal(t, "OPS-123", issues[1].Identifier)
 	assert.True(t, issues[1].ExactMatch)
+	assert.False(t, issues[1].ExplicitIdentifier)
 	assert.False(t, issues[2].ExactMatch)
+	assert.False(t, issues[2].ExplicitIdentifier)
 	assert.Equal(t, []any{"ENG-123", "OPS-123"}, variablesFromRequest(t, httpContext, 2)["identifiers"])
 	assert.Equal(t, []any{"p1", "p2"}, variablesFromRequest(t, httpContext, 1)["ids"])
 }
@@ -141,19 +144,22 @@ func Test__Client__SearchProjectIssues__ScopeAndLimit(t *testing.T) {
 		`"project":{"id":"p1"},"state":{"type":"canceled"}`,
 		`"project":{"id":"p1"},"labels":{"nodes":[]}`,
 	} {
-		t.Run(scope, func(t *testing.T) {
-			httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-				jsonResponse(`{"data":{"issues":{"nodes":[{"id":"text"}]}}}`),
-				jsonResponse(`{"data":{"issues":{"nodes":[{"id":"exact","identifier":"ENG-123",` + scope + `}]}}}`),
-			}}
-			client, err := NewClient(httpContext, newAuthorizedIntegration())
-			require.NoError(t, err)
-			issues, err := client.SearchProjectIssues([]string{"p1"}, "eng-123", 1)
-			require.NoError(t, err)
-			require.Len(t, issues, 1)
-			assert.Equal(t, "exact", issues[0].ID)
-			assert.True(t, issues[0].ExactMatch)
-		})
+		for _, query := range []string{"ENG-123", "eng-123", "ENG 123", "please find eng-123 for me", "https://linear.app/acme/issue/eng-123/fix"} {
+			t.Run(scope+"/"+query, func(t *testing.T) {
+				httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+					jsonResponse(`{"data":{"issues":{"nodes":[{"id":"text"}]}}}`),
+					jsonResponse(`{"data":{"issues":{"nodes":[{"id":"exact","identifier":"ENG-123",` + scope + `}]}}}`),
+				}}
+				client, err := NewClient(httpContext, newAuthorizedIntegration())
+				require.NoError(t, err)
+				issues, err := client.SearchProjectIssues([]string{"p1"}, query, 1)
+				require.NoError(t, err)
+				require.Len(t, issues, 1)
+				assert.Equal(t, "exact", issues[0].ID)
+				assert.True(t, issues[0].ExactMatch)
+				assert.True(t, issues[0].ExplicitIdentifier)
+			})
+		}
 	}
 }
 

@@ -189,6 +189,8 @@ func (c *Client) ListOpenProjectIssues(projectIDs []string, limit int) ([]Issue,
 type ProjectIssueSearchResult struct {
 	Issue
 	ExactMatch bool
+	// ExplicitIdentifier excludes identifiers inferred from a bare number.
+	ExplicitIdentifier bool
 }
 
 // SearchOpenProjectIssues returns open issues in the selected projects.
@@ -251,7 +253,11 @@ func (c *Client) SearchProjectIssues(projectIDs []string, query string, limit in
 			if seen[issue.ID] {
 				continue
 			}
-			results = append(results, ProjectIssueSearchResult{Issue: issue, ExactMatch: true})
+			results = append(results, ProjectIssueSearchResult{
+				Issue:              issue,
+				ExactMatch:         true,
+				ExplicitIdentifier: !issueNumberPattern.MatchString(query),
+			})
 			seen[issue.ID] = true
 		}
 	}
