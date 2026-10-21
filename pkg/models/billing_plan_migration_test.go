@@ -52,7 +52,7 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 	require.Equal(t, int64(2300), amount)
 	for _, path := range []string{
 		"../../db/data_migrations/20261021171448_seed-billing-catalog.up.sql",
-		"../../db/data_migrations/20261021215654_remove-business-manual-price-and-usage.up.sql",
+		"../../db/data_migrations/20261021224720_remove-business-manual-price-and-usage.up.sql",
 	} {
 		migration, err := os.ReadFile(path)
 		require.NoError(t, err)
