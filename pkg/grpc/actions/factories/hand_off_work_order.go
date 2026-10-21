@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -63,8 +64,14 @@ type HandOffWorkOrderRequest struct {
 	Column         string
 	PullRequestURL string
 	LineName       string
+	Model          string
 	MCPClientID    string
 	MCPClientName  string
+}
+
+type HandOffLineModel struct {
+	ID   string
+	Name string
 }
 
 type HandOffWorkOrderResult struct {
@@ -105,6 +112,13 @@ func HandOffWorkOrder(
 	if column != HandOffColumnImplement && column != HandOffColumnVerify {
 		return nil, factoryErrorToStatus(invalidArgument("column must be implement or verify"), "failed to hand off work order")
 	}
+	model := strings.TrimSpace(req.Model)
+	if column == HandOffColumnVerify && model != "" {
+		return nil, factoryErrorToStatus(
+			invalidArgument("Verify does not start an agent, so a model is not used."),
+			"failed to hand off work order",
+		)
+	}
 	if column == HandOffColumnVerify && strings.TrimSpace(req.PullRequestURL) == "" {
 		return nil, factoryErrorToStatus(invalidArgument("pull_request_url is required"), "failed to hand off work order")
 	}
@@ -143,6 +157,11 @@ func HandOffWorkOrder(
 		implementIndex, err = resolveImplementationStageIndex(stages)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to hand off work order")
+		}
+		if model != "" {
+			if err := ensureHandOffModelAllowed(db, factory, line.Steps[implementIndex].AppID, model); err != nil {
+				return nil, factoryErrorToStatus(err, "failed to hand off work order")
+			}
 		}
 	} else {
 		verifyIndex, err = resolveVerifyStageIndex(stages)
@@ -196,7 +215,7 @@ func HandOffWorkOrder(
 			return bindErr
 		}
 		if column == HandOffColumnImplement {
-			started, err := dispatchWorkOrderOnLineTx(tx, factory, order.ID, line, &actor, implementIndex, false, "", "")
+			started, err := dispatchWorkOrderOnLineTx(tx, factory, order.ID, line, &actor, implementIndex, false, model, "")
 			if err != nil {
 				return err
 			}
@@ -498,6 +517,52 @@ func handOffProviderLabel(provider string) string {
 	default:
 		return provider
 	}
+}
+
+func ListHandOffLineModels(ctx context.Context, organizationID, factoryID, lineName string) ([]HandOffLineModel, error) {
+	orgID, err := parseOrganizationID(organizationID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list line models")
+	}
+	db := database.DB(ctx)
+	factory, err := findFactory(db, orgID, factoryID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list line models")
+	}
+	line, err := resolveHandOffLine(db, factory, lineName)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list line models")
+	}
+	stages, err := classifyHandOffStages(db, factory, line)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list line models")
+	}
+	implementIndex, err := resolveImplementationStageIndex(stages)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list line models")
+	}
+	ids, err := listRunnerModelsForApps(db, orgID, factory.ID, []uuid.UUID{line.Steps[implementIndex].AppID})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list line models")
+	}
+
+	serialized := serializeLineRunnerModels(ids)
+	listed := make([]HandOffLineModel, 0, len(serialized))
+	for _, model := range serialized {
+		listed = append(listed, HandOffLineModel{ID: model.GetId(), Name: model.GetName()})
+	}
+	return listed, nil
+}
+
+func ensureHandOffModelAllowed(tx *gorm.DB, factory *models.Factory, appID uuid.UUID, model string) error {
+	allowed, err := listRunnerModelsForApps(tx, factory.OrganizationID, factory.ID, []uuid.UUID{appID})
+	if err != nil {
+		return err
+	}
+	if slices.Contains(allowed, model) {
+		return nil
+	}
+	return invalidArgument("This model is not available for Implement. Set model to one of: " + strings.Join(allowed, ", "))
 }
 
 func resolveHandOffLine(tx *gorm.DB, factory *models.Factory, lineName string) (*models.FactoryLine, error) {
