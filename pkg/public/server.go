@@ -37,6 +37,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
@@ -1180,6 +1181,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
+	recordOrganizationCreated(organization, account.ID, "workspace_switcher")
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
@@ -1263,6 +1265,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
 	}
+	recordOrganizationCreated(organization, account.ID, "initial_onboarding")
 
 	writeInitialWorkspaceResponse(w, organization, workspace)
 }
@@ -1337,6 +1340,26 @@ func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.O
 	json.NewEncoder(w).Encode(initialWorkspaceResponse{
 		OrganizationSlug: organization.Slug,
 		WorkspaceKey:     workspace.Key,
+	})
+}
+
+func recordOrganizationCreated(organization *models.Organization, accountID uuid.UUID, creationPath string) {
+	organizationID := organization.ID.String()
+	productanalytics.Capture(productanalytics.Event{
+		Name:           productanalytics.EventOrganizationCreated,
+		EventID:        productanalytics.StableEventID(productanalytics.EventOrganizationCreated, organizationID),
+		DistinctID:     accountID.String(),
+		OrganizationID: organizationID,
+		ActorType:      productanalytics.ActorUser,
+		Source:         productanalytics.SourceUI,
+		Properties:     productanalytics.Properties{"creation_path": creationPath},
+	})
+	productanalytics.IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity{
+		ID:        organizationID,
+		Name:      organization.Name,
+		Slug:      organization.Slug,
+		CreatedAt: organization.CreatedAt,
+		AccountID: accountID.String(),
 	})
 }
 

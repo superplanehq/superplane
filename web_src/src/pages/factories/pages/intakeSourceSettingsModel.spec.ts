@@ -61,7 +61,7 @@ describe("intakeSourceSettingsModel", () => {
 
   it("accepts the intake settings tabs", () => {
     expect(isIntakeSettingsTab("automation")).toBe(true);
-    expect(isIntakeSettingsTab("runs")).toBe(false);
+    expect(isIntakeSettingsTab("runs")).toBe(true);
     expect(isIntakeSettingsTab("agent")).toBe(true);
     expect(isIntakeSettingsTab("general")).toBe(true);
     expect(isIntakeSettingsTab("listen")).toBe(false);

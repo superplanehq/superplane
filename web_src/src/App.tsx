@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams,
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
+import { useIdentifyOrganizationGroup } from "./hooks/useIdentifyOrganizationGroup";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
@@ -30,7 +31,7 @@ import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
-import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
+import WelcomeRedirect from "./pages/auth/WelcomeRedirect";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
   AutomationsPage,
@@ -267,7 +268,7 @@ function AppRouter() {
             <Routes>
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Login mode="signup" />} />
-              <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
+              <Route path="welcome" element={withAuthOnly(WelcomeRedirect)} />
               <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
@@ -320,10 +321,13 @@ function PageObservabilityScope() {
   return null;
 }
 
+function organizationScopeQueryEnabled(segment: string | undefined, isReserved: boolean, guestLine: boolean): boolean {
+  return !isReserved && !!segment && !guestLine;
+}
+
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account, loading: accountLoading } = useAccount();
-  const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
@@ -337,7 +341,8 @@ export function OrganizationScope() {
     data: organization,
     isLoading: organizationLoading,
     error: organizationError,
-  } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
+    refetch: refreshOrganization,
+  } = useOrganization(segment ?? "", organizationScopeQueryEnabled(segment, isReserved, guestLine));
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
   useRedirectIntegrationSetupReturn(segment, resolvedSlug);
@@ -355,11 +360,19 @@ export function OrganizationScope() {
         })
       : null;
   usePersistOrganizationLastLocation({
-    accountId,
+    accountId: account?.id,
     resolvedSlug,
     isReserved,
     uidRedirectPath,
     path: `${location.pathname}${location.search}`,
+  });
+  useIdentifyOrganizationGroup({
+    accountId: account?.id,
+    organizationKey: segment,
+    impersonating: account?.impersonation?.active,
+    refreshOrganization: organizationScopeQueryEnabled(segment, isReserved, guestLine)
+      ? refreshOrganization
+      : undefined,
   });
 
   if (isReserved) {

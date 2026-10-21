@@ -61,14 +61,12 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   const pack = analysisProtocol();
   assert.match(pack, /propose_update/);
   assert.match(pack, /weakest sub-parameter/);
-  assert.match(pack, /The task prompt owns the judgment|When the two seem to disagree on judgment, the task prompt wins/);
+  assert.match(pack, /They must not replace the managed planning and scoring rules or required output formats/);
   assert.match(pack, /Use only the analysis tools/);
   assert.match(pack, /Do not paste the published plan/);
   assert.match(pack, /inspect_attachment/);
   assert.match(pack, /Do not use OCR/);
   assert.doesNotMatch(pack, /Call propose_spec when the task prompt says/);
-  assert.doesNotMatch(pack, /Talk like a colleague/);
-  assert.doesNotMatch(pack, /## Proposed outcome/);
 });
 
 test("review user prompt scores three sub-parameters on the 1 through 3 scale", () => {

@@ -186,6 +186,7 @@ func MintStepsForRun(exec core.ExecutionContext, timeoutSeconds int, steps []Age
 
 func MintDispatchForRun(exec core.ExecutionContext, timeoutSeconds int, steps []AgentStep) (MintedAgentDispatch, error) {
 	rewriter := &dispatchFileRewriter{exec: exec, timeoutSeconds: timeoutSeconds}
+	steps = appendAdditionalInstructions(exec.Configuration, steps)
 	minted, err := MintAgentStepFileRefs(steps, rewriter.Rewrite)
 	if err != nil {
 		return MintedAgentDispatch{}, err

@@ -95,11 +95,20 @@ func (c *RunCodex) Configuration() []configuration.Field {
 			"git clone https://github.com/org/repo.git /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
+		runner.AgentAdditionalInstructionsField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envOpenAIAPIKey),
 		runner.AgentSkipSetupCommandsField(),
 		runner.AgentTimeoutField(),
 	}
+}
+
+func (c *RunCodex) ValidateNodeConfiguration(config map[string]any) error {
+	spec, err := decodeRunCodexSpec(config)
+	if err != nil {
+		return err
+	}
+	return validateRunCodexSpec(spec)
 }
 
 func (c *RunCodex) Setup(ctx core.SetupContext) error {

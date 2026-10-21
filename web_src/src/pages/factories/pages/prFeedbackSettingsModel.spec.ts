@@ -47,7 +47,7 @@ describe("PR feedback settings tabs", () => {
     expect(isPRFeedbackSettingsTab("general")).toBe(true);
     expect(isPRFeedbackSettingsTab("agent")).toBe(true);
     expect(isPRFeedbackSettingsTab("automation")).toBe(true);
-    expect(isPRFeedbackSettingsTab("runs")).toBe(false);
+    expect(isPRFeedbackSettingsTab("runs")).toBe(true);
     expect(prFeedbackSettingsTabs(false)).toEqual(["general", "automation"]);
     expect(prFeedbackSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
   });

@@ -77,12 +77,12 @@ az account set --subscription SUBSCRIPTION_ID
 
 ## 2. Confirm the published artifacts
 
-The defaults pin this validated set:
+The defaults pin these releases:
 
 | Artifact | Value |
 | --- | --- |
-| SuperPlane chart | `1.0.0-rc1` |
-| App image | `ghcr.io/superplanehq/superplane:v1.0.0-rc1` |
+| SuperPlane chart | `1.0.0-rc3` |
+| App image | `ghcr.io/superplanehq/superplane:v1.0.0-rc3` |
 | Fleet Manager chart | `oci://ghcr.io/superplanehq/fleet-manager-chart` version `0.1.3` |
 | Fleet Manager image | `ghcr.io/superplanehq/fleet-manager:v0.1.3` |
 | Recommended runner | `v0.2.0` |
@@ -96,13 +96,13 @@ The Fleet Manager binary syncs fleets.
 Confirm the charts before you apply:
 
 ```bash
-helm show chart oci://ghcr.io/superplanehq/superplane-chart --version 1.0.0-rc1
-docker manifest inspect ghcr.io/superplanehq/superplane:v1.0.0-rc1
+helm show chart oci://ghcr.io/superplanehq/superplane-chart --version 1.0.0-rc3
+docker manifest inspect ghcr.io/superplanehq/superplane:v1.0.0-rc3
 helm show chart oci://ghcr.io/superplanehq/fleet-manager-chart --version 0.1.3
 docker manifest inspect ghcr.io/superplanehq/fleet-manager:v0.1.3
 ```
 
-`helm show chart` for SuperPlane must print `appVersion: v1.0.0-rc1`.
+`helm show chart` for SuperPlane must print `appVersion: v1.0.0-rc3`.
 `helm show chart` for Fleet Manager must print `appVersion: v0.1.3`.
 Leave `superplane_image_tag` empty. The SuperPlane chart uses that appVersion.
 
@@ -187,7 +187,7 @@ Access SuperPlane at `https://YOUR_DOMAIN`.
 
 ## Update SuperPlane
 
-The default chart is `1.0.0-rc1`. Set `superplane_chart_version` to a
+The default chart is `1.0.0-rc3`. Set `superplane_chart_version` to a
 newer published chart when you upgrade. Use a stable `1.x` chart when one
 exists. Do not use chart `0.30.0` or any lower chart. Confirm the matching
 image and chart first.

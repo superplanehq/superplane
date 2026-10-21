@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/datatypes"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -110,6 +111,24 @@ func TestSerializeWorkOrder_SourceRunID(t *testing.T) {
 
 	assert.Equal(t, runID.String(), mustSerializeWorkOrder(t, nil, order, nil, nil).GetSourceRunId())
 	assert.Empty(t, mustSerializeWorkOrder(t, nil, &models.FactoryWorkOrder{ID: uuid.New()}, nil, nil).GetSourceRunId())
+}
+
+func TestSerializeWorkOrderSummary_SourceRunID(t *testing.T) {
+	runID := uuid.New()
+	for _, sourceRunID := range []*uuid.UUID{&runID, nil} {
+		order := &models.FactoryWorkOrder{ID: uuid.New(), SourceRunID: sourceRunID}
+		serialized, err := serializeWorkOrderSummary(nil, order, nil, nil, workOrderUsageView{})
+		require.NoError(t, err)
+		encoded, err := protojson.Marshal(serialized)
+		require.NoError(t, err)
+		var response map[string]any
+		require.NoError(t, json.Unmarshal(encoded, &response))
+		if sourceRunID != nil {
+			assert.Equal(t, runID.String(), response["sourceRunId"])
+		} else {
+			assert.Empty(t, response["sourceRunId"])
+		}
+	}
 }
 
 func TestSerializeExecutionSteps_UsesCanvasNames(t *testing.T) {

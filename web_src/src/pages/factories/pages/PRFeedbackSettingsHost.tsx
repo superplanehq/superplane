@@ -210,6 +210,7 @@ function PRFeedbackSettingsLoaded({
 
   return (
     <PRFeedbackSettingsPopup
+      factoryId={factoryId}
       organizationId={organizationId}
       githubIntegrationId={githubIntegrationId}
       vcsProvider={vcsProvider}

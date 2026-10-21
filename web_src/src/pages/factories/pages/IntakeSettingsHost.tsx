@@ -2,14 +2,17 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import { useDeleteFactoryIntake, useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomationsCopy";
+import { dependabotRepositoryValue } from "@/lib/dependabotRepository";
 import { DependabotIntakeConfigBody } from "./DependabotIntakeConfigBody";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 import { SentryIntakeConfigBody } from "./SentryIntakeConfigBody";
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
@@ -40,6 +43,10 @@ interface IntakeSettingsHostProps {
 
 /** Settings for one intake, opened from its row at the foot of Backlog. */
 export function IntakeSettingsHost(props: IntakeSettingsHostProps) {
+  const features = useExperimentalFeature(props.organizationId);
+  if (features.has(FEATURE_FACTORY_RUN_HISTORY)) {
+    return <SourceIntakeSettings {...props} />;
+  }
   if (props.intake.source.id === "dependabot-alerts") {
     return <DependabotIntakeSettings {...props} />;
   }
@@ -150,12 +157,21 @@ function SourceIntakeSettings({
   const saveError = updateIntake.error
     ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError)
     : undefined;
+  const watchedRepository =
+    intake.source.id === "dependabot-alerts"
+      ? dependabotRepositoryValue(
+          automation.graph.specNodes?.find((node) => node.component === "github.onDependabotAlert"),
+          repository,
+        )
+      : repository;
 
   return (
     <IntakeSourceSettingsPopup
       settings={intake.settings}
       sourceId={intake.source.id}
       organizationId={organizationId}
+      factoryId={factoryId}
+      repository={watchedRepository}
       integrationId={intake.integrationId}
       resourceId={intake.resourceId}
       labelOptions={labelOptions}
@@ -256,7 +272,7 @@ function useIntakeSplitSettings({
       factoryKey,
       runHrefFor: intakeRunHref(organizationId, factoryKey, intake.appId, lineId),
       onClose,
-      onSaveNode: (update: NodeConfigurationUpdate) => agent.saveNode(update, { notify: false }),
+      onSaveNode: (update: NodeConfigurationSave) => agent.saveNode(update, { notify: false }),
       onDelete: actions.removeIntake,
       deletePending: deleteIntake.isPending,
       deleteError: actions.deleteError,

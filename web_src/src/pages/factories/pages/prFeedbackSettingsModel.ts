@@ -14,11 +14,11 @@ import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
 
 export { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 
-export type PRFeedbackSettingsTab = "general" | "agent" | "automation";
+export type PRFeedbackSettingsTab = "general" | "agent" | "automation" | "runs";
 export type PRFeedbackSourceId = "discussion" | "checks";
 
 export function isPRFeedbackSettingsTab(value: string | null | undefined): value is PRFeedbackSettingsTab {
-  return value === "general" || value === "agent" || value === "automation";
+  return value === "general" || value === "agent" || value === "automation" || value === "runs";
 }
 
 export function prFeedbackSettingsTabs(hasAgent: boolean): PRFeedbackSettingsTab[] {

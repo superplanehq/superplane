@@ -199,6 +199,19 @@ func AgentWorkingDirectoryField() configuration.Field {
 	}
 }
 
+func AgentAdditionalInstructionsField() configuration.Field {
+	allowExpressions := false
+	return configuration.Field{
+		Name:        "additionalInstructions",
+		Label:       "Additional instructions",
+		Type:        configuration.FieldTypeText,
+		Description: "Additional project requirements for the agent. Managed workflow rules still apply.",
+		TypeOptions: &configuration.TypeOptions{
+			Text: &configuration.TextTypeOptions{AllowExpressions: &allowExpressions},
+		},
+	}
+}
+
 func AgentEnvironmentField(reservedEnv string) configuration.Field {
 	description := "Optional key/value pairs passed into the agent environment"
 	if reservedEnv != "" {

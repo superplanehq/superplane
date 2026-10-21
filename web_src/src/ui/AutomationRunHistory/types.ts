@@ -13,6 +13,7 @@ export interface RunActivity {
   error?: string;
   logs: RunLogs;
   outputs?: Record<string, unknown>;
+  additionalInstructions?: string;
 }
 
 export interface AutomationRun {

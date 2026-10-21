@@ -3,16 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { init, identify, capture, reset, setOnce } = vi.hoisted(() => ({
+const { init, identify, capture, reset, setOnce, group } = vi.hoisted(() => ({
   init: vi.fn(),
   identify: vi.fn(),
   capture: vi.fn(),
   reset: vi.fn(),
   setOnce: vi.fn(),
+  group: vi.fn(),
 }));
 
 vi.mock("posthog-js", () => ({
-  default: { init, identify, capture, reset, people: { set_once: setOnce } },
+  default: { init, identify, capture, reset, group, people: { set_once: setOnce } },
 }));
 
 vi.mock("react-router", () => ({
@@ -45,7 +46,7 @@ import { AccountProvider } from "@/contexts/AccountProvider";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { confirmSignupAnalyticsPreference, savePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
-import { initPostHog } from "@/posthog";
+import { initPostHog, identifyOrganizationGroup } from "@/posthog";
 
 const mockAccount = {
   id: "user-123",
@@ -84,7 +85,13 @@ describe("posthog init", () => {
     expect(initPostHog()).toBe(true);
     expect(init).toHaveBeenCalledWith(
       "test-key",
-      expect.objectContaining({ autocapture: false, capture_pageview: false, person_profiles: "always" }),
+      expect.objectContaining({
+        autocapture: false,
+        capture_pageview: false,
+        capture_pageleave: false,
+        disable_session_recording: true,
+        person_profiles: "always",
+      }),
     );
   });
 
@@ -171,7 +178,7 @@ describe("account identification", () => {
       });
     });
 
-    expect(capture).toHaveBeenCalledWith("auth:signup", {
+    expect(capture).toHaveBeenCalledWith("user_signed_up", {
       product_updates_opt_in: false,
       $set: {
         product_updates_opt_in: false,
@@ -192,7 +199,7 @@ describe("account identification", () => {
     );
 
     await waitFor(() => {
-      expect(capture).toHaveBeenCalledWith("auth:signup", {
+      expect(capture).toHaveBeenCalledWith("user_signed_up", {
         product_updates_opt_in: true,
         $set: {
           product_updates_opt_in: true,
@@ -200,6 +207,27 @@ describe("account identification", () => {
       });
     });
     expect(window.location.search).toBe("");
+  });
+
+  it("captures stored signup attribution on the signup event", async () => {
+    window.history.replaceState({}, "", "/org-123?auth_signup_result=created");
+    localStorage.setItem(
+      "superplane.initial_utm",
+      JSON.stringify({ utm_source: "youtube", utm_campaign: "erictech_beta" }),
+    );
+
+    render(
+      <AccountProvider>
+        <div />
+      </AccountProvider>,
+    );
+
+    await waitFor(() => {
+      expect(capture).toHaveBeenCalledWith("user_signed_up", {
+        utm_source: "youtube",
+        utm_campaign: "erictech_beta",
+      });
+    });
   });
 
   it("captures implicit signup without marketing properties", async () => {
@@ -214,7 +242,7 @@ describe("account identification", () => {
     );
 
     await waitFor(() => {
-      expect(capture).toHaveBeenCalledWith("auth:signup");
+      expect(capture).toHaveBeenCalledWith("user_signed_up");
     });
     expect(identify).toHaveBeenCalledWith("user-123", {
       email: "john@example.com",
@@ -245,7 +273,7 @@ describe("account identification", () => {
       });
     });
 
-    expect(capture).not.toHaveBeenCalledWith("auth:signup", expect.anything());
+    expect(capture).not.toHaveBeenCalledWith("user_signed_up", expect.anything());
     expect(window.location.search).toBe("");
   });
 });
@@ -278,5 +306,24 @@ describe("logout", () => {
     await user.click(screen.getByLabelText("Open organization menu"));
     await user.click(screen.getByText("Sign Out"));
     expect(reset).toHaveBeenCalledOnce();
+  });
+});
+
+describe("organization group", () => {
+  beforeEach(() => {
+    group.mockClear();
+  });
+
+  it("calls group with the organization id and name", () => {
+    identifyOrganizationGroup({
+      id: "org-abc123",
+      name: "Acme Corp",
+      slug: "acme",
+    });
+
+    expect(group).toHaveBeenCalledWith("organization", "org-abc123", {
+      name: "Acme Corp",
+      slug: "acme",
+    });
   });
 });

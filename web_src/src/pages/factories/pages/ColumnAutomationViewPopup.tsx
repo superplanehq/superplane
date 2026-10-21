@@ -1,30 +1,29 @@
+import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
+import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
+import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Settings, Workflow } from "lucide-react";
+import { Link } from "@/components/Link/link";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Pencil } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
 
 import { columnAutomationUsesSplitConfig, IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
-import {
-  COLUMN_AUTOMATIONS_COPY,
-  columnAutomationViewTabs,
-  type ColumnAutomationViewTab,
-} from "../lib/columnAutomations";
+import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomationViewTab } from "../lib/columnAutomations";
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import {
-  SettingsAutomationCanvasEdit,
-  SettingsAutomationHeaderRow,
-  SettingsAutomationWorkspace,
-} from "./SettingsAutomationWorkspace";
+import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import { useIntakeAutomationCanvas, type IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 
 interface ColumnAutomationViewPopupProps {
+  organizationId?: string;
+  factoryId?: string;
+  historyEligible?: boolean;
   title: string;
   graph?: IntakeAutomationGraph;
   loading?: boolean;
@@ -43,6 +42,9 @@ interface ColumnAutomationViewPopupProps {
 
 /** Read-only automation canvas in the board popup. Edit opens the full editor. */
 export function ColumnAutomationViewPopup({
+  organizationId,
+  factoryId,
+  historyEligible = false,
   title,
   graph,
   loading = false,
@@ -60,24 +62,61 @@ export function ColumnAutomationViewPopup({
 }: ColumnAutomationViewPopupProps) {
   const hasGeneral = Boolean(general);
   const hasAgent = Boolean(agent);
-  const tabs = columnAutomationViewTabs({ hasGeneral, hasAgent });
-  const [userTab, setUserTab] = useState<ColumnAutomationViewTab | undefined>(() =>
-    initialTab && tabs.includes(initialTab) ? initialTab : undefined,
-  );
+  const history = useFactoryAutomationNavigation({
+    organizationId,
+    factoryId,
+    graph,
+    agent,
+    parameter: "automationTab",
+    initialTab,
+    hasGeneral,
+    hasAgent,
+    eligible: historyEligible,
+  });
+  const { tab, setTab } = history;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [footerSlot, setFooterSlot] = useState<HTMLDivElement | null>(null);
-  const tab = userTab && tabs.includes(userTab) ? userTab : (tabs[0] ?? "automation");
   const footerSlotValue = onDelete ? (confirmDelete ? null : footerSlot) : undefined;
 
   return (
     <ColumnAutomationFooterSlotProvider slot={footerSlotValue}>
       <PopupShell testId="column-automation-view" canvas fixed onDismiss={onClose}>
-        <PopupHeader title={title} onClose={onClose}>
-          <SettingsAutomationHeaderRow
-            tabs={<ColumnAutomationViewTabs tabs={tabs} tab={tab} onTabChange={setUserTab} />}
-          />
+        <PopupHeader
+          title={title}
+          onClose={onClose}
+          actions={
+            history.enabled && editHref ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button asChild variant="ghost" size="icon" className="size-7 text-muted-foreground">
+                    <Link
+                      href={editHref}
+                      aria-label={COLUMN_AUTOMATIONS_COPY.editLabel}
+                      data-testid="column-automation-view-edit"
+                    >
+                      <Pencil className="size-4" aria-hidden />
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{COLUMN_AUTOMATIONS_COPY.editLabel}</TooltipContent>
+              </Tooltip>
+            ) : null
+          }
+        >
+          {hasGeneral || hasAgent ? (
+            <FactoryAutomationSettingsTabs
+              tab={tab}
+              onTabChange={setTab}
+              hasGeneral={hasGeneral}
+              hasAgent={hasAgent}
+              historyEnabled={history.enabled}
+              label={COLUMN_AUTOMATIONS_COPY.tabsLabel}
+              testId="column-automation-view"
+            />
+          ) : null}
         </PopupHeader>
         <ColumnAutomationViewBody
+          history={history}
           tab={tab}
           graph={graph}
           loading={loading}
@@ -160,43 +199,8 @@ function ColumnAutomationViewFooter({
   );
 }
 
-function ColumnAutomationViewTabs({
-  tabs,
-  tab,
-  onTabChange,
-}: {
-  tabs: ColumnAutomationViewTab[];
-  tab: ColumnAutomationViewTab;
-  onTabChange: (tab: ColumnAutomationViewTab) => void;
-}) {
-  if (tabs.length <= 1) {
-    return null;
-  }
-  return (
-    <Tabs value={tab} onValueChange={(value) => onTabChange(value as ColumnAutomationViewTab)}>
-      <TabsList aria-label={COLUMN_AUTOMATIONS_COPY.tabsLabel}>
-        {tabs.includes("general") ? (
-          <TabsTrigger value="general" data-testid="column-automation-view-tab-general">
-            <Settings />
-            {COLUMN_AUTOMATIONS_COPY.generalTab}
-          </TabsTrigger>
-        ) : null}
-        {tabs.includes("agent") ? (
-          <TabsTrigger value="agent" data-testid="column-automation-view-tab-agent">
-            <Bot />
-            {COLUMN_AUTOMATIONS_COPY.agentTab}
-          </TabsTrigger>
-        ) : null}
-        <TabsTrigger value="automation" data-testid="column-automation-view-tab-automation">
-          <Workflow />
-          {COLUMN_AUTOMATIONS_COPY.automationTab}
-        </TabsTrigger>
-      </TabsList>
-    </Tabs>
-  );
-}
-
 function ColumnAutomationViewBody({
+  history,
   tab,
   graph,
   loading,
@@ -208,6 +212,7 @@ function ColumnAutomationViewBody({
   general,
   agent,
 }: {
+  history: ReturnType<typeof useFactoryAutomationNavigation>;
   tab: ColumnAutomationViewTab;
   graph?: IntakeAutomationGraph;
   loading: boolean;
@@ -219,6 +224,20 @@ function ColumnAutomationViewBody({
   general?: ReactNode;
   agent?: PlanningReviewAgentSlot;
 }) {
+  if (tab === "runs") {
+    return (
+      <FactoryAutomationHistory
+        organizationId={history.organizationId}
+        factoryId={history.factoryId}
+        canvasId={canvasId}
+        selectedRunId={history.selectedRunId}
+        onSelectRun={history.setSelectedRunId}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+      />
+    );
+  }
   if (tab === "general" && general) {
     return general;
   }
@@ -258,6 +277,7 @@ export function ColumnAutomationViewHost({
   factoryKey,
   lineId,
   canvasId,
+  columnKey,
   title,
   onClose,
   general,
@@ -270,6 +290,7 @@ export function ColumnAutomationViewHost({
   factoryKey: string;
   lineId?: string;
   canvasId: string;
+  columnKey?: string;
   title: string;
   onClose: () => void;
   general?: ReactNode;
@@ -304,6 +325,9 @@ export function ColumnAutomationViewHost({
   }
   return (
     <ColumnAutomationViewPopup
+      organizationId={organizationId}
+      factoryId={factoryId}
+      historyEligible={columnKey === "verify" || columnKey === "done"}
       title={automation.name?.trim() || title}
       graph={automation.graph}
       loading={automation.isLoading}

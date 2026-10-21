@@ -1,7 +1,5 @@
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Settings, Workflow } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { PRFeedbackAutomationTab, PRFeedbackSettingsFooter } from "./PRFeedbackSettingsChrome";
 import {
@@ -10,11 +8,12 @@ import {
   PRFeedbackHealthSection,
 } from "./PRFeedbackSettingsFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import { SettingsAutomationHeaderRow } from "./SettingsAutomationWorkspace";
+import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
+import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
+import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  prFeedbackSettingsTabs,
   type PRFeedbackDraftSettings,
   type PRFeedbackSettingsTab,
 } from "./prFeedbackSettingsModel";
@@ -22,6 +21,7 @@ import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 interface PRFeedbackSettingsPopupProps {
   organizationId?: string;
+  factoryId?: string;
   githubIntegrationId?: string;
   vcsProvider?: string;
   settings: PRFeedbackDraftSettings;
@@ -46,6 +46,7 @@ interface PRFeedbackSettingsPopupProps {
 
 export function PRFeedbackSettingsPopup({
   organizationId,
+  factoryId,
   githubIntegrationId,
   vcsProvider,
   settings,
@@ -67,22 +68,25 @@ export function PRFeedbackSettingsPopup({
   fixed = true,
   initialTab = "general",
 }: PRFeedbackSettingsPopupProps) {
-  const tabs = prFeedbackSettingsTabs(Boolean(agent));
   const [draft, setDraft] = useState(settings);
-  const [tab, setTab] = useState<PRFeedbackSettingsTab>(() => (tabs.includes(initialTab) ? initialTab : "general"));
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const hasAgent = Boolean(agent);
-
+  const history = useFactoryAutomationNavigation({
+    organizationId,
+    factoryId,
+    graph: automationGraph,
+    agent,
+    parameter: "prFeedbackSettings",
+    initialTab,
+    hasAgent: Boolean(agent),
+  });
+  const { tab, setTab } = history;
+  const settingsKey = JSON.stringify(settings);
+  const syncedSettingsKey = useRef(settingsKey);
   useEffect(() => {
-    const next = prFeedbackSettingsTabs(hasAgent);
-    if (!next.includes(tab)) {
-      setTab("general");
-    }
-  }, [tab, hasAgent]);
-
-  useEffect(() => {
+    if (syncedSettingsKey.current === settingsKey) return;
+    syncedSettingsKey.current = settingsKey;
     setDraft(settings);
-  }, [settings]);
+  }, [settings, settingsKey]);
 
   function update<K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -91,30 +95,27 @@ export function PRFeedbackSettingsPopup({
   return (
     <PopupShell testId="pr-feedback-settings" canvas fixed={fixed} onDismiss={onClose}>
       <PopupHeader title={settings.name} onClose={onClose}>
-        <SettingsAutomationHeaderRow
-          tabs={
-            <Tabs value={tab} onValueChange={(value) => setTab(value as PRFeedbackSettingsTab)}>
-              <TabsList aria-label={PR_FEEDBACK_SETTINGS_COPY.tabsLabel}>
-                <TabsTrigger value="general" data-testid="pr-feedback-settings-tab-general">
-                  <Settings />
-                  {PR_FEEDBACK_SETTINGS_COPY.generalTab}
-                </TabsTrigger>
-                {tabs.includes("agent") ? (
-                  <TabsTrigger value="agent" data-testid="pr-feedback-settings-tab-agent">
-                    <Bot />
-                    {PR_FEEDBACK_SETTINGS_COPY.agentTab}
-                  </TabsTrigger>
-                ) : null}
-                <TabsTrigger value="automation" data-testid="pr-feedback-settings-tab-automation">
-                  <Workflow />
-                  {PR_FEEDBACK_SETTINGS_COPY.automationTab}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          }
+        <FactoryAutomationSettingsTabs
+          tab={tab}
+          onTabChange={setTab}
+          hasAgent={Boolean(agent)}
+          historyEnabled={history.enabled}
+          label={PR_FEEDBACK_SETTINGS_COPY.tabsLabel}
+          testId="pr-feedback-settings"
         />
       </PopupHeader>
-      {tab === "automation" ? (
+      {tab === "runs" ? (
+        <FactoryAutomationHistory
+          organizationId={history.organizationId}
+          factoryId={history.factoryId}
+          canvasId={canvasId}
+          selectedRunId={history.selectedRunId}
+          onSelectRun={history.setSelectedRunId}
+          loading={automationLoading}
+          error={automationError}
+          onRetry={onRetryAutomation}
+        />
+      ) : tab === "automation" ? (
         <PRFeedbackAutomationTab
           graph={automationGraph}
           canvasId={canvasId}

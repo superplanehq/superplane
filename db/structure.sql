@@ -975,6 +975,7 @@ CREATE TABLE public.factory_work_orders (
     mcp_client_id text,
     mcp_client_name text,
     vcs_provider text,
+    refinement_model text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -5922,7 +5923,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261020183712	f
+20261021094405	f
 \.
 
 

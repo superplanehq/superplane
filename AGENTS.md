@@ -80,7 +80,7 @@ The development environment is **entirely Docker-based**: build, lint, test, and
 run commands execute inside containers via `docker compose`. You do not need Go
 or Node installed on the host, only Docker.
 
-- Go `1.26.2` (pinned in `go.mod`; provided by the dev container).
+- Go `1.26.10` (pinned in `go.mod`; provided by the dev container).
 - Node.js, npm, and Bun (provided by the dev container; used by Vite/frontend).
 - Docker with a working `docker compose`.
 
@@ -203,6 +203,9 @@ Further reading:
   handling useful. Load
   [.agents/skills/test-audit/SKILL.md](.agents/skills/test-audit/SKILL.md)
   when you write, change, review, or sweep tests.
+- When adding or changing a built-in automation setting, including its UI,
+  preserve it through admin reset and add regression coverage. Follow
+  [pkg/grpc/actions/factories/AGENTS.md](pkg/grpc/actions/factories/AGENTS.md).
 - Before adding a test, identify the observable behavior and a credible
   regression that existing coverage does not catch.
 - Do not pin cosmetic CSS classes, wrapper structure, or copied display
