@@ -68,8 +68,17 @@ type Event struct {
 	Properties     Properties
 }
 
+type OrganizationGroupIdentity struct {
+	ID        string
+	Name      string
+	Slug      string
+	CreatedAt *time.Time
+	AccountID string
+}
+
 type Client interface {
 	Capture(Event)
+	IdentifyOrganizationGroup(OrganizationGroupIdentity)
 	Close() error
 	Enabled() bool
 }
@@ -129,6 +138,10 @@ func Current() Client {
 
 func Capture(event Event) {
 	Current().Capture(event)
+}
+
+func IdentifyOrganizationGroup(identity OrganizationGroupIdentity) {
+	Current().IdentifyOrganizationGroup(identity)
 }
 
 func WithSource(ctx context.Context, source Source) context.Context {
@@ -196,6 +209,35 @@ func (c *client) Capture(event Event) {
 	}
 }
 
+func (c *client) IdentifyOrganizationGroup(identity OrganizationGroupIdentity) {
+	organizationID := strings.TrimSpace(identity.ID)
+	accountID := strings.TrimSpace(identity.AccountID)
+	if organizationID == "" || accountID == "" {
+		return
+	}
+
+	properties := posthog.NewProperties()
+	if name := strings.TrimSpace(identity.Name); name != "" {
+		properties.Set("name", name)
+	}
+	if slug := strings.TrimSpace(identity.Slug); slug != "" {
+		properties.Set("slug", slug)
+	}
+	if identity.CreatedAt != nil && !identity.CreatedAt.IsZero() {
+		properties.Set("created_at", identity.CreatedAt.UTC().Format(time.RFC3339))
+	}
+
+	err := c.queue.Enqueue(posthog.GroupIdentify{
+		Type:       OrganizationGroup,
+		Key:        organizationID,
+		DistinctId: accountID,
+		Properties: properties,
+	})
+	if err != nil {
+		log.WithError(err).WithField("organization_id", organizationID).Warn("Failed to enqueue organization group identify")
+	}
+}
+
 func (c *client) Close() error {
 	return c.queue.Close()
 }
@@ -205,6 +247,8 @@ func (c *client) Enabled() bool {
 }
 
 func (noopClient) Capture(Event) {}
+
+func (noopClient) IdentifyOrganizationGroup(OrganizationGroupIdentity) {}
 
 func (noopClient) Close() error {
 	return nil

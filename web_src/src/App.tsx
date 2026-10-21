@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams,
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
+import { useIdentifyOrganizationGroup } from "./hooks/useIdentifyOrganizationGroup";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
@@ -323,7 +324,6 @@ function PageObservabilityScope() {
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account, loading: accountLoading } = useAccount();
-  const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
@@ -355,12 +355,13 @@ export function OrganizationScope() {
         })
       : null;
   usePersistOrganizationLastLocation({
-    accountId,
+    accountId: account?.id,
     resolvedSlug,
     isReserved,
     uidRedirectPath,
     path: `${location.pathname}${location.search}`,
   });
+  useIdentifyOrganizationGroup(account?.id, organization?.metadata);
 
   if (isReserved) {
     return <Navigate to="/" replace />;

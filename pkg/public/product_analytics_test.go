@@ -25,12 +25,19 @@ import (
 type analyticsRecorder struct {
 	mu     sync.Mutex
 	events []productanalytics.Event
+	groups []productanalytics.OrganizationGroupIdentity
 }
 
 func (r *analyticsRecorder) Capture(event productanalytics.Event) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.events = append(r.events, event)
+}
+
+func (r *analyticsRecorder) IdentifyOrganizationGroup(identity productanalytics.OrganizationGroupIdentity) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.groups = append(r.groups, identity)
 }
 
 func (r *analyticsRecorder) Close() error { return nil }
@@ -42,6 +49,14 @@ func (r *analyticsRecorder) snapshot() []productanalytics.Event {
 	defer r.mu.Unlock()
 	copied := make([]productanalytics.Event, len(r.events))
 	copy(copied, r.events)
+	return copied
+}
+
+func (r *analyticsRecorder) groupIdentities() []productanalytics.OrganizationGroupIdentity {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	copied := make([]productanalytics.OrganizationGroupIdentity, len(r.groups))
+	copy(copied, r.groups)
 	return copied
 }
 
@@ -83,6 +98,7 @@ func TestOrganizationCreationAnalytics(t *testing.T) {
 		response := postOrganization([]byte(`{"name":""}`))
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 		assert.Empty(t, recorder.snapshot())
+		assert.Empty(t, recorder.groupIdentities())
 	})
 
 	t.Run("later organization creation emits one event", func(t *testing.T) {
@@ -99,6 +115,14 @@ func TestOrganizationCreationAnalytics(t *testing.T) {
 		assert.Equal(t, productanalytics.ActorUser, events[0].ActorType)
 		assert.Equal(t, productanalytics.SourceUI, events[0].Source)
 		assert.NotEmpty(t, events[0].OrganizationID)
+
+		groups := recorder.groupIdentities()
+		require.Len(t, groups, 1)
+		assert.Equal(t, events[0].OrganizationID, groups[0].ID)
+		assert.Equal(t, "Metrics Organization", groups[0].Name)
+		assert.Equal(t, account.ID.String(), groups[0].AccountID)
+		assert.NotEmpty(t, groups[0].Slug)
+		require.NotNil(t, groups[0].CreatedAt)
 	})
 }
 
@@ -149,4 +173,11 @@ func TestInitialWorkspaceAnalytics(t *testing.T) {
 	assert.Equal(t, "initial_onboarding", events[0].Properties["creation_path"])
 	assert.Equal(t, resource.Account.ID.String(), events[0].DistinctID)
 	assert.Equal(t, productanalytics.ActorUser, events[0].ActorType)
+
+	groups := recorder.groupIdentities()
+	require.Len(t, groups, 1)
+	assert.Equal(t, events[0].OrganizationID, groups[0].ID)
+	assert.Equal(t, "GitHub Owner", groups[0].Name)
+	assert.Equal(t, resource.Account.ID.String(), groups[0].AccountID)
+	assert.NotEmpty(t, groups[0].Slug)
 }
