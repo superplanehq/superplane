@@ -53,6 +53,8 @@ const fleetManagerMetadata = {
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
   runnerVersions: ["v0.1.0"],
+  stableRunnerVersion: "v0.2.0",
+  installationType: "single-host",
   fleetPresets: [
     {
       id: "e1-large-amd64",
@@ -197,7 +199,7 @@ describe("OwnerSetup", () => {
 
     fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
 
-    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /fleet manager setup/i })).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-progress")).toBeInTheDocument();
 
@@ -211,7 +213,7 @@ describe("OwnerSetup", () => {
     await reachFleetStep();
 
     fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
-    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
@@ -226,7 +228,7 @@ describe("OwnerSetup", () => {
     for (const heading of [
       "Create the chart values",
       "Configure the default fleet",
-      "Choose a cloud provider",
+      "Choose where runners run",
       OWNER_SETUP_COPY.fleet.headline,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: "Back" }));
@@ -237,6 +239,22 @@ describe("OwnerSetup", () => {
     expect(await screen.findByRole("heading", { name: OWNER_SETUP_COPY.smtp.headline })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
+  });
+
+  it("shows the single-VM runner command with the created token", async () => {
+    stubOwnerSetupFetch();
+    renderOwnerSetup();
+    await reachFleetStep();
+
+    fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "This VM" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByRole("heading", { name: "Start runners on this VM" })).toBeInTheDocument();
+    expect(screen.getByText("./enable-runners.sh 'owner-setup-token'")).toBeInTheDocument();
+    expect(screen.queryByText(/helm upgrade --install fleet-manager/)).not.toBeInTheDocument();
   });
 
   it("resumes the stored fleet step for the signed-in admin", async () => {

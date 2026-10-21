@@ -72,6 +72,8 @@ type fleetManagerSetupResponse struct {
 	ChartRepository            string                     `json:"chartRepository"`
 	ImageRepository            string                     `json:"imageRepository"`
 	RunnerVersions             []string                   `json:"runnerVersions"`
+	StableRunnerVersion        string                     `json:"stableRunnerVersion"`
+	InstallationType           string                     `json:"installationType"`
 	FleetPresets               []fleetManagerFleetPreset  `json:"fleetPresets"`
 	InfrastructureDefaults     fleetManagerInfrastructure `json:"infrastructureDefaults"`
 }
@@ -115,7 +117,8 @@ func (s *Server) adminGetFleetManagerSetup(w http.ResponseWriter, _ *http.Reques
 		return
 	}
 
-	runnerVersion := configuredVersion("RUNNER_STABLE_VERSION", defaultStableRunnerVersion)
+	stableRunnerVersion := configuredVersion("RUNNER_STABLE_VERSION", defaultStableRunnerVersion)
+	runnerVersion := stableRunnerVersion
 	fleetManagerVersion := installationFleetManagerVersion(configuredVersion(
 		"FLEET_MANAGER_STABLE_VERSION",
 		defaultStableFleetManagerVersion,
@@ -147,6 +150,8 @@ func (s *Server) adminGetFleetManagerSetup(w http.ResponseWriter, _ *http.Reques
 		ChartRepository:            fleetManagerChartRepository,
 		ImageRepository:            fleetManagerImageRepository,
 		RunnerVersions:             runnerVersions,
+		StableRunnerVersion:        stableRunnerVersion,
+		InstallationType:           os.Getenv("SUPERPLANE_INSTALLATION_TYPE"),
 		FleetPresets:               presets,
 		InfrastructureDefaults: fleetManagerInfrastructure{
 			Source:             setup.Source,

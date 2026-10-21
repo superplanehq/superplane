@@ -206,6 +206,17 @@ func TestSetupOwnerProgressUpdate(t *testing.T) {
 	assert.Equal(t, models.OwnerSetupStepSMTP, status["step"])
 }
 
+func TestSetupOwnerProgressAcceptsDockerStep(t *testing.T) {
+	server := setupOwnerTestServer(t)
+	authCookie := submitOwnerForm(t, server)
+
+	response := patchSetupOwnerProgress(t, server, authCookie, models.OwnerSetupStepFleetDocker)
+	assert.Equal(t, http.StatusOK, response.Code)
+
+	status := getSetupOwnerStatus(t, server, authCookie)
+	assert.Equal(t, models.OwnerSetupStepFleetDocker, status["step"])
+}
+
 func TestSetupOwnerProgressRejectsUnknownStep(t *testing.T) {
 	server := setupOwnerTestServer(t)
 	authCookie := submitOwnerForm(t, server)
