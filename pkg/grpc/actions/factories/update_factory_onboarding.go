@@ -117,29 +117,37 @@ func ensureOnboardingDiscussionHandler(
 	if err := factory.UpdateOnboarding(db, patch); err != nil {
 		return err
 	}
-	handlers, err := factory.ListPRFeedbackHandlers(db)
-	if err != nil {
-		return err
-	}
-	for _, handler := range handlers {
-		if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
-			return nil
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(
+			"SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
+			"factory-discussion-handler:"+factory.ID.String(),
+		).Error; err != nil {
+			return err
 		}
-	}
-	_, err = CreateFactoryPRFeedbackHandler(ctx, deps, organizationID, &pb.CreateFactoryPRFeedbackHandlerRequest{
-		FactoryId: factory.ID.String(),
-		Settings: &pb.FactoryPRFeedbackHandler_Settings{
-			Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
-				Repository: repository,
+		handlers, err := factory.ListPRFeedbackHandlers(tx)
+		if err != nil {
+			return err
+		}
+		for _, handler := range handlers {
+			if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+				return nil
+			}
+		}
+		_, err = CreateFactoryPRFeedbackHandler(ctx, deps, organizationID, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			FactoryId: factory.ID.String(),
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+					Repository: repository,
+				},
+				Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+					Mention:        prFeedbackDefaultMention,
+					IgnoreBots:     true,
+					AddressAllBots: true,
+				},
 			},
-			Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
-				Mention:        prFeedbackDefaultMention,
-				IgnoreBots:     true,
-				AddressAllBots: true,
-			},
-		},
+		})
+		return err
 	})
-	return err
 }
 
 func validateFactoryOnboardingResources(
