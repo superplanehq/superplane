@@ -277,6 +277,9 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			settings := intakeSettingsOrDefault(source, intakeSettings{})
 			switch source {
 			case models.FactoryIntakeSourceGitHubIssues:
+				if tc.restrictAuthors {
+					settings.DefaultOwnerID = r.User.String()
+				}
 				settings.Labels = []string{"urgent"}
 				settings.LabelFilterMode = intakeLabelFilterExclude
 				settings.Assignment = intakeAssignmentUnassigned
@@ -348,6 +351,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				require.NoError(t, err)
 				defaultSpec := models.LiveCanvasSpec{Nodes: defaults.Nodes(), Edges: defaults.Edges()}
 				restored := serializeIntakeSettings(source, intakeSettingsFromGraph(source, resolveIntakeGraph(source, defaultSpec), defaultSpec))
+				assert.Empty(t, restored.GetDefaultOwnerId())
 				assert.Equal(t, expected.GetLabels(), restored.GetLabels())
 				assert.Equal(t, expected.GetLabelFilterMode(), restored.GetLabelFilterMode())
 				assert.Equal(t, expected.GetAssignment(), restored.GetAssignment())

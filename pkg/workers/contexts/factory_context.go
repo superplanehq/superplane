@@ -426,19 +426,29 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	params core.WorkOrderParams,
 	sourceRunID uuid.UUID,
 ) (*models.FactoryWorkOrder, error) {
+	assigneeIDs := []uuid.UUID{}
+	if params.DefaultOwnerID != "" {
+		user, err := models.FindActiveUserByIDInTransaction(c.tx, factoryModel.OrganizationID.String(), params.DefaultOwnerID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("find default task owner: %w", err)
+		}
+		if err == nil && user.IsHuman() {
+			assigneeIDs = append(assigneeIDs, user.ID)
+		}
+	}
 	if origin := c.originFromSourceRun(sourceRunID); origin != nil {
 		return factoryModel.CreateWorkOrderWithOrigin(
 			c.tx,
 			params.Title,
 			params.Description,
 			nil,
-			[]uuid.UUID{},
+			assigneeIDs,
 			&sourceRunID,
 			*origin,
 		)
 	}
 
-	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, assigneeIDs, &sourceRunID)
 }
 
 func (c *FactoryContext) recordSentryWebhookTask(order *models.FactoryWorkOrder) {

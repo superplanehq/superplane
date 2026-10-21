@@ -239,6 +239,9 @@ func applyIntakeGraphUpdate(
 	edges := slices.Clone(liveVersion.Edges)
 
 	if settings != nil {
+		if err := validateIntakeDefaultOwner(tx, canvas.OrganizationID, intake.Source, settings); err != nil {
+			return err
+		}
 		nodes, edges, err = applyIntakeSettingsToGraph(intake.Source, graph, spec, settings, nodes, edges)
 		if err != nil {
 			return err
@@ -290,6 +293,29 @@ func applyIntakeSettingsToGraph(
 	nodes []models.Node,
 	edges []models.Edge,
 ) ([]models.Node, []models.Edge, error) {
+	if settings.DefaultOwnerId != nil {
+		if source != models.FactoryIntakeSourceGitHubIssues {
+			return nil, nil, invalidArgument("default task owner is only supported for GitHub issues")
+		}
+		create := findIntakeNode(nodes, graph.CreateNodeID)
+		if create == nil {
+			return nil, nil, invalidArgument("intake automation has no task creation node to update")
+		}
+		for i := range nodes {
+			if nodes[i].ID != graph.CreateNodeID {
+				continue
+			}
+			configuration := maps.Clone(nodes[i].Configuration)
+			if configuration == nil {
+				configuration = map[string]any{}
+			}
+			configuration["defaultOwnerId"] = settings.GetDefaultOwnerId()
+			nodes[i].Configuration = configuration
+		}
+		if intakeSettingsOnlyDefaultOwner(settings) {
+			return nodes, edges, nil
+		}
+	}
 	current := intakeSettingsFromGraph(source, graph, spec)
 	updated := parseIntakeSettings(current, settings)
 	if source == models.FactoryIntakeSourceGitHubIssues {
