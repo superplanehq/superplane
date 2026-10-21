@@ -6,8 +6,13 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+func exampleGitHubHost() githubcommon.Host {
+	return githubcommon.DotCom()
+}
 
 const OnWorkOrderTriggerName = "onWorkOrder"
 const OnWorkOrderPayloadType = "workOrder.created"
@@ -50,7 +55,7 @@ Each event has type ` + "`workOrder.created`" + `. The payload is:
     "number": 12,
     "state": "draft",
     "repository": "acme/app",
-    "repository_url": "https://github.com/acme/app.git",
+    "repository_url": "` + exampleGitHubHost().CloneURL("acme/app") + `",
     "default_branch": "main",
     "origin": { "url": "...", "label": "..." }
   }
@@ -80,10 +85,10 @@ func (t *OnWorkOrder) ExampleData() map[string]any {
 				"number":         12,
 				"state":          "draft",
 				"repository":     "acme/app",
-				"repository_url": "https://github.com/acme/app.git",
+				"repository_url": exampleGitHubHost().CloneURL("acme/app"),
 				"default_branch": "main",
 				"origin": map[string]any{
-					"url":   "https://github.com/acme/app/issues/42",
+					"url":   exampleGitHubHost().RepoURL("acme/app") + "/issues/42",
 					"label": "acme/app#42",
 				},
 			},
