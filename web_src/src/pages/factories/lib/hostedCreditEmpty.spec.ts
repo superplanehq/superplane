@@ -17,6 +17,21 @@ const inFourteenDays = "2026-09-22T12:00:00.000Z";
 const yesterday = "2026-09-07T12:00:00.000Z";
 
 describe("isHostedCreditTrialOrg", () => {
+  it.each(["paid", "none"])("does not infer a trial for a catalog %s plan with welcome credit", (planCategory) => {
+    expect(
+      isHostedCreditTrialOrg({
+        plan: "custom",
+        planCategory,
+        purchasedCreditCents: "0",
+        welcomeCreditExpiresAt: inFourteenDays,
+      }),
+    ).toBe(false);
+  });
+
+  it("recognizes a catalog trial without welcome credit", () => {
+    expect(isHostedCreditTrialOrg({ plan: "extended_trial", planCategory: "trial" })).toBe(true);
+  });
+
   it("is true when welcome credit has an expiry and the organization has not purchased credit", () => {
     expect(
       isHostedCreditTrialOrg({
@@ -112,6 +127,24 @@ describe("hostedCreditBillingBalanceCopy", () => {
 });
 
 describe("hostedCreditBannerKind", () => {
+  it.each([
+    ["4124", null],
+    ["1500", "low"],
+    ["0", "empty"],
+  ] as const)("uses credit warnings for a custom paid plan with %s cents", (remainingCreditCents, expected) => {
+    expect(
+      hostedCreditBannerKind({
+        plan: "custom",
+        planCategory: "paid",
+        remainingCreditCents,
+        purchasedCreditCents: "0",
+        welcomeCreditExpiresAt: inFourteenDays,
+        billingEnabled: true,
+        now,
+      }),
+    ).toBe(expected);
+  });
+
   it("shows the trial banner while welcome credit remains", () => {
     expect(
       hostedCreditBannerKind({
@@ -254,6 +287,19 @@ describe("hostedCreditHeaderKickerActionLabel", () => {
 });
 
 describe("organizationPlanLabel", () => {
+  it("uses the catalog name when a paid plan has trial credit", () => {
+    expect(
+      organizationPlanLabel({
+        plan: "custom",
+        planCategory: "paid",
+        planName: "Custom plan",
+        purchasedCreditCents: "0",
+        welcomeCreditExpiresAt: inFourteenDays,
+        now,
+      }),
+    ).toBe("Custom plan");
+  });
+
   it("names Business, Trial, Trial ended, and No plan", () => {
     expect(organizationPlanLabel({ plan: "business" })).toBe("Business");
     expect(
