@@ -25,10 +25,14 @@ type Runtime struct {
 }
 
 func Tools() []Tool {
+	return withWorkspaceArgument(append([]Tool{listWorkspacesTool()}, taskTools()...))
+}
+
+func taskTools() []Tool {
 	return []Tool{
 		{
 			Name:        "list_tasks",
-			Description: "List tasks in this workspace. Draft is the backlog. Open is in progress. Closed is finished. Set mine to true to return tasks assigned to you or created by you. Set source_url to the full issue URL to return tasks created from that issue. Archived tasks stay hidden. Poll after a write to see new state.",
+			Description: "List tasks in one workspace. Draft is the backlog. Open is in progress. Closed is finished. Set mine to true to return tasks assigned to you or created by you. Set source_url to the full issue URL to return tasks created from that issue. Archived tasks stay hidden. Poll after a write to see new state.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -115,7 +119,7 @@ func Tools() []Tool {
 		},
 		{
 			Name:        "create_task",
-			Description: "Create a draft task in this workspace. The creator is the signed-in user. Refinement starts when the workspace backlog app is on. The result is the new task. It does not wait for an agent session.",
+			Description: "Create a draft task in one workspace. The creator is the signed-in user. Refinement starts when the workspace backlog app is on. The result is the new task. It does not wait for an agent session.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -170,6 +174,8 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 		return ToolResult{}, ToolError("Not found")
 	}
 	switch name {
+	case "list_workspaces":
+		return rt.listWorkspaces(ctx, claims, args)
 	case "list_tasks":
 		return rt.listTasks(ctx, claims, args)
 	case "get_task":
@@ -199,7 +205,11 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 	if err := rt.authorize(ctx, claims, "work_orders:read"); err != nil {
 		return ToolResult{}, err
 	}
-	req := &pb.ListWorkOrdersRequest{FactoryId: claims.FactoryID.String()}
+	factoryID, err := resolveWorkspace(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
+	req := &pb.ListWorkOrdersRequest{FactoryId: factoryID.String()}
 	if mine, _ := args["mine"].(bool); mine {
 		userID := claims.UserID.String()
 		req.UserId = &userID
@@ -260,12 +270,16 @@ func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[s
 	if err := rt.authorize(ctx, claims, "work_orders:read"); err != nil {
 		return ToolResult{}, err
 	}
+	factoryID, err := resolveWorkspace(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	task, err := stringArg(args, "task")
 	if err != nil {
 		return ToolResult{}, err
 	}
 	resp, err := factories.DescribeWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.DescribeWorkOrderRequest{
-		FactoryId: claims.FactoryID.String(),
+		FactoryId: factoryID.String(),
 		OrderId:   task,
 	})
 	if err != nil {
@@ -286,12 +300,16 @@ func (rt *Runtime) listTaskArtifacts(ctx context.Context, claims *AccessClaims, 
 	if err := rt.authorize(ctx, claims, "work_orders:read"); err != nil {
 		return ToolResult{}, err
 	}
+	factoryID, err := resolveWorkspace(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	task, err := stringArg(args, "task")
 	if err != nil {
 		return ToolResult{}, err
 	}
 	resp, err := factories.ListWorkOrderArtifacts(toolContext(ctx, claims), claims.OrgID.String(), &pb.ListWorkOrderArtifactsRequest{
-		FactoryId: claims.FactoryID.String(),
+		FactoryId: factoryID.String(),
 		OrderId:   task,
 	})
 	if err != nil {
@@ -324,16 +342,20 @@ func (rt *Runtime) getTaskAgent(ctx context.Context, claims *AccessClaims, args 
 	if err := rt.authorize(ctx, claims, "work_orders:read"); err != nil {
 		return ToolResult{}, err
 	}
+	factoryID, err := resolveWorkspace(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	task, err := stringArg(args, "task")
 	if err != nil {
 		return ToolResult{}, err
 	}
-	orderID, err := resolveTaskID(ctx, claims, task)
+	orderID, err := resolveTaskID(ctx, claims, factoryID, task)
 	if err != nil {
 		return ToolResult{}, err
 	}
 	resp, err := factories.FindPlanningSessionByWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
-		FactoryId:   claims.FactoryID.String(),
+		FactoryId:   factoryID.String(),
 		WorkOrderId: orderID,
 	})
 	if err != nil {
@@ -349,6 +371,10 @@ func (rt *Runtime) sendTaskMessage(ctx context.Context, claims *AccessClaims, ar
 	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
 		return ToolResult{}, err
 	}
+	factoryID, err := resolveWorkspace(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	task, err := stringArg(args, "task")
 	if err != nil {
 		return ToolResult{}, err
@@ -357,12 +383,12 @@ func (rt *Runtime) sendTaskMessage(ctx context.Context, claims *AccessClaims, ar
 	if err != nil {
 		return ToolResult{}, err
 	}
-	orderID, err := resolveTaskID(ctx, claims, task)
+	orderID, err := resolveTaskID(ctx, claims, factoryID, task)
 	if err != nil {
 		return ToolResult{}, err
 	}
 	found, err := factories.FindPlanningSessionByWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
-		FactoryId:   claims.FactoryID.String(),
+		FactoryId:   factoryID.String(),
 		WorkOrderId: orderID,
 	})
 	if err != nil {
@@ -372,7 +398,7 @@ func (rt *Runtime) sendTaskMessage(ctx context.Context, claims *AccessClaims, ar
 		return ToolResult{}, actionError(err)
 	}
 	resp, err := factories.SendPlanningSessionMessage(toolContext(ctx, claims), claims.OrgID.String(), &pb.SendPlanningSessionMessageRequest{
-		FactoryId: claims.FactoryID.String(),
+		FactoryId: factoryID.String(),
 		SessionId: found.GetSession().GetId(),
 		Text:      message,
 	})
@@ -391,13 +417,17 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 	if err := rt.authorize(ctx, claims, "work_orders:create"); err != nil {
 		return ToolResult{}, err
 	}
+	factoryID, err := resolveWorkspace(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	title, err := stringArg(args, "title")
 	if err != nil {
 		return ToolResult{}, err
 	}
 	description, _ := args["description"].(string)
 	resp, err := factories.CreateWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.CreateWorkOrderRequest{
-		FactoryId:   claims.FactoryID.String(),
+		FactoryId:   factoryID.String(),
 		Title:       title,
 		Description: strings.TrimSpace(description),
 	})
@@ -420,6 +450,10 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
 		return ToolResult{}, err
 	}
+	factoryID, err := resolveWorkspace(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	title, err := stringArg(args, "title")
 	if err != nil {
 		return ToolResult{}, err
@@ -438,7 +472,7 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 
 	clientName := ClientDisplayName(database.DB(ctx), claims.ClientID)
 	result, err := factories.HandOffWorkOrder(toolContext(ctx, claims), rt.Intake, claims.OrgID.String(), factories.HandOffWorkOrderRequest{
-		FactoryID:      claims.FactoryID.String(),
+		FactoryID:      factoryID.String(),
 		Title:          title,
 		Description:    strings.TrimSpace(description),
 		Plan:           plan,
@@ -468,6 +502,10 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
 		return ToolResult{}, err
 	}
+	factoryID, err := resolveWorkspace(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	task, err := stringArg(args, "task")
 	if err != nil {
 		return ToolResult{}, err
@@ -476,7 +514,7 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 	if err != nil {
 		return ToolResult{}, err
 	}
-	orderID, err := resolveTaskID(ctx, claims, task)
+	orderID, err := resolveTaskID(ctx, claims, factoryID, task)
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -494,7 +532,7 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 	}
 
 	resp, err := factories.UpdateWorkOrderAssignees(toolContext(ctx, claims), claims.OrgID.String(), &pb.UpdateWorkOrderAssigneesRequest{
-		FactoryId:   claims.FactoryID.String(),
+		FactoryId:   factoryID.String(),
 		OrderId:     orderID,
 		AssigneeIds: assigneeIDs,
 	})
@@ -694,9 +732,9 @@ func toolContext(ctx context.Context, claims *AccessClaims) context.Context {
 	return context.WithValue(ctx, authorization.OrganizationContextKey, claims.OrgID.String())
 }
 
-func resolveTaskID(ctx context.Context, claims *AccessClaims, task string) (string, error) {
+func resolveTaskID(ctx context.Context, claims *AccessClaims, factoryID uuid.UUID, task string) (string, error) {
 	resp, err := factories.DescribeWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.DescribeWorkOrderRequest{
-		FactoryId: claims.FactoryID.String(),
+		FactoryId: factoryID.String(),
 		OrderId:   task,
 	})
 	if err != nil {
