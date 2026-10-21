@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -151,10 +152,12 @@ func createBacklogCanvas(
 }
 
 type backlogCanvasRequest struct {
-	Name        string
-	Agent       *intakeAgent
-	VCSName     string
-	VCSProvider string
+	Name            string
+	Agent           *intakeAgent
+	VCSName         string
+	VCSProvider     string
+	AgentSettings   *factoryAgentSettings
+	TriggerSettings *factoryTriggerSettings
 }
 
 func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
@@ -177,14 +180,14 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 				{Channel: "failed", SourceID: backlogRefinementNodeID, TargetID: intakeAddRunErrorNodeID},
 			},
 			Nodes: []yaml.Node{
-				{
+				request.TriggerSettings.configure(yaml.Node{
 					ID:        backlogTriggerNodeID,
 					Name:      backlogTriggerName,
 					Type:      yaml.NodeTypeTrigger,
 					Component: factory.OnWorkOrderTriggerName,
 					Metadata:  models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, backlogTemplateVersion),
 					Position:  yaml.Position{X: 160, Y: 80},
-				},
+				}),
 				{
 					ID:        backlogRefinementFilterNodeID,
 					Name:      "Refine task?",
@@ -196,7 +199,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Concurrency: intakeConcurrency(),
 					Position:    yaml.Position{X: 160, Y: 260},
 				},
-				{
+				request.AgentSettings.configure(yaml.Node{
 					ID:            backlogRefinementNodeID,
 					Name:          "Refine Task",
 					Type:          yaml.NodeTypeAction,
@@ -204,7 +207,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Configuration: intakeRefinementConfiguration(request.Agent, request.VCSName),
 					Concurrency:   intakeConcurrency(),
 					Position:      yaml.Position{X: 160, Y: 440},
-				},
+				}),
 				{
 					ID:        intakeAddRunErrorNodeID,
 					Name:      intakeAddRunErrorNodeName,
@@ -218,4 +221,23 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 			},
 		},
 	}
+}
+
+func backlogAgentNode(spec models.LiveCanvasSpec) (*models.Node, error) {
+	if node := findIntakeNode(spec.Nodes, backlogRefinementNodeID); node != nil {
+		return node, nil
+	}
+	triggerID := onWorkOrderNodeIDFromSpec(spec)
+	var agent *models.Node
+	for i := range spec.Nodes {
+		node := &spec.Nodes[i]
+		if !isFactoryAgentHarness(node.ComponentName()) || !hasCanvasPath(spec.Edges, triggerID, node.ID) {
+			continue
+		}
+		if agent != nil {
+			return nil, fmt.Errorf("multiple planning agents cannot map to the current planner; review their settings before resetting")
+		}
+		agent = node
+	}
+	return agent, nil
 }
