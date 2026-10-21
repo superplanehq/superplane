@@ -39,8 +39,24 @@ export function isGitHubEnterpriseServerHost(host: string | null | undefined): b
 }
 
 export function githubWebOrigin(host?: string | null): string {
-  const hostname = (host ?? "").trim() || GITHUB_DOTCOM_WEB_HOST;
+  const hostname = githubWebHostname(host);
   return `https://${hostname}`;
+}
+
+/** REST API origin for this GitHub host. Empty host is api.github.com. */
+export function githubApiOrigin(host?: string | null): string {
+  const hostname = githubWebHostname(host);
+  if (hostname === GITHUB_DOTCOM_WEB_HOST) {
+    return "https://api.github.com";
+  }
+  if (hostname.endsWith(GHE_COM_SUFFIX)) {
+    return `https://api.${hostname}`;
+  }
+  return `https://${hostname}/api/v3`;
+}
+
+export function githubProfileUrl(login: string, host?: string | null): string {
+  return `${githubWebOrigin(host)}/${login.trim()}`;
 }
 
 export function githubRepoWebUrl(ownerRepo: string, host?: string | null): string | undefined {
@@ -51,14 +67,62 @@ export function githubRepoWebUrl(ownerRepo: string, host?: string | null): strin
   return `${githubWebOrigin(host)}/${match[1]}/${match[2]}`;
 }
 
+/** Stored integration host for a GitHub web URL. Empty means github.com. */
+export function githubWebHostFromUrl(url: string | undefined): string {
+  const hostname = hostnameFromUrl(url);
+  if (!hostname || !isGitHubWebHostname(hostname)) {
+    return "";
+  }
+  const web = githubWebHostname(hostname);
+  return web === GITHUB_DOTCOM_WEB_HOST ? "" : web;
+}
+
 export function isGitHubWebHostname(hostname: string, host?: string | null): boolean {
   const value = hostname.trim().toLowerCase();
   if (!value) {
     return false;
   }
-  if (value === GITHUB_DOTCOM_WEB_HOST || value.endsWith(GHE_COM_SUFFIX)) {
+  if (value === GITHUB_DOTCOM_WEB_HOST || value === `www.${GITHUB_DOTCOM_WEB_HOST}`) {
+    return true;
+  }
+  if (value.endsWith(GHE_COM_SUFFIX) && value !== "ghe.com" && !value.startsWith("api.")) {
     return true;
   }
   const expected = (host ?? "").trim().toLowerCase();
   return Boolean(expected) && value === expected;
+}
+
+/** Browser or API hostname on github.com or a GHE.com tenant. */
+export function isKnownGitHubHostname(hostname: string): boolean {
+  const value = hostname.trim().toLowerCase();
+  if (!value) {
+    return false;
+  }
+  if (value === GITHUB_DOTCOM_WEB_HOST || value === `www.${GITHUB_DOTCOM_WEB_HOST}` || value === "api.github.com") {
+    return true;
+  }
+  return value.endsWith(GHE_COM_SUFFIX) && value !== "ghe.com";
+}
+
+function githubWebHostname(host?: string | null): string {
+  const hostname = (host ?? "").trim().toLowerCase();
+  if (!hostname || hostname === GITHUB_DOTCOM_WEB_HOST || hostname === `www.${GITHUB_DOTCOM_WEB_HOST}`) {
+    return GITHUB_DOTCOM_WEB_HOST;
+  }
+  if (hostname.startsWith("api.") && hostname.endsWith(GHE_COM_SUFFIX)) {
+    return hostname.slice("api.".length);
+  }
+  return hostname;
+}
+
+function hostnameFromUrl(url: string | undefined): string {
+  const value = url?.trim();
+  if (!value) {
+    return "";
+  }
+  try {
+    return new URL(value).hostname.trim().toLowerCase();
+  } catch {
+    return "";
+  }
 }

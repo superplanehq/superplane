@@ -1,11 +1,15 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  githubApiOrigin,
   githubHostFromIntegration,
+  githubProfileUrl,
   githubRepoWebUrl,
+  githubWebHostFromUrl,
   githubWebOrigin,
   isGitHubEnterpriseServerHost,
   isGitHubWebHostname,
+  isKnownGitHubHostname,
 } from "./githubHost";
 
 describe("githubHostFromIntegration", () => {
@@ -41,12 +45,18 @@ describe("githubHostFromIntegration", () => {
 describe("github web URLs", () => {
   it("uses github.com when the host is empty", () => {
     expect(githubWebOrigin()).toBe("https://github.com");
+    expect(githubApiOrigin()).toBe("https://api.github.com");
     expect(githubRepoWebUrl("acme/api")).toBe("https://github.com/acme/api");
+    expect(githubProfileUrl("alex")).toBe("https://github.com/alex");
+    expect(githubWebHostFromUrl("https://github.com/acme/api/pull/12")).toBe("");
   });
 
   it("uses the tenant host", () => {
     expect(githubWebOrigin("acme.ghe.com")).toBe("https://acme.ghe.com");
+    expect(githubApiOrigin("acme.ghe.com")).toBe("https://api.acme.ghe.com");
     expect(githubRepoWebUrl("acme/api", "acme.ghe.com")).toBe("https://acme.ghe.com/acme/api");
+    expect(githubProfileUrl("alex", "acme.ghe.com")).toBe("https://acme.ghe.com/alex");
+    expect(githubWebHostFromUrl("https://acme.ghe.com/acme/api/pull/12")).toBe("acme.ghe.com");
   });
 });
 
@@ -54,11 +64,17 @@ describe("GitHub host kind", () => {
   it("treats a ghe.com hostname as GitHub Enterprise Cloud", () => {
     expect(isGitHubEnterpriseServerHost("acme.ghe.com")).toBe(false);
     expect(isGitHubWebHostname("acme.ghe.com")).toBe(true);
+    expect(isGitHubWebHostname("www.github.com")).toBe(true);
+    expect(isGitHubWebHostname("api.acme.ghe.com")).toBe(false);
+    expect(isKnownGitHubHostname("api.github.com")).toBe(true);
+    expect(isKnownGitHubHostname("api.acme.ghe.com")).toBe(true);
+    expect(isKnownGitHubHostname("gitlab.com")).toBe(false);
   });
 
   it("treats a self-hosted hostname as GitHub Enterprise Server", () => {
     expect(isGitHubEnterpriseServerHost("ghes.corp.example")).toBe(true);
     expect(isGitHubWebHostname("ghes.corp.example", "ghes.corp.example")).toBe(true);
     expect(isGitHubWebHostname("ghes.corp.example")).toBe(false);
+    expect(githubApiOrigin("ghes.corp.example")).toBe("https://ghes.corp.example/api/v3");
   });
 });
