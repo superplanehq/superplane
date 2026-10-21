@@ -384,7 +384,8 @@ export function LinesPage() {
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
   const githubIntegration = useIntegration(organizationId, githubIntegrationId);
-  const hideDependabot = isGitHubEnterpriseServerHost(githubHostFromIntegration(githubIntegration.data));
+  const githubHost = githubHostFromIntegration(githubIntegration.data);
+  const hideDependabot = isGitHubEnterpriseServerHost(githubHost);
   const addIntakeTemplates = useMemo(
     () => addIntakeTemplatesForOrg(hasExperimentalFeature, { hideDependabot }),
     [hasExperimentalFeature, hideDependabot],
@@ -776,6 +777,7 @@ export function LinesPage() {
                 key={intake.intakeId}
                 message={intake.healthMessage}
                 repository={intake.resourceId}
+                host={githubHost}
                 retrying={intakeWebhookRetry.retrying}
                 onRetry={() => intakeWebhookRetry.retryIntake(intake)}
               />
