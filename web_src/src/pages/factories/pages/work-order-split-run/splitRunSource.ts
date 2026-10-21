@@ -12,6 +12,7 @@ import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import superplaneIcon from "@/assets/superplane.svg";
+import { isGitHubWebHostname } from "@/lib/githubHost";
 import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import {
@@ -326,7 +327,7 @@ function parseUrl(url: string): URL | undefined {
 }
 
 function githubTicketLabel(parsed: URL): string | undefined {
-  if (parsed.hostname !== "github.com") {
+  if (!isGitHubWebHostname(parsed.hostname)) {
     return undefined;
   }
   const [, owner, repo, kind, number] = parsed.pathname.split("/");
