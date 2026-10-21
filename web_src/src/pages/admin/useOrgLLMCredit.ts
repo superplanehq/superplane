@@ -1,3 +1,4 @@
+import { billingCatalogRequest, type BillingPlan } from "./billingPlansApi";
 import type { OrganizationsOrganizationCreditGrant } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { bpsToPercentInput, centsToDollarInput, parseDollarInputToCents, percentInputToBps } from "@/lib/hostedCredit";
@@ -19,11 +20,13 @@ export type OrganizationLLMCredit = {
   warning: boolean;
 };
 
-export type BillingCatalogPlan = { key: string; name: string; require_payment_method: boolean };
-
 export type OrganizationBillingPlan = {
-  catalog_key?: string;
   plan: string;
+  catalog_key?: string;
+  catalog_name?: string;
+  catalog_category?: string;
+  credit_expiration?: string;
+  credit_validity_days?: number | null;
   plan_source: string;
   polar_subscription_status: string;
   polar_managed: boolean;
@@ -89,22 +92,15 @@ export function isFutureUtcTrialEnd(calendarDate: string, now = new Date()): boo
   return !Number.isNaN(end.getTime()) && end.getTime() > now.getTime();
 }
 
-function billingPlanRequest(plan: string, trialEndsOn: string): { plan: string; trial_ends_at?: string } {
-  if (plan !== "trial") {
+function billingPlanRequest(
+  plan: string,
+  category: string | undefined,
+  trialEndsOn: string,
+): { plan: string; trial_ends_at?: string } {
+  if (category !== "trial") {
     return { plan };
   }
   return { plan, trial_ends_at: utcTrialEndTimestamp(trialEndsOn) };
-}
-
-export function formatUtcTrialEnd(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return utcCalendarDate(parsed);
 }
 
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -150,7 +146,12 @@ async function fetchOrganizationCreditGrants(orgId: string): Promise<Organizatio
 
 async function putOrganizationCreditBalance(
   orgId: string,
-  body: { bucket: CreditBalanceBucket; target_cents: number; expected_remaining_cents: number; note: string },
+  body: {
+    bucket: CreditBalanceBucket;
+    target_cents: number;
+    expected_remaining_cents: number;
+    note: string;
+  },
 ): Promise<OrganizationLLMCredit> {
   const response = await fetch(`/admin/api/organizations/${orgId}/llm-credit/balances`, {
     method: "PUT",
@@ -195,18 +196,14 @@ async function loadOrganizationCreditState(
 }
 
 function useOrgBillingPlan(orgId: string, enabled: boolean) {
-  const [catalog, setCatalog] = useState<BillingCatalogPlan[]>([]);
+  const [catalog, setCatalog] = useState<BillingPlan[]>([]);
   const [catalogError, setCatalogError] = useState("");
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     setCatalog([]);
     setCatalogError("");
-    fetch("/admin/api/billing-plans", { credentials: "include" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Failed to load billing plans");
-        return (await response.json()) as BillingCatalogPlan[];
-      })
+    billingCatalogRequest<BillingPlan[]>("billing-plans")
       .then((plans) => {
         if (!cancelled) setCatalog(plans);
       })
@@ -230,6 +227,8 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
 
   const clearPlan = useCallback(() => setPlan(null), []);
 
+  const selectedCategory = catalog.find((entry) => entry.key === planValue)?.category;
+
   const savePlan = async () => {
     if (
       catalogError ||
@@ -238,12 +237,12 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
       )
     )
       return;
-    if (planValue === "trial" && !isFutureUtcTrialEnd(trialEndsOn)) {
+    if (selectedCategory === "trial" && !isFutureUtcTrialEnd(trialEndsOn)) {
       return;
     }
     setSavingPlan(true);
     try {
-      applyPlan(await putOrganizationBillingPlan(orgId, billingPlanRequest(planValue, trialEndsOn)));
+      applyPlan(await putOrganizationBillingPlan(orgId, billingPlanRequest(planValue, selectedCategory, trialEndsOn)));
       showSuccessToast("Billing plan updated");
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to set billing plan");
@@ -260,7 +259,7 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
     setPlanValue,
     trialEndsOn,
     setTrialEndsOn,
-    trialEndInvalid: planValue === "trial" && !isFutureUtcTrialEnd(trialEndsOn),
+    trialEndInvalid: selectedCategory === "trial" && !isFutureUtcTrialEnd(trialEndsOn),
     savingPlan,
     savePlan,
     applyPlan,

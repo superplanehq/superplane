@@ -842,6 +842,10 @@ message DescribeOrganizationBillingResponse {
   int64 welcome_remaining_cents = 14;
   int64 admin_remaining_cents = 15;
   bool cancel_at_period_end = 16;
+  string plan_name = 17;
+  int64 plan_price_cents = 18;
+  bool plan_per_seat = 19;
+  string plan_category = 20;
 }
 
 message CreateBusinessCheckoutRequest {
