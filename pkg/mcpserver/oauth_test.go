@@ -407,3 +407,114 @@ func TestRefreshTokensRejectsBlockedAccount(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+
+func TestExchangeAndRefreshKeepWorkspaceList(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	resource := "http://localhost:8000/mcp"
+	first := uuid.New()
+	second := uuid.New()
+	ids, err := models.NormalizeFactoryIDs([]uuid.UUID{second, first})
+	require.NoError(t, err)
+	raw, err := CreateAuthorizationCode(database.Conn(), &AuthorizeRequest{
+		ClientID:            LocalClientID,
+		RedirectURI:         CursorRedirectURIs[0],
+		CodeChallenge:       mcp.S256Challenge(testPKCEVerifier),
+		CodeChallengeMethod: "S256",
+		Resource:            resource,
+		ResponseType:        "code",
+	}, r.User, r.Organization.ID, []uuid.UUID{second, first})
+	require.NoError(t, err)
+
+	var refresh string
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		issue, next, oauthErr := ExchangeAuthorizationCode(tx, tokenForm(raw, testPKCEVerifier, resource), resource)
+		require.Nil(t, oauthErr)
+		require.Equal(t, ids, issue.FactoryIDs)
+		refresh = next
+		return nil
+	})
+	require.NoError(t, err)
+
+	values := url.Values{}
+	values.Set("grant_type", "refresh_token")
+	values.Set("refresh_token", refresh)
+	values.Set("client_id", LocalClientID)
+	values.Set("resource", resource)
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		issue, _, oauthErr := RefreshTokens(tx, values, resource)
+		require.Nil(t, oauthErr)
+		require.Equal(t, ids, issue.FactoryIDs)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func TestRefreshOldTokenKeepsOriginalWorkspace(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	resource := "http://localhost:8000/mcp"
+	factoryID := uuid.New()
+	raw := "refresh-" + uuid.NewString()
+	token := &models.MCPOAuthRefreshToken{
+		TokenHash:      crypto.HashToken(raw),
+		ClientID:       LocalClientID,
+		UserID:         r.User,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryID,
+		Resource:       resource,
+		Scopes:         datatypes.NewJSONSlice(GrantedScopes),
+		ExpiresAt:      time.Now().Add(time.Hour),
+	}
+	require.NoError(t, models.CreateMCPOAuthRefreshToken(database.Conn(), token))
+	require.NoError(t, database.Conn().Exec("UPDATE mcp_oauth_refresh_tokens SET factory_ids = NULL WHERE id = ?", token.ID).Error)
+
+	values := url.Values{}
+	values.Set("grant_type", "refresh_token")
+	values.Set("refresh_token", raw)
+	values.Set("client_id", LocalClientID)
+	values.Set("resource", resource)
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		issue, _, oauthErr := RefreshTokens(tx, values, resource)
+		require.Nil(t, oauthErr)
+		require.Equal(t, []uuid.UUID{factoryID}, issue.FactoryIDs)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func TestAccessGrantRejectsSmallerWorkspaceSet(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	first := uuid.New()
+	second := uuid.New()
+	require.NoError(t, models.CreateMCPOAuthRefreshToken(database.Conn(), &models.MCPOAuthRefreshToken{
+		TokenHash:      uuid.NewString(),
+		ClientID:       LocalClientID,
+		UserID:         r.User,
+		OrganizationID: r.Organization.ID,
+		FactoryIDs:     datatypes.NewJSONSlice([]string{first.String(), second.String()}),
+		Resource:       "http://localhost:8000/mcp",
+		Scopes:         datatypes.NewJSONSlice(GrantedScopes),
+		ExpiresAt:      time.Now().Add(time.Hour),
+	}))
+
+	active := AccessGrantIsActive(database.Conn(), &AccessClaims{
+		UserID:     r.User,
+		OrgID:      r.Organization.ID,
+		FactoryID:  first,
+		FactoryIDs: []uuid.UUID{first},
+		ClientID:   LocalClientID,
+	}, time.Now())
+	require.False(t, active)
+
+	ids, err := models.NormalizeFactoryIDs([]uuid.UUID{second, first})
+	require.NoError(t, err)
+	active = AccessGrantIsActive(database.Conn(), &AccessClaims{
+		UserID:     r.User,
+		OrgID:      r.Organization.ID,
+		FactoryIDs: ids,
+		ClientID:   LocalClientID,
+	}, time.Now())
+	require.True(t, active)
+}
