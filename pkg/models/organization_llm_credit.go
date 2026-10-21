@@ -19,13 +19,15 @@ const (
 	LLMCreditGrantKindTopup       = "topup"
 	LLMCreditGrantKindTopupRefund = "topup_refund"
 
-	LLMCreditGrantKindTrialAdjustment = "trial_adjustment"
-	LLMCreditGrantKindTopupAdjustment = "topup_adjustment"
-	LLMCreditGrantKindAdminAdjustment = "admin_adjustment"
+	LLMCreditGrantKindIncludedAdjustment = "included_adjustment"
+	LLMCreditGrantKindTrialAdjustment    = "trial_adjustment"
+	LLMCreditGrantKindTopupAdjustment    = "topup_adjustment"
+	LLMCreditGrantKindAdminAdjustment    = "admin_adjustment"
 
-	CreditBalanceBucketTrial = "trial"
-	CreditBalanceBucketTopup = "topup"
-	CreditBalanceBucketGrant = "grant"
+	CreditBalanceBucketIncluded = "included"
+	CreditBalanceBucketTrial    = "trial"
+	CreditBalanceBucketTopup    = "topup"
+	CreditBalanceBucketGrant    = "grant"
 
 	canceledIncludedGrantPrefix = "canceled:"
 )
@@ -630,6 +632,14 @@ func ResolveOrganizationMarkupBPS(tx *gorm.DB, orgID uuid.UUID) (int, error) {
 		return *orgSettings.MarkupBPS, nil
 	}
 
+	plan, err := FindOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return 0, err
+	}
+	if plan != nil && plan.Catalog.MarkupBPS != nil {
+		return *plan.Catalog.MarkupBPS, nil
+	}
+
 	installation, err := GetInstallationLLMSettings(tx)
 	if err != nil {
 		return 0, err
@@ -855,13 +865,21 @@ type IncludedUsageSync struct {
 // way Polar subscription webhooks do.
 func SyncIncludedLLMCreditGrant(tx *gorm.DB, sync IncludedUsageSync) error {
 	if sync.GrantIncluded {
+		plan, err := FindOrganizationBillingPlan(tx, sync.OrganizationID)
+		if err != nil {
+			return err
+		}
+		// New catalog policies are stored until automatic delivery is implemented.
+		if plan == nil || (plan.Catalog.Key != "business_legacy" && plan.Catalog.Key != BillingPlanBusinessManual) || plan.Catalog.CreditAmountCents == 0 {
+			return nil
+		}
 		if sync.PeriodEnd == nil {
 			return nil
 		}
-		_, err := AddIncludedLLMCreditGrant(
+		_, err = AddIncludedLLMCreditGrant(
 			tx,
 			sync.OrganizationID,
-			CentsToMicros(DefaultIncludedGrantCents),
+			CentsToMicros(plan.Catalog.CreditAmountCents),
 			IncludedGrantKey(sync.SubscriptionID, *sync.PeriodEnd),
 			*sync.PeriodEnd,
 		)
@@ -920,9 +938,9 @@ func ExpireOpenIncludedGrants(tx *gorm.DB, orgID uuid.UUID) error {
 	now := time.Now()
 	var grants []OrganizationLLMCreditGrant
 	err := tx.Where(
-		"organization_id = ? AND kind = ? AND (expires_at IS NULL OR expires_at > ?)",
+		"organization_id = ? AND kind IN ? AND (expires_at IS NULL OR expires_at > ?)",
 		orgID,
-		LLMCreditGrantKindIncluded,
+		[]string{LLMCreditGrantKindIncluded, LLMCreditGrantKindIncludedAdjustment},
 		now,
 	).Find(&grants).Error
 	if err != nil {

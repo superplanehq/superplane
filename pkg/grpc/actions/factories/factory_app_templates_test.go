@@ -988,19 +988,15 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 	prompt := implementationStep(t, refinement, "Refine Task")
 	text, ok := prompt["prompt"].(string)
 	require.True(t, ok)
-	assert.Contains(t, text, runner.PlanningSessionUserPromptReviewMarkdown())
-	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
+	assert.Equal(t, "Review and score this task\n\n{{ root().data.workOrder }}", text)
 }
 
-func TestBuildBacklogCanvasUsesReviewPrompt(t *testing.T) {
+func TestBuildBacklogCanvasUsesMinimalTaskPrompt(t *testing.T) {
 	canvas := buildBacklogCanvas(backlogCanvasRequest{})
 	refinement := findYAMLNode(t, canvas, backlogRefinementNodeID)
 	assert.Equal(t, true, refinement.Configuration[runner.SkipSetupCommandsField])
 	text := backlogRefinementPromptText(t, canvas)
-	assert.Contains(t, text, runner.PlanningSessionUserPromptReviewMarkdown())
-	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
-	assert.Contains(t, text, "Clarity, Complexity, and Verifiability")
-	assert.NotContains(t, text, "1 through 5")
+	assert.Equal(t, "Review and score this task\n\n{{ root().data.workOrder }}", text)
 }
 
 func backlogRefinementPromptText(t *testing.T, canvas *yaml.Canvas) string {

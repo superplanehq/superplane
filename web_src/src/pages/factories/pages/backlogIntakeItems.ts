@@ -42,6 +42,7 @@ export interface BacklogIntakeItem {
   title: string;
   body: string;
   createdAt?: string;
+  disabledReason?: string;
 }
 
 export interface BacklogIntakeItemCatalog {

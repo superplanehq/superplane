@@ -29,12 +29,13 @@ type IntakeDependencies struct {
 }
 
 type IntakeItem struct {
-	ID        string
-	Key       string
-	Title     string
-	Body      string
-	URL       string
-	CreatedAt time.Time
+	DisabledReason string
+	ID             string
+	Key            string
+	Title          string
+	Body           string
+	URL            string
+	CreatedAt      time.Time
 }
 
 type intakeItemSource interface {

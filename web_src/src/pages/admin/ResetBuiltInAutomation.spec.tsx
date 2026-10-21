@@ -4,12 +4,19 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import { ResetBuiltInAutomation } from "./ResetBuiltInAutomation";
 
-const automations = [
+type CatalogAutomation = {
+  id: string;
+  name: string;
+  last_reset_at?: string;
+  last_reset_by?: string;
+};
+
+const automations: CatalogAutomation[] = [
   { id: "intake:github-issues", name: "GitHub issues" },
   { id: "pr-feedback:discussion", name: "Pull request discussion" },
 ];
 
-function catalogResponse(items = automations) {
+function catalogResponse(items: CatalogAutomation[] = automations) {
   return new Response(JSON.stringify({ automations: items }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
@@ -20,7 +27,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("Reset one built-in automation", () => {
   it("resets the selected automation in every organization", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === "POST") {
         return new Response(
           JSON.stringify({
@@ -117,7 +124,10 @@ describe("Reset one built-in automation", () => {
   });
 
   it("does not reset when the administrator cancels", async () => {
-    const fetchMock = vi.fn(async () => catalogResponse());
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      void init;
+      return catalogResponse();
+    });
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<ResetBuiltInAutomation />);

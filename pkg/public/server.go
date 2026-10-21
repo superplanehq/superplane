@@ -817,6 +817,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
 	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt))
 	adminRoute.Use(middleware.RequireInstallationAdmin())
+	adminRoute.HandleFunc("/billing-plans", s.adminListBillingPlans).Methods("GET")
 	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}", s.adminGetOrganization).Methods("GET")
@@ -1183,15 +1184,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
-	productanalytics.Capture(productanalytics.Event{
-		Name:           productanalytics.EventOrganizationCreated,
-		EventID:        productanalytics.StableEventID(productanalytics.EventOrganizationCreated, organization.ID.String()),
-		DistinctID:     account.ID.String(),
-		OrganizationID: organization.ID.String(),
-		ActorType:      productanalytics.ActorUser,
-		Source:         productanalytics.SourceUI,
-		Properties:     productanalytics.Properties{"creation_path": "workspace_switcher"},
-	})
+	recordOrganizationCreated(organization, account.ID, "workspace_switcher")
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
@@ -1275,15 +1268,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
 	}
-	productanalytics.Capture(productanalytics.Event{
-		Name:           productanalytics.EventOrganizationCreated,
-		EventID:        productanalytics.StableEventID(productanalytics.EventOrganizationCreated, organization.ID.String()),
-		DistinctID:     account.ID.String(),
-		OrganizationID: organization.ID.String(),
-		ActorType:      productanalytics.ActorUser,
-		Source:         productanalytics.SourceUI,
-		Properties:     productanalytics.Properties{"creation_path": "initial_onboarding"},
-	})
+	recordOrganizationCreated(organization, account.ID, "initial_onboarding")
 
 	writeInitialWorkspaceResponse(w, organization, workspace)
 }
@@ -1358,6 +1343,26 @@ func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.O
 	json.NewEncoder(w).Encode(initialWorkspaceResponse{
 		OrganizationSlug: organization.Slug,
 		WorkspaceKey:     workspace.Key,
+	})
+}
+
+func recordOrganizationCreated(organization *models.Organization, accountID uuid.UUID, creationPath string) {
+	organizationID := organization.ID.String()
+	productanalytics.Capture(productanalytics.Event{
+		Name:           productanalytics.EventOrganizationCreated,
+		EventID:        productanalytics.StableEventID(productanalytics.EventOrganizationCreated, organizationID),
+		DistinctID:     accountID.String(),
+		OrganizationID: organizationID,
+		ActorType:      productanalytics.ActorUser,
+		Source:         productanalytics.SourceUI,
+		Properties:     productanalytics.Properties{"creation_path": creationPath},
+	})
+	productanalytics.IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity{
+		ID:        organizationID,
+		Name:      organization.Name,
+		Slug:      organization.Slug,
+		CreatedAt: organization.CreatedAt,
+		AccountID: accountID.String(),
 	})
 }
 

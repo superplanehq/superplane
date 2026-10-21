@@ -358,6 +358,66 @@ func TestAdminOrganizationBillingPlanHiddenWhenBillingDisabled(t *testing.T) {
 	}
 }
 
+func TestAdminCatalogPlanAssignment(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	catalog := models.BillingPlan{Key: "support_plan", Name: "Support plan", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	t.Cleanup(func() {
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, "none", nil)
+		require.NoError(t, err)
+		require.NoError(t, models.DeleteBillingPlan(database.Conn(), catalog.ID))
+	})
+
+	regular, err := models.CreateAccount("Catalog user", "catalog-user@example.com")
+	require.NoError(t, err)
+	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+	denied := execRequest(server, requestParams{method: "GET", path: "/admin/api/billing-plans", authCookie: regularToken})
+	require.Equal(t, http.StatusNotFound, denied.Code)
+
+	response := execRequest(server, requestParams{method: "GET", path: "/admin/api/billing-plans", authCookie: token})
+	require.Equal(t, http.StatusOK, response.Code)
+	var plans []models.BillingPlan
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plans))
+	found := false
+	for _, plan := range plans {
+		if plan.Key == catalog.Key {
+			found = true
+			require.Equal(t, catalog.ID, plan.ID)
+		}
+	}
+	require.True(t, found, "private catalog plan must be listed")
+
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+	previous, err := models.ResolveOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	catalog.RequirePaymentMethod = true
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	response = execRequest(server, requestParams{method: "PUT", path: path, authCookie: token, body: []byte(`{"plan":"support_plan"}`), contentType: "application/json"})
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	require.Contains(t, response.Body.String(), "Plans that require a payment method cannot be assigned by an admin")
+	unchanged, err := models.ResolveOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, previous.PlanID, unchanged.PlanID)
+	require.Equal(t, previous.PlanSource, unchanged.PlanSource)
+
+	catalog.RequirePaymentMethod = false
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	response = execRequest(server, requestParams{method: "PUT", path: path, authCookie: token, body: []byte(`{"plan":"support_plan"}`), contentType: "application/json"})
+	require.Equal(t, http.StatusOK, response.Code)
+	var saved map[string]any
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &saved))
+	require.Equal(t, catalog.Key, saved["catalog_key"])
+	assigned, err := models.ResolveOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, catalog.ID, assigned.PlanID)
+
+	response = execRequest(server, requestParams{method: "GET", path: path, authCookie: token})
+	require.Equal(t, http.StatusOK, response.Code)
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &saved))
+	require.Equal(t, catalog.Key, saved["catalog_key"])
+}
+
 func TestAdminOrganizationBillingPlan(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
@@ -415,6 +475,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 				"items": []map[string]any{
 					{
 						"id":                   "sub_admin_sync",
+						"product_id":           "prod_business",
 						"status":               "active",
 						"current_period_start": periodStart.Format(time.RFC3339),
 						"current_period_end":   periodEnd.Format(time.RFC3339),
@@ -451,7 +512,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 	t.Run("PUT rejects Polar-managed organizations", func(t *testing.T) {
 		now := time.Now()
 		end := now.AddDate(0, 1, 0)
-		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
+		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 			ID:          "sub_admin_put",
 			Status:      models.PolarSubscriptionStatusActive,
 			PeriodStart: &now,
