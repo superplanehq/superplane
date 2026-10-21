@@ -8,25 +8,41 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const AccessTokenTTL = time.Hour
 const ConsentTTL = 10 * time.Minute
 
 type AccessClaims struct {
-	UserID    uuid.UUID
-	OrgID     uuid.UUID
-	FactoryID uuid.UUID
-	ClientID  string
-	Resource  string
-	Scopes    []string
+	UserID     uuid.UUID
+	OrgID      uuid.UUID
+	FactoryID  uuid.UUID
+	FactoryIDs []uuid.UUID
+	ClientID   string
+	Resource   string
+	Scopes     []string
+}
+
+func (c AccessClaims) WorkspaceIDs() []uuid.UUID {
+	if len(c.FactoryIDs) > 0 {
+		ids, err := models.NormalizeFactoryIDs(c.FactoryIDs)
+		if err == nil {
+			return ids
+		}
+	}
+	if c.FactoryID == uuid.Nil {
+		return nil
+	}
+	return []uuid.UUID{c.FactoryID}
 }
 
 func MintAccessToken(signer *jwt.Signer, claims AccessClaims, ttl time.Duration) (string, error) {
 	if signer == nil {
 		return "", fmt.Errorf("jwt signer is required")
 	}
-	if claims.UserID == uuid.Nil || claims.OrgID == uuid.Nil || claims.FactoryID == uuid.Nil {
+	factoryIDs, err := claims.accessFactoryIDs()
+	if err != nil || claims.UserID == uuid.Nil || claims.OrgID == uuid.Nil {
 		return "", fmt.Errorf("access token scope is incomplete")
 	}
 	clientID := strings.TrimSpace(claims.ClientID)
@@ -41,13 +57,14 @@ func MintAccessToken(signer *jwt.Signer, claims AccessClaims, ttl time.Duration)
 		ttl = AccessTokenTTL
 	}
 	return signer.GenerateWithClaims(ttl, map[string]string{
-		"purpose":    AccessTokenPurpose,
-		"sub":        claims.UserID.String(),
-		"org_id":     claims.OrgID.String(),
-		"factory_id": claims.FactoryID.String(),
-		"client_id":  clientID,
-		"aud":        resource,
-		"scope":      strings.Join(normalizeScopes(claims.Scopes), " "),
+		"purpose":     AccessTokenPurpose,
+		"sub":         claims.UserID.String(),
+		"org_id":      claims.OrgID.String(),
+		"factory_id":  factoryIDs[0].String(),
+		"factory_ids": formatFactoryIDsClaim(factoryIDs),
+		"client_id":   clientID,
+		"aud":         resource,
+		"scope":       strings.Join(normalizeScopes(claims.Scopes), " "),
 	})
 }
 
@@ -79,18 +96,23 @@ func ParseAccessToken(signer *jwt.Signer, token, resource string) (*AccessClaims
 	if err != nil {
 		return nil, err
 	}
+	factoryIDs, err := parseFactoryIDsClaim(stringClaim(claims, "factory_ids"), factoryID)
+	if err != nil {
+		return nil, err
+	}
 	clientID := stringClaim(claims, "client_id")
 	if clientID == "" {
 		return nil, fmt.Errorf("invalid client_id")
 	}
 	scope, _ := claims["scope"].(string)
 	return &AccessClaims{
-		UserID:    userID,
-		OrgID:     orgID,
-		FactoryID: factoryID,
-		ClientID:  clientID,
-		Resource:  audience,
-		Scopes:    strings.Fields(scope),
+		UserID:     userID,
+		OrgID:      orgID,
+		FactoryID:  factoryIDs[0],
+		FactoryIDs: factoryIDs,
+		ClientID:   clientID,
+		Resource:   audience,
+		Scopes:     strings.Fields(scope),
 	}, nil
 }
 
@@ -145,6 +167,44 @@ func ParseConsentToken(signer *jwt.Signer, token string) (*ConsentClaims, error)
 		Resource:            stringClaim(claims, "resource"),
 		ResponseType:        stringClaim(claims, "response_type"),
 	}, nil
+}
+
+func (c AccessClaims) accessFactoryIDs() ([]uuid.UUID, error) {
+	if len(c.FactoryIDs) > 0 {
+		return models.NormalizeFactoryIDs(c.FactoryIDs)
+	}
+	if c.FactoryID == uuid.Nil {
+		return nil, fmt.Errorf("workspace is required")
+	}
+	return []uuid.UUID{c.FactoryID}, nil
+}
+
+func formatFactoryIDsClaim(ids []uuid.UUID) string {
+	parts := make([]string, len(ids))
+	for i, id := range ids {
+		parts[i] = id.String()
+	}
+	return strings.Join(parts, ",")
+}
+
+func parseFactoryIDsClaim(raw string, fallback uuid.UUID) ([]uuid.UUID, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		if fallback == uuid.Nil {
+			return nil, fmt.Errorf("invalid factory_id")
+		}
+		return []uuid.UUID{fallback}, nil
+	}
+	parts := strings.Split(raw, ",")
+	ids := make([]uuid.UUID, 0, len(parts))
+	for _, part := range parts {
+		id, err := uuid.Parse(strings.TrimSpace(part))
+		if err != nil || id == uuid.Nil {
+			return nil, fmt.Errorf("invalid factory_ids")
+		}
+		ids = append(ids, id)
+	}
+	return models.NormalizeFactoryIDs(ids)
 }
 
 func parseClaimUUID(claims map[string]any, key string) (uuid.UUID, error) {
