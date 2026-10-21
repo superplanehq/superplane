@@ -18,8 +18,9 @@ func init() {
 type CreateWorkOrder struct{}
 
 type CreateWorkOrderConfiguration struct {
-	Title       string `json:"title" mapstructure:"title"`
-	Description string `json:"description" mapstructure:"description"`
+	DefaultOwnerID string `json:"defaultOwnerId" mapstructure:"defaultOwnerId"`
+	Title          string `json:"title" mapstructure:"title"`
+	Description    string `json:"description" mapstructure:"description"`
 }
 
 func (c *CreateWorkOrder) Name() string {
@@ -74,6 +75,12 @@ func (c *CreateWorkOrder) Configuration() []configuration.Field {
 			Required:    true,
 		},
 		{
+			Name:        "defaultOwnerId",
+			Label:       "Default task owner",
+			Description: "Organization member ID to assign when the task has no owner",
+			Type:        configuration.FieldTypeString,
+		},
+		{
 			Name:        "description",
 			Label:       "Description",
 			Description: "The description of the task",
@@ -90,8 +97,9 @@ func (c *CreateWorkOrder) Execute(ctx core.ExecutionContext) error {
 	}
 
 	workOrder, created, err := ctx.Factory.CreateWorkOrder(core.WorkOrderParams{
-		Title:       config.Title,
-		Description: config.Description,
+		DefaultOwnerID: config.DefaultOwnerID,
+		Title:          config.Title,
+		Description:    config.Description,
 	})
 	if err != nil {
 		return err
