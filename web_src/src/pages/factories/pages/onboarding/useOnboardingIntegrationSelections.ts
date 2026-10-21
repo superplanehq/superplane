@@ -1,5 +1,6 @@
-import type { FactoriesFactory } from "@/api-client";
+import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
+import { selectReadyIntegrationInstance } from "@/pages/home/useIntegrationConnectDialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { loadSavedInstallationName, selectionsWithSavedVcsInstallation } from "./githubIntegrationSelection";
@@ -73,4 +74,25 @@ export function useOnboardingIntegrationSelections(organizationId: string, onboa
 
   const connected = useMemo(() => connectedFromSelections(selections), [selections]);
   return { selections, connected, setSelections };
+}
+
+export function requestOnboardingConnect(args: {
+  id: IntegrationId;
+  customProvider: boolean;
+  requestConnect: (id: IntegrationId) => boolean | Promise<boolean>;
+  connectedIntegrations: OrganizationsIntegration[];
+  selections: IntegrationSelections;
+  setSelections: (
+    selections: IntegrationSelections | ((current: IntegrationSelections) => IntegrationSelections),
+  ) => void;
+  setCustomProviderDialogOpen: (open: boolean) => void;
+}): boolean | Promise<boolean> {
+  if (args.id !== "customLlm" || !args.customProvider) return args.requestConnect(args.id);
+  const existing = selectReadyIntegrationInstance(args.connectedIntegrations, args.selections, "customLlm");
+  if (existing) {
+    args.setSelections(existing);
+    return false;
+  }
+  args.setCustomProviderDialogOpen(true);
+  return false;
 }

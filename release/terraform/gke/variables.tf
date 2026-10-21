@@ -134,6 +134,18 @@ variable "superplane_image_tag" {
   }
 }
 
+variable "github_enterprise_allowed_hosts" {
+  description = "Optional comma-separated GitHub Enterprise Cloud host allowlist. Empty allows any host that SuperPlane accepts."
+  type        = string
+  default     = ""
+}
+
+variable "github_enterprise_extra_ca_certs_secret" {
+  description = "Optional Kubernetes secret name with a CA bundle for GitHub Enterprise TLS. Empty skips the mount."
+  type        = string
+  default     = ""
+}
+
 variable "superplane_chart_path" {
   description = "Path to a local SuperPlane Helm chart, for example ../../superplane-helm-chart/helm. Leave empty to install the published chart from oci://ghcr.io/superplanehq."
   type        = string

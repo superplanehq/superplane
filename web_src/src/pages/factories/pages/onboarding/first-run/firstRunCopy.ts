@@ -24,6 +24,23 @@ export const FIRST_RUN_COPY = {
     headline: "Where is your code?",
     body: "Choose the Git host of your repository. SuperPlane opens pull requests there.",
   },
+  githubEnterprise: {
+    headline: "Where is your GitHub Enterprise Cloud?",
+    body: "Enter the hostname of your GitHub Enterprise Cloud, for example acme.ghe.com.",
+    hostLabel: "GitHub hostname",
+    hostPlaceholder: "acme.ghe.com",
+    ipAllowList: "If your organization uses an IP allow list, add the SuperPlane egress addresses.",
+    ipAllowListLink: "See GitHub Enterprise setup",
+    ipAllowListHref: "https://docs.superplane.com/components/github#github-enterprise-cloud",
+    continue: "Create GitHub App",
+    opening: "Opening GitHub…",
+    invalidHost: "Enter a GitHub hostname, for example acme.ghe.com.",
+    connectError: "SuperPlane could not connect to GitHub Enterprise. Check the hostname and try again.",
+    repositoryHelper: "SuperPlane opens pull requests in this GitHub repository for review.",
+    loading: "Loading GitHub repositories…",
+    loadError: "SuperPlane could not load the GitHub repositories. Check the connection and try again.",
+    empty: "SuperPlane cannot see repositories for this GitHub App.",
+  },
   bitbucket: {
     connectHeadline: "Connect SuperPlane to Bitbucket",
     connectBody:

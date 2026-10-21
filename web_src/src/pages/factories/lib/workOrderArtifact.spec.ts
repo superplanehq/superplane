@@ -21,6 +21,9 @@ describe("branchTreeUrl", () => {
     expect(branchTreeUrl({ repository: "example/repo", name: "feature/refund-retry" })).toBe(
       "https://github.com/example/repo/tree/feature/refund-retry",
     );
+    expect(branchTreeUrl({ repository: "example/repo", name: "feature/refund-retry" }, "acme.ghe.com")).toBe(
+      "https://acme.ghe.com/example/repo/tree/feature/refund-retry",
+    );
   });
 
   it("accepts the free-form `repo` key the artifact component also reads", () => {

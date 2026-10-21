@@ -9,6 +9,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
@@ -77,7 +78,7 @@ func configureScheduledIntake(canvas *yaml.Canvas, provider string, params map[s
 	if repository == "" {
 		return invalidArgument("repository is required for scheduled intake")
 	}
-	host := "github.com"
+	host := strings.TrimPrefix(githubcommon.DotCom().WebURL(), "https://")
 	if provider == models.ProviderBitbucket {
 		host = "bitbucket.org"
 	}
