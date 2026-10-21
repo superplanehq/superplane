@@ -1373,6 +1373,8 @@ message FactoryIntake {
     // Projects that still create a task. Required for a Sentry intake.
     // Sentry exception intakes only. Values are project slugs.
     repeated string sentry_project_ids = 23;
+    // Organization user ID. Omitted updates preserve the selection; empty clears it.
+    optional string default_owner_id = 24;
   }
 
   string id = 1;
