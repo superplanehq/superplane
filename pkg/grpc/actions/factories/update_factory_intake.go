@@ -239,7 +239,11 @@ func applyIntakeGraphUpdate(
 	edges := slices.Clone(liveVersion.Edges)
 
 	if settings != nil {
-		if err := validateIntakeDefaultOwner(tx, canvas.OrganizationID, intake.Source, settings); err != nil {
+		currentOwner := ""
+		if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+			currentOwner = intakeSettingsFromGraph(intake.Source, graph, spec).DefaultOwnerID
+		}
+		if err := validateIntakeDefaultOwner(tx, canvas.OrganizationID, intake.Source, currentOwner, settings); err != nil {
 			return err
 		}
 		nodes, edges, err = applyIntakeSettingsToGraph(intake.Source, graph, spec, settings, nodes, edges)

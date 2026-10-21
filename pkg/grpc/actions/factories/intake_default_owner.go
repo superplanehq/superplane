@@ -9,17 +9,18 @@ import (
 	"gorm.io/gorm"
 )
 
-func validateIntakeDefaultOwner(tx *gorm.DB, organizationID uuid.UUID, source string, settings *pb.FactoryIntake_Settings) error {
+func validateIntakeDefaultOwner(tx *gorm.DB, organizationID uuid.UUID, source, currentOwner string, settings *pb.FactoryIntake_Settings) error {
 	if settings == nil || settings.DefaultOwnerId == nil {
 		return nil
 	}
 	if source != models.FactoryIntakeSourceGitHubIssues {
 		return invalidArgument("default task owner is only supported for GitHub issues")
 	}
-	if settings.GetDefaultOwnerId() == "" {
+	ownerID := settings.GetDefaultOwnerId()
+	if ownerID == "" || ownerID == currentOwner {
 		return nil
 	}
-	id, err := uuid.Parse(settings.GetDefaultOwnerId())
+	id, err := uuid.Parse(ownerID)
 	if err != nil {
 		return invalidArgument("invalid default task owner id")
 	}

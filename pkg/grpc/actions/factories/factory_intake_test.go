@@ -82,6 +82,37 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, r.User.String(), listed.Intakes[0].Settings.GetDefaultOwnerId())
 	})
 
+	t.Run("unchanged unavailable owner does not block other settings", func(t *testing.T) {
+		f := newFactory(t)
+		account, err := models.CreateAccount(support.RandomName("left"), support.RandomName("left")+"@example.com")
+		require.NoError(t, err)
+		member, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
+		require.NoError(t, err)
+		intake := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: &pb.FactoryIntake_Settings{
+			DefaultOwnerId: proto.String(member.ID.String()), Labels: []string{"urgent"},
+		}})
+		require.NoError(t, database.DB(t.Context()).Delete(member).Error)
+
+		next := proto.Clone(intake.GetSettings()).(*pb.FactoryIntake_Settings)
+		next.Labels = []string{"billing"}
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: f.ID.String(), IntakeId: intake.GetId(), Settings: next,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, member.ID.String(), response.GetIntake().GetSettings().GetDefaultOwnerId())
+		assert.Equal(t, []string{"billing"}, response.GetIntake().GetSettings().GetLabels())
+
+		changed := proto.Clone(next).(*pb.FactoryIntake_Settings)
+		changed.DefaultOwnerId = proto.String(uuid.NewString())
+		_, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: f.ID.String(), IntakeId: intake.GetId(), Settings: changed,
+		})
+		require.Error(t, err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
 	t.Run("rejects invalid default owners on create and update", func(t *testing.T) {
 		f := newFactory(t)
 		intake := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
