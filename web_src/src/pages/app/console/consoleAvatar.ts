@@ -12,8 +12,8 @@ export interface ConsoleAvatarDisplay {
  * already image URLs (e.g. an `avatar_url` field or a `{{ cel }}` expression
  * that builds one) are passed through as the image source directly.
  */
-export function resolveConsoleAvatar(author: unknown, committer?: unknown): ConsoleAvatarDisplay {
-  const fromString = avatarFromUsernameString(author);
+export function resolveConsoleAvatar(author: unknown, committer?: unknown, host?: string | null): ConsoleAvatarDisplay {
+  const fromString = avatarFromUsernameString(author, host);
   if (fromString) {
     return fromString;
   }
@@ -22,7 +22,7 @@ export function resolveConsoleAvatar(author: unknown, committer?: unknown): Cons
   const committerRecord = asRecord(committer);
   const username = coerceToString(authorRecord?.username).trim();
   const name = coerceToString(authorRecord?.name).trim() || coerceToString(committerRecord?.name).trim() || username;
-  const src = githubPersonAvatarUrl(author);
+  const src = githubPersonAvatarUrl(author, host);
   if (src) {
     return { src, name };
   }
@@ -36,12 +36,12 @@ export function resolveConsoleAvatar(author: unknown, committer?: unknown): Cons
   return { initials: initials || undefined, name };
 }
 
-function avatarFromUsernameString(author: unknown): ConsoleAvatarDisplay | undefined {
+function avatarFromUsernameString(author: unknown, host?: string | null): ConsoleAvatarDisplay | undefined {
   if (typeof author !== "string") {
     return undefined;
   }
   const username = author.trim();
-  const src = githubPersonAvatarUrl(username);
+  const src = githubPersonAvatarUrl(username, host);
   if (!src) {
     return undefined;
   }

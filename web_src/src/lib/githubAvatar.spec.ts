@@ -31,4 +31,15 @@ describe("githubPersonAvatarUrl", () => {
       "https://github.com/alex.png",
     );
   });
+
+  it("uses the tenant host for a GitHub push author", () => {
+    const author = {
+      date: "2026-10-21T12:00:00Z",
+      email: "alex@acme.com",
+      name: "Alex Rivera",
+      username: "alex",
+    };
+    expect(githubPersonAvatarUrl(author)).toBe("https://github.com/alex.png");
+    expect(githubPersonAvatarUrl(author, "acme.ghe.com")).toBe("https://acme.ghe.com/alex.png");
+  });
 });
