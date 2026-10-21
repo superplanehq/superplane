@@ -17,6 +17,21 @@ describe("privateGitHubAppCreateConfiguration", () => {
     expect(privateGitHubAppCreateConfiguration("github")).toEqual({ privateApp: true });
   });
 
+  it("sends the GitHub Enterprise host and factory onboarding flag", () => {
+    expect(
+      privateGitHubAppCreateConfiguration("github", {
+        host: "acme.ghe.com",
+        factoryOnboarding: true,
+        returnTo: "/org-1/workspaces/ws/setup?step=repo",
+      }),
+    ).toEqual({
+      privateApp: true,
+      host: "acme.ghe.com",
+      factoryOnboarding: true,
+      setupReturnPath: "/org-1/workspaces/ws/setup?step=repo",
+    });
+  });
+
   it("does not send privateApp for other integrations", () => {
     expect(privateGitHubAppCreateConfiguration("slack")).toBeUndefined();
   });
@@ -90,5 +105,39 @@ describe("connectPrivateGitHubApp", () => {
       configuration: { privateApp: true },
     });
     expect(goTo).not.toHaveBeenCalled();
+  });
+
+  it("creates a private app for GitHub Enterprise and opens the wizard", async () => {
+    const goTo = vi.fn();
+    const onCreated = vi.fn();
+    const create = vi.fn().mockResolvedValue({
+      integration: { metadata: { id: "int-ghe" }, status: { setupState: { currentStep: "selectOwner" } } },
+    });
+
+    await connectPrivateGitHubApp({
+      useWizard: true,
+      organizationId: "org-1",
+      host: "acme.ghe.com",
+      factoryOnboarding: true,
+      returnTo: "/org-1/workspaces/ws/setup?step=repo",
+      goTo,
+      existingNames: new Set(),
+      connected: [],
+      create,
+      onCreated,
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      integrationName: "github",
+      name: "github",
+      configuration: {
+        privateApp: true,
+        host: "acme.ghe.com",
+        factoryOnboarding: true,
+        setupReturnPath: "/org-1/workspaces/ws/setup?step=repo",
+      },
+    });
+    expect(onCreated).toHaveBeenCalledWith("int-ghe");
+    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/github/setup?integrationId=int-ghe");
   });
 });

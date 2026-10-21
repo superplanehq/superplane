@@ -42,3 +42,6 @@ export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
 
 /** Organization experimental feature: new Implement run history and details. */
 export const FEATURE_FACTORY_RUN_HISTORY = "factory_run_history";
+
+/** Organization experimental feature: GitHub Enterprise Cloud (ghe.com) connections. */
+export const FEATURE_GITHUB_ENTERPRISE = "github_enterprise";

@@ -93,6 +93,37 @@ func TestScheduledIntakeCreation(t *testing.T) {
 	require.Equal(t, codes.InvalidArgument, code)
 }
 
+func TestScheduledIntakeUsesGitHubEnterpriseHost(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("scheduled"), "", "")
+	require.NoError(t, err)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{"host": "acme.ghe.com"})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	repository, branch, vcsID := "acme/app", "main", integration.ID.String()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository, DefaultBranch: &branch, VCSIntegrationID: &vcsID}))
+	enableHostedSuperPlaneAgent(t, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryScheduledIntake))
+	deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+	response, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryAutomationRequest{
+		FactoryId: factory.ID.String(), TemplateId: scheduledIntakeTemplateID, InstallParams: map[string]string{"hour": "9", "minute": "0"},
+	})
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(response.Automation.Id))
+	require.NoError(t, err)
+	for _, node := range version.Nodes {
+		if node.ID != "scheduled-agent" {
+			continue
+		}
+		env := node.Configuration["environment"].([]any)
+		require.Equal(t, "https://acme.ghe.com/acme/app.git", env[0].(map[string]any)["value"])
+		return
+	}
+	t.Fatal("scheduled-agent node not found")
+}
+
 func TestScheduledIntakeProposalResult(t *testing.T) {
 	result, err := materializeFactoryTemplate(scheduledIntakeTemplateID, models.ProviderGitHub, factoryTemplateInput{installParams: map[string]string{"appRepository": "acme/app"}})
 	require.NoError(t, err)
