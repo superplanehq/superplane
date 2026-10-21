@@ -41,11 +41,12 @@ type SetupOwnerStatus = "disabled" | "required" | "in_progress" | "complete";
 interface SetupOwnerStatusResponse {
   status: SetupOwnerStatus;
   step?: string;
+  beacon_enabled?: boolean;
 }
 
 type OwnerSetupEntry =
   | { kind: "redirect"; to: string }
-  | { kind: "owner" }
+  | { kind: "owner"; beaconEnabled: boolean }
   | { kind: "resume"; step: OwnerSetupStep; email: string; orgSlug: string };
 
 function isResumableStep(step: string | undefined): step is OwnerSetupStep {
@@ -98,7 +99,7 @@ async function resolveOwnerSetupEntry(): Promise<OwnerSetupEntry> {
   }
 
   if (status.status === "required") {
-    return { kind: "owner" };
+    return { kind: "owner", beaconEnabled: status.beacon_enabled === true };
   }
 
   const account = await fetchSignedInAccount();
@@ -244,12 +245,17 @@ interface OwnerSetupEntryActions {
   setPendingOrganizationSlug: (slug: string | null) => void;
   setStep: (step: OwnerSetupStep) => void;
   setPhase: (phase: "loading" | "ready") => void;
+  setBeaconEnabled: (enabled: boolean) => void;
 }
 
 function applyOwnerSetupEntry(entry: OwnerSetupEntry, actions: OwnerSetupEntryActions) {
   if (entry.kind === "redirect") {
     window.location.href = entry.to;
     return;
+  }
+
+  if (entry.kind === "owner") {
+    actions.setBeaconEnabled(entry.beaconEnabled);
   }
 
   if (entry.kind === "resume") {
@@ -282,6 +288,7 @@ function ownerSetupChrome(args: {
 const OwnerSetup: React.FC = () => {
   const [phase, setPhase] = useState<"loading" | "ready">("loading");
   const [step, setStep] = useState<OwnerSetupStep>("owner");
+  const [beaconEnabled, setBeaconEnabled] = useState(false);
   const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
   const activeFleetStep = fleetWizardStep(step);
   const fleetSetup = useFleetManagerSetup(
@@ -307,6 +314,7 @@ const OwnerSetup: React.FC = () => {
   const account = useOwnerAccountForm({
     setPendingOrganizationSlug,
     onOwnerCreated,
+    shareInstallReport: beaconEnabled,
   });
 
   useEffect(() => {
@@ -319,6 +327,7 @@ const OwnerSetup: React.FC = () => {
           setPendingOrganizationSlug,
           setStep,
           setPhase,
+          setBeaconEnabled,
         });
       }
     });
@@ -376,6 +385,9 @@ const OwnerSetup: React.FC = () => {
           onLastNameChange={account.setLastName}
           onPasswordChange={account.setPassword}
           onConfirmPasswordChange={account.setConfirmPassword}
+          showInstallReport={beaconEnabled}
+          shareOwnerIdentity={account.shareOwnerIdentity}
+          onShareOwnerIdentityChange={account.setShareOwnerIdentity}
           onSubmit={account.handleOwnerSubmit}
         />
       )}

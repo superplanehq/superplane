@@ -7,6 +7,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    environment:
+      SUPERPLANE_VERSION: __SUPERPLANE_VERSION__
     env_file:
       - superplane.env
     volumes:
