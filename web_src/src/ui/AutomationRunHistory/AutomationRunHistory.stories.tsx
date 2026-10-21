@@ -117,6 +117,25 @@ export const AddressPRFeedback: Story = { args: { automation: "Address PR feedba
 export const FailedRun: Story = { args: { initialRun: implementationRuns[1] } };
 export const RunningRun: Story = { args: { initialRun: implementationRuns[0] } };
 export const PassedRun: Story = { args: { initialRun: implementationRuns[2] } };
+export const RunInstructions: Story = {
+  args: {
+    initialRun: {
+      ...implementationRuns[0],
+      activities: implementationRuns[0].activities.map((activity) =>
+        activity.id === "implement"
+          ? {
+              ...activity,
+              additionalInstructions:
+                "Avoid new production dependencies unless the task requires them.\nFor API changes, include a request and response example in the pull request description.",
+            }
+          : activity,
+      ),
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("tab", { name: "Instructions" }));
+  },
+};
 export const CancelledRun: Story = { args: { initialRun: implementationRuns[4] } };
 export const NoLinkedTask: Story = {
   args: { automation: "Address PR feedback", runs: verificationRuns, initialRun: verificationRuns[0] },

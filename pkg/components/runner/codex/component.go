@@ -95,6 +95,7 @@ func (c *RunCodex) Configuration() []configuration.Field {
 			"git clone https://github.com/org/repo.git /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
+		runner.AgentAdditionalInstructionsField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envOpenAIAPIKey),
 		runner.AgentSkipSetupCommandsField(),

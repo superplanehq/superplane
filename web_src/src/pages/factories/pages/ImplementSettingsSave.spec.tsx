@@ -143,6 +143,7 @@ describe("Implement settings save", () => {
     expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeDisabled();
     expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toBeDisabled();
     expect(screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Additional instructions" })).toBeDisabled();
     finishSave();
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
