@@ -2,6 +2,7 @@
 // for the dashboard's expression environment. Split out of `celExpr.ts` so
 // the adapter surface stays focused on parse / eval / coercion.
 import type { Environment } from "@marcbachmann/cel-js";
+import { githubPersonAvatarUrl } from "@/lib/githubAvatar";
 
 import { coerceWidgetTimestamp } from "./widgetFormat";
 
@@ -349,12 +350,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 // otherwise falls back to an initial-letter badge derived from the
 // available names.
 function githubAvatar(author: unknown, committer: unknown): string {
+  const src = githubPersonAvatarUrl(author);
+  if (src) {
+    return `<img class="avatar avatar-image" src="${src}" alt="" />`;
+  }
   const authorRecord = asRecord(author);
   const committerRecord = asRecord(committer);
-  const username = coerceToString(authorRecord?.username).trim();
-  if (username) {
-    return `<img class="avatar avatar-image" src="https://github.com/${username}.png" alt="" />`;
-  }
   const letter = firstInitialFromValues(
     authorRecord?.name,
     committerRecord?.name,

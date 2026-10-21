@@ -1,3 +1,5 @@
+import { githubPersonAvatarUrl } from "@/lib/githubAvatar";
+
 export interface ConsoleAvatarDisplay {
   src?: string;
   initials?: string;
@@ -11,23 +13,18 @@ export interface ConsoleAvatarDisplay {
  * that builds one) are passed through as the image source directly.
  */
 export function resolveConsoleAvatar(author: unknown, committer?: unknown): ConsoleAvatarDisplay {
-  if (typeof author === "string") {
-    const username = author.trim();
-    if (isImageUrl(username)) {
-      return { src: username, name: "" };
-    }
-    if (username) {
-      return { src: `https://github.com/${username}.png`, name: username };
-    }
+  const fromString = avatarFromUsernameString(author);
+  if (fromString) {
+    return fromString;
   }
 
   const authorRecord = asRecord(author);
   const committerRecord = asRecord(committer);
   const username = coerceToString(authorRecord?.username).trim();
   const name = coerceToString(authorRecord?.name).trim() || coerceToString(committerRecord?.name).trim() || username;
-
-  if (username) {
-    return { src: `https://github.com/${username}.png`, name };
+  const src = githubPersonAvatarUrl(author);
+  if (src) {
+    return { src, name };
   }
 
   const initials = firstInitialFromValues(
@@ -36,12 +33,22 @@ export function resolveConsoleAvatar(author: unknown, committer?: unknown): Cons
     authorRecord?.username,
     committerRecord?.username,
   );
-
   return { initials: initials || undefined, name };
 }
 
-function isImageUrl(value: string): boolean {
-  return value.startsWith("https://") || value.startsWith("http://");
+function avatarFromUsernameString(author: unknown): ConsoleAvatarDisplay | undefined {
+  if (typeof author !== "string") {
+    return undefined;
+  }
+  const username = author.trim();
+  const src = githubPersonAvatarUrl(username);
+  if (!src) {
+    return undefined;
+  }
+  if (username.startsWith("https://") || username.startsWith("http://")) {
+    return { src, name: "" };
+  }
+  return { src, name: username };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
