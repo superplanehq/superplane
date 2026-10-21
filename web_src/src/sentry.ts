@@ -148,9 +148,30 @@ export function normalizeSentryFingerprint<E extends Sentry.Event>(event: E): E 
   } as E;
 }
 
-// Drops known browser noise before send. A permission denial from application
-// code has no editor frame and still reports.
+// captureConsoleIntegration forwards console.error(prefix, error) through
+// captureException. ignoreErrors then sees the Error message, not the prefix.
+// The prefix stays on extra.arguments. Bundled frames also hide @dash0/sdk-web.
+function isIgnoredConsoleEvent(event: Sentry.ErrorEvent): boolean {
+  if (isIgnoredConsoleMessage(event.message)) {
+    return true;
+  }
+
+  if (isIgnoredConsoleMessage(event.exception?.values?.[0]?.value)) {
+    return true;
+  }
+
+  const args = event.extra?.arguments;
+  return Array.isArray(args) && args.some((argument) => isIgnoredConsoleMessage(argument));
+}
+
+// Drops known browser noise before send. A Load failed error that is not a
+// telemetry export still reports. A permission denial from application code
+// has no editor frame and still reports.
 export function filterSentryEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent | null {
+  if (isIgnoredConsoleEvent(event)) {
+    return null;
+  }
+
   const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
   const allDash0 = frames.length > 0 && frames.every((frame) => frame.filename?.includes("@dash0/sdk-web"));
   if (allDash0) {

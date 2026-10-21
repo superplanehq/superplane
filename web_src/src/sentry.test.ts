@@ -256,6 +256,72 @@ function unknownTouch(): object {
   return Object.defineProperty({}, Symbol.toStringTag, { value: "Touch" });
 }
 
+const DASH0_TRACE_EXPORT = "Error sending telemetry to https://ingress.us-west-2.aws.dash0.com/v1/traces:";
+
+describe("filterSentryEvent", () => {
+  it("drops a Dash0 export failure recorded as Load failed with bundled frames", () => {
+    const event: Sentry.ErrorEvent = {
+      ...buildEvent(
+        "Load failed",
+        [
+          "https://assets.superplane.com/releases/0a44665d92442819a665933f0b18e2d18f418d48/assets/PhaseLogCard-BedK_CGu.js",
+          "https://assets.superplane.com/releases/0a44665d92442819a665933f0b18e2d18f418d48/assets/index-ByzI7553.js",
+          "../../../../../web_src/node_modules/@sentry/browser/build/npm/esm/helpers.js",
+        ],
+        "TypeError",
+      ),
+      extra: {
+        arguments: [DASH0_TRACE_EXPORT, { message: "Load failed", name: "TypeError" }],
+      },
+    };
+
+    expect(filterSentryEvent(event)).toBeNull();
+  });
+});
+
+describe("captureConsole telemetry export failures", () => {
+  it("drops a telemetry export error and keeps Load failed without that prefix", async () => {
+    const kept: string[] = [];
+    const client = Sentry.init({
+      dsn: "https://public@o0.ingest.sentry.io/0",
+      autoSessionTracking: false,
+      sendClientReports: false,
+      ignoreErrors: IGNORED_CONSOLE_MESSAGES,
+      beforeSend(event) {
+        const filtered = filterSentryEvent(event);
+        if (!filtered) {
+          return null;
+        }
+
+        kept.push(filtered.exception?.values?.[0]?.value ?? filtered.message ?? "");
+        return null;
+      },
+      integrations: [
+        Sentry.captureConsoleIntegration({
+          levels: ["warn", "error"],
+        }),
+      ],
+    });
+
+    expect(client).toBeDefined();
+
+    try {
+      console.error(DASH0_TRACE_EXPORT, new TypeError("Load failed"));
+      console.error(
+        "Failed to send telemetry to https://ingress.us-west-2.aws.dash0.com/v1/traces:",
+        new TypeError("Failed to fetch"),
+      );
+      console.error(new TypeError("Load failed"));
+
+      await Sentry.flush(2000);
+
+      expect(kept).toEqual(["Load failed"]);
+    } finally {
+      await client?.close(0);
+    }
+  });
+});
+
 describe("captureConsole editor clipboard denials", () => {
   it("drops the denial Sentry builds from a logged editor error", async () => {
     const kept: string[][] = [];
