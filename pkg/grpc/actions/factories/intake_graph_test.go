@@ -295,7 +295,6 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		prompt, ok := steps[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "Refine Task", prompt["name"])
-		assert.Contains(t, prompt["prompt"], runner.PlanningSessionUserPromptMarkdown())
 		assert.NotContains(t, prompt["prompt"], runner.PlanningSessionProtocolMarkdown())
 		assert.Contains(t, prompt["prompt"], "{{ root().data.workOrder }}")
 
@@ -348,7 +347,6 @@ func Test__BuildBacklogCanvas(t *testing.T) {
 		prompt, ok := steps[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "Refine Task", prompt["name"])
-		assert.Contains(t, prompt["prompt"], runner.PlanningSessionUserPromptMarkdown())
 		assert.Contains(t, prompt["prompt"], "{{ root().data.workOrder }}")
 	})
 }

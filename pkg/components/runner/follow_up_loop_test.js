@@ -19,6 +19,7 @@ const {
   persistAnalysisContinuation,
   runLoop,
   runPromptFile,
+  writePrompt,
   safeWaitRequest,
   signedFileURLs,
 } = require("./follow_up_loop.js");
@@ -761,6 +762,34 @@ test("runPromptFile forwards extra argv to run.js", async () => {
   const recorded = JSON.parse(fs.readFileSync(argvFile, "utf8"));
   assert.deepEqual(recorded.argv, [promptFile, "openai/gpt-4.1", "64"]);
   assert.equal(recorded.rewind, "yes");
+});
+
+test("follow-up prompt files retain project instructions on every rewind", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-instructions-"));
+  try {
+    const received = path.join(taskDir, "received.json");
+    fs.writeFileSync(path.join(taskDir, "run.js"), `
+      const fs = require("node:fs");
+      fs.writeFileSync(${JSON.stringify(received)}, JSON.stringify({
+        prompt: fs.readFileSync(process.argv[2], "utf8"),
+        rewind: process.env.SUPERPLANE_ANALYSIS_REWIND,
+      }));
+    `);
+    const instructions = "Additional instructions for this automation:\nSupport legacy annual plans. Keep {{ example }} literal.";
+    fs.writeFileSync(path.join(taskDir, "planning_additional_instructions.md"), instructions);
+    for (const text of ["Narrow the plan", "Now update the scores"]) {
+      const file = writePrompt(taskDir, text);
+      assert.equal(await runPromptFile(taskDir, file, ""), 0);
+      const actual = JSON.parse(fs.readFileSync(received, "utf8"));
+      assert.equal(actual.rewind, "yes");
+      assert.equal(actual.prompt, `${text}\n\n${instructions}\n`);
+    }
+    fs.unlinkSync(path.join(taskDir, "planning_additional_instructions.md"));
+    const file = writePrompt(taskDir, "No additional requirements");
+    assert.equal(fs.readFileSync(file, "utf8"), "No additional requirements\n");
+  } finally {
+    fs.rmSync(taskDir, { recursive: true, force: true });
+  }
 });
 
 const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);

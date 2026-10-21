@@ -70,10 +70,10 @@ func PlanningSessionProtocolMarkdown() string {
 	return strings.TrimSpace(analysisProtocolReviewMarkdown)
 }
 
-// PlanningSessionUserPromptMarkdown is the Refine Task prompt: tone, the
-// 1 through 3 sub-parameters, and plan shape. Built-in Planning uses this
-// managed definition. User additions are stored in additionalInstructions.
-// Existing canvases receive template changes through admin reset.
+// PlanningSessionUserPromptMarkdown provides the full refinement instructions
+// for the system skill. Runners inject the planning protocol separately; the
+// built-in canvas prompt only supplies the task. User additions are stored in
+// additionalInstructions and appended at dispatch.
 func PlanningSessionUserPromptMarkdown() string {
 	return strings.TrimSpace(analysisUserPromptReviewMarkdown)
 }
@@ -141,6 +141,13 @@ func FollowUpLoopFile() BrokerTaskFile {
 func AppendPlanningSessionContinuation(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, files []BrokerTaskFile) []BrokerTaskFile {
 	if !HasPlanningSessionToken(environment) {
 		return files
+	}
+	// Follow-up turns start fresh agent conversations. Keep project instructions
+	// in a separate task file so every turn receives them, even without rewind text.
+	if instructions := additionalInstructionsText(ctx.Configuration); instructions != "" {
+		files = appendUniqueTaskFiles(files, BrokerTaskFile{
+			Path: "planning_additional_instructions.md", Content: instructions, Mode: "0644",
+		})
 	}
 	if file := PlanningSessionContinuationFile(ctx); file != nil {
 		return append(files, *file)
