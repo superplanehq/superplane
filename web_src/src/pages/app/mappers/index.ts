@@ -147,6 +147,7 @@ import {
   eventStateRegistry as bitbucketEventStateRegistry,
 } from "./bitbucket/index";
 import { componentMappers as coolifyComponentMappers } from "./coolify/index";
+import { componentMappers as dokployComponentMappers } from "./dokploy/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import {
   componentMappers as jfrogArtifactoryComponentMappers,
@@ -379,6 +380,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   coolify: coolifyComponentMappers,
+  dokploy: dokployComponentMappers,
   hetzner: hetznerComponentMappers,
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,

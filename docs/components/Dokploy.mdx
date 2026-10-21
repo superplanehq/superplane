@@ -1,0 +1,116 @@
+---
+title: "Dokploy"
+---
+
+List Dokploy applications and trigger deployments
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Deploy Application" href="#deploy-application" description="Queue a deployment for a Dokploy application (fire-and-forget)" />
+  <LinkCard title="List Applications" href="#list-applications" description="List all applications visible to the Dokploy API key" />
+</CardGrid>
+
+## Instructions
+
+**Setup steps:**
+
+1. **Base URL:** Use your Dokploy instance URL (for example `https://dokploy.example.com`). Dokploy is self-hosted, so this is the address of your own server.
+2. **API Key:** In Dokploy, go to **Settings → API/CLI** and generate a new API key, then copy it.
+3. The API key inherits the permissions of the user that created it, so SuperPlane only sees the projects and applications that user can access.
+
+<a id="deploy-application"></a>
+
+## Deploy Application
+
+**Component key:** `dokploy.deployApplication`
+
+The Deploy Application component queues a deployment for a Dokploy application. It does not wait for the deployment to finish. The execution emits as soon as Dokploy accepts the request.
+
+### How It Works
+
+1. Calls `POST /api/application.deploy` on the configured Dokploy instance with the selected application
+2. Emits the queued deployment metadata on the default output channel and finishes immediately
+
+Dokploy adds the deployment to a queue and returns no deployment identifier, so there is nothing to poll for here. Watch the deployment in Dokploy, or gate later steps on your application's own health check.
+
+### Configuration
+
+- **Application**: The Dokploy application to deploy
+- **Title**: Optional label recorded against the deployment in Dokploy's log. Dokploy records "Manual deployment" when this is empty.
+- **Description**: Optional longer note recorded alongside the title
+
+### Output
+
+A `dokploy.application.deploy.queued` payload with `applicationId`, and `title` / `description` when set.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "l9xKq2mP4vRt7nB",
+    "description": "Queued by SuperPlane",
+    "title": "Release v1.4.0"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "dokploy.application.deploy.queued"
+}
+```
+
+<a id="list-applications"></a>
+
+## List Applications
+
+**Component key:** `dokploy.listApplications`
+
+The List Applications component fetches every application available to the Dokploy API key and emits the list on the default output channel.
+
+### How It Works
+
+1. Calls `GET /api/project.all` on the configured Dokploy instance
+2. Flattens the returned projects, which nest applications under environments, into a single list
+3. Emits the array of applications, each with `applicationId`, `name`, `status`, and the `project` and `environment` it belongs to
+
+Dokploy exposes no endpoint that lists applications directly, so they are read through their projects. Application names are only unique within an environment, which is why the project and environment are included on every entry.
+
+### Use Cases
+
+- Iterate over every application with a downstream `forEach` to act on each
+- Filter applications by status before deploying
+- Resolve an application's ID by name for use in later steps
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applications": [
+      {
+        "applicationId": "l9xKq2mP4vRt7nB",
+        "environment": "production",
+        "environmentId": "eV6bN4jH9sDf2Kl",
+        "name": "web",
+        "project": "storefront",
+        "projectId": "pR3tYw8kLm1QzXc",
+        "status": "done"
+      },
+      {
+        "applicationId": "a2WgT5cZ8yUi3oE",
+        "environment": "production",
+        "environmentId": "eV6bN4jH9sDf2Kl",
+        "name": "api",
+        "project": "storefront",
+        "projectId": "pR3tYw8kLm1QzXc",
+        "status": "idle"
+      }
+    ],
+    "count": 2
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "dokploy.applications.listed"
+}
+```
+
