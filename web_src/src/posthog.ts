@@ -20,6 +20,8 @@ export function initPostHog(win: PostHogWindow = posthogWindow()): boolean {
     api_host: "https://us.i.posthog.com",
     autocapture: false,
     capture_pageview: false,
+    capture_pageleave: false,
+    disable_session_recording: true,
     person_profiles: "always",
   });
   initializeUtmAttribution(posthog);

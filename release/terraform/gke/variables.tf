@@ -153,9 +153,9 @@ variable "superplane_chart_path" {
 }
 
 variable "superplane_chart_version" {
-  description = "Published SuperPlane Helm chart version, for example 1.0.0-rc1. Required when superplane_chart_path is empty. Chart versions 0.30.0 and lower are the previous chart line."
+  description = "Published SuperPlane Helm chart version, for example 1.0.0-rc3. Required when superplane_chart_path is empty. Chart versions 0.30.0 and lower are the previous chart line."
   type        = string
-  default     = "1.0.0-rc1"
+  default     = "1.0.0-rc3"
 }
 
 # -----------------------------------------------------------------------------

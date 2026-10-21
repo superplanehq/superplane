@@ -104,9 +104,6 @@ function CatalogEmpty({ catalog, styles }: { catalog: CatalogState; styles: Cata
       <p className={styles.emptyTitle}>
         {catalog.integrationCatalog.length === 0 ? "No integrations available." : "No integrations match your filter."}
       </p>
-      {catalog.isIntegrationSurveyActive ? (
-        <RequestIntegrationLink catalog={catalog} className={styles.requestWrap} styles={styles} />
-      ) : null}
     </div>
   );
 }
@@ -131,9 +128,6 @@ function CatalogList({
           styles={styles}
         />
       ))}
-      {catalog.isIntegrationSurveyActive ? (
-        <RequestIntegrationLink catalog={catalog} className={styles.footerRequest} styles={styles} />
-      ) : null}
     </div>
   );
 }
@@ -261,25 +255,6 @@ function CatalogInstanceRow({
         </PermissionTooltip>
       </div>
     </div>
-  );
-}
-
-function RequestIntegrationLink({
-  catalog,
-  className,
-  styles,
-}: {
-  catalog: CatalogState;
-  className: string;
-  styles: CatalogStyles;
-}) {
-  return (
-    <p className={className}>
-      {styles.requestPrompt}
-      <button type="button" onClick={catalog.handleRequestIntegration} className={styles.requestButton}>
-        Request it
-      </button>
-    </p>
   );
 }
 

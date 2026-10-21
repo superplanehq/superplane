@@ -165,6 +165,10 @@ type factoryTemplateInput struct {
 	integrations          map[string]factoryTemplateIntegration
 	agent                 *factoryTemplateAgent
 	includeVisualEvidence *bool
+	agentSettings         map[string]*factoryAgentSettings
+	triggerSettings       *factoryTriggerSettings
+	pullRequestSettings   map[string]any
+	mergeCheckSteps       any
 }
 
 type factoryTemplateIntegration struct {
@@ -243,10 +247,23 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	}
 	if template.id == "risk-score" {
 		filterDisabledMergeChecks(canvas, params["enabledChecks"])
+		if input.mergeCheckSteps != nil {
+			for i := range canvas.Spec.Nodes {
+				node := &canvas.Spec.Nodes[i]
+				if isFactoryAgentHarness(node.Component) {
+					if err := configureMergeConfidenceChecks(node, input.mergeCheckSteps); err != nil {
+						return nil, &BuiltInAutomationSettingsError{cause: err}
+					}
+				}
+			}
+		}
 	}
 
 	if template.id == scheduledIntakeTemplateID {
 		if err := configureScheduledIntake(canvas, template.provider, params); err != nil {
+			if input.triggerSettings != nil {
+				return nil, &BuiltInAutomationSettingsError{cause: err}
+			}
 			return nil, err
 		}
 	}
@@ -362,6 +379,15 @@ func wireFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate, input
 		rewriteFactoryAgent(node, input.agent)
 		if template.id == "line-implementation" {
 			applyFactoryVisualEvidence(node, input.includeVisualEvidence)
+		}
+		if settings := input.agentSettings[node.ID]; settings != nil {
+			*node = settings.configure(*node)
+		}
+		if node.ID == template.entrypointNodeID {
+			*node = input.triggerSettings.configure(*node)
+		}
+		if node.Component == "github.createPullRequest" || node.Component == "bitbucket.createPullRequest" {
+			maps.Copy(node.Configuration, input.pullRequestSettings)
 		}
 		if node.Component == "runApp" && configString(node.Configuration, "app") == input.appID {
 			node.Metadata = maps.Clone(node.Metadata)
@@ -541,6 +567,7 @@ func deriveFactoryTemplateInput(
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
 	template factoryAppTemplate,
+	settings *factoryAutomationSettings,
 ) factoryTemplateInput {
 	includeVisualEvidence := canvasAgentIncludesVisualEvidence(version.Nodes)
 	input := factoryTemplateInput{
@@ -551,9 +578,21 @@ func deriveFactoryTemplateInput(
 		agent:                 resetFactoryTemplateAgent(tx, factory, version.Nodes),
 		includeVisualEvidence: &includeVisualEvidence,
 	}
+	if settings != nil {
+		input.agentSettings = settings.agents
+		input.triggerSettings = settings.triggers[template.entrypointNodeID]
+		input.pullRequestSettings = settings.pullRequests["create-pr"]
+		if template.id == "risk-score" {
+			input.mergeCheckSteps = settings.agentSteps["assess-risk"]
+		}
+	}
+
 	if template.id == scheduledIntakeTemplateID {
 		config := factory.OnboardingConfigValue()
 		input.installParams["appRepository"] = config.AppRepository
+		if settings != nil {
+			input.installParams["prompt"] = scheduledIntakePromptFromSteps(settings.agentSteps["scheduled-agent"])
+		}
 		for _, node := range version.Nodes {
 			if node.ComponentName() == "schedule" {
 				for _, key := range []string{"type", "hour", "minute", "timezone", "cronExpression"} {
@@ -733,6 +772,7 @@ func materializeIntakeDefaults(
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
 	intake *models.FactoryIntake,
+	savedSettings *factoryAutomationSettings,
 ) (*materializedFactoryTemplate, error) {
 	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 	graph := resolveIntakeGraph(intake.Source, spec)
@@ -758,32 +798,58 @@ func materializeIntakeDefaults(
 		}
 	}
 
-	defaults, err := buildIntakeCanvas(intakeCanvasRequest{
+	settings := intakeSettingsFromGraph(intake.Source, graph, spec)
+	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+		settings = deriveGitHubIssueListening(settings)
+	}
+	request := intakeCanvasRequest{
 		OrganizationID: canvas.OrganizationID,
 		FactoryID:      intake.FactoryID,
 		Source:         intake.Source,
 		Name:           canvas.Name,
 		Binding:        binding,
-	})
+	}
+	if savedSettings != nil {
+		request.Settings = settings
+	}
+	defaults, err := buildIntakeCanvas(request)
 	if err != nil {
 		return nil, err
 	}
-	settings := intakeSettingsFromGraph(intake.Source, graph, spec)
-	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
-		settings = deriveGitHubIssueListening(settings)
-	}
-	for i := range defaults.Spec.Nodes {
-		node := &defaults.Spec.Nodes[i]
-		if node.ID == intakeFilterNodeID {
-			node.Configuration["expression"] = intakeFilterExpressionFor(intake.Source, settings)
-		}
-		if node.ID == intakeTriggerNodeID {
-			if intake.Source == models.FactoryIntakeSourceGitHubIssues {
-				node.Configuration["actions"] = intakeTriggerActionsFor(settings)
+	if savedSettings == nil {
+		// The editor action historically keeps intake filters and GitHub event
+		// choices, but otherwise restores the template-generated defaults.
+		for i := range defaults.Spec.Nodes {
+			node := &defaults.Spec.Nodes[i]
+			if node.ID == intakeFilterNodeID {
+				node.Configuration["expression"] = intakeFilterExpressionFor(intake.Source, settings)
 			}
-			node.Metadata = models.FactoryAppTemplateMetadata("intake:"+intake.Source, factoryTemplateVersion)
+			if node.ID == intakeTriggerNodeID {
+				if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+					node.Configuration["actions"] = intakeTriggerActionsFor(settings)
+				}
+				node.Metadata = models.FactoryAppTemplateMetadata("intake:"+intake.Source, factoryTemplateVersion)
+			}
 		}
 	}
+	if savedSettings != nil && intake.Source == models.FactoryIntakeSourceGitHubIssues && settings.AuthorsWithAccess {
+		// Use the same access gate as intake creation and configuration saves.
+		nodes, edges, err := applyDefaultAuthorAccess(request, defaults.Nodes(), defaults.Edges())
+		if err != nil {
+			return nil, &BuiltInAutomationSettingsError{cause: fmt.Errorf("restore intake author-access filter: %w", err)}
+		}
+		encoded, err := yaml.VersionToCanvasYAML(defaults.Metadata.Name, defaults.Metadata.Description, &models.CanvasVersion{Nodes: nodes, Edges: edges})
+		if err != nil {
+			return nil, err
+		}
+		defaults, err = yaml.CanvasFromYAML([]byte(encoded))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	stampFactoryTemplateMetadata(defaults, intakeTriggerNodeID, "intake:"+intake.Source)
+
 	defaults.Metadata.ID = canvas.ID.String()
 	encoded, err := goyaml.Marshal(defaults)
 	if err != nil {
@@ -800,12 +866,28 @@ func materializeBacklogDefaults(
 	factory *models.Factory,
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
+	savedSettings *factoryAutomationSettings,
 ) (*materializedFactoryTemplate, error) {
+	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+	var agentSettings *factoryAgentSettings
+	var triggerSettings *factoryTriggerSettings
+	if savedSettings != nil {
+		savedAgent, err := backlogAgentNode(spec)
+		if err != nil {
+			return nil, &BuiltInAutomationSettingsError{cause: err}
+		}
+		if savedAgent != nil {
+			agentSettings = savedSettings.agents[savedAgent.ID]
+		}
+		triggerSettings = savedSettings.triggers[onWorkOrderNodeIDFromSpec(spec)]
+	}
 	defaults := buildBacklogCanvas(backlogCanvasRequest{
-		Name:        canvas.Name,
-		Agent:       resetFactoryIntakeAgent(tx, factory, version.Nodes),
-		VCSName:     resolveVCSInstallationName(tx, factory),
-		VCSProvider: factoryVCSProviderOrDefault(factory),
+		AgentSettings:   agentSettings,
+		TriggerSettings: triggerSettings,
+		Name:            canvas.Name,
+		Agent:           resetFactoryIntakeAgent(tx, factory, version.Nodes),
+		VCSName:         resolveVCSInstallationName(tx, factory),
+		VCSProvider:     factoryVCSProviderOrDefault(factory),
 	})
 	defaults.Metadata.ID = canvas.ID.String()
 	for i := range defaults.Spec.Nodes {
@@ -868,6 +950,7 @@ func materializePRFeedbackDefaults(
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
 	handler *models.FactoryPRFeedbackHandler,
+	savedSettings *factoryAutomationSettings,
 ) (*materializedFactoryTemplate, error) {
 	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 	graph := resolvePRFeedbackGraph(spec)
@@ -885,6 +968,8 @@ func materializePRFeedbackDefaults(
 		Binding:                resolvePRFeedbackBinding(tx, factory, settings.Repository),
 		Agent:                  resetFactoryIntakeAgent(tx, factory, version.Nodes),
 		VCSProvider:            factoryVCSProviderOrDefault(factory),
+		AgentSettings:          prFeedbackAgentSettingsFromGraph(graph, spec, savedSettings),
+		TriggerSettings:        prFeedbackTriggerSettingsFromGraph(graph, savedSettings),
 	}
 	omitIdentity := false
 	if factory.OrganizationID != uuid.Nil {
@@ -972,16 +1057,17 @@ func materializeNonIntakeFactoryAppDefaults(
 	factory *models.Factory,
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
+	savedSettings *factoryAutomationSettings,
 ) (*materializedFactoryTemplate, error) {
 	handler, err := models.FindPRFeedbackHandlerByCanvasID(tx, canvas.ID)
 	if err != nil {
 		return nil, err
 	}
 	if handler != nil && handler.FactoryID == factory.ID {
-		return materializePRFeedbackDefaults(tx, factory, canvas, version, handler)
+		return materializePRFeedbackDefaults(tx, factory, canvas, version, handler, savedSettings)
 	}
 	if onWorkOrderNodeIDFromSpec(models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}) != "" {
-		return materializeBacklogDefaults(tx, factory, canvas, version)
+		return materializeBacklogDefaults(tx, factory, canvas, version, savedSettings)
 	}
 	resolved, ok := resolveFactoryTemplate(version.Nodes)
 	if !ok {
@@ -992,6 +1078,6 @@ func materializeNonIntakeFactoryAppDefaults(
 	return materializeFactoryTemplate(
 		resolved.id,
 		resolved.provider,
-		deriveFactoryTemplateInput(tx, factory, canvas, version, resolved),
+		deriveFactoryTemplateInput(tx, factory, canvas, version, resolved, savedSettings),
 	)
 }

@@ -103,6 +103,14 @@ func (c *RunCodex) Configuration() []configuration.Field {
 	}
 }
 
+func (c *RunCodex) ValidateNodeConfiguration(config map[string]any) error {
+	spec, err := decodeRunCodexSpec(config)
+	if err != nil {
+		return err
+	}
+	return validateRunCodexSpec(spec)
+}
+
 func (c *RunCodex) Setup(ctx core.SetupContext) error {
 	spec, err := decodeRunCodexSpec(ctx.Configuration)
 	if err != nil {

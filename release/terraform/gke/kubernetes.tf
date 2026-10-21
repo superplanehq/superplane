@@ -63,7 +63,7 @@ resource "kubernetes_secret" "jwt" {
 }
 
 # -----------------------------------------------------------------------------
-# Encryption Key Secret
+# Encryption Master Key Secret
 # -----------------------------------------------------------------------------
 
 resource "kubernetes_secret" "encryption" {
@@ -73,7 +73,7 @@ resource "kubernetes_secret" "encryption" {
   }
 
   data = {
-    ENCRYPTION_KEY = random_password.encryption_key.result
+    ENCRYPTION_MASTER_KEYS = "env://initial:${base64encode(random_password.encryption_key.result)}"
   }
 }
 

@@ -645,6 +645,11 @@ resource "helm_release" "superplane" {
   }
 
   set {
+    name  = "encryption.writeFormat"
+    value = "versioned"
+  }
+
+  set {
     name  = "oidc.secretName"
     value = "superplane-oidc"
   }

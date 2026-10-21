@@ -8,6 +8,7 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"gorm.io/gorm"
 )
 
@@ -48,6 +49,7 @@ func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
 	factoriesByID := map[string]*models.Factory{}
 	for i := range pullRequests {
 		pullRequest := &pullRequests[i]
+		wasMerged := pullRequest.State == models.FactoryPullRequestStateMerged
 		factory := factoriesByID[pullRequest.FactoryID.String()]
 		if factory == nil {
 			loaded, findErr := models.FindFactory(db, pullRequest.OrganizationID, pullRequest.FactoryID)
@@ -59,6 +61,7 @@ func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
 			factoriesByID[factory.ID.String()] = factory
 		}
 
+		automation := githubCloseAutomation(payload, merged)
 		outcome, err := applyGitHubPullRequestClosed(
 			db,
 			factory,
@@ -66,14 +69,45 @@ func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
 			merged,
 			mergedAt,
 			closedAt,
-			githubCloseAutomation(payload, merged),
+			automation,
 		)
 		if err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to close work order for pull request %s", pullRequest.ID)
 			continue
 		}
+		identity := ""
+		if automation != nil {
+			identity = automation.AppName
+		}
+		if merged && !wasMerged {
+			captureExternalFactoryProductEvent(
+				db,
+				factory,
+				pullRequest.WorkOrderID,
+				productanalytics.EventFactoryTaskMerged,
+				productanalytics.StableEventID(productanalytics.EventFactoryTaskMerged, pullRequest.ID.String()),
+				models.ProviderGitHub,
+				identity,
+				productanalytics.Properties{
+					"provider":     models.ProviderGitHub,
+					"merge_source": "vcs_webhook",
+				},
+			)
+		}
 		if outcome == nil || !outcome.closed {
 			continue
+		}
+		if !merged {
+			captureExternalFactoryProductEvent(
+				db,
+				factory,
+				pullRequest.WorkOrderID,
+				productanalytics.EventFactoryTaskRejected,
+				productanalytics.StableEventID(productanalytics.EventFactoryTaskRejected, pullRequest.WorkOrderID.String(), models.FactoryWorkOrderResultPRClosed),
+				models.ProviderGitHub,
+				identity,
+				productanalytics.Properties{"rejection_source": "pull_request_closed"},
+			)
 		}
 		publishWorkOrderClosed(
 			factory.OrganizationID,

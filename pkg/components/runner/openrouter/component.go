@@ -107,6 +107,14 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 	}
 }
 
+func (c *RunOpenRouter) ValidateNodeConfiguration(config map[string]any) error {
+	spec, err := decodeRunOpenRouterSpec(config)
+	if err != nil {
+		return err
+	}
+	return validateRunOpenRouterSpec(spec)
+}
+
 func (c *RunOpenRouter) Setup(ctx core.SetupContext) error {
 	spec, err := decodeRunOpenRouterSpec(ctx.Configuration)
 	if err != nil {

@@ -50,7 +50,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 				{Channel: "default", SourceID: prFeedbackStopWaitingNodeID, TargetID: prFeedbackRecordTimeoutNodeID},
 			},
 			Nodes: []yaml.Node{
-				{
+				request.TriggerSettings[prFeedbackPullRequestTriggerNodeID].configure(yaml.Node{
 					ID:        prFeedbackPullRequestTriggerNodeID,
 					Name:      "On Pull Request",
 					Type:      yaml.NodeTypeTrigger,
@@ -62,7 +62,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					},
 					Integration: request.Binding.integrationRef(),
 					Position:    yaml.Position{X: 80, Y: 260},
-				},
+				}),
 				{
 					ID:        prFeedbackActivityNodeID,
 					Name:      "Add Pull Request Activity",
@@ -108,14 +108,14 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					},
 					Position: yaml.Position{X: 820, Y: 260},
 				},
-				{
+				request.AgentSettings[prFeedbackRunnerNodeID].configure(yaml.Node{
 					ID:            prFeedbackRunnerNodeID,
 					Name:          "Fix Failed Checks",
 					Type:          yaml.NodeTypeAction,
 					Component:     request.Agent.component(),
 					Configuration: prFeedbackChecksRunnerConfiguration(request),
 					Position:      yaml.Position{X: 1000, Y: 260},
-				},
+				}),
 				{
 					ID:        prFeedbackPauseFixesNodeID,
 					Name:      "Pause Automatic Fixes",
