@@ -389,6 +389,20 @@ func TestAdminCatalogPlanAssignment(t *testing.T) {
 	require.True(t, found, "private catalog plan must be listed")
 
 	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+	previous, err := models.ResolveOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	catalog.RequirePaymentMethod = true
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	response = execRequest(server, requestParams{method: "PUT", path: path, authCookie: token, body: []byte(`{"plan":"support_plan"}`), contentType: "application/json"})
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	require.Contains(t, response.Body.String(), "Plans that require a payment method cannot be assigned by an admin")
+	unchanged, err := models.ResolveOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, previous.PlanID, unchanged.PlanID)
+	require.Equal(t, previous.PlanSource, unchanged.PlanSource)
+
+	catalog.RequirePaymentMethod = false
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
 	response = execRequest(server, requestParams{method: "PUT", path: path, authCookie: token, body: []byte(`{"plan":"support_plan"}`), contentType: "application/json"})
 	require.Equal(t, http.StatusOK, response.Code)
 	var saved map[string]any

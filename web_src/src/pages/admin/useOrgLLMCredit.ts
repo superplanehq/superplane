@@ -19,7 +19,7 @@ export type OrganizationLLMCredit = {
   warning: boolean;
 };
 
-export type BillingCatalogPlan = { key: string; name: string };
+export type BillingCatalogPlan = { key: string; name: string; require_payment_method: boolean };
 
 export type OrganizationBillingPlan = {
   catalog_key?: string;
@@ -231,7 +231,13 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
   const clearPlan = useCallback(() => setPlan(null), []);
 
   const savePlan = async () => {
-    if (catalogError || !catalog.some((entry) => entry.key === planValue && entry.key !== "business_legacy")) return;
+    if (
+      catalogError ||
+      !catalog.some(
+        (entry) => entry.key === planValue && entry.key !== "business_legacy" && !entry.require_payment_method,
+      )
+    )
+      return;
     if (planValue === "trial" && !isFutureUtcTrialEnd(trialEndsOn)) {
       return;
     }

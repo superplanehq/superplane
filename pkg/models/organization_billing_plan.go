@@ -243,6 +243,9 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 	if err != nil {
 		return nil, ErrInvalidBillingPlan
 	}
+	if catalog.RequirePaymentMethod {
+		return nil, errors.New("Plans that require a payment method cannot be assigned by an admin")
+	}
 	planName = catalog.ResponsePlan()
 
 	var saved *OrganizationBillingPlan

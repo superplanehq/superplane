@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export const ADMIN_POLAR_MANAGED_PLAN_COPY =
   "This organization uses Polar for billing. Cancel or change the subscription in Polar.";
-export const ADMIN_LOCAL_PLAN_COPY = "Select a catalog plan. Business subscriptions are managed in Polar.";
+export const ADMIN_LOCAL_PLAN_COPY = "Select a plan without a payment requirement. Manage paid subscriptions in Polar.";
 export const ADMIN_PLAN_UNKNOWN_COPY = "SuperPlane could not load the billing plan. Refresh the page and try again.";
 export const ADMIN_SET_BALANCE_HELP_COPY =
   "Enter the new remaining balance. SuperPlane adds the difference to the credit history as an adjustment.";
@@ -102,7 +102,11 @@ function OrgBillingPlanField(args: {
         </SelectTrigger>
         <SelectContent>
           {args.catalog.map((plan) => (
-            <SelectItem key={plan.key} value={plan.key} disabled={plan.key === "business_legacy"}>
+            <SelectItem
+              key={plan.key}
+              value={plan.key}
+              disabled={plan.key === "business_legacy" || plan.require_payment_method}
+            >
               {plan.name}
             </SelectItem>
           ))}
@@ -145,7 +149,13 @@ function OrgBillingPlanField(args: {
           className="mt-3"
           data-testid="admin-org-billing-plan-save"
           onClick={args.savePlan}
-          disabled={args.savingPlan || catalogLocked || args.planValue === "business_legacy"}
+          disabled={
+            args.savingPlan ||
+            catalogLocked ||
+            args.catalog.some(
+              (plan) => plan.key === args.planValue && (plan.key === "business_legacy" || plan.require_payment_method),
+            )
+          }
         >
           {args.savingPlan ? "Saving..." : "Save plan"}
         </Button>

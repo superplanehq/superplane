@@ -46,11 +46,11 @@ const credit: OrganizationLLMCredit = {
 };
 
 const catalog = [
-  { key: "trial", name: "Trial", category: "trial" },
-  { key: "business_legacy", name: "Business", category: "paid" },
-  { key: "business_manual", name: "Business Manual", category: "paid" },
-  { key: "pay_as_you_go", name: "Pay-as-you-go", category: "paid" },
-  { key: "none", name: "None", category: "none" },
+  { key: "trial", name: "Trial", category: "trial", require_payment_method: false },
+  { key: "business_legacy", name: "Business", category: "paid", require_payment_method: true },
+  { key: "business_manual", name: "Business Manual", category: "paid", require_payment_method: false },
+  { key: "pay_as_you_go", name: "Pay-as-you-go", category: "paid", require_payment_method: true },
+  { key: "none", name: "None", category: "none", require_payment_method: false },
 ];
 
 const grants = [
@@ -138,20 +138,21 @@ afterEach(() => {
 });
 
 describe("OrgLLMCreditSection billing plan", () => {
-  it("selects and saves a catalog plan by its key", async () => {
+  it("disables plans that require payment and saves a manual plan", async () => {
     const fetchMock = mockOrgCreditFetch();
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
 
     await user.click(await screen.findByTestId("admin-org-billing-plan"));
     expect(await screen.findByRole("option", { name: "Business" })).toHaveAttribute("aria-disabled", "true");
-    await user.click(screen.getByRole("option", { name: "Pay-as-you-go" }));
+    expect(screen.getByRole("option", { name: "Pay-as-you-go" }).getAttribute("aria-disabled")).toBe("true");
+    await user.click(screen.getByRole("option", { name: "Business Manual" }));
     await user.click(screen.getByTestId("admin-org-billing-plan-save"));
 
     await waitFor(() => {
       const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
       expect(String(put?.[0])).toBe("/admin/api/organizations/org-1/billing-plan");
-      expect(JSON.parse(String(put?.[1]?.body))).toEqual({ plan: "pay_as_you_go" });
+      expect(JSON.parse(String(put?.[1]?.body))).toEqual({ plan: "business_manual" });
     });
   });
 
