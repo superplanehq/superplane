@@ -6,23 +6,6 @@ Manage and react to changes in your GitHub repositories
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-## GitHub Enterprise Cloud
-
-SuperPlane can connect to GitHub Enterprise Cloud on `ghe.com` when the
-`github_enterprise` organization feature is on. The GitHub integration stays
-`github`. An empty host is github.com.
-
-Connect with an organization owner. Create a GitHub App on that organization.
-SuperPlane does not use GitHub Enterprise login or the hosted SuperPlane app
-for this host.
-
-If the GitHub organization uses an IP allow list, add the SuperPlane egress
-addresses. SuperPlane does not publish a fixed IP list in this document.
-Self-host operators set `githubEnterprise.allowedHosts` and an optional CA
-bundle. See [GitHub Enterprise self-hosting](../self-hosting/github-enterprise.md).
-
-GitHub Enterprise Server is not available yet.
-
 ## Triggers
 
 <CardGrid>
