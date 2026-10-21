@@ -7,9 +7,11 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
@@ -29,6 +31,9 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
+
+	previousName := organization.Name
+	previousSlug := organization.Slug
 
 	if pbOrganization.Metadata.Name != "" {
 		organization.Name = pbOrganization.Metadata.Name
@@ -55,6 +60,17 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 
 		log.Errorf("Error updating organization %s: %v", orgID, err)
 		return nil, err
+	}
+
+	if organization.Name != previousName || organization.Slug != previousSlug {
+		accountID, _ := authentication.GetAccountIDFromMetadata(ctx)
+		productanalytics.IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity{
+			ID:        organization.ID.String(),
+			Name:      organization.Name,
+			Slug:      organization.Slug,
+			CreatedAt: organization.CreatedAt,
+			AccountID: accountID,
+		})
 	}
 
 	response := &pb.UpdateOrganizationResponse{
