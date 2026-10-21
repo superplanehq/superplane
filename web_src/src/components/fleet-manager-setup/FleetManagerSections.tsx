@@ -13,6 +13,7 @@ import {
   machineTypeChoices,
   type CloudFleetManagerProvider,
 } from "@/lib/fleetManagerSetup";
+import { singleHostInstall } from "@/lib/fleetManagerWizard";
 
 import { AwsProviderLogo, AzureProviderLogo, GcpProviderLogo, ThisVmLogo } from "./providerLogos";
 
@@ -194,18 +195,17 @@ export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetu
   const terraformNoteIdPrefix = useId();
   if (!setup.metadata || !setup.draft) return null;
   const terraformProvider = setup.metadata.infrastructureDefaults.provider;
-  const providers = PROVIDERS.filter(
-    (provider) => provider.id !== "docker" || setup.metadata?.installationType === "single-host",
-  );
+  const singleHost = singleHostInstall(setup.metadata.installationType);
+  const providers = PROVIDERS.filter((provider) => (singleHost ? provider.id === "docker" : provider.id !== "docker"));
+  const gridClass =
+    providers.length === 1
+      ? "grid max-w-xs grid-cols-1 gap-3"
+      : providers.length > 3
+        ? "grid grid-cols-2 gap-3 sm:grid-cols-4"
+        : "grid grid-cols-2 gap-3 sm:grid-cols-3";
 
   return (
-    <div
-      className={
-        providers.length > 3 ? "grid grid-cols-2 gap-3 sm:grid-cols-4" : "grid grid-cols-2 gap-3 sm:grid-cols-3"
-      }
-      role="radiogroup"
-      aria-label="Where runners run"
-    >
+    <div className={gridClass} role="radiogroup" aria-label="Where runners run">
       {providers.map(({ id, name, Logo }) => (
         <ProviderCard
           key={id}

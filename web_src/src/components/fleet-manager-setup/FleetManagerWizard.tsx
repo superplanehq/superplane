@@ -14,7 +14,12 @@ import {
   fleetManagerHelmCommand,
   fleetManagerValuesFileCommand,
 } from "@/lib/fleetManagerSetup";
-import type { FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
+import {
+  fleetProviderChoiceCopy,
+  omittedFleetWizardStep,
+  singleHostInstall,
+  type FleetManagerWizardStep,
+} from "@/lib/fleetManagerWizard";
 import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import { CheckCircle2, LoaderCircle, TriangleAlert } from "lucide-react";
 
@@ -67,12 +72,12 @@ function WizardActions({
 function ProviderStep({ setup, actions }: { setup: FleetManagerSetupState; actions: React.ReactNode }) {
   if (!setup.metadata || !setup.draft) return null;
 
+  const choice = fleetProviderChoiceCopy(singleHostInstall(setup.metadata.installationType));
+
   return (
     <div data-testid="fleet-manager-provider-step">
-      <FirstRunHeading headline="Choose where runners run" size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          Use this VM, or select the cloud account that will run fleet machines.
-        </p>
+      <FirstRunHeading headline={choice.title} size="display">
+        <p className="text-[15px] leading-6 text-muted-foreground">{choice.description}</p>
       </FirstRunHeading>
       <div className="mt-7">
         <FleetManagerProviderSection setup={setup} />
@@ -310,7 +315,26 @@ function usePrepareValuesCommand(step: FleetManagerWizardStep, setup: FleetManag
 }
 
 export function FleetManagerWizardScreen(props: WizardProps) {
-  usePrepareValuesCommand(props.step, props.setup);
+  const omittedStep = props.setup.metadata
+    ? omittedFleetWizardStep(props.step, props.setup.metadata.installationType)
+    : null;
+  usePrepareValuesCommand(omittedStep ?? props.step, props.setup);
+
+  if (props.setup.loadError) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        SuperPlane could not load Fleet Manager setup. Refresh the page and try again.
+      </p>
+    );
+  }
+  if (!props.setup.metadata || !props.setup.draft || omittedStep) {
+    return <p className="text-sm text-muted-foreground">Loading Fleet Manager setup...</p>;
+  }
+
+  return <FleetManagerWizardSteps {...props} />;
+}
+
+function FleetManagerWizardSteps(props: WizardProps) {
   const back = props.showBackButton ? props.onBack : undefined;
   const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
   const continueToNextStep = async () => {
@@ -335,17 +359,6 @@ export function FleetManagerWizardScreen(props: WizardProps) {
       )}
     </>
   );
-
-  if (props.setup.loadError) {
-    return (
-      <p role="alert" className="text-sm text-destructive">
-        SuperPlane could not load Fleet Manager setup. Refresh the page and try again.
-      </p>
-    );
-  }
-  if (!props.setup.metadata || !props.setup.draft) {
-    return <p className="text-sm text-muted-foreground">Loading Fleet Manager setup...</p>;
-  }
 
   if (props.step === "docker") return <DockerStep {...props} />;
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;

@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
 import { Button } from "@/components/ui/button";
 import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
-import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
+import {
+  FLEET_MANAGER_WIZARD_STEPS,
+  omittedFleetWizardStep,
+  singleHostInstall,
+  type FleetManagerWizardStep,
+} from "@/lib/fleetManagerWizard";
 import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import type { FirstRunChrome } from "@/pages/factories/pages/onboarding/first-run/firstRunTypes";
 import type { FirstRunSphereProps } from "@/pages/factories/pages/onboarding/first-run/FirstRunSpherePane";
@@ -181,6 +186,21 @@ function fleetManagerOrganizationId(slug: string | null) {
   return slug ?? "";
 }
 
+function useAlignFleetStep(
+  step: OwnerSetupStep,
+  installationType: string | undefined,
+  metadataLoaded: boolean,
+  goToStep: (step: OwnerSetupStep) => void,
+) {
+  useEffect(() => {
+    if (!metadataLoaded) return;
+    const active = fleetWizardStep(step);
+    if (!active) return;
+    const next = omittedFleetWizardStep(active, installationType);
+    if (next) goToStep(`fleet-${next}`);
+  }, [goToStep, installationType, metadataLoaded, step]);
+}
+
 function fleetWizardStep(step: OwnerSetupStep): FleetManagerWizardStep | null {
   if (!step.startsWith("fleet-") || step === "fleet-intro") return null;
   return step.slice("fleet-".length) as FleetManagerWizardStep;
@@ -223,7 +243,13 @@ function OwnerFleetSetupSteps({
 }) {
   if (!pendingOrganizationSlug) return null;
   if (step === "fleet-intro") {
-    return <FleetManagerStep onContinue={() => setStep("fleet-provider")} onSkip={finishInstallation} />;
+    return (
+      <FleetManagerStep
+        singleHost={singleHostInstall(fleetSetup.metadata?.installationType)}
+        onContinue={() => setStep("fleet-provider")}
+        onSkip={finishInstallation}
+      />
+    );
   }
   if (!activeFleetStep) return null;
 
@@ -296,7 +322,7 @@ const OwnerSetup: React.FC = () => {
   const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
   const activeFleetStep = fleetWizardStep(step);
   const fleetSetup = useFleetManagerSetup(
-    activeFleetStep !== null,
+    step === "fleet-intro" || activeFleetStep !== null,
     fleetManagerOrganizationId(pendingOrganizationSlug),
   );
   const saveSetupProgress = useQueuedSetupProgress();
@@ -349,6 +375,8 @@ const OwnerSetup: React.FC = () => {
     },
     [saveSetupProgress],
   );
+
+  useAlignFleetStep(step, fleetSetup.metadata?.installationType, fleetSetup.metadata != null, goToStep);
 
   const fleetStepIndex = activeFleetStep ? FLEET_MANAGER_WIZARD_STEPS.indexOf(activeFleetStep) : -1;
 

@@ -25,6 +25,7 @@ import {
   type FleetManagerSetupMetadata,
   type InstalledFleet,
 } from "@/lib/fleetManagerSetup";
+import { singleHostInstall } from "@/lib/fleetManagerWizard";
 
 const VERIFICATION_INTERVAL_MS = 5_000;
 const VERIFICATION_TIMEOUT_MS = 10 * 60_000;
@@ -79,7 +80,9 @@ function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDra
       : [];
   const restoredDraft = loadFleetManagerDraft();
   let draft = restoredDraft ? mergeTerraformInfrastructure(restoredDraft, metadata) : defaultDraft(metadata);
-  if (draft.provider === "docker" && metadata.installationType !== "single-host") {
+  if (singleHostInstall(metadata.installationType)) {
+    if (draft.provider !== "docker") draft = draftForProvider(draft, "docker", metadata);
+  } else if (draft.provider === "docker") {
     draft = draftForProvider(draft, "aws", metadata);
   }
   return pinSetupFleet({ ...draft, runnerVersion: installationRunnerVersion(metadata) }, metadata);

@@ -19,6 +19,7 @@ import {
   fleetManagerValuesFileCommand,
   type FleetManagerDraft,
 } from "@/lib/fleetManagerSetup";
+import { fleetProviderChoiceCopy, singleHostInstall } from "@/lib/fleetManagerWizard";
 
 function SectionCard({
   title,
@@ -92,6 +93,15 @@ function installSectionCopy(isDocker: boolean, draftIsValid: boolean) {
   };
 }
 
+function ProviderChoice({ setup }: { setup: FleetManagerSetupState }) {
+  const copy = fleetProviderChoiceCopy(singleHostInstall(setup.metadata?.installationType));
+  return (
+    <SectionCard title={copy.title} description={copy.description}>
+      <FleetManagerProviderSection setup={setup} />
+    </SectionCard>
+  );
+}
+
 function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
   const [submittedDraft, setSubmittedDraft] = useState<FleetManagerDraft | null>(null);
   const draft = setup.draft;
@@ -113,12 +123,7 @@ function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
 
   return (
     <div className="space-y-5">
-      <SectionCard
-        title="Choose where runners run"
-        description="Use this VM, or select the cloud account that will run fleet machines."
-      >
-        <FleetManagerProviderSection setup={setup} />
-      </SectionCard>
+      <ProviderChoice setup={setup} />
       {isDocker ? null : (
         <SectionCard
           title="Configure the default fleet"

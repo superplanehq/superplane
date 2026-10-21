@@ -7,7 +7,7 @@ import { FleetManagerProviderSection, type FleetManagerSetupState } from "./Flee
 function buildSetup({
   provider = "aws",
   terraformProvider = "aws",
-  installationType = "single-host",
+  installationType = "",
 }: { provider?: string; terraformProvider?: string; installationType?: string } = {}) {
   const setProvider = vi.fn();
   const setup = {
@@ -62,7 +62,7 @@ describe("FleetManagerProviderSection", () => {
     expect(screen.getAllByRole("tooltip")).toHaveLength(1);
   });
 
-  it("hides This VM unless the installation is single-host", () => {
+  it("hides This VM on a cloud installation", () => {
     const { setup } = buildSetup({ installationType: "" });
     render(<FleetManagerProviderSection setup={setup} />);
 
@@ -70,9 +70,19 @@ describe("FleetManagerProviderSection", () => {
     expect(screen.getByRole("button", { name: "AWS" })).toBeInTheDocument();
   });
 
+  it("shows only This VM on a single-host installation", () => {
+    const { setup } = buildSetup({ installationType: "single-host", provider: "docker" });
+    render(<FleetManagerProviderSection setup={setup} />);
+
+    expect(screen.getByRole("button", { name: "This VM" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "AWS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "GCP" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Azure" })).not.toBeInTheDocument();
+  });
+
   it("selects the provider on click", async () => {
     const user = userEvent.setup();
-    const { setup, setProvider } = buildSetup();
+    const { setup, setProvider } = buildSetup({ installationType: "single-host" });
     render(<FleetManagerProviderSection setup={setup} />);
 
     await user.click(screen.getByRole("button", { name: "This VM" }));
