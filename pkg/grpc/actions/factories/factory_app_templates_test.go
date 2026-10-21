@@ -514,6 +514,7 @@ func TestDeriveFactoryTemplateInputCarriesVisualEvidence(t *testing.T) {
 					},
 				}}},
 				mustFactoryAppTemplate(t, "line-implementation"),
+				nil,
 			)
 			require.NotNil(t, input.includeVisualEvidence)
 			assert.Equal(t, enabled, *input.includeVisualEvidence)
@@ -547,6 +548,7 @@ func TestCanvasAgentIncludesVisualEvidenceIgnoresUnrelatedRunners(t *testing.T) 
 		&models.Canvas{ID: uuid.New(), Name: "Implement"},
 		&models.CanvasVersion{Nodes: nodes},
 		mustFactoryAppTemplate(t, "line-implementation"),
+		nil,
 	)
 	require.NotNil(t, input.includeVisualEvidence)
 	assert.False(t, *input.includeVisualEvidence)
@@ -596,6 +598,7 @@ func TestMaterializePRFeedbackDefaultsRemovesSeparateEvidenceComment(t *testing.
 		&models.Canvas{ID: canvasID, Name: "Address PR feedback"},
 		&models.CanvasVersion{Nodes: current.Nodes(), Edges: current.Edges()},
 		&models.FactoryPRFeedbackHandler{Source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion},
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -631,6 +634,7 @@ func TestMaterializePRFeedbackChecksDefaultsKeepsVisualEvidence(t *testing.T) {
 		&models.Canvas{ID: canvasID, Name: "Fix pull request checks"},
 		&models.CanvasVersion{Nodes: current.Nodes(), Edges: current.Edges()},
 		&models.FactoryPRFeedbackHandler{Source: models.FactoryPRFeedbackHandlerSourcePullRequestChecks},
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -964,7 +968,7 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		Edges: current.Edges(),
 	}
 
-	result, err := materializeBacklogDefaults(nil, nil, canvas, version)
+	result, err := materializeBacklogDefaults(nil, nil, canvas, version, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "backlog", result.templateID)
 

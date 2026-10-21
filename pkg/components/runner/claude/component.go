@@ -114,6 +114,14 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 	}
 }
 
+func (c *RunClaudeCode) ValidateNodeConfiguration(config map[string]any) error {
+	spec, err := decodeRunClaudeCodeSpec(config)
+	if err != nil {
+		return err
+	}
+	return validateRunClaudeCodeSpec(spec)
+}
+
 func (c *RunClaudeCode) Setup(ctx core.SetupContext) error {
 	spec, err := decodeRunClaudeCodeSpec(ctx.Configuration)
 	if err != nil {
