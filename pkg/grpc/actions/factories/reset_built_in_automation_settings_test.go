@@ -255,9 +255,11 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 	cases := []struct {
 		source          string
 		restrictAuthors bool
+		paused          bool
 	}{
 		{source: models.FactoryIntakeSourceGitHubIssues},
 		{source: models.FactoryIntakeSourceGitHubIssues, restrictAuthors: true},
+		{source: models.FactoryIntakeSourceGitHubIssues, paused: true},
 		{source: models.FactoryIntakeSourceJiraIssues},
 		{source: models.FactoryIntakeSourceSentryExceptions},
 		{source: models.FactoryIntakeSourceDependabotAlerts},
@@ -271,6 +273,9 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		name := source
 		if tc.restrictAuthors {
 			name += "/authors-with-access"
+		}
+		if tc.paused {
+			name += "/paused"
 		}
 		t.Run(name, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
@@ -332,10 +337,15 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			intake, err := factory.CreateIntake(database.DB(t.Context()), canvas.ID, source)
 			require.NoError(t, err)
 			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			var paused *bool
+			if source == models.FactoryIntakeSourceGitHubIssues {
+				paused = &tc.paused
+			}
 			updated, err := UpdateFactoryIntake(ctx, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}, r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
-				FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), Settings: serializeIntakeSettings(source, settings),
+				FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), Settings: serializeIntakeSettings(source, settings), Paused: paused,
 			})
 			require.NoError(t, err)
+			assert.Equal(t, tc.paused, updated.Intake.GetPaused())
 			expected := updated.Intake.Settings
 			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceJiraIssues {
 				// The editor action historically retains filters, but restores
@@ -360,6 +370,10 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				}
 			}
 			require.NoError(t, resetTestOrganization(t, r))
+			listed, err := ListFactoryIntakes(ctx, r.Organization.ID.String(), &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+			require.NoError(t, err)
+			require.Len(t, listed.Intakes, 1)
+			assert.Equal(t, tc.paused, listed.Intakes[0].GetPaused())
 			version := resetTestLiveVersion(t, canvas)
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 			actual := intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
