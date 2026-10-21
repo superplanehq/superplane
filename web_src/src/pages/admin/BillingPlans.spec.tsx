@@ -1,0 +1,245 @@
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, expect, it, vi } from "bun:test";
+import { MemoryRouter } from "react-router";
+import { BillingPlans } from "./BillingPlans";
+
+vi.mock("@/lib/toast", () => ({ showErrorToast: vi.fn() }));
+afterEach(() => vi.unstubAllGlobals());
+
+it("creates a per-seat paid plan and explains deferred credit delivery", async () => {
+  const requests: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        requests.push(JSON.parse(String(init.body)));
+        return new Response("{}");
+      }
+      return new Response(
+        JSON.stringify(
+          String(input).endsWith("feature-definitions")
+            ? [{ key: "byo_key", label: "Bring your own API key", gated: false }]
+            : [],
+        ),
+      );
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole("button", { name: "Create plan" }));
+  expect(screen.getByRole("dialog", { name: "Create plan" })).toBeInTheDocument();
+  await user.type(screen.getByLabelText("Key"), "payg");
+  await user.type(screen.getByLabelText("Name"), "Pay as you go");
+  await user.type(screen.getByLabelText("Price (cents)", { exact: true }), "3000");
+  await user.click(screen.getByRole("switch", { name: "Per seat" }));
+  await user.click(screen.getByRole("checkbox", { name: "Require payment method" }));
+  await user.click(await screen.findByRole("checkbox", { name: /Bring your own API key/ }));
+  expect(screen.getByText(/Other credit policies are stored for future delivery/)).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Save plan" }));
+  await waitFor(() =>
+    expect(requests).toEqual([
+      expect.objectContaining({
+        key: "payg",
+        category: "paid",
+        price_cents: 3000,
+        per_seat: true,
+        require_payment_method: true,
+        features: ["byo_key"],
+      }),
+    ]),
+  );
+});
+
+it("creates a feature and selects its string key in a plan", async () => {
+  const definitions: { key: string; label: string; gated: boolean }[] = [];
+  const savedPlans: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const isFeature = String(input).endsWith("feature-definitions");
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        if (isFeature) definitions.push(body);
+        else savedPlans.push(body);
+        return new Response(JSON.stringify(body));
+      }
+      return new Response(JSON.stringify(isFeature ? definitions : []));
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await screen.findByRole("tab", { name: /Plans/ });
+  expect(screen.queryByRole("button", { name: "Create feature" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("tab", { name: /Features/ }));
+  await user.click(await screen.findByRole("button", { name: "Create feature" }));
+  expect(screen.getByRole("dialog", { name: "Create feature" })).toBeInTheDocument();
+  await user.type(screen.getByLabelText("Feature key"), "custom_reports");
+  await user.type(screen.getByLabelText("Feature name"), "Custom reports");
+  await user.click(screen.getByRole("button", { name: "Save feature" }));
+  await screen.findByRole("button", { name: "Edit Custom reports" });
+  expect(definitions).toEqual([{ key: "custom_reports", label: "Custom reports", gated: true }]);
+  await user.click(screen.getByRole("tab", { name: /Plans/ }));
+  await user.click(screen.getByRole("button", { name: "Create plan" }));
+  await user.type(screen.getByLabelText("Key"), "reports");
+  await user.type(screen.getByLabelText("Name"), "Reports");
+  await user.click(screen.getByRole("checkbox", { name: /Custom reports/ }));
+  await user.click(screen.getByRole("button", { name: "Save plan" }));
+  await waitFor(() => expect(savedPlans).toEqual([expect.objectContaining({ features: ["custom_reports"] })]));
+});
+
+it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimited limits", async () => {
+  const plan = {
+    id: "starter-plan",
+    key: "starter",
+    name: "Starter",
+    category: "paid",
+    visibility: "public",
+    require_payment_method: true,
+    price_cents: 500,
+    per_seat: true,
+    polar_product_id: "polar-starter",
+    seat_limit: 10,
+    parallel_task_limit: 5,
+    credit_amount_cents: 0,
+    credit_frequency: "none",
+    credit_expiration: "never",
+    credit_validity_days: null,
+    trial_credit_cents: 0,
+    trial_length_days: 14,
+    markup_bps: null,
+    features: [],
+  };
+  const updates: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT") {
+        updates.push({ path: String(input), body: JSON.parse(String(init.body)) });
+        return new Response("{}");
+      }
+      return new Response(JSON.stringify(String(input).endsWith("feature-definitions") ? [] : [plan]));
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  const editButton = await screen.findByRole("button", { name: "Edit Starter" });
+  const planRow = within(screen.getByRole("row", { name: /Starter/ }));
+  expect(planRow.getByText("$5.00 per seat")).toBeInTheDocument();
+  await user.click(editButton);
+  expect(screen.getByRole("dialog", { name: "Edit Starter" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Key", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Price (cents)", { exact: true })).toBeDisabled();
+  expect(screen.getByRole("switch", { name: "Per seat" })).toBeDisabled();
+  expect(screen.getByLabelText("Polar product ID", { exact: true })).toBeDisabled();
+  await user.hover(screen.getByRole("button", { name: "Help for Seat limit" }));
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Leave empty for unlimited seats.");
+  await user.clear(screen.getByLabelText("Seat limit", { exact: true }));
+  await user.clear(screen.getByLabelText("Parallel task limit", { exact: true }));
+  await user.type(screen.getByLabelText("Parallel task limit", { exact: true }), "2");
+  await user.click(screen.getByRole("button", { name: "Save plan" }));
+  await waitFor(() =>
+    expect(updates).toEqual([
+      {
+        path: "/admin/api/billing-plans/starter-plan",
+        body: { ...plan, seat_limit: null, parallel_task_limit: 2 },
+      },
+    ]),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await user.click(screen.getByRole("button", { name: "Edit Starter" }));
+  await user.type(screen.getByLabelText("Name", { exact: true }), " changed");
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Edit Starter" })).toHaveFocus());
+  expect(updates).toHaveLength(1);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("locks legacy Business pricing and usage limits in the editor", async () => {
+  const plan = {
+    id: "legacy-business",
+    key: "business_legacy",
+    name: "Business",
+    category: "paid",
+    visibility: "private",
+    require_payment_method: false,
+    price_cents: 19900,
+    per_seat: false,
+    polar_product_id: null,
+    seat_limit: null,
+    parallel_task_limit: null,
+    credit_amount_cents: 5000,
+    credit_frequency: "billing_period",
+    credit_expiration: "period_end",
+    credit_validity_days: null,
+    trial_credit_cents: 0,
+    trial_length_days: 14,
+    markup_bps: null,
+    features: [],
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async (input: RequestInfo | URL) =>
+        new Response(JSON.stringify(String(input).endsWith("feature-definitions") ? [] : [plan])),
+    ),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await user.click(await screen.findByRole("button", { name: "Edit Business" }));
+  expect(screen.getByLabelText("Price (cents)", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Seat limit", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Parallel task limit", { exact: true })).toBeDisabled();
+});
+
+it("protects Business Manual from deletion and unsupported catalog edits", async () => {
+  const plan = {
+    id: "manual-business",
+    key: "business_manual",
+    name: "Business Manual",
+    category: "paid",
+    visibility: "private",
+    price_cents: 19900,
+    per_seat: false,
+    polar_product_id: null,
+    credit_frequency: "billing_period",
+    credit_expiration: "period_end",
+    features: [],
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async (input: RequestInfo | URL) =>
+        new Response(JSON.stringify(String(input).endsWith("feature-definitions") ? [] : [plan])),
+    ),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  const edit = await screen.findByRole("button", { name: "Edit Business Manual" });
+  expect(screen.queryByRole("button", { name: "Delete Business Manual" }) === null).toBe(true);
+  await user.click(edit);
+  expect(screen.getByRole("combobox", { name: "Category" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByLabelText("Polar product ID", { exact: true }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("combobox", { name: "Credit frequency" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("combobox", { name: "Credit expiration" }).hasAttribute("disabled")).toBe(true);
+});

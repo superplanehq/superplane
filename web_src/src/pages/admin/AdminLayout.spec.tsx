@@ -24,6 +24,7 @@ const pageLinks = [
   { label: "Settings", href: "/admin/settings", icon: "lucide-network" },
   { label: "Encryption", href: "/admin/encryption", icon: "lucide-key-round" },
   { label: "License", href: "/admin/license", icon: "lucide-key-round" },
+  { label: "Billing plans", href: "/admin/billing-plans", icon: "lucide-book-open" },
   { label: "Price Books", href: "/admin/price-books", icon: "lucide-book-open" },
   { label: "Fleets", href: "/admin/runner-tasks", icon: "lucide-terminal" },
   { label: "Fleet setup", href: "/admin/fleet-manager-setup", icon: "lucide-terminal" },
