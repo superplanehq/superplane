@@ -189,11 +189,10 @@ func (r *Reconciler) Reconcile(ctx context.Context) error {
 		"cleaning up terminated provider resources",
 		slog.Int("provider_resources", len(resources)),
 	)
-	confirmed, err := r.deleteTerminatedResources(ctx, resourcesByRunner)
-	if err != nil {
+	if err := r.confirmProviderDeletion(ctx, resourcesByRunner); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
-	if err := r.confirmProviderDeletion(ctx, resourcesByRunner, confirmed); err != nil {
+	if err := r.deleteTerminatedResources(ctx, resourcesByRunner); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
 
@@ -254,11 +253,10 @@ func (r *Reconciler) reconcileDisabledFleet(ctx context.Context) error {
 		"cleaning up terminated provider resources",
 		slog.Int("provider_resources", len(resources)),
 	)
-	confirmed, err := r.deleteTerminatedResources(ctx, resourcesByRunner)
-	if err != nil {
+	if err := r.confirmProviderDeletion(ctx, resourcesByRunner); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
-	if err := r.confirmProviderDeletion(ctx, resourcesByRunner, confirmed); err != nil {
+	if err := r.deleteTerminatedResources(ctx, resourcesByRunner); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
 	r.logAction("listing active runners")
@@ -479,9 +477,8 @@ func (r *Reconciler) rollbackProvision(
 func (r *Reconciler) deleteTerminatedResources(
 	ctx context.Context,
 	resourcesByRunner map[string][]provider.Resource,
-) ([]string, error) {
+) error {
 	var deleteErrors []error
-	var confirmed []string
 	for runnerID, resources := range resourcesByRunner {
 		r.logAction(
 			"describing runner for resource cleanup",
@@ -521,27 +518,16 @@ func (r *Reconciler) deleteTerminatedResources(
 		}
 		if deleted {
 			delete(resourcesByRunner, runnerID)
-			if err == nil && runner.State == adminclient.RunnerStateTerminated {
-				confirmed = append(confirmed, runnerID)
-			}
 		}
 	}
-	return confirmed, errors.Join(deleteErrors...)
+	return errors.Join(deleteErrors...)
 }
 
 func (r *Reconciler) confirmProviderDeletion(
 	ctx context.Context,
 	resourcesByRunner map[string][]provider.Resource,
-	confirmed []string,
 ) error {
-	marked := map[string]struct{}{}
 	var markErrors []error
-	for _, runnerID := range confirmed {
-		marked[runnerID] = struct{}{}
-		if err := r.markProviderDeleted(ctx, runnerID); err != nil {
-			markErrors = append(markErrors, err)
-		}
-	}
 
 	terminated, err := r.admin.ListRunners(
 		ctx,
@@ -553,9 +539,6 @@ func (r *Reconciler) confirmProviderDeletion(
 		return errors.Join(append(markErrors, fmt.Errorf("list terminated runners for fleet %s: %w", r.config.FleetID, err))...)
 	}
 	for _, runner := range terminated {
-		if _, ok := marked[runner.ID]; ok {
-			continue
-		}
 		if len(resourcesByRunner[runner.ID]) > 0 {
 			continue
 		}
