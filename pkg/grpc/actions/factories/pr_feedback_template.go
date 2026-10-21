@@ -332,13 +332,15 @@ type prFeedbackDiscussionFlowRequest struct {
 }
 
 type prFeedbackDiscussionFlowSpec struct {
-	triggerID string
-	nodes     []yaml.Node
-	edges     []yaml.Edge
+	findID string
+	nodes  []yaml.Node
+	edges  []yaml.Edge
 }
 
+// withAcknowledge reacts only after Find Pull Request emits found.
+// A mention on a pull request that is not a factory task must not react.
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedbackDiscussionFlowSpec {
-	return flow.withAcknowledgeFrom(flow.triggerID, "default", node)
+	return flow.withAcknowledgeFrom(flow.findID, "found", node)
 }
 
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledgeFrom(sourceID, channel string, node yaml.Node) prFeedbackDiscussionFlowSpec {
@@ -386,7 +388,7 @@ func prFeedbackDiscussionFlowNodes(
 	flow.Trigger = request.TriggerSettings[flow.Trigger.ID].configure(flow.Trigger)
 	flow.Trigger.Position = yaml.Position{X: 80, Y: flow.Y}
 	return prFeedbackDiscussionFlowSpec{
-		triggerID: flow.Trigger.ID,
+		findID: flow.FindID,
 		nodes: []yaml.Node{
 			flow.Trigger,
 			{
