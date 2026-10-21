@@ -328,6 +328,48 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 	})
 }
 
+func TestOnPRCommentAddressAllBots(t *testing.T) {
+	trigger := &OnPRComment{}
+	configuration := map[string]any{
+		"repository":     "test",
+		"contentFilter":  "@superplaneagent",
+		"ignoreBots":     true,
+		"addressAllBots": true,
+	}
+	cases := []struct {
+		name     string
+		userType string
+		login    string
+		body     string
+		want     int
+	}{
+		{name: "other bot without mention starts a run", userType: "Bot", login: "coderabbitai[bot]", body: "please fix the race", want: 1},
+		{name: "superplane comment does not start a run", userType: "Bot", login: "superplaneagent[bot]", body: "@superplaneagent please", want: 0},
+		{name: "human without mention does not start a run", userType: "User", login: "octocat", body: "please fix the race", want: 0},
+		{name: "human mention starts a run", userType: "User", login: "octocat", body: "@superplaneagent please", want: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := []byte(fmt.Sprintf(
+				`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"},"number":1},"comment":{"body":%q,"user":{"login":%q,"type":%q}}}`,
+				tc.body, tc.login, tc.userType,
+			))
+			events := &contexts.EventContext{}
+			code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+				Body:          body,
+				Headers:       signedHeaders(body, "test-secret", "issue_comment"),
+				Logger:        logrus.NewEntry(logrus.New()),
+				Configuration: configuration,
+				Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
+				Events:        events,
+			})
+			assert.Equal(t, http.StatusOK, code)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, events.Count())
+		})
+	}
+}
+
 func Test__OnPRComment__Setup(t *testing.T) {
 	trigger := OnPRComment{}
 

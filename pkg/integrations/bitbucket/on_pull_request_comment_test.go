@@ -65,6 +65,54 @@ func TestForgeCommentFetchesContentBeforeMentionFilter(t *testing.T) {
 	}
 }
 
+func TestOnPullRequestCommentAddressAllBots(t *testing.T) {
+	cases := []struct {
+		name string
+		user map[string]any
+		body string
+		want int
+	}{
+		{name: "other bot without mention starts a run", user: map[string]any{"type": "app_user", "display_name": "open-code-review[bot]"}, body: "please fix the race", want: 1},
+		{name: "superplane comment does not start a run", user: map[string]any{"type": "app_user", "display_name": "SuperPlane", "nickname": "SuperPlane"}, body: "@superplaneagent please", want: 0},
+		{name: "human without mention does not start a run", user: map[string]any{"type": "user", "nickname": "ada"}, body: "please fix the race", want: 0},
+		{name: "human mention starts a run", user: map[string]any{"type": "user", "nickname": "ada"}, body: "@superplaneagent please", want: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			payload := map[string]any{
+				"comment": map[string]any{
+					"id":      7,
+					"content": map[string]any{"raw": tc.body},
+					"user":    tc.user,
+				},
+				"pullrequest": map[string]any{"id": 2},
+				"repository":  map[string]any{"full_name": "acme/widgets"},
+			}
+			body, err := json.Marshal(payload)
+			require.NoError(t, err)
+			headers := http.Header{}
+			headers.Set("X-Event-Key", pullRequestCommentCreated)
+			headers.Set("X-Hub-Signature", "sha256="+signBitbucketPayload("secret", body))
+			events := &contexts.EventContext{}
+			code, _, err := (&OnPullRequestComment{}).HandleWebhook(core.WebhookRequestContext{
+				Body:    body,
+				Headers: headers,
+				Webhook: &contexts.NodeWebhookContext{Secret: "secret"},
+				Configuration: map[string]any{
+					"repository":     "acme/widgets",
+					"contentFilter":  "@superplaneagent",
+					"ignoreBots":     true,
+					"addressAllBots": true,
+				},
+				Events: events,
+			})
+			assert.Equal(t, http.StatusOK, code)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, events.Count())
+		})
+	}
+}
+
 func pullRequestCommentFixture(t *testing.T) []byte {
 	t.Helper()
 	body, err := os.ReadFile("example_data_on_pull_request_comment.json")

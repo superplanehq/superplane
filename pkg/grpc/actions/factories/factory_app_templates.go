@@ -960,6 +960,7 @@ func materializePRFeedbackDefaults(
 		Repository:             settings.Repository,
 		Mention:                settings.Mention,
 		IgnoreBots:             settings.IgnoreBots,
+		AddressAllBots:         settings.AddressAllBots,
 		IncludeVisualEvidence:  prFeedbackVisualEvidenceEnabled(graph, spec),
 		AllowedBots:            settings.AllowedBots,
 		CheckNames:             settings.CheckNames,

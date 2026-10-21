@@ -41,6 +41,7 @@ function VerificationPreview({ source, detail = false }: { source: VerificationS
               repository: "superplanehq/superplane",
               mention: "@superplaneagent",
               ignoreBots: true,
+              addressAllBots: false,
               allowedBots: [],
               checkNames: ["CI"],
               maximumAttempts: 3,

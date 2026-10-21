@@ -6,7 +6,6 @@ import (
 	"maps"
 	"net/http"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -29,6 +28,7 @@ type OnPullRequestCommentConfiguration struct {
 	ContentFilter           string   `json:"contentFilter" mapstructure:"contentFilter"`
 	AllowedBots             []string `json:"allowedBots" mapstructure:"allowedBots"`
 	IgnoreBots              bool     `json:"ignoreBots" mapstructure:"ignoreBots"`
+	AddressAllBots          bool     `json:"addressAllBots" mapstructure:"addressAllBots"`
 	OnlyFactoryPullRequests bool     `json:"onlyFactoryPullRequests" mapstructure:"onlyFactoryPullRequests"`
 }
 
@@ -212,12 +212,13 @@ func (p *OnPullRequestComment) HandleWebhook(ctx core.WebhookRequestContext) (in
 
 	normalizedComment, _ := event["comment"].(map[string]any)
 	author, _ := normalizedComment["author"].(map[string]any)
+	if isSuperPlaneBitbucketAuthor(author) {
+		return http.StatusOK, nil, nil
+	}
 	authorType, _ := author["type"].(string)
 	isBot := authorType == "app_user"
 	nickname, _ := normalizedComment["nickname"].(string)
-	allowedBot := isBot && nickname != "" && slices.ContainsFunc(config.AllowedBots, func(bot string) bool {
-		return strings.EqualFold(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(bot), "@"), "[bot]"), strings.TrimSuffix(nickname, "[bot]"))
-	})
+	allowedBot := isBot && (config.AddressAllBots || bitbucketBotAllowed(nickname, config.AllowedBots))
 	if isBot && config.IgnoreBots && !allowedBot {
 		return http.StatusOK, nil, nil
 	}
@@ -237,6 +238,46 @@ func (p *OnPullRequestComment) HandleWebhook(ctx core.WebhookRequestContext) (in
 	}
 
 	return http.StatusOK, nil, nil
+}
+
+func bitbucketBotAllowed(nickname string, allowed []string) bool {
+	nickname = normalizeBitbucketBotName(nickname)
+	if nickname == "" {
+		return false
+	}
+	for _, bot := range allowed {
+		if normalizeBitbucketBotName(bot) == nickname {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeBitbucketBotName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	name = strings.TrimPrefix(name, "@")
+	name = strings.TrimSuffix(name, "[bot]")
+	return strings.Join(strings.Fields(name), " ")
+}
+
+// isSuperPlaneBitbucketAuthor reports comments written by this Forge app.
+// The app user is named SuperPlane. Other app users stay eligible.
+func isSuperPlaneBitbucketAuthor(author map[string]any) bool {
+	if author == nil {
+		return false
+	}
+	authorType, _ := author["type"].(string)
+	if !strings.EqualFold(strings.TrimSpace(authorType), "app_user") {
+		return false
+	}
+	for _, key := range []string{"nickname", "display_name", "displayName", "login"} {
+		name, _ := author[key].(string)
+		switch normalizeBitbucketBotName(name) {
+		case "superplane", "superplane agent", "superplaneagent":
+			return true
+		}
+	}
+	return false
 }
 
 func (p *OnPullRequestComment) Cleanup(ctx core.TriggerContext) error {
