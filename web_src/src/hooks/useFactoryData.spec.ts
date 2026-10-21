@@ -91,7 +91,7 @@ describe("useCreateWorkOrder", () => {
     });
   }
 
-  async function createOrder(queryClient: QueryClient, orderId: string) {
+  async function createOrder(queryClient: QueryClient, orderId: string, model?: string) {
     factoriesCreateWorkOrder.mockResolvedValue({ data: { order: { id: orderId } } });
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useCreateWorkOrder("org-1", "factory-1"), {
@@ -99,7 +99,7 @@ describe("useCreateWorkOrder", () => {
     });
 
     await act(async () => {
-      await result.current.mutateAsync({ title: "New task", description: "" });
+      await result.current.mutateAsync({ title: "New task", description: "", model });
     });
 
     return invalidateSpy;
@@ -125,6 +125,20 @@ describe("useCreateWorkOrder", () => {
 
     await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-planning-on")).toBe(true));
     expectListAndRunInvalidation(invalidateSpy);
+  });
+
+  it.each([undefined, "claude-opus-4-6"])("sends the optional model through the create API (%s)", async (model) => {
+    await createOrder(new QueryClient(), "wo-created-1", model);
+    const request = factoriesCreateWorkOrder.mock.calls.at(-1)?.[0];
+    expect(request.body).toEqual({
+      title: "New task",
+      description: "",
+      assigneeIds: undefined,
+      ...(model ? { model } : {}),
+    });
+    if (!model) {
+      expect(request.body).not.toHaveProperty("model");
+    }
   });
 
   it("marks the new order pending analysis when the factory cache is missing", async () => {

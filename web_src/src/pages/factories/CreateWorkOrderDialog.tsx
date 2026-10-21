@@ -17,6 +17,7 @@ import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 import { useWorkOrderFieldDictation } from "./useWorkOrderFieldDictation";
 import { factoryPlanningEnabled } from "./pages/planningSettingsModel";
+import { useWorkOrderRefinementModels } from "./useWorkOrderRefinementModels";
 
 interface CreateWorkOrderDialogProps {
   open: boolean;
@@ -47,10 +48,12 @@ function CreateWorkOrderRequestSession({
 }) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
+  const modelSelection = useWorkOrderRefinementModels(organizationId, factoryId);
   const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId });
 
   return (
     <CreateWorkOrderRequestDialog
+      modelSelection={modelSelection}
       open
       description={composer.description}
       maxLength={composer.maxDescriptionLength}
