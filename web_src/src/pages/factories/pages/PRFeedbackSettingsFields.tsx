@@ -150,6 +150,7 @@ export function PRFeedbackDiscussionFields({
   const supportsReviewBots = factoryVCSProvider(vcsProvider) !== "bitbucket";
   const mentionRequired = draft.mention.trim().length > 0;
   const [botMode, setBotMode] = useState<DiscussionBotMode>(() => discussionBotModeFromDraft(draft));
+  const [showAddressAllBots] = useState(() => draft.addressAllBots);
   const catalogEnabled = Boolean(organizationId && githubIntegrationId) && supportsReviewBots;
   const catalogParameters = draft.repository.trim() ? { repository: draft.repository.trim() } : undefined;
   const catalogQuery = useIntegrationResources(
@@ -166,6 +167,7 @@ export function PRFeedbackDiscussionFields({
     const next = discussionBotSettings(mode, mode === "address" ? draft.allowedBots : []);
     onUpdate("ignoreBots", next.ignoreBots);
     onUpdate("allowedBots", next.allowedBots);
+    onUpdate("addressAllBots", next.addressAllBots);
   };
 
   return (
@@ -210,21 +212,10 @@ export function PRFeedbackDiscussionFields({
           role="radiogroup"
           aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
         >
-          <IntakeSettingsRadioOption
-            name="pr-feedback-bot-mode"
-            value="ignore"
-            checked={botMode === "ignore"}
-            title={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreOption}
-            helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreHelper}
-            onChange={() => setBotModeAndDraft("ignore")}
-          />
-          <IntakeSettingsRadioOption
-            name="pr-feedback-bot-mode"
-            value="address"
-            checked={botMode === "address"}
-            title={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressOption}
-            helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressHelper}
-            onChange={() => setBotModeAndDraft("address")}
+          <DiscussionBotChoices
+            botMode={botMode}
+            showAddressAllBots={showAddressAllBots}
+            onChange={setBotModeAndDraft}
           />
         </div>
         {botMode === "address" ? (
@@ -249,6 +240,47 @@ export function PRFeedbackDiscussionFields({
           />
         ) : null}
       </section>
+    </>
+  );
+}
+
+function DiscussionBotChoices({
+  botMode,
+  showAddressAllBots,
+  onChange,
+}: {
+  botMode: DiscussionBotMode;
+  showAddressAllBots: boolean;
+  onChange: (mode: DiscussionBotMode) => void;
+}) {
+  return (
+    <>
+      <IntakeSettingsRadioOption
+        name="pr-feedback-bot-mode"
+        value="ignore"
+        checked={botMode === "ignore"}
+        title={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreOption}
+        helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreHelper}
+        onChange={() => onChange("ignore")}
+      />
+      <IntakeSettingsRadioOption
+        name="pr-feedback-bot-mode"
+        value="address"
+        checked={botMode === "address"}
+        title={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressOption}
+        helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressHelper}
+        onChange={() => onChange("address")}
+      />
+      {showAddressAllBots ? (
+        <IntakeSettingsRadioOption
+          name="pr-feedback-bot-mode"
+          value="all"
+          checked={botMode === "all"}
+          title={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsLabel}
+          helper={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsHelper}
+          onChange={() => onChange("all")}
+        />
+      ) : null}
     </>
   );
 }

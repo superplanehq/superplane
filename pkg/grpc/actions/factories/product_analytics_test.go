@@ -408,7 +408,7 @@ func TestFactoryProductAnalytics(t *testing.T) {
 		appID, lineID := createOnboardingResources(t, r, factoryModel)
 		request := readyOnboardingRequest(factoryModel.ID.String(), vcsID, agentID, appID, lineID)
 		request.Complete = github.Ptr(true)
-		_, err = UpdateFactoryOnboarding(ctx, IntakeDependencies{}, orgID, request)
+		_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), orgID, request)
 		require.NoError(t, err)
 		event := requireNamedEvent(t, recorder, productanalytics.EventFactoryOnboardingCompleted)
 		assert.NotEmpty(t, event.Properties["vcs_provider"])
@@ -416,7 +416,7 @@ func TestFactoryProductAnalytics(t *testing.T) {
 		assert.NotEmpty(t, event.Properties["agent_harness"])
 		assertNoRestrictedContent(t, event, "acme/api", "acme/backlog")
 
-		_, err = UpdateFactoryOnboarding(ctx, IntakeDependencies{}, orgID, request)
+		_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), orgID, request)
 		require.NoError(t, err)
 		assert.Len(t, eventsNamed(recorder, productanalytics.EventFactoryOnboardingCompleted), 1)
 	})

@@ -55,10 +55,17 @@ describe("discussionBotSettings", () => {
     expect(discussionBotSettings("ignore", ["coderabbitai"])).toEqual({
       ignoreBots: true,
       allowedBots: [],
+      addressAllBots: false,
     });
     expect(discussionBotSettings("address", ["coderabbitai"])).toEqual({
       ignoreBots: true,
       allowedBots: ["coderabbitai"],
+      addressAllBots: false,
+    });
+    expect(discussionBotSettings("all", ["coderabbitai"])).toEqual({
+      ignoreBots: true,
+      allowedBots: [],
+      addressAllBots: true,
     });
   });
 });

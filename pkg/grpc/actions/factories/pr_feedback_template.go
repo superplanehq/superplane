@@ -74,6 +74,7 @@ type prFeedbackBuildRequest struct {
 	Repository             string
 	Mention                string
 	IgnoreBots             bool
+	AddressAllBots         bool
 	IncludeVisualEvidence  bool
 	AllowedBots            []string
 	CheckNames             []string
@@ -125,7 +126,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Name:          "On PR Comment",
 			Type:          yaml.NodeTypeTrigger,
 			Component:     "github.onPRComment",
-			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
+			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
 			Integration:   request.Binding.integrationRef(),
 		},
 		FindID:       prFeedbackFindNodeID,
@@ -151,7 +152,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Name:          "On PR Review",
 			Type:          yaml.NodeTypeTrigger,
 			Component:     "github.onPRReview",
-			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
+			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
 			Integration:   request.Binding.integrationRef(),
 		},
 		FindID:       prFeedbackReviewFindNodeID,
@@ -182,6 +183,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 				mention,
 				request.IgnoreBots,
 				request.AllowedBots,
+				request.AddressAllBots,
 				includeReviewSubmissions,
 			),
 			Integration: request.Binding.integrationRef(),
@@ -229,6 +231,9 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 		"contentFilter": mention,
 		"allowedBots":   allowedBotsNodeValue(request.AllowedBots),
 		"ignoreBots":    request.IgnoreBots,
+	}
+	if request.AddressAllBots {
+		triggerConfig["addressAllBots"] = true
 	}
 	if strings.TrimSpace(request.Repository) != "" {
 		triggerConfig["repository"] = request.Repository
@@ -450,14 +455,14 @@ func prFeedbackDiscussionFlowNodes(
 	}
 }
 
-func prFeedbackReplyTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, includeReviewSubmissions bool) map[string]any {
-	configuration := prFeedbackTriggerConfiguration(repository, mention, ignoreBots, allowedBots)
+func prFeedbackReplyTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, addressAllBots bool, includeReviewSubmissions bool) map[string]any {
+	configuration := prFeedbackTriggerConfiguration(repository, mention, ignoreBots, allowedBots, addressAllBots)
 	configuration["includeReviewSubmissions"] = includeReviewSubmissions
 	configuration["commentScope"] = prFeedbackCommentScopeReplies
 	return configuration
 }
 
-func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string) map[string]any {
+func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, addressAllBots bool) map[string]any {
 	configuration := map[string]any{
 		"contentFilter": mention,
 		"ignoreBots":    ignoreBots,
@@ -467,6 +472,9 @@ func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool,
 	}
 	if len(allowedBots) > 0 {
 		configuration["allowedBots"] = allowedBotsNodeValue(allowedBots)
+	}
+	if addressAllBots {
+		configuration["addressAllBots"] = true
 	}
 	return configuration
 }
@@ -659,7 +667,7 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 			"name":             "Address PR feedback",
 			"type":             "prompt",
 			"workingDirectory": "repo",
-			"prompt":           prFeedbackPrompt(),
+			"prompt":           prFeedbackPromptFor(request),
 		},
 		map[string]any{
 			"name":             "Commit and Push",
@@ -713,9 +721,7 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 			"",
 			"Use the Bitbucket token in BITBUCKET_TOKEN.",
 			"When BITBUCKET_EMAIL is set, send HTTP basic authentication with that email and BITBUCKET_TOKEN.",
-			"Read pull request comments that mention the workspace agent.",
-			"Use inline file and line context on code-anchored comments.",
-			"Ignore replies that SuperPlane Agent already wrote.",
+			strings.Join(prFeedbackBitbucketReadInstructions(request), "\n"),
 			"",
 			"For each request:",
 			"- Check that the change is valid and safe.",
@@ -741,11 +747,7 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 		"Pull request: #{{ root().data.pull_request?.number ?? root().data.issue?.number }}",
 		"",
 		"Use the GitHub token in GITHUB_TOKEN.",
-		"Read unresolved review threads.",
-		"Read pull request conversation comments that mention @superplaneagent.",
-		"Also read comments from bots that the automation allows, even without a mention.",
-		"Ignore comments from all other bots.",
-		"Ignore replies that SuperPlane Agent already wrote.",
+		strings.Join(prFeedbackGitHubReadInstructions(request), "\n"),
 		"",
 		"For each request:",
 		"- Check that the change is valid and safe.",
@@ -762,4 +764,61 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 		"Keep the change focused. Add tests where they are needed.",
 		runner.FactoryCommitIdentityPrompt,
 	}, "\n")
+}
+
+func prFeedbackGitHubReadInstructions(request prFeedbackBuildRequest) []string {
+	if request.AddressAllBots {
+		return []string{
+			"Read unresolved review threads.",
+			"Read pull request conversation comments that mention " + prFeedbackPromptMention(request) + ".",
+			"Read every bot comment, including comments with no mention.",
+			"Ignore comments SuperPlane already wrote.",
+		}
+	}
+	return []string{
+		"Read unresolved review threads.",
+		"Read pull request conversation comments that mention @superplaneagent.",
+		"Also read comments from bots that the automation allows, even without a mention.",
+		"Ignore comments from all other bots.",
+		"Ignore replies that SuperPlane Agent already wrote.",
+	}
+}
+
+func prFeedbackBitbucketReadInstructions(request prFeedbackBuildRequest) []string {
+	if request.AddressAllBots {
+		return []string{
+			"Read pull request comments that mention " + prFeedbackPromptMention(request) + ".",
+			"Read every bot comment, including comments with no mention.",
+			"Ignore comments SuperPlane already wrote.",
+			"Use inline file and line context on code-anchored comments.",
+		}
+	}
+	return []string{
+		"Read pull request comments that mention the workspace agent.",
+		"Use inline file and line context on code-anchored comments.",
+		"Ignore replies that SuperPlane Agent already wrote.",
+	}
+}
+
+func prFeedbackPromptMention(request prFeedbackBuildRequest) string {
+	mention := strings.TrimSpace(request.Mention)
+	if mention == "" {
+		return prFeedbackDefaultMention
+	}
+	return mention
+}
+
+func refreshDiscussionRunnerPrompt(configuration map[string]any, request prFeedbackBuildRequest) {
+	steps, ok := configuration["steps"].([]any)
+	if !ok {
+		return
+	}
+	prompt := prFeedbackPromptFor(request)
+	for _, item := range steps {
+		step, ok := item.(map[string]any)
+		if !ok || step["name"] != "Address PR feedback" || step["type"] != "prompt" {
+			continue
+		}
+		step["prompt"] = prompt
+	}
 }
