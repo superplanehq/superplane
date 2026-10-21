@@ -6,6 +6,7 @@ import (
 	"maps"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -245,12 +246,9 @@ func bitbucketBotAllowed(nickname string, allowed []string) bool {
 	if nickname == "" {
 		return false
 	}
-	for _, bot := range allowed {
-		if normalizeBitbucketBotName(bot) == nickname {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(allowed, func(bot string) bool {
+		return normalizeBitbucketBotName(bot) == nickname
+	})
 }
 
 func normalizeBitbucketBotName(name string) string {

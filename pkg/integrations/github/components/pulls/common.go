@@ -295,17 +295,66 @@ func isBotAuthor(eventType string, data map[string]any) bool {
 	return strings.EqualFold(userType, "Bot")
 }
 
-func isSuperPlaneGitHubAuthor(eventType string, data map[string]any) bool {
+func isSuperPlaneGitHubAuthor(eventType string, data map[string]any, appLogins []string) bool {
 	if !isBotAuthor(eventType, data) {
 		return false
 	}
-	return normalizeBotName(authorLogin(eventType, data)) == superPlaneGitHubLogin
+	login := normalizeBotName(authorLogin(eventType, data))
+	if login == "" {
+		return false
+	}
+	if login == superPlaneGitHubLogin {
+		return true
+	}
+	return slices.ContainsFunc(appLogins, func(candidate string) bool {
+		normalized := normalizeBotName(candidate)
+		return normalized != "" && normalized == login
+	})
+}
+
+// connectedGitHubAppLogins is the GitHub App that posts SuperPlane comments.
+// A custom app uses its own bot login, not superplaneagent[bot].
+func connectedGitHubAppLogins(integration core.IntegrationContext, data map[string]any) []string {
+	logins := make([]string, 0, 2)
+	if slug := installationAppSlug(data); slug != "" {
+		logins = append(logins, slug)
+	}
+	if integration == nil {
+		return logins
+	}
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err == nil {
+		if slug := strings.TrimSpace(metadata.GitHubApp.Slug); slug != "" {
+			logins = append(logins, slug)
+		}
+	}
+	properties := integration.Properties()
+	if properties == nil {
+		return logins
+	}
+	slug, err := properties.GetString(common.PropertyAppSlug)
+	if err != nil {
+		return logins
+	}
+	if slug = strings.TrimSpace(slug); slug != "" {
+		logins = append(logins, slug)
+	}
+	return logins
+}
+
+func installationAppSlug(data map[string]any) string {
+	installation, ok := data["installation"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	slug, _ := installation["app_slug"].(string)
+	return strings.TrimSpace(slug)
 }
 
 // prCommentAuthorDecision reports whether the author is excluded, and whether
 // a remaining author bypasses the mention filter.
-func prCommentAuthorDecision(config prCommentTriggerConfiguration, eventType string, data map[string]any) (ignore bool, bypassFilter bool) {
-	if isSuperPlaneGitHubAuthor(eventType, data) {
+func prCommentAuthorDecision(config prCommentTriggerConfiguration, eventType string, data map[string]any, appLogins []string) (ignore bool, bypassFilter bool) {
+	if isSuperPlaneGitHubAuthor(eventType, data, appLogins) {
 		return true, false
 	}
 	if config.AddressAllBots && isBotAuthor(eventType, data) {

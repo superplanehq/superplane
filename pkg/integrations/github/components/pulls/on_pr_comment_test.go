@@ -370,6 +370,68 @@ func TestOnPRCommentAddressAllBots(t *testing.T) {
 	}
 }
 
+func TestOnPRCommentCustomAppDoesNotTriggerItself(t *testing.T) {
+	trigger := &OnPRComment{}
+	configuration := map[string]any{
+		"repository":     "test",
+		"contentFilter":  "@superplaneagent",
+		"ignoreBots":     true,
+		"addressAllBots": true,
+	}
+	propertyIntegration := &contexts.IntegrationContext{
+		NewSetupFlow: true,
+		CurrentProperties: map[string]any{
+			common.PropertyAppSlug: "acme-superplane",
+		},
+	}
+	metadataIntegration := &contexts.IntegrationContext{
+		Metadata: common.Metadata{GitHubApp: common.GitHubAppMetadata{Slug: "hosted-superplane"}},
+	}
+
+	cases := []struct {
+		name         string
+		integration  core.IntegrationContext
+		userType     string
+		login        string
+		installation string
+		want         int
+	}{
+		{name: "custom app property does not start a run", integration: propertyIntegration, userType: "Bot", login: "acme-superplane[bot]", want: 0},
+		{name: "hosted app metadata does not start a run", integration: metadataIntegration, userType: "Bot", login: "hosted-superplane[bot]", want: 0},
+		{name: "other bot still starts a run", integration: propertyIntegration, userType: "Bot", login: "coderabbitai[bot]", want: 1},
+		{name: "human with the app slug still needs a mention", integration: propertyIntegration, userType: "User", login: "acme-superplane", want: 0},
+		{name: "webhook app slug does not start a run", userType: "Bot", login: "workspace-app[bot]", installation: "workspace-app", want: 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			payload := fmt.Sprintf(
+				`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"},"number":1},"comment":{"body":"please fix the race","user":{"login":%q,"type":%q}}}`,
+				tc.login, tc.userType,
+			)
+			if tc.installation != "" {
+				payload = fmt.Sprintf(
+					`{"action":"created","installation":{"app_slug":%q},"issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"},"number":1},"comment":{"body":"please fix the race","user":{"login":%q,"type":%q}}}`,
+					tc.installation, tc.login, tc.userType,
+				)
+			}
+			body := []byte(payload)
+			events := &contexts.EventContext{}
+			code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+				Body:          body,
+				Headers:       signedHeaders(body, "test-secret", "issue_comment"),
+				Logger:        logrus.NewEntry(logrus.New()),
+				Configuration: configuration,
+				Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
+				Events:        events,
+				Integration:   tc.integration,
+			})
+			assert.Equal(t, http.StatusOK, code)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, events.Count())
+		})
+	}
+}
+
 func Test__OnPRComment__Setup(t *testing.T) {
 	trigger := OnPRComment{}
 

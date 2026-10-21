@@ -159,7 +159,7 @@ func (p *OnPRReviewComment) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 		return http.StatusOK, nil, nil
 	}
 
-	ignore, bypassFilter := prCommentAuthorDecision(config, eventType, data)
+	ignore, bypassFilter := prCommentAuthorDecision(config, eventType, data, connectedGitHubAppLogins(ctx.Integration, data))
 	if ignore {
 		ctx.Logger.Info("Ignoring event - author is excluded")
 		return http.StatusOK, nil, nil

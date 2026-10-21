@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -317,6 +318,36 @@ func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 			assertDiscussionHandler(t, db, factory, provider, 1)
 		})
 	}
+
+	t.Run("overlapping completions create one handler", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+		appID, lineID := createOnboardingResources(t, r, factory)
+		req := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
+		complete := true
+		req.Complete = &complete
+
+		var wg sync.WaitGroup
+		errs := make([]error, 2)
+		wg.Add(len(errs))
+		for i := range errs {
+			go func(i int) {
+				defer wg.Done()
+				_, errs[i] = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+			}(i)
+		}
+		wg.Wait()
+		successes := 0
+		for _, err := range errs {
+			if err == nil {
+				successes++
+			}
+		}
+		require.Greater(t, successes, 0)
+		assertDiscussionHandler(t, db, factory, "github", 1)
+	})
 
 	t.Run("an already complete workspace is unchanged", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
