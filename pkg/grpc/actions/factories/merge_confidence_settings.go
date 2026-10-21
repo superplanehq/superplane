@@ -51,6 +51,14 @@ func configureMergeConfidenceChecks(node *yaml.Node, raw any) error {
 		}
 		selected = append(selected, step)
 	}
+	if len(ids) == 0 {
+		// Runners require a prompt even when the saved selection enables no checks.
+		selected = []any{map[string]any{
+			"name":   "No checks enabled",
+			"type":   "prompt",
+			"prompt": "Enabled checks: none.\nNo merge confidence checks are enabled. Do not inspect the repository or call the report_merge_check tool.",
+		}}
+	}
 	node.Configuration["steps"] = replaceMergeCheckSteps(generated, selected)
 	return nil
 }

@@ -772,6 +772,7 @@ func materializeIntakeDefaults(
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
 	intake *models.FactoryIntake,
+	savedSettings *factoryAutomationSettings,
 ) (*materializedFactoryTemplate, error) {
 	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 	graph := resolveIntakeGraph(intake.Source, spec)
@@ -807,13 +808,31 @@ func materializeIntakeDefaults(
 		Source:         intake.Source,
 		Name:           canvas.Name,
 		Binding:        binding,
-		Settings:       settings,
+	}
+	if savedSettings != nil {
+		request.Settings = settings
 	}
 	defaults, err := buildIntakeCanvas(request)
 	if err != nil {
 		return nil, err
 	}
-	if intake.Source == models.FactoryIntakeSourceGitHubIssues && settings.AuthorsWithAccess {
+	if savedSettings == nil {
+		// The editor action historically keeps intake filters and GitHub event
+		// choices, but otherwise restores the template-generated defaults.
+		for i := range defaults.Spec.Nodes {
+			node := &defaults.Spec.Nodes[i]
+			if node.ID == intakeFilterNodeID {
+				node.Configuration["expression"] = intakeFilterExpressionFor(intake.Source, settings)
+			}
+			if node.ID == intakeTriggerNodeID {
+				if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+					node.Configuration["actions"] = intakeTriggerActionsFor(settings)
+				}
+				node.Metadata = models.FactoryAppTemplateMetadata("intake:"+intake.Source, factoryTemplateVersion)
+			}
+		}
+	}
+	if savedSettings != nil && intake.Source == models.FactoryIntakeSourceGitHubIssues && settings.AuthorsWithAccess {
 		// Use the same access gate as intake creation and configuration saves.
 		nodes, edges, err := applyDefaultAuthorAccess(request, defaults.Nodes(), defaults.Edges())
 		if err != nil {

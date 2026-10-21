@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
@@ -282,7 +283,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.Labels = []string{"urgent"}
 				settings.NewIssues, settings.ReopenedIssues = false, true
 				settings.JiraMoveOnComplete = false
-				settings.JiraCompletionColumn = ""
+				settings.JiraCompletionColumn = "QA"
 			case models.FactoryIntakeSourceSentryExceptions:
 				settings.SentryNewIssues, settings.SentryRegressedIssues, settings.SentryAssignedIssues = false, false, true
 				settings.SentryLevels = []string{"fatal", "warning"}
@@ -332,6 +333,28 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			})
 			require.NoError(t, err)
 			expected := updated.Intake.Settings
+			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceJiraIssues {
+				// The editor action historically retains filters, but restores
+				// default completion behavior and does not keep an author gate.
+				response, err := MaterializeFactoryAutomationDefaults(ctx, r.Organization.ID.String(), &pb.MaterializeFactoryAutomationDefaultsRequest{
+					FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(),
+				})
+				require.NoError(t, err)
+				defaults, err := yaml.CanvasFromYAML([]byte(response.CanvasYaml))
+				require.NoError(t, err)
+				defaultSpec := models.LiveCanvasSpec{Nodes: defaults.Nodes(), Edges: defaults.Edges()}
+				restored := serializeIntakeSettings(source, intakeSettingsFromGraph(source, resolveIntakeGraph(source, defaultSpec), defaultSpec))
+				assert.Equal(t, expected.GetLabels(), restored.GetLabels())
+				assert.Equal(t, expected.GetLabelFilterMode(), restored.GetLabelFilterMode())
+				assert.Equal(t, expected.GetAssignment(), restored.GetAssignment())
+				assert.Equal(t, expected.GetReopenedIssues(), restored.GetReopenedIssues())
+				if source == models.FactoryIntakeSourceJiraIssues {
+					assert.True(t, restored.GetJiraMoveOnComplete())
+					assert.Empty(t, restored.GetJiraCompletionColumn())
+				} else {
+					assert.False(t, restored.GetAuthorsWithAccess())
+				}
+			}
 			require.NoError(t, resetTestOrganization(t, r))
 			version := resetTestLiveVersion(t, canvas)
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
@@ -522,4 +545,31 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 	require.NotNil(t, agent.Concurrency)
 	assert.Equal(t, 5, agent.Concurrency.EffectiveMax())
 	assert.Equal(t, false, findIntakeNode(version.Nodes, "create-pr").Configuration["draft"])
+}
+
+func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			canvas := resetTestTemplate(t, r, factory, "risk-score", provider, func(doc *yaml.Canvas) {
+				findYAMLNode(t, doc, "assess-risk").Configuration["steps"] = []any{
+					map[string]any{
+						"name": "Review", "type": "prompt",
+						"prompt": "Enabled checks: none.\nDo not call the report_merge_check tool.\nRetired system instruction",
+					},
+				}
+			})
+			require.NoError(t, resetTestOrganization(t, r))
+			node := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, "assess-risk")
+			require.NotNil(t, node)
+			var steps []runner.AgentStep
+			decoder, err := runner.NewSpecDecoder(&steps)
+			require.NoError(t, err)
+			require.NoError(t, decoder.Decode(node.Configuration["steps"]))
+			require.NotEmpty(t, steps)
+			checks, _ := runner.MergeConfidenceChecksFromSteps(steps)
+			assert.Empty(t, checks)
+			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired system instruction")
+		})
+	}
 }

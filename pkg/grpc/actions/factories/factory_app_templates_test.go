@@ -935,7 +935,7 @@ func TestMaterializeIntakeDefaults(t *testing.T) {
 		Source:    source,
 	}
 
-	result, err := materializeIntakeDefaults(nil, canvas, version, intake)
+	result, err := materializeIntakeDefaults(nil, canvas, version, intake, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "intake:"+source, result.templateID)
 

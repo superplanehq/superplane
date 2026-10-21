@@ -116,7 +116,7 @@ func materializeLiveAutomationDefaults(
 	intake, intakeErr := models.FindFactoryIntakeByCanvasID(tx, canvas.ID)
 	switch {
 	case intakeErr == nil && intake.FactoryID == factory.ID:
-		return materializeIntakeDefaults(tx, canvas, version, intake)
+		return materializeIntakeDefaults(tx, canvas, version, intake, settings)
 	case intakeErr != nil && !errors.Is(intakeErr, models.ErrFactoryIntakeNotFound):
 		return nil, intakeErr
 	default:
