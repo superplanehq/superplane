@@ -50,6 +50,12 @@ describe("github web URLs", () => {
     expect(githubRepoWebUrl("acme/api")).toBe("https://github.com/acme/api");
     expect(githubProfileUrl("alex")).toBe("https://github.com/alex");
     expect(githubWebHostFromUrl("https://github.com/acme/api/pull/12")).toBe("");
+    expect(
+      githubHostFromHint({
+        html_url: "https://github.com/acme/app",
+        url: "https://api.github.com/repos/acme/app",
+      }),
+    ).toBe("");
   });
 
   it("uses the tenant host", () => {

@@ -137,7 +137,12 @@ export function isKnownGitHubHostname(hostname: string): boolean {
 
 function githubWebHostname(host?: string | null): string {
   const hostname = (host ?? "").trim().toLowerCase();
-  if (!hostname || hostname === GITHUB_DOTCOM_WEB_HOST || hostname === `www.${GITHUB_DOTCOM_WEB_HOST}`) {
+  if (
+    !hostname ||
+    hostname === GITHUB_DOTCOM_WEB_HOST ||
+    hostname === `www.${GITHUB_DOTCOM_WEB_HOST}` ||
+    hostname === "api.github.com"
+  ) {
     return GITHUB_DOTCOM_WEB_HOST;
   }
   if (hostname.startsWith("api.") && hostname.endsWith(GHE_COM_SUFFIX)) {
