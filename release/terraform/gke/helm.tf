@@ -256,6 +256,22 @@ resource "helm_release" "superplane" {
     value = "false"
   }
 
+  dynamic "set" {
+    for_each = var.github_enterprise_allowed_hosts == "" ? [] : [var.github_enterprise_allowed_hosts]
+    content {
+      name  = "githubEnterprise.allowedHosts"
+      value = set.value
+    }
+  }
+
+  dynamic "set" {
+    for_each = var.github_enterprise_extra_ca_certs_secret == "" ? [] : [var.github_enterprise_extra_ca_certs_secret]
+    content {
+      name  = "githubEnterprise.extraCACertsSecret"
+      value = set.value
+    }
+  }
+
   set {
     name  = "authentication.google.enabled"
     value = "false"

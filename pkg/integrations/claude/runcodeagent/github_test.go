@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -59,7 +60,7 @@ func Test__resolveGitHubUser(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 			resp(`{"login":"octocat","id":583231,"name":"The Octocat","email":"octo@github.com"}`),
 		}}
-		name, email, err := resolveGitHubUser(httpCtx, "tok")
+		name, email, err := resolveGitHubUser(httpCtx, "tok", githubcommon.DotCom())
 		require.NoError(t, err)
 		assert.Equal(t, "The Octocat", name)
 		assert.Equal(t, "octo@github.com", email)
@@ -69,7 +70,7 @@ func Test__resolveGitHubUser(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 			resp(`{"login":"octocat","id":583231,"name":"","email":""}`),
 		}}
-		name, email, err := resolveGitHubUser(httpCtx, "tok")
+		name, email, err := resolveGitHubUser(httpCtx, "tok", githubcommon.DotCom())
 		require.NoError(t, err)
 		assert.Equal(t, "octocat", name)
 		assert.Equal(t, "583231+octocat@users.noreply.github.com", email)
@@ -79,7 +80,7 @@ func Test__resolveGitHubUser(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
 			StatusCode: 401, Body: io.NopCloser(strings.NewReader(`{"message":"Bad credentials"}`)),
 		}}}
-		_, _, err := resolveGitHubUser(httpCtx, "tok")
+		_, _, err := resolveGitHubUser(httpCtx, "tok", githubcommon.DotCom())
 		require.Error(t, err)
 	})
 }
