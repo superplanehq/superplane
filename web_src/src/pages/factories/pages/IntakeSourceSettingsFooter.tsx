@@ -64,6 +64,7 @@ export function IntakeSourceSettingsFooter({
               type="button"
               variant="ghost"
               size="sm"
+              className="hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/10 dark:hover:text-destructive"
               disabled={deletePending}
               onClick={() => setDeleteOpen(true)}
               data-testid="intake-source-settings-delete"
