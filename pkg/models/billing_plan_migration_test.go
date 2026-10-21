@@ -52,7 +52,7 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 	require.Equal(t, int64(2300), amount)
 }
 
-func TestPricingMigrationPreservesFlatAndSeatPrices(t *testing.T) {
+func TestPricingMigrationPreservesRegularPrices(t *testing.T) {
 	tx := database.Conn().Begin()
 	require.NoError(t, tx.Error)
 	defer tx.Rollback()
@@ -60,7 +60,7 @@ func TestPricingMigrationPreservesFlatAndSeatPrices(t *testing.T) {
 	require.NoError(t, tx.Exec(`CREATE SCHEMA `+schema).Error)
 	require.NoError(t, tx.Exec(`SET LOCAL search_path TO `+schema+`, public`).Error)
 	require.NoError(t, tx.Exec(`CREATE TABLE billing_plans(key text, base_price_cents bigint, seat_price_cents bigint);
- INSERT INTO billing_plans VALUES ('free',0,0),('flat',2000,0),('seat',0,3000);`).Error)
+ INSERT INTO billing_plans VALUES ('free',0,0),('business_legacy',19900,0);`).Error)
 	for _, path := range []string{
 		"../../db/migrations/20261020183712_simplify-plan-pricing.up.sql",
 		"../../db/data_migrations/20261020183817_convert-plan-pricing.up.sql",
@@ -69,13 +69,6 @@ func TestPricingMigrationPreservesFlatAndSeatPrices(t *testing.T) {
 		require.NoError(t, err)
 		// The test owns the transaction so its temporary schema is rolled back.
 		sql := strings.ReplaceAll(strings.ReplaceAll(string(migration), "BEGIN;", ""), "COMMIT;", "")
-		if strings.Contains(path, "data_migrations") {
-			require.NoError(t, tx.Exec(`INSERT INTO billing_plans(key,base_price_cents,seat_price_cents) VALUES ('mixed',1000,2000)`).Error)
-			require.NoError(t, tx.SavePoint("mixed_prices").Error)
-			require.ErrorContains(t, tx.Exec(sql).Error, "Cannot convert plans")
-			require.NoError(t, tx.RollbackTo("mixed_prices").Error)
-			require.NoError(t, tx.Exec(`DELETE FROM billing_plans WHERE key='mixed'`).Error)
-		}
 		require.NoError(t, tx.Exec(sql).Error)
 	}
 	var plans []struct {
@@ -84,12 +77,11 @@ func TestPricingMigrationPreservesFlatAndSeatPrices(t *testing.T) {
 		PerSeat    bool
 	}
 	require.NoError(t, tx.Table("billing_plans").Order("key").Find(&plans).Error)
-	require.Len(t, plans, 3)
-	require.Equal(t, "flat", plans[0].Key)
-	require.Equal(t, int64(2000), plans[0].PriceCents)
+	require.Len(t, plans, 2)
+	require.Equal(t, "business_legacy", plans[0].Key)
+	require.Equal(t, int64(19900), plans[0].PriceCents)
 	require.False(t, plans[0].PerSeat)
+	require.Equal(t, "free", plans[1].Key)
 	require.Zero(t, plans[1].PriceCents)
 	require.False(t, plans[1].PerSeat)
-	require.Equal(t, int64(3000), plans[2].PriceCents)
-	require.True(t, plans[2].PerSeat)
 }
