@@ -25,14 +25,24 @@ const state = vi.hoisted(() => ({
   ],
 }));
 const modelQuery = vi.hoisted(() => vi.fn());
+const apps = vi.hoisted(() => ({
+  data: [
+    { id: "decoy", name: "Backlog" },
+    { id: "6f1c2b3a-4d5e-6f70-8192-a3b4c5d6e7f8", name: "Planning", templateId: "backlog" },
+  ],
+}));
+const editorCanvas = vi.hoisted(() => ({ id: undefined as string | undefined }));
 vi.mock("@/hooks/useFactoryData", () => ({
-  useFactoryAutomations: () => ({ data: [{ id: "backlog", name: "Backlog" }], isPending: false }),
+  useFactoryAutomations: () => ({ data: apps.data, isPending: false }),
 }));
 vi.mock("./pages/useColumnCanvasAgentEditor", () => ({
-  useColumnCanvasAgentEditor: () => ({
-    agentNode: { id: "refine-task", component: state.component, configuration: { model: state.model } },
-    isLoading: false,
-  }),
+  useColumnCanvasAgentEditor: (_organizationId: string, canvasId: string | undefined) => {
+    editorCanvas.id = canvasId;
+    return {
+      agentNode: { id: "refine-task", component: state.component, configuration: { model: state.model } },
+      isLoading: false,
+    };
+  },
 }));
 vi.mock("@/hooks/useComponentData", () => ({
   useComponent: () => ({
@@ -73,6 +83,7 @@ describe("Manual task refinement models", () => {
     expect(result.current.defaultModel).toBe("hosted::anthropic::claude-sonnet-4-6");
     expect(result.current.options.map((option) => option.value)).toEqual(state.models.map((model) => model.key));
     expect(modelQuery).toHaveBeenCalledWith("org-1", { factoryId: "factory-1", sources: ["hosted"], enabled: true });
+    expect(editorCanvas.id).toBe("6f1c2b3a-4d5e-6f70-8192-a3b4c5d6e7f8");
   });
 
   it("uses only the refine node provider for a BYOK runner", () => {
@@ -91,5 +102,33 @@ describe("Manual task refinement models", () => {
     expect(result.current.defaultModel).toBe("claude-sonnet-4-6");
     expect(result.current.options.map((option) => option.value)).toEqual(["claude-sonnet-4-6"]);
     expect(modelQuery).toHaveBeenCalledWith("org-1", { factoryId: "factory-1", sources: ["byok"], enabled: true });
+  });
+
+  it("keeps a saved alias as the phase default when a newer model is available", () => {
+    state.component = "runnerClaudeCode";
+    state.model = "sonnet";
+    state.provider = "anthropic";
+    modelQuery.mockReturnValue({
+      data: [
+        {
+          source: { id: "byok", name: "Your keys" },
+          provider: { id: "anthropic", name: "Anthropic" },
+          model: { id: "claude-sonnet-4-6", name: "Claude Sonnet" },
+          key: "byok::anthropic::claude-sonnet-4-6",
+          label: "Claude Sonnet",
+        },
+        {
+          source: { id: "byok", name: "Your keys" },
+          provider: { id: "anthropic", name: "Anthropic" },
+          model: { id: "claude-opus-5-5", name: "Claude Opus" },
+          key: "byok::anthropic::claude-opus-5-5",
+          label: "Claude Opus",
+        },
+      ],
+      isLoading: false,
+    });
+    const { result } = renderHook(() => useWorkOrderRefinementModels("org-1", "factory-1"));
+    expect(result.current.defaultModel).toBe("sonnet");
+    expect(result.current.options.map((option) => option.value)).toEqual(["claude-sonnet-4-6", "claude-opus-5-5"]);
   });
 });

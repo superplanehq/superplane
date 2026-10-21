@@ -5,7 +5,6 @@ import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceU
 import { HOSTED_MODEL_ALL_PROVIDERS, shortClaudeModelLabel } from "@/lib/hostedLLMModels";
 import {
   byokRunnerModelOptions,
-  defaultByokRunnerModel,
   hostedSelectableLLMModelKey,
   normalizeSuperPlaneModelValue,
   SELECTABLE_LLM_SOURCE_BYOK,
@@ -113,16 +112,10 @@ function byokModelSelection(
   models: SelectableLLMModel[],
 ): WorkOrderRefinementModelSelection {
   const providerModels = selectableLLMModelsForProvider(models, provider);
-  const defaultModel =
-    defaultByokRunnerModel(
-      current,
-      provider,
-      providerModels.map((model) => model.model.id),
-    ) ?? current;
   return {
-    defaultModel,
+    defaultModel: current,
     options: providerModels.length
-      ? byokRunnerModelOptions(providerModels, defaultModel).map((option) => ({
+      ? byokRunnerModelOptions(providerModels, current).map((option) => ({
           ...option,
           label: shortClaudeModelLabel(option.value) ?? option.label,
         }))
