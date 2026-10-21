@@ -149,6 +149,7 @@ describe("OrganizationDetail", () => {
             warning: false,
           });
         }
+        if (url.endsWith("/billing-plans")) return jsonResponse([{ key: "trial", name: "Trial" }]);
         if (url.includes("/billing-plan")) {
           return jsonResponse({
             plan: "trial",
