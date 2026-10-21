@@ -25,6 +25,18 @@ function expectColoredMark(image: HTMLImageElement) {
 }
 
 describe("FirstRunHostScreen", () => {
+  it("shows GitHub Enterprise Cloud when that option is on", () => {
+    render(<FirstRunHostScreen selectedHost={null} showGitHubEnterprise onChooseHost={vi.fn()} />);
+
+    expect(screen.getByTestId("first-run-host-github-enterprise")).toHaveTextContent("GitHub Enterprise Cloud");
+  });
+
+  it("hides GitHub Enterprise Cloud when that option is off", () => {
+    render(<FirstRunHostScreen selectedHost={null} onChooseHost={vi.fn()} />);
+
+    expect(screen.queryByTestId("first-run-host-github-enterprise")).not.toBeInTheDocument();
+  });
+
   it("shows a light GitHub mark on the dark host card without a dark ancestor", () => {
     render(<FirstRunHostScreen selectedHost={null} onChooseHost={vi.fn()} />);
 

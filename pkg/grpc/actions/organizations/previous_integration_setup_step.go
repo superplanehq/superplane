@@ -76,6 +76,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 			Properties:     contexts.NewIntegrationPropertyStorage(integration),
 			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Capabilities:   capabilityCtx,
+			Configuration:  integration.Configuration.Data(),
 		}
 
 		err = setupProvider.OnStepRevert(ctx)

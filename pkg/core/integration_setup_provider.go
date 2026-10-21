@@ -118,6 +118,7 @@ type SetupStepContext struct {
 	Secrets         IntegrationSecretStorage
 	Properties      IntegrationPropertyStorage
 	Capabilities    CapabilityContext
+	Configuration   map[string]any
 }
 
 type StepInfo struct {

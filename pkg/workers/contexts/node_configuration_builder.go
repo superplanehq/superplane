@@ -1098,7 +1098,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"state":          order.State,
 		"result":         order.Result,
 		"repository":     repository,
-		"repository_url": models.VCSRepositoryCloneURL(provider, repository),
+		"repository_url": models.VCSRepositoryCloneURL(provider, repository, githubServerURL(b.tx, owningFactory.OrganizationID, config)),
 		"default_branch": defaultBranch,
 		// Keep this compatibility value until stored canvases no longer reference it.
 		"visual_evidence_enabled": false,

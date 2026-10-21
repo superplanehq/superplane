@@ -84,7 +84,7 @@ func (a *OnAlert) ExampleData() map[string]any {
 			"alert": map[string]any{
 				"number":   7,
 				"state":    "open",
-				"html_url": "https://github.com/acme/payments/security/dependabot/7",
+				"html_url": common.DotCom().RepoURL("acme/payments") + "/security/dependabot/7",
 				"dependency": map[string]any{
 					"package": map[string]any{
 						"name":      "lodash",
