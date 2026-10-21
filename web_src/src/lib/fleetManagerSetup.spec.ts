@@ -4,6 +4,8 @@ import { load } from "js-yaml";
 import {
   FLEET_MANAGER_DRAFT_KEY,
   fleetsMatchConfiguration,
+  fleetsMatchDockerVm,
+  fleetManagerDockerCommand,
   fleetManagerHelmCommand,
   fleetManagerInstallCommand,
   fleetManagerValuesFileCommand,
@@ -228,6 +230,13 @@ describe("validateFleetManagerConfiguration", () => {
     );
     expect(validateFleetSelection(listed)).not.toContain("SuperPlane could not determine a Runner version.");
   });
+});
+
+it("quotes the single-VM runner command and accepts either machine fleet", () => {
+  expect(fleetManagerDockerCommand("owner-setup-token")).toBe("./enable-runners.sh 'owner-setup-token'");
+  expect(fleetManagerDockerCommand("o'token")).toBe("./enable-runners.sh 'o'\\''token'");
+  expect(fleetsMatchDockerVm([{ id: "e1-large-arm64", runnerVersion: "v0.2.0" }], "v0.2.0")).toBe(true);
+  expect(fleetsMatchDockerVm([{ id: "e1-large-amd64", runnerVersion: "v0.1.0" }], "v0.2.0")).toBe(false);
 });
 
 it("generates a bounded Helm installation command with the complete values", () => {
