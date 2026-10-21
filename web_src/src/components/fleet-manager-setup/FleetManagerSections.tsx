@@ -11,10 +11,11 @@ import {
   DEFAULT_SETUP_FLEET_ID,
   formatMachineTypeOption,
   machineTypeChoices,
-  type FleetManagerProvider,
+  type CloudFleetManagerProvider,
 } from "@/lib/fleetManagerSetup";
+import { singleHostInstall } from "@/lib/fleetManagerWizard";
 
-import { AwsProviderLogo, AzureProviderLogo, GcpProviderLogo } from "./providerLogos";
+import { AwsProviderLogo, AzureProviderLogo, GcpProviderLogo, ThisVmLogo } from "./providerLogos";
 
 export type FleetManagerSetupState = ReturnType<typeof useFleetManagerSetup>;
 
@@ -35,13 +36,13 @@ function MachineTypeField({
   onChange,
 }: {
   id: string;
-  provider: FleetManagerProvider;
+  provider: CloudFleetManagerProvider;
   value: string;
   onChange: (value: string) => void;
 }) {
   const customFieldId = `${id}-custom`;
   const listed = machineTypeChoices(provider, "");
-  const [customTypes, setCustomTypes] = useState<{ provider: FleetManagerProvider | null; ids: string[] }>({
+  const [customTypes, setCustomTypes] = useState<{ provider: CloudFleetManagerProvider | null; ids: string[] }>({
     provider: null,
     ids: [],
   });
@@ -136,6 +137,7 @@ const CapacityField = ({
 );
 
 const PROVIDERS = [
+  { id: "docker", name: "This VM", Logo: ThisVmLogo },
   { id: "aws", name: "AWS", Logo: AwsProviderLogo },
   { id: "gcp", name: "GCP", Logo: GcpProviderLogo },
   { id: "azure", name: "Azure", Logo: AzureProviderLogo },
@@ -193,10 +195,18 @@ export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetu
   const terraformNoteIdPrefix = useId();
   if (!setup.metadata || !setup.draft) return null;
   const terraformProvider = setup.metadata.infrastructureDefaults.provider;
+  const singleHost = singleHostInstall(setup.metadata.installationType);
+  const providers = PROVIDERS.filter((provider) => (singleHost ? provider.id === "docker" : provider.id !== "docker"));
+  const gridClass =
+    providers.length === 1
+      ? "grid max-w-xs grid-cols-1 gap-3"
+      : providers.length > 3
+        ? "grid grid-cols-2 gap-3 sm:grid-cols-4"
+        : "grid grid-cols-2 gap-3 sm:grid-cols-3";
 
   return (
-    <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Cloud provider">
-      {PROVIDERS.map(({ id, name, Logo }) => (
+    <div className={gridClass} role="radiogroup" aria-label="Where runners run">
+      {providers.map(({ id, name, Logo }) => (
         <ProviderCard
           key={id}
           id={id}
@@ -217,6 +227,7 @@ export function FleetManagerFleetSection({ setup }: { setup: FleetManagerSetupSt
   if (!setup.metadata || !setup.draft) return null;
   const metadata = setup.metadata;
   const draft = setup.draft;
+  if (draft.provider === "docker") return null;
   const preset = metadata.fleetPresets.find((item) => item.id === DEFAULT_SETUP_FLEET_ID);
   if (!preset) {
     return (
