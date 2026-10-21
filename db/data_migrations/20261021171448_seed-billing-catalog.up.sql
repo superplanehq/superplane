@@ -1,5 +1,16 @@
 BEGIN;
 
+-- All seeded plans stay private until pricing and credits are agreed.
+INSERT INTO billing_plans (
+ key, name, category, visibility, price_cents, per_seat,
+ seat_limit, parallel_task_limit, markup_bps, require_payment_method,
+ trial_credit_cents, trial_length_days, features
+) VALUES (
+ 'pay_as_you_go', 'Pay-as-you-go', 'paid', 'private', 0, false,
+ 10, 5, 1000, true, 1000, 14, '["byo_subscription"]'::jsonb
+)
+ON CONFLICT (key) DO NOTHING;
+
 INSERT INTO billing_plans (
  key, name, category, visibility, price_cents, per_seat,
  seat_limit, parallel_task_limit, credit_amount_cents, credit_frequency,
