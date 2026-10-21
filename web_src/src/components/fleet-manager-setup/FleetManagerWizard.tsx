@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { type FleetManagerVerificationStatus, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
 import {
   FLEET_MANAGER_VALUES_FILE,
+  fleetManagerDockerCommand,
   fleetManagerHelmCommand,
   fleetManagerValuesFileCommand,
 } from "@/lib/fleetManagerSetup";
@@ -68,9 +69,9 @@ function ProviderStep({ setup, actions }: { setup: FleetManagerSetupState; actio
 
   return (
     <div data-testid="fleet-manager-provider-step">
-      <FirstRunHeading headline="Choose a cloud provider" size="display">
+      <FirstRunHeading headline="Choose where runners run" size="display">
         <p className="text-[15px] leading-6 text-muted-foreground">
-          Select the account that will run your fleet machines.
+          Use this VM, or select the cloud account that will run fleet machines.
         </p>
       </FirstRunHeading>
       <div className="mt-7">
@@ -106,15 +107,17 @@ const fleetManagerVerificationCopy: Record<FleetManagerVerificationStatus, strin
   verified: "Fleet Manager created every selected fleet with the requested configuration.",
   unauthorized: "SuperPlane could not verify the fleets. Sign in again and retry.",
   error: "SuperPlane could not verify the fleets. Check the installation and retry.",
-  timeout: "Verification timed out. Check the Helm command and retry.",
+  timeout: "Verification timed out. Check the install command and retry.",
 };
 
 export function FleetManagerVerificationStatus({
   status,
   onRetry,
+  copy,
 }: {
   status: FleetManagerVerificationStatus;
   onRetry: () => void;
+  copy?: Partial<Record<FleetManagerVerificationStatus, string>>;
 }) {
   const failed = ["unauthorized", "error", "timeout"].includes(status);
 
@@ -128,7 +131,7 @@ export function FleetManagerVerificationStatus({
         <LoaderCircle className="mt-0.5 size-5 shrink-0 animate-spin" aria-hidden />
       )}
       <div>
-        <p>{fleetManagerVerificationCopy[status]}</p>
+        <p>{copy?.[status] ?? fleetManagerVerificationCopy[status]}</p>
         {failed && (
           <Button type="button" variant="link" className="h-auto p-0" onClick={onRetry}>
             Retry verification
@@ -158,6 +161,56 @@ function ValuesStep({ setup, actions }: { setup: FleetManagerSetupState; actions
         </div>
       )}
       {actions}
+    </div>
+  );
+}
+
+function DockerStep({ setup, onFinish, onFinishLater }: WizardProps) {
+  const verification = useFleetManagerVerification(Boolean(setup.installationToken), setup.draft, setup.metadata);
+  const command = setup.installationToken ? fleetManagerDockerCommand(setup.installationToken) : null;
+
+  return (
+    <div data-testid="fleet-manager-docker-step">
+      <FirstRunHeading headline="Start runners on this VM" size="display">
+        <p className="text-[15px] leading-6 text-muted-foreground">
+          Run this command in the SuperPlane install directory. It starts Fleet Manager on this machine.
+        </p>
+      </FirstRunHeading>
+      {command ? (
+        <div className="mt-5">
+          <FleetManagerCommandBlock code={command} language="shell" copyLabel="Copy runner command" />
+        </div>
+      ) : (
+        <p className="mt-5 text-sm text-muted-foreground">Preparing the runner command...</p>
+      )}
+      {setup.tokenError && (
+        <div className="mt-5">
+          <p role="alert" className="text-sm text-destructive">
+            {setup.tokenError}
+          </p>
+          <Button type="button" className="mt-3" onClick={() => void setup.prepareInstallation()}>
+            Try again
+          </Button>
+        </div>
+      )}
+      <div className="mt-5">
+        <FleetManagerVerificationStatus
+          status={verification.status}
+          onRetry={verification.retry}
+          copy={{
+            waiting: "Waiting for Fleet Manager on this VM...",
+            timeout: "Verification timed out. Check the command in the install directory and retry.",
+          }}
+        />
+      </div>
+      <div className="mt-7 flex flex-wrap gap-3">
+        {verification.status === "verified" && (
+          <Button type="button" onClick={onFinish}>
+            Finish installation
+          </Button>
+        )}
+        <FinishLaterButton onFinishLater={onFinishLater} />
+      </div>
     </div>
   );
 }
@@ -248,7 +301,9 @@ function usePrepareValuesCommand(step: FleetManagerWizardStep, setup: FleetManag
   const started = useRef(false);
 
   useEffect(() => {
-    if (step !== "values" || setup.values || started.current) return;
+    const preparingDocker = step === "docker" && !setup.installationToken;
+    const preparingValues = step === "values" && !setup.values;
+    if ((!preparingDocker && !preparingValues) || started.current) return;
     started.current = true;
     void setup.prepareInstallation();
   }, [setup, step]);
@@ -259,7 +314,9 @@ export function FleetManagerWizardScreen(props: WizardProps) {
   const back = props.showBackButton ? props.onBack : undefined;
   const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
   const continueToNextStep = async () => {
-    if (props.step === "fleets" && !(await props.setup.prepareInstallation())) return;
+    const createToken =
+      props.step === "fleets" || (props.step === "provider" && props.setup.draft?.provider === "docker");
+    if (createToken && !(await props.setup.prepareInstallation())) return;
     props.onNext();
   };
   const continueActions = (
@@ -290,6 +347,7 @@ export function FleetManagerWizardScreen(props: WizardProps) {
     return <p className="text-sm text-muted-foreground">Loading Fleet Manager setup...</p>;
   }
 
+  if (props.step === "docker") return <DockerStep {...props} />;
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;
   if (props.step === "fleets") return <FleetsStep setup={props.setup} actions={continueActions} />;
   if (props.step === "values") {

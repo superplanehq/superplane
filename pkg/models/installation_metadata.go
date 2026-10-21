@@ -20,6 +20,7 @@ const (
 	OwnerSetupStepFleetFleets   = "fleet-fleets"
 	OwnerSetupStepFleetValues   = "fleet-values"
 	OwnerSetupStepFleetInstall  = "fleet-install"
+	OwnerSetupStepFleetDocker   = "fleet-docker"
 )
 
 type InstallationMetadata struct {
@@ -42,6 +43,7 @@ var OwnerSetupSteps = []string{
 	OwnerSetupStepFleetFleets,
 	OwnerSetupStepFleetValues,
 	OwnerSetupStepFleetInstall,
+	OwnerSetupStepFleetDocker,
 }
 
 func IsOwnerSetupStep(step string) bool {

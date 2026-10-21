@@ -1,6 +1,7 @@
 import { dump } from "js-yaml";
 
-export type FleetManagerProvider = "aws" | "gcp" | "azure";
+export type CloudFleetManagerProvider = "aws" | "gcp" | "azure";
+export type FleetManagerProvider = CloudFleetManagerProvider | "docker";
 
 export type FleetSpec = {
   operatingSystem: string;
@@ -19,6 +20,8 @@ export type FleetManagerSetupMetadata = {
   chartRepository: string;
   imageRepository: string;
   runnerVersions: string[];
+  stableRunnerVersion?: string;
+  installationType?: string;
   fleetPresets: Array<{ id: string; spec: FleetSpec }>;
   infrastructureDefaults: {
     source: "terraform" | "manual";
@@ -87,7 +90,7 @@ const machineType = (fleetId: string, spec: FleetSpec, fields: FleetManagerProvi
   fallback;
 
 export const recommendedMachineType = (
-  provider: FleetManagerProvider,
+  provider: CloudFleetManagerProvider,
   architecture: FleetSpec["architecture"],
 ): string => {
   if (provider === "aws") return architecture === "amd64" ? "m8a.large" : "m8g.large";
@@ -103,7 +106,7 @@ export type CloudMachineType = {
   memoryGb?: number;
 };
 
-const CLOUD_MACHINE_TYPES: Record<FleetManagerProvider, CloudMachineType[]> = {
+const CLOUD_MACHINE_TYPES: Record<CloudFleetManagerProvider, CloudMachineType[]> = {
   aws: [
     { id: "m8a.large", vcpu: 2, memoryGb: 8 },
     { id: "m8a.xlarge", vcpu: 4, memoryGb: 16 },
@@ -129,14 +132,14 @@ export function formatMachineTypeOption(option: CloudMachineType): string {
   return `${option.id} · ${option.vcpu} vCPU · ${option.memoryGb} GB memory`;
 }
 
-export function machineTypeChoices(provider: FleetManagerProvider, current: string): CloudMachineType[] {
+export function machineTypeChoices(provider: CloudFleetManagerProvider, current: string): CloudMachineType[] {
   const catalog = CLOUD_MACHINE_TYPES[provider];
   const value = current.trim();
   if (!value || catalog.some((option) => option.id === value)) return catalog;
   return [...catalog, { id: value }];
 }
 
-export function resolveSetupMachineType(provider: FleetManagerProvider, current: string | undefined): string {
+export function resolveSetupMachineType(provider: CloudFleetManagerProvider, current: string | undefined): string {
   const value = current?.trim() ?? "";
   if (!value) return recommendedMachineType(provider, "amd64");
   if (CLOUD_MACHINE_TYPES[provider].some((option) => option.id === value)) return value;
@@ -197,6 +200,8 @@ const providerConfiguration = {
 };
 
 export function generateFleetManagerValues(input: GenerateValuesInput): string {
+  const provider = input.provider;
+  if (provider === "docker") return "";
   const selected = new Set(input.selectedFleetIds);
   const fleets = input.metadata.fleetPresets
     .filter((preset) => selected.has(preset.id))
@@ -208,8 +213,8 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
         warmCapacity: capacity.warmCapacity,
         maxCapacity: capacity.maxCapacity,
         spec: preset.spec,
-        provider: input.provider,
-        ...providerConfiguration[input.provider](preset.id, preset.spec, input.fields),
+        provider,
+        ...providerConfiguration[provider](preset.id, preset.spec, input.fields),
       };
     });
 
@@ -350,6 +355,18 @@ export function fleetManagerValuesFileCommand(values: string): string {
   return `cat > ${FLEET_MANAGER_VALUES_FILE} <<'EOF'\n${values.trimEnd()}\nEOF\n`;
 }
 
+const DOCKER_VM_FLEET_IDS = ["e1-large-amd64", "e1-large-arm64"];
+
+export function fleetManagerDockerCommand(token: string): string {
+  return `./enable-runners.sh '${token.replace(/'/g, `'\\''`)}'`;
+}
+
+export function fleetsMatchDockerVm(installed: InstalledFleet[], runnerVersion: string): boolean {
+  return installed.some((fleet) =>
+    Boolean(fleet.id && DOCKER_VM_FLEET_IDS.includes(fleet.id) && fleet.runnerVersion === runnerVersion),
+  );
+}
+
 export function fleetManagerHelmCommand(metadata: FleetManagerSetupMetadata, namespace: string): string {
   return [
     "helm upgrade --install fleet-manager",
@@ -403,7 +420,7 @@ export function fleetsMatchConfiguration(
   });
 }
 
-const FLEET_MANAGER_PROVIDERS: FleetManagerProvider[] = ["aws", "gcp", "azure"];
+const FLEET_MANAGER_PROVIDERS: FleetManagerProvider[] = ["aws", "gcp", "azure", "docker"];
 
 export function mergeTerraformInfrastructure(
   draft: FleetManagerDraft,

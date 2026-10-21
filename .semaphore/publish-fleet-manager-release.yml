@@ -50,7 +50,7 @@ blocks:
                 --sha "$SEMAPHORE_GIT_SHA" \
                 --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
                 --directory "$release_dir" \
-                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,fleet-manager-chart-${RELEASE_VERSION#v}.tgz,checksums.txt,fleet-manager.oci.tar \
+                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,fleet-manager-chart-${RELEASE_VERSION#v}.tgz,checksums.txt,fleet-manager.oci.tar,fleet-manager-docker.oci.tar \
                 --manifest "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum --check checksums.txt)
               test -n "${GITHUB_TOKEN:-}"
@@ -90,6 +90,23 @@ blocks:
               image_digest="$(cat /tmp/fleet-manager-image-digest)"
               bash release/fleet-manager/verify-image.sh \
                 "$FLEET_MANAGER_IMAGE_REPO:$RELEASE_VERSION" \
+                "$image_digest" \
+                "$RELEASE_VERSION" \
+                "$SEMAPHORE_GIT_SHA"
+            - |
+              set -euo pipefail
+              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json
+              export FLEET_MANAGER_DIGEST_OUTPUT=/tmp/fleet-manager-docker-image-digest
+              bash release/fleet-manager/publish-image.sh \
+                "$RELEASE_VERSION" \
+                "build/fleet-manager/$RELEASE_VERSION/fleet-manager-docker.oci.tar" \
+                "${RELEASE_VERSION}-docker"
+            - |
+              set -euo pipefail
+              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json
+              image_digest="$(cat /tmp/fleet-manager-docker-image-digest)"
+              bash release/fleet-manager/verify-image.sh \
+                "$FLEET_MANAGER_IMAGE_REPO:${RELEASE_VERSION}-docker" \
                 "$image_digest" \
                 "$RELEASE_VERSION" \
                 "$SEMAPHORE_GIT_SHA"
