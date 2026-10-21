@@ -1818,6 +1818,7 @@ message CreateWorkOrderRequest {
   string title = 2;
   string description = 3;
   repeated string assignee_ids = 4;
+  string model = 5;
 }
 
 message CreateWorkOrderResponse {
