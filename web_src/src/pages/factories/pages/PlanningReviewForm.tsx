@@ -59,7 +59,7 @@ export function PlanningReviewForm({
   showConcurrency?: boolean;
   /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
   appearance?: "card" | "fields";
-  view?: "full" | "implementation";
+  view?: "full" | "implementation" | "planning";
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled?: boolean;
   restoreError?: string;
@@ -120,7 +120,7 @@ function AgentPanel({
   onChange,
 }: {
   appearance: "card" | "fields";
-  view: "full" | "implementation";
+  view: "full" | "implementation" | "planning";
   component: PlanningReviewComponent;
   organizationId?: string;
   factoryId?: string;
@@ -191,10 +191,10 @@ function AgentPanel({
 
   const modelControl = modelUsedField ? (
     <ConfigurationFieldRenderer
-      field={view === "implementation" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
+      field={view !== "full" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
       hideLabel={appearance === "fields"}
       triggerClassName={
-        view === "implementation" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
+        view !== "full" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
       }
       value={byokModelDefault ?? component.configuration.model}
       onChange={(value) => setConfigurationField("model", value)}
@@ -227,8 +227,8 @@ function AgentPanel({
       onChange={(event) =>
         onChange({ ...component, concurrency: { ...component.concurrency, max: event.target.value } })
       }
-      className={view === "implementation" ? "w-24 tabular-nums shadow-none max-sm:text-base" : "shadow-none"}
-      aria-describedby={view === "implementation" ? `planning-review-concurrency-max-${component.id}-help` : undefined}
+      className={view !== "full" ? "w-24 tabular-nums shadow-none max-sm:text-base" : "shadow-none"}
+      aria-describedby={view !== "full" ? `planning-review-concurrency-max-${component.id}-help` : undefined}
     />
   );
 
@@ -240,7 +240,7 @@ function AgentPanel({
       <section
         className={
           appearance === "fields"
-            ? view === "implementation"
+            ? view !== "full"
               ? "flex flex-col gap-8"
               : "flex flex-col gap-6"
             : cn(
@@ -250,18 +250,21 @@ function AgentPanel({
         }
         data-testid="planning-review-settings"
       >
-        {view === "implementation" && modelControl ? (
+        {view !== "full" && modelControl ? (
           <div role="group" aria-label="Default model">
-            <ImplementSettingRow label="Default model" description="The model used to implement tasks.">
+            <ImplementSettingRow
+              label="Default model"
+              description={view === "planning" ? "The model used to plan tasks." : "The model used to implement tasks."}
+            >
               <div className="w-full min-w-0">{modelControl}</div>
             </ImplementSettingRow>
           </div>
         ) : null}
         {showConcurrency ? (
-          view === "implementation" ? (
+          view !== "full" ? (
             <ImplementSettingRow
               label="Maximum simultaneous runs"
-              description="Extra runs wait until a running implementation finishes."
+              description="Extra runs wait until a running task finishes."
               htmlFor={`planning-review-concurrency-max-${component.id}`}
             >
               {concurrencyControl}
@@ -282,7 +285,7 @@ function AgentPanel({
             disabled={disabled}
             onChange={(seconds) => setConfigurationField("executionTimeoutSeconds", seconds)}
           />
-        ) : modelControl ? (
+        ) : view === "full" && modelControl ? (
           <div className={appearance === "fields" ? "flex flex-col gap-2" : undefined}>
             {appearance === "fields" ? <h3 className="workspace-section-title">Model</h3> : null}
             {modelControl}

@@ -492,27 +492,51 @@ func TestResetPreservesRunnerProviderAndCredentials(t *testing.T) {
 }
 
 func TestResetPlannerKeepsSettingsWhenGeneratedIDsChange(t *testing.T) {
-	r, factory := resetTestFactory(t)
-	doc := buildBacklogCanvas(backlogCanvasRequest{Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent}})
-	agent := findYAMLNode(t, doc, backlogRefinementNodeID)
-	agent.ID = "legacy-refiner"
-	agent.Configuration["executionTimeoutSeconds"] = 1250
-	agent.Configuration["disabledAgentResourceIds"] = []any{"skill-to-disable"}
-	for i := range doc.Spec.Edges {
-		if doc.Spec.Edges[i].SourceID == backlogRefinementNodeID {
-			doc.Spec.Edges[i].SourceID = agent.ID
-		}
-		if doc.Spec.Edges[i].TargetID == backlogRefinementNodeID {
-			doc.Spec.Edges[i].TargetID = agent.ID
-		}
+	for _, tc := range []struct {
+		name         string
+		instructions string
+	}{
+		{name: "instructions", instructions: "Include rollout risks. Keep {{ example }} literal."},
+		{name: "cleared instructions", instructions: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			doc := buildBacklogCanvas(backlogCanvasRequest{Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent}})
+			agent := findYAMLNode(t, doc, backlogRefinementNodeID)
+			agent.ID = "legacy-refiner"
+			agent.Configuration["additionalInstructions"] = tc.instructions
+			agent.Configuration["steps"].([]any)[0].(map[string]any)["prompt"] = "Retired planning prompt"
+			max := 7
+			agent.Concurrency = &yaml.ConcurrencySpec{Max: &max, Key: "planning-team"}
+			model := models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
+			agent.Configuration["model"] = model
+			agent.Configuration["thinkingLevel"] = "low"
+			agent.Configuration["executionTimeoutSeconds"] = 1250
+			agent.Configuration["disabledAgentResourceIds"] = []any{"skill-to-disable"}
+			for i := range doc.Spec.Edges {
+				if doc.Spec.Edges[i].SourceID == backlogRefinementNodeID {
+					doc.Spec.Edges[i].SourceID = agent.ID
+				}
+				if doc.Spec.Edges[i].TargetID == backlogRefinementNodeID {
+					doc.Spec.Edges[i].TargetID = agent.ID
+				}
+			}
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Planner")
+			resetTestPublishCanvas(t, r, canvas, doc)
+			require.NoError(t, resetTestOrganization(t, r))
+			current := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, backlogRefinementNodeID)
+			require.NotNil(t, current)
+			assert.Equal(t, tc.instructions, current.Configuration["additionalInstructions"])
+			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired planning prompt")
+			assert.Equal(t, model, current.Configuration["model"])
+			assert.Equal(t, "low", current.Configuration["thinkingLevel"])
+			require.NotNil(t, current.Concurrency)
+			assert.Equal(t, max, current.Concurrency.EffectiveMax())
+			assert.Equal(t, "planning-team", current.Concurrency.Key)
+			assert.EqualValues(t, 1250, current.Configuration["executionTimeoutSeconds"])
+			assert.Equal(t, []any{"skill-to-disable"}, current.Configuration["disabledAgentResourceIds"])
+		})
 	}
-	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Planner")
-	resetTestPublishCanvas(t, r, canvas, doc)
-	require.NoError(t, resetTestOrganization(t, r))
-	current := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, backlogRefinementNodeID)
-	require.NotNil(t, current)
-	assert.EqualValues(t, 1250, current.Configuration["executionTimeoutSeconds"])
-	assert.Equal(t, []any{"skill-to-disable"}, current.Configuration["disabledAgentResourceIds"])
 }
 
 func TestResetSupportsLegacyHostedRunnerSettings(t *testing.T) {

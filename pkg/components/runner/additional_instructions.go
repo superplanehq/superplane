@@ -16,9 +16,10 @@ func appendAdditionalInstructions(configuration any, steps []AgentStep) []AgentS
 		if NormalizeAgentStepType(result[i].Type) != AgentStepPrompt || result[i].Prompt == nil {
 			continue
 		}
-		prompt := *result[i].Prompt + "\n\nAdditional instructions for this implementation:\n" +
-			"Apply these instructions to implementation and pull request writing. They refine the general defaults. " +
+		prompt := *result[i].Prompt + "\n\nAdditional instructions for this automation:\n" +
+			"Apply these instructions within the managed workflow. They refine the general defaults. " +
 			"Follow applicable repository instructions and skills, and the task requirements. " +
+			"Keep the managed planning and scoring rules and required output formats unchanged. " +
 			"The automation still controls branch handling, pushing, commit identity, and pull request creation.\n\n" + instructions
 		result[i].Prompt = &prompt
 	}

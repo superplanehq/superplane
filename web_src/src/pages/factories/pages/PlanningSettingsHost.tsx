@@ -3,7 +3,7 @@ import { useFactory, useFactoryAutomations, useUpdateFactory } from "@/hooks/use
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
 
-import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
+import { factoryAppRunPath } from "../lib/factoryPagePaths";
 import { findBacklogAutomationApp } from "../lib/linePhaseRuns";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
@@ -117,12 +117,10 @@ function PlanningSettingsLoaded({
     preferredAgentNodeId: REFINE_TASK_NODE_ID,
   });
   const updateFactory = useUpdateFactory(organizationId, factoryId);
-  const editAutomationHref = canvasId
-    ? factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "lines", lineId })
-    : undefined;
 
   return (
     <PlanningSettingsPopup
+      key={canvasId ?? factoryId}
       organizationId={organizationId}
       factoryId={factoryId}
       title={title}
@@ -147,27 +145,21 @@ function PlanningSettingsLoaded({
           throw error;
         }
       }}
-      editAutomationHref={editAutomationHref}
       canvasId={canvasId}
       runHrefFor={
         canvasId
           ? (runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
           : undefined
       }
-      agent={
-        agent.agentNode
-          ? {
-              draft: agent.draft ?? undefined,
-              isLoading: agent.isLoading || !agent.draft,
-              organizationId,
-              factoryId,
-              factoryKey,
-              automationId: canvasId,
-              onSave: agent.save,
-              showVisualEvidenceSetting: false,
-            }
-          : undefined
-      }
+      agent={{
+        draft: agent.draft ?? undefined,
+        isLoading: canvasLoading || agent.isLoading,
+        organizationId,
+        factoryId,
+        factoryKey,
+        automationId: canvasId,
+        onSave: agent.save,
+      }}
       onClose={onClose}
       initialTab={initialTab}
     />

@@ -30,10 +30,6 @@ export function isPlanningSettingsTab(value: string | null | undefined): value i
   return value === "general" || value === "agent" || value === "automation" || value === "runs";
 }
 
-export function planningSettingsTabs(hasAgent: boolean): PlanningSettingsTab[] {
-  return hasAgent ? ["general", "agent", "automation"] : ["general", "automation"];
-}
-
 export function planningAutoStartLines(factory?: FactoriesFactory | null): PlanningAutoStartLine[] {
   return (factory?.lines ?? []).flatMap((line) => {
     const id = line.id?.trim() ?? "";
