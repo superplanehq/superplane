@@ -281,6 +281,49 @@ CREATE TABLE public.application_encryption_migrations (
 
 
 --
+-- Name: billing_plans; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.billing_plans (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    key text NOT NULL,
+    name text NOT NULL,
+    category text NOT NULL,
+    visibility text DEFAULT 'private'::text NOT NULL,
+    polar_product_id text,
+    seat_limit integer,
+    parallel_task_limit integer,
+    credit_amount_cents bigint DEFAULT 0 NOT NULL,
+    credit_frequency text DEFAULT 'none'::text NOT NULL,
+    credit_expiration text DEFAULT 'never'::text NOT NULL,
+    credit_validity_days integer,
+    trial_credit_cents bigint DEFAULT 0 NOT NULL,
+    trial_length_days integer DEFAULT 14 NOT NULL,
+    markup_bps integer,
+    features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    require_payment_method boolean DEFAULT false NOT NULL,
+    price_cents bigint DEFAULT 0 NOT NULL,
+    per_seat boolean DEFAULT false NOT NULL,
+    CONSTRAINT billing_plans_category_check CHECK ((category = ANY (ARRAY['none'::text, 'trial'::text, 'paid'::text]))),
+    CONSTRAINT billing_plans_check CHECK (((credit_expiration <> 'after_days'::text) OR (credit_validity_days > 0))),
+    CONSTRAINT billing_plans_credit_amount_cents_check CHECK ((credit_amount_cents >= 0)),
+    CONSTRAINT billing_plans_credit_expiration_check CHECK ((credit_expiration = ANY (ARRAY['period_end'::text, 'after_days'::text, 'never'::text]))),
+    CONSTRAINT billing_plans_credit_frequency_check CHECK ((credit_frequency = ANY (ARRAY['none'::text, 'once'::text, 'billing_period'::text]))),
+    CONSTRAINT billing_plans_key_check CHECK ((key ~ '^[a-z][a-z0-9_]*$'::text)),
+    CONSTRAINT billing_plans_markup_bps_check CHECK ((markup_bps >= 0)),
+    CONSTRAINT billing_plans_name_check CHECK ((btrim(name) <> ''::text)),
+    CONSTRAINT billing_plans_parallel_task_limit_check CHECK ((parallel_task_limit > 0)),
+    CONSTRAINT billing_plans_price_cents_check CHECK ((price_cents >= 0)),
+    CONSTRAINT billing_plans_seat_limit_check CHECK ((seat_limit > 0)),
+    CONSTRAINT billing_plans_trial_credit_cents_check CHECK ((trial_credit_cents >= 0)),
+    CONSTRAINT billing_plans_trial_length_days_check CHECK ((trial_length_days > 0)),
+    CONSTRAINT billing_plans_visibility_check CHECK ((visibility = ANY (ARRAY['public'::text, 'private'::text])))
+);
+
+
+--
 -- Name: bitbucket_forge_installations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1202,7 +1245,7 @@ CREATE TABLE public.organization_billing_plans (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     cancel_at_period_end boolean DEFAULT false NOT NULL,
     polar_modified_at timestamp with time zone,
-    CONSTRAINT organization_billing_plans_plan CHECK ((plan = ANY (ARRAY['trial'::text, 'business'::text, 'none'::text]))),
+    plan_id uuid NOT NULL,
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
 
@@ -1217,6 +1260,17 @@ CREATE TABLE public.organization_byok_model_allowlists (
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT organization_byok_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text])))
+);
+
+
+--
+-- Name: organization_feature_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_feature_grants (
+    organization_id uuid NOT NULL,
+    feature_key text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL
 );
 
 
@@ -1278,8 +1332,8 @@ CREATE TABLE public.organization_llm_credit_grants (
     polar_order_id text,
     polar_refund_id text,
     expires_at timestamp with time zone,
-    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'topup_refund'::text) AND (amount_micros < 0)) OR ((kind = ANY (ARRAY['trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text])) AND (amount_micros <> 0)) OR ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text])) AND (amount_micros > 0)))),
-    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text, 'topup_refund'::text, 'trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text])))
+    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'topup_refund'::text) AND (amount_micros < 0)) OR ((kind = ANY (ARRAY['trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text, 'included_adjustment'::text])) AND (amount_micros <> 0)) OR ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text])) AND (amount_micros > 0)))),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text, 'topup_refund'::text, 'trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text, 'included_adjustment'::text])))
 );
 
 
@@ -1312,6 +1366,19 @@ CREATE TABLE public.organizations (
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
     created_by_account_id uuid
+);
+
+
+--
+-- Name: plan_feature_definitions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.plan_feature_definitions (
+    key text NOT NULL,
+    label text NOT NULL,
+    gated boolean DEFAULT true NOT NULL,
+    CONSTRAINT plan_feature_definitions_key_check CHECK ((key ~ '^[a-z][a-z0-9_]*$'::text)),
+    CONSTRAINT plan_feature_definitions_label_check CHECK ((btrim(label) <> ''::text))
 );
 
 
@@ -2227,6 +2294,30 @@ ALTER TABLE ONLY public.application_encryption_migrations
 
 
 --
+-- Name: billing_plans billing_plans_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_plans
+    ADD CONSTRAINT billing_plans_key_key UNIQUE (key);
+
+
+--
+-- Name: billing_plans billing_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_plans
+    ADD CONSTRAINT billing_plans_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: billing_plans billing_plans_polar_product_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_plans
+    ADD CONSTRAINT billing_plans_polar_product_id_key UNIQUE (polar_product_id);
+
+
+--
 -- Name: bitbucket_forge_installations bitbucket_forge_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2691,6 +2782,14 @@ ALTER TABLE ONLY public.organization_byok_model_allowlists
 
 
 --
+-- Name: organization_feature_grants organization_feature_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_feature_grants
+    ADD CONSTRAINT organization_feature_grants_pkey PRIMARY KEY (organization_id, feature_key);
+
+
+--
 -- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2752,6 +2851,14 @@ ALTER TABLE ONLY public.organization_llm_settings
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: plan_feature_definitions plan_feature_definitions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.plan_feature_definitions
+    ADD CONSTRAINT plan_feature_definitions_pkey PRIMARY KEY (key);
 
 
 --
@@ -4302,6 +4409,13 @@ CREATE INDEX installation_admin_organization_pins_account_pinned_at_idx ON publi
 
 
 --
+-- Name: organization_billing_plans_catalog; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_billing_plans_catalog ON public.organization_billing_plans USING btree (plan_id);
+
+
+--
 -- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5242,6 +5356,22 @@ ALTER TABLE ONLY public.installation_licenses
 
 
 --
+-- Name: organization_billing_plans organization_billing_plans_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_plans
+    ADD CONSTRAINT organization_billing_plans_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.billing_plans(id);
+
+
+--
+-- Name: organization_feature_grants organization_feature_grants_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_feature_grants
+    ADD CONSTRAINT organization_feature_grants_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5829,7 +5959,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260925150940	f
+20261021145656	f
 \.
 
 
