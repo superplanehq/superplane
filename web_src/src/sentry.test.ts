@@ -277,6 +277,41 @@ describe("filterSentryEvent", () => {
 
     expect(filterSentryEvent(event)).toBeNull();
   });
+
+  it("drops a Dash0 stack that ends in a Sentry helper frame", () => {
+    const event = buildEvent("Load failed", [
+      "../../../../../web_src/node_modules/@dash0/sdk-web/dist/dash0.js",
+      "../../../../../web_src/node_modules/@sentry/browser/build/npm/esm/helpers.js",
+    ]);
+
+    expect(filterSentryEvent(event)).toBeNull();
+  });
+
+  it("keeps a stack that includes an application file", () => {
+    const event = buildEvent("Load failed", [
+      "../../../../../web_src/node_modules/@dash0/sdk-web/dist/dash0.js",
+      "web_src/src/pages/app/Line.tsx",
+    ]);
+
+    expect(filterSentryEvent(event)).not.toBeNull();
+  });
+
+  it("drops an application stack when a console argument is a telemetry export failure", () => {
+    const event = {
+      ...buildEvent("Load failed", [
+        "../../../../../web_src/node_modules/@dash0/sdk-web/dist/dash0.js",
+        "web_src/src/pages/app/Line.tsx",
+      ]),
+      extra: {
+        arguments: [
+          "Error sending telemetry to https://ingress.us-west-2.aws.dash0.com/v1/logs:",
+          { message: "Load failed", name: "TypeError" },
+        ],
+      },
+    } as Sentry.ErrorEvent;
+
+    expect(filterSentryEvent(event)).toBeNull();
+  });
 });
 
 describe("captureConsole telemetry export failures", () => {
@@ -307,6 +342,10 @@ describe("captureConsole telemetry export failures", () => {
 
     try {
       console.error(DASH0_TRACE_EXPORT, new TypeError("Load failed"));
+      console.error(
+        "Error sending telemetry to https://ingress.us-west-2.aws.dash0.com/v1/logs:",
+        new TypeError("Load failed"),
+      );
       console.error(
         "Failed to send telemetry to https://ingress.us-west-2.aws.dash0.com/v1/traces:",
         new TypeError("Failed to fetch"),

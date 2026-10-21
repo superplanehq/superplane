@@ -164,17 +164,26 @@ function isIgnoredConsoleEvent(event: Sentry.ErrorEvent): boolean {
   return Array.isArray(args) && args.some((argument) => isIgnoredConsoleMessage(argument));
 }
 
+// A symbolicated Dash0 stack ends in a Sentry helper frame. An application
+// frame still reports.
+function isDash0SdkStack(event: Sentry.ErrorEvent): boolean {
+  const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
+  if (frames.length === 0) {
+    return false;
+  }
+
+  const hasDash0Frame = frames.some((frame) => frame.filename?.includes("@dash0/sdk-web"));
+  return (
+    hasDash0Frame &&
+    frames.every((frame) => frame.filename?.includes("@dash0/sdk-web") || frame.filename?.includes("@sentry"))
+  );
+}
+
 // Drops known browser noise before send. A Load failed error that is not a
 // telemetry export still reports. A permission denial from application code
 // has no editor frame and still reports.
 export function filterSentryEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent | null {
-  if (isIgnoredConsoleEvent(event)) {
-    return null;
-  }
-
-  const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
-  const allDash0 = frames.length > 0 && frames.every((frame) => frame.filename?.includes("@dash0/sdk-web"));
-  if (allDash0) {
+  if (isIgnoredConsoleEvent(event) || isDash0SdkStack(event)) {
     return null;
   }
 
