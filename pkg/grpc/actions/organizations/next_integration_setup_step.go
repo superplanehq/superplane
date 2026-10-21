@@ -138,6 +138,7 @@ func submitStep(
 			Properties:      contexts.NewIntegrationPropertyStorage(integration),
 			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Capabilities:    capabilityCtx,
+			Configuration:   integration.Configuration.Data(),
 		})
 
 		if err != nil {

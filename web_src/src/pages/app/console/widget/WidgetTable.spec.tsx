@@ -268,6 +268,41 @@ describe("WidgetTable column formatting", () => {
     view.unmount();
   });
 
+  it("renders GitHub Enterprise avatars for push authors from the repository host", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
+            <WidgetTable
+              render={{
+                kind: "table",
+                columns: [{ field: "author", format: "avatar", label: "Who" }],
+              }}
+              rows={[
+                {
+                  author: {
+                    date: "2026-10-21T12:00:00Z",
+                    email: "alex@acme.com",
+                    name: "Alex Rivera",
+                    username: "alex",
+                  },
+                  repository: { html_url: "https://acme.ghe.com/acme/app" },
+                },
+              ]}
+              isLoading={false}
+            />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    const avatar = view.container.querySelector('[data-slot="avatar"] img');
+    expect(avatar).not.toBeNull();
+    expect(avatar!.getAttribute("src")).toBe("https://acme.ghe.com/alex.png");
+    view.unmount();
+  });
+
   it("renders avatar columns for plain username strings", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(

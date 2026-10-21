@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -166,7 +167,7 @@ func AttachWorkspaceAgentResources(
 	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
 	files = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceSetupFiles(setupCommands, files)
-	files = appendWorkspaceContextFiles(factory, contextRepos, files)
+	files = appendWorkspaceContextFiles(db, factory, contextRepos, files)
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, setupCommands, contextRepos)
 	return environment, files
 }
@@ -294,7 +295,7 @@ func appendWorkspaceSetupFiles(commands []string, files []BrokerTaskFile) []Brok
 	})
 }
 
-func WorkspaceContextRepoURL(provider, repository string) string {
+func WorkspaceContextRepoURL(provider, repository, githubHost string) string {
 	repository = strings.TrimSpace(repository)
 	if strings.HasPrefix(repository, "https://") {
 		return repository
@@ -302,7 +303,11 @@ func WorkspaceContextRepoURL(provider, repository string) string {
 	if strings.EqualFold(strings.TrimSpace(provider), models.ProviderBitbucket) {
 		return "https://bitbucket.org/" + repository + ".git"
 	}
-	return "https://github.com/" + repository + ".git"
+	host, err := githubcommon.ParseHost(githubHost)
+	if err != nil {
+		host = githubcommon.DotCom()
+	}
+	return host.CloneURL(repository)
 }
 
 func WorkspaceContextRepoDirectory(repository string) string {
@@ -313,13 +318,18 @@ func WorkspaceContextRepoDirectory(repository string) string {
 	return "context/" + repository
 }
 
-func appendWorkspaceContextFiles(factory *models.Factory, resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
 	if len(resources) == 0 {
 		return files
 	}
 	factoryProvider := ""
+	githubHost := ""
 	if factory != nil {
-		factoryProvider = factory.OnboardingConfigValue().EffectiveVCSProvider()
+		onboarding := factory.OnboardingConfigValue()
+		factoryProvider = onboarding.EffectiveVCSProvider()
+		if host, err := githubcommon.HostFromFactoryOnboarding(db, factory.OrganizationID, onboarding); err == nil {
+			githubHost = host.WebHostname()
+		}
 	}
 	repos := make([]workspaceContextRepository, 0, len(resources))
 	for i := range resources {
@@ -338,7 +348,7 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 		repos = append(repos, workspaceContextRepository{
 			Name:       resources[i].Name,
 			Repository: repository,
-			URL:        WorkspaceContextRepoURL(provider, repository),
+			URL:        WorkspaceContextRepoURL(provider, repository, githubHost),
 			Directory:  WorkspaceContextRepoDirectory(repository),
 		})
 	}
@@ -389,7 +399,7 @@ if [ -z "${REPO_URL:-}" ] && [ -n "${REPO:-}" ]; then
   if [ -n "${SOURCE_REPO:-}" ] || { [ -n "${BITBUCKET_TOKEN:-}" ] && [ -z "${GITHUB_TOKEN:-}" ]; }; then
     REPO_URL="https://bitbucket.org/${REPO}.git"
   else
-    REPO_URL="https://github.com/${REPO}.git"
+    REPO_URL="${GITHUB_SERVER_URL:-` + githubcommon.DotCom().WebURL() + `}/${REPO}.git"
   fi
 fi
 if [ -z "${REPO_URL:-}" ] && [ -z "${SOURCE_REPO:-}" ]; then
@@ -485,7 +495,7 @@ checkout_github_branch() {
       echo "Could not resolve the pull request head branch." >&2
       exit 1
     fi
-    PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)
+    PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${GITHUB_API_URL:-` + githubcommon.DotCom().APIURLEnv() + `}/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)
   fi
   if [ -z "${PR_HEAD}" ] || [ "${PR_HEAD}" = "null" ]; then
     echo "Could not resolve the pull request head branch." >&2
@@ -589,7 +599,7 @@ if [ -f "$ctx" ]; then
     if [ -n "$_sp_ctx_list" ]; then
       clone_context_repository() {
         case "$1" in
-          https://github.com/*|https://www.github.com/*)
+          ` + githubcommon.DotCom().WebURL() + `/*|https://www.` + githubcommon.DotCom().WebHostname() + `/*)
             if [ -n "${` + GitHubContextTokenEnv + `:-}" ]; then
               git -c credential.helper= -c 'credential.helper=!f() { echo username=superplane; echo "password=$` + GitHubContextTokenEnv + `"; }; f' clone --depth 1 "$1" "$2"
               return
