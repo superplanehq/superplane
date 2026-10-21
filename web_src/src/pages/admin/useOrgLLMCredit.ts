@@ -207,15 +207,25 @@ async function loadOrganizationCreditState(
 }
 
 function useOrgBillingPlan(orgId: string, enabled: boolean) {
-  const [plan, setPlan] = useState<OrganizationBillingPlan | null>(null);
   const [catalog, setCatalog] = useState<BillingPlan[]>([]);
   const [catalogError, setCatalogError] = useState("");
   useEffect(() => {
     if (!enabled) return;
+    let cancelled = false;
+    setCatalog([]);
+    setCatalogError("");
     billingCatalogRequest<BillingPlan[]>("billing-plans")
-      .then(setCatalog)
-      .catch(() => setCatalogError("Failed to load billing plans. Refresh and try again."));
+      .then((plans) => {
+        if (!cancelled) setCatalog(plans);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogError("Failed to load billing plans. Refresh and try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [enabled]);
+  const [plan, setPlan] = useState<OrganizationBillingPlan | null>(null);
   const [planValue, setPlanValue] = useState("trial");
   const [trialEndsOn, setTrialEndsOn] = useState("");
   const [savingPlan, setSavingPlan] = useState(false);
@@ -229,6 +239,13 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
   const clearPlan = useCallback(() => setPlan(null), []);
 
   const savePlan = async () => {
+    if (
+      catalogError ||
+      !catalog.some(
+        (entry) => entry.key === planValue && entry.key !== "business_legacy" && !entry.require_payment_method,
+      )
+    )
+      return;
     if (planValue === "trial" && !isFutureUtcTrialEnd(trialEndsOn)) {
       return;
     }
@@ -244,9 +261,9 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
   };
 
   return {
-    plan,
     catalog,
     catalogError,
+    plan,
     planValue,
     setPlanValue,
     trialEndsOn,

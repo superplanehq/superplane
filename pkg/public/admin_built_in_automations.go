@@ -2,6 +2,8 @@ package public
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
@@ -22,6 +24,11 @@ func (s *Server) adminResetBuiltInAutomations(w http.ResponseWriter, r *http.Req
 	})
 	if err != nil {
 		log.Errorf("admin: failed to reset built-in automations for org %s: %v", orgID, err)
+		var settingsError *factoryactions.BuiltInAutomationSettingsError
+		if errors.As(err, &settingsError) {
+			http.Error(w, fmt.Sprintf("Reset stopped: %v. No automations were changed. Correct these settings and try again.", err), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Could not reset built-in automations.", http.StatusInternalServerError)
 		return
 	}

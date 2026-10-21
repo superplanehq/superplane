@@ -563,6 +563,15 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 	respondJSON(w, response)
 }
 
+func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
+	plans, err := models.ListBillingPlans(database.DB(r.Context()))
+	if err != nil {
+		http.Error(w, "Failed to load billing plans", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, plans)
+}
+
 func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
 	if !models.BillingEnabled() {
 		http.Error(w, "Billing is not available", http.StatusNotFound)

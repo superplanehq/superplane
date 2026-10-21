@@ -11,6 +11,14 @@ const { showErrorToast } = vi.hoisted(() => ({
   showErrorToast: vi.fn(),
 }));
 
+const modelSelection = {
+  defaultModel: "sonnet",
+  options: [
+    { value: "sonnet", label: "Claude Sonnet" },
+    { value: "opus", label: "Claude Opus" },
+  ],
+};
+
 vi.mock("@/lib/toast", () => ({
   showErrorToast,
 }));
@@ -165,7 +173,13 @@ describe("CreateWorkOrderRequestDialog", () => {
   it("creates the task with Command+Enter", async () => {
     const user = userEvent.setup();
     const onCreate = vi.fn();
-    renderRequestDialog({ description: "Refunds fail on retry.", onCreate });
+    renderRequestDialog({
+      description: "Refunds fail on retry.",
+      onCreate,
+      modelSelection,
+    });
+
+    expect(screen.getByRole("button", { name: "Model: Claude Sonnet" })).toBeInTheDocument();
 
     await user.keyboard("{Meta>}{Enter}{/Meta}");
 

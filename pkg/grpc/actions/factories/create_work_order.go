@@ -13,6 +13,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -50,11 +51,17 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := validateRefinementModel(tx, factory, strings.TrimSpace(req.GetModel())); err != nil {
+			return err
+		}
 		created, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
 		if err != nil {
 			return err
 		}
 		order = created
+		if err := order.SetRefinementModel(tx, strings.TrimSpace(req.GetModel())); err != nil {
+			return err
+		}
 		result, bindErr := storedfiles.BindDescriptionFiles(
 			ctx,
 			tx,
@@ -75,6 +82,19 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)
+	creationSource := "manual"
+	if productanalytics.SourceFromContext(ctx, productanalytics.SourceAPI) == productanalytics.SourceMCP {
+		creationSource = "mcp"
+	}
+	captureFactoryProductEvent(
+		ctx,
+		db,
+		factory,
+		order.ID,
+		productanalytics.EventFactoryTaskCreated,
+		productanalytics.StableEventID(productanalytics.EventFactoryTaskCreated, order.ID.String()),
+		productanalytics.Properties{"creation_source": creationSource},
+	)
 
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),
@@ -92,4 +112,45 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	return &pb.CreateWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func validateRefinementModel(tx *gorm.DB, factory *models.Factory, model string) error {
+	if model == "" {
+		return nil
+	}
+	if !factory.PlanningEnabled {
+		return invalidArgument("Model selection requires Planning.")
+	}
+	canvases, err := factory.ListCanvases(tx)
+	if err != nil {
+		return err
+	}
+	ids := make([]uuid.UUID, 0, len(canvases))
+	for _, canvas := range canvases {
+		if canvas.LiveVersionID != nil {
+			ids = append(ids, canvas.ID)
+		}
+	}
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, ids)
+	if err != nil {
+		return err
+	}
+	for _, spec := range specs {
+		if !models.IsBacklogFactoryApp(spec.Nodes, spec.Edges) {
+			continue
+		}
+		for _, node := range spec.Nodes {
+			if node.ID != backlogRefinementNodeID {
+				continue
+			}
+			accepted, err := models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, node.ComponentName(), node.Configuration, model)
+			if err != nil {
+				return err
+			}
+			if accepted {
+				return nil
+			}
+		}
+	}
+	return invalidArgument("The refinement agent cannot use this model.")
 }

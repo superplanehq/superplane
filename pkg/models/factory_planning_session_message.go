@@ -34,6 +34,14 @@ func (s *FactoryPlanningSession) usesAnalysisFollowUp(_ *gorm.DB) bool {
 	return s.IsAnalysisSession()
 }
 
+func CountPlanningSessionUserMessages(tx *gorm.DB, sessionID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Model(&PlanningSessionMessage{}).
+		Where("session_id = ? AND role = ?", sessionID, PlanningSessionMessageRoleUser).
+		Count(&count).Error
+	return count, err
+}
+
 func ListPlanningSessionMessages(tx *gorm.DB, sessionID uuid.UUID) ([]PlanningSessionMessage, error) {
 	var messages []PlanningSessionMessage
 	err := tx.Where("session_id = ?", sessionID).Order("created_at ASC, id ASC").Find(&messages).Error

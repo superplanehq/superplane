@@ -267,3 +267,43 @@ func parsePRFeedbackSettings(current prFeedbackSettings, requested *pb.FactoryPR
 	}
 	return updated.normalized()
 }
+
+func prFeedbackAgentSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSpec, saved *factoryAutomationSettings) map[string]*factoryAgentSettings {
+	if saved == nil {
+		return nil
+	}
+	settings := map[string]*factoryAgentSettings{}
+	if graph.isChecks() {
+		settings[prFeedbackRunnerNodeID] = saved.agents[graph.RunnerNodeID]
+		return settings
+	}
+	for _, flow := range []struct{ trigger, runner string }{
+		{graph.CommentTriggerNodeID, prFeedbackRunnerNodeID},
+		{graph.ReviewTriggerNodeID, prFeedbackReviewRunnerNodeID},
+		{graph.ReplyTriggerNodeID, prFeedbackReplyRunnerNodeID},
+	} {
+		if flow.trigger == "" {
+			continue
+		}
+		if resolved, ok := resolvePRFeedbackDiscussionFlow(spec, flow.trigger); ok {
+			settings[flow.runner] = saved.agents[resolved.RunnerNodeID]
+		}
+	}
+	return settings
+}
+
+func prFeedbackTriggerSettingsFromGraph(graph prFeedbackGraph, saved *factoryAutomationSettings) map[string]*factoryTriggerSettings {
+	if saved == nil {
+		return nil
+	}
+	settings := map[string]*factoryTriggerSettings{}
+	for _, trigger := range []struct{ generated, saved string }{
+		{prFeedbackPullRequestTriggerNodeID, graph.PullRequestTriggerNodeID},
+		{prFeedbackCommentTriggerNodeID, graph.CommentTriggerNodeID},
+		{prFeedbackReviewTriggerNodeID, graph.ReviewTriggerNodeID},
+		{prFeedbackReplyTriggerNodeID, graph.ReplyTriggerNodeID},
+	} {
+		settings[trigger.generated] = saved.triggers[trigger.saved]
+	}
+	return settings
+}

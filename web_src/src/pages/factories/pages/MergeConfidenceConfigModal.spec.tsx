@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -95,7 +95,7 @@ function renderModal(
   onDelete: () => void = vi.fn(),
   onSaveNode = vi.fn(),
   graph: IntakeAutomationGraph = confidenceGraph(),
-  options: { initialNodeId?: string; runHistoryEnabled?: boolean } = {},
+  options: { initialNodeId?: string; runHistoryEnabled?: boolean; onClose?: () => void } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const features = [FEATURE_FACTORY_RUN_HISTORY, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
@@ -116,7 +116,7 @@ function renderModal(
               title="Merge confidence"
               graph={nextGraph}
               canvasId="merge-confidence"
-              onClose={vi.fn()}
+              onClose={options.onClose ?? vi.fn()}
               onSaveNode={onSaveNode}
               onDelete={onDelete}
               initialNodeId={options.initialNodeId}
@@ -146,12 +146,14 @@ describe("MergeConfidenceConfigModal", () => {
     const saving = new Promise<void>((resolve) => {
       finishSave = resolve;
     });
+    const onClose = vi.fn();
     const onSaveNode = vi.fn(() => saving);
     const steps = [{ name: "Implementation", type: "prompt", prompt: "Built-in implementation instructions" }];
     const graph = implementConfigGraph(steps);
-    renderModal(vi.fn(), onSaveNode, graph, {
+    const view = renderModal(vi.fn(), onSaveNode, graph, {
       runHistoryEnabled: enabled,
       initialNodeId: "implementation-agent-no-issue",
+      onClose,
     });
 
     expect(Boolean(screen.queryByTestId("merge-confidence-config-canvas"))).toBe(!enabled);
@@ -165,8 +167,9 @@ describe("MergeConfidenceConfigModal", () => {
     await user.tab();
 
     if (enabled) {
+      expect(onSaveNode).not.toHaveBeenCalled();
       expect(screen.queryByRole("navigation", { name: "Automation settings" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
       expect(screen.queryByRole("textbox", { name: /^Name/ })).not.toBeInTheDocument();
       expect(screen.queryByText("Key")).not.toBeInTheDocument();
       expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
@@ -175,11 +178,48 @@ describe("MergeConfidenceConfigModal", () => {
       expect(screen.queryByText("Start implementation")).not.toBeInTheDocument();
       expect(screen.queryByText("Implement From Task Description")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add step" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Run history" })).toBeInTheDocument();
-      expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeChecked();
-      await user.click(screen.getByRole("switch", { name: "Create draft pull requests" }));
-      expect(onSaveNode).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "false");
+      const draftPullRequest = screen.getByRole("switch", { name: "Create draft pull requests" });
+      expect(draftPullRequest).toBeChecked();
+      await user.click(draftPullRequest);
+      expect(draftPullRequest).not.toBeChecked();
+      expect(onSaveNode).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("tab", { name: "Runs" }));
+      expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByRole("group", { name: "Default model" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("tab", { name: "Configuration" }));
+      expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(3);
+      expect(screen.getByRole("switch", { name: "Create draft pull requests" })).not.toBeChecked();
+      view.rerenderGraph(implementConfigGraph(steps));
+      expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(3);
+      expect(onSaveNode).not.toHaveBeenCalled();
+      const save = screen.getByTestId("implement-settings-save");
+      await user.click(save);
+      expect(save).toHaveTextContent("Saving");
+      expect(save).toBeDisabled();
+      expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeDisabled();
+      expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toBeDisabled();
+      await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(1));
+      finishSave();
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(onSaveNode).toHaveBeenCalledWith([
+        expect.objectContaining({
+          nodeId: "implementation-agent-no-issue",
+          configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
+          concurrency: { max: 3, key: "implementation" },
+        }),
+        expect.objectContaining({
+          nodeId: "create-pr",
+          name: "Create Pull Request",
+          configuration: { draft: false, repository: "{{ install_params.appRepository }}" },
+          integration: { id: "github-connection" },
+          concurrency: { max: 1, key: "{{ $.data.branch }}" },
+        }),
+      ]);
+      return;
     }
+
+    expect(screen.queryByTestId("implement-settings-save")).not.toBeInTheDocument();
     finishSave();
     await waitFor(() => {
       expect(onSaveNode).toHaveBeenCalledWith(
@@ -190,18 +230,6 @@ describe("MergeConfidenceConfigModal", () => {
         }),
       );
     });
-    if (!enabled) return;
-    await waitFor(() =>
-      expect(onSaveNode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          nodeId: "create-pr",
-          name: "Create Pull Request",
-          configuration: { draft: false, repository: "{{ install_params.appRepository }}" },
-          integration: { id: "github-connection" },
-          concurrency: { max: 1, key: "{{ $.data.branch }}" },
-        }),
-      ),
-    );
   });
 
   it("opens the first component beside the automation", () => {

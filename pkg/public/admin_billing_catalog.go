@@ -13,15 +13,6 @@ import (
 	"slices"
 )
 
-func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
-	plans, err := models.ListBillingPlans(database.DB(r.Context()))
-	if err != nil {
-		http.Error(w, "Failed to load billing plans", 500)
-		return
-	}
-	respondJSON(w, plans)
-}
-
 func (s *Server) adminSaveBillingPlan(w http.ResponseWriter, r *http.Request) {
 	var plan models.BillingPlan
 	if err := json.NewDecoder(r.Body).Decode(&plan); err != nil {

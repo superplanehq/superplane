@@ -121,10 +121,11 @@ export function AutomationRunDetails({
                 {selected.error}
               </p>
             )}
-            <Tabs defaultValue="logs">
+            <Tabs key={selected.id} defaultValue="logs">
               <TabsList>
                 <TabsTrigger value="logs">Logs</TabsTrigger>
                 <TabsTrigger value="outputs">Outputs</TabsTrigger>
+                {selected.additionalInstructions ? <TabsTrigger value="instructions">Instructions</TabsTrigger> : null}
               </TabsList>
               <TabsContent value="logs" className="pt-5">
                 {renderLogs ? (
@@ -133,6 +134,14 @@ export function AutomationRunDetails({
                   <RunLogContent logs={selected.logs} onRetry={() => onRetryLogs(selected.id)} />
                 )}
               </TabsContent>
+              {selected.additionalInstructions ? (
+                <TabsContent value="instructions" className="space-y-3 pt-5">
+                  <p className="text-xs text-muted-foreground">Additional instructions used for this activity.</p>
+                  <pre className="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-5 font-sans text-sm leading-6">
+                    {selected.additionalInstructions}
+                  </pre>
+                </TabsContent>
+              ) : null}
               <TabsContent value="outputs" className="pt-5">
                 {selected.outputs ? (
                   <pre className="overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-5 text-xs leading-6">

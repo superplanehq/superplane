@@ -47,16 +47,26 @@ function RequestDialogPlayground({
   initialDescription = "",
   fileUrls,
   initialAttachedFiles = [],
+  initialModel,
 }: {
   initialDescription?: string;
   fileUrls?: Record<string, string>;
   initialAttachedFiles?: UploadedWorkOrderFile[];
+  initialModel?: string;
 }) {
   const [description, setDescription] = useState(initialDescription);
 
   return (
     <CreateWorkOrderRequestDialog
       open
+      modelSelection={{
+        defaultModel: "claude-sonnet-4-6",
+        options: [
+          { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+          { value: "claude-opus-4-6", label: "Claude Opus 4.6" },
+        ],
+      }}
+      initialModel={initialModel}
       description={description}
       maxLength={20000}
       fileUrls={fileUrls}
@@ -100,6 +110,13 @@ type Story = StoryObj;
 export const Empty: Story = {
   name: "Empty",
   render: () => <RequestDialogPlayground />,
+};
+
+export const DifferentModel: Story = {
+  name: "Different refinement model",
+  render: () => (
+    <RequestDialogPlayground initialDescription="Review the checkout retry flow." initialModel="claude-opus-4-6" />
+  ),
 };
 
 export const AttachedImages: Story = {

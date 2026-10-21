@@ -45,6 +45,14 @@ const credit: OrganizationLLMCredit = {
   warning: false,
 };
 
+const catalog = [
+  { key: "trial", name: "Trial", category: "trial", require_payment_method: false },
+  { key: "business_legacy", name: "Business", category: "paid", require_payment_method: true },
+  { key: "business_manual", name: "Business Manual", category: "paid", require_payment_method: false },
+  { key: "pay_as_you_go", name: "Pay-as-you-go", category: "paid", require_payment_method: true },
+  { key: "none", name: "None", category: "none", require_payment_method: false },
+];
+
 const grants = [
   {
     id: "grant-2",
@@ -92,12 +100,14 @@ function mockOrgCreditFetch(
     creditData?: typeof credit;
     onPutBalance?: (body: unknown) => Response;
     onGetGrants?: () => Response;
+    catalogStatus?: number;
   } = {},
 ) {
+  const { catalogStatus = 200 } = options;
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    const catalogResponse = mockBillingCatalogResponse(url);
-    if (catalogResponse) return catalogResponse;
+    if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+    if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
     if (url.endsWith("/llm-credit/balances") && init?.method === "PUT") {
       const body = JSON.parse(String(init.body));
       return options.onPutBalance ? options.onPutBalance(body) : jsonResponse(options.creditData ?? credit);
@@ -107,6 +117,9 @@ function mockOrgCreditFetch(
     }
     if (url.endsWith("/llm-credit")) {
       return jsonResponse(options.creditData ?? credit);
+    }
+    if (url.endsWith("/billing-plans")) {
+      return jsonResponse(catalog, catalogStatus);
     }
     if (url.includes("/billing-plan")) {
       if (options.planStatus) {
@@ -127,6 +140,40 @@ afterEach(() => {
 });
 
 describe("OrgLLMCreditSection billing plan", () => {
+  it("disables plans that require payment and saves a manual plan", async () => {
+    const fetchMock = mockOrgCreditFetch();
+    const user = userEvent.setup();
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    await user.click(await screen.findByTestId("admin-org-billing-plan"));
+    expect(await screen.findByRole("option", { name: "Business" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("option", { name: "Pay-as-you-go" }).getAttribute("aria-disabled")).toBe("true");
+    await user.click(screen.getByRole("option", { name: "Business Manual" }));
+    await user.click(screen.getByTestId("admin-org-billing-plan-save"));
+
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+      expect(String(put?.[0])).toBe("/admin/api/organizations/org-1/billing-plan");
+      expect(JSON.parse(String(put?.[1]?.body))).toEqual({ plan: "business_manual" });
+    });
+  });
+
+  it("shows the assigned catalog key when the legacy plan field differs", async () => {
+    mockOrgCreditFetch({ plan: { ...billingPlan(false, null, "business"), catalog_key: "business_manual" } });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-billing-plan")).toHaveTextContent("Business Manual");
+  });
+
+  it("blocks plan changes when the catalog cannot load", async () => {
+    mockOrgCreditFetch({ catalogStatus: 500 });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load billing plans");
+    expect(screen.getByTestId("admin-org-billing-plan")).toBeDisabled();
+    expect(screen.getByTestId("admin-org-billing-plan-save")).toBeDisabled();
+  });
+
   it("keeps Save plan when Polar is not set up", async () => {
     mockOrgCreditFetch();
     render(<OrgLLMCreditSection orgId="org-1" />);
@@ -173,6 +220,8 @@ describe("OrgLLMCreditSection billing plan", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
         if (url.endsWith("/billing-plans"))
           return jsonResponse([
             { key: "trial", name: "Trial" },
@@ -188,6 +237,7 @@ describe("OrgLLMCreditSection billing plan", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
+        if (url.endsWith("/billing-plans")) return jsonResponse(catalog);
         if (url.includes("/billing-plan")) {
           return new Response(JSON.stringify(billingPlan(false, trialEndsAt, "trial")), {
             status: 200,
@@ -218,6 +268,8 @@ describe("OrgLLMCreditSection billing plan", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
         if (url.endsWith("/billing-plans"))
           return jsonResponse([
             { key: "trial", name: "Trial" },
@@ -233,6 +285,7 @@ describe("OrgLLMCreditSection billing plan", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
+        if (url.endsWith("/billing-plans")) return jsonResponse(catalog);
         if (url.includes("/billing-plan")) {
           return new Response(JSON.stringify(billingPlan(true, "2026-12-20T23:59:59Z", "business")), {
             status: 200,
@@ -264,6 +317,8 @@ describe("OrgLLMCreditSection billing plan", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
         if (url.endsWith("/billing-plans"))
           return jsonResponse([
             { key: "trial", name: "Trial" },
@@ -287,6 +342,7 @@ describe("OrgLLMCreditSection billing plan", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
+        if (url.endsWith("/billing-plans")) return jsonResponse(catalog);
         if (url.includes("/billing-plan")) {
           return new Response(JSON.stringify(billingPlan(false, `${futureUtcDate(40)}T23:59:59Z`, "trial")), {
             status: 200,
@@ -492,19 +548,6 @@ describe("OrgLLMCreditSection balances", () => {
     expect(screen.queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
   });
 });
-
-function mockBillingCatalogResponse(url: string): Response | null {
-  if (url.endsWith("/billing-plans"))
-    return jsonResponse([
-      { key: "trial", name: "Trial" },
-      { key: "business_legacy", name: "Business" },
-      { key: "business_manual", name: "Business Manual" },
-      { key: "none", name: "None" },
-    ]);
-  if (url.endsWith("/feature-definitions")) return jsonResponse([]);
-  if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
-  return null;
-}
 
 it("sends the exact included balance with an expiration and note", async () => {
   const user = userEvent.setup();

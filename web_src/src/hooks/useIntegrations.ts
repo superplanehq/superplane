@@ -20,7 +20,6 @@ import type {
 } from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
-import { analytics, type IntegrationSource } from "@/lib/analytics";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 export const integrationKeys = {
@@ -177,8 +176,10 @@ export const useIntegrationResources = (
   });
 };
 
+export type IntegrationSource = "integrations_page" | "node_configuration" | "install_wizard";
+
 // Hook to create an integration
-export const useCreateIntegration = (organizationId: string, source: IntegrationSource) => {
+export const useCreateIntegration = (organizationId: string, _source: IntegrationSource) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -201,12 +202,10 @@ export const useCreateIntegration = (organizationId: string, source: Integration
         }),
       );
     },
-    onSuccess: (data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
-      const status = (data.data?.integration?.status?.state || "pending") as "ready" | "error" | "pending";
-      analytics.integrationConnectSubmit(variables.integrationName, source, status, organizationId);
     },
   });
 };
@@ -408,14 +407,13 @@ export const useDeleteIntegration = (organizationId: string, integrationId: stri
       );
       return data;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
       queryClient.removeQueries({
         queryKey: integrationKeys.integration(organizationId, integrationId),
       });
-      analytics.integrationDelete(variables.integrationName, organizationId);
     },
   });
 };

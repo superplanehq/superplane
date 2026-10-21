@@ -2,21 +2,23 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { History, Settings } from "lucide-react";
 import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
 import { cn } from "@/lib/utils";
 import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
-import { ImplementRunHistory } from "./implementRunHistory/ImplementRunHistory";
+import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
 import { ImplementConfiguration } from "./ImplementConfiguration";
-import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
+import { useImplementSettingsDraft } from "./implementSettingsDraft";
+import { IMPLEMENT_AGENT_NODE_ID, columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
 import { MergeConfidenceActionsMenu, MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { NodeConfigPanel } from "./NodeConfigPanel";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 import {
   SettingsAutomationHeaderRow,
   SettingsAutomationWorkspace,
@@ -51,7 +53,7 @@ interface MergeConfidenceConfigShellProps {
   isResizing: boolean;
   onResizeStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onClosePanel?: () => void;
-  onSaveNode: (update: NodeConfigurationUpdate) => Promise<void> | void;
+  onSaveNode: (update: NodeConfigurationSave) => Promise<void> | void;
   graph?: IntakeAutomationGraph;
   loading: boolean;
   error: boolean;
@@ -95,31 +97,24 @@ function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
   return (
     <>
       <PopupHeader
-        title={simplifiedImplement && props.tab === "runs" ? `${props.title} run history` : props.title}
+        title={props.title}
         onClose={props.onClose}
         actions={
-          <>
-            {simplifiedImplement && props.showRunsTab ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => props.onTabChange(props.tab === "runs" ? "automation" : "runs")}
-              >
-                {props.tab === "runs" ? "Back to settings" : "Run history"}
-              </Button>
-            ) : null}
-            {props.onDelete ? (
-              <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
-            ) : null}
-          </>
+          props.onDelete ? (
+            <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
+          ) : null
         }
       >
-        {!simplifiedImplement ? (
-          <SettingsAutomationHeaderRow
-            tabs={<ConfigTabs tab={props.tab} showRunsTab={props.showRunsTab} onTabChange={props.onTabChange} />}
-          />
-        ) : null}
+        <SettingsAutomationHeaderRow
+          tabs={
+            <ConfigTabs
+              tab={props.tab}
+              showRunsTab={props.showRunsTab}
+              onTabChange={props.onTabChange}
+              simplifiedImplement={simplifiedImplement}
+            />
+          }
+        />
       </PopupHeader>
       <MergeConfidenceConfigBody {...configBodyProps(props)} />
       {props.onDelete ? (
@@ -147,6 +142,7 @@ function configBodyProps(props: MergeConfidenceConfigShellProps) {
     widthPercent: props.widthPercent,
     isResizing: props.isResizing,
     onResizeStart: props.onResizeStart,
+    onClose: props.onClose,
     onClosePanel: props.onClosePanel,
     onSaveNode: props.onSaveNode,
     tab: props.tab,
@@ -169,19 +165,23 @@ function ConfigTabs({
   tab,
   showRunsTab,
   onTabChange,
+  simplifiedImplement,
 }: {
   tab: MergeConfidenceConfigTab;
   showRunsTab: boolean;
   onTabChange: (tab: MergeConfidenceConfigTab) => void;
+  simplifiedImplement: boolean;
 }) {
   return (
     <Tabs value={tab} onValueChange={(value) => onTabChange(value as MergeConfidenceConfigTab)}>
-      <TabsList aria-label={MERGE_CONFIDENCE_CONFIG_COPY.tabsLabel}>
+      <TabsList aria-label={simplifiedImplement ? "Implement sections" : MERGE_CONFIDENCE_CONFIG_COPY.tabsLabel}>
         <TabsTrigger value="automation" data-testid="merge-confidence-config-tab-automation">
-          {MERGE_CONFIDENCE_CONFIG_COPY.automationTab}
+          {simplifiedImplement ? <Settings aria-hidden /> : null}
+          {simplifiedImplement ? "Configuration" : MERGE_CONFIDENCE_CONFIG_COPY.automationTab}
         </TabsTrigger>
         {showRunsTab ? (
           <TabsTrigger value="runs" data-testid="merge-confidence-config-tab-runs">
+            {simplifiedImplement ? <History aria-hidden /> : null}
             {MERGE_CONFIDENCE_CONFIG_COPY.runsTab}
           </TabsTrigger>
         ) : null}
@@ -190,7 +190,7 @@ function ConfigTabs({
   );
 }
 
-function implementHistoryContext({
+function automationHistoryContext({
   tab,
   canvasId,
   organizationId,
@@ -198,13 +198,41 @@ function implementHistoryContext({
   graph,
 }: ReturnType<typeof configBodyProps>) {
   if (tab !== "runs" || !canvasId || !organizationId || !factoryId) return null;
-  if (!graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID)) return null;
+  if (!columnAutomationUsesSplitConfig(graph?.specNodes?.map((node) => node.id) ?? [])) return null;
   return { canvasId, organizationId, factoryId };
 }
 
 function implementSettingsNode({ tab, graph }: ReturnType<typeof configBodyProps>) {
   if (tab !== "automation") return undefined;
   return graph?.specNodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID);
+}
+
+function ImplementSettingsScreen(props: {
+  settings: ReturnType<typeof useImplementSettingsDraft>;
+  body: ReturnType<typeof configBodyProps>;
+}) {
+  const draft = props.settings.draft;
+  if (!draft) return null;
+  return (
+    <ImplementConfiguration
+      agent={draft.agentBase}
+      organizationId={props.body.organizationId}
+      factoryId={props.body.factoryId}
+      factoryKey={props.body.factoryKey}
+      controller={{
+        agentDraft: draft.agentDraft,
+        pullRequest: draft.pullRequestNode,
+        durationMinutes: draft.durationMinutes,
+        durationInvalid: draft.durationInvalid,
+        saving: props.settings.saving,
+        saveError: props.settings.saveError,
+        onAgentDraftChange: props.settings.updateAgentDraft,
+        onPullRequestDraftChange: props.settings.updatePullRequestDraft,
+        onDurationStateChange: props.settings.updateDuration,
+        onSave: () => void props.settings.save(props.body.onSaveNode, props.body.onClose),
+      }}
+    />
+  );
 }
 
 function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
@@ -235,20 +263,13 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     layoutFitNonce,
   } = props;
   const features = useExperimentalFeature(organizationId);
+  const runHistoryEnabled = features.has(FEATURE_FACTORY_RUN_HISTORY);
+  const implementSettings = useImplementSettingsDraft(graph?.specNodes, runHistoryEnabled);
   const implementAgent = implementSettingsNode(props);
-  if (implementAgent && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
-    return (
-      <ImplementConfiguration
-        agent={implementAgent}
-        nodes={graph?.specNodes ?? []}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        onSave={onSaveNode}
-      />
-    );
+  if (implementAgent && runHistoryEnabled && implementSettings.draft) {
+    return <ImplementSettingsScreen settings={implementSettings} body={props} />;
   }
-  const historyContext = implementHistoryContext(props);
+  const historyContext = automationHistoryContext(props);
   if (historyContext && features.isLoading) {
     return (
       <p role="status" className="p-6 text-sm text-muted-foreground">
@@ -267,9 +288,8 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     );
   }
   if (historyContext && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
-    return (
-      <ImplementRunHistory {...historyContext} selectedRunId={selectedRunId} onSelectRun={onSelectedRunIdChange} />
-    );
+    const history = { ...historyContext, selectedRunId, onSelectRun: onSelectedRunIdChange };
+    return <FactoryAutomationRunHistory {...history} />;
   }
   return (
     <div

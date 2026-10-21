@@ -1,5 +1,9 @@
 import { ArrowUp, Loader2, Maximize2, Minimize2, XIcon } from "lucide-react";
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  WorkOrderRefinementModelSelect,
+  type WorkOrderRefinementModelSelection,
+} from "./WorkOrderRefinementModelSelect";
 
 import { MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import { Button } from "@/components/ui/button";
@@ -34,6 +38,7 @@ import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 export interface CreateWorkOrderRequestDraft {
   title: string;
   description: string;
+  model?: string;
 }
 
 export interface CreateWorkOrderRequestDialogProps {
@@ -50,6 +55,8 @@ export interface CreateWorkOrderRequestDialogProps {
   initialAttachedFiles?: UploadedWorkOrderFile[];
   organizationId?: string;
   factoryId?: string;
+  modelSelection?: WorkOrderRefinementModelSelection;
+  initialModel?: string;
 }
 
 export function CreateWorkOrderRequestDialog({
@@ -66,7 +73,10 @@ export function CreateWorkOrderRequestDialog({
   initialAttachedFiles = [],
   organizationId,
   factoryId,
+  modelSelection,
+  initialModel,
 }: CreateWorkOrderRequestDialogProps) {
+  const { model, modelOverride, setSelectedModel } = useRefinementModelChoice(open, modelSelection, initialModel);
   const [isExpanded, setIsExpanded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const stopDictationRef = useRef<() => void>(() => {});
@@ -78,7 +88,7 @@ export function CreateWorkOrderRequestDialog({
     onDescriptionChange,
     onCreate: (draft) => {
       stopDictationRef.current();
-      onCreate(draft);
+      onCreate(modelOverride ? { ...draft, model: modelOverride } : draft);
     },
     onUploadFiles,
     initialAttachedFiles,
@@ -145,10 +155,42 @@ export function CreateWorkOrderRequestDialog({
           organizationId={organizationId}
           factoryId={factoryId}
           onDescriptionChange={onDescriptionChange}
+          modelControl={
+            modelSelection ? (
+              <WorkOrderRefinementModelSelect
+                selection={modelSelection}
+                model={model}
+                disabled={form.busy}
+                onChange={setSelectedModel}
+              />
+            ) : null
+          }
         />
       </DialogContent>
     </Dialog>
   );
+}
+
+function useRefinementModelChoice(
+  open: boolean,
+  selection: WorkOrderRefinementModelSelection | undefined,
+  initialModel: string | undefined,
+) {
+  const [selectedModel, setSelectedModel] = useState(initialModel);
+  useEffect(() => {
+    if (!open) {
+      setSelectedModel(undefined);
+    }
+  }, [open]);
+  const model = selectedModel ?? selection?.defaultModel ?? "";
+  const modelOverride =
+    selection &&
+    !selection.isLoading &&
+    selection.options.some((option) => option.value === model) &&
+    model !== selection.defaultModel
+      ? model
+      : undefined;
+  return { model, modelOverride, setSelectedModel };
 }
 
 function preventSkillSlashMenuOutside(event: { target: EventTarget | null; preventDefault: () => void }) {
@@ -158,6 +200,7 @@ function preventSkillSlashMenuOutside(event: { target: EventTarget | null; preve
 }
 
 function RequestDialogForm({
+  modelControl,
   attachedImages,
   description,
   dictation,
@@ -171,6 +214,7 @@ function RequestDialogForm({
   factoryId,
   onDescriptionChange,
 }: {
+  modelControl: ReactNode;
   attachedImages: ReturnType<typeof mergeCreateWorkOrderRequestImages>;
   description: string;
   dictation: ReturnType<typeof useWorkOrderFieldDictation>;
@@ -234,6 +278,7 @@ function RequestDialogForm({
         pendingFiles={form.pendingFiles}
         showAttach={showAttach}
         dictate={<DictateButton dictation={dictation} copy={CREATE_WORK_ORDER_REQUEST_COPY} disabled={form.busy} />}
+        modelControl={modelControl}
         onAttach={(files) => void form.handleAttach(files)}
         onAddHostedVideo={(video) => addHostedVideo(description, form.attachedFiles, video, onDescriptionChange)}
         onRemoveAttachment={form.handleRemoveAttachment}
@@ -312,6 +357,7 @@ function RequestDialogTitleField({
 }
 
 function RequestDialogFooter({
+  modelControl,
   attachedImages,
   canAttach,
   canCreate,
@@ -323,6 +369,7 @@ function RequestDialogFooter({
   onAddHostedVideo,
   onRemoveAttachment,
 }: {
+  modelControl: ReactNode;
   attachedImages: ReturnType<typeof mergeCreateWorkOrderRequestImages>;
   canAttach: boolean;
   canCreate: boolean;
@@ -354,6 +401,7 @@ function RequestDialogFooter({
             ) : null}
             <HostedVideoLinkField disabled={isCreating} onAdd={onAddHostedVideo} />
             {dictate}
+            {modelControl}
           </div>
           <div className="ms-auto flex items-center gap-1.5">
             <Kbd className="hidden sm:inline-flex" data-testid="create-work-order-request-create-kbd">

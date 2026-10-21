@@ -107,11 +107,20 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			"git clone https://github.com/org/repo.git /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
+		runner.AgentAdditionalInstructionsField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envAnthropicAPIKey),
 		runner.AgentSkipSetupCommandsField(),
 		runner.AgentTimeoutField(),
 	}
+}
+
+func (c *RunClaudeCode) ValidateNodeConfiguration(config map[string]any) error {
+	spec, err := decodeRunClaudeCodeSpec(config)
+	if err != nil {
+		return err
+	}
+	return validateRunClaudeCodeSpec(spec)
 }
 
 func (c *RunClaudeCode) Setup(ctx core.SetupContext) error {

@@ -159,3 +159,17 @@ func scheduledIntakeSchedule(params map[string]string) (schedule.Configuration, 
 	}
 	return config, nil
 }
+
+// The proposal instructions are user-owned; the output contract is managed.
+func scheduledIntakePromptFromSteps(raw any) string {
+	steps, _ := raw.([]any)
+	for _, item := range steps {
+		step, _ := item.(map[string]any)
+		if step["type"] != "prompt" {
+			continue
+		}
+		prompt, _ := step["prompt"].(string)
+		return strings.TrimSuffix(strings.TrimRight(prompt, "\r\n"), scheduledIntakeOutputInstructions)
+	}
+	return ""
+}

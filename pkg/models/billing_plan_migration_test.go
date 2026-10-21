@@ -37,7 +37,7 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 	}
 	var before, after string
 	require.NoError(t, tx.Raw(`SELECT jsonb_agg(to_jsonb(o) ORDER BY organization_id)::text FROM organization_billing_plans o`).Scan(&before).Error)
-	migration, err := os.ReadFile("../../db/migrations/20261020121125_plan-catalog.up.sql")
+	migration, err := os.ReadFile("../../db/migrations/20261021165513_billing-catalog.up.sql")
 	require.NoError(t, err)
 	require.NoError(t, tx.Exec(string(migration)).Error)
 	require.NoError(t, tx.Raw(`SELECT jsonb_agg(to_jsonb(o)-'plan_id' ORDER BY organization_id)::text FROM organization_billing_plans o`).Scan(&after).Error)
@@ -51,10 +51,7 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 	require.NoError(t, tx.Raw(`SELECT trial_credit_cents FROM billing_plans WHERE key='trial'`).Scan(&amount).Error)
 	require.Equal(t, int64(2300), amount)
 	for _, path := range []string{
-		"../../db/migrations/20261020132828_require-plan-payment-method.up.sql",
-		"../../db/migrations/20261020183712_simplify-plan-pricing.up.sql",
-		"../../db/data_migrations/20261020183817_convert-plan-pricing.up.sql",
-		"../../db/data_migrations/20261021145656_seed-manual-business.up.sql",
+		"../../db/data_migrations/20261021171448_seed-billing-catalog.up.sql",
 	} {
 		migration, err := os.ReadFile(path)
 		require.NoError(t, err)
@@ -72,45 +69,24 @@ func TestCatalogMigrationPreservesLegacyBilling(t *testing.T) {
 		Name              string
 		PolarProductID    *string
 		CreditAmountCents int64
+		PriceCents        int64
+		PerSeat           bool
 	}
 	require.NoError(t, tx.Table("billing_plans").Where("key = ?", "business_manual").Take(&manual).Error)
 	require.Equal(t, "Business Manual", manual.Name)
 	require.Nil(t, manual.PolarProductID)
 	require.Equal(t, int64(5000), manual.CreditAmountCents)
+	require.Equal(t, int64(19900), manual.PriceCents)
+	require.False(t, manual.PerSeat)
+	var payAsYouGo struct {
+		RequirePaymentMethod bool
+		TrialCreditCents     int64
+		TrialLengthDays      int
+	}
+	require.NoError(t, tx.Table("billing_plans").Where("key = ?", "pay_as_you_go").Take(&payAsYouGo).Error)
+	require.True(t, payAsYouGo.RequirePaymentMethod)
+	require.Equal(t, int64(1000), payAsYouGo.TrialCreditCents)
+	require.Equal(t, 14, payAsYouGo.TrialLengthDays)
 	require.NoError(t, tx.Raw(`SELECT sum(amount_micros) FROM organization_llm_credit_grants`).Scan(&amount).Error)
 	require.Equal(t, int64(620000), amount)
-}
-
-func TestPricingMigrationPreservesRegularPrices(t *testing.T) {
-	tx := database.Conn().Begin()
-	require.NoError(t, tx.Error)
-	defer tx.Rollback()
-	schema := "pricing_test_" + uuid.NewString()[:8]
-	require.NoError(t, tx.Exec(`CREATE SCHEMA `+schema).Error)
-	require.NoError(t, tx.Exec(`SET LOCAL search_path TO `+schema+`, public`).Error)
-	require.NoError(t, tx.Exec(`CREATE TABLE billing_plans(key text, base_price_cents bigint, seat_price_cents bigint);
- INSERT INTO billing_plans VALUES ('free',0,0),('business_legacy',19900,3000);`).Error)
-	for _, path := range []string{
-		"../../db/migrations/20261020183712_simplify-plan-pricing.up.sql",
-		"../../db/data_migrations/20261020183817_convert-plan-pricing.up.sql",
-	} {
-		migration, err := os.ReadFile(path)
-		require.NoError(t, err)
-		// The test owns the transaction so its temporary schema is rolled back.
-		sql := strings.ReplaceAll(strings.ReplaceAll(string(migration), "BEGIN;", ""), "COMMIT;", "")
-		require.NoError(t, tx.Exec(sql).Error)
-	}
-	var plans []struct {
-		Key        string
-		PriceCents int64
-		PerSeat    bool
-	}
-	require.NoError(t, tx.Table("billing_plans").Order("key").Find(&plans).Error)
-	require.Len(t, plans, 2)
-	require.Equal(t, "business_legacy", plans[0].Key)
-	require.Equal(t, int64(19900), plans[0].PriceCents)
-	require.False(t, plans[0].PerSeat)
-	require.Equal(t, "free", plans[1].Key)
-	require.Zero(t, plans[1].PriceCents)
-	require.False(t, plans[1].PerSeat)
 }
