@@ -482,3 +482,17 @@ it("opens plan selection before provisioning when billing is enabled", async () 
   await user.click(screen.getByRole("button", { name: "Finish with selected plan" }));
   await waitFor(() => expect(model.finish).toHaveBeenCalled());
 });
+
+it.each(["issues", "billing"])("finishes with the legacy trial when billing is off at step %s", async (step) => {
+  billingState.enabled = false;
+  const user = userEvent.setup();
+  const model = pageModel({
+    hostedAgentReady: true,
+    hostedModelsAvailable: true,
+    setup: { ...withRepository(), issuesChoice: "vcs" },
+  });
+  renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
+  expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
+  await user.click(screen.getByTestId("first-run-analyze-tickets"));
+  await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
+});

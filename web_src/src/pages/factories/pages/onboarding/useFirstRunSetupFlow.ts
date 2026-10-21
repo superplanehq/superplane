@@ -437,6 +437,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   return {
     ...navigation,
     ...commands,
+    screen: navigation.screen === "billing" && !billing.data?.billingEnabled ? "tickets" : navigation.screen,
     hasBillingStep: billing.data?.billingEnabled === true,
     finishSetup: () =>
       blocking.run("finishing-setup", async () => {

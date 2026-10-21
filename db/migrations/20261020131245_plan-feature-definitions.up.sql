@@ -7,6 +7,4 @@ CREATE TABLE plan_feature_definitions (
 INSERT INTO plan_feature_definitions (key, label, gated) VALUES
  ('byo_subscription', 'Bring your own subscription', false),
  ('byo_key', 'Bring your own API key', false),
- ('centralized_billing', 'Centralized billing', false),
- ('self_hosted_app', 'Self-hosted application', false),
- ('priority_support', 'Priority support', false);
+ ('centralized_billing', 'Centralized billing', false);

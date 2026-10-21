@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -55,6 +56,13 @@ func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool,
 
 func AssertOrganizationPaymentMethod(tx *gorm.DB, orgID uuid.UUID) error {
 	if !models.BillingEnabled() {
+		return nil
+	}
+	enabled, err := models.OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureNewBilling)
+	if err != nil {
+		return err
+	}
+	if !enabled {
 		return nil
 	}
 	plan, err := models.ResolveOrganizationBillingPlan(tx, orgID)

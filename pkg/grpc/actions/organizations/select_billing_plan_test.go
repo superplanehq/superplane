@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -21,6 +22,7 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	plan := models.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: "Pay as you go", Category: "paid", Visibility: "public", RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
 	hasCard := false
@@ -55,10 +57,52 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
 }
 
+func TestNewBillingIsOptInAndKeepsMigratedTrial(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	requests := 0
+	server := polarAPIServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
+	})
+	usePolarTestServer(t, server)
+	require.NoError(t, models.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cust_legacy"))
+	trial, err := models.FindBillingPlan(db, models.BillingPlanTrial)
+	require.NoError(t, err)
+	plan := models.BillingPlan{Key: "opt_in_" + uuid.NewString()[:8], Name: "Opt in", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+
+	response, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	require.False(t, response.BillingEnabled)
+	require.Empty(t, response.AvailablePlans)
+	require.False(t, response.SubscriptionCheckoutEnabled)
+	require.False(t, response.RequirePaymentMethod)
+	require.True(t, response.HostedExecutionAllowed)
+	require.Equal(t, trial.ID.String(), response.CatalogId)
+	require.Equal(t, models.BillingPlanTrial, response.CatalogKey)
+	require.Equal(t, trial.TrialCreditCents, response.WelcomeRemainingCents)
+
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	_, err = CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{}, r.Account.ID.String())
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	require.Zero(t, requests, "legacy onboarding must not contact Polar")
+
+	plan.RequirePaymentMethod = true
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
+	require.Zero(t, requests, "card requirements must remain off without the flag")
+}
+
 func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	product := "prod_selected_" + uuid.NewString()
 	plan := models.BillingPlan{Key: "paid_" + uuid.NewString()[:8], Name: "Paid", Category: "paid", Visibility: "public", PriceCents: 25000, PolarProductID: &product, RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
@@ -103,6 +147,7 @@ func TestPaymentMethodSetupCreatesCustomerWithoutCheckout(t *testing.T) {
 	sessionToken := "polar_cst_setup"
 	r := support.Setup(t)
 	defer r.Close()
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(database.DB(t.Context()), r.Organization.ID, features.FeatureNewBilling))
 	created := false
 	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {

@@ -307,6 +307,9 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 		if err != nil {
 			return err
 		}
+		if err := addInitialPlanTrialCredit(inner, existing, saved); err != nil {
+			return err
+		}
 		if planName == BillingPlanTrial && trialEndsAt != nil && saved.TrialEndsAt != nil {
 			if err := SetWelcomeGrantExpiresAt(inner, orgID, *saved.TrialEndsAt); err != nil {
 				return err
@@ -426,6 +429,9 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 
 		saved, err = loadedOrganizationBillingPlan(inner, orgID)
 		if err != nil {
+			return err
+		}
+		if err := addInitialPlanTrialCredit(inner, existing, saved); err != nil {
 			return err
 		}
 		grantIncluded = shouldGrantIncludedUsage(existing, saved)

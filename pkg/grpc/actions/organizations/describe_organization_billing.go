@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -39,6 +40,11 @@ func DescribeOrganizationBilling(
 	}
 
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
+	newBilling, err := models.OrganizationHasExperimentalFeatures(db, organizationID, features.FeatureNewBilling)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
+	}
+	billingEnabled = billingEnabled && newBilling
 	hasCard := false
 	if billingEnabled && hasCustomer {
 		hasCard, err = polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())
@@ -63,14 +69,14 @@ func DescribeOrganizationBilling(
 	}
 	return &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
-		RequirePaymentMethod:        models.BillingEnabled() && plan.Catalog.RequirePaymentMethod,
+		RequirePaymentMethod:        models.BillingEnabled() && newBilling && plan.Catalog.RequirePaymentMethod,
 		HasPaymentMethod:            hasCard,
 		AvailablePlans:              available,
 		CatalogId:                   plan.PlanID.String(),
 		CatalogKey:                  plan.Catalog.Key,
 		CatalogName:                 plan.Catalog.Name,
 		CatalogCategory:             plan.Catalog.Category,
-		HostedExecutionAllowed:      !models.BillingEnabled() || plan.AllowsHostedExecution(time.Now()) && (!plan.Catalog.RequirePaymentMethod || hasCard),
+		HostedExecutionAllowed:      !models.BillingEnabled() || plan.AllowsHostedExecution(time.Now()) && (!newBilling || !plan.Catalog.RequirePaymentMethod || hasCard),
 		PlanSource:                  plan.PlanSource,
 		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
 		TrialEndsAt:                 protoTimestamp(plan.TrialEndsAt),

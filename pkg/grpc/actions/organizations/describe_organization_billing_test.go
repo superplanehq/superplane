@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -273,6 +274,7 @@ func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	plans := []models.BillingPlan{

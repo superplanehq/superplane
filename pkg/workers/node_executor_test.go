@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testcontexts "github.com/superplanehq/superplane/test/support/contexts"
@@ -588,6 +589,7 @@ func TestNodeExecutorRejectsUsageWithoutRequiredCard(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	plan := models.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
 	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
