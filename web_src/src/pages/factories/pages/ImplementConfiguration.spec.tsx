@@ -6,9 +6,9 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
 import { ImplementConfiguration } from "./ImplementConfiguration";
 import { implementConfigGraph } from "./MergeConfidenceConfigModal.spec.fixtures";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 
-function renderSettings(agent: SuperplaneComponentsNode, onSave: (update: NodeConfigurationUpdate) => void) {
+function renderSettings(agent: SuperplaneComponentsNode, onSave: (update: NodeConfigurationSave) => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(experimentalFeaturesKeys.registry(), { features: [] });
   return render(
@@ -36,13 +36,18 @@ describe("ImplementConfiguration", () => {
       fireEvent.change(duration, { target: { value: invalid } });
       fireEvent.blur(duration);
       expect(duration).toHaveAttribute("aria-invalid", "true");
-      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("Enter a duration from 1 second to 1440 minutes.");
+      expect(screen.getByTestId("implement-settings-save")).toBeDisabled();
       expect(onSaveNode).not.toHaveBeenCalled();
     }
     fireEvent.change(duration, { target: { value: "120" } });
     expect(onSaveNode).not.toHaveBeenCalled();
     fireEvent.blur(duration);
+    fireEvent.keyDown(duration, { key: "Enter" });
+    expect(onSaveNode).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByTestId("implement-settings-save"));
     await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(1));
     expect(onSaveNode).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -54,26 +59,17 @@ describe("ImplementConfiguration", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it.each(["120", "0", ""])("preserves only valid duration edits when dismissed without blur: %s", async (minutes) => {
+  it.each(["120", "0", ""])("does not save duration edits on blur or unmount: %s", (minutes) => {
     const onSaveNode = vi.fn();
     const graph = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Keep this prompt" }]);
     const agent = graph.specNodes![1];
     const view = renderSettings(agent, onSaveNode);
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" }), {
-      target: { value: minutes },
-    });
+    const duration = screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" });
+    fireEvent.change(duration, { target: { value: minutes } });
+    fireEvent.blur(duration);
+    fireEvent.keyDown(duration, { key: "Enter" });
     expect(onSaveNode).not.toHaveBeenCalled();
     view.unmount();
-
-    if (minutes !== "120") {
-      expect(onSaveNode).not.toHaveBeenCalled();
-      return;
-    }
-    await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(1));
-    expect(onSaveNode).toHaveBeenCalledWith(
-      expect.objectContaining({
-        configuration: { ...graph.specNodes![1].configuration, executionTimeoutSeconds: 7200 },
-      }),
-    );
+    expect(onSaveNode).not.toHaveBeenCalled();
   });
 });

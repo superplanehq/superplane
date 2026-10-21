@@ -146,12 +146,17 @@ function ImplementConfigPreview({
           onClose={() => console.log("Close Implement settings")}
           onDelete={() => console.log("Delete Implement automation")}
           onSaveNode={(update) => {
-            console.log("Save Implement settings", update);
+            const updates = Array.isArray(update) ? update : [update];
+            console.log("Save Implement settings", updates);
             setSpecNodes((nodes) =>
-              nodes.map((node) =>
-                node.id === update.nodeId
-                  ? { ...node, name: update.name, configuration: update.configuration, concurrency: update.concurrency }
-                  : node,
+              updates.reduce(
+                (current, next) =>
+                  current.map((node) =>
+                    node.id === next.nodeId
+                      ? { ...node, name: next.name, configuration: next.configuration, concurrency: next.concurrency }
+                      : node,
+                  ),
+                nodes,
               ),
             );
           }}
@@ -193,6 +198,8 @@ export const InvalidDuration: Story = {
     await userEvent.clear(duration);
     await userEvent.tab();
     await expect(canvas.getByRole("alert")).toBeVisible();
+    await expect(canvas.getByRole("alert")).toHaveTextContent("Enter a duration from 1 second to 1440 minutes.");
+    await expect(canvas.getByTestId("implement-settings-save")).toBeDisabled();
   },
 };
 export const FeatureDisabled: Story = {
