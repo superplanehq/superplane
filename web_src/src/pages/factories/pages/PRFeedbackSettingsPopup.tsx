@@ -65,6 +65,7 @@ export function PRFeedbackSettingsPopup({
 }: PRFeedbackSettingsPopupProps) {
   const [draft, setDraft] = useState(settings);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const agentTabAvailable = settings.source === "checks" && Boolean(agent);
   const history = useFactoryAutomationNavigation({
     organizationId,
     factoryId,
@@ -72,7 +73,7 @@ export function PRFeedbackSettingsPopup({
     agent,
     parameter: "prFeedbackSettings",
     initialTab,
-    hasAgent: Boolean(agent),
+    hasAgent: agentTabAvailable,
   });
   const { tab, setTab } = history;
   const settingsKey = JSON.stringify(settings);
@@ -93,7 +94,7 @@ export function PRFeedbackSettingsPopup({
         <FactoryAutomationSettingsTabs
           tab={tab}
           onTabChange={setTab}
-          hasAgent={Boolean(agent)}
+          hasAgent={agentTabAvailable}
           historyEnabled={history.enabled}
           label={PR_FEEDBACK_SETTINGS_COPY.tabsLabel}
           testId="pr-feedback-settings"
@@ -110,7 +111,7 @@ export function PRFeedbackSettingsPopup({
           error={automationError}
           onRetry={onRetryAutomation}
         />
-      ) : tab === "agent" && agent ? (
+      ) : tab === "agent" && agentTabAvailable && agent ? (
         <PlanningReviewEditor
           key={agent.draft?.components[0]?.id ?? "agent"}
           initialDraft={agent.draft}

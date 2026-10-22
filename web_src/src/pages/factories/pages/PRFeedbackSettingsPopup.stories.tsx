@@ -7,11 +7,11 @@ import { draftWithBashCommand, LONG_BASH_COMMAND } from "./planningReviewFindBox
 import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 
 const settings: PRFeedbackDraftSettings = {
-  source: "discussion",
-  name: "Address PR feedback",
+  source: "checks",
+  name: "Fix pull request checks",
   repository: "acme/payments",
-  mention: "@superplaneagent",
-  ignoreBots: true,
+  mention: "",
+  ignoreBots: false,
   addressAllBots: false,
   allowedBots: [],
   checkNames: [],
