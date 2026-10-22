@@ -25,7 +25,7 @@ func TestVersionedEncryptorReadsOldDataKeyAfterRotation(t *testing.T) {
 	first := DataKey{ID: uuid.New(), Material: bytes.Repeat([]byte{1}, 32)}
 	second := DataKey{ID: uuid.New(), Material: bytes.Repeat([]byte{2}, 32)}
 	keys := &testDataKeys{active: first, keys: map[uuid.UUID]DataKey{first.ID: first, second.ID: second}}
-	encryptor := NewVersionedEncryptor(keys, NewAESGCMEncryptor(bytes.Repeat([]byte{3}, 32)))
+	encryptor := NewVersionedEncryptor(keys)
 	ctx := context.Background()
 
 	oldValue, err := encryptor.Encrypt(ctx, []byte("secret"), []byte("record-1"))
@@ -52,46 +52,9 @@ func TestVersionedEncryptorReadsOldDataKeyAfterRotation(t *testing.T) {
 	}
 }
 
-func TestVersionedEncryptorReadsLegacyCiphertext(t *testing.T) {
-	legacy := NewAESGCMEncryptor(bytes.Repeat([]byte{3}, 32))
-	oldValue, err := legacy.Encrypt(context.Background(), []byte("legacy"), []byte("record"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	encryptor := NewVersionedEncryptor(&testDataKeys{}, legacy)
-	plain, err := encryptor.Decrypt(context.Background(), oldValue, []byte("record"))
-	if err != nil || !bytes.Equal(plain, []byte("legacy")) {
-		t.Fatalf("decrypt legacy: %q, %v", plain, err)
-	}
-}
-
-func TestVersionedEncryptorLegacyWriteModeReadsBothFormats(t *testing.T) {
-	ctx := context.Background()
-	key := DataKey{ID: uuid.New(), Material: bytes.Repeat([]byte{1}, 32)}
-	keys := &testDataKeys{active: key, keys: map[uuid.UUID]DataKey{key.ID: key}}
-	legacy := NewAESGCMEncryptor(bytes.Repeat([]byte{2}, 32))
-	versioned := NewVersionedEncryptor(keys, legacy)
-	compatible := versioned.WithLegacyWrites()
-	aad := []byte("record")
-
-	legacyValue, err := compatible.Encrypt(ctx, []byte("old"), aad)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, versionedValue, err := EncryptedDataKeyID(legacyValue); err != nil || versionedValue {
-		t.Fatalf("legacy write has versioned envelope: %v", err)
-	}
-	newValue, err := versioned.Encrypt(ctx, []byte("new"), aad)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, item := range []struct {
-		value []byte
-		want  string
-	}{{legacyValue, "old"}, {newValue, "new"}} {
-		plain, err := compatible.Decrypt(ctx, item.value, aad)
-		if err != nil || string(plain) != item.want {
-			t.Fatalf("decrypt compatible value: %q, %v", plain, err)
-		}
+func TestVersionedEncryptorRejectsUnmarkedCiphertext(t *testing.T) {
+	encryptor := NewVersionedEncryptor(&testDataKeys{})
+	if _, err := encryptor.Decrypt(context.Background(), []byte("unmarked"), []byte("record")); err == nil {
+		t.Fatal("unmarked ciphertext was accepted")
 	}
 }

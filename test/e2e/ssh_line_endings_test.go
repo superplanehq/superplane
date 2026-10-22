@@ -16,6 +16,7 @@ import (
 	"gorm.io/datatypes"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -99,6 +100,10 @@ func (s *sshLineEndingsSteps) createPasswordSecret() {
 		sshLineEndingSecretKey: sshLineEndingPassword,
 	})
 	require.NoError(s.t, err)
+	encryptor, err := crypto.ProcessEncryptor()
+	require.NoError(s.t, err)
+	encrypted, err := encryptor.Encrypt(s.t.Context(), data, []byte(sshLineEndingSecretName))
+	require.NoError(s.t, err)
 
 	_, err = models.CreateSecret(
 		sshLineEndingSecretName,
@@ -106,7 +111,7 @@ func (s *sshLineEndingsSteps) createPasswordSecret() {
 		s.session.Account.ID.String(),
 		models.DomainTypeOrganization,
 		s.session.OrgID,
-		data,
+		encrypted,
 	)
 	require.NoError(s.t, err)
 }

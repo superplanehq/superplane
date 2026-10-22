@@ -56,13 +56,13 @@ func TestStoreCreatesDataKeysAndRewrapsMaster(t *testing.T) {
 	v2 := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{2}, 32))
 	store := NewStore(masters, "local-v1")
 	require.NoError(t, store.Initialize(ctx))
-	encryptor := crypto.NewVersionedEncryptor(store, nil)
+	encryptor := crypto.NewVersionedEncryptor(store)
 	oldValue, err := encryptor.Encrypt(ctx, []byte("old value"), []byte("record"))
 	require.NoError(t, err)
 
 	store = NewStore(masters, "local-v2")
 	require.NoError(t, store.Initialize(ctx))
-	encryptor = crypto.NewVersionedEncryptor(store, nil)
+	encryptor = crypto.NewVersionedEncryptor(store)
 	newID, err := store.CreateAndActivateDataKey(ctx)
 	require.NoError(t, err)
 	newValue, err := encryptor.Encrypt(ctx, []byte("new value"), []byte("record"))
@@ -101,7 +101,7 @@ func TestStoreEncryptsWithActiveKeyInsideTransaction(t *testing.T) {
 	db := storeTestDB(t)
 	store := NewStore(storeTestMasterKeys(t), "local-v1")
 	require.NoError(t, store.Initialize(ctx))
-	encryptor := NewApplicationEncryptor(crypto.NewVersionedEncryptor(store, nil), store)
+	encryptor := NewApplicationEncryptor(crypto.NewVersionedEncryptor(store), store)
 
 	var ciphertext []byte
 	var newID uuid.UUID
