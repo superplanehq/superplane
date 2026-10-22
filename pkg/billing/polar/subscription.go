@@ -258,9 +258,12 @@ func VerifyOrganizationSubscription(ctx context.Context, orgID uuid.UUID) (strin
 }
 
 func SubscriptionDashboardURL(subscriptionID string) string {
-	slug := strings.TrimSpace(os.Getenv("POLAR_DASHBOARD_ORGANIZATION_SLUG"))
-	if slug == "" || strings.TrimSpace(subscriptionID) == "" {
+	if strings.TrimSpace(subscriptionID) == "" {
 		return ""
+	}
+	slug := strings.TrimSpace(os.Getenv("POLAR_DASHBOARD_ORGANIZATION_SLUG"))
+	if slug == "" {
+		slug = "superplane-inc"
 	}
 	host := "https://sandbox.polar.sh"
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("POLAR_ENVIRONMENT")), "production") {
