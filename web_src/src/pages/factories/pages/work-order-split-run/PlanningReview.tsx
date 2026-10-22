@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 
-import { ChevronRight, FileText } from "lucide-react";
+import { ChevronDown, FileText } from "lucide-react";
 
 import { Link } from "@/components/Link/link";
 import { Frame, FramePanel } from "@/components/reui/frame";
@@ -300,7 +300,7 @@ function PlanToggle({
       </span>
       <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-foreground/70 group-hover:text-foreground">
         {open ? "Hide plan" : "Open plan"}
-        <ChevronRight aria-hidden className={cn("size-3.5 transition-transform", open && "rotate-90")} />
+        <ChevronDown aria-hidden className={cn("size-3.5 transition-transform", open && "rotate-180")} />
         <PlanStatusMark isAnalyzing={isAnalyzing} planStatus={planStatus} />
       </span>
     </Button>

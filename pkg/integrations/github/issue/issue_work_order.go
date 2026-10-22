@@ -92,17 +92,16 @@ func lockKey(factoryID uuid.UUID, ref Ref) int64 {
 	return int64(binary.BigEndian.Uint64(digest[:8]))
 }
 
-// HasActiveWorkOrder reports whether this factory has a task for the issue
-// that is not closed. A closed task does not count, so a reopened issue can
-// create a new task.
-func HasActiveWorkOrder(tx *gorm.DB, factory *models.Factory, ref Ref) (bool, error) {
+// FindActiveWorkOrder returns a task for this issue that is not closed.
+// A closed task does not count, so a reopened issue can create a new task.
+func FindActiveWorkOrder(tx *gorm.DB, factory *models.Factory, ref Ref) (*models.FactoryWorkOrder, error) {
 	if factory == nil || !ref.valid() {
-		return false, nil
+		return nil, nil
 	}
 
 	orders, err := factory.ListWorkOrdersByOriginURLFragment(tx, ref.Repository+"/issues/"+strconv.Itoa(ref.Number))
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	for i := range orders {
@@ -110,8 +109,8 @@ func HasActiveWorkOrder(tx *gorm.DB, factory *models.Factory, ref Ref) (bool, er
 			continue
 		}
 		if found, ok := RefFromURL(*orders[i].OriginURL); ok && found == ref {
-			return true, nil
+			return &orders[i], nil
 		}
 	}
-	return false, nil
+	return nil, nil
 }

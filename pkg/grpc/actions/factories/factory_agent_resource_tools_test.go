@@ -24,7 +24,7 @@ import (
 
 func Test__ListFactoryAgentResourceToolsReturnsNames(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -62,7 +62,7 @@ func Test__ListFactoryAgentResourceToolsReturnsNames(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsRejectsSkills(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -85,7 +85,7 @@ func Test__ListFactoryAgentResourceToolsRejectsSkills(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsRequiresOAuthConnection(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -109,7 +109,7 @@ func Test__ListFactoryAgentResourceToolsRequiresOAuthConnection(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsUsesTokenWhenReconnectIsNeeded(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func Test__ListFactoryAgentResourceToolsUsesTokenWhenReconnectIsNeeded(t *testin
 
 func Test__ListFactoryAgentResourceToolsRejectsNonJSON(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -190,7 +190,7 @@ func Test__ListFactoryAgentResourceToolsRejectsNonJSON(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsDoesNotRestoreRemovedWriteTools(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -235,7 +235,7 @@ func Test__ListFactoryAgentResourceToolsDoesNotRestoreRemovedWriteTools(t *testi
 
 func Test__ListFactoryAgentResourceToolsKeepsExistingDenylist(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -269,7 +269,7 @@ func Test__ListFactoryAgentResourceToolsKeepsExistingDenylist(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsMarksEmptyListApplied(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -299,7 +299,7 @@ func Test__ListFactoryAgentResourceToolsMarksEmptyListApplied(t *testing.T) {
 
 func Test__ListFactoryAgentResourceToolsSavesDefaultsFromTheReturnedList(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -358,7 +358,7 @@ func Test__ListFactoryAgentResourceToolsSavesDefaultsFromTheReturnedList(t *test
 
 func Test__ListFactoryAgentResourceToolsReturnsErrorWhenDefaultSaveFails(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	require.NoError(t, db.Exec(`
 		ALTER TABLE factory_agent_resources
@@ -432,7 +432,7 @@ func Test__ListFactoryAgentResourceToolsDoesNotApplyDefaultsForAReplacedServer(t
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := support.Setup(t)
-			enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+			enableWorkspaceSkills(t, r.Organization.ID)
 			db := database.DB(t.Context())
 			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 			require.NoError(t, err)
@@ -489,7 +489,7 @@ func Test__ListFactoryAgentResourceToolsDoesNotApplyDefaultsForAReplacedServer(t
 
 func Test__SaveDefaultMCPWriteToolsDoesNotReplaceAppliedDenylist(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

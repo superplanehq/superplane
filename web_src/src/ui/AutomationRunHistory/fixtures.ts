@@ -44,7 +44,6 @@ export const implementationRuns: AutomationRun[] = titles.map((title, index) => 
         name: "Run started",
         status: "Passed",
         recordedAt: fixtureTime(index),
-        logs: { state: "empty" },
         outputs: { task: { id: taskIds[index], title } },
       },
       {
@@ -66,7 +65,6 @@ export const implementationRuns: AutomationRun[] = titles.map((title, index) => 
               name: "Record implementation failure",
               status: "Passed" as const,
               recordedAt: fixtureTime(index, "14:18"),
-              logs: { state: "empty" as const },
               outputs: { result: "failed", message: error },
             },
           ]
@@ -91,14 +89,12 @@ export const verificationRuns: AutomationRun[] = implementationRuns.map((run, in
             name: "Pull request review received",
             status: "Passed",
             recordedAt: fixtureTime(index, "14:32"),
-            logs: { state: "empty" },
           },
           {
             id: "find",
             name: "Find pull request",
             status: "Passed",
             recordedAt: fixtureTime(index, "14:32"),
-            logs: { state: "empty" },
             outputs: { channel: "notFound", type: "pullRequest.notFound" },
           },
         ]

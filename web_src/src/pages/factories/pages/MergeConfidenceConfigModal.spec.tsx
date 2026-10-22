@@ -9,11 +9,7 @@ import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
-import {
-  FEATURE_FACTORY_RUN_HISTORY,
-  FEATURE_WORKSPACE_MCP,
-  FEATURE_WORKSPACE_SKILLS,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_RUN_HISTORY, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -98,7 +94,7 @@ function renderModal(
   options: { initialNodeId?: string; runHistoryEnabled?: boolean; onClose?: () => void } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const features = [FEATURE_FACTORY_RUN_HISTORY, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+  const features = [FEATURE_FACTORY_RUN_HISTORY, FEATURE_WORKSPACE_SKILLS];
   client.setQueryData(experimentalFeaturesKeys.registry(), {
     features: features.map((id) => ({ id, released: false })),
   });

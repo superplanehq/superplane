@@ -60,4 +60,26 @@ describe("Implement run history data", () => {
     expect(activities[1].additionalInstructions).toBe("Instructions captured for this run");
     expect(activities[0].additionalInstructions).toBeUndefined();
   });
+  it("keeps logs available for historical runner steps before a broker task exists", () => {
+    const activities = toRunActivities(
+      {
+        id: "run",
+        executions: [{ id: "agent", nodeId: "agent", componentName: "runnerOpenCode" }],
+        queueItems: [
+          { id: "queued", nodeId: "queued-agent" },
+          { id: "queued-filter", nodeId: "filter" },
+        ],
+      },
+      [],
+      [
+        { id: "agent", component: "if" },
+        { id: "queued-agent", component: "runnerSuperPlane" },
+        { id: "filter", component: "if" },
+      ],
+    );
+    expect(activities.find((activity) => activity.id === "agent")?.logs).toBeDefined();
+    expect(activities.find((activity) => activity.id === "agent")?.defaultTab).toBe("logs");
+    expect(activities.find((activity) => activity.id === "queue:queued")?.logs).toEqual({ state: "waiting" });
+    expect(activities.find((activity) => activity.id === "queue:queued-filter")?.logs).toBeUndefined();
+  });
 });
