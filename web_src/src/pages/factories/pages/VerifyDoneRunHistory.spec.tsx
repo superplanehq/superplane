@@ -101,6 +101,32 @@ describe("Verify and Done run history", () => {
     expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
   });
 
+  it("opens pull request closure on runs without the automation tab", () => {
+    renderPage(
+      <MergeConfidenceConfigModal
+        title="PR Closure"
+        canvasId="canvas"
+        factoryId="factory"
+        graph={{
+          organizationId: "org",
+          factoryId: "factory",
+          nodes: [],
+          edges: [],
+          specNodes: [{ id: "on-pr-closed", type: "TYPE_TRIGGER" }],
+        }}
+        onClose={() => {}}
+        onSaveNode={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "PR Closure" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
+  });
+
   it.each(["discussion", "checks"] as const)("shares %s settings and run selection through the URL", async (source) => {
     const user = userEvent.setup();
     renderPage(
