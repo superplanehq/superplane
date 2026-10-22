@@ -1,6 +1,7 @@
 package pulls
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -315,7 +316,7 @@ func isSuperPlaneGitHubAuthor(eventType string, data map[string]any, appLogins [
 // connectedGitHubAppLogins is the GitHub App that posts SuperPlane comments.
 // A custom app uses its own bot login, not superplaneagent[bot].
 func connectedGitHubAppLogins(integration core.IntegrationContext, data map[string]any) []string {
-	logins := make([]string, 0, 2)
+	logins := make([]string, 0, 3)
 	if slug := installationAppSlug(data); slug != "" {
 		logins = append(logins, slug)
 	}
@@ -326,6 +327,11 @@ func connectedGitHubAppLogins(integration core.IntegrationContext, data map[stri
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err == nil {
 		if slug := strings.TrimSpace(metadata.GitHubApp.Slug); slug != "" {
 			logins = append(logins, slug)
+		}
+		if metadata.HostedApp {
+			if app, ok := common.ResolveHostedApp(context.Background()); ok {
+				logins = append(logins, app.Slug)
+			}
 		}
 	}
 	properties := integration.Properties()
