@@ -195,6 +195,12 @@ until backup retention and any remaining writes permit removal.
 
 ## Master Key Rewrap
 
+A change to the primary master key requires every API and worker instance to
+have both the old and new master keys before data key creation or rewrap.
+Otherwise, an instance can fail at startup when it cannot unwrap a stored data
+key. The old master key remains available until rewrap and backup retention
+permit its removal.
+
 A rewrap decrypts each stored data key with its recorded master key reference
 and encrypts it with the configured primary master key. The operation updates
 all wrapped data keys and their references in one database transaction. A
