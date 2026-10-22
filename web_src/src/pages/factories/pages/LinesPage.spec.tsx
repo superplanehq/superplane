@@ -2233,7 +2233,7 @@ describe("LinesPage Implement phase window", () => {
     useFactoryWorkOrders.mockReturnValue({ data: [order] });
     renderLinesBoard();
     const card = within(screen.getByTestId("lines-verify-column")).getByTestId("work-order-card-wo-kickoff-0");
-    expect(within(card).getByText("Review: Queued #1")).toBeVisible();
+    expect(within(card).getByRole("status")).toHaveTextContent("Queued #1");
     expect(within(card).queryByRole("button", { name: /from queue/ })).not.toBeInTheDocument();
   });
 
