@@ -546,7 +546,7 @@ describe("OrgLLMCreditSection balances", () => {
     grantsFailed = false;
     const history = screen.getByTestId("admin-org-credit-history");
     await user.click(within(history).getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("Trial adjustment")).toBeInTheDocument();
-    expect(screen.queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
+    expect(await within(history).findByText("Trial adjustment")).toBeInTheDocument();
+    expect(within(history).queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
   });
 });
