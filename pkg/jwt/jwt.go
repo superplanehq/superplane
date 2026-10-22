@@ -23,6 +23,16 @@ func (s *Signer) Generate(subject string, duration time.Duration) (string, error
 // GenerateWithClaims creates a JWT with the standard time claims plus any additional custom claims.
 // Extra claims must not override the reserved time claims (iat, nbf, exp).
 func (s *Signer) GenerateWithClaims(duration time.Duration, extraClaims map[string]string) (string, error) {
+	values := make(map[string]any, len(extraClaims))
+	for k, v := range extraClaims {
+		values[k] = v
+	}
+	return s.GenerateWithJSONClaims(duration, values)
+}
+
+// GenerateWithJSONClaims is GenerateWithClaims for claims that are not plain
+// strings, such as lists. Extra claims must not override iat, nbf, or exp.
+func (s *Signer) GenerateWithJSONClaims(duration time.Duration, extraClaims map[string]any) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
 		"iat": now.Unix(),

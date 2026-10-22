@@ -26,7 +26,7 @@ func Test__ListFactoryMCPClients(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	now := time.Now()
-	token := insertFactoryMCPRefreshToken(t, r, factory.ID, localMCPClientID, now.Add(time.Hour), now)
+	token := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, localMCPClientID, now.Add(time.Hour), now)
 
 	response, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{
 		FactoryId: factory.ID.String(),
@@ -50,7 +50,7 @@ func Test__ListFactoryMCPClientsUsesRegisteredClientName(t *testing.T) {
 	_, err = models.CreateMCPOAuthClient(db, "cursor-dcr", "Cursor Desktop", []string{"cursor://callback"})
 	require.NoError(t, err)
 	now := time.Now()
-	insertFactoryMCPRefreshToken(t, r, factory.ID, "cursor-dcr", now.Add(time.Hour), now)
+	insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, "cursor-dcr", now.Add(time.Hour), now)
 
 	response, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{
 		FactoryId: factory.ID.String(),
@@ -79,10 +79,10 @@ func Test__ListFactoryMCPClientsNamesCodexMetadataClient(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now()
-	codex := insertFactoryMCPRefreshToken(t, r, factory.ID, codexID, now.Add(time.Hour), now)
-	named := insertFactoryMCPRefreshToken(t, r, factory.ID, namedCodexID, now.Add(time.Hour), now.Add(time.Second))
-	stored := insertFactoryMCPRefreshToken(t, r, factory.ID, storedCodexID, now.Add(time.Hour), now.Add(2*time.Second))
-	other := insertFactoryMCPRefreshToken(t, r, factory.ID, otherID, now.Add(time.Hour), now.Add(3*time.Second))
+	codex := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, codexID, now.Add(time.Hour), now)
+	named := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, namedCodexID, now.Add(time.Hour), now.Add(time.Second))
+	stored := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, storedCodexID, now.Add(time.Hour), now.Add(2*time.Second))
+	other := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, otherID, now.Add(time.Hour), now.Add(3*time.Second))
 
 	response, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{
 		FactoryId: factory.ID.String(),
@@ -121,7 +121,7 @@ func Test__RevokeFactoryMCPClient(t *testing.T) {
 	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	now := time.Now()
-	token := insertFactoryMCPRefreshToken(t, r, factory.ID, localMCPClientID, now.Add(time.Hour), now)
+	token := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, localMCPClientID, now.Add(time.Hour), now)
 
 	_, err = RevokeFactoryMCPClient(t.Context(), r.Organization.ID.String(), &pb.RevokeFactoryMCPClientRequest{
 		FactoryId: otherFactory.ID.String(),
@@ -146,6 +146,52 @@ func Test__RevokeFactoryMCPClient(t *testing.T) {
 	assert.Empty(t, listed.GetClients())
 }
 
+func Test__MultiWorkspaceMCPClientListsInEveryWorkspaceAndRevokesOneAtATime(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	db := database.DB(t.Context())
+	alpha, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "ALP")
+	require.NoError(t, err)
+	beta, err := models.CreateFactory(db, r.Organization.ID, "Beta", "", "BET")
+	require.NoError(t, err)
+	now := time.Now()
+	token := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{alpha.ID, beta.ID}, localMCPClientID, now.Add(time.Hour), now)
+
+	list := func(factory *models.Factory) []*pb.FactoryMCPClient {
+		response, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		return response.GetClients()
+	}
+	revoke := func(factory *models.Factory) error {
+		_, err := RevokeFactoryMCPClient(t.Context(), r.Organization.ID.String(), &pb.RevokeFactoryMCPClientRequest{
+			FactoryId: factory.ID.String(),
+			ClientId:  token.ID.String(),
+		})
+		return err
+	}
+
+	inAlpha := list(alpha)
+	require.Len(t, inAlpha, 1)
+	assert.Equal(t, []string{"Beta"}, inAlpha[0].GetOtherWorkspaceNames())
+	inBeta := list(beta)
+	require.Len(t, inBeta, 1)
+	assert.Equal(t, []string{"Alpha"}, inBeta[0].GetOtherWorkspaceNames())
+
+	require.NoError(t, revoke(alpha))
+	assert.Empty(t, list(alpha))
+	remaining := list(beta)
+	require.Len(t, remaining, 1)
+	assert.Empty(t, remaining[0].GetOtherWorkspaceNames())
+
+	require.NoError(t, revoke(beta))
+	assert.Empty(t, list(beta))
+	err = revoke(beta)
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
+}
+
 func Test__RevokeFactoryMCPClientDeletesRotatedTokens(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
@@ -153,9 +199,9 @@ func Test__RevokeFactoryMCPClientDeletesRotatedTokens(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	now := time.Now()
-	listed := insertFactoryMCPRefreshToken(t, r, factory.ID, localMCPClientID, now.Add(time.Hour), now)
-	rotated := insertFactoryMCPRefreshToken(t, r, factory.ID, localMCPClientID, now.Add(time.Hour), now.Add(time.Second))
-	other := insertFactoryMCPRefreshToken(t, r, factory.ID, "other-client", now.Add(time.Hour), now)
+	listed := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, localMCPClientID, now.Add(time.Hour), now)
+	rotated := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, localMCPClientID, now.Add(time.Hour), now.Add(time.Second))
+	other := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, "other-client", now.Add(time.Hour), now)
 
 	_, err = RevokeFactoryMCPClient(t.Context(), r.Organization.ID.String(), &pb.RevokeFactoryMCPClientRequest{
 		FactoryId: factory.ID.String(),
@@ -179,9 +225,9 @@ func Test__RevokeFactoryMCPClientDeletesAuthorizationCodes(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	now := time.Now()
-	listed := insertFactoryMCPRefreshToken(t, r, factory.ID, localMCPClientID, now.Add(time.Hour), now)
-	pending := insertFactoryMCPAuthCode(t, r, factory.ID, localMCPClientID, now.Add(time.Minute))
-	other := insertFactoryMCPAuthCode(t, r, factory.ID, "other-client", now.Add(time.Minute))
+	listed := insertFactoryMCPRefreshToken(t, r, []uuid.UUID{factory.ID}, localMCPClientID, now.Add(time.Hour), now)
+	pending := insertFactoryMCPAuthCode(t, r, []uuid.UUID{factory.ID}, localMCPClientID, now.Add(time.Minute))
+	other := insertFactoryMCPAuthCode(t, r, []uuid.UUID{factory.ID}, "other-client", now.Add(time.Minute))
 
 	_, err = RevokeFactoryMCPClient(t.Context(), r.Organization.ID.String(), &pb.RevokeFactoryMCPClientRequest{
 		FactoryId: factory.ID.String(),
@@ -214,7 +260,7 @@ func Test__RevokeFactoryMCPClientRejectsInvalidID(t *testing.T) {
 func insertFactoryMCPRefreshToken(
 	t *testing.T,
 	r *support.ResourceRegistry,
-	factoryID uuid.UUID,
+	factoryIDs []uuid.UUID,
 	clientID string,
 	expiresAt time.Time,
 	createdAt time.Time,
@@ -225,7 +271,7 @@ func insertFactoryMCPRefreshToken(
 		ClientID:       clientID,
 		UserID:         r.User,
 		OrganizationID: r.Organization.ID,
-		FactoryID:      factoryID,
+		FactoryIDs:     models.NewMCPOAuthFactoryIDs(factoryIDs),
 		Resource:       "http://localhost:8000/mcp",
 		Scopes:         datatypes.NewJSONSlice([]string{"work_orders:read"}),
 		ExpiresAt:      expiresAt,
@@ -238,7 +284,7 @@ func insertFactoryMCPRefreshToken(
 func insertFactoryMCPAuthCode(
 	t *testing.T,
 	r *support.ResourceRegistry,
-	factoryID uuid.UUID,
+	factoryIDs []uuid.UUID,
 	clientID string,
 	expiresAt time.Time,
 ) *models.MCPOAuthCode {
@@ -252,7 +298,7 @@ func insertFactoryMCPAuthCode(
 		CodeChallengeMethod: "S256",
 		UserID:              r.User,
 		OrganizationID:      r.Organization.ID,
-		FactoryID:           factoryID,
+		FactoryIDs:          models.NewMCPOAuthFactoryIDs(factoryIDs),
 		Scopes:              datatypes.NewJSONSlice([]string{"work_orders:read"}),
 		ExpiresAt:           expiresAt,
 	}
