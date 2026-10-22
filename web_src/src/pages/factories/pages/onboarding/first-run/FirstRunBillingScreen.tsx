@@ -22,6 +22,25 @@ function isCurrentBillingPlan(
   return !plan.subscriptionRequired || (billing.planSource === "polar" && billing.creditPurchaseAllowed === true);
 }
 
+// The picker lists public plans. An active paid plan that is not listed, such
+// as a private plan, still satisfies this step, so it joins the list as the
+// current plan and no replacement is needed.
+function currentPlanOption(
+  billing: OrganizationsDescribeOrganizationBillingResponse | undefined,
+): OrganizationsBillingPlanOption | undefined {
+  if (!billing?.catalogKey || billing.planCategory !== "paid" || billing.creditPurchaseAllowed !== true) {
+    return undefined;
+  }
+  return {
+    key: billing.catalogKey,
+    name: billing.planName || billing.catalogKey,
+    priceCents: billing.planPriceCents,
+    perSeat: billing.planPerSeat,
+    requirePaymentMethod: billing.requirePaymentMethod === true,
+    subscriptionRequired: billing.planSource === "polar",
+  };
+}
+
 function assertPlanActive(
   plan: OrganizationsBillingPlanOption,
   billing: OrganizationsDescribeOrganizationBillingResponse | undefined,
@@ -41,7 +60,12 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
   const [selectedKey, setSelectedKey] = useState(searchParams.get("plan") ?? "");
   const [error, setError] = useState("");
   const [checkoutReturned, setCheckoutReturned] = useState(searchParams.get("subscribed") === "1");
-  const plans = billing.data?.availablePlans ?? [];
+  const availablePlans = billing.data?.availablePlans ?? [];
+  const currentOption = currentPlanOption(billing.data);
+  const plans =
+    currentOption && !availablePlans.some((option) => option.key === currentOption.key)
+      ? [currentOption, ...availablePlans]
+      : availablePlans;
   const plan = plans.find((option) => option.key === selectedKey);
   const currentPlan = isCurrentBillingPlan(plan, billing.data);
   const needsCard = plan?.requirePaymentMethod && !plan.subscriptionRequired && !billing.data?.hasPaymentMethod;
@@ -59,6 +83,10 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
     setCheckoutReturned(false);
     refresh.mutate();
   }, [checkoutReturned, refresh]);
+  useEffect(() => {
+    if (selectedKey || !currentOption?.key) return;
+    setSelectedKey(currentOption.key);
+  }, [currentOption?.key, selectedKey]);
 
   const activate = useMutation({
     mutationFn: async () => {
@@ -100,6 +128,7 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
     billing,
     plans,
     plan,
+    currentOption,
     currentPlan,
     selectedKey,
     setSelectedKey,
@@ -115,11 +144,13 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
 function BillingPlanChoice({
   plan,
   selected,
+  current,
   disabled,
   onSelect,
 }: {
   plan: OrganizationsBillingPlanOption;
   selected: boolean;
+  current: boolean;
   disabled: boolean;
   onSelect: () => void;
 }) {
@@ -139,11 +170,13 @@ function BillingPlanChoice({
           {plan.perSeat && " per seat"}
         </span>
         <span className="text-sm text-muted-foreground">
-          {plan.subscriptionRequired
-            ? "Subscription checkout required"
-            : plan.requirePaymentMethod
-              ? "Card required. No subscription."
-              : "No card or subscription required."}
+          {current
+            ? "Current plan"
+            : plan.subscriptionRequired
+              ? "Subscription checkout required"
+              : plan.requirePaymentMethod
+                ? "Card required. No subscription."
+                : "No card or subscription required."}
         </span>
       </Button>
     </FirstRunPanel>
@@ -167,6 +200,7 @@ export function FirstRunBillingScreen({
     billing,
     plans,
     plan,
+    currentOption,
     currentPlan,
     selectedKey,
     setSelectedKey,
@@ -191,6 +225,7 @@ export function FirstRunBillingScreen({
             key={option.key}
             plan={option}
             selected={selectedKey === option.key}
+            current={currentOption?.key !== undefined && option.key === currentOption.key}
             disabled={busy || Boolean(subscriptionActive && option.key !== billing.data?.catalogKey)}
             onSelect={() => {
               setSelectedKey(option.key ?? "");

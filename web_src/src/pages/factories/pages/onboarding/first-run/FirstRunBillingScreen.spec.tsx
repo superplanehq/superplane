@@ -168,6 +168,28 @@ it("waits for a returning subscription without creating another checkout", async
   expect(finish).not.toHaveBeenCalled();
 });
 
+it("finishes setup with an active private plan that is not listed", async () => {
+  billing = {
+    ...billing,
+    catalogKey: "enterprise",
+    planName: "Enterprise",
+    planCategory: "paid",
+    planPriceCents: "5000",
+    planSource: "polar",
+    creditPurchaseAllowed: true,
+    hasPaymentMethod: true,
+  };
+  const user = userEvent.setup();
+  const finish = renderBilling();
+  const current = await screen.findByRole("button", { name: /Enterprise/ });
+  expect(current).toHaveTextContent("Current plan");
+  expect(current).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: /Free/ })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Finish setup" }));
+  await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
+  expect(selectPlan).not.toHaveBeenCalled();
+});
+
 it("shows one plan price with a per-seat suffix only for seat pricing", async () => {
   renderBilling();
   expect(await screen.findByRole("button", { name: /Team/ })).toHaveTextContent("$30.00 per seat");
