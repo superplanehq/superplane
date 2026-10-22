@@ -126,7 +126,6 @@ services:
       SESSION_SECRET: ${SERVICE_PASSWORD_64_SESSION}
       BLOB_STORAGE_SIGNING_KEY: ${SERVICE_PASSWORD_64_BLOBSIGNING}
       ENCRYPTION_MASTER_KEYS: ${ENCRYPTION_MASTER_KEYS:-env://coolify-v1:${SERVICE_REALBASE64_32_ENCRYPTION}}
-      ENCRYPTION_WRITE_FORMAT: versioned
       SWAGGER_BASE_PATH: /app/api/swagger
       RBAC_MODEL_PATH: /app/rbac/rbac_model.conf
       RBAC_ORG_POLICY_PATH: /app/rbac/rbac_org_policy.csv
@@ -221,7 +220,7 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
       FLEET_MANAGER_CONFIG: |
-        id: coolify
+        id: ${FLEET_MANAGER_ID:-${COMPOSE_PROJECT_NAME:-coolify}}
         superplaneUrl: http://app:8000
         reconciliation:
           pollTimeout: 30s

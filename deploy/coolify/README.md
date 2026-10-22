@@ -107,8 +107,9 @@ Git checkout.
 
 ## Runner network and architecture
 
-The runner network uses the Compose project name. Two stacks on one Docker host
-stay isolated. Set `RUNNER_NETWORK` if you override the project name.
+The runner network and Fleet Manager ID use the Compose project name. Two
+stacks on one Docker host stay isolated. Set `RUNNER_NETWORK` or
+`FLEET_MANAGER_ID` if you override the project name.
 
 On an ARM VM, set `RUNNER_FLEET_ID=e1-large-arm64` and `RUNNER_ARCH=arm64`.
 
