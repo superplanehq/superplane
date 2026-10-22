@@ -16,7 +16,7 @@ const hostedLLMModelKeySeparator = "::"
 
 const (
 	SuperPlaneRunnerNoCreditMessage        = "This organization has no hosted credit."
-	SuperPlaneRunnerSubscribeMessage       = "Subscribe to Business to keep SuperPlane-hosted runs."
+	SuperPlaneRunnerSubscribeMessage       = "Contact an installation admin to keep SuperPlane-hosted runs."
 	SuperPlaneRunnerNoFactoryBudgetMessage = "This workspace has no remaining hosted credit."
 	SuperPlaneRunnerNoModelMessage         = "The instance has no SuperPlane agent model."
 	SuperPlaneRunnerModelNotAllowedMessage = "This workspace does not allow the SuperPlane agent model."

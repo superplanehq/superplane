@@ -55,11 +55,12 @@ func SearchFactoryIntakeItems(
 
 func serializeFactoryIntakeItem(item IntakeItem) *pb.FactoryIntakeItem {
 	serialized := &pb.FactoryIntakeItem{
-		Id:    item.ID,
-		Key:   item.Key,
-		Title: item.Title,
-		Body:  item.Body,
-		Url:   item.URL,
+		DisabledReason: item.DisabledReason,
+		Id:             item.ID,
+		Key:            item.Key,
+		Title:          item.Title,
+		Body:           item.Body,
+		Url:            item.URL,
 	}
 	if !item.CreatedAt.IsZero() {
 		serialized.CreatedAt = timestamppb.New(item.CreatedAt)

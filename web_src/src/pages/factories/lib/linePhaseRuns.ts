@@ -258,13 +258,16 @@ export function visibleLineStageColumns(
   });
 }
 
+const BACKLOG_TEMPLATE_ID = "backlog";
+
 /** Factory-level intake automation. It is not a line step. */
 export function findBacklogAutomationApp(
-  apps: Array<{ id?: string; name?: string }>,
+  apps: Array<{ id?: string; name?: string; templateId?: string }>,
 ): { id: string; name: string } | undefined {
-  const match = apps.find(
-    (app) => app.id && (app.name === "Backlog" || app.name === "Ingest" || app.id === "app-refund-backlog"),
-  );
+  const saved = apps.find((app) => app.id && app.templateId === BACKLOG_TEMPLATE_ID);
+  const match =
+    saved ??
+    apps.find((app) => app.id && (app.name === "Backlog" || app.name === "Ingest" || app.id === "app-refund-backlog"));
   if (!match?.id) {
     return undefined;
   }

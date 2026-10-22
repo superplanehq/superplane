@@ -29,12 +29,13 @@ type IntakeDependencies struct {
 }
 
 type IntakeItem struct {
-	ID        string
-	Key       string
-	Title     string
-	Body      string
-	URL       string
-	CreatedAt time.Time
+	DisabledReason string
+	ID             string
+	Key            string
+	Title          string
+	Body           string
+	URL            string
+	CreatedAt      time.Time
 }
 
 type intakeItemSource interface {
@@ -116,6 +117,9 @@ func CreateFactoryIntake(
 		settings = defaultDatadogIntakeSettings()
 	case models.FactoryIntakeSourceLinearIssues:
 		settings = defaultLinearIntakeSettings()
+	}
+	if err := validateIntakeDefaultOwner(db, orgID, source, "", req.GetSettings()); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
 	settings = parseIntakeSettings(settings, req.GetSettings())
 	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {

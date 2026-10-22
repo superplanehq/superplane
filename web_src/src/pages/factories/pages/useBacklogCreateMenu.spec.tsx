@@ -107,6 +107,21 @@ describe("useBacklogCreateMenu", () => {
     });
   });
 
+  it("preserves a search restriction and prevents import of the restricted item", async () => {
+    useSearchFactoryIntakeItems.mockReturnValue({
+      data: [{ ...liveItem, disabledReason: "This issue has no project." }],
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    });
+    const { result } = renderHook(() => useBacklogCreateMenu("org-1", "factory-1"), { wrapper: wrapper() });
+    act(() => result.current.setFocusedIntake(intake.id));
+    expect(result.current.items[0]?.disabledReason).toBe("This issue has no project.");
+    await act(async () => result.current.importItem(result.current.items[0]!));
+    expect(importFactoryIntakeItem).not.toHaveBeenCalled();
+    expect(createWorkOrder).not.toHaveBeenCalled();
+  });
+
   it("creates from the Storybook catalog without calling import", async () => {
     const onImported = vi.fn();
     const catalogItem = {

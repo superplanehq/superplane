@@ -2336,7 +2336,7 @@ The Add Reaction component adds a reaction emoji to a GitHub comment.
 
 If the component creates a reaction, it returns the GitHub reaction object, including id, content, user, and timestamp.
 
-If the resolved comment ID is blank, the component finishes with success and emits no reaction object. Downstream nodes that wait for that output do not run.
+If the resolved comment ID is blank, the component finishes with success and emits an empty result. Later nodes on the same path still run.
 
 ### Example Output
 

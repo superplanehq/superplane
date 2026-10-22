@@ -30,6 +30,8 @@ func (r *analyticsRecorder) Capture(event productanalytics.Event) {
 	r.events = append(r.events, event)
 }
 
+func (r *analyticsRecorder) IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity) {}
+
 func (r *analyticsRecorder) Close() error { return nil }
 
 func (r *analyticsRecorder) Enabled() bool { return true }

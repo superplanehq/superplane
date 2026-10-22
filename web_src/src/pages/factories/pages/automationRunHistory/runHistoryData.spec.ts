@@ -34,6 +34,7 @@ describe("Implement run history data", () => {
         state: "STATE_FINISHED" as const,
         result: "RESULT_PASSED" as const,
         outputs: { default: [{ result: "done" }] },
+        configuration: { additionalInstructions: "Instructions captured for this run" },
       },
       {
         id: "first",
@@ -46,11 +47,17 @@ describe("Implement run history data", () => {
       { id: "other", nodeId: "agent", runId: "different-run" },
     ];
     const activities = toRunActivities({ id: "run", executions: [{ id: "first" }, { id: "retry" }] }, executions, [
-      { id: "agent", name: "Original implementation step" },
+      {
+        id: "agent",
+        name: "Original implementation step",
+        configuration: { additionalInstructions: "Different current instructions" },
+      },
     ]);
     expect(activities.map((activity) => activity.id)).toEqual(["first", "retry"]);
     expect(activities[0].name).toBe("Original implementation step");
     expect(activities[0].error).toBe("Agent exited");
     expect(activities[1].outputs).toEqual({ default: [{ result: "done" }] });
+    expect(activities[1].additionalInstructions).toBe("Instructions captured for this run");
+    expect(activities[0].additionalInstructions).toBeUndefined();
   });
 });

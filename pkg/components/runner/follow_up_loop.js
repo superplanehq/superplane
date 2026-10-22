@@ -538,7 +538,16 @@ function writePrompt(taskDir, text) {
   const dir = path.join(taskDir, "prompts");
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `follow-up-${Date.now()}.txt`);
-  fs.writeFileSync(file, `${text}\n`);
+  let instructions = "";
+  try {
+    instructions = fs.readFileSync(path.join(taskDir, "planning_additional_instructions.md"), "utf8");
+  } catch (err) {
+    if (err.code !== "ENOENT") {
+      throw err;
+    }
+  }
+  const prompt = instructions.trim() ? `${text}\n\n${instructions}` : text;
+  fs.writeFileSync(file, `${prompt}\n`);
   return file;
 }
 

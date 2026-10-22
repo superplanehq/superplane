@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams,
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
+import { useIdentifyOrganizationGroup } from "./hooks/useIdentifyOrganizationGroup";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
@@ -320,10 +321,13 @@ function PageObservabilityScope() {
   return null;
 }
 
+function organizationScopeQueryEnabled(segment: string | undefined, isReserved: boolean, guestLine: boolean): boolean {
+  return !isReserved && !!segment && !guestLine;
+}
+
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account, loading: accountLoading } = useAccount();
-  const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
@@ -337,7 +341,8 @@ export function OrganizationScope() {
     data: organization,
     isLoading: organizationLoading,
     error: organizationError,
-  } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
+    refetch: refreshOrganization,
+  } = useOrganization(segment ?? "", organizationScopeQueryEnabled(segment, isReserved, guestLine));
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
   useRedirectIntegrationSetupReturn(segment, resolvedSlug);
@@ -355,11 +360,19 @@ export function OrganizationScope() {
         })
       : null;
   usePersistOrganizationLastLocation({
-    accountId,
+    accountId: account?.id,
     resolvedSlug,
     isReserved,
     uidRedirectPath,
     path: `${location.pathname}${location.search}`,
+  });
+  useIdentifyOrganizationGroup({
+    accountId: account?.id,
+    organizationKey: segment,
+    impersonating: account?.impersonation?.active,
+    refreshOrganization: organizationScopeQueryEnabled(segment, isReserved, guestLine)
+      ? refreshOrganization
+      : undefined,
   });
 
   if (isReserved) {

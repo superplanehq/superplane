@@ -5,6 +5,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -16,6 +21,51 @@ import (
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 )
+
+func Test__CreateWorkOrder__RefinementModel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider: models.UsageProviderAnthropic, Enabled: true, APIKey: []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6", "claude-opus-4-6"},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{}) })
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "trigger", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "onWorkOrder"}}), Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 3))},
+		{NodeID: "refine-task", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}}), Configuration: datatypes.NewJSONType(map[string]any{"model": "claude-sonnet-4-6", "credentials": map[string]any{"source": "hosted"}})},
+	}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", f.ID).Error)
+	for _, model := range []string{"", "claude-opus-4-6", "gpt-5"} {
+		t.Run(model, func(t *testing.T) {
+			resp, err := CreateWorkOrder(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{FactoryId: f.ID.String(), Title: "Refine this task", Model: model})
+			if model == "gpt-5" {
+				code, _, ok := grpcerrors.HandlerStatus(err)
+				require.True(t, ok)
+				require.Equal(t, codes.InvalidArgument, code)
+				var count int64
+				require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", f.ID).Count(&count).Error)
+				assert.Equal(t, int64(2), count)
+				return
+			}
+			require.NoError(t, err)
+			order, err := f.FindWorkOrder(db, uuid.MustParse(resp.Order.Id))
+			require.NoError(t, err)
+			if model == "" {
+				assert.Nil(t, order.RefinementModel)
+			} else {
+				require.NotNil(t, order.RefinementModel)
+				assert.Equal(t, model, *order.RefinementModel)
+			}
+		})
+	}
+	node, err := models.FindCanvasNode(db, canvas.ID, "refine-task")
+	require.NoError(t, err)
+	assert.Equal(t, "claude-sonnet-4-6", node.Configuration.Data()["model"])
+}
 
 func Test__CreateWorkOrder__AssignsTheCreator(t *testing.T) {
 	r := support.Setup(t)

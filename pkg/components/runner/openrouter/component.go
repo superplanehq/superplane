@@ -99,11 +99,20 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 			"git clone https://github.com/org/repo.git /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
+		runner.AgentAdditionalInstructionsField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envOpenRouterAPIKey),
 		runner.AgentSkipSetupCommandsField(),
 		runner.AgentTimeoutField(),
 	}
+}
+
+func (c *RunOpenRouter) ValidateNodeConfiguration(config map[string]any) error {
+	spec, err := decodeRunOpenRouterSpec(config)
+	if err != nil {
+		return err
+	}
+	return validateRunOpenRouterSpec(spec)
 }
 
 func (c *RunOpenRouter) Setup(ctx core.SetupContext) error {
