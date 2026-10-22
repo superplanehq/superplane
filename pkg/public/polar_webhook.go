@@ -25,6 +25,10 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if errors.Is(err, polar.ErrUnsupportedWebhookEvent) {
+		var unsupported *polar.UnsupportedWebhookEventError
+		if errors.As(err, &unsupported) {
+			log.WithField("polar_event_type", unsupported.EventType).Info("ignored unsupported polar webhook event type")
+		}
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
