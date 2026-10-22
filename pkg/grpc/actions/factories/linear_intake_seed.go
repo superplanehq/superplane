@@ -14,7 +14,7 @@ import (
 const (
 	// intakeLinearSeedSize is how many open Linear issues a new intake
 	// imports. The wizard tells the user this number.
-	intakeLinearSeedSize = 10
+	intakeLinearSeedSize = 3
 	// intakeLinearSeedFetchSize is the page read before label filtering, so
 	// a label filter can still fill intakeLinearSeedSize.
 	intakeLinearSeedFetchSize = 50

@@ -1,5 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 
+import { IntakeSkipInitialImportField } from "../../IntakeSkipInitialImportField";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketChoices } from "./firstRunTicketChoices";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
@@ -12,6 +13,9 @@ export type FirstRunJiraProject = { id?: string; name?: string };
 export type FirstRunFlaggedChoiceBlock = "loading" | "lookup-failed";
 
 type FirstRunTicketsScreenProps = {
+  initialImportLimit?: number;
+  skipInitialImport?: boolean;
+  onSkipInitialImportChange?: (skip: boolean) => void;
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
@@ -199,6 +203,12 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
           failed={copy.linearLookupFailed}
           testId="first-run-linear-choice-notice"
         />
+        <FirstRunInitialImportChoice
+          initialImportLimit={props.initialImportLimit}
+          skipInitialImport={props.skipInitialImport}
+          onSkipInitialImportChange={props.onSkipInitialImportChange}
+          saving={saving}
+        />
         <div className="space-y-3">
           <LoadingButton
             type="button"
@@ -244,6 +254,35 @@ function FirstRunChoiceNotice({
       data-testid={testId}
     >
       {notice}
+    </p>
+  );
+}
+
+function FirstRunInitialImportChoice(
+  props: Pick<
+    FirstRunTicketsScreenProps,
+    "initialImportLimit" | "skipInitialImport" | "onSkipInitialImportChange" | "saving"
+  >,
+) {
+  if (props.onSkipInitialImportChange) {
+    return (
+      <IntakeSkipInitialImportField
+        checked={props.skipInitialImport ?? false}
+        onCheckedChange={props.onSkipInitialImportChange}
+        disabled={props.saving}
+        helper={
+          props.skipInitialImport
+            ? "Start with new issues only. Existing issues will stay in your issue tracker."
+            : "Import up to 3 existing issues to get started."
+        }
+        testId="onboarding-skip-initial-import"
+      />
+    );
+  }
+  if (!props.initialImportLimit) return null;
+  return (
+    <p className="text-xs text-muted-foreground">
+      Import up to {props.initialImportLimit} existing issues to get started.
     </p>
   );
 }

@@ -87,7 +87,7 @@ describe("SentryIntakeSetupDialog", () => {
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent(
       "newest unresolved issues",
     );
-    expect(screen.getByTestId("sentry-skip-initial-import")).toBeChecked();
+    expect(screen.getByTestId("sentry-skip-initial-import")).not.toBeChecked();
     expect(screen.getByTestId("sentry-intake-setup-stepper")).toBeInTheDocument();
     expect(screen.getByTestId("sentry-intake-setup-sphere")).toBeInTheDocument();
     expect(screen.queryByTestId("sentry-setup-preview")).not.toBeInTheDocument();
@@ -120,7 +120,7 @@ describe("SentryIntakeSetupDialog", () => {
 
     await screen.findByTestId("sentry-project-payments");
     expect(screen.getByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
-    expect(screen.getByTestId("sentry-skip-initial-import")).toBeChecked();
+    expect(screen.getByTestId("sentry-skip-initial-import")).not.toBeChecked();
     await user.click(screen.getByTestId("sentry-skip-initial-import"));
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.importExistingHelperOff)).toBeInTheDocument();
     await user.click(screen.getByTestId("sentry-project-payments"));

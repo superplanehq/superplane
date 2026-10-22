@@ -216,7 +216,9 @@ function TicketsScreenHost({
   saving,
   chrome,
   sphere,
+  initialWorkspace,
 }: {
+  initialWorkspace: boolean;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
   saving: boolean;
@@ -226,11 +228,18 @@ function TicketsScreenHost({
   const finishing = flow.blockingAction === "finishing-setup" || (flow.ticketsFinishSetup && saving);
   return (
     <FirstRunTicketsScreen
+      initialImportLimit={initialWorkspace ? 3 : undefined}
+      skipInitialImport={model.setup.skipInitialImport}
+      onSkipInitialImportChange={initialWorkspace ? undefined : model.setup.setSkipInitialImport}
       githubAvailable={flow.vcsHost !== "bitbucket"}
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
+      continueLabel={
+        flow.ticketsFinishSetup && !initialWorkspace && model.setup.skipInitialImport
+          ? FIRST_RUN_COPY.finish.action
+          : ticketsContinueLabel(flow.ticketsFinishSetup)
+      }
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
       savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
@@ -417,7 +426,7 @@ function VcsScreen({
  */
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
-  const { organizationId, factoryId, factories } = useFactoriesLayout();
+  const { organizationId, factoryId, factories, factory } = useFactoriesLayout();
   const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
   const destination = model.provisionedDestination;
@@ -486,6 +495,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "tickets") {
     return (
       <TicketsScreenHost
+        initialWorkspace={factory?.onboarding?.initial === true}
         flow={flow}
         model={model}
         saving={model.saving}
