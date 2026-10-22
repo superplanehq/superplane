@@ -42,73 +42,16 @@ type FactoryPullRequestAccessResult struct {
 }
 
 func (p *FactoryPullRequest) CreateActivity(tx *gorm.DB, params FactoryPullRequestActivityParams) (*FactoryPullRequestActivityResult, error) {
-	if params.RunID == uuid.Nil {
-		return nil, fmt.Errorf("%w: run id is required", ErrFactoryPullRequestInvalid)
-	}
-
-	access, err := normalizeActivityAccess(params.Access)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := p.lock(tx); err != nil {
-		return nil, err
-	}
-
-	existing, err := FindPullRequestActivityByRunID(tx, params.RunID)
-	if err == nil {
-		if existing.PullRequestID != p.ID {
-			return nil, ErrFactoryPullRequestRunAlreadyLinked
+	var result *FactoryPullRequestActivityResult
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := LockOrganizationTaskAdmission(inner, p.OrganizationID); err != nil {
+			return err
 		}
-		return p.existingActivityResult(tx, existing, access)
-	}
-	if !errors.Is(err, ErrFactoryPullRequestActivityNotFound) {
-		return nil, err
-	}
-
-	result := &FactoryPullRequestActivityResult{}
-	var revision *FactoryPullRequestRevision
-	if sha := strings.TrimSpace(params.RevisionSHA); sha != "" {
-		observed, observeErr := p.ObserveRevision(tx, sha)
-		if observeErr != nil {
-			return nil, observeErr
-		}
-		revision = observed.Revision
-		result.Revision = revision
-	}
-
-	if revision != nil && params.FeedbackHandlerID != nil {
-		existingActivity, existingErr := findActiveHandlerRevisionActivity(tx, p.ID, revision.ID, *params.FeedbackHandlerID)
-		if existingErr != nil {
-			return nil, existingErr
-		}
-		if existingActivity != nil && existingActivity.RunID != params.RunID {
-			return nil, ErrFactoryPullRequestActivityDuplicate
-		}
-	}
-
-	activity, err := p.insertActivity(tx, params, revision, FactoryPullRequestActivityStateActive, access)
-	if err != nil {
-		return nil, err
-	}
-
-	result.Activity = activity
-	result.Revision = revision
-	result.CurrentRevision = currentRevisionOf(tx, p)
-
-	if access != FactoryPullRequestAccessExclusive {
-		result.Outcome = FactoryPullRequestActivityOutcomeReady
-		return result, nil
-	}
-
-	accessResult, err := p.grantOrQueueExclusiveAccess(tx, activity)
-	if err != nil {
-		return nil, err
-	}
-	result.Activity = accessResult.Activity
-	result.Outcome = accessResult.Outcome
-	result.CurrentRevision = accessResult.CurrentRevision
-	return result, nil
+		var err error
+		result, err = p.createActivity(inner, params)
+		return err
+	})
+	return result, err
 }
 
 func (p *FactoryPullRequest) RequestExclusiveAccess(tx *gorm.DB, activity *FactoryPullRequestRun) (*FactoryPullRequestAccessResult, error) {
@@ -205,6 +148,82 @@ func FindPullRequestActivityByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryPullR
 		return nil, err
 	}
 	return &activity, nil
+}
+
+func (p *FactoryPullRequest) createActivity(tx *gorm.DB, params FactoryPullRequestActivityParams) (*FactoryPullRequestActivityResult, error) {
+	if params.RunID == uuid.Nil {
+		return nil, fmt.Errorf("%w: run id is required", ErrFactoryPullRequestInvalid)
+	}
+
+	access, err := normalizeActivityAccess(params.Access)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.lock(tx); err != nil {
+		return nil, err
+	}
+
+	existing, err := FindPullRequestActivityByRunID(tx, params.RunID)
+	if err == nil {
+		if existing.PullRequestID != p.ID {
+			return nil, ErrFactoryPullRequestRunAlreadyLinked
+		}
+		return p.existingActivityResult(tx, existing, access)
+	}
+	if !errors.Is(err, ErrFactoryPullRequestActivityNotFound) {
+		return nil, err
+	}
+	if err := checkOrganizationTaskAdmission(tx, p.OrganizationID, p.WorkOrderID); err != nil {
+		if errors.Is(err, ErrOrganizationTaskCapacity) {
+			return &FactoryPullRequestActivityResult{Outcome: FactoryPullRequestActivityOutcomeWaiting}, nil
+		}
+		return nil, err
+	}
+
+	result := &FactoryPullRequestActivityResult{}
+	var revision *FactoryPullRequestRevision
+	if sha := strings.TrimSpace(params.RevisionSHA); sha != "" {
+		observed, observeErr := p.ObserveRevision(tx, sha)
+		if observeErr != nil {
+			return nil, observeErr
+		}
+		revision = observed.Revision
+		result.Revision = revision
+	}
+
+	if revision != nil && params.FeedbackHandlerID != nil {
+		existingActivity, existingErr := findActiveHandlerRevisionActivity(tx, p.ID, revision.ID, *params.FeedbackHandlerID)
+		if existingErr != nil {
+			return nil, existingErr
+		}
+		if existingActivity != nil && existingActivity.RunID != params.RunID {
+			return nil, ErrFactoryPullRequestActivityDuplicate
+		}
+	}
+
+	activity, err := p.insertActivity(tx, params, revision, FactoryPullRequestActivityStateActive, access)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Activity = activity
+	result.Revision = revision
+	result.CurrentRevision = currentRevisionOf(tx, p)
+
+	if access != FactoryPullRequestAccessExclusive {
+		result.Outcome = FactoryPullRequestActivityOutcomeReady
+		return result, nil
+	}
+
+	accessResult, err := p.grantOrQueueExclusiveAccess(tx, activity)
+	if err != nil {
+		return nil, err
+	}
+	result.Activity = accessResult.Activity
+	result.Outcome = accessResult.Outcome
+	result.CurrentRevision = accessResult.CurrentRevision
+	return result, nil
 }
 
 func (p *FactoryPullRequest) insertActivity(

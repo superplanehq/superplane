@@ -222,6 +222,8 @@ export function columnAppsFromFactoryApps(
 export type SplitRunIntakeCanvasKey = "intake" | "sentry" | "slack";
 
 export interface SplitRunFixture {
+  queuedTasks?: FactoriesWorkOrder["queuedTasks"];
+  taskLimitReached?: boolean;
   title: string;
   /** Stored task key, for example `RF-101`. Empty when the order has no key. */
   identifier?: string;
@@ -502,6 +504,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   ];
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
+    queuedTasks: order.queuedTasks,
+    taskLimitReached: order.taskLimitReached,
     title: order.title ?? "Task",
     identifier: order.key?.trim() ?? "",
     descriptionText: order.description ?? "",

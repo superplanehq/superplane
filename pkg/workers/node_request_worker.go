@@ -168,6 +168,11 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 	runCancellations := &RunCancellationNotifier{}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if request.ExecutionID != nil {
+			if err := models.LockTaskExecutionAdmission(tx, *request.ExecutionID); err != nil {
+				return err
+			}
+		}
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err == nil {
 			return w.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)

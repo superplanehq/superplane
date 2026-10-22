@@ -29,7 +29,7 @@ export function BillingPlansTable({
               Limits{" "}
               <BillingHelp
                 label="Plan limits"
-                text="Seats are organization members. Parallel task limits are saved but not enforced."
+                text="Seats are organization members. Parallel task limits apply across all workspaces in an organization."
               />
             </TableHeader>
             <TableHeader>Features</TableHeader>
