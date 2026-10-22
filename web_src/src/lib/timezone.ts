@@ -9,25 +9,33 @@ function getUserTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+const TIMESTAMP_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false, // Use 24-hour format instead of AM/PM
+};
+
 /**
  * Format a timestamp to display in user's local timezone
  * @param timestamp - ISO timestamp string or Date object
- * @param userTimezone - Optional user timezone, defaults to browser timezone
+ * @param userTimezone - Optional IANA timezone name, defaults to browser timezone
  * @returns Formatted datetime string
  */
 export function formatTimestampInUserTimezone(timestamp: string | Date, userTimezone?: string): string {
   const timezone = userTimezone || getUserTimezone();
   const date = typeof timestamp === "string" ? new Date(timestamp) : timestamp;
-  const options: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false, // Use 24-hour format instead of AM/PM
-  };
 
-  return date.toLocaleDateString("en-US", options) + ` ${timezone}`;
+  try {
+    return `${date.toLocaleDateString("en-US", { ...TIMESTAMP_OPTIONS, timeZone: timezone })} ${timezone}`;
+  } catch {
+    // Intl throws a RangeError on an unrecognized timezone. Fall back to the
+    // browser timezone so one bad value cannot break the surrounding view.
+    const fallback = getUserTimezone();
+    return `${date.toLocaleDateString("en-US", { ...TIMESTAMP_OPTIONS, timeZone: fallback })} ${fallback}`;
+  }
 }
 
 /**
