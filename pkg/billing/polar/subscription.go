@@ -23,6 +23,19 @@ var (
 	ErrSubscriptionNotCanceling     = errors.New("business is not set to end at the period end")
 )
 
+func BusinessCheckoutProductID(tx *gorm.DB) (string, error) {
+	plan, err := models.FindBillingPlan(tx, models.BillingPlanBusiness)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", err
+	}
+	if err == nil && plan.PolarProductID != nil {
+		if id := strings.TrimSpace(*plan.PolarProductID); id != "" {
+			return id, nil
+		}
+	}
+	return BusinessProductID(), nil
+}
+
 func ApplySubscriptionEvent(ctx context.Context, tx *gorm.DB, event *SubscriptionWebhookEvent) error {
 	if event == nil {
 		return permanentApplyError("subscription event is required")
