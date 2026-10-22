@@ -543,6 +543,11 @@ func (w *NodeExecutor) executeActionNode(
 
 	ctx.Logger = logger
 	if err := polar.AssertOrganizationPaymentMethod(tx, workflow.OrganizationID); err != nil {
+		// Only a confirmed missing card fails the node. Temporary verification
+		// errors roll back the transaction, so the pending execution is retried.
+		if !errors.Is(err, models.ErrPaymentMethodRequired) {
+			return err
+		}
 		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 	}
 	if err := action.Execute(ctx); err != nil {

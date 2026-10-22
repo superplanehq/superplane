@@ -615,3 +615,33 @@ func TestNodeExecutorRejectsUsageWithoutRequiredCard(t *testing.T) {
 	require.Equal(t, models.CanvasNodeExecutionResultFailed, saved.Result)
 	require.Contains(t, saved.ResultMessage, "payment method")
 }
+
+func TestNodeExecutorRetriesWhenPaymentMethodVerificationFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	plan := models.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	plan.RequirePaymentMethod = true
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		http.Error(w, "polar unavailable", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	t.Setenv("POLAR_ACCESS_TOKEN", "test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "start", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}})},
+		{NodeID: "action", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+	}, []models.Edge{{SourceID: "start", TargetID: "action", Channel: "default"}})
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "action", event.ID, event.ID)
+	err = newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID)
+	require.ErrorContains(t, err, "could not verify the organization payment method")
+	saved, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionStatePending, saved.State)
+}
