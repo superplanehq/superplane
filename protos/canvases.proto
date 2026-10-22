@@ -273,7 +273,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas runs";
-      description: "Returns a list of runs for a canvas";
+      description: "Returns a list of runs for a canvas. Set include_task to include the task id, key, and title.";
       tags: "CanvasRun";
     };
   }
@@ -284,7 +284,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe a run";
-      description: "Returns a description of a run";
+      description: "Returns a description of a run. Set include_task to include the task id, key, and title.";
       tags: "CanvasRun";
     };
   }
@@ -730,6 +730,7 @@ message ListRunsRequest {
   google.protobuf.Timestamp before = 3;
   repeated CanvasRun.State states = 4;
   repeated CanvasRun.Result results = 5;
+  optional bool include_task = 6;
 }
 
 message ListRunsResponse {
@@ -742,6 +743,7 @@ message ListRunsResponse {
 message DescribeRunRequest {
   string canvas_id = 1;
   string run_id = 2;
+  optional bool include_task = 3;
 }
 
 message DescribeRunResponse {
@@ -822,6 +824,12 @@ message CanvasEvent {
   string run_id = 9;
 }
 
+message CanvasRunTask {
+  string id = 1;
+  string key = 2;
+  string title = 3;
+}
+
 message CanvasRun {
   enum State {
     STATE_UNKNOWN = 0;
@@ -858,6 +866,7 @@ message CanvasRun {
   int64 cost_cents = 17;
   // Models that recorded spend on this run tree.
   repeated string models = 18;
+  CanvasRunTask task = 19;
 }
 
 message CanvasRunRef {

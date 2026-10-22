@@ -175,6 +175,7 @@ function dropMissingWorkOrder(
     queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
     exact: true,
   });
+  clearOpenRunTaskLabels(queryClient, orderId);
 }
 
 async function refreshUpdatedWorkOrder(
@@ -202,9 +203,185 @@ async function refreshUpdatedWorkOrder(
     factoryQueryKeys.historicalWorkOrders(organizationId, factoryId),
     (orders) => patchCachedWorkOrderList(orders, orderId, order),
   );
+  refreshOpenRunTaskLabels(queryClient, order);
   for (const queryKey of unknownMembershipKeys) {
     void queryClient.invalidateQueries({ queryKey });
   }
+}
+
+function isIncludeTaskRunQuery(queryKey: readonly unknown[]): boolean {
+  return queryKey[0] === "canvases" && queryKey[1] === "runs" && queryKey.includes("includeTask");
+}
+
+function refreshOpenRunTaskLabels(queryClient: WorkOrderQueryClient, order: FactoriesWorkOrder) {
+  if (!order.id) return;
+  const label = { id: order.id, key: order.key || order.id, title: order.title || "Untitled task" };
+  const linkedRunIds = runIdsLinkedToOrder(order);
+  const queries = queryClient.getQueriesData({
+    predicate: (query) => isIncludeTaskRunQuery(query.queryKey),
+  });
+  for (const [queryKey, data] of queries) {
+    const runs = runsInIncludeTaskData(data);
+    const targets = runIdsToLabel(runs, linkedRunIds, order.id);
+    const next = patchIncludeTaskLabels(data, order.id, label, targets);
+    if (next !== data) {
+      queryClient.setQueryData(queryKey, next);
+    }
+    if (gainedRunLink(runs, targets, order.id)) {
+      void queryClient.invalidateQueries({ queryKey });
+    }
+  }
+}
+
+function runIdsLinkedToOrder(order: FactoriesWorkOrder): Set<string> {
+  const ids = new Set<string>();
+  addRunId(ids, order.sourceRunId);
+  for (const dispatch of order.lineDispatches ?? []) {
+    for (const execution of dispatch.stepExecutions ?? []) {
+      addRunId(ids, execution.run?.id);
+    }
+  }
+  for (const pullRequest of order.pullRequests ?? []) {
+    for (const activity of pullRequest.activities ?? []) {
+      addRunId(ids, activity.run?.id);
+    }
+    for (const activity of pullRequest.runs ?? []) {
+      addRunId(ids, activity.run?.id);
+    }
+  }
+  return ids;
+}
+
+function addRunId(ids: Set<string>, id: string | undefined) {
+  const trimmed = id?.trim();
+  if (trimmed) ids.add(trimmed);
+}
+
+function clearOpenRunTaskLabels(queryClient: WorkOrderQueryClient, orderId: string) {
+  queryClient.setQueriesData({ predicate: (query) => isIncludeTaskRunQuery(query.queryKey) }, (data) =>
+    patchIncludeTaskLabels(data, orderId, undefined),
+  );
+}
+
+function patchIncludeTaskLabels(
+  data: unknown,
+  orderId: string,
+  label: { id: string; key: string; title: string } | undefined,
+  targetRunIds?: ReadonlySet<string>,
+): unknown {
+  if (!data || typeof data !== "object") return data;
+  const targets = label ? (targetRunIds ?? runIdsToLabel(runsInIncludeTaskData(data), new Set(), orderId)) : undefined;
+  if ("pages" in data && Array.isArray(data.pages)) {
+    let changed = false;
+    const pages = data.pages.map((page) => {
+      if (!page || typeof page !== "object" || !("runs" in page) || !Array.isArray(page.runs)) return page;
+      let pageChanged = false;
+      const runs = page.runs.map((run: unknown) => {
+        const next = patchRunTask(run, orderId, label, targets);
+        if (next !== run) pageChanged = true;
+        return next;
+      });
+      if (!pageChanged) return page;
+      changed = true;
+      return { ...page, runs };
+    });
+    return changed ? { ...data, pages } : data;
+  }
+  if ("run" in data) {
+    const next = patchRunTask(data.run, orderId, label, targets);
+    return next === data.run ? data : { ...data, run: next };
+  }
+  return data;
+}
+
+function gainedRunLink(runs: unknown[], targets: ReadonlySet<string>, orderId: string): boolean {
+  return runs.some((run) => {
+    const id = runId(run);
+    return Boolean(id && targets.has(id) && taskId(run) !== orderId);
+  });
+}
+
+function runIdsToLabel(runs: unknown[], linkedRunIds: ReadonlySet<string>, orderId: string): Set<string> {
+  const parents = parentIdsByRunId(runs);
+  const ids = new Set<string>();
+  for (const run of runs) {
+    const id = runId(run);
+    if (!id) continue;
+    if (taskId(run) === orderId || (!taskId(run) && reachesLinkedRun(id, parents, linkedRunIds))) {
+      ids.add(id);
+    }
+  }
+  return ids;
+}
+
+function reachesLinkedRun(
+  start: string,
+  parents: Map<string, string | undefined>,
+  linkedRunIds: ReadonlySet<string>,
+): boolean {
+  const seen = new Set<string>();
+  let current: string | undefined = start;
+  while (current && !seen.has(current)) {
+    if (linkedRunIds.has(current)) return true;
+    seen.add(current);
+    current = parents.get(current);
+  }
+  return false;
+}
+
+function runsInIncludeTaskData(data: unknown): unknown[] {
+  if (!data || typeof data !== "object") return [];
+  if ("pages" in data && Array.isArray(data.pages)) {
+    return data.pages.flatMap((page) =>
+      page && typeof page === "object" && "runs" in page && Array.isArray(page.runs) ? page.runs : [],
+    );
+  }
+  if ("run" in data) return [data.run];
+  return [];
+}
+
+function parentIdsByRunId(runs: unknown[]): Map<string, string | undefined> {
+  const parents = new Map<string, string | undefined>();
+  for (const run of runs) {
+    const id = runId(run);
+    if (!id) continue;
+    parents.set(id, parentRunId(run));
+  }
+  return parents;
+}
+
+function runId(run: unknown): string | undefined {
+  if (!run || typeof run !== "object" || !("id" in run) || typeof run.id !== "string" || !run.id) return undefined;
+  return run.id;
+}
+
+function parentRunId(run: unknown): string | undefined {
+  if (!run || typeof run !== "object" || !("parent" in run)) return undefined;
+  return runId(run.parent);
+}
+
+function taskId(run: unknown): string | undefined {
+  if (!run || typeof run !== "object" || !("task" in run)) return undefined;
+  return runId(run.task);
+}
+
+function patchRunTask(
+  run: unknown,
+  orderId: string,
+  label: { id: string; key: string; title: string } | undefined,
+  targetRunIds: ReadonlySet<string> | undefined,
+): unknown {
+  if (!run || typeof run !== "object") return run;
+  const id = runId(run);
+  const currentTaskId = taskId(run);
+  if (!label) {
+    if (currentTaskId !== orderId || !("task" in run)) return run;
+    const { task: _removed, ...rest } = run;
+    return rest;
+  }
+  if (!id || !targetRunIds?.has(id) || (currentTaskId && currentTaskId !== orderId)) return run;
+  const task = "task" in run && run.task && typeof run.task === "object" ? run.task : {};
+  return { ...run, task: { ...task, id: label.id, key: label.key, title: label.title } };
 }
 
 function invalidateFactoryWorkOrdersOnReconnect(
@@ -222,6 +399,9 @@ function invalidateFactoryWorkOrdersOnReconnect(
     factoryId,
     cachedWorkOrderIds(queryClient, organizationId, factoryId),
   );
+  void queryClient.invalidateQueries({
+    predicate: (query) => isIncludeTaskRunQuery(query.queryKey),
+  });
 }
 
 export function invalidateFactoryWorkOrderQueries(

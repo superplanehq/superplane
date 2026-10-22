@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func DescribeRun(ctx context.Context, db *gorm.DB, canvas *models.Canvas, runID string) (*pb.DescribeRunResponse, error) {
+func DescribeRun(ctx context.Context, db *gorm.DB, canvas *models.Canvas, runID string, includeTask bool) (*pb.DescribeRunResponse, error) {
 	runUUID, err := uuid.Parse(runID)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, "invalid run id")
@@ -47,6 +47,11 @@ func DescribeRun(ctx context.Context, db *gorm.DB, canvas *models.Canvas, runID 
 	}
 
 	AttachCanvasRunUsage(db, []*pb.CanvasRun{serializedRun})
+	if includeTask {
+		if err := attachCanvasRunTasks(db, canvas, []models.CanvasRun{*run}, []*pb.CanvasRun{serializedRun}); err != nil {
+			return nil, err
+		}
+	}
 
 	return &pb.DescribeRunResponse{
 		Run: serializedRun,
