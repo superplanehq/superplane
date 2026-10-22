@@ -241,11 +241,7 @@ function SearchProbe() {
   return <output data-testid="location">{location.search}</output>;
 }
 
-function renderAgentSettingsPopup(
-  settings: PRFeedbackDraftSettings,
-  showVisualEvidenceSetting: boolean,
-  initialPath = "/",
-) {
+function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, initialPath = "/") {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter initialEntries={[initialPath]}>
@@ -256,7 +252,6 @@ function renderAgentSettingsPopup(
             draft: PLANNING_REVIEW_DRAFT,
             organizationId: "org-1",
             onSave: vi.fn(),
-            showVisualEvidenceSetting,
           }}
           onSave={vi.fn()}
           onClose={vi.fn()}
@@ -419,11 +414,7 @@ describe("PRFeedbackSettingsPopup check names", () => {
     await user.click(screen.getByTestId("pr-feedback-check-option-e2e"));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
 
-    expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({
-        checkNames: ["e2e"],
-      }),
-    );
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ checkNames: ["e2e"] }));
   });
 });
 
@@ -553,18 +544,22 @@ describe("PRFeedbackSettingsPopup automation", () => {
   });
 
   it("puts Agent between General and Runs when the canvas has an agent", () => {
-    renderAgentSettingsPopup(discussionDraft(), true);
+    renderAgentSettingsPopup(discussionDraft());
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Runs"]);
 
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
+    expect(screen.getByText("Concurrency")).toBeInTheDocument();
+    expect(screen.getByText("Model")).toBeInTheDocument();
+    expect(screen.getByText("Steps")).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
-    expect(screen.getByRole("switch", { name: "Include visual evidence" })).not.toBeChecked();
+    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Include visual evidence")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
   });
 
   it("opens a checks Agent link on General and hides the Agent tab", () => {
-    renderAgentSettingsPopup(checksDraft(), false, "/?prFeedbackSettings=agent");
+    renderAgentSettingsPopup(checksDraft(), "/?prFeedbackSettings=agent");
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
     expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
