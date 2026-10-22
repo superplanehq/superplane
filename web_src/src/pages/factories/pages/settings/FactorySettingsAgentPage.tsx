@@ -14,6 +14,7 @@ import { MCPCatalogSetupDialog } from "./MCPCatalogSetupDialog";
 import { MCPServerList } from "./MCPServerList";
 import { useMCPPage } from "./useMCPPage";
 import { CrossRepoContextCard } from "./WorkspaceCrossRepoSection";
+import { WorkspaceDefaultModelSection } from "./WorkspaceDefaultModelSection";
 import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
 import { WorkspaceSkillsSection } from "./WorkspaceSkillsSection";
 
@@ -31,6 +32,12 @@ export function FactorySettingsAgentPage() {
       subtitle={AGENT_RESOURCES_COPY.agentSubtitle}
     >
       <div className="flex flex-col gap-5" data-testid="factory-settings-agent">
+        <WorkspaceDefaultModelSection
+          organizationId={page.organizationId}
+          factoryId={page.factoryId}
+          factory={page.factory}
+          canUpdate={page.canUpdate}
+        />
         {showAgentSetup ? (
           <WorkspaceSetupStepsSection
             organizationId={page.organizationId}

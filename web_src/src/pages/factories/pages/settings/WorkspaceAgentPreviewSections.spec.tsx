@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
@@ -12,6 +13,21 @@ import {
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
 import { WorkspaceDefaultModelSection } from "./WorkspaceDefaultModelSection";
+
+vi.mock("@/hooks/useSelectableLLMModels", () => ({
+  useSelectableLLMModels: () => ({
+    data: [
+      {
+        source: { id: "hosted", name: "SuperPlane" },
+        provider: { id: "anthropic", name: "Anthropic" },
+        model: { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
+        key: "hosted::anthropic::claude-sonnet-4-6",
+        label: "Claude Sonnet",
+      },
+    ],
+    isLoading: false,
+  }),
+}));
 
 vi.mock("@monaco-editor/react", () => ({
   Editor: () => <div data-testid="monaco-mock" />,
@@ -27,7 +43,11 @@ describe("workspace agent preview fields", () => {
 
   it("opens the model selector from its label", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceDefaultModelSection canUpdate models={[{ value: "claude-sonnet", label: "Claude Sonnet" }]} />);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WorkspaceDefaultModelSection organizationId="org-1" factoryId="factory-1" canUpdate />
+      </QueryClientProvider>,
+    );
 
     expect(screen.getByRole("combobox", { name: "Default model" })).toBeInTheDocument();
     await user.click(screen.getByText("Default model"));

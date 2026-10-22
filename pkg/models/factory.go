@@ -70,9 +70,14 @@ type Factory struct {
 	PublicBadgeEnabled  bool
 	PublicBadgeShowCost bool
 	PublicBadgeToken    *string
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	DeletedAt           gorm.DeletedAt `gorm:"index"`
+	// DefaultAgentModel is the model id agents use when a step does not set one.
+	// DefaultAgentModelProvider is set for a hosted model and empty for a
+	// bring-your-own-key model. Both empty means this workspace has no default.
+	DefaultAgentModel         string
+	DefaultAgentModelProvider string
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+	DeletedAt                 gorm.DeletedAt `gorm:"index"`
 }
 
 // FactoryPlanning is the workspace toggle for draft chat plus the two
@@ -560,6 +565,25 @@ func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error
 		return err
 	}
 	f.HostedSpendBudgetCents = budgetCents
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) UpdateDefaultAgentModel(tx *gorm.DB, model, provider string) error {
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("default_agent_model", "default_agent_model_provider", "updated_at").
+		Updates(map[string]any{
+			"default_agent_model":          strings.TrimSpace(model),
+			"default_agent_model_provider": strings.TrimSpace(provider),
+			"updated_at":                   now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.DefaultAgentModel = strings.TrimSpace(model)
+	f.DefaultAgentModelProvider = strings.TrimSpace(provider)
 	f.UpdatedAt = now
 	return nil
 }

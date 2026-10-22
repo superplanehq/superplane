@@ -61,10 +61,17 @@ type fakeFactoryContext struct {
 
 	vcsProvider    string
 	vcsProviderErr error
+
+	defaultAgentModel core.FactoryDefaultAgentModel
+	defaultAgentErr   error
 }
 
 func (f *fakeFactoryContext) VCSProvider() (string, error) {
 	return f.vcsProvider, f.vcsProviderErr
+}
+
+func (f *fakeFactoryContext) DefaultAgentModel() (core.FactoryDefaultAgentModel, error) {
+	return f.defaultAgentModel, f.defaultAgentErr
 }
 
 func (f *fakeFactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {

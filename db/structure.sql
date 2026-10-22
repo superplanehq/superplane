@@ -493,6 +493,8 @@ CREATE TABLE public.factories (
     public_badge_show_cost boolean DEFAULT false NOT NULL,
     public_badge_token text,
     url_id text NOT NULL,
+    default_agent_model text,
+    default_agent_model_provider text,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text)),
     CONSTRAINT factories_url_id_format_check CHECK ((url_id ~ '^[a-z0-9]{8}$'::text))
@@ -5979,7 +5981,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261022013100	f
+20261022122437	f
 \.
 
 

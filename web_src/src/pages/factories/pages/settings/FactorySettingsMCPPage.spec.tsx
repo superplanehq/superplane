@@ -114,6 +114,8 @@ describe("FactorySettingsMCPPage", () => {
     expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factory-settings-skills")).not.toBeInTheDocument();
+    const agent = screen.getByTestId("factory-settings-agent");
+    expect(agent.firstElementChild).toHaveAttribute("data-testid", "agent-default-model");
   }, 10000);
 
   it("redirects the legacy agent-resources route to MCP", async () => {
@@ -170,7 +172,8 @@ describe("FactorySettingsMCPPage", () => {
     const empty = await screen.findByTestId("agent-resources-connections-empty");
     expect(empty).not.toHaveTextContent("No MCP servers yet");
     expect(screen.getByTestId("agent-resources-add-connection")).toHaveTextContent("Connect");
-    expect(screen.queryByTestId("agent-default-model")).not.toBeInTheDocument();
+    const agent = screen.getByTestId("factory-settings-agent");
+    expect(agent.firstElementChild).toHaveAttribute("data-testid", "agent-default-model");
     expect(await screen.findByTestId("agent-setup-steps")).toBeInTheDocument();
     expect(await screen.findByTestId("agent-cross-repo")).toBeInTheDocument();
   }, 10000);

@@ -78,6 +78,9 @@ interface RequestBody {
   clearHostedSpendBudget?: unknown;
   publicBadgeEnabled?: unknown;
   publicBadgeShowCost?: unknown;
+  defaultAgentModel?: unknown;
+  defaultAgentModelProvider?: unknown;
+  clearDefaultAgentModel?: unknown;
   assigneeIds?: unknown;
   assignee_ids?: unknown;
   lineName?: unknown;
@@ -364,6 +367,21 @@ function applyFactoryPut(factory: FactoriesFactory, body: Record<string, unknown
   if (typeof request.publicBadgeShowCost === "boolean") {
     factory.publicBadgeShowCost = request.publicBadgeShowCost;
   }
+  applyDefaultAgentModel(factory, request);
+}
+
+function applyDefaultAgentModel(factory: FactoriesFactory, request: RequestBody) {
+  if (request.clearDefaultAgentModel === true) {
+    factory.defaultAgentModel = "";
+    factory.defaultAgentModelProvider = "";
+    return;
+  }
+  if (typeof request.defaultAgentModel !== "string") {
+    return;
+  }
+  factory.defaultAgentModel = request.defaultAgentModel;
+  factory.defaultAgentModelProvider =
+    typeof request.defaultAgentModelProvider === "string" ? request.defaultAgentModelProvider : "";
 }
 
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
@@ -377,6 +395,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
 
         if (method === "PUT") {
           if (!factory) return { json: {} };
+          if (fixture.failFactoryUpdate) return { status: 503, json: {} };
           applyFactoryPut(factory, body);
           return { json: { factory: factoryWithLineMetrics(factory) } };
         }

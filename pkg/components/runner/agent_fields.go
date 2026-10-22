@@ -84,7 +84,7 @@ func AgentModelField(provider string) configuration.Field {
 		Label:       "Model",
 		Type:        configuration.FieldTypeHostedModel,
 		Required:    false,
-		Description: "Select a model from Organization LLM Models.",
+		Description: "The workspace default model is used when you do not select one.",
 		Placeholder: "Select a model",
 		TypeOptions: &configuration.TypeOptions{
 			HostedModel: &configuration.HostedModelTypeOptions{Provider: provider},
@@ -98,8 +98,8 @@ func SuperPlaneAgentModelField() configuration.Field {
 		Label:       "Model",
 		Type:        configuration.FieldTypeHostedModel,
 		Required:    false,
-		Description: "Select a SuperPlane-hosted model. The instance SuperPlane agent model is used when you do not select one.",
-		Placeholder: "Instance SuperPlane agent model",
+		Description: "The workspace default model is used when you do not select one. If the workspace has no default, the instance SuperPlane agent model is used.",
+		Placeholder: "Workspace default model",
 		TypeOptions: &configuration.TypeOptions{
 			HostedModel: &configuration.HostedModelTypeOptions{Provider: configuration.HostedModelAllProviders},
 		},

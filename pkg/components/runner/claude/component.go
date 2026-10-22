@@ -146,6 +146,10 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	if err := validateRunClaudeCodeSpec(spec); err != nil {
 		return err
 	}
+	spec.Model, err = runner.ModelOrFactoryDefault(ctx, ComponentName, spec.Model)
+	if err != nil {
+		return err
+	}
 
 	resolved, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {

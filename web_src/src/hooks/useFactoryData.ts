@@ -470,6 +470,9 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
       };
       publicBadgeEnabled?: boolean;
       publicBadgeShowCost?: boolean;
+      defaultAgentModel?: string;
+      defaultAgentModelProvider?: string;
+      clearDefaultAgentModel?: boolean;
     }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
@@ -487,6 +490,14 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
             planning: input.planning,
             ...(input.publicBadgeEnabled !== undefined ? { publicBadgeEnabled: input.publicBadgeEnabled } : {}),
             ...(input.publicBadgeShowCost !== undefined ? { publicBadgeShowCost: input.publicBadgeShowCost } : {}),
+            ...(input.clearDefaultAgentModel
+              ? { clearDefaultAgentModel: true }
+              : input.defaultAgentModel !== undefined
+                ? {
+                    defaultAgentModel: input.defaultAgentModel,
+                    defaultAgentModelProvider: input.defaultAgentModelProvider ?? "",
+                  }
+                : {}),
           },
         }),
       );

@@ -74,7 +74,7 @@ function SuperPlaneModelField({
       model={selected}
       committedModel={current}
       thinkingLevel={normalizeThinkingLevel(allValues?.[THINKING_LEVEL_KEY])}
-      placeholder={field.placeholder || "Instance SuperPlane agent model"}
+      placeholder={field.placeholder || "Workspace default model"}
       readOnly={readOnly}
       options={options}
       triggerClassName={triggerClassName}
