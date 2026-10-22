@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/Table/table";
+import { FeatureDeleteDialog } from "./FeatureDeleteDialog";
 import { FeatureOrganizationsSheet } from "./FeatureOrganizationsSheet";
 import { BillingHelp } from "./BillingHelp";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,11 @@ export function BillingPlanFeatures({
 }) {
   const returnFocus = useRef<HTMLButtonElement>(null);
   const organizationTrigger = useRef<HTMLButtonElement>(null);
+  const createButton = useRef<HTMLButtonElement>(null);
   const [selected, setSelected] = useState<FeatureDefinition | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ feature: FeatureDefinition; trigger: HTMLButtonElement } | null>(
+    null,
+  );
   const [editing, setEditing] = useState<FeatureDefinition | null>(null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,6 +62,7 @@ export function BillingPlanFeatures({
           <p className="text-sm text-muted-foreground">Define features, then select them in a plan.</p>
         </div>
         <Button
+          ref={createButton}
           onClick={(event) => {
             returnFocus.current = event.currentTarget;
             setCreating(true);
@@ -67,61 +73,33 @@ export function BillingPlanFeatures({
           Create feature
         </Button>
       </div>
-      <div className="overflow-hidden rounded-lg border px-6">
-        <Table aria-label="Features" bleed>
-          <TableHead>
-            <TableRow>
-              <TableHeader>Feature</TableHeader>
-              <TableHeader>
-                Key{" "}
-                <BillingHelp
-                  label="Feature key"
-                  text="Use this stable identifier to check feature access in code. The key cannot change after creation."
-                />
-              </TableHeader>
-              <TableHeader>
-                Access{" "}
-                <BillingHelp
-                  label="Feature access"
-                  text="Restricted features require plan selection or an organization grant. All organizations have access to unrestricted features."
-                />
-              </TableHeader>
-              <TableHeader>
-                <span className="sr-only">Actions</span>
-              </TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {features.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  No features. Create a feature to add it to plans.
-                </TableCell>
-              </TableRow>
-            )}
-            {features.map((feature) => (
-              <FeatureRow
-                key={feature.key}
-                feature={feature}
-                onViewOrganizations={(trigger) => {
-                  organizationTrigger.current = trigger;
-                  setSelected(feature);
-                }}
-                onEdit={(trigger) => {
-                  returnFocus.current = trigger;
-                  setCreating(false);
-                  setEditing({ ...feature });
-                }}
-              />
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <FeatureCatalogTable
+        features={features}
+        onViewOrganizations={(feature, trigger) => {
+          organizationTrigger.current = trigger;
+          setSelected(feature);
+        }}
+        onEdit={(feature, trigger) => {
+          returnFocus.current = trigger;
+          setCreating(false);
+          setEditing({ ...feature });
+        }}
+        onDelete={(feature, trigger) => setPendingDelete({ feature, trigger })}
+      />
       {selected && (
         <FeatureOrganizationsSheet
           feature={selected}
           returnFocus={organizationTrigger.current}
           onClose={() => setSelected(null)}
+        />
+      )}
+      {pendingDelete && (
+        <FeatureDeleteDialog
+          feature={pendingDelete.feature}
+          returnFocus={pendingDelete.trigger}
+          survivorFocus={createButton.current}
+          onDeleted={onSaved}
+          onClose={() => setPendingDelete(null)}
         />
       )}
       {editing && (
@@ -139,13 +117,74 @@ export function BillingPlanFeatures({
   );
 }
 
+function FeatureCatalogTable({
+  features,
+  onEdit,
+  onDelete,
+  onViewOrganizations,
+}: {
+  features: FeatureDefinition[];
+  onEdit: (feature: FeatureDefinition, trigger: HTMLButtonElement) => void;
+  onDelete: (feature: FeatureDefinition, trigger: HTMLButtonElement) => void;
+  onViewOrganizations: (feature: FeatureDefinition, trigger: HTMLButtonElement) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border px-6">
+      <Table aria-label="Features" bleed>
+        <TableHead>
+          <TableRow>
+            <TableHeader>Feature</TableHeader>
+            <TableHeader>
+              Key{" "}
+              <BillingHelp
+                label="Feature key"
+                text="Use this stable identifier to check feature access in code. The key cannot change after creation."
+              />
+            </TableHeader>
+            <TableHeader>
+              Access{" "}
+              <BillingHelp
+                label="Feature access"
+                text="Restricted features require plan selection or an organization grant. All organizations have access to unrestricted features."
+              />
+            </TableHeader>
+            <TableHeader>
+              <span className="sr-only">Actions</span>
+            </TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {features.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center text-muted-foreground">
+                No features. Create a feature to add it to plans.
+              </TableCell>
+            </TableRow>
+          )}
+          {features.map((feature) => (
+            <FeatureRow
+              key={feature.key}
+              feature={feature}
+              onViewOrganizations={(trigger) => onViewOrganizations(feature, trigger)}
+              onEdit={(trigger) => onEdit(feature, trigger)}
+              onDelete={(trigger) => onDelete(feature, trigger)}
+            />
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 function FeatureRow({
   feature,
   onEdit,
+  onDelete,
   onViewOrganizations,
 }: {
   feature: FeatureDefinition;
   onEdit: (trigger: HTMLButtonElement) => void;
+  onDelete: (trigger: HTMLButtonElement) => void;
   onViewOrganizations: (trigger: HTMLButtonElement) => void;
 }) {
   return (
@@ -168,6 +207,14 @@ function FeatureRow({
           onClick={(event) => onEdit(event.currentTarget)}
         >
           <Pencil aria-hidden="true" />
+        </Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label={`Delete ${feature.label}`}
+          onClick={(event) => onDelete(event.currentTarget)}
+        >
+          <Trash2 aria-hidden="true" />
         </Button>
       </TableCell>
     </TableRow>

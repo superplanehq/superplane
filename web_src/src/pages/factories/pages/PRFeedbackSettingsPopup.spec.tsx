@@ -60,11 +60,7 @@ vi.mock("@/ui/componentSidebar/integrationIcons", () => ({
 }));
 
 function mockConnectedIntegrations(data: unknown[] = []) {
-  return {
-    data,
-    isLoading: false,
-    error: null,
-  } as unknown as ReturnType<typeof useConnectedIntegrations>;
+  return { data, isLoading: false, error: null } as unknown as ReturnType<typeof useConnectedIntegrations>;
 }
 
 function mockIntegrationResources(data: unknown[] = [], overrides: Record<string, unknown> = {}) {
