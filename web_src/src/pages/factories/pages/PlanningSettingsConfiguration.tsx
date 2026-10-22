@@ -78,7 +78,7 @@ export function PlanningSettingsConfiguration({
             onChange={onAgentChange}
             disabled={saving}
             description="Add requirements for new planning conversations. SuperPlane keeps the planning and scoring rules."
-            placeholder="For example: Changes to billing must support customers on legacy annual plans."
+            placeholder="For example: In our project, small features often touch both the UI and backend. That alone does not make them complex."
           />
         ) : null}
       </div>
