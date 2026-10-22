@@ -26,10 +26,6 @@ type MCPOAuthClient struct {
 	CreatedAt    time.Time
 }
 
-func (MCPOAuthClient) TableName() string {
-	return "mcp_oauth_clients"
-}
-
 type MCPOAuthCode struct {
 	ID                  uuid.UUID
 	CodeHash            string
@@ -46,14 +42,6 @@ type MCPOAuthCode struct {
 	CreatedAt           time.Time
 }
 
-func (MCPOAuthCode) TableName() string {
-	return "mcp_oauth_codes"
-}
-
-func (c *MCPOAuthCode) FactoryUUIDs() []uuid.UUID {
-	return parseMCPFactoryIDs(c.FactoryIDs)
-}
-
 type MCPOAuthRefreshToken struct {
 	ID             uuid.UUID
 	TokenHash      string
@@ -67,14 +55,6 @@ type MCPOAuthRefreshToken struct {
 	CreatedAt      time.Time
 }
 
-func (MCPOAuthRefreshToken) TableName() string {
-	return "mcp_oauth_refresh_tokens"
-}
-
-func (t *MCPOAuthRefreshToken) FactoryUUIDs() []uuid.UUID {
-	return parseMCPFactoryIDs(t.FactoryIDs)
-}
-
 // NewMCPOAuthFactoryIDs returns the stored form of a workspace list.
 func NewMCPOAuthFactoryIDs(ids []uuid.UUID) datatypes.JSONSlice[string] {
 	out := make([]string, 0, len(ids))
@@ -82,6 +62,26 @@ func NewMCPOAuthFactoryIDs(ids []uuid.UUID) datatypes.JSONSlice[string] {
 		out = append(out, id.String())
 	}
 	return datatypes.NewJSONSlice(out)
+}
+
+func (MCPOAuthClient) TableName() string {
+	return "mcp_oauth_clients"
+}
+
+func (MCPOAuthCode) TableName() string {
+	return "mcp_oauth_codes"
+}
+
+func (c *MCPOAuthCode) FactoryUUIDs() []uuid.UUID {
+	return parseMCPFactoryIDs(c.FactoryIDs)
+}
+
+func (MCPOAuthRefreshToken) TableName() string {
+	return "mcp_oauth_refresh_tokens"
+}
+
+func (t *MCPOAuthRefreshToken) FactoryUUIDs() []uuid.UUID {
+	return parseMCPFactoryIDs(t.FactoryIDs)
 }
 
 func CreateMCPOAuthClient(tx *gorm.DB, clientID, clientName string, redirectURIs []string) (*MCPOAuthClient, error) {
