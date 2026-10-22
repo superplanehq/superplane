@@ -17,7 +17,7 @@ export function intakeRunSource(
     }
     case "linear-issues": {
       const issue = record(payload.data);
-      return source(text(issue.identifier) || "Linear issue", issue.title, issue.url);
+      return source(text(issue.identifier) || "Linear issue", issue.title, text(payload.url, issue.url));
     }
     case "jira-issues": {
       const issue = record(payload.issue);

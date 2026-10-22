@@ -74,11 +74,11 @@ function extraPayload(sourceId: ExtraSource, source: SourceItem, index: number):
         data: {
           action: "create",
           type: "Issue",
+          url: source.url,
           data: {
             id: `linear-issue-${index}`,
             identifier: source.reference,
             title: source.title,
-            url: source.url,
             description: "Keep the existing behavior for other projects.",
             project: { id: "project-1", name: "Platform" },
             labels: [],

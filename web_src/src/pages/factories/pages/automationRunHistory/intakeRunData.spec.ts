@@ -71,7 +71,12 @@ describe("Intake run evidence", () => {
     },
     {
       sourceId: "linear-issues",
-      data: { data: { identifier: "ENG-42", title: "Checkout error", url: "https://linear.app/example/issue/ENG-42" } },
+      data: {
+        action: "create",
+        type: "Issue",
+        url: "https://linear.app/example/issue/ENG-42",
+        data: { identifier: "ENG-42", title: "Checkout error" },
+      },
       key: "ENG-42",
     },
     {
@@ -120,6 +125,7 @@ describe("Intake run evidence", () => {
     );
     expect(run.source?.reference).toBe(key);
     expect(run.source?.title).toBe("Checkout error");
+    if (sourceId === "linear-issues") expect(run.source?.url).toBe("https://linear.app/example/issue/ENG-42");
     expect(run.task).toBeUndefined();
   });
   it("does not attach a different task that happens to share the incoming title", () => {
