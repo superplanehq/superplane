@@ -40,7 +40,7 @@ func ListOrganizationQueuedTasks(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationQu
 	if err != nil {
 		return nil, err
 	}
-	analysis, err := listQueuedRootTasks(tx, orgID)
+	analysis, err := listQueuedRootTasks(tx, orgID, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -59,56 +59,6 @@ func ListOrganizationQueuedTasks(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationQu
 		queued[i].Position = positions[queued[i].WorkOrderID]
 	}
 	return queued, nil
-}
-
-func listQueuedRootTasks(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationQueuedTask, error) {
-	var queued []OrganizationQueuedTask
-	err := tx.Table("workflow_events AS e").
-		Select("e.id, c.factory_id, o.id AS work_order_id, e.run_id, e.created_at, c.name").
-		Joins("JOIN workflows c ON c.id = e.workflow_id AND c.deleted_at IS NULL").
-		Joins("JOIN factories f ON f.id = c.factory_id AND f.deleted_at IS NULL").
-		Joins("JOIN workflow_runs r ON r.id = e.run_id").
-		Joins("JOIN factory_work_orders o ON o.id::text = COALESCE(COALESCE(e.data->'data', e.data)->'workOrder'->>'id', COALESCE(e.data->'data', e.data)->'work_order'->>'id') AND o.factory_id = c.factory_id AND o.organization_id = c.organization_id").
-		Where("c.organization_id = ? AND e.execution_id IS NULL AND e.state = ?", orgID, CanvasEventStatePending).
-		Where("o.state IN ? AND r.state IN ?", []string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen}, []string{CanvasRunStateStarted, CanvasRunStatePending}).
-		Where("NOT EXISTS (SELECT 1 FROM factory_work_order_executions x WHERE x.run_id = r.id)").
-		Scan(&queued).Error
-	return queued, err
-}
-
-// Locally full line steps do not prevent another eligible task from using an
-// organization slot. The card position retains the full queue order.
-func nextQueuedOrganizationTask(tx *gorm.DB, orgID uuid.UUID) (*OrganizationQueuedTask, error) {
-	queued, err := ListOrganizationQueuedTasks(tx, orgID)
-	if err != nil {
-		return nil, err
-	}
-	for i := range queued {
-		task := &queued[i]
-		if task.RunID != uuid.Nil {
-			return task, nil
-		}
-		item := &FactoryWorkOrderQueueItem{
-			ID: task.ID, OrganizationID: orgID, FactoryID: task.FactoryID,
-			WorkOrderID: task.WorkOrderID, LineDispatchID: task.LineDispatchID,
-			LineID: task.LineID, StepIndex: task.StepIndex,
-		}
-		dispatch, order, line, err := queuedTaskCandidate(tx, item)
-		if err != nil {
-			return nil, err
-		}
-		if dispatch == nil || order == nil || line == nil || task.StepIndex < 0 || task.StepIndex >= len(dispatch.Steps) {
-			continue
-		}
-		active, err := countActiveFactoryStepExecutions(tx, task.LineID, task.StepIndex)
-		if err != nil {
-			return nil, err
-		}
-		if active < int64(admissionStep(line, dispatch, task.StepIndex).EffectiveMaxParallelism()) {
-			return task, nil
-		}
-	}
-	return nil, nil
 }
 
 func (o *FactoryWorkOrder) CancelQueuedTask(tx *gorm.DB, queueID uuid.UUID) (*RunCancellationResult, error) {
@@ -152,4 +102,57 @@ func (o *FactoryWorkOrder) CancelQueuedTask(tx *gorm.DB, queueID uuid.UUID) (*Ru
 		return run.RequestCancellation(tx, nil)
 	}
 	return nil, ErrTaskNoLongerQueued
+}
+
+func listQueuedRootTasks(tx *gorm.DB, orgID uuid.UUID, limit int) ([]OrganizationQueuedTask, error) {
+	var queued []OrganizationQueuedTask
+	query := tx.Table("workflow_events AS e").
+		Select("e.id, c.factory_id, o.id AS work_order_id, e.run_id, e.created_at, c.name").
+		Joins("JOIN workflows c ON c.id = e.workflow_id AND c.deleted_at IS NULL").
+		Joins("JOIN factories f ON f.id = c.factory_id AND f.deleted_at IS NULL").
+		Joins("JOIN workflow_runs r ON r.id = e.run_id").
+		Joins("JOIN factory_work_orders o ON o.id::text = COALESCE(COALESCE(e.data->'data', e.data)->'workOrder'->>'id', COALESCE(e.data->'data', e.data)->'work_order'->>'id') AND o.factory_id = c.factory_id AND o.organization_id = c.organization_id").
+		Where("c.organization_id = ? AND e.execution_id IS NULL AND e.state = ?", orgID, CanvasEventStatePending).
+		Where("o.state IN ? AND r.state IN ?", []string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen}, []string{CanvasRunStateStarted, CanvasRunStatePending}).
+		Where("NOT EXISTS (SELECT 1 FROM factory_work_order_executions x WHERE x.run_id = r.id)")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	err := query.Scan(&queued).Error
+	return queued, err
+}
+
+// Locally full line steps do not prevent another eligible task from using an
+// organization slot. The card position retains the full queue order.
+func nextQueuedOrganizationTask(tx *gorm.DB, orgID uuid.UUID) (*OrganizationQueuedTask, error) {
+	queued, err := ListOrganizationQueuedTasks(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range queued {
+		task := &queued[i]
+		if task.RunID != uuid.Nil {
+			return task, nil
+		}
+		item := &FactoryWorkOrderQueueItem{
+			ID: task.ID, OrganizationID: orgID, FactoryID: task.FactoryID,
+			WorkOrderID: task.WorkOrderID, LineDispatchID: task.LineDispatchID,
+			LineID: task.LineID, StepIndex: task.StepIndex,
+		}
+		dispatch, order, line, err := queuedTaskCandidate(tx, item)
+		if err != nil {
+			return nil, err
+		}
+		if dispatch == nil || order == nil || line == nil || task.StepIndex < 0 || task.StepIndex >= len(dispatch.Steps) {
+			continue
+		}
+		active, err := countActiveFactoryStepExecutions(tx, task.LineID, task.StepIndex)
+		if err != nil {
+			return nil, err
+		}
+		if active < int64(admissionStep(line, dispatch, task.StepIndex).EffectiveMaxParallelism()) {
+			return task, nil
+		}
+	}
+	return nil, nil
 }
