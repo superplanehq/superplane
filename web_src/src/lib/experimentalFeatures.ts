@@ -13,9 +13,6 @@ export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 /** Organization experimental feature: Datadog Error Tracking intake from the Backlog column menu. */
 export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 
-/** Organization experimental feature: SuperPlane Agent page. */
-export const FEATURE_WORKSPACE_AGENT = "workspace_agent";
-
 /** Organization experimental feature: workspace skills. */
 export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 

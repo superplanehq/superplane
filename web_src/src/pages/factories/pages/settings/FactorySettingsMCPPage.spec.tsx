@@ -4,11 +4,7 @@ import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import type { FactoriesFactoryMcpClient } from "@/api-client";
-import {
-  FEATURE_SUPERPLANE_MCP_SERVER,
-  FEATURE_WORKSPACE_AGENT,
-  FEATURE_WORKSPACE_SKILLS,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_SUPERPLANE_MCP_SERVER, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import {
   HEADER_MCP_RESOURCE,
   OAUTH_CONNECTED_RESOURCE,
@@ -27,7 +23,7 @@ const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 const settingsAgentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
 const superplaneMcpServerPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/superplane-mcp-server`;
 const mcpConfigurePath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
-const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS];
+const agentPageFeatures = [FEATURE_WORKSPACE_SKILLS];
 
 function connectedMcpClient(id: string, clientName: string): FactoriesFactoryMcpClient {
   return {
@@ -81,7 +77,6 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_AGENT]}
       />,
     );
 
@@ -111,8 +106,8 @@ describe("FactorySettingsMCPPage", () => {
 
     expect(await screen.findByTestId("factory-settings-agent", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(await screen.findByTestId("agent-resources-connections-empty")).toBeInTheDocument();
-    expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("agent-setup-steps")).toBeInTheDocument();
+    expect(await screen.findByTestId("agent-cross-repo")).toBeInTheDocument();
     expect(screen.queryByTestId("factory-settings-skills")).not.toBeInTheDocument();
   }, 10000);
 

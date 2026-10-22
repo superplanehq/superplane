@@ -111,11 +111,6 @@ func AttachWorkspaceAgentResources(
 		logger.WithError(err).Warn("skip workspace skills: skills feature check failed")
 		skillsEnabled = false
 	}
-	agentEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgent)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace setup and context: agent feature check failed")
-		agentEnabled = false
-	}
 
 	mcpServers, err := factory.ListEnabledMCPServers(db)
 	if err != nil {
@@ -130,15 +125,11 @@ func AttachWorkspaceAgentResources(
 			skills = nil
 		}
 	}
-	var setupCommands []string
-	var contextRepos []models.FactoryAgentResource
-	if agentEnabled {
-		setupCommands, contextRepos, err = loadWorkspaceSetupAndContext(db, factory)
-		if err != nil {
-			logger.WithError(err).Warn("skip workspace setup and context: list failed")
-			setupCommands = nil
-			contextRepos = nil
-		}
+	setupCommands, contextRepos, err := loadWorkspaceSetupAndContext(db, factory)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace setup and context: list failed")
+		setupCommands = nil
+		contextRepos = nil
 	}
 
 	disabled := disabledAgentResourceIDs(ctx.Configuration)
