@@ -160,6 +160,9 @@ func dispatchWorkOrderOnLineTx(
 	}
 
 	orgID := factory.OrganizationID
+	if err := models.LockOrganizationTaskAdmission(tx, orgID); err != nil {
+		return nil, err
+	}
 	factoryID := factory.ID
 	lineID := line.ID
 
@@ -272,6 +275,13 @@ func publishDispatchedWorkOrder(
 	startedSteps []*models.FactoryLineStepResult,
 ) {
 	for _, result := range startedSteps {
+		if result != nil && result.Cancellation != nil {
+			cancellation := result.Cancellation
+			messages.PublishRunCancellationDrain(cancellation.Run.WorkflowID, cancellation.Drain)
+			if err := messages.NewCanvasRunMessage(cancellation.Run.WorkflowID.String(), cancellation.Run.ID.String()).Publish(); err != nil {
+				logger.WithError(err).Warn("Failed to publish replaced run cancellation")
+			}
+		}
 		publishPendingStepRun(logger, result)
 	}
 
@@ -284,16 +294,23 @@ func publishDispatchedWorkOrder(
 		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
 	for _, result := range startedSteps {
-		if result == nil || result.Execution == nil {
+		if result == nil {
 			continue
 		}
-		extraID := result.Execution.WorkOrderID
+		var extraID, extraFactoryID uuid.UUID
+		if result.Execution != nil {
+			extraID, extraFactoryID = result.Execution.WorkOrderID, result.Execution.FactoryID
+		} else if result.QueueItem != nil {
+			extraID, extraFactoryID = result.QueueItem.WorkOrderID, result.QueueItem.FactoryID
+		} else {
+			continue
+		}
 		if _, seen := publishedOrders[extraID]; seen {
 			continue
 		}
 		publishedOrders[extraID] = struct{}{}
 		if err := messages.PublishFactoryWorkOrderUpdated(
-			factoryID.String(),
+			extraFactoryID.String(),
 			extraID.String(),
 			factoryevents.EventTypeLineStepExecutionCreated,
 		); err != nil {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -674,6 +675,15 @@ func Test__DispatchWorkOrder__ReplaceActiveLogsAdmittedRunOnItsOrder(t *testing.
 	var queuedBefore int64
 	require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", queued.ID).Count(&queuedBefore).Error)
 	require.Zero(t, queuedBefore, "the second order must wait for the step slot")
+
+	// The run stopped, but its factory execution still awaits finalization.
+	// Replacement can release this slot immediately and publish the waiter.
+	var oldExecution models.FactoryWorkOrderExecution
+	require.NoError(t, db.Where("work_order_id = ?", running.ID).First(&oldExecution).Error)
+	require.NotNil(t, oldExecution.RunID)
+	now := time.Now()
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", *oldExecution.RunID).
+		Updates(map[string]any{"state": models.CanvasRunStateFinished, "finished_at": &now}).Error)
 
 	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
 		FactoryId:     factoryModel.ID.String(),
