@@ -46,6 +46,7 @@ const OUTCOMES: IntakeRunOutcome[] = [
 const SUMMARY: Record<IntakeRunOutcome, string> = {
   "no-proposal": "The scheduled review finished without proposing a task.",
   created: "SuperPlane created a task from this source event.",
+  existing: "A task already exists for this source. SuperPlane did not create another task.",
   filtered: "This source event did not match the intake filters. No task was created.",
   processing: "SuperPlane is processing this source event. The final outcome is not available yet.",
   failed: "Processing failed before SuperPlane could create a task.",
@@ -130,7 +131,6 @@ function activityFor(
     name: "Source event",
     status: "Passed",
     recordedAt: startedAt,
-    logs: { state: "empty" },
     outputs: payload,
     defaultTab: "outputs",
     outputsLabel: "Event data",
@@ -141,7 +141,6 @@ function activityFor(
     name: "Matches filters?",
     status: "Passed",
     recordedAt: startedAt,
-    logs: { state: "empty" },
     outputs: outcome === "filtered" ? { false: [{}] } : { true: [{}] },
     defaultTab: "outputs",
   };
@@ -161,7 +160,6 @@ function activityFor(
               ? "Cancelled"
               : "Passed",
       recordedAt: startedAt,
-      logs: { state: "empty" },
       outputs: outcome === "created" ? { default: [{ taskId }] } : undefined,
       error: outcome === "failed" ? "The task could not be saved because of a temporary connection error." : undefined,
       defaultTab: "outputs",
@@ -187,6 +185,7 @@ function sourcePreview(sourceId: LineIntakeSourceId, index: number) {
 
 const EXECUTION_STATUS = {
   created: "Passed",
+  existing: "Passed",
   filtered: "Passed",
   processing: "Running",
   failed: "Failed",
@@ -197,9 +196,15 @@ const EXECUTION_STATUS = {
 
 export function intakeHistoryPreviewRuns(sourceId: IntakePreviewSource): IntakeRunPreview[] {
   if (sourceId === "scheduled-intake") return scheduledHistoryPreviewRuns();
-  return OUTCOMES.map((sampleOutcome, index) => {
+  const outcomes = [...OUTCOMES];
+  if (sourceId === "github-issues") {
+    outcomes[0] = "existing";
+    outcomes[2] = "created";
+  }
+  return outcomes.map((sampleOutcome, index) => {
     const outcome = sourceId === "pagerduty-incidents" && sampleOutcome === "filtered" ? "created" : sampleOutcome;
-    const { source, event, payload } = sourcePreview(sourceId, index);
+    const { source, event, payload } = sourcePreview(sourceId, sourceId === "github-issues" && index === 2 ? 0 : index);
+    const taskNumber = sourceId === "github-issues" && index === 2 ? 987 : 987 + index;
     const started = new Date(Date.now() - (index * 9 + 1) * 60_000);
     const startedAt = started.toISOString();
     return {
@@ -215,9 +220,16 @@ export function intakeHistoryPreviewRuns(sourceId: IntakePreviewSource): IntakeR
           : new Date(started.getTime() + (index % 2 === 0 ? 1000 : 500)).toISOString(),
       duration: outcome === "processing" ? `${index * 9 + 1}m` : index % 2 === 0 ? "1s" : "< 1s",
       executionStatus: EXECUTION_STATUS[outcome],
-      task: outcome === "created" ? { id: `SUPER-${987 + index}`, title: source.title } : undefined,
+      task:
+        outcome === "created" || outcome === "existing"
+          ? {
+              id: `SUPER-${taskNumber}`,
+              title: source.title,
+              url: `/example/workspaces/sp/task/${taskNumber}`,
+            }
+          : undefined,
       error: outcome === "failed" ? "The task could not be saved because of a temporary connection error." : undefined,
-      activities: activityFor(outcome, startedAt, payload, `task-${987 + index}`).filter(
+      activities: activityFor(outcome, startedAt, payload, `task-${taskNumber}`).filter(
         (activity) => sourceId !== "pagerduty-incidents" || activity.id !== "intake-filters",
       ),
     };

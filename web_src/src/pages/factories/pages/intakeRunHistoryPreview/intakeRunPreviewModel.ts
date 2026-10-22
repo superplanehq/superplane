@@ -16,7 +16,7 @@ export interface IntakeRunPreview {
   duration: string;
   finishedAt?: string;
   executionStatus: RunStatus;
-  task?: { id: string; title: string };
+  task?: { id: string; title: string; url?: string };
   error?: string;
   activities: RunActivity[];
 }
