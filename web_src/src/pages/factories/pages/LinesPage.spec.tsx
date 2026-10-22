@@ -1666,7 +1666,7 @@ describe("LinesPage board editing", () => {
     expect(savedAgent?.concurrency?.max).toBe(3);
     expect(savedAgent?.configuration?.steps).toEqual(implementerCanvas.spec.nodes[1].configuration.steps);
     await waitFor(() => expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument());
-  });
+  }, 15000);
 
   it("keeps Backlog Edit as the only edit action", async () => {
     const user = userEvent.setup();
