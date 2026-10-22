@@ -13,18 +13,20 @@ import (
 )
 
 const (
-	labelManaged       = "superplane.managed-runner"
-	labelFleetID       = "superplane.fleet-id"
-	labelRunnerID      = "superplane.runner-id"
-	labelRunnerVersion = "superplane.runner-version"
+	labelManaged        = "superplane.managed-runner"
+	labelFleetManagerID = "superplane.fleet-manager-id"
+	labelFleetID        = "superplane.fleet-id"
+	labelRunnerID       = "superplane.runner-id"
+	labelRunnerVersion  = "superplane.runner-version"
 )
 
 type Config struct {
-	Image        string
-	RunnerAPIURL string
-	Network      string
-	Volumes      []string
-	ExtraHosts   []string
+	FleetManagerID string
+	Image          string
+	RunnerAPIURL   string
+	Network        string
+	Volumes        []string
+	ExtraHosts     []string
 }
 
 type commandRunner interface {
@@ -52,6 +54,7 @@ func newProvider(
 	docker commandRunner,
 	log *slog.Logger,
 ) (*Provider, error) {
+	config.FleetManagerID = strings.TrimSpace(config.FleetManagerID)
 	config.Image = strings.TrimSpace(config.Image)
 	config.RunnerAPIURL = strings.TrimRight(
 		strings.TrimSpace(config.RunnerAPIURL),
@@ -60,6 +63,9 @@ func newProvider(
 	config.Network = strings.TrimSpace(config.Network)
 	config.Volumes = nonEmpty(config.Volumes)
 	config.ExtraHosts = nonEmpty(config.ExtraHosts)
+	if config.FleetManagerID == "" {
+		return nil, fmt.Errorf("Fleet Manager ID is required")
+	}
 	if config.Image == "" {
 		return nil, fmt.Errorf("Docker runner image is required")
 	}
@@ -85,15 +91,21 @@ func (p *Provider) List(
 		`{{.Label "` + labelRunnerID + `"}}`,
 		`{{.Label "` + labelFleetID + `"}}`,
 		"{{.State}}",
+		`{{.Label "` + labelFleetManagerID + `"}}`,
 	}, "\t")
-	output, err := p.docker.Run(
-		ctx,
+	args := []string{
 		"ps",
 		"-a",
-		"--filter", "label="+labelManaged+"=true",
-		"--filter", "label="+labelFleetID+"="+fleetID,
-		"--format", format,
-	)
+		"--filter", "label=" + labelManaged + "=true",
+		"--filter", "label=" + labelFleetID + "=" + fleetID,
+	}
+	if p.config.Network != "" {
+		args = append(args, "--filter", "network="+p.config.Network)
+	} else {
+		args = append(args, "--filter", "label="+labelFleetManagerID+"="+p.config.FleetManagerID)
+	}
+	args = append(args, "--format", format)
+	output, err := p.docker.Run(ctx, args...)
 	if err != nil {
 		return nil, dockerError("list runner containers", output, err)
 	}
@@ -104,7 +116,14 @@ func (p *Provider) List(
 			continue
 		}
 		fields := strings.Split(line, "\t")
-		if len(fields) != 4 || fields[0] == "" || fields[1] == "" {
+		if len(fields) != 5 || fields[0] == "" || fields[1] == "" {
+			continue
+		}
+		managerID := strings.TrimSpace(fields[4])
+		if managerID != "" && managerID != p.config.FleetManagerID {
+			continue
+		}
+		if managerID == "" && p.config.Network == "" {
 			continue
 		}
 		resources = append(resources, provider.Resource{
@@ -165,6 +184,7 @@ func (p *Provider) Create(
 		"run", "-d",
 		"--name", name,
 		"--label", labelManaged + "=true",
+		"--label", labelFleetManagerID + "=" + p.config.FleetManagerID,
 		"--label", labelFleetID + "=" + request.FleetID,
 		"--label", labelRunnerID + "=" + request.RunnerID,
 		"--label", labelRunnerVersion + "=" + request.RunnerVersion,
