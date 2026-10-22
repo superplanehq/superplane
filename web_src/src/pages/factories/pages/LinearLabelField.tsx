@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { addIntakeLabel, toggleIntakeLabel } from "./intakeSourceSettingsModel";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
@@ -64,29 +65,7 @@ export function LinearLabelField({
       {!labelsQuery.isLoading && !labelsQuery.isError && choices.length === 0 ? (
         <p className="workspace-body-text text-muted-foreground">{LINEAR_INTAKE_SETUP_COPY.labelsEmpty}</p>
       ) : null}
-      {choices.length > 0 ? (
-        <ul className="flex flex-wrap items-center gap-1.5">
-          {choices.map((label) => (
-            <li key={label}>
-              <label
-                className={cn(
-                  "inline-flex max-w-full cursor-pointer items-center gap-2 rounded-md border px-2 py-1 text-[13px]",
-                  labels.includes(label)
-                    ? "border-foreground/20 bg-accent/50 text-foreground"
-                    : "border-border bg-card text-muted-foreground hover:border-foreground/15",
-                )}
-              >
-                <Checkbox
-                  checked={labels.includes(label)}
-                  onChange={() => onChange(toggleIntakeLabel(labels, label))}
-                  aria-label={label}
-                />
-                <span className="min-w-0 truncate">{label}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {choices.length > 0 ? <LinearLabelChoiceList choices={choices} labels={labels} onChange={onChange} /> : null}
       {typing ? (
         <div className="flex items-center gap-2">
           <Input
@@ -131,5 +110,45 @@ export function LinearLabelField({
         </div>
       )}
     </div>
+  );
+}
+
+function LinearLabelChoiceList({
+  choices,
+  labels,
+  onChange,
+}: {
+  choices: string[];
+  labels: string[];
+  onChange: (labels: string[]) => void;
+}) {
+  const choiceIdPrefix = useId();
+
+  return (
+    <ul className="flex flex-wrap items-center gap-1.5">
+      {choices.map((label) => {
+        const choiceId = `${choiceIdPrefix}-${encodeURIComponent(label)}`;
+        return (
+          <li key={label}>
+            <Label
+              htmlFor={choiceId}
+              className={cn(
+                "inline-flex max-w-full cursor-pointer items-center gap-2 rounded-md border px-2 py-1 text-[13px] font-normal",
+                labels.includes(label)
+                  ? "border-foreground/20 bg-accent/50 text-foreground"
+                  : "border-border bg-card text-muted-foreground hover:border-foreground/15 dark:text-muted-foreground",
+              )}
+            >
+              <Checkbox
+                id={choiceId}
+                checked={labels.includes(label)}
+                onChange={() => onChange(toggleIntakeLabel(labels, label))}
+              />
+              <span className="min-w-0 truncate">{label}</span>
+            </Label>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
