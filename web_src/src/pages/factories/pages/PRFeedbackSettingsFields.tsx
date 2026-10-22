@@ -150,7 +150,6 @@ export function PRFeedbackDiscussionFields({
   const supportsReviewBots = factoryVCSProvider(vcsProvider) !== "bitbucket";
   const mentionRequired = draft.mention.trim().length > 0;
   const [botMode, setBotMode] = useState<DiscussionBotMode>(() => discussionBotModeFromDraft(draft));
-  const [showAddressAllBots] = useState(() => draft.addressAllBots);
   const catalogEnabled = Boolean(organizationId && githubIntegrationId) && supportsReviewBots;
   const catalogParameters = draft.repository.trim() ? { repository: draft.repository.trim() } : undefined;
   const catalogQuery = useIntegrationResources(
@@ -209,11 +208,7 @@ export function PRFeedbackDiscussionFields({
           role="radiogroup"
           aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
         >
-          <DiscussionBotChoices
-            botMode={botMode}
-            showAddressAllBots={showAddressAllBots}
-            onChange={setBotModeAndDraft}
-          />
+          <DiscussionBotChoices botMode={botMode} onChange={setBotModeAndDraft} />
         </div>
         {botMode === "address" ? (
           <ReviewBotPicker
@@ -243,24 +238,21 @@ export function PRFeedbackDiscussionFields({
 
 function DiscussionBotChoices({
   botMode,
-  showAddressAllBots,
   onChange,
 }: {
   botMode: DiscussionBotMode;
-  showAddressAllBots: boolean;
   onChange: (mode: DiscussionBotMode) => void;
 }) {
   return (
     <>
-      {showAddressAllBots ? (
-        <IntakeSettingsRadioOption
-          name="pr-feedback-bot-mode"
-          value="all"
-          checked={botMode === "all"}
-          title={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsLabel}
-          onChange={() => onChange("all")}
-        />
-      ) : null}
+      <IntakeSettingsRadioOption
+        name="pr-feedback-bot-mode"
+        value="all"
+        checked={botMode === "all"}
+        title={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsLabel}
+        helper={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsHelper}
+        onChange={() => onChange("all")}
+      />
       <IntakeSettingsRadioOption
         name="pr-feedback-bot-mode"
         value="ignore"
