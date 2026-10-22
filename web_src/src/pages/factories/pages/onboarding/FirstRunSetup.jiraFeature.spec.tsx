@@ -317,3 +317,11 @@ describe("FirstRunSetup Jira intake", () => {
     expect(setupRef.current?.issuesChoice).toBe("linear");
   });
 });
+
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
+  useOrganizationBilling: () => ({
+    data: { billingEnabled: false },
+    refetch: async () => ({ data: { billingEnabled: false } }),
+  }),
+}));
