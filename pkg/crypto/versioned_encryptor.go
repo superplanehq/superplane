@@ -24,19 +24,11 @@ type DataKeys interface {
 }
 
 type VersionedEncryptor struct {
-	keys         DataKeys
-	legacy       Encryptor
-	legacyWrites bool
+	keys DataKeys
 }
 
-func NewVersionedEncryptor(keys DataKeys, legacy Encryptor) *VersionedEncryptor {
-	return &VersionedEncryptor{keys: keys, legacy: legacy}
-}
-
-func (e *VersionedEncryptor) WithLegacyWrites() *VersionedEncryptor {
-	copy := *e
-	copy.legacyWrites = true
-	return &copy
+func NewVersionedEncryptor(keys DataKeys) *VersionedEncryptor {
+	return &VersionedEncryptor{keys: keys}
 }
 
 func (e *VersionedEncryptor) WithKeys(keys DataKeys) *VersionedEncryptor {
@@ -46,9 +38,6 @@ func (e *VersionedEncryptor) WithKeys(keys DataKeys) *VersionedEncryptor {
 }
 
 func (e *VersionedEncryptor) Encrypt(ctx context.Context, plain, associatedData []byte) ([]byte, error) {
-	if e.legacyWrites {
-		return e.legacy.Encrypt(ctx, plain, associatedData)
-	}
 	key, err := e.keys.Active(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load active data key: %w", err)
@@ -66,10 +55,7 @@ func (e *VersionedEncryptor) Encrypt(ctx context.Context, plain, associatedData 
 
 func (e *VersionedEncryptor) Decrypt(ctx context.Context, value, associatedData []byte) ([]byte, error) {
 	if !bytes.HasPrefix(value, envelopeMarker) {
-		if e.legacy == nil {
-			return nil, errors.New("legacy decryption is unavailable")
-		}
-		return e.legacy.Decrypt(ctx, value, associatedData)
+		return nil, errors.New("encrypted value has no versioned envelope")
 	}
 	headerLength := len(envelopeMarker) + len(uuid.UUID{})
 	if len(value) < headerLength+28 {

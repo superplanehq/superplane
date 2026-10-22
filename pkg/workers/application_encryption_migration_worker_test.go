@@ -21,21 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestMigratorConvertsLegacyCiphertextAndUnblocksRotation(t *testing.T) {
-	for _, source := range []struct {
-		name      string
-		encryptor crypto.Encryptor
-	}{
-		{"aes-gcm", crypto.NewAESGCMEncryptor(bytes.Repeat([]byte{4}, 32))},
-		{"plaintext", crypto.NewNoOpEncryptor()},
-	} {
-		t.Run(source.name, func(t *testing.T) {
-			testMigratorConvertsLegacyValues(t, source.encryptor)
-		})
-	}
-}
-
-func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
+func TestMigratorRotatesVersionedCiphertextAndUnblocksRotation(t *testing.T) {
 	ctx := t.Context()
 	db := database.DB(context.Background())
 	require.NoError(t, database.VerifyTestDatabase(db))
@@ -51,7 +37,7 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	require.NoError(t, err)
 	store := encryption.NewStore(masters, "local-v1")
 	require.NoError(t, store.Initialize(ctx))
-	encryptor := encryption.NewApplicationEncryptor(crypto.NewVersionedEncryptor(store, legacy), store)
+	encryptor := encryption.NewApplicationEncryptor(crypto.NewVersionedEncryptor(store), store)
 	table := "encryption_migration_test_" + uuid.NewString()[:8]
 	require.NoError(t, db.Exec(fmt.Sprintf("CREATE TABLE %s (id uuid PRIMARY KEY, secret bytea NOT NULL, configuration jsonb NOT NULL, app_name text NOT NULL)", table)).Error)
 	t.Cleanup(func() { require.NoError(t, db.Exec("DROP TABLE "+table).Error) })
@@ -76,12 +62,12 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 		return models.LoadApplicationEncryptionMigration(db, id)
 	}
 
-	ciphertext, err := legacy.Encrypt(ctx, []byte("smtp secret"), []byte("smtp_password"))
+	ciphertext, err := encryptor.Encrypt(ctx, []byte("smtp secret"), []byte("smtp_password"))
 	require.NoError(t, err)
 	id := uuid.New()
-	apiKey, err := legacy.Encrypt(ctx, []byte("api secret"), []byte(id.String()))
+	apiKey, err := encryptor.Encrypt(ctx, []byte("api secret"), []byte(id.String()))
 	require.NoError(t, err)
-	adminKey, err := legacy.Encrypt(ctx, []byte("admin secret"), []byte(id.String()))
+	adminKey, err := encryptor.Encrypt(ctx, []byte("admin secret"), []byte(id.String()))
 	require.NoError(t, err)
 	configuration, err := json.Marshal(map[string]any{
 		"apiKey":      base64.StdEncoding.EncodeToString(apiKey),
@@ -92,12 +78,14 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	require.NoError(t, err)
 	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name) VALUES (?, ?, ?, 'openai')", id, ciphertext, string(configuration)).Error)
 	openRouterID := uuid.New()
-	openRouterKey, err := legacy.Encrypt(ctx, []byte("router secret"), []byte(openRouterID.String()))
+	openRouterKey, err := encryptor.Encrypt(ctx, []byte("router secret"), []byte(openRouterID.String()))
 	require.NoError(t, err)
 	openRouterConfig, err := json.Marshal(map[string]string{"apiKey": base64.StdEncoding.EncodeToString(openRouterKey)})
 	require.NoError(t, err)
 	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name) VALUES (?, ?, ?, 'openrouter')", openRouterID, ciphertext, string(openRouterConfig)).Error)
 
+	_, err = store.CreateAndActivateDataKey(ctx)
+	require.NoError(t, err)
 	job, err := startJob()
 	require.NoError(t, err)
 	_, err = store.CreateAndActivateDataKey(ctx)
@@ -158,9 +146,6 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	require.Equal(t, "router secret", string(plain))
 	newKeyID, err := store.CreateAndActivateDataKey(ctx)
 	require.NoError(t, err)
-	if _, plaintext := legacy.(*crypto.NoOpEncryptor); plaintext {
-		return
-	}
 	corruptID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name) VALUES (?, ?, '{}', 'openai')", corruptID, []byte("invalid ciphertext")).Error)
 	failedJob, err := startJob()
@@ -182,7 +167,7 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	require.True(t, versioned)
 	require.Equal(t, newKeyID, keyID)
 
-	repaired, err := legacy.Encrypt(ctx, []byte("repaired secret"), []byte("smtp_password"))
+	repaired, err := encryptor.Encrypt(ctx, []byte("repaired secret"), []byte("smtp_password"))
 	require.NoError(t, err)
 	require.NoError(t, db.Exec("UPDATE "+table+" SET secret = ? WHERE id = ?", repaired, corruptID).Error)
 	newJob, err := startJob()

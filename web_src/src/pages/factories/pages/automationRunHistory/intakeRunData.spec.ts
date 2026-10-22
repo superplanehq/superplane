@@ -25,6 +25,25 @@ const received: CanvasesCanvasRun = {
 const map = (run: CanvasesCanvasRun) => toAutomationRun(run, [], Date.now(), "github-issues");
 
 describe("Intake run evidence", () => {
+  it("keeps an indexed task when archived tasks are not loaded", () => {
+    const run = toAutomationRun(
+      { ...received, executions: [], task: { id: "task-1", key: "SP-9", title: "Indexed task" } },
+      [],
+      Date.now(),
+      "github-issues",
+    );
+    expect(run.intake?.outcome).toBe("created");
+    expect(run.task).toEqual({ id: "SP-9", title: "Indexed task" });
+  });
+  it("does not hide a recorded filter rejection behind an indexed task", () => {
+    const run = toAutomationRun(
+      { ...received, task: { id: "task-1", key: "SP-9", title: "Indexed task" } },
+      [],
+      Date.now(),
+      "github-issues",
+    );
+    expect(run.intake?.outcome).toBe("filtered");
+  });
   it("shows a received issue and a recorded filter rejection without a linked task", () => {
     const run = map(received);
     expect(run.source).toEqual({
@@ -50,6 +69,53 @@ describe("Intake run evidence", () => {
         executions: [{ componentName: "createWorkOrder", result: "RESULT_PASSED", outputChannels: ["default"] }],
       }).intake?.outcome,
     ).toBe("created");
+  });
+  it("uses a recorded duplicate decision to identify the existing task", () => {
+    const run: CanvasesCanvasRun = {
+      ...received,
+      executions: [
+        {
+          id: "create",
+          nodeId: "create",
+          componentName: "createWorkOrder",
+          result: "RESULT_PASSED",
+          existingTaskId: "existing-task",
+        },
+      ],
+    };
+    const mapped = toAutomationRun(
+      run,
+      [{ id: "existing-task", key: "SP-42", title: "Fix checkout", sourceRunId: "original-run" }],
+      Date.now(),
+      "github-issues",
+    );
+    expect(mapped.intake?.outcome).toBe("existing");
+    expect(mapped.task).toEqual({ id: "SP-42", title: "Fix checkout" });
+    expect(map(run).intake?.outcome).toBe("existing");
+    expect(map(run).task).toBeUndefined();
+    expect(map({ ...run, result: "RESULT_FAILED" }).intake?.outcome).toBe("failed");
+  });
+  it("does not reuse an existing-task decision from a superseded or unfinished attempt", () => {
+    const previous = {
+      id: "first",
+      nodeId: "create",
+      componentName: "createWorkOrder",
+      result: "RESULT_PASSED" as const,
+      existingTaskId: "existing-task",
+      createdAt: "2026-10-22T12:00:00Z",
+    };
+    expect(
+      map({
+        ...received,
+        executions: [
+          previous,
+          { ...previous, id: "retry", existingTaskId: undefined, createdAt: "2026-10-22T12:01:00Z" },
+        ],
+      }).intake?.outcome,
+    ).toBe("unknown");
+    expect(map({ ...received, executions: [{ ...previous, result: "RESULT_UNKNOWN" }] }).intake?.outcome).toBe(
+      "unknown",
+    );
   });
   it("uses the last attempt for each filter and keeps failed runs failed", () => {
     const retry = {
@@ -154,6 +220,9 @@ describe("Intake run evidence", () => {
       ],
     );
     expect(activities.find((a) => a.id === "event:event")?.outputsLabel).toBe("Event data");
+    expect(activities.find((a) => a.id === "event:event")?.logs).toBeUndefined();
+    expect(activities.find((a) => a.id === "filter")?.logs).toBeUndefined();
+    expect(activities.find((a) => a.id === "agent")?.logs).toBeDefined();
     expect(activities.find((a) => a.id === "filter")?.defaultTab).toBe("outputs");
     expect(activities.find((a) => a.id === "agent")?.defaultTab).toBe("logs");
   });

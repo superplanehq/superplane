@@ -43,7 +43,6 @@ required_keys=(
   START_ORGANIZATION_CLEANUP_WORKER
   START_FILE_CLEANUP_WORKER
   START_EVENT_RETENTION_WORKER
-  ENCRYPTION_KEY
   ENCRYPTION_MASTER_KEYS
   JWT_SECRET
 )
@@ -67,7 +66,7 @@ test "${env_mode}" = "600"
 rabbit_mode="$(stat -c %a rabbitmq.env 2>/dev/null || stat -f %OLp rabbitmq.env)"
 test "${rabbit_mode}" = "600"
 grep -Eq '^RABBITMQ_DEFAULT_USER=superplane$' rabbitmq.env
-if grep -Eq 'JWT_SECRET|ENCRYPTION_KEY|DB_PASSWORD' rabbitmq.env; then
+if grep -Eq 'JWT_SECRET|ENCRYPTION_MASTER_KEYS|DB_PASSWORD' rabbitmq.env; then
   echo "Error: rabbitmq.env contains app secrets" >&2
   exit 1
 fi
@@ -77,7 +76,7 @@ grep -q "network: superplane_default" fleet-manager.yaml
 
 secret_snapshot() {
   local key
-  for key in ENCRYPTION_KEY ENCRYPTION_MASTER_KEYS JWT_SECRET DB_PASSWORD BLOB_STORAGE_SIGNING_KEY RABBITMQ_DEFAULT_PASS; do
+  for key in ENCRYPTION_MASTER_KEYS JWT_SECRET DB_PASSWORD BLOB_STORAGE_SIGNING_KEY RABBITMQ_DEFAULT_PASS; do
     grep -E "^${key}=" superplane.env
   done
 }
@@ -117,7 +116,7 @@ rabbit_block="$(printf '%s\n' "${rendered}" | awk '
   flag { print }
 ')"
 printf '%s\n' "${rabbit_block}" | grep -q 'RABBITMQ_DEFAULT_USER'
-if printf '%s\n' "${rabbit_block}" | grep -Eq 'JWT_SECRET|ENCRYPTION_KEY|DB_PASSWORD'; then
+if printf '%s\n' "${rabbit_block}" | grep -Eq 'JWT_SECRET|ENCRYPTION_MASTER_KEYS|DB_PASSWORD'; then
   echo "Error: RabbitMQ receives app secrets" >&2
   exit 1
 fi
@@ -137,14 +136,14 @@ guest_dir="$(mktemp -d)"
 tar -C "${guest_dir}" -xzf "${REPO_ROOT}/build/superplane-single-host-tarball-${VERSION}/superplane-single-host.tar.gz"
 cd "${guest_dir}/superplane"
 SUPERPLANE_DOMAIN=superplane.example.com SUPERPLANE_CONFIG_ONLY=yes ./install.sh >/dev/null
-old_key="$(grep '^ENCRYPTION_KEY=' superplane.env)"
+master_keys="$(grep '^ENCRYPTION_MASTER_KEYS=' superplane.env)"
 printf 'RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672\n' >>superplane.env
 grep -v '^RABBITMQ_DEFAULT_PASS=' superplane.env >superplane.env.tmp
 mv superplane.env.tmp superplane.env
 chmod 600 superplane.env
 SUPERPLANE_CONFIG_ONLY=yes ./install.sh >/dev/null
 grep -Eq '^RABBITMQ_URL=amqp://superplane:' superplane.env
-test "$(grep '^ENCRYPTION_KEY=' superplane.env)" = "${old_key}"
+test "$(grep '^ENCRYPTION_MASTER_KEYS=' superplane.env)" = "${master_keys}"
 if grep -Eq '^RABBITMQ_URL=amqp://guest:guest@' superplane.env; then
   echo "Error: guest RabbitMQ URL was kept" >&2
   exit 1

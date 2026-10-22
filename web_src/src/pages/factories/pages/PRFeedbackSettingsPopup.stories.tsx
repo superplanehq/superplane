@@ -35,7 +35,6 @@ function popup(command?: string) {
       <div className="relative min-h-svh bg-background">
         <PRFeedbackSettingsPopup
           settings={settings}
-          healthy
           onSave={(next) => console.log("save PR feedback settings", next)}
           onClose={() => console.log("close PR feedback settings")}
           fixed={false}

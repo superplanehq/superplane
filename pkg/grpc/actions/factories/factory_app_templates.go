@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -971,16 +970,8 @@ func materializePRFeedbackDefaults(
 		VCSProvider:            factoryVCSProviderOrDefault(factory),
 		AgentSettings:          prFeedbackAgentSettingsFromGraph(graph, spec, savedSettings),
 		TriggerSettings:        prFeedbackTriggerSettingsFromGraph(graph, savedSettings),
+		OmitCommitIdentity:     true,
 	}
-	omitIdentity := false
-	if factory.OrganizationID != uuid.Nil {
-		var err error
-		omitIdentity, err = models.HasExperimentalFeature(factory.OrganizationID, features.FeatureWorkspaceAgent)
-		if err != nil {
-			return nil, err
-		}
-	}
-	request.OmitCommitIdentity = omitIdentity
 
 	templateID := prFeedbackDiscussionTemplateID
 	triggerID := prFeedbackCommentTriggerNodeID

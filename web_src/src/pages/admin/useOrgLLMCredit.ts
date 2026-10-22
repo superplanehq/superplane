@@ -30,6 +30,9 @@ export type OrganizationBillingPlan = {
   plan_source: string;
   polar_subscription_status: string;
   polar_managed: boolean;
+  polar_subscription_verification?: "active" | "none" | "failed" | "not_configured";
+  polar_subscription_id?: string;
+  polar_subscription_url?: string;
   trial_ends_at: string | null;
   current_period_end: string | null;
 };

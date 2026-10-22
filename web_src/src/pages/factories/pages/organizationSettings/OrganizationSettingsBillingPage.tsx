@@ -1,3 +1,5 @@
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
 import { type ReactNode } from "react";
 import { Navigate, useParams } from "react-router";
 
@@ -30,6 +32,7 @@ import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { BillingCreditHistoryCard } from "./BillingCreditHistoryCard";
 import { BillingInvoicesCard } from "./BillingInvoicesCard";
+import { BillingPaymentSettings } from "./BillingPaymentSettings";
 import { BillingPlansSection } from "./BillingPlansSection";
 import { HostedCreditTopUpBanner } from "./HostedCreditTopUpBanner";
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
@@ -41,6 +44,7 @@ const HOSTED_CREDIT_REMAINING_CAPTION = "Remaining hosted credit";
 export function OrganizationSettingsBillingPage() {
   const { organizationId = "", factoryKey = "" } = useParams<{ organizationId: string; factoryKey: string }>();
   const billingProductEnabled = useBillingProductEnabled();
+  const newBilling = useExperimentalFeature(organizationId).has(FEATURE_NEW_BILLING);
   const model = useOrganizationBillingPageModel(organizationId);
   const packs = model.billing.products;
 
@@ -53,7 +57,11 @@ export function OrganizationSettingsBillingPage() {
 
   return (
     <FactorySettingsPageFrame title="Billing">
+      {newBilling && !model.isLoading && !model.error && (
+        <BillingPaymentSettings organizationId={organizationId} canManageBilling={model.canManageBilling} />
+      )}
       <BillingPageBody
+        newBilling={newBilling}
         billingContactMessage={model.billingContactMessage}
         billingEnabled={model.billingEnabled}
         businessCheckoutPending={model.billing.businessCheckoutPending}
@@ -96,6 +104,7 @@ export function OrganizationSettingsBillingPage() {
 }
 
 type BillingPageBodyProps = {
+  newBilling: boolean;
   billingContactMessage?: string;
   billingEnabled: boolean;
   businessCheckoutPending: boolean;
@@ -135,6 +144,7 @@ type BillingPageBodyProps = {
 };
 
 function BillingPageBody({
+  newBilling,
   billingContactMessage,
   billingEnabled,
   businessCheckoutPending,
@@ -193,6 +203,7 @@ function BillingPageBody({
   return (
     <>
       <BillingPlansSection
+        showUpgrade={!newBilling}
         planName={planName}
         planPriceCents={planPriceCents}
         planPerSeat={planPerSeat}

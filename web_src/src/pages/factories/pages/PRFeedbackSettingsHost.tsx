@@ -13,12 +13,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS, supportsPRFeedbackVisualEvidence } from "../lib/columnCanvasAgent";
-import {
-  factoryAppConfigurePath,
-  factoryAppRunPath,
-  factoryPRFeedbackSetupPath,
-  prFeedbackSetupKindFromSourceId,
-} from "../lib/factoryPagePaths";
+import { factoryPRFeedbackSetupPath, prFeedbackSetupKindFromSourceId } from "../lib/factoryPagePaths";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
@@ -152,13 +147,11 @@ export function PRFeedbackSettingsHost({
       factoryKey={factoryKey}
       githubIntegrationId={githubIntegrationId}
       vcsProvider={vcsProvider}
-      lineId={lineId}
       canUpdate={canUpdate}
       initialTab={initialTab}
       handlerId={handler.id}
       canvasId={handler.canvasId}
       settings={prFeedbackDraftFromHandler(handler)}
-      healthy={Boolean(handler.healthy)}
       onClose={onClose}
     />
   );
@@ -170,13 +163,11 @@ function PRFeedbackSettingsLoaded({
   factoryKey,
   githubIntegrationId,
   vcsProvider,
-  lineId,
   canUpdate,
   initialTab,
   handlerId,
   canvasId,
   settings,
-  healthy,
   onClose,
 }: {
   organizationId: string;
@@ -190,7 +181,6 @@ function PRFeedbackSettingsLoaded({
   handlerId: string;
   canvasId?: string;
   settings: PRFeedbackDraftSettings;
-  healthy: boolean;
   onClose: () => void;
 }) {
   const [saveError, setSaveError] = useState<string | undefined>();
@@ -204,9 +194,6 @@ function PRFeedbackSettingsLoaded({
   });
   const updateHandler = useUpdateFactoryPRFeedbackHandler(organizationId, factoryId);
   const deleteHandler = useDeleteFactoryPRFeedbackHandler(organizationId, factoryId);
-  const editAutomationHref = canvasId
-    ? factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "lines", lineId })
-    : undefined;
 
   return (
     <PRFeedbackSettingsPopup
@@ -215,7 +202,6 @@ function PRFeedbackSettingsLoaded({
       githubIntegrationId={githubIntegrationId}
       vcsProvider={vcsProvider}
       settings={settings}
-      healthy={healthy}
       automationGraph={automation.graph}
       automationLoading={automation.isLoading}
       automationError={automation.isError}
@@ -249,13 +235,7 @@ function PRFeedbackSettingsLoaded({
             }
           : undefined
       }
-      editAutomationHref={editAutomationHref}
       canvasId={canvasId}
-      runHrefFor={
-        canvasId
-          ? (runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
-          : undefined
-      }
       agent={
         agent.agentNode
           ? {

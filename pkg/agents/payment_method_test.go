@@ -1,0 +1,50 @@
+package agents_test
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
+)
+
+func TestAgentUsageRequiresPlanPaymentMethod(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	provider := &fakeProvider{}
+	service := newService(t, r, provider)
+	canvas := setupCanvasForUser(t, r)
+	session, err := service.EnsureSession(t.Context(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	plan := models.BillingPlan{Key: "agent_card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	plan.RequirePaymentMethod = true
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, "/customers/external/"+r.Organization.ID.String()+"/payment-methods", req.URL.Path)
+		_, _ = w.Write([]byte(`{"items":[],"pagination":{"max_page":1}}`))
+	}))
+	defer server.Close()
+	t.Setenv("POLAR_ACCESS_TOKEN", "test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	_, err = service.EnsureSession(t.Context(), r.Organization.ID, r.User, canvas.ID)
+	require.ErrorIs(t, err, models.ErrPaymentMethodRequired)
+	_, err = service.ResetSession(t.Context(), r.Organization.ID, r.User, canvas.ID)
+	require.ErrorIs(t, err, models.ErrPaymentMethodRequired)
+	require.Equal(t, 1, provider.createCalled)
+	_, err = service.SendMessage(t.Context(), r.Organization.ID, r.User, session.ID, "Start work", nil)
+	require.ErrorIs(t, err, models.ErrPaymentMethodRequired)
+	require.Zero(t, provider.sendCalled)
+	err = service.DefineOutcome(t.Context(), r.Organization.ID, r.User, session.ID, "Build it", "Works", 1)
+	require.ErrorIs(t, err, models.ErrPaymentMethodRequired)
+	require.Empty(t, provider.defineSessions)
+}

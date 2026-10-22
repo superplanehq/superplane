@@ -9,6 +9,7 @@ import (
 	appconfig "github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/githubapp"
@@ -284,6 +285,8 @@ func TestListIntegrationsHostedGitHubAppInstall(t *testing.T) {
 	})
 
 	t.Run("true when the installation stores the app", func(t *testing.T) {
+		crypto.SetProcessEncryptor(setup.Encryptor)
+		t.Cleanup(func() { crypto.SetProcessEncryptor(nil) })
 		t.Setenv(appconfig.EnvGitHubAppID, "")
 		t.Setenv(appconfig.EnvGitHubAppSlug, "")
 		t.Setenv(appconfig.EnvGitHubAppPrivateKey, "")

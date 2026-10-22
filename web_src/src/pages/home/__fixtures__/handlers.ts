@@ -145,6 +145,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       resolve: () => ({
         json: {
           features: [
+            { id: "new_billing", label: "New billing", description: "Select a plan and set up a payment method" },
             {
               id: "claude_managed_agents",
               label: "Managed agents",
@@ -170,11 +171,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               id: "organization_byok_custom_provider",
               label: "Organization BYOK Custom Provider",
               description: "Add a custom model provider with a URL, token, and API type",
-            },
-            {
-              id: "workspace_agent",
-              label: "SuperPlane Agent",
-              description: "Show the SuperPlane Agent page",
             },
             {
               id: "workspace_skills",

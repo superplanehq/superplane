@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import { Link } from "@/components/Link/link";
 import { CopyButton } from "@/ui/CopyButton";
 import { RunIdCopy } from "./RunIdentity";
 import { IntakeOutcomeLabel } from "./IntakeOutcomeLabel";
@@ -32,9 +33,15 @@ export function IntakeRunHeading({ run }: { run: AutomationRun }) {
           <span>{intake.event}</span>
           {run.task ? (
             <span className="inline-flex items-center gap-2">
-              <span>
-                Task <code className="font-mono">{run.task.id}</code>
-              </span>
+              {run.task.url ? (
+                <Link href={run.task.url} className="underline underline-offset-4 hover:text-foreground">
+                  Task <code className="font-mono">{run.task.id}</code>
+                </Link>
+              ) : (
+                <span>
+                  Task <code className="font-mono">{run.task.id}</code>
+                </span>
+              )}
               <CopyButton
                 text={run.task.id}
                 ariaLabel={`Copy task ID ${run.task.id}`}

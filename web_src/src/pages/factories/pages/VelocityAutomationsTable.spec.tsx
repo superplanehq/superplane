@@ -1,6 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "bun:test";
 
 import type { VelocityAutomation } from "../lib/factoryVelocityReport";
@@ -28,22 +27,13 @@ const AUTOMATIONS: VelocityAutomation[] = [
 ];
 
 function renderTable(automations: VelocityAutomation[] = AUTOMATIONS) {
-  return render(
-    <MemoryRouter>
-      <VelocityAutomationsTable
-        automations={automations}
-        organizationId="org-1"
-        factoryKey="refunds"
-        periodLabel="Last 14 days"
-      />
-    </MemoryRouter>,
-  );
+  return render(<VelocityAutomationsTable automations={automations} periodLabel="Last 14 days" />);
 }
 
 /** The automation name of each body row, top to bottom. */
 function rowNames(): string[] {
   const rows = within(screen.getByTestId("velocity-automations")).getAllByRole("row").slice(1);
-  return rows.map((row) => within(row).getByRole("link").textContent ?? "");
+  return rows.map((row) => within(row).getAllByRole("cell")[0]?.textContent ?? "");
 }
 
 describe("VelocityAutomationsTable", () => {
@@ -86,12 +76,12 @@ describe("VelocityAutomationsTable", () => {
     expect(failed).toHaveAttribute("aria-sort", "ascending");
   });
 
-  it("links each automation to its detail page", () => {
+  it("shows each automation name as text, not a link", () => {
     renderTable();
 
-    expect(screen.getByRole("link", { name: "Planner" })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/refunds/automations/app-planner?from=automations",
-    );
+    expect(screen.getByText("Planner")).toBeVisible();
+    expect(screen.getByText("Verifier")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Planner" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Verifier" })).toBeNull();
   });
 });
