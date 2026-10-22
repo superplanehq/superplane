@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
@@ -39,4 +40,23 @@ func Test__ListUsers(t *testing.T) {
 		assert.Len(t, resp.Users, 1)
 		assert.Empty(t, resp.Users[0].Status.Roles)
 	})
+}
+
+func TestListUsersSeatMetadata(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	limit := 3
+	require.NoError(t, models.SetOrganizationSeatLimitOverride(database.Conn(), r.Organization.ID, &limit))
+	for _, roles := range []bool{false, true} {
+		resp, err := ListUsers(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), roles, r.AuthService)
+		require.NoError(t, err)
+		require.NotNil(t, resp.SeatLimit)
+		require.EqualValues(t, 3, *resp.SeatLimit)
+		require.Len(t, resp.Users, 1)
+	}
+	require.NoError(t, models.SetOrganizationSeatLimitOverride(database.Conn(), r.Organization.ID, nil))
+	resp, err := ListUsers(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), false, r.AuthService)
+	require.NoError(t, err)
+	require.Nil(t, resp.SeatLimit)
 }

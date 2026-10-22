@@ -16,18 +16,20 @@ type CreditPolicy struct {
 }
 
 type Entitlements struct {
-	PlanID                 uuid.UUID       `json:"plan_id"`
-	PlanKey                string          `json:"plan_key"`
-	PlanName               string          `json:"plan_name"`
-	SeatLimit              *int            `json:"seat_limit"`
-	ParallelTaskLimit      *int            `json:"parallel_task_limit"`
-	Features               map[string]bool `json:"features"`
-	CreditPolicy           CreditPolicy    `json:"credit_policy"`
-	TrialCreditCents       int64           `json:"trial_credit_cents"`
-	TrialLengthDays        int             `json:"trial_length_days"`
-	MarkupBPS              int             `json:"markup_bps"`
-	HostedExecutionAllowed bool            `json:"hosted_execution_allowed"`
-	CreditPurchaseAllowed  bool            `json:"credit_purchase_allowed"`
+	PlanID                 uuid.UUID                             `json:"plan_id"`
+	PlanKey                string                                `json:"plan_key"`
+	PlanName               string                                `json:"plan_name"`
+	PlanSeatLimit          *int                                  `json:"plan_limit"`
+	SeatLimitOverride      *models.OrganizationSeatLimitOverride `json:"override"`
+	SeatLimit              *int                                  `json:"seat_limit"`
+	ParallelTaskLimit      *int                                  `json:"parallel_task_limit"`
+	Features               map[string]bool                       `json:"features"`
+	CreditPolicy           CreditPolicy                          `json:"credit_policy"`
+	TrialCreditCents       int64                                 `json:"trial_credit_cents"`
+	TrialLengthDays        int                                   `json:"trial_length_days"`
+	MarkupBPS              int                                   `json:"markup_bps"`
+	HostedExecutionAllowed bool                                  `json:"hosted_execution_allowed"`
+	CreditPurchaseAllowed  bool                                  `json:"credit_purchase_allowed"`
 }
 
 func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
@@ -36,6 +38,10 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 		return nil, err
 	}
 	catalog := plan.Catalog
+	override, err := models.FindOrganizationSeatLimitOverride(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
 	markup, err := models.ResolveOrganizationMarkupBPS(tx, orgID)
 	if err != nil {
 		return nil, err
@@ -52,7 +58,7 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 	}
 	result := &Entitlements{
 		PlanID: catalog.ID, PlanKey: catalog.Key, PlanName: catalog.Name,
-		SeatLimit: catalog.SeatLimit, ParallelTaskLimit: catalog.ParallelTaskLimit,
+		PlanSeatLimit: catalog.SeatLimit, SeatLimitOverride: override, SeatLimit: catalog.SeatLimit, ParallelTaskLimit: catalog.ParallelTaskLimit,
 		Features:         map[string]bool{},
 		CreditPolicy:     CreditPolicy{AmountCents: catalog.CreditAmountCents, Frequency: catalog.CreditFrequency, Expiration: catalog.CreditExpiration, ValidityDays: catalog.CreditValidityDays},
 		TrialCreditCents: catalog.TrialCreditCents, TrialLengthDays: catalog.TrialLengthDays, MarkupBPS: markup,
@@ -64,6 +70,9 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 	}
 	for _, feature := range definitions {
 		result.Features[feature.Key] = !models.BillingEnabled() || !feature.Gated || slices.Contains(catalog.Features, feature.Key) || enabled[feature.Key]
+	}
+	if override != nil {
+		result.SeatLimit = override.SeatLimit
 	}
 	if !models.BillingEnabled() {
 		result.SeatLimit = nil
