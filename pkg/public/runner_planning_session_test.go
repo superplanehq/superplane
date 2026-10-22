@@ -692,6 +692,47 @@ func TestRunnerPlanningSessionStoresActivityAndLinksAgentMessage(t *testing.T) {
 	assert.Equal(t, activityID, *messages[0].ActivityID)
 }
 
+func TestRunnerPlanningSessionActivityPublishesBoardUpdate(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	require.NotNil(t, session.DraftWorkOrderID)
+	activityID := uuid.New()
+	startedAt := time.Now().UnixMilli()
+
+	type boardUpdate struct {
+		factoryID string
+		orderID   string
+		reason    string
+	}
+	published := []boardUpdate{}
+	restore := messages.SetFactoryWorkOrderUpdatedPublisherForTest(func(factoryID, orderID, reason string) error {
+		published = append(published, boardUpdate{factoryID: factoryID, orderID: orderID, reason: reason})
+		return nil
+	})
+	defer restore()
+
+	body := fmt.Sprintf(`{
+		"schema_version":2,
+		"activity_id":%q,
+		"provider":"claude",
+		"turn":1,
+		"sequence":1,
+		"status":"running",
+		"started_at":%d,
+		"items":[{"type":"tool","id":"tool-1","kind":"bash","input":"go test ./pkg/models","status":"running"}]
+	}`, activityID.String(), startedAt)
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), bytes.NewReader([]byte(body)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	require.Len(t, published, 1)
+	assert.Equal(t, session.FactoryID.String(), published[0].factoryID)
+	assert.Equal(t, session.DraftWorkOrderID.String(), published[0].orderID)
+	assert.Equal(t, factoryevents.EventTypeOrderUpdated, published[0].reason)
+}
+
 func TestRunnerPlanningSessionIgnoresStaleActivitySnapshot(t *testing.T) {
 	r := support.Setup(t)
 	server, session, _, token := mustPlanningRunnerSession(t, r)

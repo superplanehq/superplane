@@ -119,6 +119,7 @@ func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Req
 		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
+	messages.PublishPlanningBoardStatus(session)
 	writeJSON(w, http.StatusOK, map[string]any{"status": "stored"})
 }
 

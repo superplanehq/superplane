@@ -48,7 +48,7 @@ describe("useAnalysisPlanningSession", () => {
     vi.mocked(answerPlanningSessionSurvey).mockReset();
   });
 
-  it("keeps chat closed when the draft has no analysis session", async () => {
+  it("keeps polling for a session while the draft has none, without opening the chat", async () => {
     vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValue(null);
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -75,7 +75,62 @@ describe("useAnalysisPlanningSession", () => {
     const query = queryClient.getQueryCache().find({
       queryKey: workOrderPlanningSessionQueryKey("org-1", "factory-1", "order-1"),
     });
-    expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBeUndefined();
+    expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBe(15_000);
+  });
+
+  it("exposes a running activity when a missing session appears on a later poll", async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+    vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: "session-1",
+      state: "running",
+      activities: [
+        {
+          id: "activity-1",
+          schemaVersion: 2,
+          provider: "claude",
+          status: "running",
+          lastSequence: "1",
+          items: [{ type: "tool", id: "tool-1", kind: "bash", input: "go test ./pkg/models", status: "running" }],
+        },
+      ],
+    });
+
+    try {
+      const { result } = renderHook(
+        () =>
+          useAnalysisPlanningSession({
+            organizationId: "org-1",
+            factoryId: "factory-1",
+            workOrderId: "order-1",
+            enabled: true,
+            canUpdate: true,
+          }),
+        { wrapper },
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+      expect(result.current.session).toBeNull();
+      expect(result.current.showChat).toBe(false);
+      expect(findPlanningSessionByWorkOrder).toHaveBeenCalledTimes(1);
+      const scheduled = setIntervalSpy.mock.calls.find(([, delay]) => delay === 15_000);
+      expect(scheduled).toBeDefined();
+
+      await act(async () => {
+        (scheduled?.[0] as () => void)();
+      });
+
+      await waitFor(() => {
+        expect(result.current.session?.activities).toMatchObject([{ id: "activity-1", status: "running" }]);
+      });
+      expect(result.current.showChat).toBe(true);
+      expect(result.current.view.machineStatus).toBe("starting");
+      expect(result.current.view.activities).toMatchObject([{ id: "activity-1", status: "running" }]);
+      expect(findPlanningSessionByWorkOrder).toHaveBeenCalledTimes(2);
+    } finally {
+      setIntervalSpy.mockRestore();
+    }
   });
 
   it("refetches the planning session every 15 seconds while the session is live", async () => {

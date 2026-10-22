@@ -47,8 +47,14 @@ type AnalysisPlanningSessionArgs = {
 
 const LIVE_SESSION_REFETCH_INTERVAL_MS = 15_000;
 
-function planningSessionIsLive(session: PlanningSessionPayload | null | undefined): boolean {
-  return Boolean(session?.id && session.state !== "ended");
+/**
+ * Poll while the session is missing, starting, or running. The first turn
+ * has no live connection yet, so the open chat relies on the stored
+ * activity snapshots this refresh delivers. Only an ended session stops
+ * the refresh.
+ */
+function planningSessionNeedsPolling(session: PlanningSessionPayload | null | undefined): boolean {
+  return !session?.id || session.state !== "ended";
 }
 
 function usePlanningSessionLookup(
@@ -56,10 +62,10 @@ function usePlanningSessionLookup(
     organizationId: string;
     factoryId: string;
     workOrderId: string;
-    isLive: boolean;
+    poll: boolean;
   },
 ) {
-  const { organizationId, factoryId, workOrderId, enabled, isLive } = args;
+  const { organizationId, factoryId, workOrderId, enabled, poll } = args;
   return useQuery<PlanningSessionPayload | null>({
     queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
     queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
@@ -70,7 +76,7 @@ function usePlanningSessionLookup(
         next as PlanningSessionPayload | null,
       ),
     refetchOnWindowFocus: false,
-    refetchInterval: isLive ? LIVE_SESSION_REFETCH_INTERVAL_MS : undefined,
+    refetchInterval: poll ? LIVE_SESSION_REFETCH_INTERVAL_MS : undefined,
   });
 }
 
@@ -174,7 +180,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId,
     workOrderId,
     enabled,
-    isLive: planningSessionIsLive(queryClient.getQueryData<PlanningSessionPayload | null>(queryKey)),
+    poll: planningSessionNeedsPolling(queryClient.getQueryData<PlanningSessionPayload | null>(queryKey)),
   });
   const session = query.data ?? null;
   useRefreshAnalysisWorkOrder({
