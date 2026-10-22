@@ -5,7 +5,7 @@ export const PRODUCTIVE_INTAKE_SETUP_COPY = {
   wizardStepConnectExisting: "Choose the Productive account that SuperPlane will monitor.",
   wizardStepProject: "Which Productive project should create tasks?",
   wizardStepProjectHelper: "SuperPlane listens for new tasks.",
-  importExistingHelper: "SuperPlane adds the 10 newest open tasks from this project.",
+  importExistingHelper: "SuperPlane adds up to 3 of the newest open tasks from this project.",
   importExistingHelperOff: "SuperPlane does not import existing tasks.",
   wizardConnect: "Connect Productive",
   wizardConnectAnother: "Connect another account",

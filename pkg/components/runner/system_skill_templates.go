@@ -19,7 +19,7 @@ func SystemSkillTemplateByID(id string) (SystemSkillTemplate, bool) {
 		return SystemSkillTemplate{}, false
 	}
 	return SystemSkillTemplate{
-		ID: "refine-task", Version: 1, Title: "Refine task",
+		ID: "refine-task", Version: 2, Title: "Refine task",
 		Description:  "Refine a task into a clear implementation plan.",
 		Instructions: PlanningSessionUserPromptMarkdown(),
 	}, true

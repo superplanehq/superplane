@@ -11,6 +11,34 @@ describe("useOnboardingSetupState", () => {
     sessionStorage.clear();
   });
 
+  it("keeps the import choice through reloads without sharing it with another workspace", () => {
+    const mountSetup = (factoryId: string) =>
+      renderHook(() =>
+        useOnboardingSetupState("Payments", {
+          simulateDiscovery: false,
+          persistInitialImportKey: factoryId,
+          initial: { issuesChoice: "vcs" },
+        }),
+      );
+    const first = mountSetup("factory-1");
+    act(() => {
+      first.result.current.setSkipInitialImport(true);
+      first.result.current.commitIssuesStep();
+    });
+    first.unmount();
+
+    const resumed = mountSetup("factory-1");
+    expect(resumed.result.current.skipInitialImport).toBe(true);
+    const other = mountSetup("factory-2");
+    expect(other.result.current.skipInitialImport).toBe(false);
+    other.unmount();
+
+    act(() => resumed.result.current.setSkipInitialImport(false));
+    resumed.unmount();
+    const enabledAgain = mountSetup("factory-1");
+    expect(enabledAgain.result.current.skipInitialImport).toBe(false);
+  });
+
   it("keeps a Bitbucket host when setup is created again before a repository is saved", () => {
     const first = renderHook(() =>
       useOnboardingSetupState("Payments", {

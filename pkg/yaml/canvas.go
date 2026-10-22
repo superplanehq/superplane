@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gopkg.in/yaml.v3"
+	"gorm.io/gorm"
 )
 
 const (
@@ -362,6 +363,14 @@ func ModelTypeToYamlType(t string) string {
 }
 
 func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node, []models.Edge, error) {
+	return c.parse(registry, orgID, nil)
+}
+
+func (c *Canvas) ParseInTransaction(registry *registry.Registry, orgID string, tx *gorm.DB) ([]models.Node, []models.Edge, error) {
+	return c.parse(registry, orgID, tx)
+}
+
+func (c *Canvas) parse(registry *registry.Registry, orgID string, tx *gorm.DB) ([]models.Node, []models.Edge, error) {
 
 	//
 	// Allow empty canvases
@@ -404,7 +413,7 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 
 		nodeIDs[node.ID] = true
 		nodeTypeByID[node.ID] = node.Type
-		if err := c.validateNodeRef(registry, orgID, node); err != nil {
+		if err := c.validateNodeRef(registry, orgID, node, tx); err != nil {
 			nodeValidationErrors[node.ID] = err.Error()
 		}
 	}
@@ -536,7 +545,7 @@ func validateNodeConcurrency(node Node) error {
 	return nil
 }
 
-func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID string, node Node) error {
+func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID string, node Node, tx *gorm.DB) error {
 	if node.Component == "" {
 		return fmt.Errorf("component name is required")
 	}
@@ -552,7 +561,7 @@ func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID str
 	}
 
 	if len(parts) > 1 {
-		err := c.validateIntegration(organizationID, node.Integration, node.Component)
+		err := c.validateIntegration(organizationID, node.Integration, node.Component, tx)
 		if err != nil {
 			return err
 		}
@@ -561,7 +570,7 @@ func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID str
 	return configuration.ValidateConfiguration(configurable.Configuration(), node.Configuration)
 }
 
-func (c *Canvas) validateIntegration(organizationID string, ref *IntegrationRef, component string) error {
+func (c *Canvas) validateIntegration(organizationID string, ref *IntegrationRef, component string, tx *gorm.DB) error {
 	if ref == nil || ref.ID == "" {
 		return fmt.Errorf("integration is required")
 	}
@@ -576,7 +585,12 @@ func (c *Canvas) validateIntegration(organizationID string, ref *IntegrationRef,
 		return fmt.Errorf("invalid organization ID: %v", err)
 	}
 
-	integration, err := models.FindIntegration(orgID, integrationID)
+	var integration *models.Integration
+	if tx != nil {
+		integration, err = models.FindIntegrationInTransaction(tx, orgID, integrationID)
+	} else {
+		integration, err = models.FindIntegration(orgID, integrationID)
+	}
 	if err != nil {
 		return fmt.Errorf("integration not found or does not belong to this organization")
 	}

@@ -43,6 +43,10 @@ export type OrganizationBillingPageModel = {
   subscriptionCheckoutEnabled: boolean;
   creditPurchaseAllowed: boolean;
   plan?: string;
+  planCategory?: string;
+  planName?: string;
+  planPriceCents?: string;
+  planPerSeat?: boolean;
   trialEndsAt?: string;
   billing: HostedCreditBillingActions;
   creditRefreshStatus: HostedCreditRefreshStatus;
@@ -87,20 +91,24 @@ function creditMetricsFromSpend(spend: OrganizationsDescribeOrganizationWorkspac
   };
 }
 
-function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse | undefined) {
+function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse = {}) {
   return {
-    plan: billing?.plan,
-    trialEndsAt: billing?.trialEndsAt,
-    currentPeriodEnd: billing?.currentPeriodEnd,
-    includedRemaining: parseWorkOrderMetric(billing?.includedRemainingCents),
-    purchasedRemaining: parseWorkOrderMetric(billing?.purchasedRemainingCents),
-    welcomeRemaining: parseWorkOrderMetric(billing?.welcomeRemainingCents),
-    adminRemaining: parseWorkOrderMetric(billing?.adminRemainingCents),
-    subscriptionCheckoutEnabled: billing?.subscriptionCheckoutEnabled === true,
-    creditPurchaseAllowed: billing?.creditPurchaseAllowed === true,
-    describeBillingEnabled: billing?.billingEnabled === true,
-    planSource: billing?.planSource,
-    cancelAtPeriodEnd: billing?.cancelAtPeriodEnd === true,
+    plan: billing.plan,
+    planCategory: billing.planCategory,
+    planName: billing.planName,
+    planPriceCents: billing.planPriceCents,
+    planPerSeat: billing.planPerSeat,
+    trialEndsAt: billing.trialEndsAt,
+    currentPeriodEnd: billing.currentPeriodEnd,
+    includedRemaining: parseWorkOrderMetric(billing.includedRemainingCents),
+    purchasedRemaining: parseWorkOrderMetric(billing.purchasedRemainingCents),
+    welcomeRemaining: parseWorkOrderMetric(billing.welcomeRemainingCents),
+    adminRemaining: parseWorkOrderMetric(billing.adminRemainingCents),
+    subscriptionCheckoutEnabled: billing.subscriptionCheckoutEnabled === true,
+    creditPurchaseAllowed: billing.creditPurchaseAllowed === true,
+    describeBillingEnabled: billing.billingEnabled === true,
+    planSource: billing.planSource,
+    cancelAtPeriodEnd: billing.cancelAtPeriodEnd === true,
   };
 }
 
@@ -167,6 +175,10 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     subscriptionCheckoutEnabled: flags.subscriptionCheckoutEnabled,
     creditPurchaseAllowed: flags.creditPurchaseAllowed,
     plan: flags.plan,
+    planCategory: flags.planCategory,
+    planName: flags.planName,
+    planPriceCents: flags.planPriceCents,
+    planPerSeat: flags.planPerSeat,
     trialEndsAt: flags.trialEndsAt,
     billing,
     creditRefreshStatus,

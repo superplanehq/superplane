@@ -19,6 +19,29 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
+	r := support.Setup(t)
+	catalog := models.BillingPlan{
+		Key: "billing_response_custom", Name: "Team", Category: "paid", Visibility: "private",
+		PriceCents: 2900, PerSeat: true, CreditFrequency: "none", CreditExpiration: "never",
+	}
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	t.Cleanup(func() {
+		require.NoError(t, database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBillingPlan{}).Error)
+		require.NoError(t, models.DeleteBillingPlan(database.Conn(), catalog.ID))
+	})
+	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, catalog.Key, nil)
+	require.NoError(t, err)
+
+	resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, catalog.Key, resp.Plan)
+	assert.Equal(t, "Team", resp.PlanName)
+	assert.Equal(t, "paid", resp.PlanCategory)
+	assert.Equal(t, int64(2900), resp.PlanPriceCents)
+	assert.True(t, resp.PlanPerSeat)
+}
+
 func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))

@@ -23,6 +23,8 @@ export interface BillingCreditBucketsInput {
   adminRemainingCents?: number;
   adminGrantCents?: number;
   plan?: string;
+  planName?: string;
+  planCategory?: string;
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
   currentPeriodEnd?: string;
@@ -99,7 +101,7 @@ export function billingCreditBucketsView(args: BillingCreditBucketsInput): Billi
     remainingCents: Math.max(0, args.includedRemainingCents),
     remainingLabel: `${formatUsdCents(args.includedRemainingCents)} remaining`,
     usedPercent: billingUsagePercentUsed(args.includedRemainingCents, BILLING_INCLUDED_USAGE_CENTS),
-    footer: includedUsageFooter(args.plan, periodEnd),
+    footer: includedUsageFooter(args, periodEnd),
   });
 
   buckets.push({
@@ -179,9 +181,12 @@ function trialCreditFooter(expiresAt: Date | null): string {
   return `Expires on ${expiresAt.toLocaleDateString()}. ${BILLING_TRIAL_TTL_COPY}`;
 }
 
-function includedUsageFooter(plan: string | undefined, periodEnd: Date | null): string {
-  if (plan === "business" && periodEnd) {
+function includedUsageFooter(args: BillingCreditBucketsInput, periodEnd: Date | null): string {
+  if (args.plan === "business" && periodEnd) {
     return `Resets ${periodEnd.toLocaleDateString()}`;
+  }
+  if (args.planCategory === "paid" && args.planName) {
+    return `Included with ${args.planName}.`;
   }
   return "Included with Business.";
 }
