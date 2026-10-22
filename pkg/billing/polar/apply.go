@@ -47,7 +47,7 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 	if productID := event.Data.productID(); productID != "" {
 		_, err := models.FindBillingPlanByProduct(tx, productID)
 		if err == nil {
-			return nil
+			return resyncSubscriptionAfterCycle(ctx, tx, event.Data)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
@@ -91,6 +91,20 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 		}
 		return nil
 	})
+}
+
+// resyncSubscriptionAfterCycle refreshes the subscription from Polar when a
+// plan renewal order is paid. It recovers the period and the Included grant
+// when a subscription event was skipped as stale or could not be parsed.
+func resyncSubscriptionAfterCycle(ctx context.Context, tx *gorm.DB, data OrderData) error {
+	if strings.TrimSpace(data.BillingReason) != billingReasonSubscriptionCycle {
+		return nil
+	}
+	orgID, err := parseOrganizationID(data)
+	if err != nil {
+		return err
+	}
+	return SyncOrganizationSubscription(ctx, tx, orgID)
 }
 
 func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, lookup CreditPackLookup) error {

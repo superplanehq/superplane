@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -295,6 +296,11 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 			return fmt.Errorf("organization billing plan is missing")
 		}
 		if polarSnapshotIsStale(existing, sub.ModifiedAt) {
+			log.WithFields(log.Fields{
+				"organization_id":      orgID.String(),
+				"polar_modified_at":    existing.PolarModifiedAt,
+				"incoming_modified_at": sub.ModifiedAt,
+			}).Warn("skipped stale polar subscription snapshot")
 			saved = existing
 			return nil
 		}
