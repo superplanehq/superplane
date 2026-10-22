@@ -124,10 +124,14 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 // FactoryWorkOrderLineDispatch.EnqueueOrStartStep): either the run +
 // execution created by starting it, or — when the step is at its
 // maxParallelism — the queue item created instead (Run and Execution nil).
+// Organization admission also returns removed queue items so callers can
+// publish updates after commit. Those results have no Run or Execution.
+// Retry and replacement include cancellation results for post-commit delivery.
 type FactoryLineStepResult struct {
-	Run       *CanvasRun
-	Execution *FactoryWorkOrderExecution
-	QueueItem *FactoryWorkOrderQueueItem
+	Run          *CanvasRun
+	Execution    *FactoryWorkOrderExecution
+	QueueItem    *FactoryWorkOrderQueueItem
+	Cancellation *RunCancellationResult
 }
 
 const onRunTriggerName = "onRun"

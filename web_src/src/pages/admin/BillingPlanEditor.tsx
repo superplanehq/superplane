@@ -366,7 +366,7 @@ function planNumberFields(linked: boolean, legacy: boolean) {
       label: "Parallel task limit",
       help: legacy
         ? "Legacy Business parallel task limit cannot change."
-        : "Saved for future use. This limit does not restrict task execution.",
+        : "Maximum parallel tasks across all workspaces in an organization. Leave empty for unlimited tasks.",
       nullable: true,
       placeholder: "Unlimited",
       locked: legacy,

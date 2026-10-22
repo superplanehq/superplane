@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -85,6 +86,9 @@ func (l *FactoryLine) DispatchFrom(tx *gorm.DB, order *FactoryWorkOrder, startIn
 // DispatchFromWithModel is DispatchFrom with optional Start model and
 // thinking overrides. Empty model or thinking means Auto.
 func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder, startIndex int, model, thinkingLevel string) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
+	if err := LockOrganizationTaskAdmission(tx, l.OrganizationID); err != nil {
+		return nil, nil, err
+	}
 	if len(l.Steps) == 0 {
 		return nil, nil, ErrFactoryLineHasNoSteps
 	}
@@ -191,9 +195,16 @@ func (l *FactoryLine) RecordPassedStageWithoutRun(
 // maxParallelism. The step's queue is FIFO: when other dispatches already
 // wait for the step, the newcomer joins the back of the queue even if a
 // slot is free (a raised maxParallelism can leave free slots behind queued
-// work). It takes the line's admission lock, so concurrent decisions for
-// the same line cannot both see the last free slot.
+// work). The caller holds the organization admission lock before row locks
+// or writes, so concurrent decisions share the same capacity count.
 func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
+	if err := LockOrganizationTaskAdmission(tx, l.OrganizationID); err != nil {
+		return nil, err
+	}
+	if _, err := FindFactory(tx, l.OrganizationID, l.FactoryID); err != nil {
+		return nil, err
+	}
+
 	steps := []FactoryLineStep(l.Steps)
 	if stepIndex < 0 || stepIndex >= len(steps) {
 		return nil, fmt.Errorf("step index %d out of range", stepIndex)
@@ -204,12 +215,25 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return nil, err
 	}
 
-	queued, err := countQueuedFactoryStepItems(tx, l.LineID, stepIndex)
+	activeTasks, err := continuableOrganizationTaskIDs(tx, l.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
-	if queued > 0 {
-		return l.enqueueStep(tx, order, stepIndex)
+	if !slices.Contains(activeTasks, order.ID) {
+		full, err := organizationAtTaskCapacity(tx, l.OrganizationID)
+		if err != nil {
+			return nil, err
+		}
+		if full {
+			return l.enqueueStep(tx, order, stepIndex)
+		}
+		queued, err := hasEligibleQueuedTask(tx, l.OrganizationID)
+		if err != nil {
+			return nil, err
+		}
+		if queued {
+			return l.enqueueStep(tx, order, stepIndex)
+		}
 	}
 
 	step := admissionStep(line, l, stepIndex)
@@ -265,7 +289,7 @@ func (l *FactoryWorkOrderLineDispatch) enqueueStep(tx *gorm.DB, order *FactoryWo
 func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
 	steps := []FactoryLineStep(l.Steps)
 	if stepIndex < 0 || stepIndex >= len(steps) {
-		return nil, fmt.Errorf("step index %d out of range", stepIndex)
+		return nil, fmt.Errorf("%w: step index %d out of range", errQueuedTaskUnstartable, stepIndex)
 	}
 
 	step := steps[stepIndex]
@@ -273,24 +297,24 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 	node, err := FindCanvasNode(tx, step.AppID, step.Entrypoint)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("entrypoint %q not found", step.Entrypoint)
+			return nil, fmt.Errorf("%w: entrypoint %q not found", errQueuedTaskUnstartable, step.Entrypoint)
 		}
 		return nil, err
 	}
 
 	ref := node.Ref.Data()
 	if ref.Trigger == nil || ref.Trigger.Name != onRunTriggerName {
-		return nil, ErrFactoryLineStepNotOnRun
+		return nil, fmt.Errorf("%w: %w", errQueuedTaskUnstartable, ErrFactoryLineStepNotOnRun)
 	}
 
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, step.AppID)
 	if err != nil {
-		return nil, err
+		return nil, queuedTaskLookupError(err)
 	}
 
 	canvas, err := FindCanvasInTransaction(tx, l.OrganizationID, step.AppID)
 	if err != nil {
-		return nil, err
+		return nil, queuedTaskLookupError(err)
 	}
 
 	runInput, err := factoryWorkOrderRunInput(tx, order)
@@ -452,10 +476,12 @@ func (l *FactoryWorkOrderLineDispatch) Finish(tx *gorm.DB, result string) error 
 
 // AbandonActiveLineDispatch finishes the current traversal as cancelled
 // so a new dispatch can start. No-op when no active dispatch exists. The
-// return lists every step this abandon started, because the traversal
-// releases its parallelism slots and waiters move in. The caller must
-// publish those runs after commit.
+// return includes cancellation requests and any admitted waiters. Reservations
+// remain until the cancelled runs finish. Publish the results after commit.
 func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) ([]*FactoryLineStepResult, error) {
+	if err := LockOrganizationTaskAdmission(tx, o.OrganizationID); err != nil {
+		return nil, err
+	}
 	if err := o.dropQueuedLineWork(tx); err != nil {
 		return nil, err
 	}
@@ -488,6 +514,9 @@ func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) ([]*FactoryLin
 // has a canvas run, including waiters this retry admitted. The caller
 // must publish those runs after commit.
 func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepIndex int) (*FactoryLineStepResult, []*FactoryLineStepResult, error) {
+	if err := LockOrganizationTaskAdmission(tx, o.OrganizationID); err != nil {
+		return nil, nil, err
+	}
 	if stepIndex < 0 {
 		return nil, nil, ErrFactoryLineStepOutOfRange
 	}
@@ -569,27 +598,23 @@ func startedLineStepResults(results ...*FactoryLineStepResult) []*FactoryLineSte
 // parallelism slots let in. The caller must publish the returned runs
 // after commit.
 func (l *FactoryWorkOrderLineDispatch) releaseOpenWorkFrom(tx *gorm.DB, stepIndex int) ([]*FactoryLineStepResult, error) {
-	if err := l.settleOpenWorkFrom(tx, stepIndex); err != nil {
+	cancelled, err := l.settleOpenWorkFrom(tx, stepIndex)
+	if err != nil {
 		return nil, err
 	}
 
-	var started []*FactoryLineStepResult
-	for index := stepIndex; index < len(l.Steps); index++ {
-		admitted, err := AdmitQueuedForStep(tx, l.LineID, index)
-		if err != nil {
-			return nil, err
-		}
-		started = append(started, startedLineStepResults(admitted...)...)
-	}
-
-	return started, nil
+	admitted, err := AdmitQueuedForOrganization(tx, l.OrganizationID)
+	return append(cancelled, admitted...), err
 }
 
-func (l *FactoryWorkOrderLineDispatch) settleOpenWorkFrom(tx *gorm.DB, stepIndex int) error {
+func (l *FactoryWorkOrderLineDispatch) settleOpenWorkFrom(tx *gorm.DB, stepIndex int) ([]*FactoryLineStepResult, error) {
+	if err := LockOrganizationTaskAdmission(tx, l.OrganizationID); err != nil {
+		return nil, err
+	}
 	if err := tx.
 		Where("line_dispatch_id = ? AND step_index >= ?", l.ID, stepIndex).
 		Delete(&FactoryWorkOrderQueueItem{}).Error; err != nil {
-		return err
+		return nil, err
 	}
 
 	var executions []FactoryWorkOrderExecution
@@ -601,16 +626,29 @@ func (l *FactoryWorkOrderLineDispatch) settleOpenWorkFrom(tx *gorm.DB, stepIndex
 		}).
 		Find(&executions).Error
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	var cancelled []*FactoryLineStepResult
 	for i := range executions {
+		if executions[i].RunID == nil {
+			return nil, fmt.Errorf("work order execution %s has no run", executions[i].ID)
+		}
+		run, err := FindUnscopedCanvasRun(tx, *executions[i].RunID)
+		if err != nil {
+			return nil, err
+		}
+		cancellation, err := run.RequestCancellation(tx, nil)
+		if err != nil {
+			return nil, err
+		}
+		cancelled = append(cancelled, &FactoryLineStepResult{Cancellation: cancellation})
 		if err := executions[i].MarkFinished(tx, CanvasRunResultCancelled); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return cancelled, nil
 }
 
 func pickDispatchForStepRetry(records []FactoryWorkOrderLineDispatchRecord, stepIndex int) *FactoryWorkOrderLineDispatch {

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -38,6 +39,61 @@ func newTestNodeExecutor(t *testing.T, r *support.ResourceRegistry) *NodeExecuto
 		"",
 		r.AuthService,
 	)
+}
+
+func TestFactoryComponentCallsDoNotHoldOrganizationAdmission(t *testing.T) {
+	for _, hook := range []bool{false, true} {
+		t.Run(fmt.Sprintf("hook=%t", hook), func(t *testing.T) {
+			r := support.Setup(t)
+			step := dispatchFactoryExecutionForUsageTest(t, r)
+			entered := make(chan struct{})
+			release := make(chan struct{})
+			execution := createFactoryStepNodeExecution(t, r, step, func(ctx core.ExecutionContext) error {
+				close(entered)
+				<-release
+				return ctx.ExecutionState.Pass()
+			})
+			var process func() error
+			if hook {
+				node, err := models.FindCanvasNode(database.DB(t.Context()), execution.WorkflowID, execution.NodeID)
+				require.NoError(t, err)
+				r.Registry.Actions[node.ComponentName()] = impl.NewDummyAction(impl.DummyActionOptions{
+					Name: node.ComponentName(), Hooks: []core.Hook{{Name: "wait"}},
+					HandleHookFunc: func(ctx core.ActionHookContext) error {
+						close(entered)
+						<-release
+						return ctx.ExecutionState.Pass()
+					},
+				})
+				request := models.CanvasNodeRequest{ID: uuid.New(), WorkflowID: execution.WorkflowID, NodeID: execution.NodeID, ExecutionID: &execution.ID,
+					Type: models.NodeRequestTypeInvokeAction, State: models.NodeExecutionRequestStatePending,
+					Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{InvokeAction: &models.InvokeAction{ActionName: "wait"}})}
+				require.NoError(t, database.DB(t.Context()).Create(&request).Error)
+				process = func() error {
+					return NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService).LockAndProcessRequest(request)
+				}
+			} else {
+				process = func() error { return newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID) }
+			}
+			done := make(chan error, 1)
+			go func() { done <- process() }()
+			defer func() {
+				close(release)
+				require.NoError(t, <-done)
+			}()
+			select {
+			case <-entered:
+			case <-time.After(5 * time.Second):
+				t.Fatal("component call did not start")
+			}
+			require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+				locked, err := models.TryLockOrganizationTaskAdmission(tx, r.Organization.ID)
+				require.NoError(t, err)
+				require.True(t, locked, "unrelated admission must continue while a component call waits")
+				return nil
+			}))
+		})
+	}
 }
 
 func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {

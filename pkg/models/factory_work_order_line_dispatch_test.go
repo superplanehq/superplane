@@ -168,7 +168,7 @@ func Test__FactoryWorkOrder__Close__CancelsLineRun(t *testing.T) {
 	assert.Equal(t, models.CanvasRunStateStarted, unrelated.State)
 }
 
-func Test__FactoryWorkOrder__AbandonActiveLineDispatch__FreesTheStepSlot(t *testing.T) {
+func Test__FactoryWorkOrder__AbandonActiveLineDispatch__RetainsSlotUntilRunStops(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
@@ -224,8 +224,23 @@ func Test__FactoryWorkOrder__AbandonActiveLineDispatch__FreesTheStepSlot(t *test
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, settled.Status)
 	assert.Equal(t, models.CanvasRunResultCancelled, settled.Result)
+	run, err := models.FindUnscopedCanvasRun(db, *inFlight.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, run.State)
+	require.Len(t, started, 1)
+	require.NotNil(t, started[0].Cancellation)
 
 	byDispatch, err := models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{queuedDispatch.ID})
+	require.NoError(t, err)
+	assert.Contains(t, byDispatch, queuedDispatch.ID, "the cancelling run still holds the step slot")
+	now := time.Now()
+	require.NoError(t, db.Model(run).Updates(map[string]any{"state": models.CanvasRunStateFinished, "finished_at": &now}).Error)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		started, err = models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+		return err
+	}))
+
+	byDispatch, err = models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{queuedDispatch.ID})
 	require.NoError(t, err)
 	_, stillQueued := byDispatch[queuedDispatch.ID]
 	assert.False(t, stillQueued, "the freed slot must admit the waiting dispatch")
@@ -549,7 +564,7 @@ func Test__FactoryWorkOrder__RetryLineStep__SettlesInFlightStepBeforeRerun(t *te
 	assert.Equal(t, models.CanvasRunResultCancelled, settled.Result)
 }
 
-func Test__FactoryWorkOrder__RetryLineStep__AdmitsQueuedWorkForFreedSlot(t *testing.T) {
+func Test__FactoryWorkOrder__RetryLineStep__RetainsSlotUntilRunStops(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
@@ -607,6 +622,18 @@ func Test__FactoryWorkOrder__RetryLineStep__AdmitsQueuedWorkForFreedSlot(t *test
 	}))
 
 	byDispatch, err := models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{queuedDispatch.ID})
+	require.NoError(t, err)
+	assert.Contains(t, byDispatch, queuedDispatch.ID, "the cancelling run still holds the step slot")
+	require.Len(t, started, 1)
+	require.NotNil(t, started[0].Cancellation)
+	run := started[0].Cancellation.Run
+	now := time.Now()
+	require.NoError(t, db.Model(run).Updates(map[string]any{"state": models.CanvasRunStateFinished, "finished_at": &now}).Error)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		started, err = models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+		return err
+	}))
+	byDispatch, err = models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{queuedDispatch.ID})
 	require.NoError(t, err)
 	_, stillQueued := byDispatch[queuedDispatch.ID]
 	assert.False(t, stillQueued, "the freed slot must admit the waiting dispatch")

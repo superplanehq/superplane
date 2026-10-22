@@ -104,6 +104,9 @@ func MergeFactoryPullRequest(
 
 	var closeOutcome *factoryPullRequestCloseResult
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, factory.OrganizationID); err != nil {
+			return err
+		}
 		if err := assertNoActiveAutomationLocked(tx, factory, pullRequest); err != nil {
 			return err
 		}
