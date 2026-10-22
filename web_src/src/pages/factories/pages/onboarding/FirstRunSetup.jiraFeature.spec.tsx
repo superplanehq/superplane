@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import { render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -203,11 +203,11 @@ describe("FirstRunSetup Jira intake", () => {
     expect(screen.getByTestId("first-run-jira-projects")).toBeInTheDocument();
     expect(setupRef.current?.issuesChoice).toBe("jira");
 
-    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+    await user.click(screen.getByRole("button", { name: "Continue to repository" }));
 
-    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId("first-run-host")).toBeInTheDocument();
     expect(model.saveIssues).toHaveBeenCalledWith("jira");
-    expect(model.finish).toHaveBeenCalledWith("jira");
+    expect(model.finish).not.toHaveBeenCalled();
   });
 
   it("keeps a saved Jira choice when the organization lookup fails", async () => {
@@ -233,11 +233,11 @@ describe("FirstRunSetup Jira intake", () => {
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(setupRef.current?.issuesChoice).toBe("jira");
 
-    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+    await user.click(screen.getByRole("button", { name: "Continue to repository" }));
 
-    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId("first-run-host")).toBeInTheDocument();
     expect(model.saveIssues).toHaveBeenCalledWith("jira");
-    expect(model.finish).toHaveBeenCalledWith("jira");
+    expect(model.finish).not.toHaveBeenCalled();
   });
 
   it("does not block ticket choices while the organization lookup is loading", () => {
@@ -278,21 +278,15 @@ describe("FirstRunSetup Jira intake", () => {
     expect(model.toggleLinearProject).toHaveBeenCalledWith("project-1");
   });
 
-  it("keeps setup available after Connect GitHub selects a saved connection", async () => {
+  it("saves GitHub Issues before repository setup without connecting GitHub", async () => {
     const user = userEvent.setup();
-    const requestConnect = vi.fn().mockResolvedValue(false);
-    const model = pageModel({ requestConnect });
-
+    const model = pageModel();
     renderLiveSetup(model, { simulateDiscovery: false });
-
-    await user.click(screen.getByRole("button", { name: "Connect GitHub" }));
-
-    await waitFor(() => {
-      expect(requestConnect).toHaveBeenCalledWith("github");
-      expect(screen.getByTestId("first-run-tickets")).not.toHaveAttribute("aria-busy");
-    });
-    expect(screen.getByTestId("first-run-back")).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Connect Jira" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: /GitHub Issues/ }));
+    await user.click(screen.getByRole("button", { name: "Continue to repository" }));
+    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+    expect(model.requestConnect).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("first-run-host")).toBeInTheDocument();
   });
 
   it("keeps a saved Linear choice while the feature lookup is loading", () => {

@@ -1,0 +1,78 @@
+import { useCallback, useEffect, useState } from "react";
+import { useBYOKAccess } from "@/hooks/useBYOKAccess";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
+import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
+import { showErrorToast } from "@/lib/toast";
+import type { FirstRunScreen, OnboardingPageModel } from "./useFirstRunSetupFlow";
+
+export function useOnboardingPlanTransition(
+  model: Pick<OnboardingPageModel, "saving" | "finish">,
+  navigation: { screen: FirstRunScreen; goToScreen: (next: FirstRunScreen) => void },
+  organizationId: string,
+) {
+  const rollout = useExperimentalFeature(organizationId);
+  const access = useBYOKAccess(organizationId);
+  const billing = useOrganizationBilling(organizationId);
+  const [repositorySaved, setRepositorySaved] = useState(false);
+  const [pending, setPending] = useState(false);
+  const hasBillingStep =
+    rollout.has(FEATURE_NEW_BILLING) &&
+    billing.data?.billingEnabled === true &&
+    Boolean(billing.data.availablePlans?.length);
+  const continueAfterPlan = useCallback(async () => {
+    try {
+      if (await access.verify()) {
+        navigation.goToScreen("agent");
+        return;
+      }
+      await model.finish();
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "SuperPlane could not verify model access. Try again.");
+    }
+  }, [access, navigation, model]);
+  useEffect(() => {
+    if (!repositorySaved || model.saving) return;
+    setRepositorySaved(false);
+    const continueFromRepository = async () => {
+      if (rollout.isLoading || !rollout.organizationReady) {
+        showErrorToast("SuperPlane could not load billing settings. Try again.");
+        return;
+      }
+      const result = await billing.refetch().catch(() => undefined);
+      if (!result || result.error || !result.data) {
+        showErrorToast("Could not load billing plans. Try again.");
+        return;
+      }
+      if (rollout.has(FEATURE_NEW_BILLING) && result.data.billingEnabled && result.data.availablePlans?.length) {
+        navigation.goToScreen("billing");
+        return;
+      }
+      await continueAfterPlan();
+    };
+    setPending(true);
+    void continueFromRepository().finally(() => setPending(false));
+  }, [repositorySaved, model.saving, rollout, billing, navigation, continueAfterPlan]);
+  const planActive =
+    billing.data?.planCategory === "paid" &&
+    billing.data.creditPurchaseAllowed &&
+    (!billing.data.requirePaymentMethod || billing.data.hasPaymentMethod);
+  const screen =
+    navigation.screen === "agent" && (!access.allowed || (hasBillingStep && !planActive))
+      ? ("billing" as const)
+      : navigation.screen;
+  useEffect(() => {
+    if (access.ready && screen !== navigation.screen) navigation.goToScreen(screen);
+  }, [access.ready, screen, navigation]);
+  return {
+    screen,
+    pending,
+    hasBillingStep,
+    skipAgentScreen: !access.allowed,
+    accessError: access.error,
+    afterRepository: async () => {
+      setRepositorySaved(true);
+    },
+    continueAfterPlan,
+  };
+}

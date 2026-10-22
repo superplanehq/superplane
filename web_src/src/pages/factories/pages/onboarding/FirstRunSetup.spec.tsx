@@ -109,7 +109,12 @@ vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 vi.mock("./AgentStep", () => ({ AgentStep: () => <div data-testid="agent-step" /> }));
 
 function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPageModel {
-  const { result } = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+  const { result } = renderHook(() =>
+    useOnboardingSetupState("Payments", {
+      simulateDiscovery: false,
+      initial: { issuesChoice: intakeChosen ? "vcs" : undefined },
+    }),
+  );
   return {
     setup: result.current,
     hostedAgentReady: true,
@@ -165,6 +170,8 @@ function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/s
   );
 }
 
+let intakeChosen = true;
+
 const runningDestination = {
   organizationId: "acme",
   factoryKey: "PAY",
@@ -173,6 +180,7 @@ const runningDestination = {
 
 describe("FirstRunSetup GitHub catalog", () => {
   beforeEach(() => {
+    intakeChosen = true;
     github.data.providerConfigured = true;
     github.data.accountConnectionRequired = true;
     github.data.identity = undefined;
@@ -395,6 +403,9 @@ describe("FirstRunSetup GitHub catalog", () => {
   });
 
   describe("without a requested step", () => {
+    beforeEach(() => {
+      intakeChosen = false;
+    });
     const setupPath = "/org-1/workspaces/PAY/setup";
 
     it("opens the welcome screen before GitHub is connected", () => {
@@ -404,15 +415,13 @@ describe("FirstRunSetup GitHub catalog", () => {
       expect(screen.getByTestId("first-run-get-started")).toBeInTheDocument();
     });
 
-    it("keeps loading until GitHub access is known", () => {
+    it("opens welcome while GitHub access loads", () => {
       github.isPending = true;
       github.data.providerConfigured = false;
       github.data.accountConnectionRequired = false;
       renderSetup(pageModel(), setupPath);
 
-      expect(screen.getByRole("status")).toHaveTextContent(FIRST_RUN_COPY.connect.loadingAccounts);
-      expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("first-run-get-started")).not.toBeInTheDocument();
+      expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
     });
 
     it("opens organization selection when the installation GitHub App does not require sign-in", () => {
@@ -420,9 +429,7 @@ describe("FirstRunSetup GitHub catalog", () => {
       github.data.accountConnectionRequired = false;
       renderSetup(pageModel(), setupPath);
 
-      expect(screen.getByText(FIRST_RUN_COPY.choose.organizationHeadline)).toBeInTheDocument();
-      expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("first-run-get-started")).not.toBeInTheDocument();
+      expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
     });
 
     it("opens the welcome screen when the GitHub identity only comes from sign-in", () => {
@@ -433,14 +440,14 @@ describe("FirstRunSetup GitHub catalog", () => {
       expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
     });
 
-    it("resumes at repository selection after a GitHub setup callback", async () => {
+    it("requires intake before honoring a GitHub setup callback", async () => {
       github.data.identity = { userId: "9", login: "octocat" };
 
       renderSetup(pageModel(), `${setupPath}?githubConnected=1`);
 
-      expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+      expect(await screen.findByTestId("first-run-welcome")).toBeInTheDocument();
       await waitFor(() => expect(readOnboardingGitHubConnect("account-1", "factory-1")).toBe(true));
-      expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
+      expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
     });
 
     it("reuses a GitHub connection from another workspace after the person chooses GitHub", async () => {
@@ -448,11 +455,13 @@ describe("FirstRunSetup GitHub catalog", () => {
       localStorage.setItem("superplane:onboarding-github-connect:account-1:factory-2", "yes");
       github.data.identity = { userId: "9", login: "octocat" };
 
-      renderSetup(pageModel(), setupPath);
+      intakeChosen = true;
+      renderSetup(pageModel(), `${setupPath}?step=welcome`);
 
       expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("first-run-get-started"));
+      await user.click(screen.getByTestId("first-run-analyze-tickets"));
       expect(screen.getByTestId("first-run-host")).toBeInTheDocument();
 
       await user.click(within(screen.getByTestId("first-run-host-github")).getByRole("button"));
@@ -476,9 +485,12 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(screen.getByTestId("first-run-host")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
     expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("first-run-get-started"));
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
     expect(screen.getByTestId("first-run-host")).toBeInTheDocument();
 
     await user.click(within(screen.getByTestId("first-run-host-github")).getByRole("button"));
@@ -535,7 +547,8 @@ describe("FirstRunSetup GitHub catalog", () => {
 vi.mock("@/hooks/useOrganizationBilling", () => ({
   organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
   useOrganizationBilling: () => ({
-    data: { billingEnabled: false },
-    refetch: async () => ({ data: { billingEnabled: false } }),
+    data: { billingEnabled: false, productFeatures: { byo_key: true } },
+    isSuccess: true,
+    refetch: async () => ({ data: { billingEnabled: false, productFeatures: { byo_key: true } } }),
   }),
 }));

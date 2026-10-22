@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router";
 import type { OrganizationsBillingPlanOption, OrganizationsDescribeOrganizationBillingResponse } from "@/api-client";
 import { organizationsSelectBillingPlan } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useBillingCardSetup } from "@/hooks/useBillingCardSetup";
-import { syncOrganizationBilling, useOrganizationBilling } from "@/hooks/useOrganizationBilling";
+import {
+  invalidateOrganizationModelAccess,
+  syncOrganizationBilling,
+  useOrganizationBilling,
+} from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { formatUsdCents } from "../../../lib/workOrderUsage";
@@ -78,6 +82,7 @@ function isReturnedCheckoutPlan(planKey: string | undefined, returnedKey: string
 
 function useOnboardingBilling(organizationId: string, onContinue: () => Promise<void>) {
   const billing = useOrganizationBilling(organizationId);
+  const queryClient = useQueryClient();
   const cardSetup = useBillingCardSetup(organizationId);
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -95,7 +100,7 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
   const subscriptionActive = billing.data?.planSource === "polar" && billing.data.creditPurchaseAllowed;
   const refresh = useMutation({
     mutationFn: async () => {
-      await syncOrganizationBilling(organizationId);
+      await syncOrganizationBilling(organizationId, queryClient);
       const result = await billing.refetch();
       if (result.error) throw result.error;
     },
@@ -116,7 +121,7 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
       setError("");
       if (!plan?.key) return;
       const waitingForReturnedPlan = isReturnedCheckoutPlan(plan.key, returnedPlanKey.current);
-      if (waitingForReturnedPlan) await syncOrganizationBilling(organizationId);
+      if (waitingForReturnedPlan) await syncOrganizationBilling(organizationId, queryClient);
       const verified = await billing.refetch();
       if (verified.error) throw verified.error;
       if (!verified.data) throw new Error("Could not verify billing. Try again.");
@@ -144,6 +149,7 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
       const updated = await billing.refetch();
       if (updated.error) throw updated.error;
       assertPlanActive(plan, updated.data);
+      await invalidateOrganizationModelAccess(queryClient, organizationId);
       await onContinue();
     },
     onError: (cause) => setError(getApiErrorMessage(cause, "Could not select the plan. Try again.")),
@@ -255,7 +261,7 @@ export function FirstRunBillingScreen({
   return (
     <FirstRunShell testId="first-run-billing" chrome={chrome} busy={busy} sphere={sphere} visual="preview" width="wide">
       <FirstRunHeading headline="Choose a plan">
-        <p>Select a plan for your organization to finish setup.</p>
+        <p>Select a plan for your organization.</p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
         {billing.isPending && <p role="status">Loading plans…</p>}
@@ -283,7 +289,7 @@ export function FirstRunBillingScreen({
             if (plan) activate.mutate(plan);
           }}
         >
-          {plan?.subscriptionRequired && !currentPlan ? `Subscribe to ${plan.name}` : "Finish setup"}
+          {plan?.subscriptionRequired && !currentPlan ? `Subscribe to ${plan.name}` : "Continue"}
         </LoadingButton>
         {error && (
           <p role="alert" className="text-sm text-destructive">

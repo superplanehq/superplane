@@ -120,8 +120,8 @@ export const FIRST_RUN_COPY = {
     moreLater: "You can add more repositories later.",
   },
   tickets: {
-    headline: "Choose the backlog to scan",
-    intro: "SuperPlane reads these tickets and scores each one by how likely an agent can complete it.",
+    headline: "Choose your intake source",
+    intro: "Choose where SuperPlane reads issues. You will select a code repository next.",
     githubIssues: "GitHub Issues",
     jira: "Jira",
     linear: "Linear",

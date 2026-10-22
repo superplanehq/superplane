@@ -163,13 +163,17 @@ function StatefulSetup({
   connected: Set<IntegrationId>;
   overrides: Partial<OnboardingPageModel>;
 }) {
-  const setup = useOnboardingSetupState("Payments", { connected, simulateDiscovery: false });
-  return <FirstRunSetup model={pageModel(setup, overrides)} />;
+  const setup = useOnboardingSetupState("Payments", {
+    connected: new Set([...connected, "jira"]),
+    simulateDiscovery: false,
+    initial: { issuesChoice: "jira" },
+  });
+  return <FirstRunSetup model={pageModel(setup, { jiraProjectId: "PAY", ...overrides })} />;
 }
 
 function renderSetup(connected: Set<IntegrationId>, overrides: Partial<OnboardingPageModel> = {}) {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
       <StatefulSetup connected={connected} overrides={overrides} />
     </MemoryRouter>,
   );
@@ -177,6 +181,7 @@ function renderSetup(connected: Set<IntegrationId>, overrides: Partial<Onboardin
 
 async function chooseBitbucket(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId("first-run-get-started"));
+  await user.click(screen.getByTestId("first-run-analyze-tickets"));
   await user.click(within(screen.getByTestId("first-run-host-bitbucket")).getByRole("button"));
   const workspace = screen.queryByRole("button", { name: "Use acme-team" });
   if (workspace) await user.click(workspace);
@@ -203,6 +208,7 @@ describe("FirstRunSetup Bitbucket", () => {
     renderSetup(new Set());
 
     await user.click(screen.getByTestId("first-run-get-started"));
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
 
     expect(within(screen.getByTestId("first-run-host-github")).getByRole("button")).toBeEnabled();
     expect(within(screen.getByTestId("first-run-host-bitbucket")).getByRole("button")).toBeEnabled();
@@ -272,7 +278,7 @@ describe("FirstRunSetup Bitbucket", () => {
     bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
     bitbucketOnboarding.repositories = [{ fullName: "acme-team/api" }];
     rerender(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
         <StatefulSetup connected={new Set()} overrides={{}} />
       </MemoryRouter>,
     );
@@ -345,12 +351,14 @@ describe("FirstRunSetup Bitbucket", () => {
 
     await waitFor(() => expect(selectBitbucketRepository).toHaveBeenCalledWith("acme-team/api"));
     expect(resources.calls).toContainEqual({ integrationId: "bitbucket-1", type: "repository", enabled: true });
+    await user.click(screen.getByTestId("first-run-back"));
+    await user.click(screen.getByTestId("first-run-back"));
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /GitHub Issues/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect GitHub" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Jira/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Linear/ })).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(requestConnect).not.toHaveBeenCalled();
   });
 
