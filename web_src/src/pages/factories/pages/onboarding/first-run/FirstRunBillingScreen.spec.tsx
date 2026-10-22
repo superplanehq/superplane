@@ -78,16 +78,17 @@ it("activates a plan without a card or checkout when neither is required", async
   expect(createSession).not.toHaveBeenCalled();
 });
 
-it("verifies the saved card before activating a card-only plan and finishing", async () => {
+it.each(["payg", "pro"])("verifies the saved card before finishing plan %s", async (planKey) => {
+  if (planKey === "pro") {
+    billing = { ...billing, catalogKey: "pro", planSource: "polar", creditPurchaseAllowed: true };
+  }
   const user = userEvent.setup();
   const finish = renderBilling();
-  await user.click(await screen.findByRole("button", { name: /Pay-as-you-go/ }));
-  expect(screen.getByRole("button", { name: "Finish setup" })).toBeDisabled();
   const previousOpen = window.open;
   const popup = { closed: false, opener: {}, location: { replace: vi.fn() }, close: vi.fn() };
   window.open = vi.fn(() => popup as unknown as Window);
   try {
-    await user.click(screen.getByRole("button", { name: "Add payment method" }));
+    await user.click(await screen.findByRole("button", { name: planKey === "payg" ? /Pay-as-you-go/ : /Pro/ }));
     await waitFor(() =>
       expect(popup.location.replace).toHaveBeenCalledWith(
         "https://sandbox.polar.sh/acme/portal/settings?customer_session_token=test-session",
@@ -107,20 +108,19 @@ it("verifies the saved card before activating a card-only plan and finishing", a
   await waitFor(() => expect(screen.getByRole("button", { name: "Finish setup" })).toBeEnabled());
   await user.click(screen.getByRole("button", { name: "Finish setup" }));
   await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
-  expect(selectPlan).toHaveBeenCalledTimes(1);
-  expect(selectPlan).toHaveBeenCalledWith(
-    expect.objectContaining({ body: expect.objectContaining({ planKey: "payg" }) }),
-  );
+  expect(selectPlan).toHaveBeenCalledTimes(planKey === "payg" ? 1 : 0);
+  if (planKey === "payg") {
+    expect(selectPlan).toHaveBeenCalledWith(expect.objectContaining({ body: expect.objectContaining({ planKey }) }));
+  }
 });
 
 it("lets the user retry when the browser blocks the card setup window", async () => {
   const user = userEvent.setup();
   renderBilling();
-  await user.click(await screen.findByRole("button", { name: /Pay-as-you-go/ }));
   const previousOpen = window.open;
   window.open = vi.fn(() => null);
   try {
-    await user.click(screen.getByRole("button", { name: "Add payment method" }));
+    await user.click(await screen.findByRole("button", { name: /Pay-as-you-go/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Allow pop-ups for SuperPlane, then try again.");
     expect(createSession).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Add payment method" })).toBeEnabled();
@@ -138,7 +138,6 @@ it("sends subscription plans to checkout with an onboarding return path", async 
   window.location.assign = assign;
   try {
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(screen.getByRole("button", { name: "Subscribe to Pro" }));
     await waitFor(() => expect(assign).toHaveBeenCalledWith("https://polar.sh/checkout/pro"));
     expect(createSession).not.toHaveBeenCalled();
     expect(finish).not.toHaveBeenCalled();

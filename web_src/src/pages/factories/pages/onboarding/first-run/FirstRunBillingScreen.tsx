@@ -5,6 +5,7 @@ import type { OrganizationsBillingPlanOption, OrganizationsDescribeOrganizationB
 import { organizationsSelectBillingPlan } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { useBillingCardSetup } from "@/hooks/useBillingCardSetup";
 import { syncOrganizationBilling, useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -55,6 +56,7 @@ function assertPlanActive(
 
 function useOnboardingBilling(organizationId: string, onContinue: () => Promise<void>) {
   const billing = useOrganizationBilling(organizationId);
+  const cardSetup = useBillingCardSetup(organizationId);
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [selectedKey, setSelectedKey] = useState(searchParams.get("plan") ?? "");
@@ -68,7 +70,8 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
       : availablePlans;
   const plan = plans.find((option) => option.key === selectedKey);
   const currentPlan = isCurrentBillingPlan(plan, billing.data);
-  const needsCard = plan?.requirePaymentMethod && !plan.subscriptionRequired && !billing.data?.hasPaymentMethod;
+  const needsCard =
+    plan?.requirePaymentMethod && (!plan.subscriptionRequired || currentPlan) && !billing.data?.hasPaymentMethod;
   const subscriptionActive = billing.data?.planSource === "polar" && billing.data.creditPurchaseAllowed;
   const refresh = useMutation({
     mutationFn: async () => {
@@ -89,7 +92,7 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
   }, [currentOption?.key, selectedKey]);
 
   const activate = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (plan: OrganizationsBillingPlanOption) => {
       setError("");
       if (!plan?.key) return;
       if (searchParams.has("subscribed")) await syncOrganizationBilling(organizationId);
@@ -131,13 +134,21 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
     currentOption,
     currentPlan,
     selectedKey,
-    setSelectedKey,
+    selectPlan: (option: OrganizationsBillingPlanOption) => {
+      setSelectedKey(option.key ?? "");
+      setError("");
+      if (option.subscriptionRequired && !isCurrentBillingPlan(option, billing.data)) {
+        activate.mutate(option);
+        return;
+      }
+      if (option.requirePaymentMethod && !billing.data?.hasPaymentMethod) cardSetup.open();
+    },
+    cardSetup,
     needsCard,
     subscriptionActive,
     activate,
     refresh,
     error,
-    setError,
   };
 }
 
@@ -203,13 +214,13 @@ export function FirstRunBillingScreen({
     currentOption,
     currentPlan,
     selectedKey,
-    setSelectedKey,
+    selectPlan,
+    cardSetup,
     needsCard,
     subscriptionActive,
     activate,
     refresh,
     error,
-    setError,
   } = useOnboardingBilling(organizationId, onContinue);
   const busy = saving || activate.isPending || refresh.isPending;
   return (
@@ -226,24 +237,25 @@ export function FirstRunBillingScreen({
             plan={option}
             selected={selectedKey === option.key}
             current={currentOption?.key !== undefined && option.key === currentOption.key}
-            disabled={busy || Boolean(subscriptionActive && option.key !== billing.data?.catalogKey)}
-            onSelect={() => {
-              setSelectedKey(option.key ?? "");
-              setError("");
-            }}
+            disabled={
+              busy || cardSetup.isPending || Boolean(subscriptionActive && option.key !== billing.data?.catalogKey)
+            }
+            onSelect={() => selectPlan(option)}
           />
         ))}
         {billing.isSuccess && plans.length === 0 && (
           <p role="alert">No plans are available. Contact an organization admin.</p>
         )}
-        {needsCard && <BillingCardSetup key={selectedKey} organizationId={organizationId} disabled={busy} />}
+        {needsCard && <BillingCardSetup setup={cardSetup} disabled={busy} />}
         <LoadingButton
           type="button"
           className="w-full"
           loading={busy}
           loadingText="Saving plan…"
           disabled={!plan || Boolean(needsCard) || billing.isPending || billing.isError}
-          onClick={() => activate.mutate()}
+          onClick={() => {
+            if (plan) activate.mutate(plan);
+          }}
         >
           {plan?.subscriptionRequired && !currentPlan ? `Subscribe to ${plan.name}` : "Finish setup"}
         </LoadingButton>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { organizationsCreateBillingPortalSession, organizationsSelectBillingPlan } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { useBillingCardSetup } from "@/hooks/useBillingCardSetup";
 import { organizationBillingQueryKey, useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -17,6 +18,7 @@ export function BillingPaymentSettings({
   canManageBilling: boolean;
 }) {
   const { data: billing } = useOrganizationBilling(organizationId);
+  const cardSetup = useBillingCardSetup(organizationId);
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
   const action = useMutation({
@@ -54,7 +56,7 @@ export function BillingPaymentSettings({
       )}
       {canManageBilling ? (
         <div className="mt-3 space-y-3">
-          {!manageInPortal && <BillingCardSetup organizationId={organizationId} disabled={action.isPending} />}
+          {!manageInPortal && <BillingCardSetup setup={cardSetup} disabled={action.isPending} />}
           <div className="flex flex-wrap gap-2">
             {manageInPortal && (
               <Button disabled={action.isPending} onClick={() => action.mutate(undefined)}>
