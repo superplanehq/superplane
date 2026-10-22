@@ -224,7 +224,7 @@ function ConnectedRunPage() {
   );
 }
 const meta = {
-  title: "Factories/Pages/Automation run history/Connected Implement",
+  title: "Factories/Components/Run history/Integration scenarios/Implement",
   component: ConnectedPreview,
   decorators: [withFactoriesTheme],
   parameters: { layout: "fullscreen", msw: { handlers } },
