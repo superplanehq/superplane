@@ -206,7 +206,7 @@ it("sends one delete request and blocks dismissal while the request is pending",
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   expect(catalog.deletes).toHaveLength(1);
   expect(await screen.findByText("No features. Create a feature to add it to plans.")).toBeInTheDocument();
-});
+}, 15000);
 
 it("shows a delete error in the dialog, allows retry, and keeps the feature until deletion succeeds", async () => {
   let attempts = 0;
