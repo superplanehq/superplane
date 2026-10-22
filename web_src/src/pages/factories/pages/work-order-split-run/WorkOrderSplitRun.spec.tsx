@@ -1729,6 +1729,34 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });
 
+  it("queues a draft at capacity and shows its position without another start action", async () => {
+    const user = userEvent.setup();
+    const onDispatch = vi.fn().mockResolvedValue(undefined);
+    const order = { ...REVIEW_CANDIDATE_WORK_ORDERS[0], taskLimitReached: true };
+    const props = {
+      fixture: splitRunFixtureForWorkOrder(order, { checks: OPEN_WORK_ORDER_CHECKS }),
+      canDispatch: true,
+      onDispatch,
+    };
+    const view = renderPopup(props);
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Queue" }));
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+    view.rerenderPopup({
+      ...props,
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          ...order,
+          queuedTasks: [{ id: "queue-1", position: 2, name: "Implement", startsLine: true }],
+        },
+        { checks: OPEN_WORK_ORDER_CHECKS },
+      ),
+    });
+    expect(screen.getByText("Queued #2")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Queue" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+  });
+
   it("hides Refine on a backlog draft", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 

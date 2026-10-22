@@ -29,16 +29,25 @@ function liveThinkingCopy(testId: string): string | undefined {
 }
 
 function renderCard(props: {
+  queuedLabel?: string;
   isAnalyzing?: boolean;
   clarityScore?: number;
   confidenceScore?: number;
   hasAgentQuestion?: boolean;
+  queuedTasks?: FactoriesWorkOrder["queuedTasks"];
+  state?: FactoriesWorkOrder["state"];
+  onCancelQueuedTask?: (orderId: string, queueId: string) => Promise<void>;
+  cancellingQueueOrderIds?: ReadonlySet<string>;
+  interactive?: boolean;
 }) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
         <WorkOrderCard
-          entry={buildWorkOrderListEntry(order, factory)}
+          entry={buildWorkOrderListEntry(
+            { ...order, state: props.state ?? order.state, queuedTasks: props.queuedTasks },
+            factory,
+          )}
           organizationId="org-1"
           factoryKey="RF"
           factoryLines={[{ id: "line-a", name: "hotfix" }]}
@@ -58,6 +67,55 @@ function renderCard(props: {
 describe("Confidence score on a backlog card", () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("shows a queue icon for a queued line step without a task queue entry", () => {
+    renderCard({ queuedLabel: "Queued #1" });
+
+    expect(screen.getByRole("img", { name: "Queued #1" })).toBeVisible();
+    expect(screen.queryByLabelText("Draft")).not.toBeInTheDocument();
+  });
+
+  it("shows the queue position instead of the thinking state and removes only that pending work", async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    renderCard({ isAnalyzing: true, queuedTasks: [{ id: "queue-1", position: 2 }], onCancelQueuedTask: cancel });
+
+    expect(screen.getByText("Queued #2")).toBeVisible();
+    expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: `Remove ${order.title} from queue` }));
+    expect(cancel).toHaveBeenCalledWith("wo-1", "queue-1");
+  });
+
+  it("keeps the queue label visible while cancellation is pending", () => {
+    renderCard({
+      queuedTasks: [{ id: "queue-1", position: 1 }],
+      onCancelQueuedTask: vi.fn(),
+      cancellingQueueOrderIds: new Set(["wo-1"]),
+    });
+    expect(screen.getByText("Queued #1")).toBeVisible();
+    expect(screen.getByRole("button", { name: `Remove ${order.title} from queue` })).toBeDisabled();
+  });
+
+  it("keeps pending actions distinct and preserves running status when another automation is active", async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    renderCard({
+      state: "STATE_OPEN",
+      queuedTasks: [
+        { id: "queue-1", position: 2, name: "Implement", taskActive: true },
+        { id: "queue-2", position: 2, name: "Review", taskActive: true },
+      ],
+      onCancelQueuedTask: cancel,
+    });
+    expect(screen.getAllByText("Queued #2")).toHaveLength(2);
+    expect(screen.getByLabelText("Running")).toBeVisible();
+    await userEvent.setup().click(screen.getByRole("button", { name: `Remove Review for ${order.title} from queue` }));
+    expect(cancel).toHaveBeenCalledWith("wo-1", "queue-2");
+  });
+
+  it("shows queued work without a cancellation control on the public board", () => {
+    renderCard({ queuedTasks: [{ id: "queue-1", position: 3 }], interactive: false, onCancelQueuedTask: vi.fn() });
+    expect(screen.getByText("Queued #3")).toBeVisible();
+    expect(screen.queryByRole("button", { name: `Remove ${order.title} from queue` })).not.toBeInTheDocument();
   });
 
   it("shows that analysis runs while the score is not ready", () => {

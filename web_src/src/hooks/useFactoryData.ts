@@ -8,6 +8,7 @@ import {
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
+  factoriesCancelWorkOrderQueue,
   factoriesCreateFactoryAutomation,
   factoriesPreviewFactorySchedule,
   factoriesDeleteFactoryAutomation,
@@ -37,7 +38,7 @@ import type {
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
+import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
 import { buildOptimisticDispatchedOrder } from "@/pages/factories/lib/dispatchOptimistic";
 import { factoryPlanningEnabled } from "@/pages/factories/pages/planningSettingsModel";
 import {
@@ -217,6 +218,8 @@ export function useFactoryWorkOrders(
     enabled: Boolean(organizationId && factoryId),
     // Live via websocket; remount must refetch instead of serving 5m global stale cache.
     staleTime: 0,
+    // Other workspaces can change organization queue positions without a local WebSocket event.
+    refetchInterval: (query) => (query.state.data?.some((order) => order.queuedTasks?.length) ? 5000 : false),
   });
 }
 
@@ -279,6 +282,8 @@ export function useFactoryWorkOrdersPage(
       Boolean(organizationId && factoryId) &&
       (!options?.requireUser || Boolean(pageQuery.userId)),
     staleTime: 0,
+    refetchInterval: (query) =>
+      query.state.data?.pages.some((page) => page.orders.some((order) => order.queuedTasks?.length)) ? 5000 : false,
     placeholderData: keepPreviousData,
   });
 
@@ -400,6 +405,8 @@ export function useWorkOrder(organizationId: string, factoryId: string, orderId:
     },
     enabled: Boolean(organizationId && factoryId && orderId),
     staleTime: 0,
+    refetchInterval: (query) =>
+      query.state.data?.queuedTasks?.length || query.state.data?.state === "STATE_DRAFT" ? 5000 : false,
   });
 }
 
@@ -1097,4 +1104,32 @@ export function useFactorySchedulePreview(
     return () => clearTimeout(timer);
   }, [enabled, nextRunAt, now, refetch]);
   return { ...preview, isFuture: nextRunAt > Math.max(now, Date.now()) };
+}
+
+export function useCancelWorkOrderQueue(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { orderId: string; queueId: string }) => {
+      const response = await factoriesCancelWorkOrderQueue(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: { queueId: input.queueId },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Could not remove the task from the queue");
+      }
+      return response.data.order;
+    },
+    onSuccess: (order, input) => {
+      clearBacklogAnalysisPending(input.orderId);
+      applyWorkOrderToListCaches(queryClient, organizationId, factoryId, input.orderId, order);
+      queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, input.orderId), order);
+    },
+    onSettled: () => {
+      // Queue positions change for other tasks and workspaces, too.
+      void queryClient.invalidateQueries({ queryKey: ["factories", organizationId] });
+    },
+  });
 }
