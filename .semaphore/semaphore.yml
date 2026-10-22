@@ -37,7 +37,7 @@ blocks:
   - name: "Backend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -86,7 +86,7 @@ blocks:
   - name: "Security"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -115,7 +115,7 @@ blocks:
   - name: "Frontend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -159,7 +159,7 @@ blocks:
   - name: "Build Image"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       secrets:
         - name: ghcr-push-token
@@ -174,16 +174,6 @@ blocks:
         - name: Build image
           commands:
             - bash scripts/build-image
-
-  - name: "Terraform"
-    dependencies: []
-    run:
-      when: "change_in('/release/terraform', {exclude: ['**/*.md'], default_branch: 'main'})"
-    task:
-      jobs:
-        - name: Format and validate
-          commands:
-            - make terraform.check
 
 after_pipeline:
   task:
@@ -241,4 +231,4 @@ promotions:
     pipeline_file: promote.yml
     deployment_target: production
     auto_promote:
-      when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"

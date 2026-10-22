@@ -126,9 +126,6 @@ format.js:
 format.js.check:
 	cd web_src && npm run format:check
 
-terraform.format:
-	$(MAKE) -C release/terraform format
-
 dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
@@ -352,9 +349,6 @@ check.test.ui.browser:
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
-
-terraform.check:
-	$(MAKE) -C release/terraform check
 
 check.tool.configs:
 	bash ./scripts/check_tool_config_guard.sh
