@@ -40,6 +40,8 @@ type AnalysisPlanningSessionArgs = {
   workOrderId?: string;
   enabled: boolean;
   canUpdate: boolean;
+  /** Poll a missing session only when a refinement run can still start. */
+  refinementCanStart?: boolean;
   analysisDelivered?: boolean;
   isUploading?: boolean;
   uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
@@ -47,8 +49,29 @@ type AnalysisPlanningSessionArgs = {
 
 const LIVE_SESSION_REFETCH_INTERVAL_MS = 15_000;
 
-function planningSessionIsLive(session: PlanningSessionPayload | null | undefined): boolean {
-  return Boolean(session?.id && session.state !== "ended");
+export function planningSessionCanStart(input: {
+  factoryLoaded: boolean;
+  planningEnabled: boolean;
+  isDraft: boolean;
+  analysisActive: boolean;
+}): boolean {
+  return input.factoryLoaded && input.planningEnabled && (input.isDraft || input.analysisActive);
+}
+
+/**
+ * Poll a live session until it ends. The first turn has no live connection
+ * yet, so the open chat relies on stored activity from this refresh. Poll a
+ * missing session only when refinement can still start. An open task that
+ * cannot start refinement keeps the first lookup and does not refresh again.
+ */
+function planningSessionNeedsPolling(
+  session: PlanningSessionPayload | null | undefined,
+  refinementCanStart: boolean,
+): boolean {
+  if (session?.id) {
+    return session.state !== "ended";
+  }
+  return refinementCanStart;
 }
 
 function usePlanningSessionLookup(
@@ -56,10 +79,10 @@ function usePlanningSessionLookup(
     organizationId: string;
     factoryId: string;
     workOrderId: string;
-    isLive: boolean;
+    poll: boolean;
   },
 ) {
-  const { organizationId, factoryId, workOrderId, enabled, isLive } = args;
+  const { organizationId, factoryId, workOrderId, enabled, poll } = args;
   return useQuery<PlanningSessionPayload | null>({
     queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
     queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
@@ -70,7 +93,7 @@ function usePlanningSessionLookup(
         next as PlanningSessionPayload | null,
       ),
     refetchOnWindowFocus: false,
-    refetchInterval: isLive ? LIVE_SESSION_REFETCH_INTERVAL_MS : undefined,
+    refetchInterval: poll ? LIVE_SESSION_REFETCH_INTERVAL_MS : undefined,
   });
 }
 
@@ -161,6 +184,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     workOrderId = "",
     enabled,
     canUpdate,
+    refinementCanStart = false,
     analysisDelivered = false,
     isUploading = false,
     uploadFiles,
@@ -174,7 +198,10 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId,
     workOrderId,
     enabled,
-    isLive: planningSessionIsLive(queryClient.getQueryData<PlanningSessionPayload | null>(queryKey)),
+    poll: planningSessionNeedsPolling(
+      queryClient.getQueryData<PlanningSessionPayload | null>(queryKey),
+      refinementCanStart,
+    ),
   });
   const session = query.data ?? null;
   useRefreshAnalysisWorkOrder({
