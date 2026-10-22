@@ -118,7 +118,7 @@ func listQueuedRootTasks(tx *gorm.DB, orgID uuid.UUID, limit int) ([]Organizatio
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
-	err := query.Scan(&queued).Error
+	err := query.Order("e.created_at, e.id").Scan(&queued).Error
 	return queued, err
 }
 

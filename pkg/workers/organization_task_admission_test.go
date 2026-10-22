@@ -46,6 +46,13 @@ func TestOrganizationQueueActiveReviewTaskKeepsItsSlotForLineWork(t *testing.T) 
 			waiter, waiting := other.dispatchLine(t, other.createOpenWorkOrder(t, r, "Older waiting task"))
 			require.NotNil(t, waiting.QueueItem)
 			if queued {
+				// An active task beyond a full batch of older inactive tasks
+				// must still reach admission in this pass.
+				for range 100 {
+					_, waiting := other.dispatchLine(t, other.createOpenWorkOrder(t, r, "Earlier inactive task"))
+					require.NotNil(t, waiting.QueueItem)
+				}
+				require.NoError(t, db.Model(&models.FactoryWorkOrderQueueItem{}).Where("line_id = ?", other.line.ID).Update("created_at", time.Now().Add(-time.Minute)).Error)
 				require.NoError(t, db.Model(&models.FactoryWorkOrderQueueItem{}).Where("line_dispatch_id = ?", waiter.ID).Update("created_at", time.Now().Add(-time.Minute)).Error)
 				NewRunFinalizer("", r.Registry).sweepQueuedTasks(t.Context())
 				require.Nil(t, queueItemForDispatch(t, dispatch.ID))

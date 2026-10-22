@@ -150,9 +150,12 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 	}
 	var head *OrganizationQueuedTask
 	if slots == nil || *slots > 0 {
-		head, err = nextQueuedOrganizationTask(tx, orgID)
+		roots, err := listQueuedRootTasks(tx, orgID, 1)
 		if err != nil {
 			return nil, err
+		}
+		if len(roots) > 0 {
+			head = &roots[0]
 		}
 	}
 	active, err := ListActiveOrganizationTaskIDs(tx, orgID)
