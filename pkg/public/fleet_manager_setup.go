@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	defaultStableRunnerVersion       = "v0.1.0"
+	defaultStableRunnerVersion       = "v0.2.0"
 	defaultStableFleetManagerVersion = "v0.1.4"
 	fleetManagerReleaseTagPrefix     = "fleet-manager/"
 	fleetManagerChartRepository      = "oci://ghcr.io/superplanehq/fleet-manager-chart"
