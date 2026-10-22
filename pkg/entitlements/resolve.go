@@ -36,6 +36,10 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 		return nil, err
 	}
 	catalog := plan.Catalog
+	parallelLimit, err := models.ResolveOrganizationParallelTaskLimit(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
 	markup, err := models.ResolveOrganizationMarkupBPS(tx, orgID)
 	if err != nil {
 		return nil, err
@@ -52,7 +56,7 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 	}
 	result := &Entitlements{
 		PlanID: catalog.ID, PlanKey: catalog.Key, PlanName: catalog.Name,
-		SeatLimit: catalog.SeatLimit, ParallelTaskLimit: catalog.ParallelTaskLimit,
+		SeatLimit: catalog.SeatLimit, ParallelTaskLimit: parallelLimit,
 		Features:         map[string]bool{},
 		CreditPolicy:     CreditPolicy{AmountCents: catalog.CreditAmountCents, Frequency: catalog.CreditFrequency, Expiration: catalog.CreditExpiration, ValidityDays: catalog.CreditValidityDays},
 		TrialCreditCents: catalog.TrialCreditCents, TrialLengthDays: catalog.TrialLengthDays, MarkupBPS: markup,

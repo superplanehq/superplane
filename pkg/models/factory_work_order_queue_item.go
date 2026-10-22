@@ -98,23 +98,6 @@ func lockFactoryLineForStepAdmission(tx *gorm.DB, lineID uuid.UUID) (*FactoryLin
 	return &line, nil
 }
 
-// countQueuedFactoryStepItems counts the dispatches waiting in the step's
-// queue across all work orders of the line.
-func countQueuedFactoryStepItems(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (int64, error) {
-	var count int64
-	err := tx.
-		Model(&FactoryWorkOrderQueueItem{}).
-		Where("line_id = ?", lineID).
-		Where("step_index = ?", stepIndex).
-		Count(&count).
-		Error
-	if err != nil {
-		return 0, err
-	}
-
-	return count, nil
-}
-
 // countActiveFactoryStepExecutions counts the step's in-flight runs across
 // all work orders and dispatches of the line — the number a step's
 // maxParallelism caps.
@@ -153,24 +136,6 @@ func admissionStep(liveLine *FactoryLine, dispatch *FactoryWorkOrderLineDispatch
 	return &snapshotSteps[stepIndex]
 }
 
-func findOldestFactoryWorkOrderQueueItem(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (*FactoryWorkOrderQueueItem, error) {
-	var item FactoryWorkOrderQueueItem
-	err := tx.
-		Where("line_id = ? AND step_index = ?", lineID, stepIndex).
-		Order("created_at ASC").
-		Order("id ASC").
-		First(&item).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return &item, nil
-}
-
 // dropQueuedLineWork abandons a traversal that is waiting in a step's
 // queue: the queue item is deleted and its dispatch finishes as
 // cancelled. Called when the work order closes — a queued dispatch has no
@@ -179,35 +144,14 @@ func findOldestFactoryWorkOrderQueueItem(tx *gorm.DB, lineID uuid.UUID, stepInde
 // a running step are not touched here: the run finalizer cancels them
 // when their run ends.
 //
-// It holds the admission lock of every involved line while it works, so a
+// It holds the organization admission lock while it works, so a
 // concurrent admission cannot consume a queue item this close is about to
 // drop — without the lock, the close could finish a dispatch whose step
 // run had just started.
 func (o *FactoryWorkOrder) dropQueuedLineWork(tx *gorm.DB) error {
-	var lineIDs []uuid.UUID
-	err := tx.
-		Model(&FactoryWorkOrderQueueItem{}).
-		Distinct().
-		Where("work_order_id = ?", o.ID).
-		Order("line_id").
-		Pluck("line_id", &lineIDs).
-		Error
-	if err != nil {
+	if err := LockOrganizationTaskAdmission(tx, o.OrganizationID); err != nil {
 		return err
 	}
-	if len(lineIDs) == 0 {
-		return nil
-	}
-
-	// Sorted lock order, so two closes over the same lines cannot deadlock.
-	for _, lineID := range lineIDs {
-		if _, err := lockFactoryLineForStepAdmission(tx, lineID); err != nil {
-			return err
-		}
-	}
-
-	// Re-read under the locks: an item seen above may have been admitted
-	// (and its row deleted) before the lock was acquired.
 	var items []FactoryWorkOrderQueueItem
 	if err := tx.Where("work_order_id = ?", o.ID).Find(&items).Error; err != nil {
 		return err
@@ -215,87 +159,14 @@ func (o *FactoryWorkOrder) dropQueuedLineWork(tx *gorm.DB) error {
 
 	for i := range items {
 		dispatch, err := FindWorkOrderLineDispatch(tx, items[i].LineDispatchID)
-		if err != nil {
+		if err != nil && !errors.Is(err, ErrFactoryWorkOrderLineDispatchNotFound) {
 			return err
 		}
 
-		if err := items[i].Delete(tx); err != nil {
-			return err
-		}
-
-		if err := dispatch.Finish(tx, CanvasRunResultCancelled); err != nil {
+		if err := discardQueuedTask(tx, &items[i], dispatch, CanvasRunResultCancelled); err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-// AdmitQueuedForStep admits queued dispatches of (lineID, stepIndex) in
-// FIFO order, oldest first, while the step has free slots — normally one
-// per finished run, more when the step's maxParallelism was raised
-// mid-flight and a finished run reveals the extra capacity. Queue items
-// whose work order is no longer open are dropped (their dispatch finishes
-// as cancelled) without using a slot. Returns one result per admitted
-// dispatch, oldest first; empty when nothing was admitted.
-func AdmitQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) ([]*FactoryLineStepResult, error) {
-	line, err := lockFactoryLineForStepAdmission(tx, lineID)
-	if err != nil {
-		return nil, err
-	}
-
-	var admitted []*FactoryLineStepResult
-	for {
-		item, err := findOldestFactoryWorkOrderQueueItem(tx, lineID, stepIndex)
-		if err != nil {
-			return nil, err
-		}
-		if item == nil {
-			return admitted, nil
-		}
-
-		dispatch, err := FindWorkOrderLineDispatch(tx, item.LineDispatchID)
-		if err != nil {
-			return nil, err
-		}
-
-		step := admissionStep(line, dispatch, stepIndex)
-		active, err := countActiveFactoryStepExecutions(tx, lineID, stepIndex)
-		if err != nil {
-			return nil, err
-		}
-		if active >= int64(step.EffectiveMaxParallelism()) {
-			return admitted, nil
-		}
-
-		if err := item.Delete(tx); err != nil {
-			return nil, err
-		}
-
-		f, err := FindFactory(tx, item.OrganizationID, item.FactoryID)
-		if err != nil {
-			return nil, err
-		}
-
-		order, err := f.FindWorkOrder(tx, item.WorkOrderID)
-		if err != nil {
-			return nil, err
-		}
-
-		// Safety net: the close path drops queued work, but an order that
-		// slipped through must not start a run. Abandon its traversal and
-		// try the next item in the queue.
-		if !order.IsOpen() {
-			if err := dispatch.Finish(tx, CanvasRunResultCancelled); err != nil {
-				return nil, err
-			}
-			continue
-		}
-
-		result, err := dispatch.StartStep(tx, order, item.StepIndex)
-		if err != nil {
-			return nil, err
-		}
-		admitted = append(admitted, result)
-	}
 }

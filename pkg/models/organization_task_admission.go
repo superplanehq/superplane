@@ -1,0 +1,236 @@
+package models
+
+import (
+	"crypto/sha256"
+	"encoding/binary"
+	"errors"
+	"fmt"
+
+	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+)
+
+// ResolveOrganizationParallelTaskLimit uses the effective plan, including trial
+// and subscription expiry. A nil limit means unlimited organization capacity.
+func ResolveOrganizationParallelTaskLimit(tx *gorm.DB, orgID uuid.UUID) (*int, error) {
+	if !BillingEnabled() {
+		return nil, nil
+	}
+	plan, err := ResolveOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return plan.Catalog.ParallelTaskLimit, nil
+}
+
+// LockOrganizationTaskAdmission must precede row locks and writes in the outer
+// transaction. Reacquiring it in nested model calls is safe. The namespace keeps
+// these advisory keys separate from other application locks.
+func LockOrganizationTaskAdmission(tx *gorm.DB, orgID uuid.UUID) error {
+	return tx.Exec("SELECT pg_advisory_xact_lock(?)", organizationAdmissionKey(orgID)).Error
+}
+
+func TryLockOrganizationTaskAdmission(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	var locked bool
+	err := tx.Raw("SELECT pg_try_advisory_xact_lock(?)", organizationAdmissionKey(orgID)).Scan(&locked).Error
+	return locked, err
+}
+
+// LockRunOrganizationTaskAdmission also covers automation callbacks that close
+// orders. Resolve without row locks, then lock the organization before the run.
+func LockRunOrganizationTaskAdmission(tx *gorm.DB, runID uuid.UUID) error {
+	var owner struct{ OrganizationID uuid.UUID }
+	err := tx.Table("workflow_runs AS r").Select("c.organization_id").
+		Joins("JOIN workflows c ON c.id = r.workflow_id").Where("r.id = ?", runID).Scan(&owner).Error
+	if err != nil || owner.OrganizationID == uuid.Nil {
+		return err
+	}
+	return LockOrganizationTaskAdmission(tx, owner.OrganizationID)
+}
+
+// LockTaskStatusExecutionAdmission locks before the execution row because this
+// action can close an order and remove its queued work.
+func LockTaskStatusExecutionAdmission(tx *gorm.DB, executionID uuid.UUID) error {
+	var owner struct{ OrganizationID uuid.UUID }
+	err := tx.Table("workflow_node_executions AS e").Select("c.organization_id").
+		Joins("JOIN workflows c ON c.id = e.workflow_id").
+		Joins("JOIN workflow_nodes n ON n.workflow_id = e.workflow_id AND n.node_id = e.node_id").
+		Where("e.id = ? AND n.ref->'component'->>'name' = ?", executionID, "updateWorkOrderStatus").Scan(&owner).Error
+	if err != nil || owner.OrganizationID == uuid.Nil {
+		return err
+	}
+	return LockOrganizationTaskAdmission(tx, owner.OrganizationID)
+}
+
+func ListQueuedTaskOrganizationIDs(tx *gorm.DB) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := tx.Model(&FactoryWorkOrderQueueItem{}).Distinct().Order("organization_id").Pluck("organization_id", &ids).Error
+	return ids, err
+}
+
+func organizationAtTaskCapacity(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	limit, err := ResolveOrganizationParallelTaskLimit(tx, orgID)
+	if err != nil || limit == nil {
+		return false, err
+	}
+	var active int64
+	err = tx.Model(&FactoryWorkOrderExecution{}).Where("organization_id = ?", orgID).
+		Where("status IN ?", []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning}).Count(&active).Error
+	return active >= int64(*limit), err
+}
+
+// AdmitQueuedForOrganization selects globally by enqueue time and ID, skipping
+// locally full steps. Results also include removed queue items for publication.
+// The organization lock remains outside candidate savepoints.
+func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineStepResult, error) {
+	if err := LockOrganizationTaskAdmission(tx, orgID); err != nil {
+		return nil, err
+	}
+	var items []FactoryWorkOrderQueueItem
+	if err := tx.Where("organization_id = ?", orgID).Order("created_at, id").Find(&items).Error; err != nil {
+		return nil, err
+	}
+	var admitted []*FactoryLineStepResult
+	for i := range items {
+		item := &items[i]
+		result, err := admitQueuedTask(tx, item)
+		if err != nil {
+			return nil, fmt.Errorf("organization %s queue item %s: %w", orgID, item.ID, err)
+		}
+		if result != nil {
+			admitted = append(admitted, result)
+		}
+	}
+	return admitted, nil
+}
+
+// A candidate load does not lock rows: the outer organization lock serializes
+// admission, replacement, and order closure. Missing work is stale, not retryable.
+func queuedTaskCandidate(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*FactoryWorkOrderLineDispatch, *FactoryWorkOrder, *FactoryLine, error) {
+	dispatch, err := FindWorkOrderLineDispatch(tx, item.LineDispatchID)
+	if errors.Is(err, ErrFactoryWorkOrderLineDispatchNotFound) {
+		return nil, nil, nil, nil
+	}
+	if err != nil || !dispatch.IsActive() {
+		return dispatch, nil, nil, err
+	}
+	workspace, err := FindFactory(tx, item.OrganizationID, item.FactoryID)
+	if errors.Is(err, ErrFactoryNotFound) {
+		return dispatch, nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	order, err := workspace.FindWorkOrder(tx, item.WorkOrderID)
+	if errors.Is(err, ErrFactoryWorkOrderNotFound) {
+		return dispatch, nil, nil, nil
+	}
+	if err != nil || !order.IsOpen() {
+		return dispatch, nil, nil, err
+	}
+	line, err := workspace.FindLine(tx, item.LineID)
+	if errors.Is(err, ErrFactoryLineNotFound) {
+		return dispatch, order, nil, nil
+	}
+	return dispatch, order, line, err
+}
+
+func admitQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*FactoryLineStepResult, error) {
+	dispatch, order, line, err := queuedTaskCandidate(tx, item)
+	if err != nil {
+		return nil, err
+	}
+	if dispatch == nil || order == nil || !dispatch.IsActive() {
+		return &FactoryLineStepResult{QueueItem: item}, discardQueuedTask(tx, item, dispatch, CanvasRunResultCancelled)
+	}
+	if line == nil {
+		return failQueuedTask(tx, item, dispatch, ErrFactoryLineNotFound)
+	}
+	if item.StepIndex < 0 || item.StepIndex >= len(dispatch.Steps) {
+		return failQueuedTask(tx, item, dispatch, fmt.Errorf("step index %d out of range", item.StepIndex))
+	}
+	active, err := countActiveFactoryStepExecutions(tx, item.LineID, item.StepIndex)
+	if err != nil {
+		return nil, err
+	}
+	if active >= int64(admissionStep(line, dispatch, item.StepIndex).EffectiveMaxParallelism()) {
+		return nil, nil
+	}
+	full, err := organizationAtTaskCapacity(tx, item.OrganizationID)
+	if err != nil || full {
+		return nil, err
+	}
+	var result *FactoryLineStepResult
+	// GORM creates a savepoint for this nested transaction. Run creation and
+	// deletion roll back together before an invalid candidate is cleaned up.
+	err = tx.Transaction(func(candidate *gorm.DB) error {
+		if err := item.Delete(candidate); err != nil {
+			return err
+		}
+		var err error
+		result, err = dispatch.StartStep(candidate, order, item.StepIndex)
+		return err
+	})
+	if errors.Is(err, errQueuedTaskUnstartable) {
+		return failQueuedTask(tx, item, dispatch, err)
+	}
+	return result, err
+}
+
+func failQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem, dispatch *FactoryWorkOrderLineDispatch, cause error) (*FactoryLineStepResult, error) {
+	log.WithError(cause).WithFields(log.Fields{"organization_id": item.OrganizationID, "queue_item_id": item.ID, "factory_id": item.FactoryID, "order_id": item.WorkOrderID}).Warn("Discarding unstartable queued task")
+	return &FactoryLineStepResult{QueueItem: item}, discardQueuedTask(tx, item, dispatch, CanvasRunResultFailed)
+}
+
+func discardQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem, dispatch *FactoryWorkOrderLineDispatch, result string) error {
+	if err := item.Delete(tx); err != nil {
+		return err
+	}
+	if dispatch == nil || !dispatch.IsActive() {
+		return nil
+	}
+	open, err := dispatch.HasOpenWork(tx)
+	if err != nil || open {
+		return err
+	}
+	return dispatch.Finish(tx, result)
+}
+
+func hasEligibleQueuedTask(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	var items []FactoryWorkOrderQueueItem
+	if err := tx.Where("organization_id = ?", orgID).Order("created_at, id").Find(&items).Error; err != nil {
+		return false, err
+	}
+	for i := range items {
+		dispatch, order, line, err := queuedTaskCandidate(tx, &items[i])
+		if err != nil {
+			return false, err
+		}
+		if dispatch == nil || order == nil || line == nil || items[i].StepIndex < 0 || items[i].StepIndex >= len(dispatch.Steps) {
+			continue
+		}
+		active, err := countActiveFactoryStepExecutions(tx, line.ID, items[i].StepIndex)
+		if err != nil {
+			return false, err
+		}
+		if active < int64(admissionStep(line, dispatch, items[i].StepIndex).EffectiveMaxParallelism()) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+var errQueuedTaskUnstartable = errors.New("queued task cannot start")
+
+func queuedTaskLookupError(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("%w: %w", errQueuedTaskUnstartable, err)
+	}
+	return err
+}
+
+func organizationAdmissionKey(orgID uuid.UUID) int64 {
+	sum := sha256.Sum256(append([]byte("organization-task-admission:"), orgID[:]...))
+	return int64(binary.BigEndian.Uint64(sum[:8]))
+}
