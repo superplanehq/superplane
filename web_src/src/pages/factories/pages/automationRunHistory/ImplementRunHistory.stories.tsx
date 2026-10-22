@@ -69,13 +69,11 @@ const handlers = [
     HttpResponse.json({
       organization: {
         metadata: { id: "storybook-org", name: "SuperPlane Prod" },
-        spec: { enabledExperimentalFeatures: ["factory_run_history"] },
+        spec: { enabledExperimentalFeatures: [] },
       },
     }),
   ),
-  http.get("/account/experimental-features", () =>
-    HttpResponse.json({ features: [{ id: "factory_run_history", label: "Factory Run History", released: false }] }),
-  ),
+  http.get("/account/experimental-features", () => HttpResponse.json({ features: [] })),
   http.get(`${api}/runs`, ({ request }) => runsPage(request)),
   http.get(`${api}/runs/:runId`, ({ params }) =>
     HttpResponse.json({ run: historyRuns.find((item) => item.id === params.runId) }),

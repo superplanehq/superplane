@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as FactoryIntakeDataModule from "@/hooks/useFactoryIntakeData";
@@ -59,7 +60,7 @@ vi.mock("@/hooks/useIntegrations", () => ({
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   ...unmockedSrc<typeof FactoryIntakeDataModule>("hooks/useFactoryIntakeData"),
-  useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
+  useUpdateFactoryIntake: () => useMutation({ mutationFn: updateIntake }),
   useDeleteFactoryIntake: () => ({ mutateAsync: deleteIntake, isPending: false, error: null }),
 }));
 
