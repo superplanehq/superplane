@@ -12,7 +12,7 @@ import {
   useAssignRole,
   useOrganizationInviteLink,
   useOrganizationRoles,
-  useOrganizationUsers,
+  useOrganizationMembers,
   useRemoveOrganizationSubject,
   useResetOrganizationInviteLink,
   useSetUserOwner,
@@ -43,7 +43,17 @@ export function Members({ organizationId }: MembersProps) {
   }>({ key: null, direction: "asc" });
   const [removalError, setRemovalError] = useState<string | null>(null);
 
-  const { data: users = [], isLoading: loadingMembers, error: usersError } = useOrganizationUsers(organizationId, true);
+  const {
+    users,
+    seatLimit,
+    isLoading: loadingMembers,
+    isFetching: refreshingMembers,
+    isSuccess: membersLoaded,
+    error: usersError,
+  } = useOrganizationMembers(organizationId);
+  const seatsFull = seatLimit != null && users.length >= seatLimit;
+  const capacityLoading = loadingMembers || refreshingMembers;
+  const sharingBlocked = capacityLoading || !membersLoaded || !!usersError || seatsFull;
   const {
     data: organizationRoles = [],
     isLoading: loadingRoles,
@@ -224,6 +234,7 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   const handleInviteLinkToggle = async (enabled: boolean) => {
+    if (enabled && sharingBlocked) return;
     try {
       await updateInviteLinkMutation.mutateAsync(enabled);
     } catch {
@@ -232,6 +243,7 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   const handleInviteLinkReset = async () => {
+    if (sharingBlocked) return;
     try {
       await resetInviteLinkMutation.mutateAsync();
       showSuccessToast("Invite link reset.");
@@ -241,7 +253,7 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   const handleCopyInviteLink = async () => {
-    if (!inviteLinkUrl) return;
+    if (!inviteLinkUrl || sharingBlocked) return;
 
     try {
       await navigator.clipboard.writeText(inviteLinkUrl);
@@ -283,7 +295,7 @@ export function Members({ organizationId }: MembersProps) {
                         type="button"
                         className="text-blue-600 hover:underline hover:text-blue-700 disabled:text-gray-400 dark:text-indigo-300 dark:hover:text-indigo-200 dark:disabled:text-gray-500"
                         onClick={handleInviteLinkReset}
-                        disabled={loadingInviteLink || inviteLinkBusy || !canManageInviteLink}
+                        disabled={loadingInviteLink || inviteLinkBusy || !canManageInviteLink || sharingBlocked}
                       >
                         generate a new link
                       </button>
@@ -296,7 +308,12 @@ export function Members({ organizationId }: MembersProps) {
                 <Switch
                   checked={inviteLinkEnabled}
                   onCheckedChange={handleInviteLinkToggle}
-                  disabled={loadingInviteLink || inviteLinkBusy || !canManageInviteLink}
+                  disabled={
+                    loadingInviteLink ||
+                    inviteLinkBusy ||
+                    !canManageInviteLink ||
+                    (!inviteLinkEnabled && sharingBlocked)
+                  }
                   aria-label="Toggle invite link"
                 />
               </div>
@@ -322,7 +339,9 @@ export function Members({ organizationId }: MembersProps) {
                 <Button
                   variant="outline"
                   onClick={handleCopyInviteLink}
-                  disabled={!inviteLinkUrl || loadingInviteLink || inviteLinkBusy || !canManageInviteLink}
+                  disabled={
+                    !inviteLinkUrl || loadingInviteLink || inviteLinkBusy || !canManageInviteLink || sharingBlocked
+                  }
                 >
                   <Icon name="copy" />
                   Copy link
@@ -344,7 +363,30 @@ export function Members({ organizationId }: MembersProps) {
       <div className={settingsTableCardClassName}>
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between mb-4">
-            <Text className="text-sm font-medium text-gray-600 dark:text-gray-300">Members ({members.length})</Text>
+            <div className="space-y-2" aria-live="polite">
+              <Text className="text-sm font-medium text-gray-600 dark:text-gray-300">Members ({members.length})</Text>
+              {capacityLoading ? (
+                <p>Loading seat usage...</p>
+              ) : usersError ? (
+                <p role="alert">Failed to load seat usage. Refresh the page to try again.</p>
+              ) : membersLoaded ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {seatLimit == null
+                      ? `${users.length} members · Unlimited seats`
+                      : `${users.length} of ${seatLimit} seats used`}
+                  </p>
+                  {seatsFull && (
+                    <div className="text-sm text-amber-700 dark:text-amber-400">
+                      <p className="font-medium">
+                        {users.length > seatLimit! ? "Seat limit exceeded." : "Seat limit reached."}
+                      </p>
+                      <p>An organization admin can remove members. Contact a site admin to increase the limit.</p>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
 

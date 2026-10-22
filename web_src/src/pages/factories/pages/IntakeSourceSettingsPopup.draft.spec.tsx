@@ -55,10 +55,9 @@ describe("IntakeSourceSettingsPopup draft", () => {
     expect(screen.queryByRole("button", { name: "Default task owner" })).not.toBeInTheDocument();
   });
   it("keeps the selected owner in the draft until Save", async () => {
-    queryClient.setQueryData(
-      ["organization", "users", "org-owner"],
-      [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
-    );
+    queryClient.setQueryData(["organization", "users", "org-owner"], {
+      users: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    });
     const onSave = vi.fn();
     render(popup(DEFAULT_GITHUB_INTAKE_SETTINGS, [], onSave, "org-owner"));
     const user = userEvent.setup();

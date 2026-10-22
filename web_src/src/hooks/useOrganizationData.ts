@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   usersListUsers,
   rolesListRoles,
@@ -61,8 +61,8 @@ export const useOrganization = (organizationId: string, enabled = true) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string, includeRoles = false, enabled = true) => {
-  return useQuery({
+const organizationUsersOptions = (organizationId: string, includeRoles = false, enabled = true) =>
+  queryOptions({
     queryKey: includeRoles
       ? [...organizationKeys.users(organizationId), includeRoles]
       : organizationKeys.users(organizationId),
@@ -76,12 +76,23 @@ export const useOrganizationUsers = (organizationId: string, includeRoles = fals
           },
         }),
       );
-      return response.data?.users || [];
+      if (!response.data) throw new Error("Failed to load members.");
+      return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!organizationId && enabled,
   });
+
+export const useOrganizationUsers = (organizationId: string, includeRoles = false, enabled = true) =>
+  useQuery({
+    ...organizationUsersOptions(organizationId, includeRoles, enabled),
+    select: (response) => response.users || [],
+  });
+
+export const useOrganizationMembers = (organizationId: string) => {
+  const query = useQuery({ ...organizationUsersOptions(organizationId, true), refetchOnWindowFocus: "always" });
+  return { ...query, users: query.data?.users || [], seatLimit: query.data?.seatLimit };
 };
 
 export const useOrganizationRoles = (organizationId: string) => {
