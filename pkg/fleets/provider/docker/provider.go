@@ -13,18 +13,20 @@ import (
 )
 
 const (
-	labelManaged       = "superplane.managed-runner"
-	labelFleetID       = "superplane.fleet-id"
-	labelRunnerID      = "superplane.runner-id"
-	labelRunnerVersion = "superplane.runner-version"
+	labelManaged        = "superplane.managed-runner"
+	labelFleetManagerID = "superplane.fleet-manager-id"
+	labelFleetID        = "superplane.fleet-id"
+	labelRunnerID       = "superplane.runner-id"
+	labelRunnerVersion  = "superplane.runner-version"
 )
 
 type Config struct {
-	Image        string
-	RunnerAPIURL string
-	Network      string
-	Volumes      []string
-	ExtraHosts   []string
+	FleetManagerID string
+	Image          string
+	RunnerAPIURL   string
+	Network        string
+	Volumes        []string
+	ExtraHosts     []string
 }
 
 type commandRunner interface {
@@ -52,6 +54,7 @@ func newProvider(
 	docker commandRunner,
 	log *slog.Logger,
 ) (*Provider, error) {
+	config.FleetManagerID = strings.TrimSpace(config.FleetManagerID)
 	config.Image = strings.TrimSpace(config.Image)
 	config.RunnerAPIURL = strings.TrimRight(
 		strings.TrimSpace(config.RunnerAPIURL),
@@ -60,6 +63,9 @@ func newProvider(
 	config.Network = strings.TrimSpace(config.Network)
 	config.Volumes = nonEmpty(config.Volumes)
 	config.ExtraHosts = nonEmpty(config.ExtraHosts)
+	if config.FleetManagerID == "" {
+		return nil, fmt.Errorf("Fleet Manager ID is required")
+	}
 	if config.Image == "" {
 		return nil, fmt.Errorf("Docker runner image is required")
 	}
@@ -91,6 +97,7 @@ func (p *Provider) List(
 		"ps",
 		"-a",
 		"--filter", "label="+labelManaged+"=true",
+		"--filter", "label="+labelFleetManagerID+"="+p.config.FleetManagerID,
 		"--filter", "label="+labelFleetID+"="+fleetID,
 		"--format", format,
 	)
@@ -165,6 +172,7 @@ func (p *Provider) Create(
 		"run", "-d",
 		"--name", name,
 		"--label", labelManaged + "=true",
+		"--label", labelFleetManagerID + "=" + p.config.FleetManagerID,
 		"--label", labelFleetID + "=" + request.FleetID,
 		"--label", labelRunnerID + "=" + request.RunnerID,
 		"--label", labelRunnerVersion + "=" + request.RunnerVersion,
