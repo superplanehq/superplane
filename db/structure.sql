@@ -4268,6 +4268,13 @@ CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (c
 
 
 --
+-- Name: idx_workflow_runs_parent_execution; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_parent_execution ON public.workflow_runs USING btree (parent_workflow_id, parent_execution_id) WHERE (parent_execution_id IS NOT NULL);
+
+
+--
 -- Name: idx_workflow_runs_parent_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5979,7 +5986,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261022013100	f
+20261022121656	f
 \.
 
 
