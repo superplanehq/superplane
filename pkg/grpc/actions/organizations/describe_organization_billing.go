@@ -40,6 +40,10 @@ func DescribeOrganizationBilling(
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
 	return &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
+		PlanName:                    plan.Catalog.Name,
+		PlanCategory:                plan.Catalog.Category,
+		PlanPriceCents:              plan.Catalog.PriceCents,
+		PlanPerSeat:                 plan.Catalog.PerSeat,
 		PlanSource:                  plan.PlanSource,
 		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
 		TrialEndsAt:                 protoTimestamp(plan.TrialEndsAt),
