@@ -1,5 +1,4 @@
 import { Link } from "@/components/Link/link";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
@@ -24,26 +23,6 @@ import {
   type DiscussionBotMode,
 } from "./useDiscussionPRFeedbackSetup";
 import { StatusCheckPicker } from "./StatusCheckPicker";
-
-export function PRFeedbackHealthSection({ healthy, checks }: { healthy: boolean; checks: boolean }) {
-  const helper = healthy
-    ? checks
-      ? PR_FEEDBACK_SETTINGS_COPY.healthChecksReadyHelper
-      : PR_FEEDBACK_SETTINGS_COPY.healthReadyHelper
-    : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepairHelper;
-
-  return (
-    <section>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">Health</h3>
-        <Badge variant="outline" data-testid="pr-feedback-health">
-          {healthy ? PR_FEEDBACK_SETTINGS_COPY.healthReady : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepair}
-        </Badge>
-      </div>
-      <p className="workspace-body-text mt-1 text-muted-foreground">{helper}</p>
-    </section>
-  );
-}
 
 export function PRFeedbackTextField({
   id,
