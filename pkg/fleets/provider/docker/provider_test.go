@@ -40,16 +40,17 @@ func (f *fakeCommandRunner) Run(
 func TestProviderLifecycle(t *testing.T) {
 	commands := &fakeCommandRunner{
 		outputs: [][]byte{
-			[]byte("container-1\trunner-1\te1-large-amd64\trunning\n"),
+			[]byte("container-1\trunner-1\te1-large-amd64\trunning\tcoolify\n"),
 			[]byte("container-2\n"),
 			nil,
 		},
 	}
 	p, err := newProvider(Config{
-		Image:        "runner:dev",
-		RunnerAPIURL: "http://app:8000",
-		Network:      "superplane_default",
-		Volumes:      []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		FleetManagerID: "coolify",
+		Image:          "runner:dev",
+		RunnerAPIURL:   "http://app:8000",
+		Network:        "superplane_default",
+		Volumes:        []string{"/var/run/docker.sock:/var/run/docker.sock"},
 	}, commands, slog.Default())
 	if err != nil {
 		t.Fatal(err)
@@ -61,6 +62,19 @@ func TestProviderLifecycle(t *testing.T) {
 	}
 	if len(resources) != 1 || resources[0].RunnerID != "runner-1" {
 		t.Fatalf("resources = %#v", resources)
+	}
+	listArgs := strings.Join(commands.calls[0].args, " ")
+	for _, expected := range []string{
+		"label=superplane.managed-runner=true",
+		"label=superplane.fleet-id=e1-large-amd64",
+		"network=superplane_default",
+	} {
+		if !strings.Contains(listArgs, expected) {
+			t.Fatalf("list args %q do not contain %q", listArgs, expected)
+		}
+	}
+	if strings.Contains(listArgs, "label=superplane.fleet-manager-id=") {
+		t.Fatalf("list args %q must not filter fleet-manager-id", listArgs)
 	}
 
 	encoded, err := p.BuildBootstrap(provider.RunnerBootstrap{
@@ -86,6 +100,7 @@ func TestProviderLifecycle(t *testing.T) {
 	createArgs := strings.Join(commands.calls[1].args, " ")
 	for _, expected := range []string{
 		"--network superplane_default",
+		"--label superplane.fleet-manager-id=coolify",
 		"runner:dev",
 		"--url http://app:8000",
 		"--registration-token one-time-token",
@@ -112,12 +127,57 @@ func TestProviderReportsDockerErrors(t *testing.T) {
 		outputs: [][]byte{[]byte("daemon unavailable")},
 		errors:  []error{errors.New("exit status 1")},
 	}
-	p, err := newProvider(Config{Image: "runner:dev"}, commands, nil)
+	p, err := newProvider(Config{
+		FleetManagerID: "coolify",
+		Image:          "runner:dev",
+	}, commands, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := p.List(context.Background(), "fleet"); err == nil ||
 		!strings.Contains(err.Error(), "daemon unavailable") {
 		t.Fatalf("List error = %v", err)
+	}
+	listArgs := strings.Join(commands.calls[0].args, " ")
+	if !strings.Contains(listArgs, "label=superplane.fleet-manager-id=coolify") {
+		t.Fatalf("list args %q must filter fleet-manager-id without a network", listArgs)
+	}
+}
+
+func TestListAdoptsUnlabeledRunnersOnThisNetwork(t *testing.T) {
+	commands := &fakeCommandRunner{
+		outputs: [][]byte{
+			[]byte(strings.Join([]string{
+				"ours\trunner-ours\te1-large-amd64\trunning\tcoolify",
+				"legacy\trunner-legacy\te1-large-amd64\texited\t",
+				"other\trunner-other\te1-large-amd64\trunning\tlocal",
+			}, "\n") + "\n"),
+		},
+	}
+	p, err := newProvider(Config{
+		FleetManagerID: "coolify",
+		Image:          "runner:dev",
+		Network:        "coolify_runners",
+	}, commands, slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resources, err := p.List(context.Background(), "e1-large-amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resources) != 2 {
+		t.Fatalf("resources = %#v", resources)
+	}
+	if resources[0].RunnerID != "runner-ours" || resources[1].RunnerID != "runner-legacy" {
+		t.Fatalf("resources = %#v", resources)
+	}
+}
+
+func TestNewRequiresFleetManagerID(t *testing.T) {
+	if _, err := newProvider(Config{Image: "runner:dev"}, &fakeCommandRunner{}, nil); err == nil ||
+		!strings.Contains(err.Error(), "Fleet Manager ID is required") {
+		t.Fatalf("New error = %v", err)
 	}
 }
