@@ -237,7 +237,7 @@ function renderAutomationPopup(props: { canvasId?: string } = {}) {
   );
 }
 
-function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, showVisualEvidenceSetting: boolean) {
+function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -249,7 +249,6 @@ function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, showVisualE
             draft: PLANNING_REVIEW_DRAFT,
             organizationId: "org-1",
             onSave: vi.fn(),
-            showVisualEvidenceSetting,
           }}
           onSave={vi.fn()}
           onClose={vi.fn()}
@@ -515,19 +514,28 @@ describe("PRFeedbackSettingsPopup automation", () => {
   });
 
   it("puts Agent between General and Runs when the canvas has an agent", () => {
-    renderAgentSettingsPopup(discussionDraft(), true);
+    renderAgentSettingsPopup(discussionDraft());
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Runs"]);
 
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
+    expect(screen.getByText("Concurrency")).toBeInTheDocument();
+    expect(screen.getByText("Model")).toBeInTheDocument();
+    expect(screen.getByText("Steps")).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
-    expect(screen.getByRole("switch", { name: "Include visual evidence" })).not.toBeChecked();
+    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Include visual evidence")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
   });
 
-  it("hides visual evidence for check-repair agents", () => {
-    renderAgentSettingsPopup(checksDraft(), false);
+  it("keeps visual evidence hidden for check-repair agents", () => {
+    renderAgentSettingsPopup(checksDraft());
 
     expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Include visual evidence")).not.toBeInTheDocument();
+    expect(screen.getByText("Concurrency")).toBeInTheDocument();
+    expect(screen.getByText("Model")).toBeInTheDocument();
+    expect(screen.getByText("Steps")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
   });
 });
