@@ -272,7 +272,7 @@ export function FirstRunBillingScreen({
             onSelect={() => selectPlan(option)}
           />
         ))}
-        {needsCard && <BillingCardSetup setup={cardSetup} disabled={busy} />}
+        {needsCard && <BillingCardSetup setup={cardSetup} />}
         <LoadingButton
           type="button"
           className="w-full"

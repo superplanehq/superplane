@@ -6,7 +6,6 @@ import { useBillingCardSetup } from "@/hooks/useBillingCardSetup";
 import { organizationBillingQueryKey, useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { BillingCardSetup } from "./BillingCardSetup";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
 import { formatUsdCents } from "../../lib/workOrderUsage";
 
@@ -48,6 +47,8 @@ export function BillingPaymentSettings({
   const plans = billing.availablePlans ?? [];
   const subscriptionActive = billing.planSource === "polar" && billing.creditPurchaseAllowed;
   const manageInPortal = subscriptionActive || billing.hasPaymentMethod;
+  const busy = action.isPending || cardSetup.isPending;
+  const cardRequiredPlan = plans.some((plan) => plan.requirePaymentMethod && !plan.subscriptionRequired);
   return (
     <FactorySettingsCard title="Payment method">
       <p>{billing.hasPaymentMethod ? "A saved card is available." : "No saved card is available."}</p>
@@ -56,10 +57,14 @@ export function BillingPaymentSettings({
       )}
       {canManageBilling ? (
         <div className="mt-3 space-y-3">
-          {!manageInPortal && <BillingCardSetup setup={cardSetup} disabled={action.isPending} />}
+          {!manageInPortal && !cardRequiredPlan && (
+            <Button disabled={busy} onClick={() => cardSetup.open()}>
+              Add payment method
+            </Button>
+          )}
           <div className="flex flex-wrap gap-2">
             {manageInPortal && (
-              <Button disabled={action.isPending} onClick={() => action.mutate(undefined)}>
+              <Button disabled={busy} onClick={() => action.mutate(undefined)}>
                 {subscriptionActive ? "Manage subscription and card" : "Manage payment method"}
               </Button>
             )}
@@ -76,14 +81,25 @@ export function BillingPaymentSettings({
                     {plan.perSeat && " per seat"}
                     {plan.requirePaymentMethod && " · Card required"}
                   </p>
-                  {needsCard && <p className="text-sm">Add a payment method before selecting this plan.</p>}
+                  {needsCard && (
+                    <p className="text-sm text-muted-foreground">
+                      Save a card in the Polar popup to activate this plan. No subscription required.
+                    </p>
+                  )}
                 </div>
                 <Button
                   variant="outline"
-                  disabled={current || needsCard || action.isPending || subscriptionActive}
-                  onClick={() => action.mutate(plan.key)}
+                  disabled={(current && !needsCard) || busy || subscriptionActive}
+                  onClick={() => {
+                    setError("");
+                    if (needsCard) {
+                      cardSetup.open(() => action.mutate(plan.key));
+                      return;
+                    }
+                    action.mutate(plan.key);
+                  }}
                 >
-                  {current
+                  {current && !needsCard
                     ? "Current plan"
                     : plan.subscriptionRequired
                       ? `Subscribe to ${plan.name}`
@@ -92,16 +108,7 @@ export function BillingPaymentSettings({
               </div>
             );
           })}
-          {subscriptionActive && (
-            <p className="text-sm text-muted-foreground">
-              Manage your existing subscription in the billing portal to change plans.
-            </p>
-          )}
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
+          <BillingPaymentFeedback setup={cardSetup} error={error} subscriptionActive={Boolean(subscriptionActive)} />
         </div>
       ) : (
         <p className="mt-2 text-sm text-muted-foreground">
@@ -109,5 +116,32 @@ export function BillingPaymentSettings({
         </p>
       )}
     </FactorySettingsCard>
+  );
+}
+
+function BillingPaymentFeedback({
+  setup,
+  error,
+  subscriptionActive,
+}: {
+  setup: ReturnType<typeof useBillingCardSetup>;
+  error: string;
+  subscriptionActive: boolean;
+}) {
+  const message = error || setup.error;
+  return (
+    <>
+      {subscriptionActive && (
+        <p className="text-sm text-muted-foreground">
+          Manage your existing subscription in the billing portal to change plans.
+        </p>
+      )}
+      {setup.isPending && <p role="status">{setup.opening ? "Opening card setup…" : "Waiting for your saved card…"}</p>}
+      {message && (
+        <p role="alert" className="text-sm text-destructive">
+          {message}
+        </p>
+      )}
+    </>
   );
 }
