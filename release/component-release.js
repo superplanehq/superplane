@@ -117,10 +117,21 @@ function isPrerelease(version) {
 }
 
 function sha256File(filePath) {
-  return crypto
-    .createHash("sha256")
-    .update(fs.readFileSync(filePath))
-    .digest("hex");
+  const hash = crypto.createHash("sha256");
+  const file = fs.openSync(filePath, "r");
+  const chunk = Buffer.alloc(8 * 1024 * 1024);
+  try {
+    let bytesRead = 0;
+    do {
+      bytesRead = fs.readSync(file, chunk, 0, chunk.length, null);
+      if (bytesRead > 0) {
+        hash.update(chunk.subarray(0, bytesRead));
+      }
+    } while (bytesRead > 0);
+  } finally {
+    fs.closeSync(file);
+  }
+  return hash.digest("hex");
 }
 
 function releaseNotesMetadata(version, directory) {
