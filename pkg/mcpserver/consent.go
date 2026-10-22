@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -14,16 +15,30 @@ import (
 	"gorm.io/gorm"
 )
 
+type OrganizationOption struct {
+	OrganizationID string
+	Name           string
+}
+
 type WorkspaceOption struct {
 	FactoryID string
 	Label     string
 }
 
-type consentPageData struct {
-	ClientName string
-	Consent    string
-	Workspaces []WorkspaceOption
-	Error      string
+// ConsentView is the data for one step of the consent page. The page shows the
+// workspace step when Organization is set. Otherwise it shows the organization
+// step.
+type ConsentView struct {
+	ClientName    string
+	ConsentToken  string
+	Error         string
+	Organizations []OrganizationOption
+	Organization  *OrganizationOption
+	Workspaces    []WorkspaceOption
+}
+
+func (v ConsentView) CanChangeOrganization() bool {
+	return len(v.Organizations) > 1
 }
 
 var consentPage = template.Must(template.New("mcp-consent").Parse(`<!DOCTYPE html>
@@ -135,6 +150,39 @@ var consentPage = template.Must(template.New("mcp-consent").Parse(`<!DOCTYPE htm
       line-height: var(--workspace-label-line-height);
       text-transform: uppercase;
     }
+    fieldset {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      min-width: 0;
+    }
+    legend {
+      padding: 0;
+      color: var(--muted-foreground);
+      font-size: var(--workspace-label-size);
+      font-weight: 500;
+      letter-spacing: var(--workspace-label-tracking);
+      line-height: var(--workspace-label-line-height);
+      text-transform: uppercase;
+    }
+    label.option {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      margin-top: 0.375rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--field);
+      color: var(--foreground);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+      font-size: var(--workspace-body-size);
+      font-weight: 400;
+      letter-spacing: normal;
+      line-height: var(--workspace-body-line-height);
+      text-transform: none;
+      cursor: pointer;
+    }
+    label.option input { margin: 0; }
     select {
       display: block;
       width: 100%;
@@ -168,6 +216,12 @@ var consentPage = template.Must(template.New("mcp-consent").Parse(`<!DOCTYPE htm
       cursor: pointer;
     }
     button:hover { opacity: 0.92; }
+    button.secondary {
+      margin-top: 0.5rem;
+      background: transparent;
+      color: var(--foreground);
+      border: 1px solid var(--border);
+    }
     .empty {
       margin: 1.5rem 0 0;
       color: var(--muted-foreground);
@@ -185,39 +239,56 @@ var consentPage = template.Must(template.New("mcp-consent").Parse(`<!DOCTYPE htm
       <span class="brand-name">SuperPlane</span>
     </div>
     <h1>Allow access to SuperPlane</h1>
-    <p class="lead">Choose the workspace {{.ClientName}} can use. The token applies to that workspace only.</p>
+    {{if .Organization}}
+    <p class="lead">Select the workspaces that {{.ClientName}} can use in {{.Organization.Name}}. {{.ClientName}} can do only what you can do in these workspaces.</p>
+    {{else}}
+    <p class="lead">Choose the organization that {{.ClientName}} can use. In the next step, you select the workspaces.</p>
+    {{end}}
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-    {{if .Workspaces}}
+    {{if .Organization}}
     <form method="post" action="/oauth/authorize">
-      <input type="hidden" name="consent" value="{{.Consent}}">
-      <label for="factory_id">Workspace</label>
-      <select id="factory_id" name="factory_id" required>
+      <input type="hidden" name="consent" value="{{.ConsentToken}}">
+      <input type="hidden" name="organization_id" value="{{.Organization.OrganizationID}}">
+      {{if .Workspaces}}
+      <fieldset>
+        <legend>Workspaces in {{.Organization.Name}}</legend>
         {{range .Workspaces}}
-        <option value="{{.FactoryID}}">{{.Label}}</option>
+        <label class="option"><input type="checkbox" name="factory_id" value="{{.FactoryID}}"> {{.Label}}</label>
+        {{end}}
+      </fieldset>
+      <button type="submit">Allow access</button>
+      {{else}}
+      <p class="empty">This organization has no workspace that this application can use.</p>
+      {{end}}
+      {{if .CanChangeOrganization}}
+      <button type="submit" name="step" value="organizations" formnovalidate class="secondary">Change organization</button>
+      {{end}}
+    </form>
+    {{else if .Organizations}}
+    <form method="post" action="/oauth/authorize">
+      <input type="hidden" name="consent" value="{{.ConsentToken}}">
+      <input type="hidden" name="step" value="organization">
+      <label for="organization_id">Organization</label>
+      <select id="organization_id" name="organization_id" required>
+        {{range .Organizations}}
+        <option value="{{.OrganizationID}}">{{.Name}}</option>
         {{end}}
       </select>
-      <button type="submit">Allow access</button>
+      <button type="submit">Choose workspaces</button>
     </form>
     {{else}}
-    <p class="empty">This account has no workspace that this application can use.</p>
+    <p class="empty">This account has no organization that this application can use.</p>
     {{end}}
   </main>
 </body>
 </html>`))
 
-func RenderConsentPage(clientName, consentToken, errMessage string, workspaces []WorkspaceOption) ([]byte, error) {
-	name := strings.TrimSpace(clientName)
-	if name == "" {
-		name = "this application"
+func RenderConsentPage(view ConsentView) ([]byte, error) {
+	if strings.TrimSpace(view.ClientName) == "" {
+		view.ClientName = "this application"
 	}
 	var buf bytes.Buffer
-	err := consentPage.Execute(&buf, consentPageData{
-		ClientName: name,
-		Consent:    consentToken,
-		Workspaces: workspaces,
-		Error:      errMessage,
-	})
-	if err != nil {
+	if err := consentPage.Execute(&buf, view); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -245,53 +316,130 @@ func UserAccountBlocked(tx *gorm.DB, userID uuid.UUID) bool {
 	return account.IsBlocked()
 }
 
-func ListConsentWorkspaces(ctx context.Context, account *models.Account) ([]WorkspaceOption, error) {
+// NewConsentView builds the consent step for an account. It shows the
+// workspace step when selectedOrganizationID names a qualifying organization.
+// It also shows that step when only one organization qualifies, because there
+// is nothing to choose. Otherwise it shows the organization step.
+func NewConsentView(ctx context.Context, account *models.Account, selectedOrganizationID string) (ConsentView, error) {
+	organizations, err := ListConsentOrganizations(ctx, account)
+	if err != nil {
+		return ConsentView{}, err
+	}
+	view := ConsentView{Organizations: organizations}
+
+	selected := selectOrganization(organizations, selectedOrganizationID)
+	if selected == nil {
+		return view, nil
+	}
+	workspaces, err := ListConsentWorkspaces(ctx, account, selected.OrganizationID)
+	if err != nil {
+		return ConsentView{}, err
+	}
+	view.Organization = selected
+	view.Workspaces = workspaces
+	return view, nil
+}
+
+func selectOrganization(organizations []OrganizationOption, organizationID string) *OrganizationOption {
+	organizationID = strings.TrimSpace(organizationID)
+	for i := range organizations {
+		if organizations[i].OrganizationID == organizationID {
+			return &organizations[i]
+		}
+	}
+	if len(organizations) == 1 {
+		return &organizations[0]
+	}
+	return nil
+}
+
+// ListConsentOrganizations lists the organizations where the account is an
+// active human member and both MCP and workspaces are enabled.
+func ListConsentOrganizations(ctx context.Context, account *models.Account) ([]OrganizationOption, error) {
 	organizations, err := models.FindOrganizationsForAccount(account.Email)
 	if err != nil {
 		return nil, err
 	}
 	db := database.DB(ctx)
-	options := make([]WorkspaceOption, 0)
+	options := make([]OrganizationOption, 0, len(organizations))
 	for _, organization := range organizations {
-		_, err := models.FindActiveHumanUserByAccountAndOrganization(db, organization.ID, account.ID)
-		if err != nil {
+		if _, err := findConsentUser(db, account, organization.ID); err != nil {
 			continue
 		}
-		if !OrganizationAllowsPublicMCP(organization.ID) {
-			continue
-		}
-		if !organizationAllowsFactories(organization.ID) {
-			continue
-		}
-		listed, err := models.ListFactories(db, organization.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, factory := range listed {
-			options = append(options, WorkspaceOption{
-				FactoryID: factory.ID.String(),
-				Label:     strings.TrimSpace(organization.Name) + " / " + strings.TrimSpace(factory.Name),
-			})
-		}
+		options = append(options, OrganizationOption{
+			OrganizationID: organization.ID.String(),
+			Name:           strings.TrimSpace(organization.Name),
+		})
 	}
 	return options, nil
 }
 
-func ResolveConsentWorkspace(ctx context.Context, account *models.Account, factoryID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
-	id, err := uuid.Parse(strings.TrimSpace(factoryID))
+// ListConsentWorkspaces lists the workspaces of one organization that the
+// account can grant. It returns none when the organization does not qualify.
+func ListConsentWorkspaces(ctx context.Context, account *models.Account, organizationID string) ([]WorkspaceOption, error) {
+	orgID, err := uuid.Parse(strings.TrimSpace(organizationID))
 	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, fmt.Errorf("workspace is required")
+		return nil, fmt.Errorf("organization is required")
 	}
-	factoryModel, err := models.FindFactoryByID(database.DB(ctx), id)
+	db := database.DB(ctx)
+	if _, err := findConsentUser(db, account, orgID); err != nil {
+		return []WorkspaceOption{}, nil
+	}
+	listed, err := models.ListFactories(db, orgID)
 	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, err
+		return nil, err
 	}
-	if !OrganizationAllowsPublicMCP(factoryModel.OrganizationID) || !organizationAllowsFactories(factoryModel.OrganizationID) {
-		return uuid.Nil, uuid.Nil, uuid.Nil, fmt.Errorf("workspace is required")
+	options := make([]WorkspaceOption, 0, len(listed))
+	for _, factory := range listed {
+		options = append(options, WorkspaceOption{
+			FactoryID: factory.ID.String(),
+			Label:     strings.TrimSpace(factory.Name),
+		})
 	}
-	user, err := models.FindActiveHumanUserByAccountAndOrganization(database.DB(ctx), factoryModel.OrganizationID, account.ID)
+	return options, nil
+}
+
+// ResolveConsentGrant validates a consent choice. It returns the account's user
+// in the organization, the organization, and the unique workspaces chosen.
+func ResolveConsentGrant(
+	ctx context.Context,
+	account *models.Account,
+	organizationID string,
+	factoryIDs []string,
+) (uuid.UUID, uuid.UUID, []uuid.UUID, error) {
+	orgID, err := uuid.Parse(strings.TrimSpace(organizationID))
 	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, err
+		return uuid.Nil, uuid.Nil, nil, fmt.Errorf("organization is required")
 	}
-	return user.ID, factoryModel.OrganizationID, factoryModel.ID, nil
+	if len(factoryIDs) == 0 {
+		return uuid.Nil, uuid.Nil, nil, fmt.Errorf("workspace is required")
+	}
+	db := database.DB(ctx)
+	user, err := findConsentUser(db, account, orgID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, nil, err
+	}
+
+	granted := make([]uuid.UUID, 0, len(factoryIDs))
+	for _, raw := range factoryIDs {
+		id, err := uuid.Parse(strings.TrimSpace(raw))
+		if err != nil {
+			return uuid.Nil, uuid.Nil, nil, fmt.Errorf("workspace is required")
+		}
+		if slices.Contains(granted, id) {
+			continue
+		}
+		if _, err := models.FindFactory(db, orgID, id); err != nil {
+			return uuid.Nil, uuid.Nil, nil, err
+		}
+		granted = append(granted, id)
+	}
+	return user.ID, orgID, granted, nil
+}
+
+func findConsentUser(db *gorm.DB, account *models.Account, orgID uuid.UUID) (*models.User, error) {
+	if !OrganizationAllowsPublicMCP(orgID) || !organizationAllowsFactories(orgID) {
+		return nil, fmt.Errorf("organization is not available")
+	}
+	return models.FindActiveHumanUserByAccountAndOrganization(db, orgID, account.ID)
 }

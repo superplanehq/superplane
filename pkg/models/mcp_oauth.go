@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -25,10 +26,6 @@ type MCPOAuthClient struct {
 	CreatedAt    time.Time
 }
 
-func (MCPOAuthClient) TableName() string {
-	return "mcp_oauth_clients"
-}
-
 type MCPOAuthCode struct {
 	ID                  uuid.UUID
 	CodeHash            string
@@ -39,14 +36,10 @@ type MCPOAuthCode struct {
 	CodeChallengeMethod string
 	UserID              uuid.UUID
 	OrganizationID      uuid.UUID
-	FactoryID           uuid.UUID
+	FactoryIDs          datatypes.JSONSlice[string]
 	Scopes              datatypes.JSONSlice[string]
 	ExpiresAt           time.Time
 	CreatedAt           time.Time
-}
-
-func (MCPOAuthCode) TableName() string {
-	return "mcp_oauth_codes"
 }
 
 type MCPOAuthRefreshToken struct {
@@ -55,15 +48,40 @@ type MCPOAuthRefreshToken struct {
 	ClientID       string
 	UserID         uuid.UUID
 	OrganizationID uuid.UUID
-	FactoryID      uuid.UUID
+	FactoryIDs     datatypes.JSONSlice[string]
 	Resource       string
 	Scopes         datatypes.JSONSlice[string]
 	ExpiresAt      time.Time
 	CreatedAt      time.Time
 }
 
+// NewMCPOAuthFactoryIDs returns the stored form of a workspace list.
+func NewMCPOAuthFactoryIDs(ids []uuid.UUID) datatypes.JSONSlice[string] {
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, id.String())
+	}
+	return datatypes.NewJSONSlice(out)
+}
+
+func (MCPOAuthClient) TableName() string {
+	return "mcp_oauth_clients"
+}
+
+func (MCPOAuthCode) TableName() string {
+	return "mcp_oauth_codes"
+}
+
+func (c *MCPOAuthCode) FactoryUUIDs() []uuid.UUID {
+	return parseMCPFactoryIDs(c.FactoryIDs)
+}
+
 func (MCPOAuthRefreshToken) TableName() string {
 	return "mcp_oauth_refresh_tokens"
+}
+
+func (t *MCPOAuthRefreshToken) FactoryUUIDs() []uuid.UUID {
+	return parseMCPFactoryIDs(t.FactoryIDs)
 }
 
 func CreateMCPOAuthClient(tx *gorm.DB, clientID, clientName string, redirectURIs []string) (*MCPOAuthClient, error) {
@@ -152,7 +170,7 @@ func DeleteMCPOAuthRefreshToken(tx *gorm.DB, token *MCPOAuthRefreshToken) error 
 func ListMCPOAuthRefreshTokensForFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID, now time.Time) ([]MCPOAuthRefreshToken, error) {
 	var tokens []MCPOAuthRefreshToken
 	err := tx.
-		Where("organization_id = ? AND factory_id = ? AND expires_at > ?", organizationID, factoryID, now).
+		Where("organization_id = ? AND factory_ids @> jsonb_build_array(?::text) AND expires_at > ?", organizationID, factoryID.String(), now).
 		Order("created_at DESC").
 		Find(&tokens).Error
 	if err != nil {
@@ -164,7 +182,7 @@ func ListMCPOAuthRefreshTokensForFactory(tx *gorm.DB, organizationID, factoryID 
 func FindMCPOAuthRefreshTokenForFactory(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (*MCPOAuthRefreshToken, error) {
 	var token MCPOAuthRefreshToken
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("id = ? AND organization_id = ? AND factory_id = ?", id, organizationID, factoryID).
+		Where("id = ? AND organization_id = ? AND factory_ids @> jsonb_build_array(?::text)", id, organizationID, factoryID.String()).
 		First(&token).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrMCPOAuthRefreshNotFound
@@ -175,25 +193,33 @@ func FindMCPOAuthRefreshTokenForFactory(tx *gorm.DB, organizationID, factoryID, 
 	return &token, nil
 }
 
+// HasMCPOAuthRefreshTokenForClient reports whether one live refresh token of the
+// client covers every listed workspace.
 func HasMCPOAuthRefreshTokenForClient(
 	tx *gorm.DB,
-	organizationID, factoryID, userID uuid.UUID,
+	organizationID uuid.UUID,
+	factoryIDs []uuid.UUID,
+	userID uuid.UUID,
 	clientID string,
 	now time.Time,
 ) (bool, error) {
 	clientID = strings.TrimSpace(clientID)
-	if clientID == "" {
+	if clientID == "" || len(factoryIDs) == 0 {
 		return false, nil
 	}
+	required, err := json.Marshal(NewMCPOAuthFactoryIDs(factoryIDs))
+	if err != nil {
+		return false, err
+	}
 	var count int64
-	err := tx.Model(&MCPOAuthRefreshToken{}).
+	err = tx.Model(&MCPOAuthRefreshToken{}).
 		Where(
-			"organization_id = ? AND factory_id = ? AND user_id = ? AND client_id = ? AND expires_at > ?",
+			"organization_id = ? AND user_id = ? AND client_id = ? AND expires_at > ? AND factory_ids @> ?::jsonb",
 			organizationID,
-			factoryID,
 			userID,
 			clientID,
 			now,
+			string(required),
 		).
 		Count(&count).Error
 	if err != nil {
@@ -202,7 +228,10 @@ func HasMCPOAuthRefreshTokenForClient(
 	return count > 0, nil
 }
 
-func DeleteMCPOAuthRefreshTokensForClient(
+// RemoveFactoryFromMCPOAuthGrant removes one workspace from every refresh token
+// and pending code of a client for a user. A row left with no workspace is
+// deleted, so the connection ends when its last workspace is removed.
+func RemoveFactoryFromMCPOAuthGrant(
 	tx *gorm.DB,
 	organizationID, factoryID, userID uuid.UUID,
 	clientID string,
@@ -211,35 +240,41 @@ func DeleteMCPOAuthRefreshTokensForClient(
 	if clientID == "" {
 		return nil
 	}
-	return tx.
-		Where(
-			"organization_id = ? AND factory_id = ? AND user_id = ? AND client_id = ?",
-			organizationID,
-			factoryID,
-			userID,
-			clientID,
-		).
-		Delete(&MCPOAuthRefreshToken{}).Error
+	for _, table := range []any{&MCPOAuthRefreshToken{}, &MCPOAuthCode{}} {
+		err := removeFactoryFromGrantRows(tx, table, organizationID, factoryID, userID, clientID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func DeleteMCPOAuthCodesForClient(
+func removeFactoryFromGrantRows(
 	tx *gorm.DB,
+	table any,
 	organizationID, factoryID, userID uuid.UUID,
 	clientID string,
 ) error {
-	clientID = strings.TrimSpace(clientID)
-	if clientID == "" {
-		return nil
+	err := tx.Model(table).
+		Where(
+			"organization_id = ? AND user_id = ? AND client_id = ? AND factory_ids @> jsonb_build_array(?::text)",
+			organizationID,
+			userID,
+			clientID,
+			factoryID.String(),
+		).
+		UpdateColumn("factory_ids", gorm.Expr("factory_ids - ?::text", factoryID.String())).Error
+	if err != nil {
+		return err
 	}
 	return tx.
 		Where(
-			"organization_id = ? AND factory_id = ? AND user_id = ? AND client_id = ?",
+			"organization_id = ? AND user_id = ? AND client_id = ? AND jsonb_array_length(factory_ids) = 0",
 			organizationID,
-			factoryID,
 			userID,
 			clientID,
 		).
-		Delete(&MCPOAuthCode{}).Error
+		Delete(table).Error
 }
 
 func ListMCPOAuthClientsByClientIDs(tx *gorm.DB, clientIDs []string) ([]MCPOAuthClient, error) {
@@ -252,4 +287,16 @@ func ListMCPOAuthClientsByClientIDs(tx *gorm.DB, clientIDs []string) ([]MCPOAuth
 		return nil, err
 	}
 	return clients, nil
+}
+
+func parseMCPFactoryIDs(raw []string) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(raw))
+	for _, value := range raw {
+		id, err := uuid.Parse(value)
+		if err != nil || id == uuid.Nil {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids
 }

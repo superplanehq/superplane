@@ -18,7 +18,15 @@ import (
 
 const testPKCEVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 
-func insertAuthCode(t *testing.T, r *support.ResourceRegistry, resource string) string {
+// grantedFactoryIDs defaults a test grant to one random workspace.
+func grantedFactoryIDs(factoryIDs []uuid.UUID) []uuid.UUID {
+	if len(factoryIDs) == 0 {
+		return []uuid.UUID{uuid.New()}
+	}
+	return factoryIDs
+}
+
+func insertAuthCode(t *testing.T, r *support.ResourceRegistry, resource string, factoryIDs ...uuid.UUID) string {
 	t.Helper()
 	raw := "one-time-code-" + uuid.NewString()
 	err := models.CreateMCPOAuthCode(database.Conn(), &models.MCPOAuthCode{
@@ -30,7 +38,7 @@ func insertAuthCode(t *testing.T, r *support.ResourceRegistry, resource string) 
 		CodeChallengeMethod: "S256",
 		UserID:              r.User,
 		OrganizationID:      r.Organization.ID,
-		FactoryID:           uuid.New(),
+		FactoryIDs:          models.NewMCPOAuthFactoryIDs(grantedFactoryIDs(factoryIDs)),
 		Scopes:              datatypes.NewJSONSlice(GrantedScopes),
 		ExpiresAt:           time.Now().Add(time.Minute),
 	})
@@ -38,7 +46,7 @@ func insertAuthCode(t *testing.T, r *support.ResourceRegistry, resource string) 
 	return raw
 }
 
-func insertRefreshToken(t *testing.T, r *support.ResourceRegistry, resource string) string {
+func insertRefreshToken(t *testing.T, r *support.ResourceRegistry, resource string, factoryIDs ...uuid.UUID) string {
 	t.Helper()
 	raw := "refresh-" + uuid.NewString()
 	err := models.CreateMCPOAuthRefreshToken(database.Conn(), &models.MCPOAuthRefreshToken{
@@ -46,7 +54,7 @@ func insertRefreshToken(t *testing.T, r *support.ResourceRegistry, resource stri
 		ClientID:       LocalClientID,
 		UserID:         r.User,
 		OrganizationID: r.Organization.ID,
-		FactoryID:      uuid.New(),
+		FactoryIDs:     models.NewMCPOAuthFactoryIDs(grantedFactoryIDs(factoryIDs)),
 		Resource:       resource,
 		Scopes:         datatypes.NewJSONSlice(GrantedScopes),
 		ExpiresAt:      time.Now().Add(time.Hour),
@@ -406,4 +414,104 @@ func TestRefreshTokensRejectsBlockedAccount(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
+}
+
+func refreshForm(raw, resource string) url.Values {
+	values := url.Values{}
+	values.Set("grant_type", "refresh_token")
+	values.Set("refresh_token", raw)
+	values.Set("client_id", LocalClientID)
+	values.Set("resource", resource)
+	return values
+}
+
+func TestExchangeAuthorizationCodeKeepsEveryWorkspace(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	resource := "http://localhost:8000/mcp"
+	granted := []uuid.UUID{uuid.New(), uuid.New()}
+	code := insertAuthCode(t, r, resource, granted...)
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		issue, refresh, oauthErr := ExchangeAuthorizationCode(tx, tokenForm(code, testPKCEVerifier, resource), resource)
+		require.Nil(t, oauthErr)
+		require.Equal(t, granted, issue.FactoryIDs)
+
+		stored, err := models.FindMCPOAuthRefreshToken(tx, crypto.HashToken(refresh), time.Now())
+		require.NoError(t, err)
+		require.Equal(t, granted, stored.FactoryUUIDs())
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func TestExchangeAuthorizationCodeRejectsCodeWithoutWorkspace(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	resource := "http://localhost:8000/mcp"
+	code := insertAuthCode(t, r, resource)
+	require.NoError(t, database.Conn().Model(&models.MCPOAuthCode{}).
+		Where("code_hash = ?", crypto.HashToken(code)).
+		Update("factory_ids", datatypes.NewJSONSlice([]string{})).Error)
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, _, oauthErr := ExchangeAuthorizationCode(tx, tokenForm(code, testPKCEVerifier, resource), resource)
+		require.NotNil(t, oauthErr)
+		require.Equal(t, "invalid_grant", oauthErr.Code)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func TestRefreshTokensKeepsEveryWorkspaceAndHonorsRevocation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	resource := "http://localhost:8000/mcp"
+	granted := []uuid.UUID{uuid.New(), uuid.New()}
+	raw := insertRefreshToken(t, r, resource, granted...)
+
+	var rotated string
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		issue, refresh, oauthErr := RefreshTokens(tx, refreshForm(raw, resource), resource)
+		require.Nil(t, oauthErr)
+		require.Equal(t, granted, issue.FactoryIDs)
+		rotated = refresh
+		return nil
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, models.RemoveFactoryFromMCPOAuthGrant(database.Conn(), r.Organization.ID, granted[0], r.User, LocalClientID))
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		issue, _, oauthErr := RefreshTokens(tx, refreshForm(rotated, resource), resource)
+		require.Nil(t, oauthErr)
+		require.Equal(t, granted[1:], issue.FactoryIDs)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func TestAccessGrantIsActiveFollowsGrantedWorkspaces(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	resource := "http://localhost:8000/mcp"
+	granted := []uuid.UUID{uuid.New(), uuid.New()}
+	insertRefreshToken(t, r, resource, granted...)
+	claims := &AccessClaims{
+		UserID:     r.User,
+		OrgID:      r.Organization.ID,
+		FactoryIDs: granted,
+		ClientID:   LocalClientID,
+		Resource:   resource,
+		Scopes:     GrantedScopes,
+	}
+	db := database.Conn()
+
+	require.True(t, AccessGrantIsActive(db, claims, time.Now()))
+
+	require.NoError(t, models.RemoveFactoryFromMCPOAuthGrant(db, r.Organization.ID, granted[1], r.User, LocalClientID))
+	require.False(t, AccessGrantIsActive(db, claims, time.Now()))
+
+	claims.FactoryIDs = granted[:1]
+	require.True(t, AccessGrantIsActive(db, claims, time.Now()))
 }
