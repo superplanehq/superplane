@@ -1,8 +1,11 @@
-# Coolify: Docker Compose build pack, base directory /, this file as the
-# Compose path. Set SUPERPLANE_VERSION to a published ghcr tag. Set
-# ENCRYPTION_MASTER_KEYS once with:
+# Coolify Git build pack: base directory /, this file as the Compose path.
+# Builds the runner and Fleet Manager from this repository.
+# Set SUPERPLANE_VERSION to a published ghcr tag. Set ENCRYPTION_MASTER_KEYS
+# once with:
 #   echo "env://coolify-v1:$(openssl rand -base64 32)"
 # On ARM, set RUNNER_FLEET_ID=e1-large-arm64 and RUNNER_ARCH=arm64.
+# For a pasteable stack that only pulls published images, use
+# docker-compose.image.yml. See README.md.
 
 services:
   init:
