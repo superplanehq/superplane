@@ -240,7 +240,7 @@ func applyIntakeGraphUpdate(
 
 	if settings != nil {
 		currentOwner := ""
-		if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+		if intakeSourceSupportsDefaultOwner(intake.Source) {
 			currentOwner = intakeSettingsFromGraph(intake.Source, graph, spec).DefaultOwnerID
 		}
 		if err := validateIntakeDefaultOwner(tx, canvas.OrganizationID, intake.Source, currentOwner, settings); err != nil {
@@ -298,8 +298,8 @@ func applyIntakeSettingsToGraph(
 	edges []models.Edge,
 ) ([]models.Node, []models.Edge, error) {
 	if settings.DefaultOwnerId != nil {
-		if source != models.FactoryIntakeSourceGitHubIssues {
-			return nil, nil, invalidArgument("default task owner is only supported for GitHub issues")
+		if !intakeSourceSupportsDefaultOwner(source) {
+			return nil, nil, invalidArgument("default task owner is not supported for this intake")
 		}
 		create := findIntakeNode(nodes, graph.CreateNodeID)
 		if create == nil {
