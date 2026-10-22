@@ -5,7 +5,7 @@ import type {
   FactoriesWorkOrder,
   SuperplaneComponentsNode,
 } from "@/api-client";
-import { intakeRunPresentation, type RunHistoryIntakeSource } from "./intakeRunData";
+import { intakeRunPresentation, recordedExistingTaskId, type RunHistoryIntakeSource } from "./intakeRunData";
 import { formatCompactDuration } from "@/lib/duration";
 import type { AutomationRun, RunActivity, RunStatus } from "@/ui/AutomationRunHistory/types";
 import { findWorkOrderForAutomationRun } from "../../lib/factoryAutomationStatus";
@@ -32,9 +32,7 @@ export function toAutomationRun(
   now: number,
   intakeSource?: RunHistoryIntakeSource,
 ): AutomationRun {
-  const order = intakeSource
-    ? orders.find((order) => Boolean(run.id) && order.sourceRunId === run.id)
-    : findWorkOrderForAutomationRun(orders, run.id ?? "", run);
+  const order = intakeSource ? intakeWorkOrder(run, orders) : findWorkOrderForAutomationRun(orders, run.id ?? "", run);
   return {
     ...(intakeSource ? intakeRunPresentation(run, intakeSource, recordedStatus(run), orders) : {}),
     id: run.id ?? "",
@@ -47,6 +45,13 @@ export function toAutomationRun(
     error: run.errors?.filter(Boolean).join("\n") || undefined,
     activities: [],
   };
+}
+
+function intakeWorkOrder(run: CanvasesCanvasRun, orders: FactoriesWorkOrder[]): FactoriesWorkOrder | undefined {
+  const created = orders.find((order) => Boolean(run.id) && order.sourceRunId === run.id);
+  if (created) return created;
+  const existingTaskId = recordedExistingTaskId(run);
+  return existingTaskId ? orders.find((order) => order.id === existingTaskId) : undefined;
 }
 
 export function toRunActivities(
@@ -70,7 +75,6 @@ export function toRunActivities(
       id: `event:${run.rootEvent.id}`,
       name: "Source event",
       status: "Passed",
-      logs: { state: "empty" },
       outputs: run.rootEvent.data,
       defaultTab: "outputs",
       outputsLabel: "Event data",
@@ -79,12 +83,13 @@ export function toRunActivities(
   }
   for (const item of run.queueItems ?? []) {
     if (!item.id) continue;
+    const node = nodes.find((node) => node.id === item.nodeId);
     activities.push({
       id: `queue:${item.id}`,
-      name: nodes.find((node) => node.id === item.nodeId)?.name || item.nodeId || "Queued execution",
+      name: node?.name || item.nodeId || "Queued execution",
       status: "Pending",
       recordedAt: item.createdAt,
-      logs: { state: "empty" },
+      logs: node?.component?.startsWith("runner") ? { state: "waiting" } : undefined,
     });
   }
   return activities.sort((a, b) => (a.recordedAt ?? "").localeCompare(b.recordedAt ?? ""));
@@ -96,24 +101,24 @@ function executionActivity(
 ): RunActivity {
   const node = nodes.find((node) => node.id === execution.nodeId);
   const instructions = execution.configuration?.additionalInstructions;
+  const hasLogs = hasRunnerLogs(execution, node);
   return {
     id: execution.id!,
     name: node?.name || execution.nodeId || "Execution",
     status: recordedStatus(execution),
     recordedAt: execution.createdAt,
     error: execution.result === "RESULT_FAILED" ? execution.resultMessage || undefined : undefined,
-    logs: { state: "empty" },
-    defaultTab: activityDefaultTab(execution, node),
+    logs: hasLogs ? { state: "empty" } : undefined,
+    defaultTab: hasLogs ? "logs" : "outputs",
     outputs: execution.outputs && Object.keys(execution.outputs).length ? execution.outputs : undefined,
     additionalInstructions: typeof instructions === "string" && instructions.trim() ? instructions : undefined,
   };
 }
 
-function activityDefaultTab(
-  execution: CanvasesCanvasNodeExecution,
+function hasRunnerLogs(
+  execution: CanvasesCanvasNodeExecutionRef & CanvasesCanvasNodeExecution,
   node?: SuperplaneComponentsNode,
-): "logs" | "outputs" {
-  if (execution.metadata?.runner_broker_task_id) return "logs";
-  if (!node || node.component?.startsWith("runner")) return "logs";
-  return "outputs";
+): boolean {
+  const component = execution.componentName || node?.component;
+  return Boolean(execution.metadata?.runner_broker_task_id || component?.startsWith("runner"));
 }

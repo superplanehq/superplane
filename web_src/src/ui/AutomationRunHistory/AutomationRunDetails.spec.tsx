@@ -13,6 +13,7 @@ describe("AutomationRunDetails live activity", () => {
         activity.id === "start"
           ? {
               ...activity,
+              logs: undefined,
               defaultTab: "outputs" as const,
               outputsLabel: "Event data",
             }
@@ -22,6 +23,7 @@ describe("AutomationRunDetails live activity", () => {
     render(<AutomationRunDetails run={run} onBack={() => {}} onRetryLogs={() => {}} />);
     expect(screen.getByRole("tab", { name: "Event data", selected: true })).toBeInTheDocument();
     expect(screen.getByRole("tabpanel")).toHaveTextContent(original.task!.title);
+    expect(screen.queryByRole("tab", { name: "Logs" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Implement task/ }));
     expect(screen.getByRole("tab", { name: "Logs", selected: true })).toBeInTheDocument();
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Changes committed and pushed.");
@@ -88,7 +90,8 @@ describe("AutomationRunDetails live activity", () => {
     expect(screen.getByText(`Logs for ${execution.id}`)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Run started/ }));
     rerender(view([start, { ...execution, status: "Failed" }]));
-    expect(screen.getByText(`Logs for ${start.id}`)).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Logs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveTextContent(implementationRuns[0].task!.title);
   });
 
   it("selects activity when an initially empty run receives it", () => {

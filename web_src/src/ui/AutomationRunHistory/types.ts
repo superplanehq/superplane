@@ -13,7 +13,8 @@ export interface RunActivity {
   status: RunStatus;
   recordedAt?: string;
   error?: string;
-  logs: RunLogs;
+  // Absent for steps that do not use a runner. Runner logs can still be empty or waiting.
+  logs?: RunLogs;
   outputs?: Record<string, unknown>;
   additionalInstructions?: string;
   defaultTab?: "logs" | "outputs";
@@ -25,7 +26,7 @@ export interface AutomationRun {
   source?: { reference: string; title: string; url?: string };
   intake?: { outcome: IntakeRunOutcome; summary: string; event: string };
   id: string;
-  task?: { id: string; title: string };
+  task?: { id: string; title: string; url?: string };
   status: RunStatus;
   startedAt: string;
   finishedAt?: string;

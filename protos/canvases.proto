@@ -646,6 +646,8 @@ message CanvasNodeExecutionRef {
   repeated string output_channels = 10;
   // Historical component identity. Do not use the current canvas to interpret old runs.
   string component_name = 11;
+  // Task identified by a recorded duplicate-task decision, not inferred from source identity.
+  string existing_task_id = 12;
 }
 
 //
