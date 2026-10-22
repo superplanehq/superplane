@@ -6,7 +6,7 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
-import { getWorkOrderDisplayStatus } from "./workOrderProgress";
+import { getWorkOrderDisplayStatus, hasActiveLineDispatch } from "./workOrderProgress";
 import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
 import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
 
@@ -229,10 +229,7 @@ function ordersInSourceListOrder(
 }
 
 function isWaitingAfterPassedStage(run: LinePhaseRunCard): boolean {
-  if (run.order.state === "STATE_CLOSED") {
-    return false;
-  }
-  if (getWorkOrderDisplayStatus(run.order) !== "waiting") {
+  if (run.order.state !== "STATE_OPEN" || hasActiveLineDispatch(run.order)) {
     return false;
   }
   return run.execution.state === "STATE_FINISHED" && run.execution.result === "RESULT_PASSED";
@@ -302,7 +299,7 @@ export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "app
 }
 
 function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
-  return Boolean(order.id) && order.state === "STATE_DRAFT";
+  return Boolean(order.id) && getWorkOrderDisplayStatus(order) === "draft";
 }
 
 // A finished task belongs on this board when it ran on this line, or
@@ -407,14 +404,16 @@ function appendCurrentRunForOrder(
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
-  if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") {
+  if (!order.id || order.state === "STATE_CLOSED" || isLineBacklogOrder(order)) {
     return;
   }
 
   // A line can have more than one dispatch (traversal) for this order; the
   // board is a compact status summary, so it shows the most recent one —
   // the full history of every dispatch lives in WorkOrderExecutionsList.
-  const dispatchesForLine = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+  const dispatchesForLine = (order.lineDispatches ?? []).filter(
+    (dispatch) => dispatch.line?.id === lineId && (dispatch.queueItem || dispatch.stepExecutions?.length),
+  );
   if (dispatchesForLine.length === 0) {
     return;
   }
