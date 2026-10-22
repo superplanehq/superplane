@@ -25,7 +25,9 @@ if [ "${actual_digest}" != "${DIGEST}" ]; then
   exit 1
 fi
 
-immutable_image="${IMAGE%:${VERSION}}@${DIGEST}"
+repository="${IMAGE%:${VERSION}-docker}"
+repository="${repository%:${VERSION}}"
+immutable_image="${repository}@${DIGEST}"
 raw_manifest="$("${SKOPEO[@]}" inspect --raw "docker://${immutable_image}")"
 for architecture in amd64 arm64; do
   if ! jq -e --arg architecture "${architecture}" \
