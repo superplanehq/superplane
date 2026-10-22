@@ -855,6 +855,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/feature-definitions", s.adminListFeatureDefinitions).Methods("GET")
 	adminRoute.HandleFunc("/feature-definitions", s.adminSaveFeatureDefinition).Methods("POST")
 	adminRoute.HandleFunc("/feature-definitions/{featureKey}", s.adminSaveFeatureDefinition).Methods("PUT")
+	adminRoute.HandleFunc("/feature-definitions/{featureKey}", s.adminDeleteFeatureDefinition).Methods("DELETE")
 	adminRoute.HandleFunc("/organizations/{orgId}/features", s.adminOrganizationFeatures).Methods("GET", "PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
