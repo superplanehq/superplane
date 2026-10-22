@@ -10,7 +10,24 @@ export function useOnboardingLinearBinding(
   linearSelection?: { id: string; ready: boolean },
 ) {
   const linearIntegrationId = linearSelection?.ready ? linearSelection.id : "";
-  const [linearScope, setLinearScope] = useState(() => readOnboardingLinearScope(factoryId, linearIntegrationId));
+  const [binding, setBinding] = useState(() => ({
+    factoryId,
+    integrationId: linearIntegrationId,
+    scope: readOnboardingLinearScope(factoryId, linearIntegrationId),
+  }));
+
+  // Rekey the scope during render when the connection changes. An effect
+  // would run the checks below once with the scope of the previous connection
+  // and could erase the stored scope of the new one.
+  if (binding.factoryId !== factoryId || binding.integrationId !== linearIntegrationId) {
+    setBinding({
+      factoryId,
+      integrationId: linearIntegrationId,
+      scope: readOnboardingLinearScope(factoryId, linearIntegrationId),
+    });
+  }
+  const linearScope = binding.scope;
+
   const teamsQuery = useIntegrationResources(organizationId, linearIntegrationId, "team", undefined, {
     enabled: Boolean(linearIntegrationId),
   });
@@ -22,14 +39,10 @@ export function useOnboardingLinearBinding(
     { enabled: Boolean(linearIntegrationId && linearScope.teamId) },
   );
 
-  useEffect(() => {
-    setLinearScope(readOnboardingLinearScope(factoryId, linearIntegrationId));
-  }, [factoryId, linearIntegrationId]);
-
   const saveScope = useCallback(
     (next: LinearIntakeScope) => {
       writeOnboardingLinearScope(factoryId, linearIntegrationId, next);
-      setLinearScope(next);
+      setBinding({ factoryId, integrationId: linearIntegrationId, scope: next });
     },
     [factoryId, linearIntegrationId],
   );
@@ -50,7 +63,12 @@ export function useOnboardingLinearBinding(
       (projectsQuery.data ?? []).map((project) => project.id).filter((id): id is string => Boolean(id)),
     );
     const projectIds = linearScope.projectIds.filter((id) => available.has(id));
-    if (projectIds.length !== linearScope.projectIds.length) saveScope({ ...linearScope, projectIds });
+    // An empty project list accepts every ticket in the team. When every saved
+    // project is gone, keep the selection instead of widening the intake
+    // silently. The scope fields show the missing projects, so the user picks
+    // a replacement or clears them.
+    if (projectIds.length === 0 || projectIds.length === linearScope.projectIds.length) return;
+    saveScope({ ...linearScope, projectIds });
   }, [projectsReady, projectsQuery.data, linearScope, saveScope]);
 
   return {

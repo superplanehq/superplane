@@ -38,6 +38,14 @@ export function LinearIntakeScopeFields({
     scope.teamId ? { team: scope.teamId } : undefined,
     { enabled: connected && showFilters },
   );
+  // A saved project that Linear no longer returns stays selected and visible,
+  // so the user removes it or picks a replacement. Dropping it silently could
+  // widen the intake: an empty project list accepts every ticket in the team.
+  const projectsSettled = connected && showFilters && !projectsQuery.isPending && !projectsQuery.isError;
+  const fetchedProjectIds = new Set(
+    (projectsQuery.data ?? []).map((project) => project.id).filter((id): id is string => Boolean(id)),
+  );
+  const missingProjectIds = projectsSettled ? scope.projectIds.filter((id) => !fetchedProjectIds.has(id)) : [];
 
   return (
     <div className="flex flex-col gap-6" data-testid="linear-intake-filters">
@@ -63,13 +71,14 @@ export function LinearIntakeScopeFields({
               <LinearProjectPicker
                 projects={projectsQuery.data ?? []}
                 selectedIds={scope.projectIds}
+                missingSelectedIds={missingProjectIds}
                 loading={projectsQuery.isLoading}
                 error={projectsQuery.isError}
                 onToggle={(projectId) => onChange(toggleLinearProject(scope, projectId))}
                 onRetry={() => void projectsQuery.refetch()}
               />
             </div>
-            {scope.projectIds.length > 0 ? (
+            {scope.teamId && scope.projectIds.length > 0 ? (
               <label className="workspace-body-text mt-3 flex cursor-pointer items-center gap-2">
                 <Checkbox
                   checked={scope.includeIssuesWithoutProject}

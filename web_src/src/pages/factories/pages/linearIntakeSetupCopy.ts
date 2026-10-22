@@ -23,6 +23,8 @@ export const LINEAR_INTAKE_SETUP_COPY = {
   wizardProjectsEmpty: "This connection has no available projects.",
   wizardNoMatchingProjects: "No matching projects.",
   wizardSearchProjects: "Search projects",
+  projectsMissingLabel: "Selected projects that are no longer in Linear",
+  projectMissingLabel: "No longer in Linear",
   wizardRetry: "Try again",
   wizardCreateError: "SuperPlane could not create the Linear intake.",
   wizardConnectionsLoading: "Loading Linear connections...",

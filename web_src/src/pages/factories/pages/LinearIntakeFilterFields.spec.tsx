@@ -131,6 +131,30 @@ describe("LinearIntakeFilterFields", () => {
     expect(resourceCalls).toContainEqual({ type: "project", parameters: undefined });
   });
 
+  it("hides the no-project choice while no team is selected", () => {
+    render(<Fields initial={{ linearTeamId: "", linearProjectIds: ["project-1"] }} />);
+
+    expect(screen.queryByTestId("linear-include-no-project")).not.toBeInTheDocument();
+  });
+
+  it("shows selected projects that Linear no longer returns so the user can clear them", async () => {
+    const user = userEvent.setup();
+    let latest: IntakeSourceSettings | undefined;
+    render(
+      <Fields initial={{ linearProjectIds: ["project-1", "project-gone"] }} onChange={(next) => (latest = next)} />,
+    );
+
+    const missing = screen.getByTestId("linear-missing-project-project-gone");
+    expect(missing).toHaveAttribute("aria-selected", "true");
+    expect(missing).toHaveTextContent(LINEAR_INTAKE_SETUP_COPY.projectMissingLabel);
+    expect(screen.getByTestId("linear-project-project-1")).toHaveAttribute("aria-selected", "true");
+
+    await user.click(missing);
+
+    expect(latest).toMatchObject({ linearProjectIds: ["project-1"] });
+    expect(screen.queryByTestId("linear-missing-project-project-gone")).not.toBeInTheDocument();
+  });
+
   it("shows no projects or labels until a team is chosen", () => {
     render(<Fields initial={{ linearTeamId: "", linearProjectIds: [] }} />);
 
