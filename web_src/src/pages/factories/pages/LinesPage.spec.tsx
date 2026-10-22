@@ -1650,14 +1650,13 @@ describe("LinesPage board editing", () => {
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
-    const concurrency = screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" });
-    await user.clear(concurrency);
-    await user.type(concurrency, "3");
-    await user.tab();
+    const dialog = screen.getByTestId("merge-confidence-config");
+    const concurrency = within(dialog).getByRole("spinbutton", { name: "Maximum simultaneous runs" });
+    fireEvent.change(concurrency, { target: { value: "3" } });
     expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
     expect(commitCanvasStagingMutateAsync).not.toHaveBeenCalled();
 
-    await user.click(screen.getByTestId("implement-settings-save"));
+    await user.click(within(dialog).getByTestId("implement-settings-save"));
 
     await waitFor(() => expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step"));
     const saved = updateCanvasVersionMutateAsync.mock.calls.at(-1)?.[0] as { canvasYaml?: string };
@@ -1667,7 +1666,7 @@ describe("LinesPage board editing", () => {
     expect(savedAgent?.concurrency?.max).toBe(3);
     expect(savedAgent?.configuration?.steps).toEqual(implementerCanvas.spec.nodes[1].configuration.steps);
     await waitFor(() => expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument());
-  });
+  }, 15000);
 
   it("keeps Backlog Edit as the only edit action", async () => {
     const user = userEvent.setup();

@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/test/encryption"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 )
@@ -27,7 +27,7 @@ func Test__IntegrationRequestWorker_SyncRewritesSecret(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	encryptor := crypto.NewAESGCMEncryptor([]byte("0123456789abcdef0123456789abcdef"))
+	encryptor := encryption.NewEncryptor()
 	worker := NewIntegrationRequestWorker(encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
 
 	const (

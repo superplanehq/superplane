@@ -18,6 +18,21 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestVerifyOrganizationSubscriptionDeadline(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	t.Setenv("POLAR_ACCESS_TOKEN", "test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	verification, err := VerifyOrganizationSubscription(ctx, uuid.New())
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Equal(t, "failed", verification)
+}
+
 func Test__ApplySubscriptionActivatesBusinessAndGrantsIncluded(t *testing.T) {
 	org := setupBillingOrganization(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
@@ -649,7 +664,7 @@ func TestCatalogSubscriptionDoesNotDeliverNewPolicies(t *testing.T) {
 	event.Data.ProductID = product
 	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, event))
 	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, event))
-	order := &OrderWebhookEvent{Type: orderPaidType, Data: OrderData{ID: uuid.NewString(), ProductID: product, BillingReason: billingReasonSubscriptionCycle, Customer: OrderCustomer{ExternalID: r.Organization.ID.String()}}}
+	order := &OrderWebhookEvent{Type: orderPaidType, Data: OrderData{ID: uuid.NewString(), ProductID: product, BillingReason: billingReasonSubscriptionCycle, Customer: OrderCustomer{ExternalID: org.ID.String()}}}
 	require.NoError(t, ApplyOrderPaid(t.Context(), db, order, nil))
 	saved, err := models.FindOrganizationBillingPlan(db, org.ID)
 	require.NoError(t, err)
@@ -663,7 +678,7 @@ func TestCatalogSubscriptionDoesNotDeliverNewPolicies(t *testing.T) {
 func Test__ApplySubscriptionRenewalAdvancesPeriodAndGrantsIncluded(t *testing.T) {
 	for _, eventType := range []string{subscriptionCycledType, subscriptionUpdatedType} {
 		t.Run(eventType, func(t *testing.T) {
-			r := support.Setup(t)
+			org := setupBillingOrganization(t)
 			require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 			db := database.Conn()
 			firstStart := time.Now().UTC().Truncate(time.Second)
@@ -672,32 +687,32 @@ func Test__ApplySubscriptionRenewalAdvancesPeriodAndGrantsIncluded(t *testing.T)
 			// Included grants are keyed by subscription and period end across all orgs.
 			subscriptionID := "sub_" + uuid.NewString()
 
-			first := subscriptionEvent(r.Organization.ID, subscriptionID, "active", firstStart, firstEnd)
+			first := subscriptionEvent(org.ID, subscriptionID, "active", firstStart, firstEnd)
 			first.Data.ModifiedAt = polarTime{Time: firstStart}
 			require.NoError(t, ApplySubscriptionEvent(t.Context(), db, first))
 
-			renewal := subscriptionEvent(r.Organization.ID, subscriptionID, "active", firstEnd, renewedEnd)
+			renewal := subscriptionEvent(org.ID, subscriptionID, "active", firstEnd, renewedEnd)
 			renewal.Type = eventType
 			renewal.Data.ModifiedAt = polarTime{Time: firstEnd}
 			require.NoError(t, ApplySubscriptionEvent(t.Context(), db, renewal))
 
-			requirePeriod(t, db, r.Organization.ID, firstEnd, renewedEnd)
-			requireIncludedGrantExpiries(t, db, r.Organization.ID, firstEnd, renewedEnd)
+			requirePeriod(t, db, org.ID, firstEnd, renewedEnd)
+			requireIncludedGrantExpiries(t, db, org.ID, firstEnd, renewedEnd)
 		})
 	}
 }
 
 func Test__ApplyOrderPaidSubscriptionCycleResyncsSubscription(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	db := database.Conn()
 	firstStart := time.Now().UTC().Truncate(time.Second)
 	firstEnd := firstStart.AddDate(0, 1, 0)
 	renewedEnd := firstEnd.AddDate(0, 1, 0)
 	subscriptionID := "sub_" + uuid.NewString()
-	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, subscriptionEvent(r.Organization.ID, subscriptionID, "active", firstStart, firstEnd)))
-	usePolarSubscriptionServer(t, r.Organization.ID.String(), []map[string]any{
-		polarSubscriptionJSON(subscriptionID, "active", r.Organization.ID.String(), firstEnd, renewedEnd),
+	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, subscriptionEvent(org.ID, subscriptionID, "active", firstStart, firstEnd)))
+	usePolarSubscriptionServer(t, org.ID.String(), []map[string]any{
+		polarSubscriptionJSON(subscriptionID, "active", org.ID.String(), firstEnd, renewedEnd),
 	})
 	order := &OrderWebhookEvent{
 		Type: orderPaidType,
@@ -705,19 +720,19 @@ func Test__ApplyOrderPaidSubscriptionCycleResyncsSubscription(t *testing.T) {
 			ID:            uuid.NewString(),
 			ProductID:     "prod_business",
 			BillingReason: billingReasonSubscriptionCycle,
-			Customer:      OrderCustomer{ID: "cust_polar_1", ExternalID: r.Organization.ID.String()},
+			Customer:      OrderCustomer{ID: "cust_polar_1", ExternalID: org.ID.String()},
 		},
 	}
 
 	require.NoError(t, ApplyOrderPaid(t.Context(), db, order, nil))
 	require.NoError(t, ApplyOrderPaid(t.Context(), db, order, nil))
 
-	requirePeriod(t, db, r.Organization.ID, firstEnd, renewedEnd)
-	requireIncludedGrantExpiries(t, db, r.Organization.ID, firstEnd, renewedEnd)
+	requirePeriod(t, db, org.ID, firstEnd, renewedEnd)
+	requireIncludedGrantExpiries(t, db, org.ID, firstEnd, renewedEnd)
 }
 
 func Test__ApplyOrderPaidSubscriptionCycleRecoversFromStaleSnapshot(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 	db := database.Conn()
 	firstStart := time.Now().UTC().Truncate(time.Second)
@@ -725,36 +740,36 @@ func Test__ApplyOrderPaidSubscriptionCycleRecoversFromStaleSnapshot(t *testing.T
 	renewedEnd := firstEnd.AddDate(0, 1, 0)
 	subscriptionID := "sub_" + uuid.NewString()
 
-	first := subscriptionEvent(r.Organization.ID, subscriptionID, "active", firstStart, firstEnd)
+	first := subscriptionEvent(org.ID, subscriptionID, "active", firstStart, firstEnd)
 	first.Data.ModifiedAt = polarTime{Time: firstStart}
 	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, first))
 
-	stale := subscriptionEvent(r.Organization.ID, subscriptionID, "active", firstEnd, renewedEnd)
+	stale := subscriptionEvent(org.ID, subscriptionID, "active", firstEnd, renewedEnd)
 	stale.Type = subscriptionCycledType
 	stale.Data.ModifiedAt = polarTime{Time: firstStart.Add(-time.Minute)}
 	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, stale))
 
-	requirePeriod(t, db, r.Organization.ID, firstStart, firstEnd)
-	requireIncludedGrantExpiries(t, db, r.Organization.ID, firstEnd)
+	requirePeriod(t, db, org.ID, firstStart, firstEnd)
+	requireIncludedGrantExpiries(t, db, org.ID, firstEnd)
 
-	fresh := polarSubscriptionJSON(subscriptionID, "active", r.Organization.ID.String(), firstEnd, renewedEnd)
+	fresh := polarSubscriptionJSON(subscriptionID, "active", org.ID.String(), firstEnd, renewedEnd)
 	fresh["modified_at"] = firstEnd.Format(time.RFC3339)
-	usePolarSubscriptionServer(t, r.Organization.ID.String(), []map[string]any{fresh})
+	usePolarSubscriptionServer(t, org.ID.String(), []map[string]any{fresh})
 	order := &OrderWebhookEvent{
 		Type: orderPaidType,
 		Data: OrderData{
 			ID:            uuid.NewString(),
 			ProductID:     "prod_business",
 			BillingReason: billingReasonSubscriptionCycle,
-			Customer:      OrderCustomer{ID: "cust_polar_1", ExternalID: r.Organization.ID.String()},
+			Customer:      OrderCustomer{ID: "cust_polar_1", ExternalID: org.ID.String()},
 		},
 	}
 
 	require.NoError(t, ApplyOrderPaid(t.Context(), db, order, nil))
 	require.NoError(t, ApplyOrderPaid(t.Context(), db, order, nil))
 
-	requirePeriod(t, db, r.Organization.ID, firstEnd, renewedEnd)
-	requireIncludedGrantExpiries(t, db, r.Organization.ID, firstEnd, renewedEnd)
+	requirePeriod(t, db, org.ID, firstEnd, renewedEnd)
+	requireIncludedGrantExpiries(t, db, org.ID, firstEnd, renewedEnd)
 }
 
 func requirePeriod(t *testing.T, db *gorm.DB, orgID uuid.UUID, start, end time.Time) {

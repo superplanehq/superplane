@@ -80,6 +80,9 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 		return err
 	}
 	return tx.Transaction(func(inner *gorm.DB) error {
+		if err := lockPlanFeatureReferences(inner, plan.Features); err != nil {
+			return err
+		}
 		if plan.ID == uuid.Nil {
 			plan.ID = uuid.New()
 			return inner.Create(plan).Error
@@ -137,7 +140,12 @@ func ListOrganizationFeatureGrants(tx *gorm.DB, orgID uuid.UUID) ([]Organization
 }
 
 func SetOrganizationFeatureGrant(tx *gorm.DB, grant OrganizationFeatureGrant) error {
-	return tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "organization_id"}, {Name: "feature_key"}}, DoUpdates: clause.AssignmentColumns([]string{"enabled"})}).Create(&grant).Error
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if err := lockPlanFeatureReferences(inner, []string{grant.FeatureKey}); err != nil {
+			return err
+		}
+		return inner.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "organization_id"}, {Name: "feature_key"}}, DoUpdates: clause.AssignmentColumns([]string{"enabled"})}).Create(&grant).Error
+	})
 }
 
 func validateBillingPlan(p *BillingPlan) error {
