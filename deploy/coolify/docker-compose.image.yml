@@ -7,12 +7,15 @@
 #
 # Coolify: paste this file as Docker Compose Empty, or use it as a one-click
 # template later. Pulls published GHCR images. Does not need this repository.
-# Set SUPERPLANE_VERSION and ENCRYPTION_MASTER_KEYS before the first deploy:
-#   echo "env://coolify-v1:$(openssl rand -base64 32)"
-# After owner setup, create an installation-admin personal token, set
-# INSTALLATION_ADMIN_TOKEN, and restart Fleet Manager.
-# Set FLEET_MANAGER_VERSION to a Fleet Manager release that publishes the
-# -docker image. fleet-manager/v0.1.4 does not include that image.
+# Set SUPERPLANE_VERSION to a published ghcr.io/superplanehq/superplane tag.
+# Coolify generates SERVICE_REALBASE64_32_ENCRYPTION and builds
+# ENCRYPTION_MASTER_KEYS. Keep that value. Do not paste a password.
+# Attach the public domain to service app on port 8000 (SERVICE_URL_APP_8000).
+# Coolify stores that URL with :8000 for the proxy. The app entrypoint strips
+# :8000 from HTTPS BASE_URL so OAuth callbacks use the public hostname.
+# Complete owner setup in the SuperPlane UI. fleet-token waits, then mints
+# an admin token. fleet-manager starts after that file exists.
+# FLEET_MANAGER_VERSION defaults to v0.1.5 (the first tag with -docker).
 # RUNNER_VERSION defaults to v0.2.0.
 # On ARM, set RUNNER_FLEET_ID=e1-large-arm64 and RUNNER_ARCH=arm64.
 
@@ -74,6 +77,8 @@ services:
     pull_policy: always
     restart: unless-stopped
     stop_grace_period: 45s
+    expose:
+      - "8000"
     depends_on:
       init:
         condition: service_completed_successfully
@@ -94,10 +99,23 @@ services:
       timeout: 5s
       retries: 30
       start_period: 180s
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -eu
+        public_origin() {
+          printf '%s' "$$1" | sed -E 's#^(https://[^/:]+):8000#\1#'
+        }
+        BASE_URL="$$(public_origin "$${BASE_URL:-}")"
+        WEBHOOKS_BASE_URL="$$(public_origin "$${WEBHOOKS_BASE_URL:-$$BASE_URL}")"
+        export BASE_URL WEBHOOKS_BASE_URL
+        exec bash /app/docker-entrypoint.sh
     environment:
+      SERVICE_URL_APP:
       SERVICE_URL_APP_8000:
-      BASE_URL: ${SERVICE_URL_APP_8000:-http://localhost:8000}
-      WEBHOOKS_BASE_URL: ${SERVICE_URL_APP_8000:-http://localhost:8000}
+      SERVICE_REALBASE64_32_ENCRYPTION:
+      BASE_URL: ${SERVICE_URL_APP:-${SERVICE_URL_APP_8000:-http://localhost:8000}}
+      WEBHOOKS_BASE_URL: ${SERVICE_URL_APP:-${SERVICE_URL_APP_8000:-http://localhost:8000}}
       PUBLIC_API_BASE_PATH: /api/v1
       WEB_BASE_PATH: ""
       RUNNER_API_BASE_URL: http://app:8000
@@ -115,7 +133,7 @@ services:
       JWT_SECRET: ${SERVICE_PASSWORD_64_JWT}
       SESSION_SECRET: ${SERVICE_PASSWORD_64_SESSION}
       BLOB_STORAGE_SIGNING_KEY: ${SERVICE_PASSWORD_64_BLOBSIGNING}
-      ENCRYPTION_MASTER_KEYS: ${ENCRYPTION_MASTER_KEYS:?}
+      ENCRYPTION_MASTER_KEYS: ${ENCRYPTION_MASTER_KEYS:-env://coolify-v1:${SERVICE_REALBASE64_32_ENCRYPTION}}
       ENCRYPTION_WRITE_FORMAT: versioned
       SWAGGER_BASE_PATH: /app/api/swagger
       RBAC_MODEL_PATH: /app/rbac/rbac_model.conf
@@ -174,8 +192,82 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
 
+  fleet-token:
+    image: postgres:17.5
+    user: "0:0"
+    restart: "no"
+    exclude_from_hc: true
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    volumes:
+      - fleet-token:/token
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: superplane
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        token_file=/token/installation-admin-token
+        if [ -s "$$token_file" ]; then
+          echo "Fleet Manager token already exists."
+          exit 0
+        fi
+        echo "Waiting for the owner account."
+        owner_user_id=""
+        while [ -z "$$owner_user_id" ]; do
+          owner_user_id="$$(
+            PGPASSWORD="$$DB_PASSWORD" psql -X -Atq \
+              -h "$$DB_HOST" -p "$$DB_PORT" -U "$$DB_USERNAME" -d "$$DB_NAME" \
+              -c "SELECT users.id FROM users INNER JOIN accounts ON accounts.id = users.account_id WHERE accounts.installation_admin = true AND accounts.blocked_at IS NULL AND accounts.deleted_at IS NULL AND users.type = 'human' AND users.deleted_at IS NULL ORDER BY accounts.created_at ASC NULLS LAST, users.created_at ASC LIMIT 1" \
+              2>/dev/null || true
+          )"
+          if [ -z "$$owner_user_id" ]; then
+            sleep 2
+          fi
+        done
+        token="$$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+        token_hash="$$(printf '%s' "$$token" | sha256sum | cut -d ' ' -f 1)"
+        PGPASSWORD="$$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 \
+          -h "$$DB_HOST" -p "$$DB_PORT" -U "$$DB_USERNAME" -d "$$DB_NAME" \
+          -v owner_user_id="$$owner_user_id" \
+          -v token_hash="$$token_hash" \
+          -v token_name="Coolify Fleet Manager" <<'SQL'
+        BEGIN;
+        WITH selected AS (
+          SELECT id FROM user_api_tokens
+          WHERE name = :'token_name'
+          ORDER BY created_at ASC, id ASC LIMIT 1
+        )
+        DELETE FROM user_api_tokens
+        WHERE name = :'token_name' AND id <> (SELECT id FROM selected);
+        UPDATE user_api_tokens
+        SET user_id = :'owner_user_id'::uuid, token_hash = :'token_hash', last_used_at = NULL
+        WHERE id = (
+          SELECT id FROM user_api_tokens
+          WHERE name = :'token_name'
+          ORDER BY created_at ASC, id ASC LIMIT 1
+        );
+        INSERT INTO user_api_tokens (user_id, name, token_hash)
+        SELECT :'owner_user_id'::uuid, :'token_name', :'token_hash'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM user_api_tokens WHERE name = :'token_name'
+        );
+        COMMIT;
+        SQL
+        printf '%s' "$$token" > "$$token_file.tmp"
+        chmod 400 "$$token_file.tmp"
+        mv "$$token_file.tmp" "$$token_file"
+        echo "Fleet Manager token is ready."
+
   fleet-manager:
-    image: ghcr.io/superplanehq/fleet-manager:${FLEET_MANAGER_VERSION:?}-docker
+    image: ghcr.io/superplanehq/fleet-manager:${FLEET_MANAGER_VERSION:-v0.1.5}-docker
     pull_policy: always
     restart: unless-stopped
     depends_on:
@@ -183,6 +275,20 @@ services:
         condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - fleet-token:/token:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ -z "$${INSTALLATION_ADMIN_TOKEN:-}" ]; then
+          echo "Waiting for the Fleet Manager token after owner setup."
+          while [ ! -s /token/installation-admin-token ]; do
+            sleep 2
+          done
+          INSTALLATION_ADMIN_TOKEN="$$(cat /token/installation-admin-token)"
+          export INSTALLATION_ADMIN_TOKEN
+        fi
+        exec /usr/local/bin/fleet-manager-docker-entrypoint
     environment:
       INSTALLATION_ADMIN_TOKEN: ${INSTALLATION_ADMIN_TOKEN:-}
       FLEET_MANAGER_CONFIG: |
@@ -224,3 +330,4 @@ volumes:
   oidc-keys:
   blobs:
   runner-logs:
+  fleet-token:

@@ -1,8 +1,12 @@
 # Coolify Git build pack: base directory /, this file as the Compose path.
 # Builds the runner and Fleet Manager from this repository.
-# Set SUPERPLANE_VERSION to a published ghcr tag. Set ENCRYPTION_MASTER_KEYS
-# once with:
-#   echo "env://coolify-v1:$(openssl rand -base64 32)"
+# Set SUPERPLANE_VERSION to a published ghcr tag.
+# Coolify generates SERVICE_REALBASE64_32_ENCRYPTION and builds
+# ENCRYPTION_MASTER_KEYS. Keep that value. Do not paste a password.
+# Attach the public domain to service app on port 8000 (SERVICE_URL_APP_8000).
+# Coolify stores that URL with :8000 for the proxy. The app entrypoint strips
+# :8000 from HTTPS BASE_URL so OAuth callbacks use the public hostname.
+# Complete owner setup. Fleet Manager waits, then mints an admin token.
 # On ARM, set RUNNER_FLEET_ID=e1-large-arm64 and RUNNER_ARCH=arm64.
 # For a pasteable stack that only pulls published images, use
 # docker-compose.image.yml. See README.md.
@@ -65,8 +69,8 @@ services:
     pull_policy: always
     restart: unless-stopped
     stop_grace_period: 45s
-    ports:
-      - "127.0.0.1:8000:8000"
+    expose:
+      - "8000"
     depends_on:
       init:
         condition: service_completed_successfully
@@ -87,10 +91,23 @@ services:
       timeout: 5s
       retries: 30
       start_period: 180s
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -eu
+        public_origin() {
+          printf '%s' "$$1" | sed -E 's#^(https://[^/:]+):8000#\1#'
+        }
+        BASE_URL="$$(public_origin "$${BASE_URL:-}")"
+        WEBHOOKS_BASE_URL="$$(public_origin "$${WEBHOOKS_BASE_URL:-$$BASE_URL}")"
+        export BASE_URL WEBHOOKS_BASE_URL
+        exec bash /app/docker-entrypoint.sh
     environment:
+      SERVICE_URL_APP:
       SERVICE_URL_APP_8000:
-      BASE_URL: ${SERVICE_URL_APP_8000:-http://localhost:8000}
-      WEBHOOKS_BASE_URL: ${SERVICE_URL_APP_8000:-http://localhost:8000}
+      SERVICE_REALBASE64_32_ENCRYPTION:
+      BASE_URL: ${SERVICE_URL_APP:-${SERVICE_URL_APP_8000:-http://localhost:8000}}
+      WEBHOOKS_BASE_URL: ${SERVICE_URL_APP:-${SERVICE_URL_APP_8000:-http://localhost:8000}}
       PUBLIC_API_BASE_PATH: /api/v1
       WEB_BASE_PATH: ""
       RUNNER_API_BASE_URL: http://app:8000
@@ -108,7 +125,7 @@ services:
       JWT_SECRET: ${SERVICE_PASSWORD_64_JWT}
       SESSION_SECRET: ${SERVICE_PASSWORD_64_SESSION}
       BLOB_STORAGE_SIGNING_KEY: ${SERVICE_PASSWORD_64_BLOBSIGNING}
-      ENCRYPTION_MASTER_KEYS: ${ENCRYPTION_MASTER_KEYS:?}
+      ENCRYPTION_MASTER_KEYS: ${ENCRYPTION_MASTER_KEYS:-env://coolify-v1:${SERVICE_REALBASE64_32_ENCRYPTION}}
       ENCRYPTION_WRITE_FORMAT: versioned
       SWAGGER_BASE_PATH: /app/api/swagger
       RBAC_MODEL_PATH: /app/rbac/rbac_model.conf
