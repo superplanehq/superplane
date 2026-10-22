@@ -1,6 +1,7 @@
 import React from "react";
 import { Input, InputGroup } from "@/components/Input/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import { ErrorBanner } from "./ErrorBanner";
@@ -19,10 +20,30 @@ type OwnerStepProps = {
   onLastNameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onConfirmPasswordChange: (value: string) => void;
+  showInstallReport: boolean;
+  shareOwnerIdentity: boolean;
+  onShareOwnerIdentityChange: (value: boolean) => void;
   onSubmit: (event: React.FormEvent) => void;
 };
 
 const fieldLabelClass = "mb-2 block text-left text-[13px] font-medium";
+
+function InstallReportChoice({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <div className="flex items-start gap-2">
+      <Checkbox
+        id="owner-setup-install-report"
+        className="mt-0.5"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        data-testid="owner-setup-install-report"
+      />
+      <Label htmlFor="owner-setup-install-report" className="text-sm font-normal leading-5 text-muted-foreground">
+        SuperPlane can send the owner email and organization name with the anonymous install report.
+      </Label>
+    </div>
+  );
+}
 
 export const OwnerStep: React.FC<OwnerStepProps> = ({
   email,
@@ -38,6 +59,9 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
   onLastNameChange,
   onPasswordChange,
   onConfirmPasswordChange,
+  showInstallReport,
+  shareOwnerIdentity,
+  onShareOwnerIdentityChange,
   onSubmit,
 }) => (
   <>
@@ -133,6 +157,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
           <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>
         )}
       </div>
+      {showInstallReport && <InstallReportChoice checked={shareOwnerIdentity} onChange={onShareOwnerIdentityChange} />}
       <Button type="submit" className="mt-4 min-w-40" disabled={loading}>
         {loading ? "Saving..." : "Continue"}
       </Button>
