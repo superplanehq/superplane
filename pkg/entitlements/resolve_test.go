@@ -64,3 +64,37 @@ func TestResolveCatalogAccessAndMarkup(t *testing.T) {
 		require.True(t, resolved.Features[feature.Key])
 	}
 }
+
+func TestSeatOverridePrecedenceAndPersistence(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.Conn()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	planLimit := 4
+	plan := models.BillingPlan{Key: "seat_" + uuid.NewString()[:8], Name: "Seats", Category: "paid", Visibility: "private", SeatLimit: &planLimit, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	check := func(expected *int) {
+		t.Helper()
+		effective, err := Resolve(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.Equal(t, expected, effective.SeatLimit)
+	}
+	check(&planLimit)
+	custom := 2
+	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, &custom))
+	check(&custom)
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, "none", nil)
+	require.NoError(t, err)
+	check(&custom)
+	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, nil))
+	check(nil)
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	check(nil)
+	require.NoError(t, models.DeleteOrganizationSeatLimitOverride(db, r.Organization.ID))
+	check(&planLimit)
+	t.Setenv(models.BillingEnabledEnv, "no")
+	check(nil)
+}

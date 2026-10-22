@@ -6,6 +6,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -37,38 +38,47 @@ func AcceptInviteLink(ctx context.Context, authService authorization.Authorizati
 	}
 
 	statusValue := "joined"
-	tx := database.DB(ctx).Begin()
-	user, err := models.FindMaybeDeletedUserByEmailInTransaction(tx, org.ID.String(), account.Email)
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			tx.Rollback()
-			return nil, grpcerrors.Internal(err, "failed to accept invite")
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := models.LockOrganization(tx, org.ID); err != nil {
+			return err
 		}
-
-		user, err = models.CreateUserInTransaction(tx, org.ID, account.ID, account.Email, account.Name)
+		user, err := models.FindMaybeDeletedUserByEmailInTransaction(tx, org.ID.String(), account.Email)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil && !user.DeletedAt.Valid {
+			statusValue = "already_member"
+			return nil
+		}
+		if models.BillingEnabled() {
+			effective, err := entitlements.Resolve(tx, org.ID)
+			if err != nil {
+				return err
+			}
+			if effective.SeatLimit != nil {
+				used, err := models.CountActiveHumanUsersByOrganizationInTransaction(tx, org.ID.String())
+				if err != nil {
+					return err
+				}
+				if used >= int64(*effective.SeatLimit) {
+					return grpcerrors.FailedPrecondition(nil, "This organization has reached its seat limit. Contact an organization admin.")
+				}
+			}
+		}
+		if user == nil || errors.Is(err, gorm.ErrRecordNotFound) {
+			user, err = models.CreateUserInTransaction(tx, org.ID, account.ID, account.Email, account.Name)
+		} else {
+			err = user.RestoreInTransaction(tx)
+		}
 		if err != nil {
-			tx.Rollback()
-			return nil, grpcerrors.Internal(err, "failed to accept invite")
+			return err
 		}
-	} else if !user.DeletedAt.Valid {
-		tx.Rollback()
-		statusValue = "already_member"
-		return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
-	} else {
-		err = user.RestoreInTransaction(tx)
-		if err != nil {
-			tx.Rollback()
-			return nil, grpcerrors.Internal(err, "failed to accept invite")
-		}
-	}
-
-	err = authService.AssignRole(user.ID.String(), models.RoleOrgOperator, org.ID.String(), models.DomainTypeOrganization)
+		return authService.AssignRole(user.ID.String(), models.RoleOrgOperator, org.ID.String(), models.DomainTypeOrganization)
+	})
 	if err != nil {
-		tx.Rollback()
-		return nil, grpcerrors.Internal(err, "failed to accept invite")
-	}
-
-	if err := tx.Commit().Error; err != nil {
+		if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+			return nil, err
+		}
 		return nil, grpcerrors.Internal(err, "failed to accept invite")
 	}
 
