@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -17,73 +18,92 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 		return nil, factoryErrorToStatus(err, "failed to update factory")
 	}
 
-	db := database.DB(ctx)
-	factory, err := findFactory(db, orgID, req.GetId())
+	var response *pb.UpdateFactoryResponse
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		factory, err := findFactory(tx, orgID, req.GetId())
+		if err != nil {
+			return err
+		}
+		if err := applyFactoryUpdate(tx, factory, req); err != nil {
+			return err
+		}
+		lines, err := factory.ListLines(tx)
+		if err != nil {
+			return err
+		}
+		serialized, err := serializeFactoryWithLineMetrics(tx, factory, lines)
+		if err != nil {
+			return err
+		}
+		response = &pb.UpdateFactoryResponse{Factory: serialized}
+		return nil
+	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory")
 	}
+	return response, nil
+}
 
-	if err := factory.Update(db, req.Name, req.Description, req.Key); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory")
+func applyFactoryUpdate(tx *gorm.DB, factory *models.Factory, req *pb.UpdateFactoryRequest) error {
+	if err := rejectRequestedFactoryDefault(tx, factory, req); err != nil {
+		return err
+	}
+	if err := factory.Update(tx, req.Name, req.Description, req.Key); err != nil {
+		return err
 	}
 
 	if req.GetClearHostedSpendBudget() {
-		if err := factory.UpdateHostedSpendBudget(db, nil); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory")
+		if err := factory.UpdateHostedSpendBudget(tx, nil); err != nil {
+			return err
 		}
 	} else if req.HostedSpendBudgetCents != nil {
-		if err := factory.UpdateHostedSpendBudget(db, req.HostedSpendBudgetCents); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory")
+		if err := factory.UpdateHostedSpendBudget(tx, req.HostedSpendBudgetCents); err != nil {
+			return err
 		}
 	}
 
 	if req.Planning != nil {
 		planning, err := factoryPlanningFromProto(req.Planning)
 		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory")
+			return err
 		}
-		if err := rejectAutoStartLineOutsideFactory(db, factory, planning.AutoStartLineID); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory")
+		if err := rejectAutoStartLineOutsideFactory(tx, factory, planning.AutoStartLineID); err != nil {
+			return err
 		}
-		if err := factory.UpdatePlanning(db, planning); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory")
+		if err := factory.UpdatePlanning(tx, planning); err != nil {
+			return err
 		}
 	}
 
 	if req.PublicBadgeEnabled != nil {
-		if err := factory.UpdatePublicBadgeEnabled(db, req.GetPublicBadgeEnabled()); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory")
+		if err := factory.UpdatePublicBadgeEnabled(tx, req.GetPublicBadgeEnabled()); err != nil {
+			return err
 		}
 	}
 	if req.PublicBadgeShowCost != nil {
-		if err := factory.UpdatePublicBadgeShowCost(db, req.GetPublicBadgeShowCost()); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory")
+		if err := factory.UpdatePublicBadgeShowCost(tx, req.GetPublicBadgeShowCost()); err != nil {
+			return err
 		}
 	}
 
 	if req.GetClearDefaultAgentModel() {
-		if err := factory.UpdateDefaultAgentModel(db, "", ""); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory")
-		}
-	} else if req.DefaultAgentModel != nil {
-		if err := setFactoryDefaultAgentModel(db, factory, req.GetDefaultAgentModel(), req.GetDefaultAgentModelProvider()); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory")
-		}
+		return factory.UpdateDefaultAgentModel(tx, "", "")
 	}
-
-	lines, err := factory.ListLines(db)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory")
+	if req.DefaultAgentModel != nil {
+		return setFactoryDefaultAgentModel(tx, factory, req.GetDefaultAgentModel(), req.GetDefaultAgentModelProvider())
 	}
+	return nil
+}
 
-	serialized, err := serializeFactoryWithLineMetrics(db, factory, lines)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory")
+func rejectRequestedFactoryDefault(tx *gorm.DB, factory *models.Factory, req *pb.UpdateFactoryRequest) error {
+	if req.GetClearDefaultAgentModel() || req.DefaultAgentModel == nil {
+		return nil
 	}
-
-	return &pb.UpdateFactoryResponse{
-		Factory: serialized,
-	}, nil
+	model := strings.TrimSpace(req.GetDefaultAgentModel())
+	if model == "" {
+		return invalidArgument("default model is required")
+	}
+	return rejectUnusableFactoryDefault(tx, factory, model, req.GetDefaultAgentModelProvider())
 }
 
 func rejectAutoStartLineOutsideFactory(db *gorm.DB, factory *models.Factory, lineID *uuid.UUID) error {

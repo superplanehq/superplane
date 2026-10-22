@@ -28,7 +28,7 @@ describe("workspace default model", () => {
         <Toaster />
         <FactoriesHarness
           pathSuffix={agentPath}
-          factoriesFixture={defaultFactoriesFixture}
+          factoriesFixture={hostedDefaultFixture()}
           experimentalFeatures={agentPageFeatures}
         />
       </>,
@@ -37,6 +37,7 @@ describe("workspace default model", () => {
     const select = await screen.findByTestId("agent-default-model-select", {}, { timeout: 8000 });
     expect(select).toHaveTextContent("No default model");
     await user.click(select);
+    expect(screen.queryByRole("option", { name: "Your keys: anthropic/claude-sonnet-4-6" })).not.toBeInTheDocument();
     await user.click(await screen.findByRole("option", { name: "SuperPlane: openai/gpt-5" }));
     expect(await screen.findByTestId("agent-default-model-select")).toHaveTextContent("SuperPlane: openai/gpt-5");
 
@@ -51,9 +52,9 @@ describe("workspace default model", () => {
         <FactoriesHarness
           pathSuffix={agentPath}
           factoriesFixture={{
-            ...defaultFactoriesFixture,
+            ...hostedDefaultFixture(),
             failFactoryUpdate: true,
-            factories: defaultFactoriesFixture.factories.map((factory) =>
+            factories: hostedDefaultFixture().factories.map((factory) =>
               factory.id === PRIMARY_FACTORY_ID
                 ? { ...factory, defaultAgentModel: "gpt-5", defaultAgentModelProvider: "openai" }
                 : factory,
@@ -71,4 +72,39 @@ describe("workspace default model", () => {
     expect(await screen.findByText("SuperPlane could not save the default model. Try again.")).toBeInTheDocument();
     expect(screen.getByTestId("agent-default-model-select")).toHaveTextContent("SuperPlane: openai/gpt-5");
   }, 15000);
+
+  it("offers only models the active source can use", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={codexDefaultFixture()}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("agent-default-model-select", {}, { timeout: 8000 }));
+    expect(await screen.findByRole("option", { name: "Your keys: openai/gpt-5" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "SuperPlane: openai/gpt-5" })).not.toBeInTheDocument();
+  }, 15000);
 });
+
+function hostedDefaultFixture() {
+  return withAgentHarness(defaultFactoriesFixture, "AGENT_HARNESS_SUPERPLANE");
+}
+
+function codexDefaultFixture() {
+  return withAgentHarness(defaultFactoriesFixture, "AGENT_HARNESS_CODEX");
+}
+
+function withAgentHarness(
+  fixture: typeof defaultFactoriesFixture,
+  agentHarness: "AGENT_HARNESS_SUPERPLANE" | "AGENT_HARNESS_CODEX",
+) {
+  return {
+    ...fixture,
+    factories: fixture.factories.map((factory) =>
+      factory.id === PRIMARY_FACTORY_ID ? { ...factory, onboarding: { ...factory.onboarding, agentHarness } } : factory,
+    ),
+  };
+}

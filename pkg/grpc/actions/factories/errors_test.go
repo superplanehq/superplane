@@ -15,10 +15,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
+	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
 )
 
 func Test__factoryErrorToStatus(t *testing.T) {
+	t.Run("keeps a parent-list model error as invalid argument", func(t *testing.T) {
+		err := factoryErrorToStatus(models.ErrModelNotInParentList, "failed to update factory models")
+
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		message, ok := grpcerrors.HandlerMessage(err)
+		require.True(t, ok)
+		assert.Equal(t, "model is not in the parent selected-model list", message)
+	})
+
 	t.Run("keeps a handler error and its client message", func(t *testing.T) {
 		original := grpcerrors.Unauthenticated(errors.New("missing user"), "user not authenticated")
 

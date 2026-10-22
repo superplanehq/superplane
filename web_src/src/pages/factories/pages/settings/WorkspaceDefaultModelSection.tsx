@@ -1,20 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { FactoriesFactory } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { useUpdateFactory } from "@/hooks/useFactoryData";
-import {
-  SELECTABLE_LLM_SOURCE_BYOK,
-  SELECTABLE_LLM_SOURCE_HOSTED,
-  type SelectableLLMModel,
-} from "@/lib/selectableLLMModels";
+import { useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
+import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
+import { SELECTABLE_LLM_SOURCE_HOSTED, type SelectableLLMModel } from "@/lib/selectableLLMModels";
 import { showErrorToast } from "@/lib/toast";
 
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard } from "./FactorySettingsCard";
+import {
+  modelMatchesAgentSource,
+  workspaceAgentModelSource,
+  type AgentModelProviderConnection,
+  type AgentModelSource,
+} from "./workspaceAgentModelSource";
 
 const MODEL_FIELD_ID = "agent-default-model-select";
 const NO_DEFAULT_MODEL = "__none__";
@@ -35,10 +38,15 @@ export function WorkspaceDefaultModelSection({
     enabled: Boolean(organizationId && factoryId),
   });
   const updateFactory = useUpdateFactory(organizationId, factoryId);
-  const models = useMemo(() => modelsQuery.data ?? [], [modelsQuery.data]);
-  const noModels = !modelsQuery.isLoading && models.length === 0;
+  const sourceState = useWorkspaceAgentModelSource(organizationId, factory);
+  const models = useMemo(
+    () => (modelsQuery.data ?? []).filter((model) => modelMatchesAgentSource(model, sourceState.source)),
+    [modelsQuery.data, sourceState.source],
+  );
+  const noModels = !modelsQuery.isLoading && !sourceState.isLoading && models.length === 0;
   const savedKey = useMemo(() => savedDefaultKey(factory, models), [factory, models]);
   const [value, setValue] = useState(savedKey);
+  const saveLock = useRef(false);
 
   useEffect(() => {
     if (updateFactory.isPending) {
@@ -48,7 +56,11 @@ export function WorkspaceDefaultModelSection({
   }, [savedKey, updateFactory.isPending]);
 
   const save = async (next: string) => {
+    if (saveLock.current || updateFactory.isPending) {
+      return;
+    }
     const previous = value;
+    saveLock.current = true;
     setValue(next);
     try {
       if (next === NO_DEFAULT_MODEL) {
@@ -67,6 +79,8 @@ export function WorkspaceDefaultModelSection({
     } catch {
       setValue(previous);
       showErrorToast(AGENT_RESOURCES_COPY.defaultModelSaveFailed);
+    } finally {
+      saveLock.current = false;
     }
   };
 
@@ -81,7 +95,11 @@ export function WorkspaceDefaultModelSection({
         </p>
       </div>
       <PermissionTooltip allowed={canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission} className="w-full">
-        <Select value={value} onValueChange={(next) => void save(next)} disabled={!canUpdate || noModels}>
+        <Select
+          value={value}
+          onValueChange={(next) => void save(next)}
+          disabled={!canUpdate || noModels || updateFactory.isPending || sourceState.isLoading}
+        >
           <SelectTrigger id={MODEL_FIELD_ID} className="w-full" data-testid={MODEL_FIELD_ID}>
             <SelectValue placeholder={AGENT_RESOURCES_COPY.defaultModelPlaceholder} />
           </SelectTrigger>
@@ -112,14 +130,39 @@ function savedDefaultKey(factory: FactoriesFactory | null | undefined, models: S
     return NO_DEFAULT_MODEL;
   }
   const provider = factory?.defaultAgentModelProvider?.trim() ?? "";
-  const match = models.find((model) => {
-    if (model.model.id !== modelId) {
-      return false;
-    }
-    if (provider === "") {
-      return model.source.id === SELECTABLE_LLM_SOURCE_BYOK;
-    }
-    return model.source.id === SELECTABLE_LLM_SOURCE_HOSTED && model.provider.id === provider;
-  });
+  const match = models.find((model) => model.model.id === modelId && modelMatchesSavedProvider(model, provider));
   return match?.key ?? NO_DEFAULT_MODEL;
+}
+
+function modelMatchesSavedProvider(model: SelectableLLMModel, provider: string): boolean {
+  if (provider === "") {
+    return model.source.id !== SELECTABLE_LLM_SOURCE_HOSTED;
+  }
+  return model.source.id === SELECTABLE_LLM_SOURCE_HOSTED && model.provider.id === provider;
+}
+
+const AGENT_MODEL_PROVIDERS = ["anthropic", "openai", "openrouter", "custom"] as const;
+
+function useWorkspaceAgentModelSource(organizationId: string, factory?: FactoriesFactory | null) {
+  const harness = factory?.onboarding?.agentHarness;
+  const needsConnections =
+    Boolean(factory) &&
+    harness !== "AGENT_HARNESS_SUPERPLANE" &&
+    harness !== "AGENT_HARNESS_CODEX" &&
+    harness !== "AGENT_HARNESS_CURSOR";
+  const anthropic = useBYOKLLMModels(organizationId, "anthropic", needsConnections);
+  const openai = useBYOKLLMModels(organizationId, "openai", needsConnections);
+  const openrouter = useBYOKLLMModels(organizationId, "openrouter", needsConnections);
+  const custom = useBYOKLLMModels(organizationId, "custom", needsConnections);
+  const queries = [anthropic, openai, openrouter, custom];
+  const isLoading = !factory || (needsConnections && queries.some((query) => query.isLoading));
+  const connections: AgentModelProviderConnection[] = AGENT_MODEL_PROVIDERS.map((provider, index) => ({
+    provider,
+    connected: Boolean(queries[index]?.data?.connected),
+    integrationId: queries[index]?.data?.integrationId,
+  }));
+  const source: AgentModelSource | undefined = isLoading
+    ? undefined
+    : (workspaceAgentModelSource(harness, factory?.onboarding?.agentIntegrationId, connections) ?? undefined);
+  return { source, isLoading };
 }

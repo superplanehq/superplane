@@ -1,8 +1,10 @@
 package factories
 
 import (
+	"errors"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -13,12 +15,25 @@ func setFactoryDefaultAgentModel(tx *gorm.DB, factory *models.Factory, model, pr
 	if model == "" {
 		return invalidArgument("default model is required")
 	}
-	if _, ok, err := selectableFactoryDefault(tx, factory, model, provider); err != nil {
+	if err := rejectUnusableFactoryDefault(tx, factory, model, provider); err != nil {
 		return err
-	} else if !ok {
-		return models.ErrSelectableLLMModelNotAllowed
 	}
 	return factory.UpdateDefaultAgentModel(tx, model, provider)
+}
+
+func rejectUnusableFactoryDefault(tx *gorm.DB, factory *models.Factory, model, provider string) error {
+	source, err := activeFactoryModelSource(tx, factory)
+	if err != nil {
+		return err
+	}
+	listed, err := models.ListSelectableLLMModels(tx, factory.OrganizationID, &factory.ID)
+	if err != nil {
+		return err
+	}
+	if !selectableDefaultForSource(listed, model, provider, source) {
+		return models.ErrSelectableLLMModelNotAllowed
+	}
+	return nil
 }
 
 func clearStaleFactoryDefaultModel(tx *gorm.DB, factory *models.Factory, source string) error {
@@ -43,33 +58,96 @@ func factoryDefaultSelectableForSource(tx *gorm.DB, factory *models.Factory, sou
 	return selectableDefaultForSource(listed, factory.DefaultAgentModel, factory.DefaultAgentModelProvider, source), nil
 }
 
-func selectableFactoryDefault(tx *gorm.DB, factory *models.Factory, model, provider string) (models.SelectableLLMModel, bool, error) {
-	listed, err := models.ListSelectableLLMModels(tx, factory.OrganizationID, &factory.ID)
-	if err != nil {
-		return models.SelectableLLMModel{}, false, err
+func activeFactoryModelSource(tx *gorm.DB, factory *models.Factory) (string, error) {
+	config := factory.OnboardingConfigValue()
+	switch strings.TrimSpace(config.AgentHarness) {
+	case models.FactoryOnboardingAgentHarnessSuperPlane:
+		return modelSourceHosted, nil
+	case models.FactoryOnboardingAgentHarnessCodex:
+		return modelSourceOpenAI, nil
+	case models.FactoryOnboardingAgentHarnessCursor:
+		return "", nil
+	case models.FactoryOnboardingAgentHarnessClaudeCode:
+		return claudeFactoryModelSource(tx, factory, config.AgentIntegrationID)
+	default:
+		return unspecifiedFactoryModelSource(tx, factory, config.AgentIntegrationID)
 	}
-	found, ok := matchSelectableFactoryDefault(listed, model, provider)
-	return found, ok, nil
 }
 
-func matchSelectableFactoryDefault(listed []models.SelectableLLMModel, model, provider string) (models.SelectableLLMModel, bool) {
-	model = strings.TrimSpace(model)
-	provider = strings.TrimSpace(provider)
-	if model == "" {
-		return models.SelectableLLMModel{}, false
+func claudeFactoryModelSource(tx *gorm.DB, factory *models.Factory, integrationID string) (string, error) {
+	source, err := modelSourceFromAgentIntegration(tx, factory, integrationID)
+	if err != nil || source != "" {
+		return source, err
 	}
-	for _, item := range listed {
-		if item.Model.ID != model {
-			continue
+	return firstReadyModelSource(tx, factory.OrganizationID, []string{
+		modelSourceAnthropic,
+		modelSourceOpenRouter,
+		modelSourceCustom,
+	})
+}
+
+func unspecifiedFactoryModelSource(tx *gorm.DB, factory *models.Factory, integrationID string) (string, error) {
+	source, err := modelSourceFromAgentIntegration(tx, factory, integrationID)
+	if err != nil || source != "" {
+		return source, err
+	}
+	source, err = firstReadyModelSource(tx, factory.OrganizationID, []string{
+		modelSourceAnthropic,
+		modelSourceOpenAI,
+		modelSourceOpenRouter,
+		modelSourceCustom,
+	})
+	if err != nil || source != "" {
+		return source, err
+	}
+	return modelSourceHosted, nil
+}
+
+func modelSourceFromAgentIntegration(tx *gorm.DB, factory *models.Factory, integrationID string) (string, error) {
+	integrationID = strings.TrimSpace(integrationID)
+	if integrationID == "" {
+		return "", nil
+	}
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return "", nil
+	}
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", nil
 		}
-		if provider == "" && item.Source.ID == models.UsageFundingSourceBYOK {
-			return item, true
+		return "", err
+	}
+	return modelSourceFromAppName(integration.AppName), nil
+}
+
+func modelSourceFromAppName(appName string) string {
+	switch appName {
+	case "claude":
+		return modelSourceAnthropic
+	case "openai":
+		return modelSourceOpenAI
+	case "openrouter":
+		return modelSourceOpenRouter
+	case models.CustomLLMAppName:
+		return modelSourceCustom
+	default:
+		return ""
+	}
+}
+
+func firstReadyModelSource(tx *gorm.DB, orgID uuid.UUID, sources []string) (string, error) {
+	for _, source := range sources {
+		integration, err := models.FindReadyBYOKIntegration(tx, orgID, source)
+		if err != nil {
+			return "", err
 		}
-		if provider != "" && item.Source.ID == models.UsageFundingSourceHosted && item.Provider.ID == provider {
-			return item, true
+		if integration != nil {
+			return source, nil
 		}
 	}
-	return models.SelectableLLMModel{}, false
+	return "", nil
 }
 
 func selectableDefaultForSource(listed []models.SelectableLLMModel, model, provider, source string) bool {

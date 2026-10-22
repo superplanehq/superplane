@@ -71,6 +71,83 @@ func Test__UpdateFactory(t *testing.T) {
 		assert.Equal(t, codes.AlreadyExists, code)
 	})
 
+	t.Run("rejects a default the active source cannot use and keeps other fields", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		seedSelectableHostedModel(t)
+		_, err = models.UpsertOrganizationBYOKModelAllowlist(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			models.UsageProviderAnthropic,
+			datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+		)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
+		})
+		harness := models.FactoryOnboardingAgentHarnessSuperPlane
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AgentHarness: &harness,
+		}))
+
+		name := support.RandomName("kept")
+		model := "claude-sonnet-4-6"
+		provider := ""
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                        factory.ID.String(),
+			Name:                      &name,
+			DefaultAgentModel:         &model,
+			DefaultAgentModelProvider: &provider,
+		})
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		saved, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Equal(t, factory.Name, saved.Name)
+		assert.Empty(t, saved.DefaultAgentModel)
+		assert.Empty(t, saved.DefaultAgentModelProvider)
+	})
+
+	t.Run("saves a bring-your-own-key default for that source", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		seedSelectableHostedModel(t)
+		_, err = models.UpsertOrganizationBYOKModelAllowlist(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			models.UsageProviderOpenAI,
+			datatypes.JSONSlice[string]{"gpt-5"},
+		)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
+		})
+		harness := models.FactoryOnboardingAgentHarnessCodex
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AgentHarness: &harness,
+		}))
+
+		hosted := "claude-sonnet-4-6"
+		hostedProvider := models.UsageProviderAnthropic
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                        factory.ID.String(),
+			DefaultAgentModel:         &hosted,
+			DefaultAgentModelProvider: &hostedProvider,
+		})
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		model := "gpt-5"
+		provider := ""
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                        factory.ID.String(),
+			DefaultAgentModel:         &model,
+			DefaultAgentModelProvider: &provider,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, model, response.Factory.DefaultAgentModel)
+		assert.Empty(t, response.Factory.DefaultAgentModelProvider)
+	})
+
 	t.Run("not found -> error", func(t *testing.T) {
 		name := support.RandomName("missing")
 		_, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{

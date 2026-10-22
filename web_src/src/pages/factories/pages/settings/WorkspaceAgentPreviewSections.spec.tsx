@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it, vi } from "bun:test";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { client } from "@/api-client/client.gen";
+import type { FactoriesFactory } from "@/api-client";
 import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
@@ -45,7 +46,12 @@ describe("workspace agent preview fields", () => {
     const user = userEvent.setup();
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <WorkspaceDefaultModelSection organizationId="org-1" factoryId="factory-1" canUpdate />
+        <WorkspaceDefaultModelSection
+          organizationId="org-1"
+          factoryId="factory-1"
+          factory={{ id: "factory-1", onboarding: { agentHarness: "AGENT_HARNESS_SUPERPLANE" } } as FactoriesFactory}
+          canUpdate
+        />
       </QueryClientProvider>,
     );
 
