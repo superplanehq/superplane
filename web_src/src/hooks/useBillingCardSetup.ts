@@ -40,6 +40,7 @@ export function useBillingCardSetup(organizationId: string) {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const check = async () => {
+      if (cancelled) return;
       const result = await refetch();
       if (cancelled) return;
       if (result.data?.hasPaymentMethod) {

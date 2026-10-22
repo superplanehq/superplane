@@ -182,6 +182,62 @@ it("waits for a returning subscription without creating another checkout", async
   expect(finish).not.toHaveBeenCalled();
 });
 
+it("finishes a different plan after checkout when the subscription is not active", async () => {
+  const user = userEvent.setup();
+  const finish = renderBilling("/org-1/workspaces/pay/setup?step=billing&plan=pro&subscribed=1");
+  await waitFor(() => expect(syncBilling).toHaveBeenCalledTimes(1));
+  await user.click(await screen.findByRole("button", { name: /Free/ }));
+  await user.click(screen.getByRole("button", { name: "Finish setup" }));
+  await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
+  expect(selectPlan).toHaveBeenCalledWith(
+    expect.objectContaining({ body: expect.objectContaining({ planKey: "free" }) }),
+  );
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("starts checkout for the returned plan after the user selects another plan", async () => {
+  const user = userEvent.setup();
+  const finish = renderBilling("/org-1/workspaces/pay/setup?step=billing&plan=pro&subscribed=1");
+  const previousAssign = window.location.assign;
+  const assign = vi.fn();
+  window.location.assign = assign;
+  try {
+    await waitFor(() => expect(syncBilling).toHaveBeenCalledTimes(1));
+    await user.click(await screen.findByRole("button", { name: /Free/ }));
+    await user.click(screen.getByRole("button", { name: /Pro/ }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://polar.sh/checkout/pro"));
+    expect(screen.queryByText("The plan is not active yet.")).toBeNull();
+    expect(finish).not.toHaveBeenCalled();
+  } finally {
+    window.location.assign = previousAssign;
+  }
+});
+
+it("enables setup when the card window closes after the card is saved", async () => {
+  const user = userEvent.setup();
+  renderBilling();
+  const previousOpen = window.open;
+  const popup = {
+    closed: false,
+    opener: {},
+    location: { replace: vi.fn() },
+    close: vi.fn(),
+  };
+  window.open = vi.fn(() => popup as unknown as Window);
+  try {
+    await user.click(await screen.findByRole("button", { name: /Pay-as-you-go/ }));
+    await waitFor(() => expect(popup.location.replace).toHaveBeenCalled());
+    await waitFor(() => expect(describeBilling.mock.calls.length).toBeGreaterThanOrEqual(2));
+    const callsBeforeClose = describeBilling.mock.calls.length;
+    billing = { ...billing, hasPaymentMethod: true };
+    popup.closed = true;
+    await waitFor(() => expect(describeBilling.mock.calls.length).toBeGreaterThan(callsBeforeClose), { timeout: 3000 });
+    expect(screen.getByRole("button", { name: "Finish setup" })).toBeEnabled();
+  } finally {
+    window.open = previousOpen;
+  }
+});
+
 it("finishes setup with an active private plan that is not listed", async () => {
   billing = {
     ...billing,

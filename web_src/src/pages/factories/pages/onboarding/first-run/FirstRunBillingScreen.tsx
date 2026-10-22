@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router";
 import type { OrganizationsBillingPlanOption, OrganizationsDescribeOrganizationBillingResponse } from "@/api-client";
@@ -65,14 +65,26 @@ function assertPlanActive(
   }
 }
 
+// subscribed stays in the return URL until the user picks another plan.
+// Only the plan from that checkout must already be active.
+function checkoutReturnPlanKey(params: URLSearchParams) {
+  if (params.get("subscribed") !== "1") return "";
+  return params.get("plan") ?? "";
+}
+
+function isReturnedCheckoutPlan(planKey: string | undefined, returnedKey: string) {
+  return returnedKey !== "" && returnedKey === planKey;
+}
+
 function useOnboardingBilling(organizationId: string, onContinue: () => Promise<void>) {
   const billing = useOrganizationBilling(organizationId);
   const cardSetup = useBillingCardSetup(organizationId);
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [requestedPlanKey, setRequestedPlanKey] = useState(searchParams.get("plan") ?? "");
   const [error, setError] = useState("");
   const [checkoutReturned, setCheckoutReturned] = useState(searchParams.get("subscribed") === "1");
+  const returnedPlanKey = useRef(checkoutReturnPlanKey(searchParams));
   const currentOption = currentPlanOption(billing.data);
   const plans = billingPlanChoices(billing.data, currentOption);
   const selectedKey = requestedPlanKey;
@@ -103,14 +115,15 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
     mutationFn: async (plan: OrganizationsBillingPlanOption) => {
       setError("");
       if (!plan?.key) return;
-      if (searchParams.has("subscribed")) await syncOrganizationBilling(organizationId);
+      const waitingForReturnedPlan = isReturnedCheckoutPlan(plan.key, returnedPlanKey.current);
+      if (waitingForReturnedPlan) await syncOrganizationBilling(organizationId);
       const verified = await billing.refetch();
       if (verified.error) throw verified.error;
       if (!verified.data) throw new Error("Could not verify billing. Try again.");
       if (plan.requirePaymentMethod && !plan.subscriptionRequired && !verified.data.hasPaymentMethod) {
         throw new Error("Add a payment card before continuing.");
       }
-      if (searchParams.has("subscribed")) assertPlanActive(plan, verified.data);
+      if (waitingForReturnedPlan) assertPlanActive(plan, verified.data);
       if (!isCurrentBillingPlan(plan, verified.data)) {
         const response = await organizationsSelectBillingPlan(
           withOrganizationHeader({
@@ -145,6 +158,14 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
     selectPlan: (option: OrganizationsBillingPlanOption) => {
       setRequestedPlanKey(option.key ?? "");
       setError("");
+      if (!isReturnedCheckoutPlan(option.key, returnedPlanKey.current)) {
+        returnedPlanKey.current = "";
+        if (searchParams.has("subscribed")) {
+          const next = new URLSearchParams(searchParams);
+          next.delete("subscribed");
+          setSearchParams(next, { replace: true });
+        }
+      }
       if (option.subscriptionRequired && !isCurrentBillingPlan(option, billing.data)) {
         activate.mutate(option);
         return;
