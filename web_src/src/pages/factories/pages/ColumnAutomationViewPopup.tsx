@@ -1,5 +1,6 @@
 import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
 import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
+import type { RunHistoryIntakeSource } from "./automationRunHistory/intakeRunData";
 import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ interface ColumnAutomationViewPopupProps {
   organizationId?: string;
   factoryId?: string;
   historyEligible?: boolean;
+  intakeSource?: RunHistoryIntakeSource;
   title: string;
   graph?: IntakeAutomationGraph;
   loading?: boolean;
@@ -45,6 +47,7 @@ export function ColumnAutomationViewPopup({
   organizationId,
   factoryId,
   historyEligible = false,
+  intakeSource,
   title,
   graph,
   loading = false,
@@ -116,6 +119,7 @@ export function ColumnAutomationViewPopup({
           ) : null}
         </PopupHeader>
         <ColumnAutomationViewBody
+          intakeSource={intakeSource}
           history={history}
           tab={tab}
           graph={graph}
@@ -200,6 +204,7 @@ function ColumnAutomationViewFooter({
 }
 
 function ColumnAutomationViewBody({
+  intakeSource,
   history,
   tab,
   graph,
@@ -213,6 +218,7 @@ function ColumnAutomationViewBody({
   agent,
 }: {
   history: ReturnType<typeof useFactoryAutomationNavigation>;
+  intakeSource?: RunHistoryIntakeSource;
   tab: ColumnAutomationViewTab;
   graph?: IntakeAutomationGraph;
   loading: boolean;
@@ -227,6 +233,7 @@ function ColumnAutomationViewBody({
   if (tab === "runs") {
     return (
       <FactoryAutomationHistory
+        intakeSource={intakeSource}
         organizationId={history.organizationId}
         factoryId={history.factoryId}
         canvasId={canvasId}
@@ -301,6 +308,7 @@ export function ColumnAutomationViewHost({
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
   const nodeIds = automation.graph?.specNodes?.map((node) => node.id) ?? [];
+  const intakeSource = scheduledIntakeHistorySource(automation.graph);
   if (columnAutomationUsesSplitConfig(nodeIds)) {
     return (
       <MergeConfidenceConfigModal
@@ -327,7 +335,8 @@ export function ColumnAutomationViewHost({
     <ColumnAutomationViewPopup
       organizationId={organizationId}
       factoryId={factoryId}
-      historyEligible={columnKey === "verify" || columnKey === "done"}
+      historyEligible={Boolean(intakeSource) || columnKey === "verify" || columnKey === "done"}
+      intakeSource={intakeSource}
       title={automation.name?.trim() || title}
       graph={automation.graph}
       loading={automation.isLoading}
@@ -357,6 +366,13 @@ export function ColumnAutomationViewHost({
       deletePending={deletePending}
     />
   );
+}
+
+function scheduledIntakeHistorySource(graph: IntakeAutomationGraph): RunHistoryIntakeSource | undefined {
+  const nodes = graph.specNodes ?? [];
+  if (nodes.some((node) => node.id === "scheduled-agent") && nodes.some((node) => node.component === "schedule"))
+    return "scheduled-intake";
+  return undefined;
 }
 
 function AutomationViewBody({

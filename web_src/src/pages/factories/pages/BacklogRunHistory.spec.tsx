@@ -41,6 +41,7 @@ describe("Backlog intake run history", () => {
     [GITHUB_INTAKE, GITHUB_INTAKE_CANVAS],
     [SENTRY_INTAKE, SENTRY_INTAKE_CANVAS],
     [DEPENDABOT_INTAKE, DEPENDABOT_INTAKE_CANVAS],
+    [JIRA_INTAKE, GITHUB_INTAKE_CANVAS],
   ] as const)("replaces the canvas with shared history for $0.source.id", async (intake, canvas) => {
     useCanvas.mockReturnValue({ data: canvas, isPending: false, isError: false, refetch: vi.fn() });
     const user = userEvent.setup();
@@ -71,15 +72,6 @@ describe("Backlog intake run history", () => {
 
     expect(screen.getByText("superplanehq/superplane")).toBeInTheDocument();
     expect(screen.queryByText("superplanehq/another-repository")).not.toBeInTheDocument();
-  });
-
-  it("keeps other intake sources on their existing view", async () => {
-    const user = userEvent.setup();
-    renderHost({ intake: JIRA_INTAKE });
-    expect(screen.getByRole("tab", { name: "Automation" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("intake-settings-tab-automation"));
-    expect(screen.getByTestId("intake-source-automation")).toBeInTheDocument();
   });
 
   it("shares Planning history and run selection through browser navigation", async () => {
