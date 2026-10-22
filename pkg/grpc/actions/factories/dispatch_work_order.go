@@ -214,9 +214,6 @@ func dispatchWorkOrderOnLineTx(
 	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
 		return nil, err
 	}
-	if err := order.TransitionOnDispatch(tx, actor); err != nil {
-		return nil, err
-	}
 	if _, err := order.ClearAutoStart(tx); err != nil {
 		return nil, err
 	}
@@ -228,6 +225,9 @@ func dispatchWorkOrderOnLineTx(
 			return nil, err
 		}
 		startedSteps = started
+		if err := applyDispatchedWorkOrderState(tx, order, actor, startedSteps); err != nil {
+			return nil, err
+		}
 		return &workOrderLineDispatchResult{
 			factory:      factory,
 			order:        order,
@@ -256,6 +256,10 @@ func dispatchWorkOrderOnLineTx(
 		return nil, err
 	}
 
+	if err := applyDispatchedWorkOrderState(tx, order, actor, []*models.FactoryLineStepResult{result}); err != nil {
+		return nil, err
+	}
+
 	return &workOrderLineDispatchResult{
 		factory:      factory,
 		order:        order,
@@ -263,6 +267,20 @@ func dispatchWorkOrderOnLineTx(
 		fromState:    fromState,
 		logger:       logger,
 	}, nil
+}
+
+// A queued start stays a draft so Backlog pagination and filters agree with
+// the board. Assign its owner now; admission opens it when execution starts.
+func applyDispatchedWorkOrderState(tx *gorm.DB, order *models.FactoryWorkOrder, actor *uuid.UUID, results []*models.FactoryLineStepResult) error {
+	for _, result := range results {
+		if result != nil && result.Execution != nil && result.Execution.WorkOrderID == order.ID {
+			return order.TransitionOnDispatch(tx, actor)
+		}
+	}
+	if order.State == models.FactoryWorkOrderStateDraft && actor != nil {
+		return order.UpdateAssignees(tx, []uuid.UUID{*actor}, *actor)
+	}
+	return nil
 }
 
 func publishDispatchedWorkOrder(

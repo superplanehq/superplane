@@ -308,7 +308,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	runCancellations := &RunCancellationNotifier{}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := models.LockTaskStatusExecutionAdmission(tx, id); err != nil {
+		if err := models.LockTaskExecutionAdmission(tx, id); err != nil {
 			return err
 		}
 
