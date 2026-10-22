@@ -2,7 +2,7 @@ import { Outlet, Route } from "react-router";
 
 import { RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactorySettingsAgentPage } from "./FactorySettingsAgentPage";
 import { FactorySettingsMCPConnectionPage } from "./FactorySettingsMCPConnectionPage";
@@ -26,14 +26,7 @@ export const agentSectionRoute = (
     }
   >
     <Route index element={<FactorySettingsAgentPage />} />
-    <Route
-      path="setup-steps"
-      element={
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT}>
-          <FactorySettingsSetupStepsPage />
-        </RequireExperimentalFeature>
-      }
-    />
+    <Route path="setup-steps" element={<FactorySettingsSetupStepsPage />} />
     <Route path="mcp/:resourceId" element={<FactorySettingsMCPConnectionPage />} />
     <Route
       path="skills/new"
