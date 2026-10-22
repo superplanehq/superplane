@@ -41,6 +41,7 @@ interface MergeConfidenceConfigShellProps {
   onConfirmDelete: () => void;
   onConfirmDeleteChange: (open: boolean) => void;
   tab: MergeConfidenceConfigTab;
+  showAutomationTab?: boolean;
   showRunsTab: boolean;
   onTabChange: (tab: MergeConfidenceConfigTab) => void;
   containerRef: RefObject<HTMLDivElement | null>;
@@ -94,6 +95,7 @@ function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
     features.has(FEATURE_FACTORY_RUN_HISTORY) &&
       props.graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID),
   );
+  const showAutomationTab = props.showAutomationTab ?? true;
   return (
     <>
       <PopupHeader
@@ -105,16 +107,18 @@ function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
           ) : null
         }
       >
-        <SettingsAutomationHeaderRow
-          tabs={
-            <ConfigTabs
-              tab={props.tab}
-              showRunsTab={props.showRunsTab}
-              onTabChange={props.onTabChange}
-              simplifiedImplement={simplifiedImplement}
-            />
-          }
-        />
+        {showAutomationTab ? (
+          <SettingsAutomationHeaderRow
+            tabs={
+              <ConfigTabs
+                tab={props.tab}
+                showRunsTab={props.showRunsTab}
+                onTabChange={props.onTabChange}
+                simplifiedImplement={simplifiedImplement}
+              />
+            }
+          />
+        ) : null}
       </PopupHeader>
       <MergeConfidenceConfigBody {...configBodyProps(props)} />
       {props.onDelete ? (

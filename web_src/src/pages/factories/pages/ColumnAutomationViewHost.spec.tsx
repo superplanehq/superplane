@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -10,8 +9,6 @@ import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
-
-import { dematerializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
 
 import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
 
@@ -189,17 +186,13 @@ function renderHost() {
   );
 }
 
-function expectSplitConfig() {
+function expectRunsOnly() {
   const dialog = screen.getByTestId("merge-confidence-config");
   expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
-  expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
-  expect(within(dialog).getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
-  expect(
-    within(dialog)
-      .getAllByRole("tab")
-      .map((tab) => tab.textContent),
-  ).toEqual(["Automation", "Runs"]);
-  return within(dialog).getByTestId("merge-confidence-config-form");
+  expect(within(dialog).queryByRole("tab", { name: "Automation" })).not.toBeInTheDocument();
+  expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
+  expect(within(dialog).queryByRole("heading", { name: "On Pull Request Closed" })).not.toBeInTheDocument();
+  return dialog;
 }
 
 describe("ColumnAutomationViewHost", () => {
@@ -234,55 +227,9 @@ describe("ColumnAutomationViewHost", () => {
     localStorage.clear();
   });
 
-  it("opens pull-request closure on the split config screen", () => {
+  it("opens pull request closure on runs without the automation tab", () => {
     renderHost();
 
-    const form = expectSplitConfig();
-    expect(within(form).getByRole("heading", { name: "On Pull Request Closed" })).toBeInTheDocument();
-    expect(within(form).getByText("Start a run when:")).toBeInTheDocument();
-    expect(within(form).getByRole("checkbox", { name: "A pull request is opened" })).toBeInTheDocument();
-    expect(within(form).queryByTestId("node-name-input")).not.toBeInTheDocument();
-    expect(within(form).queryByText("Actions")).not.toBeInTheDocument();
-  });
-
-  it("keeps the Bitbucket trigger on the generic settings form", () => {
-    useCanvas.mockReturnValue({
-      data: closureCanvas("bitbucket.onPullRequest", ["merged", "declined"]),
-      isPending: false,
-      isError: false,
-      refetch: vi.fn().mockResolvedValue(undefined),
-    });
-
-    renderHost();
-
-    const form = expectSplitConfig();
-    expect(within(form).getByRole("heading", { name: "On Pull Request Closed" })).toBeInTheDocument();
-    expect(within(form).getByTestId("node-name-input")).toBeInTheDocument();
-    expect(within(form).getByText("Actions")).toBeInTheDocument();
-    expect(within(form).queryByText("Start a run when:")).not.toBeInTheDocument();
-    expect(within(form).queryByRole("checkbox", { name: "A pull request is opened" })).not.toBeInTheDocument();
-  });
-
-  it("saves the selected action when its status changes", async () => {
-    const user = userEvent.setup();
-    renderHost();
-
-    await user.click(screen.getByTestId("factory-node-update-task-status"));
-
-    const form = screen.getByTestId("merge-confidence-config-form");
-    expect(within(form).getByRole("heading", { name: "Complete Task" })).toBeInTheDocument();
-    await user.click(within(form).getByTestId("field-status-select"));
-    await user.click(screen.getByRole("option", { name: "Closed" }));
-
-    await waitFor(() => expect(updateCanvasVersion).toHaveBeenCalled());
-
-    const saved = dematerializeCanvasSpec(updateCanvasVersion.mock.calls.at(-1)?.[0].canvasYaml);
-    const savedNode = saved?.nodes?.find((node) => node.id === "complete-work-order");
-    expect(savedNode?.name).toBe("Complete Task");
-    expect(savedNode?.configuration).toEqual({
-      orderId: "{{ root().data.workOrder.id }}",
-      status: "closed",
-    });
-    expect(commitCanvasStaging).toHaveBeenCalledWith("Update step");
+    expectRunsOnly();
   });
 });
