@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router";
 import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun, FactoriesWorkOrder } from "@/api-client";
@@ -124,6 +124,7 @@ describe("Implement run details hydration", () => {
                   />
                 }
               />
+              <Route path="/:organizationId/workspaces/:factoryKey/task/:orderNumber" element={<p>Task details</p>} />
             </Routes>
           </MemoryRouter>
         </QueryClientProvider>,
@@ -135,6 +136,8 @@ describe("Implement run details hydration", () => {
         ),
       );
       expect(screen.queryByText("Outcome unavailable")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("link", { name: "Task SP-42" }));
+      await waitFor(() => expect(screen.getByText("Task details")).toBeInTheDocument());
     } finally {
       taskData.orders = [];
       client.clear();
