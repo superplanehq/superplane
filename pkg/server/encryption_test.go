@@ -9,11 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/encryption"
-	"gorm.io/gorm"
 )
 
-func TestApplicationEncryptionRolloutWriteFormat(t *testing.T) {
+func TestApplicationEncryptionRequiresMasterKeysAndWritesVersionedValues(t *testing.T) {
 	ctx := t.Context()
 	db := database.DB(context.Background())
 	require.NoError(t, database.VerifyTestDatabase(db))
@@ -24,54 +22,20 @@ func TestApplicationEncryptionRolloutWriteFormat(t *testing.T) {
 	clean()
 	t.Cleanup(clean)
 
-	t.Setenv("ENCRYPTION_KEY", "1234567890abcdefghijklmnopqrstuv")
-	t.Setenv("ENCRYPTION_MASTER_KEYS", "env://server-test-v1:"+base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)))
-	t.Setenv("ENCRYPTION_LEGACY_FORMAT", "aes-gcm")
-	t.Setenv("ENCRYPTION_WRITE_FORMAT", "legacy")
-	legacyConfig, err := loadApplicationEncryption(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, legacyConfig.keyStore)
-	require.True(t, legacyConfig.legacyWrites)
-	legacyValue, err := legacyConfig.encryptor.Encrypt(ctx, []byte("legacy secret"), []byte("record"))
-	require.NoError(t, err)
-	_, versioned, err := crypto.EncryptedDataKeyID(legacyValue)
-	require.NoError(t, err)
-	require.False(t, versioned)
-	var legacyTransactionValue []byte
-	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		var err error
-		legacyTransactionValue, err = encryption.ForDB(tx, legacyConfig.encryptor).Encrypt(
-			ctx, []byte("legacy transaction secret"), []byte("record"),
-		)
-		return err
-	}))
-	_, versioned, err = crypto.EncryptedDataKeyID(legacyTransactionValue)
-	require.NoError(t, err)
-	require.False(t, versioned)
+	t.Setenv("ENCRYPTION_MASTER_KEYS", "")
+	_, err := loadApplicationEncryption(ctx)
+	require.ErrorContains(t, err, "ENCRYPTION_MASTER_KEYS is required")
 
-	t.Setenv("ENCRYPTION_WRITE_FORMAT", "versioned")
-	versionedConfig, err := loadApplicationEncryption(ctx)
+	t.Setenv("ENCRYPTION_MASTER_KEYS", "env://server-test-v1:"+base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)))
+	configuration, err := loadApplicationEncryption(ctx)
 	require.NoError(t, err)
-	require.False(t, versionedConfig.legacyWrites)
-	versionedValue, err := versionedConfig.encryptor.Encrypt(ctx, []byte("versioned secret"), []byte("record"))
+	require.NotNil(t, configuration.keyStore)
+	value, err := configuration.encryptor.Encrypt(ctx, []byte("secret"), []byte("record"))
 	require.NoError(t, err)
-	_, versioned, err = crypto.EncryptedDataKeyID(versionedValue)
+	_, versioned, err := crypto.EncryptedDataKeyID(value)
 	require.NoError(t, err)
 	require.True(t, versioned)
-
-	for _, item := range []struct {
-		value []byte
-		want  string
-	}{
-		{legacyValue, "legacy secret"},
-		{versionedValue, "versioned secret"},
-	} {
-		plain, err := versionedConfig.encryptor.Decrypt(ctx, item.value, []byte("record"))
-		require.NoError(t, err)
-		require.Equal(t, item.want, string(plain))
-	}
-
-	plain, err := legacyConfig.encryptor.Decrypt(ctx, versionedValue, []byte("record"))
+	plain, err := configuration.encryptor.Decrypt(ctx, value, []byte("record"))
 	require.NoError(t, err)
-	require.Equal(t, "versioned secret", string(plain))
+	require.Equal(t, "secret", string(plain))
 }

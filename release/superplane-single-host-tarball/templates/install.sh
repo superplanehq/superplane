@@ -196,8 +196,7 @@ ensure_oidc_keys() {
 write_new_env() {
   local domain="$1"
   local base_url="https://${domain}"
-  local encryption_key encryption_master_keys jwt_secret db_password rabbit_password signing_key
-  encryption_key="$(random_hex 16)"
+  local encryption_master_keys jwt_secret db_password rabbit_password signing_key
   encryption_master_keys="env://host-v1:$(random_base64)"
   jwt_secret="$(random_hex 32)"
   db_password="$(random_hex 16)"
@@ -238,7 +237,6 @@ RBAC_MODEL_PATH=/app/rbac/rbac_model.conf
 RBAC_ORG_POLICY_PATH=/app/rbac/rbac_org_policy.csv
 TEMPLATE_DIR=/app/templates
 
-ENCRYPTION_KEY=${encryption_key}
 ENCRYPTION_MASTER_KEYS=${encryption_master_keys}
 JWT_SECRET=${jwt_secret}
 OIDC_KEYS_PATH=/app/oidc-keys
