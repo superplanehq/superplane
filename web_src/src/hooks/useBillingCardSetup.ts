@@ -38,7 +38,13 @@ export function useBillingCardSetup(organizationId: string) {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const check = async () => {
+      if (cancelled) return;
       if (popup.closed) {
+        const result = await refetch();
+        if (cancelled) return;
+        if (!result.data?.hasPaymentMethod && result.error) {
+          setError("Could not verify the card. Close the Polar window and try again.");
+        }
         setPopup(null);
         return;
       }
