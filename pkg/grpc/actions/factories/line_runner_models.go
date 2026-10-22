@@ -105,7 +105,7 @@ func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node model
 	if err != nil {
 		return nil, err
 	}
-	if stored := storedRunnerModel(node.Configuration); stored != "" {
+	if stored := storedRunnerModel(node.Configuration); stored != "" && runnerFundingSource(node.Configuration) == models.UsageFundingSourceHosted {
 		ids = append(ids, stored)
 	}
 	return concreteLineRunnerModels(ids), nil

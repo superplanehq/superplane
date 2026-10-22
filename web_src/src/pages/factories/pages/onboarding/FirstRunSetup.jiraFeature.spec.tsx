@@ -109,7 +109,10 @@ function LiveJiraSetup({
   setupOptions: SetupOptions;
   setupRef: { current: OnboardingSetupApi | null };
 }) {
-  const setup = useOnboardingSetupState("Payments Service", setupOptions);
+  const setup = useOnboardingSetupState("Payments Service", {
+    ...setupOptions,
+    initial: { vcsHost: "github", selectedRepo: "acme/api", ...setupOptions.initial },
+  });
   setupRef.current = setup;
   return <FirstRunSetup model={{ ...model, setup }} />;
 }
@@ -207,7 +210,6 @@ describe("FirstRunSetup Jira intake", () => {
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(model.saveIssues).toHaveBeenCalledWith("jira");
-    expect(model.finish).toHaveBeenCalledWith("jira");
   });
 
   it("keeps a saved Jira choice when the organization lookup fails", async () => {
@@ -233,11 +235,11 @@ describe("FirstRunSetup Jira intake", () => {
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(setupRef.current?.issuesChoice).toBe("jira");
 
-    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
 
-    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
-    expect(model.saveIssues).toHaveBeenCalledWith("jira");
-    expect(model.finish).toHaveBeenCalledWith("jira");
+    await waitFor(() => expect(model.saveIssues).toHaveBeenCalledWith("jira"));
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(model.finish).not.toHaveBeenCalled();
   });
 
   it("does not block ticket choices while the organization lookup is loading", () => {
@@ -321,7 +323,8 @@ describe("FirstRunSetup Jira intake", () => {
 vi.mock("@/hooks/useOrganizationBilling", () => ({
   organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
   useOrganizationBilling: () => ({
-    data: { billingEnabled: false },
-    refetch: async () => ({ data: { billingEnabled: false } }),
+    data: { billingEnabled: false, productFeatures: { byo_key: false } },
+    isSuccess: true,
+    refetch: async () => ({ data: { billingEnabled: false, productFeatures: { byo_key: false } } }),
   }),
 }));

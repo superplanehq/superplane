@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -213,6 +212,11 @@ func UpsertFactoryLLMModelAllowlist(tx *gorm.DB, orgID, factoryID uuid.UUID, pro
 	if err != nil {
 		return nil, err
 	}
+	if source == UsageFundingSourceBYOK {
+		if err := RequireOrganizationBYOKAccess(tx, orgID, normalized); err != nil {
+			return nil, err
+		}
+	}
 	if err := assertFactoryModelsInParent(tx, orgID, normalized, source, normalizedModels); err != nil {
 		return nil, err
 	}
@@ -293,13 +297,8 @@ func ModelIsSelectable(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provi
 }
 
 func parentSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, provider, fundingSource string) ([]string, error) {
-	if provider == UsageProviderCustom {
-		enabled, err := OrganizationHasExperimentalFeatures(
-			tx,
-			orgID,
-			features.FeatureOrganizationBYOK,
-			features.FeatureOrganizationBYOKCustomProvider,
-		)
+	if fundingSource == UsageFundingSourceBYOK {
+		enabled, err := OrganizationBYOKAccess(tx, orgID, provider)
 		if err != nil {
 			return nil, err
 		}

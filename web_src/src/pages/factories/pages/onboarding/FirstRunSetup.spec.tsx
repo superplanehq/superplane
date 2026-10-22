@@ -535,7 +535,8 @@ describe("FirstRunSetup GitHub catalog", () => {
 vi.mock("@/hooks/useOrganizationBilling", () => ({
   organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
   useOrganizationBilling: () => ({
-    data: { billingEnabled: false },
-    refetch: async () => ({ data: { billingEnabled: false } }),
+    data: { billingEnabled: false, productFeatures: { byo_key: true } },
+    isSuccess: true,
+    refetch: async () => ({ data: { billingEnabled: false, productFeatures: { byo_key: true } } }),
   }),
 }));

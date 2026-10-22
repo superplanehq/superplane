@@ -39,6 +39,26 @@ describe("useOnboardingSetupState", () => {
     expect(enabledAgain.result.current.skipInitialImport).toBe(false);
   });
 
+  it("preserves intake and import choices when changing repositories", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        initial: { issuesChoice: "jira", issuesRepo: "acme/backlog" },
+      }),
+    );
+    act(() => {
+      result.current.setSkipInitialImport(true);
+      result.current.selectVcsHost("github");
+      result.current.selectRepo("acme/first");
+    });
+    act(() => result.current.selectRepo("acme/second"));
+    expect(result.current.issuesChoice).toBe("jira");
+    expect(result.current.issuesRepo).toBe("acme/backlog");
+    expect(result.current.skipInitialImport).toBe(true);
+    act(() => result.current.clearRepository());
+    expect(result.current.issuesChoice).toBe("jira");
+  });
+
   it("keeps a Bitbucket host when setup is created again before a repository is saved", () => {
     const first = renderHook(() =>
       useOnboardingSetupState("Payments", {
