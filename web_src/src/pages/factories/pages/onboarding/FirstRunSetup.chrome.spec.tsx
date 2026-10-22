@@ -473,22 +473,26 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
-  it("opens plan selection before provisioning when new billing is enabled", async () => {
-    billingState.enabled = true;
-    billingState.newBilling = true;
-    const user = userEvent.setup();
-    const model = pageModel({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      setup: { ...withRepository(), issuesChoice: "vcs" },
-    });
-    renderSetup(model);
-    await user.click(screen.getByTestId("first-run-analyze-tickets"));
-    expect(await screen.findByRole("button", { name: "Finish with selected plan" })).toBeInTheDocument();
-    expect(model.finish).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Finish with selected plan" }));
-    await waitFor(() => expect(model.finish).toHaveBeenCalled());
-  });
+  it.each([false, true])(
+    "opens plan selection before provisioning (skip initial import: %s)",
+    async (skipInitialImport) => {
+      billingState.enabled = true;
+      billingState.newBilling = true;
+      const user = userEvent.setup();
+      const model = pageModel({
+        hostedAgentReady: true,
+        hostedModelsAvailable: true,
+        setup: { ...withRepository(), issuesChoice: "vcs", skipInitialImport },
+      });
+      renderSetup(model);
+      expect(screen.getByTestId("first-run-analyze-tickets")).toHaveAccessibleName(FIRST_RUN_COPY.tickets.continue);
+      await user.click(screen.getByTestId("first-run-analyze-tickets"));
+      expect(await screen.findByRole("button", { name: "Finish with selected plan" })).toBeInTheDocument();
+      expect(model.finish).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Finish with selected plan" }));
+      await waitFor(() => expect(model.finish).toHaveBeenCalled());
+    },
+  );
 
   it.each(["issues", "billing"])("finishes with the legacy trial when new billing is off at step %s", async (step) => {
     billingState.enabled = true;
