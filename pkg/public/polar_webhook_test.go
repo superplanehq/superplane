@@ -56,6 +56,43 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
 	})
 
+	t.Run("subscription cycled advances the billing period", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+		firstEnd := time.Now().UTC().Truncate(time.Second).AddDate(0, 1, 0)
+		renewedEnd := firstEnd.AddDate(0, 1, 0)
+		subscriptionBody := func(eventType string, start, end time.Time) []byte {
+			return []byte(fmt.Sprintf(`{
+				"type": %q,
+				"data": {
+					"id": "sub_cycle",
+					"status": "active",
+					"product_id": "prod_business",
+					"modified_at": %q,
+					"current_period_start": %q,
+					"current_period_end": %q,
+					"customer": {"id": "cust_1", "external_id": %q}
+				}
+			}`, eventType, start.Format(time.RFC3339), start.Format(time.RFC3339), end.Format(time.RFC3339), r.Organization.ID.String()))
+		}
+
+		for _, body := range [][]byte{
+			subscriptionBody("subscription.created", firstEnd.AddDate(0, -1, 0), firstEnd),
+			subscriptionBody("subscription.cycled", firstEnd, renewedEnd),
+		} {
+			rec := signedPolarWebhook(t, secret, body)
+			server.handlePolarWebhook(rec.recorder, rec.request)
+			require.Equal(t, http.StatusAccepted, rec.recorder.Code)
+		}
+
+		plan, err := models.FindOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+		require.NoError(t, err)
+		require.NotNil(t, plan.CurrentPeriodStart)
+		require.NotNil(t, plan.CurrentPeriodEnd)
+		assert.True(t, firstEnd.Equal(*plan.CurrentPeriodStart))
+		assert.True(t, renewedEnd.Equal(*plan.CurrentPeriodEnd))
+	})
+
 	t.Run("unusable payload", func(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
 		body := []byte(`{"type":"order.paid","data":{"id":""}}`)
