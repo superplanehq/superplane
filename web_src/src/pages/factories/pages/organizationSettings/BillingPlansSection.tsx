@@ -19,20 +19,8 @@ import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
 import { BillingCancelBusinessDialog } from "./BillingCancelBusinessDialog";
 
-export function BillingPlansSection({
-  planName,
-  planPriceCents,
-  planPerSeat,
-  canManageBilling,
-  creditPurchaseAllowed,
-  planSource,
-  cancelAtPeriodEnd,
-  currentPeriodEnd,
-  pending,
-  onSubscribe,
-  onCancel,
-  onKeep,
-}: {
+type BillingPlansSectionProps = {
+  showUpgrade?: boolean;
   planName?: string;
   planPriceCents?: string;
   planPerSeat?: boolean;
@@ -45,26 +33,30 @@ export function BillingPlansSection({
   onSubscribe: () => void | Promise<void>;
   onCancel?: () => void | Promise<void>;
   onKeep?: () => void | Promise<void>;
-}) {
+};
+
+export function BillingPlansSection({
+  showUpgrade = true,
+  planName,
+  planPriceCents,
+  planPerSeat,
+  canManageBilling,
+  creditPurchaseAllowed,
+  planSource,
+  cancelAtPeriodEnd,
+  currentPeriodEnd,
+  pending,
+  onSubscribe,
+  onCancel,
+  onKeep,
+}: BillingPlansSectionProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const businessAction = billingBusinessPlanAction({
     canManageBilling,
     creditPurchaseAllowed,
     cancelAtPeriodEnd,
   });
-  const showCurrentBadge = businessAction === "current" || businessAction === "ending";
-  const canCancel = billingCanCancelBusiness({
-    canManageBilling,
-    creditPurchaseAllowed,
-    planSource,
-    cancelAtPeriodEnd,
-  });
-  const canKeep = billingCanKeepBusiness({
-    canManageBilling,
-    creditPurchaseAllowed,
-    planSource,
-    cancelAtPeriodEnd,
-  });
+  const showCurrentBadge = !showUpgrade || businessAction === "current" || businessAction === "ending";
   const displayName = showCurrentBadge ? planName || BILLING_BUSINESS_NAME : BILLING_BUSINESS_NAME;
   const endsCopy = businessAction === "ending" ? billingSubscriptionEndsCopy(currentPeriodEnd, displayName) : null;
 
@@ -83,39 +75,26 @@ export function BillingPlansSection({
             {endsCopy}
           </p>
         ) : null}
-        {businessAction === "subscribe" ? (
-          <div className="mt-4">
-            <Button type="button" disabled={pending} data-testid="billing-subscribe" onClick={() => void onSubscribe()}>
-              {pending ? "Opening checkout..." : BILLING_UPGRADE_LABEL}
-            </Button>
-          </div>
-        ) : null}
-        {canCancel && onCancel ? (
-          <div className="mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={pending}
-              data-testid="billing-cancel-subscription"
-              onClick={() => setConfirmOpen(true)}
-            >
-              {`Cancel ${displayName}`}
-            </Button>
-          </div>
-        ) : null}
-        {canKeep && onKeep ? (
-          <div className="mt-4">
-            <Button
-              type="button"
-              disabled={pending}
-              data-testid="billing-keep-subscription"
-              onClick={() => void onKeep()}
-            >
-              {pending ? `Keeping ${displayName}...` : `Keep ${displayName}`}
-            </Button>
-          </div>
-        ) : null}
+        <BillingPlanActions
+          showUpgrade={showUpgrade}
+          businessAction={businessAction}
+          canManageBilling={canManageBilling}
+          creditPurchaseAllowed={creditPurchaseAllowed}
+          planSource={planSource}
+          cancelAtPeriodEnd={cancelAtPeriodEnd}
+          pending={pending}
+          displayName={displayName}
+          onSubscribe={onSubscribe}
+          onCancel={onCancel}
+          onKeep={onKeep}
+          onRequestCancel={() => setConfirmOpen(true)}
+        />
       </div>
+      {!showUpgrade ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Select an available plan in Payment method. Contact an installation admin if the plan you need is unavailable.
+        </p>
+      ) : null}
       <p className="mt-3 text-xs text-muted-foreground">
         For air-gapped installation, audit logs, or invoice billing,{" "}
         <a
@@ -137,6 +116,74 @@ export function BillingPlansSection({
         onConfirm={onCancel ?? (async () => undefined)}
       />
     </FactorySettingsCard>
+  );
+}
+
+function BillingPlanActions({
+  showUpgrade,
+  businessAction,
+  canManageBilling,
+  creditPurchaseAllowed,
+  planSource,
+  cancelAtPeriodEnd,
+  pending,
+  displayName,
+  onSubscribe,
+  onCancel,
+  onKeep,
+  onRequestCancel,
+}: BillingPlansSectionProps & {
+  businessAction: ReturnType<typeof billingBusinessPlanAction>;
+  displayName: string;
+  onRequestCancel: () => void;
+}) {
+  const canCancel = billingCanCancelBusiness({
+    canManageBilling,
+    creditPurchaseAllowed,
+    planSource,
+    cancelAtPeriodEnd,
+  });
+  const canKeep = billingCanKeepBusiness({
+    canManageBilling,
+    creditPurchaseAllowed,
+    planSource,
+    cancelAtPeriodEnd,
+  });
+  return (
+    <>
+      {showUpgrade && businessAction === "subscribe" ? (
+        <div className="mt-4">
+          <Button type="button" disabled={pending} data-testid="billing-subscribe" onClick={() => void onSubscribe()}>
+            {pending ? "Opening checkout..." : BILLING_UPGRADE_LABEL}
+          </Button>
+        </div>
+      ) : null}
+      {canCancel && onCancel ? (
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            data-testid="billing-cancel-subscription"
+            onClick={onRequestCancel}
+          >
+            {`Cancel ${displayName}`}
+          </Button>
+        </div>
+      ) : null}
+      {canKeep && onKeep ? (
+        <div className="mt-4">
+          <Button
+            type="button"
+            disabled={pending}
+            data-testid="billing-keep-subscription"
+            onClick={() => void onKeep()}
+          >
+            {pending ? `Keeping ${displayName}...` : `Keep ${displayName}`}
+          </Button>
+        </div>
+      ) : null}
+    </>
   );
 }
 

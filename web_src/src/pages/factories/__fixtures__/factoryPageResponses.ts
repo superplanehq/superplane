@@ -1,6 +1,6 @@
 import type {
-  OrganizationsDescribeOrganizationBillingResponse,
   FactoriesDescribeFactoryVelocityResponse,
+  OrganizationsDescribeOrganizationBillingResponse,
   FactoriesFactory,
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
@@ -436,6 +436,26 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationCreditGrants: DEFAULT_CREDIT_GRANTS,
   organizationBilling: {
     plan: "trial",
+    catalogKey: "trial",
+    hasPaymentMethod: false,
+    availablePlans: [
+      { key: "pay_as_you_go", name: "Pay-as-you-go", priceCents: "0", requirePaymentMethod: true },
+      {
+        key: "starter",
+        name: "Starter",
+        priceCents: "2000",
+        requirePaymentMethod: true,
+        subscriptionRequired: true,
+      },
+      {
+        key: "team",
+        name: "Team",
+        priceCents: "3000",
+        perSeat: true,
+        requirePaymentMethod: true,
+        subscriptionRequired: true,
+      },
+    ],
     planSource: "system",
     trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
     remainingCreditCents: "4124",
