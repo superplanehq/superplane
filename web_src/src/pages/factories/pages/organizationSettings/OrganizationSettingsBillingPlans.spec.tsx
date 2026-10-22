@@ -338,8 +338,8 @@ describe("OrganizationSettingsBillingPage plans", () => {
         }}
       />,
     );
-    expect(await screen.findByRole("button", { name: "Select Pay-as-you-go" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Add payment method" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Select Pay-as-you-go" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
   });
 });
