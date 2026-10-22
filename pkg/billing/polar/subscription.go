@@ -263,7 +263,10 @@ func SubscriptionDashboardURL(subscriptionID string) string {
 	}
 	slug := strings.TrimSpace(os.Getenv("POLAR_DASHBOARD_ORGANIZATION_SLUG"))
 	if slug == "" {
-		slug = "superplane-inc"
+		slug = "superplane"
+		if strings.EqualFold(strings.TrimSpace(os.Getenv("POLAR_ENVIRONMENT")), "production") {
+			slug = "superplane-inc"
+		}
 	}
 	host := "https://sandbox.polar.sh"
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("POLAR_ENVIRONMENT")), "production") {
