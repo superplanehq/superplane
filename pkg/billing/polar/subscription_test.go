@@ -17,6 +17,21 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestVerifyOrganizationSubscriptionDeadline(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	t.Setenv("POLAR_ACCESS_TOKEN", "test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	verification, err := VerifyOrganizationSubscription(ctx, uuid.New())
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Equal(t, "failed", verification)
+}
+
 func Test__ApplySubscriptionActivatesBusinessAndGrantsIncluded(t *testing.T) {
 	org := setupBillingOrganization(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))

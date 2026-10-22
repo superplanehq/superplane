@@ -16,26 +16,19 @@ import { Wallet } from "lucide-react";
 import {
   creditRemainingCents,
   useOrgLLMCredit,
-  utcCalendarDate,
   type CreditBalanceBucket,
   type CreditBalanceInputs,
   type OrganizationBillingPlan,
   type OrganizationLLMCredit,
 } from "./useOrgLLMCredit";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { OrgBillingPlanField } from "./OrgBillingPlanField";
 
-export const ADMIN_POLAR_MANAGED_PLAN_COPY =
-  "This organization uses Polar for billing. Cancel or change the subscription in Polar.";
-export const ADMIN_LOCAL_PLAN_COPY = "Select a plan without a payment requirement. Manage paid subscriptions in Polar.";
-export const ADMIN_PLAN_UNKNOWN_COPY = "SuperPlane could not load the billing plan. Refresh the page and try again.";
 export const ADMIN_SET_BALANCE_HELP_COPY =
   "Enter the new remaining balance. SuperPlane adds the difference to the credit history as an adjustment.";
 export const ADMIN_NO_ACTIVE_TRIAL_COPY = "This organization has no active trial credit.";
 export const ADMIN_INCLUDED_USAGE_COPY = "Plan grants set this balance.";
-export const ADMIN_TRIAL_ENDS_LABEL = "Trial ends";
-export const ADMIN_TRIAL_ENDS_HELP = "Trial credit stays usable until this date. Dates use UTC.";
-export const ADMIN_TRIAL_ENDS_ERROR = "Choose a future date.";
+
 export const ADMIN_CREDIT_HISTORY_ERROR_COPY = "SuperPlane could not load the credit history.";
 
 const EDITABLE_BALANCES: Array<{ bucket: CreditBalanceBucket; label: string; action: string }> = [
@@ -71,97 +64,6 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
       ) : null}
     </div>
   );
-}
-
-function OrgBillingPlanField(args: {
-  catalog: BillingPlan[];
-  catalogError: string;
-  polarManaged: boolean;
-  planKnown: boolean;
-  planValue: string;
-  setPlanValue: (value: string) => void;
-  trialEndsOn: string;
-  setTrialEndsOn: (value: string) => void;
-  trialEndInvalid: boolean;
-  savingPlan: boolean;
-  savePlan: () => void;
-}) {
-  const planEditable = args.planKnown && !args.polarManaged;
-  const catalogLocked = !!args.catalogError || args.catalog.length === 0;
-  const selectedCategory = args.catalog.find((plan) => plan.key === args.planValue)?.category;
-  const showTrialEnd = planEditable && selectedCategory === "trial";
-  return (
-    <div className="mb-4 max-w-sm">
-      <Label className="mb-2 block text-left">Billing plan</Label>
-      {args.catalogError && <p role="alert">{args.catalogError}</p>}
-      <Select disabled={!planEditable || catalogLocked} value={args.planValue} onValueChange={args.setPlanValue}>
-        <SelectTrigger data-testid="admin-org-billing-plan">
-          <SelectValue placeholder="Select a plan" />
-        </SelectTrigger>
-        <SelectContent>
-          {args.catalog.map((plan) => (
-            <SelectItem
-              key={plan.key}
-              value={plan.key}
-              disabled={plan.key === "business_legacy" || plan.require_payment_method}
-            >
-              {plan.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        {billingPlanHelp(args.planKnown, args.polarManaged)}
-      </Text>
-      {showTrialEnd ? (
-        <div className="mt-3">
-          <Label className="mb-2 block text-left" htmlFor="admin-org-trial-ends-input">
-            {ADMIN_TRIAL_ENDS_LABEL}
-          </Label>
-          <Input
-            id="admin-org-trial-ends-input"
-            type="date"
-            data-testid="admin-org-trial-ends-input"
-            value={args.trialEndsOn}
-            min={utcCalendarDate(new Date())}
-            aria-invalid={args.trialEndInvalid}
-            onChange={(event) => args.setTrialEndsOn(event.target.value)}
-          />
-          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">{ADMIN_TRIAL_ENDS_HELP}</Text>
-          {args.trialEndInvalid ? (
-            <Text className="mt-1 text-xs text-red-600 dark:text-red-400">{ADMIN_TRIAL_ENDS_ERROR}</Text>
-          ) : null}
-        </div>
-      ) : null}
-      {planEditable ? (
-        <Button
-          type="button"
-          className="mt-3"
-          data-testid="admin-org-billing-plan-save"
-          onClick={args.savePlan}
-          disabled={
-            args.savingPlan ||
-            catalogLocked ||
-            args.catalog.some(
-              (plan) => plan.key === args.planValue && (plan.key === "business_legacy" || plan.require_payment_method),
-            )
-          }
-        >
-          {args.savingPlan ? "Saving..." : "Save plan"}
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-function billingPlanHelp(planKnown: boolean, polarManaged: boolean): string {
-  if (!planKnown) {
-    return ADMIN_PLAN_UNKNOWN_COPY;
-  }
-  if (polarManaged) {
-    return ADMIN_POLAR_MANAGED_PLAN_COPY;
-  }
-  return ADMIN_LOCAL_PLAN_COPY;
 }
 
 function OrgHostedCreditCard(args: {
@@ -204,6 +106,7 @@ function OrgHostedCreditCard(args: {
           catalogError={args.catalogError}
           polarManaged={args.polarManaged}
           planKnown={args.planKnown}
+          savedPlan={args.savedPlan}
           planValue={args.planValue}
           setPlanValue={args.setPlanValue}
           trialEndsOn={args.trialEndsOn}

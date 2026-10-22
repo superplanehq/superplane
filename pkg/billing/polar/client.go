@@ -361,8 +361,20 @@ func (c *Client) ListSubscriptions(ctx context.Context, externalCustomerID, prod
 		if err := c.get(ctx, "/subscriptions/?"+query.Encode(), &payload); err != nil {
 			return nil, err
 		}
+		if payload.Items == nil {
+			return nil, fmt.Errorf("polar subscriptions response is missing items")
+		}
+		for _, item := range payload.Items {
+			if strings.TrimSpace(item.ID) == "" || strings.TrimSpace(item.Status) == "" {
+				return nil, fmt.Errorf("polar subscriptions response has an invalid subscription")
+			}
+		}
 		items = append(items, payload.Items...)
-		if len(payload.Items) == 0 || len(payload.Items) < 100 {
+		if payload.Pagination.MaxPage > page {
+			page++
+			continue
+		}
+		if len(payload.Items) < 100 {
 			break
 		}
 		if payload.Pagination.MaxPage > 0 && page >= payload.Pagination.MaxPage {
@@ -371,14 +383,7 @@ func (c *Client) ListSubscriptions(ctx context.Context, externalCustomerID, prod
 		page++
 	}
 
-	subscriptions := make([]SubscriptionData, 0, len(items))
-	for _, item := range items {
-		if strings.TrimSpace(item.ID) == "" {
-			continue
-		}
-		subscriptions = append(subscriptions, item)
-	}
-	return subscriptions, nil
+	return items, nil
 }
 
 func (c *Client) CancelSubscriptionAtPeriodEnd(ctx context.Context, subscriptionID string) (*SubscriptionData, error) {

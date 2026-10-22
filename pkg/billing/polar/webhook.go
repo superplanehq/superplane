@@ -127,6 +127,7 @@ type SubscriptionData struct {
 	CancelAtPeriodEnd  bool          `json:"cancel_at_period_end"`
 	ModifiedAt         polarTime     `json:"modified_at"`
 	CurrentPeriodStart polarTime     `json:"current_period_start"`
+	EndedAt            polarTime     `json:"ended_at"`
 	CurrentPeriodEnd   polarTime     `json:"current_period_end"`
 	CustomerID         string        `json:"customer_id"`
 	ExternalCustomerID string        `json:"external_customer_id"`

@@ -40,6 +40,7 @@ var (
 	ErrPaymentMethodRequired      = errors.New("add a payment method in organization billing before usage")
 	ErrHostedSubscriptionRequired = errors.New("an active paid plan is required for SuperPlane-hosted runs")
 	ErrInvalidBillingPlan         = errors.New("billing plan is invalid")
+	ErrBillingPlanChanged         = errors.New("the billing record changed. Refresh and try again")
 	ErrPolarManagedBillingPlan    = errors.New("this organization uses Polar for billing. Cancel or change the subscription in Polar")
 )
 
@@ -697,4 +698,27 @@ func setOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, catalog *BillingPl
 		return nil, err
 	}
 	return saved, nil
+}
+
+// AssignAdminPlanAfterPolarVerification requires a confirmed absence from Polar.
+// Keep the subscription ID and event timestamp for history and webhook ordering.
+func (p *OrganizationBillingPlan) AssignAdminPlanAfterPolarVerification(tx *gorm.DB, planName string, trialEndsAt *time.Time) (*OrganizationBillingPlan, error) {
+	var saved *OrganizationBillingPlan
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		current, err := lockOrganizationBillingPlan(inner, p.OrganizationID)
+		if err != nil {
+			return err
+		}
+		if current == nil || !current.UpdatedAt.Equal(p.UpdatedAt) {
+			return ErrBillingPlanChanged
+		}
+		if err := inner.Model(current).Updates(map[string]any{
+			"polar_subscription_status": "", "cancel_at_period_end": false,
+		}).Error; err != nil {
+			return err
+		}
+		saved, err = SetAdminOrganizationPlan(inner, p.OrganizationID, planName, trialEndsAt)
+		return err
+	})
+	return saved, err
 }
