@@ -331,6 +331,84 @@ func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 		assert.Nil(t, reloadPullRequest(t, db, pullRequest).ActiveMutationRunID)
 	})
 
+	t.Run("continuing paused fixes grants a fresh attempt budget", func(t *testing.T) {
+		pullRequest, canvas := createActivityFixture(t, db, r)
+		handler := createCheckHandler(t, db, r, pullRequest, canvas, 2)
+
+		requestAttempt := func(prefix string) *models.FactoryPullRequestActivityResult {
+			run := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
+			result, err := pullRequest.CreateActivity(db, models.FactoryPullRequestActivityParams{
+				RunID:             run.ID,
+				RevisionSHA:       activitySHA(prefix),
+				Access:            models.FactoryPullRequestAccessExclusive,
+				FeedbackHandlerID: &handler.ID,
+			})
+			require.NoError(t, err)
+			if result.Outcome == models.FactoryPullRequestActivityOutcomeReady {
+				require.NoError(t, result.Activity.Finalize(db, finishRun(t, db, run, models.CanvasRunResultFailed)))
+			}
+			return result
+		}
+
+		for i := 1; i <= 2; i++ {
+			result := requestAttempt(string(rune('a'+i)) + "1")
+			require.Equal(t, models.FactoryPullRequestActivityOutcomeReady, result.Outcome)
+			require.NotNil(t, result.Activity.Attempt)
+			assert.Equal(t, i, *result.Activity.Attempt)
+		}
+
+		limited := requestAttempt("c1")
+		require.Equal(t, models.FactoryPullRequestActivityOutcomeLimitReached, limited.Outcome)
+		require.NoError(t, limited.Activity.ContinueFixes(db))
+		require.NotNil(t, limited.Activity.FixesContinuedAt)
+
+		for i := 1; i <= 2; i++ {
+			result := requestAttempt(string(rune('d'+i)) + "1")
+			require.Equal(t, models.FactoryPullRequestActivityOutcomeReady, result.Outcome)
+			require.NotNil(t, result.Activity.Attempt)
+			assert.Equal(t, i, *result.Activity.Attempt)
+			require.NotNil(t, result.Activity.AttemptLimit)
+			assert.Equal(t, 2, *result.Activity.AttemptLimit)
+		}
+
+		limitedAgain := requestAttempt("f1")
+		assert.Equal(t, models.FactoryPullRequestActivityOutcomeLimitReached, limitedAgain.Outcome)
+		assert.Nil(t, limitedAgain.Activity.Attempt)
+	})
+
+	t.Run("continues only paused fixes and only once", func(t *testing.T) {
+		pullRequest, canvas := createActivityFixture(t, db, r)
+		handler := createCheckHandler(t, db, r, pullRequest, canvas, 1)
+
+		activeRun := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
+		active, err := pullRequest.CreateActivity(db, models.FactoryPullRequestActivityParams{
+			RunID:             activeRun.ID,
+			RevisionSHA:       activitySHA("a2"),
+			Access:            models.FactoryPullRequestAccessExclusive,
+			FeedbackHandlerID: &handler.ID,
+		})
+		require.NoError(t, err)
+		require.ErrorIs(t, active.Activity.ContinueFixes(db), models.ErrFactoryPullRequestFixesNotPaused)
+		require.NoError(t, active.Activity.Finalize(db, finishRun(t, db, activeRun, models.CanvasRunResultFailed)))
+
+		limitedRun := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
+		limited, err := pullRequest.CreateActivity(db, models.FactoryPullRequestActivityParams{
+			RunID:             limitedRun.ID,
+			RevisionSHA:       activitySHA("b2"),
+			Access:            models.FactoryPullRequestAccessExclusive,
+			FeedbackHandlerID: &handler.ID,
+		})
+		require.NoError(t, err)
+		require.Equal(t, models.FactoryPullRequestActivityOutcomeLimitReached, limited.Outcome)
+
+		require.NoError(t, limited.Activity.ContinueFixes(db))
+		assert.ErrorIs(t, limited.Activity.ContinueFixes(db), models.ErrFactoryPullRequestFixesNotPaused)
+
+		reloaded, err := models.FindPullRequestActivityByRunID(db, limitedRun.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.FixesContinuedAt)
+	})
+
 	t.Run("resets attempts after a passed evaluation", func(t *testing.T) {
 		pullRequest, canvas := createActivityFixture(t, db, r)
 		handler := createCheckHandler(t, db, r, pullRequest, canvas, 3)

@@ -470,6 +470,13 @@ function ActionIcon({ kind, strip }: { kind?: SplitRunFooterAction["kind"]; stri
   return null;
 }
 
+function noteActionTestId(action: SplitRunFooterAction): string {
+  if (action.emphasis === "primary" && action.kind !== "continue-fixes") {
+    return "split-run-review-cta";
+  }
+  return `split-run-footer-${action.id}`;
+}
+
 function NoteAction({
   action,
   actionBusy,
@@ -508,7 +515,7 @@ function NoteAction({
       disabled={disabled}
       onClick={onClick}
       className={noteActionClassName({ grouped })}
-      data-testid={primary ? "split-run-review-cta" : `split-run-footer-${action.id}`}
+      data-testid={noteActionTestId(action)}
     >
       {busy ? (
         <Loader2 className="size-3.5 animate-spin" aria-hidden />

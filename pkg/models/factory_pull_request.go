@@ -56,6 +56,7 @@ var (
 	ErrFactoryPullRequestActivityNotFound     = errors.New("factory pull request activity not found")
 	ErrFactoryPullRequestActivityDuplicate    = errors.New("factory pull request activity already exists for this handler and revision")
 	ErrFactoryPullRequestActivityLimitReached = errors.New("factory pull request activity reached the attempt limit")
+	ErrFactoryPullRequestFixesNotPaused       = errors.New("automatic fixes are not paused for this activity")
 )
 
 var factoryPullRequestProviders = []string{
@@ -117,8 +118,11 @@ type FactoryPullRequestRun struct {
 	AttemptLimit      *int
 	AccessRequestedAt *time.Time
 	AccessGrantedAt   *time.Time
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	// FixesContinuedAt marks a limit_reached activity that a person resumed.
+	// Attempts granted before the latest value do not count toward the limit.
+	FixesContinuedAt *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type FactoryPullRequestLinkedRun struct {

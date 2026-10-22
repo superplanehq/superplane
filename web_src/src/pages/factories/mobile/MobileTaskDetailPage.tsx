@@ -127,6 +127,7 @@ type MobileTaskModel = {
   dispatchDraft?: (model?: string, thinkingLevel?: string) => Promise<void>;
   onArchive: ReturnType<typeof footerMutationHandlers>["onArchive"];
   onReject: ReturnType<typeof footerMutationHandlers>["onReject"];
+  onContinueFixes: ReturnType<typeof footerMutationHandlers>["onContinueFixes"];
   onStop: ReturnType<typeof footerMutationHandlers>["onStop"];
   startBusy: boolean;
   actionBusy: boolean;
@@ -209,6 +210,7 @@ function useMobileTaskModel(
     dispatchDraft,
     onArchive: mutations.onArchive,
     onReject: mutations.onReject,
+    onContinueFixes: mutations.onContinueFixes,
     onStop: mutations.onStop,
     startBusy: cardActions.dispatchingOrderIds.has(orderId),
     actionBusy: footerActions.busy,

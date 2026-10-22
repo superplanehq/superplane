@@ -193,6 +193,18 @@ describe("buildSplitRunFooter", () => {
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
 
+  it("puts Continue fixes before Reject and Approve while fixes are paused", () => {
+    const footer = buildSplitRunFooter({
+      kind: "waiting",
+      note: PR_NOTE,
+      continueFixes: { pullRequestId: "pr-1", runId: "run-paused" },
+    });
+
+    expect(footer.continueFixes).toEqual({ pullRequestId: "pr-1", runId: "run-paused" });
+    expect(footer.actions.map((action) => action.label)).toEqual(["Continue fixes", "Reject", "Approve"]);
+    expect(footer.actions.map((action) => action.emphasis)).toEqual(["primary", "quiet", "quiet"]);
+  });
+
   it("omits the decision strip when a waiting order has no run note", () => {
     expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
       kind: "waiting",
