@@ -60,7 +60,6 @@ function scheduledActivities(outcome: ScheduledOutcome, startedAt: string, title
     name: "Schedule",
     status: "Passed",
     recordedAt: startedAt,
-    logs: { state: "empty" },
     outputs: { type: "schedule.tick", data: { timestamp: startedAt } },
     defaultTab: "outputs",
     outputsLabel: "Event data",
@@ -73,7 +72,6 @@ function scheduledActivities(outcome: ScheduledOutcome, startedAt: string, title
       name: "Has proposal?",
       status: "Passed",
       recordedAt: startedAt,
-      logs: { state: "empty" },
       outputs: outcome === "no-proposal" ? { false: [{}] } : { true: [{}] },
       defaultTab: "outputs",
     });
@@ -83,7 +81,6 @@ function scheduledActivities(outcome: ScheduledOutcome, startedAt: string, title
       name: "Create Task",
       status: "Passed",
       recordedAt: startedAt,
-      logs: { state: "empty" },
       outputs: { default: [{ taskId: "task-1040" }] },
       defaultTab: "outputs",
     });

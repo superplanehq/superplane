@@ -201,6 +201,9 @@ describe("Intake run evidence", () => {
       ],
     );
     expect(activities.find((a) => a.id === "event:event")?.outputsLabel).toBe("Event data");
+    expect(activities.find((a) => a.id === "event:event")?.logs).toBeUndefined();
+    expect(activities.find((a) => a.id === "filter")?.logs).toBeUndefined();
+    expect(activities.find((a) => a.id === "agent")?.logs).toBeDefined();
     expect(activities.find((a) => a.id === "filter")?.defaultTab).toBe("outputs");
     expect(activities.find((a) => a.id === "agent")?.defaultTab).toBe("logs");
   });

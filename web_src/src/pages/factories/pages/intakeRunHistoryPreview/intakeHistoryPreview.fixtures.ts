@@ -131,7 +131,6 @@ function activityFor(
     name: "Source event",
     status: "Passed",
     recordedAt: startedAt,
-    logs: { state: "empty" },
     outputs: payload,
     defaultTab: "outputs",
     outputsLabel: "Event data",
@@ -142,7 +141,6 @@ function activityFor(
     name: "Matches filters?",
     status: "Passed",
     recordedAt: startedAt,
-    logs: { state: "empty" },
     outputs: outcome === "filtered" ? { false: [{}] } : { true: [{}] },
     defaultTab: "outputs",
   };
@@ -162,7 +160,6 @@ function activityFor(
               ? "Cancelled"
               : "Passed",
       recordedAt: startedAt,
-      logs: { state: "empty" },
       outputs: outcome === "created" ? { default: [{ taskId }] } : undefined,
       error: outcome === "failed" ? "The task could not be saved because of a temporary connection error." : undefined,
       defaultTab: "outputs",
