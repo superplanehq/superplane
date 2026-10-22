@@ -220,6 +220,9 @@ func archiveDraftWorkOrderIfCurrent(
 ) (archived bool, failed bool) {
 	var archivedOrder *models.FactoryWorkOrder
 	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, orgID); err != nil {
+			return err
+		}
 		current, err := factory.FindWorkOrder(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orderID)
 		if err != nil {
 			return err

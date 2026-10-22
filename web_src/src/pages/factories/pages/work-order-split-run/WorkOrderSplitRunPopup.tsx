@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
+import { WorkOrderQueueStatus } from "../../workOrders/WorkOrderQueueStatus";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
@@ -207,24 +208,40 @@ function AnalysisWorkOrderPopup({
           sessionLookupError={analysis.queryError?.message}
           panelReview={panelReview}
           header={(views) => (
-            <AnalysisPopupHeader
-              edits={edits}
-              fixture={fixture}
-              titlePrefix={titlePrefix}
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              orderNumber={orderNumber}
-              lineId={lineId}
-              onClose={onClose}
-              fullPage={fullPage}
-              toggleFullPage={toggleFullPage}
-              onArchive={mutations.onArchive}
-              footerBusy={footerActions.busy}
-              reviewActions={reviewActions}
-              showOwnerRow={!unified}
-              planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
-              views={views}
-            />
+            <>
+              <AnalysisPopupHeader
+                edits={edits}
+                fixture={fixture}
+                titlePrefix={titlePrefix}
+                organizationId={organizationId}
+                factoryKey={factoryKey}
+                orderNumber={orderNumber}
+                lineId={lineId}
+                onClose={onClose}
+                fullPage={fullPage}
+                toggleFullPage={toggleFullPage}
+                onArchive={mutations.onArchive}
+                footerBusy={footerActions.busy}
+                reviewActions={reviewActions}
+                showOwnerRow={!unified}
+                planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
+                views={views}
+              />
+              {fixture.queuedTasks?.length ? (
+                <div className="flex flex-wrap gap-2 border-b border-border px-5 py-2">
+                  {fixture.queuedTasks.map((queue) => (
+                    <WorkOrderQueueStatus
+                      key={queue.id}
+                      queue={queue}
+                      orderId={orderId ?? ""}
+                      title={fixture.title}
+                      canCancel={false}
+                      canDispatch={canDispatch}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </>
           )}
         />
       </LiveHeaderSpendProvider>
@@ -420,9 +437,16 @@ function analysisPopupClassName(fullPage: boolean, unified: boolean, sourceOnly:
  */
 function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], factory: FactoriesFactory | undefined) {
   const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
+  const footer = sourceOnly ? classicSplitRunFooter(fixture.footer) : fixture.footer;
+  const queuedStart = fixture.queuedTasks?.some((queue) => queue.startsLine);
+  const actions = footer.actions.flatMap((action) => {
+    if (action.kind !== "start") return [action];
+    if (queuedStart) return [];
+    return [{ ...action, label: fixture.taskLimitReached ? "Queue" : "Start" }];
+  });
   return {
     sourceOnly,
-    viewFixture: sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture,
+    viewFixture: { ...fixture, footer: { ...footer, actions } },
   };
 }
 
