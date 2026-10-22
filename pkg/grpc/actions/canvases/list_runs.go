@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -147,6 +148,9 @@ func SerializeCanvasRuns(
 		result = append(result, serializedRun)
 	}
 
+	if err := attachExecutionSummaries(db, runs, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -169,7 +173,14 @@ func SerializeCanvasRun(
 		parent = *parentRun
 	}
 
-	return serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, parent, childRunsByExecutionID)
+	serialized, err := serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, parent, childRunsByExecutionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := attachExecutionSummaries(db, []models.CanvasRun{run}, []*pb.CanvasRun{serialized}); err != nil {
+		return nil, err
+	}
+	return serialized, nil
 }
 
 func serializeCanvasRunWithQueueItemInputs(
@@ -420,6 +431,13 @@ func attachCanvasRunTasks(db *gorm.DB, canvas *models.Canvas, runs []models.Canv
 	if err != nil {
 		return grpcerrors.Internal(err, "failed to load run tasks")
 	}
+	extra, err := existingTaskLabels(db, serialized, labels)
+	if err != nil {
+		return err
+	}
+	for runID, label := range extra {
+		labels[runID] = label
+	}
 
 	for _, run := range serialized {
 		if run == nil {
@@ -440,6 +458,72 @@ func attachCanvasRunTasks(db *gorm.DB, canvas *models.Canvas, runs []models.Canv
 		}
 	}
 	return nil
+}
+
+func existingTaskLabels(db *gorm.DB, serialized []*pb.CanvasRun, labels map[uuid.UUID]models.CanvasRunTaskLabel) (map[uuid.UUID]models.CanvasRunTaskLabel, error) {
+	orderIDs := map[uuid.UUID]uuid.UUID{}
+	for _, run := range serialized {
+		if run == nil {
+			continue
+		}
+		runID, err := uuid.Parse(run.GetId())
+		if err != nil {
+			continue
+		}
+		if _, ok := labels[runID]; ok {
+			continue
+		}
+		orderID, ok := recordedExistingTaskID(run)
+		if !ok {
+			continue
+		}
+		orderIDs[runID] = orderID
+	}
+	return models.CanvasRunTaskLabelsForOrders(db, orderIDs)
+}
+
+func recordedExistingTaskID(run *pb.CanvasRun) (uuid.UUID, bool) {
+	executions := append([]*pb.CanvasNodeExecutionRef{}, run.GetExecutions()...)
+	sort.SliceStable(executions, func(i, j int) bool {
+		return executionCreatedAt(executions[i]).Before(executionCreatedAt(executions[j]))
+	})
+	lastByNode := map[string]*pb.CanvasNodeExecutionRef{}
+	for _, execution := range executions {
+		if execution.GetNodeId() == "" {
+			continue
+		}
+		lastByNode[execution.GetNodeId()] = execution
+	}
+	var chosen uuid.UUID
+	var chosenAt time.Time
+	found := false
+	for _, execution := range executions {
+		if lastByNode[execution.GetNodeId()] != execution {
+			continue
+		}
+		if execution.GetComponentName() != "createWorkOrder" || execution.GetResult() != pb.CanvasNodeExecution_RESULT_PASSED {
+			continue
+		}
+		orderID, err := uuid.Parse(execution.GetExistingTaskId())
+		if err != nil || orderID == uuid.Nil {
+			continue
+		}
+		createdAt := executionCreatedAt(execution)
+		if found && !createdAt.After(chosenAt) {
+			continue
+		}
+		chosen = orderID
+		chosenAt = createdAt
+		found = true
+	}
+	return chosen, found
+}
+
+func executionCreatedAt(execution *pb.CanvasNodeExecutionRef) time.Time {
+	if execution == nil || execution.GetCreatedAt() == nil {
+		return time.Time{}
+	}
+	return execution.GetCreatedAt().AsTime()
 }
 
 func AttachCanvasRunUsage(db *gorm.DB, runs []*pb.CanvasRun) {

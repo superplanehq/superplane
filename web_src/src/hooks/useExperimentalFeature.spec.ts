@@ -303,12 +303,12 @@ describe("useExperimentalFeature", () => {
 
   it("allows retry without marking a failed organization lookup ready", async () => {
     const queryClient = createQueryClient();
-    seedQueries(queryClient, { registry: { features: [makeFeature({ id: "factory_run_history" })] } });
+    seedQueries(queryClient, { registry: { features: [makeFeature({ id: "preview" })] } });
     const request = vi
       .spyOn(apiClient, "organizationsDescribeOrganization")
       .mockRejectedValueOnce(new Error("Organization unavailable"))
       .mockResolvedValue({
-        data: { organization: { spec: { enabledExperimentalFeatures: ["factory_run_history"] } } },
+        data: { organization: { spec: { enabledExperimentalFeatures: ["preview"] } } },
         request: new Request("http://localhost/api/v1/organizations/org-1"),
         response: new Response(),
       });
@@ -316,10 +316,10 @@ describe("useExperimentalFeature", () => {
       const { result } = renderHook(() => useExperimentalFeature(), { wrapper: createWrapper(queryClient) });
       await waitFor(() => expect(result.current.isLoading).toBe(false));
       expect(result.current.organizationReady).toBe(false);
-      expect(result.current.has("factory_run_history")).toBe(false);
+      expect(result.current.has("preview")).toBe(false);
       act(() => result.current.retryOrganization?.());
       await waitFor(() => expect(result.current.organizationReady).toBe(true));
-      expect(result.current.has("factory_run_history")).toBe(true);
+      expect(result.current.has("preview")).toBe(true);
     } finally {
       request.mockRestore();
     }

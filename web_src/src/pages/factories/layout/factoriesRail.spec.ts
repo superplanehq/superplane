@@ -32,16 +32,14 @@ describe("isWorkspaceAgentNavVisible", () => {
   const visible = {
     permissionsLoading: false,
     canUpdateFactories: true,
-    workspaceAgentEnabled: true,
   };
 
-  it("shows Agent when the user can update factories and SuperPlane Agent is on", () => {
+  it("shows Agent when the user can update factories", () => {
     expect(isWorkspaceAgentNavVisible(visible)).toBe(true);
   });
 
-  it("hides Agent while permissions load, without update permission, or when the flag is off", () => {
+  it("hides Agent while permissions load or without update permission", () => {
     expect(isWorkspaceAgentNavVisible({ ...visible, permissionsLoading: true })).toBe(false);
     expect(isWorkspaceAgentNavVisible({ ...visible, canUpdateFactories: false })).toBe(false);
-    expect(isWorkspaceAgentNavVisible({ ...visible, workspaceAgentEnabled: false })).toBe(false);
   });
 });

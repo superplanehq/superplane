@@ -13,6 +13,7 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   ignoreBotsLabel: "Ignore bot comments",
   ignoreBotsHelper: "Do not start a run when a bot writes the mention.",
   addressAllBotsLabel: "All bots",
+  addressAllBotsHelper: "Every bot comment starts pull request feedback, including bots that appear later.",
   allowedBotsLabel: "Allowed bots",
   allowedBotsHelper: "React to comments from these bots even without the mention. Use the bot login.",
   checkNamesLabel: "Status checks",

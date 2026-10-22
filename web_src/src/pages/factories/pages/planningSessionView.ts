@@ -65,7 +65,7 @@ type PlanningSessionActivityItemPayload = {
 
 export type PlanningSessionSurveyPayload = {
   id?: string;
-  questions?: Array<{ prompt?: string; options?: string[] }>;
+  questions?: Array<{ prompt?: string; options?: string[]; recommendedOption?: string }>;
 };
 
 /**
@@ -215,7 +215,9 @@ function planningSessionSurveyFromPayload(
     if (!prompt || !options.length) {
       return [];
     }
-    return [{ prompt, options }];
+    return [
+      { prompt, options, ...(question.recommendedOption ? { recommendedOption: question.recommendedOption } : {}) },
+    ];
   });
   if (!questions.length) {
     return undefined;

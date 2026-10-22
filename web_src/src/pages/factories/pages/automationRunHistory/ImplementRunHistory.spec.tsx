@@ -55,13 +55,13 @@ describe("FactoryAutomationRunHistory", () => {
     expect(screen.queryByRole("status", { name: "Loading task" })).not.toBeInTheDocument();
   });
 
-  it("shows no linked task as soon as a run without a task loads", () => {
+  it("shows no task or source as soon as a run without a task loads", () => {
     hooks.useInfiniteCanvasRuns.mockReturnValue({
       data: { pages: [{ runs: [{ id: "run-1", state: "STATE_FINISHED", result: "RESULT_PASSED" }] }] },
       isLoading: false,
     });
     render(history);
-    expect(screen.getByText("No linked task")).toBeInTheDocument();
+    expect(screen.getByText("No task or source")).toBeInTheDocument();
     expect(screen.queryByRole("status", { name: "Loading task" })).not.toBeInTheDocument();
   });
 });

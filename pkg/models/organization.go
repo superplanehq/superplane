@@ -349,7 +349,6 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub},
 		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{
 			features.FeatureFactories,
-			features.FeatureWorkspaceAgent,
 		},
 		CreatedAt: &now,
 		UpdatedAt: &now,

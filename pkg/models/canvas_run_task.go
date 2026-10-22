@@ -79,6 +79,13 @@ func matchRunTaskOrderIDs(tx *gorm.DB, canvas *Canvas, chains map[uuid.UUID][]uu
 	return matched, nil
 }
 
+func CanvasRunTaskLabelsForOrders(tx *gorm.DB, orderIDsByRunID map[uuid.UUID]uuid.UUID) (map[uuid.UUID]CanvasRunTaskLabel, error) {
+	if len(orderIDsByRunID) == 0 {
+		return map[uuid.UUID]CanvasRunTaskLabel{}, nil
+	}
+	return loadCanvasRunTaskLabels(tx, orderIDsByRunID)
+}
+
 func assignNearestRunTask(chains map[uuid.UUID][]uuid.UUID, pending []uuid.UUID, links map[uuid.UUID]uuid.UUID, matched map[uuid.UUID]uuid.UUID) []uuid.UUID {
 	if len(pending) == 0 || len(links) == 0 {
 		return pending

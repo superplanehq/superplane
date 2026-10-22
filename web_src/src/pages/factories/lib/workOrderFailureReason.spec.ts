@@ -19,8 +19,8 @@ describe("workOrderCreditFailureCopy", () => {
   it("maps a missing Business plan to No plan and Subscribe", () => {
     expect(workOrderCreditFailureCopy("hosted_subscription_required")).toEqual({
       label: "No plan",
-      message: "This agent run is blocked. SuperPlane hosted runs need a Business plan.",
-      actionLabel: "Subscribe",
+      message: "This agent run is blocked. SuperPlane hosted runs need an active plan.",
+      actionLabel: "View billing",
     });
   });
 

@@ -271,7 +271,7 @@ describe("createWithAgentViewFromSession", () => {
         messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
         survey: {
           id: "pending-survey",
-          questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+          questions: [{ prompt: "What is the priority?", options: ["High", "Low"], recommendedOption: "Low" }],
         },
       },
       { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
@@ -279,7 +279,7 @@ describe("createWithAgentViewFromSession", () => {
 
     expect(view.survey).toEqual({
       id: "pending-survey",
-      questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+      questions: [{ prompt: "What is the priority?", options: ["High", "Low"], recommendedOption: "Low" }],
     });
     expect(
       planningSessionHasPendingSurvey({

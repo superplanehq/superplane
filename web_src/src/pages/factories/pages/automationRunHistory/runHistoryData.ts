@@ -2,8 +2,10 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
+  FactoriesWorkOrder,
   SuperplaneComponentsNode,
 } from "@/api-client";
+import { intakeRunPresentation, recordedExistingTaskId, type RunHistoryIntakeSource } from "./intakeRunData";
 import { formatCompactDuration } from "@/lib/duration";
 import type { AutomationRun, RunActivity, RunStatus } from "@/ui/AutomationRunHistory/types";
 
@@ -23,11 +25,18 @@ export function runDuration(run: CanvasesCanvasRun, now: number): string {
   return Number.isFinite(start) && Number.isFinite(end) ? formatCompactDuration(Math.max(0, end - start)) : "—";
 }
 
-export function toAutomationRun(run: CanvasesCanvasRun, now: number): AutomationRun {
+export function toAutomationRun(
+  run: CanvasesCanvasRun,
+  orders: FactoriesWorkOrder[],
+  now: number,
+  intakeSource?: RunHistoryIntakeSource,
+): AutomationRun {
+  const order = intakeSource ? intakeWorkOrder(run, orders) : undefined;
   return {
+    ...(intakeSource ? intakeRunPresentation(run, intakeSource, recordedStatus(run), orders) : {}),
     id: run.id ?? "",
     title: run.rootEvent?.customName,
-    task: taskFromRun(run),
+    task: taskLabel(run, order),
     status: recordedStatus(run),
     startedAt: run.createdAt ?? "",
     finishedAt: run.finishedAt,
@@ -37,15 +46,39 @@ export function toAutomationRun(run: CanvasesCanvasRun, now: number): Automation
   };
 }
 
+export function taskPageNumber(taskId: string | undefined): string | undefined {
+  if (!taskId || isUuid(taskId)) return undefined;
+  return /-(\d+)$/.exec(taskId)?.[1];
+}
+
+function taskLabel(run: CanvasesCanvasRun, order: FactoriesWorkOrder | undefined): AutomationRun["task"] {
+  const indexed = taskFromRun(run);
+  if (indexed && (!order || order.id !== run.task?.id)) return indexed;
+  if (!order) return indexed;
+  return {
+    id: order.key || order.id || "—",
+    title: order.title || "Untitled task",
+  };
+}
+
 function taskFromRun(run: CanvasesCanvasRun): AutomationRun["task"] {
   const task = run.task;
-  if (!task?.id) {
-    return undefined;
-  }
+  if (!task?.id) return undefined;
   return {
     id: task.key || task.id,
     title: task.title || "Untitled task",
   };
+}
+
+function intakeWorkOrder(run: CanvasesCanvasRun, orders: FactoriesWorkOrder[]): FactoriesWorkOrder | undefined {
+  const created = orders.find((order) => Boolean(run.id) && order.sourceRunId === run.id);
+  if (created) return created;
+  const existingTaskId = recordedExistingTaskId(run);
+  return existingTaskId ? orders.find((order) => order.id === existingTaskId) : undefined;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 export function toRunActivities(
@@ -67,21 +100,23 @@ export function toRunActivities(
   if (run.rootEvent?.id) {
     activities.push({
       id: `event:${run.rootEvent.id}`,
-      name: "Run started",
+      name: "Source event",
       status: "Passed",
-      logs: { state: "empty" },
       outputs: run.rootEvent.data,
+      defaultTab: "outputs",
+      outputsLabel: "Event data",
       recordedAt: run.createdAt,
     });
   }
   for (const item of run.queueItems ?? []) {
     if (!item.id) continue;
+    const node = nodes.find((node) => node.id === item.nodeId);
     activities.push({
       id: `queue:${item.id}`,
-      name: nodes.find((node) => node.id === item.nodeId)?.name || item.nodeId || "Queued execution",
+      name: node?.name || item.nodeId || "Queued execution",
       status: "Pending",
       recordedAt: item.createdAt,
-      logs: { state: "empty" },
+      logs: node?.component?.startsWith("runner") ? { state: "waiting" } : undefined,
     });
   }
   return activities.sort((a, b) => (a.recordedAt ?? "").localeCompare(b.recordedAt ?? ""));
@@ -93,14 +128,24 @@ function executionActivity(
 ): RunActivity {
   const node = nodes.find((node) => node.id === execution.nodeId);
   const instructions = execution.configuration?.additionalInstructions;
+  const hasLogs = hasRunnerLogs(execution, node);
   return {
     id: execution.id!,
     name: node?.name || execution.nodeId || "Execution",
     status: recordedStatus(execution),
     recordedAt: execution.createdAt,
     error: execution.result === "RESULT_FAILED" ? execution.resultMessage || undefined : undefined,
-    logs: { state: "empty" },
+    logs: hasLogs ? { state: "empty" } : undefined,
+    defaultTab: hasLogs ? "logs" : "outputs",
     outputs: execution.outputs && Object.keys(execution.outputs).length ? execution.outputs : undefined,
     additionalInstructions: typeof instructions === "string" && instructions.trim() ? instructions : undefined,
   };
+}
+
+function hasRunnerLogs(
+  execution: CanvasesCanvasNodeExecutionRef & CanvasesCanvasNodeExecution,
+  node?: SuperplaneComponentsNode,
+): boolean {
+  const component = execution.componentName || node?.component;
+  return Boolean(execution.metadata?.runner_broker_task_id || component?.startsWith("runner"));
 }

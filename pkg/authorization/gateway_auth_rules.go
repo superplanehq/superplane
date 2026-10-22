@@ -366,7 +366,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "factories",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/mcp-clients"}: {
 			Resource:                     "factories",
@@ -884,13 +884,13 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/oauth:disconnect"}: {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/groups"}: {
 			Resource:                "groups",
@@ -928,6 +928,14 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:   "org",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/select-plan"}: {
+			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureNewBilling},
+		},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/payment-method-session"}: {
+			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureNewBilling},
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/sync"}: {
 			Resource:   "org",

@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -97,6 +98,42 @@ func Test__ListRuns__IncludeTaskReturnsLinkedTaskLabels(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, omitted.Run.Task)
 	assert.Equal(t, sourceRun.ID.String(), omitted.Run.Id)
+}
+
+func Test__ListRuns__IncludeTaskUsesRecordedExistingTask(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "DUP")
+	require.NoError(t, err)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "trigger", Type: models.NodeTypeTrigger},
+		{NodeID: "create", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "createWorkOrder"}})},
+	}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	canvas.FactoryID = &factory.ID
+	order := createTaskOrder(t, db, factory, "Existing task")
+
+	duplicateRoot := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	duplicate := createFinishedRun(t, duplicateRoot, models.CanvasRunResultPassed)
+	duplicateExecution := createRunExecution(t, duplicate, duplicateRoot.ID, "create", models.CanvasNodeExecutionResultPassed)
+	require.NoError(t, db.Model(duplicateExecution).Update("metadata", datatypes.NewJSONType(map[string]any{
+		models.CanvasNodeExecutionExistingTaskIDKey: order.ID.String(),
+	})).Error)
+
+	retriedRoot := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	retried := createFinishedRun(t, retriedRoot, models.CanvasRunResultPassed)
+	first := createRunExecution(t, retried, retriedRoot.ID, "create", models.CanvasNodeExecutionResultPassed)
+	require.NoError(t, db.Model(first).Update("metadata", datatypes.NewJSONType(map[string]any{
+		models.CanvasNodeExecutionExistingTaskIDKey: order.ID.String(),
+	})).Error)
+	later := createRunExecution(t, retried, retriedRoot.ID, "create", models.CanvasNodeExecutionResultPassed)
+	require.NoError(t, db.Model(later).Update("created_at", time.Now().Add(time.Minute)).Error)
+
+	response, err := ListRuns(context.Background(), db, canvas, 0, nil, nil, nil, true)
+	require.NoError(t, err)
+	byID := indexRuns(response.Runs)
+	assertTask(t, byID[duplicate.ID.String()], order, factory)
+	assert.Nil(t, byID[retried.ID.String()].Task)
 }
 
 func createTaskOrder(t *testing.T, db *gorm.DB, factory *models.Factory, title string) *models.FactoryWorkOrder {

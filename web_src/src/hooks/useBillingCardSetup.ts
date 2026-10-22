@@ -1,0 +1,98 @@
+import { useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { organizationsCreatePaymentMethodSession } from "@/api-client";
+import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
+import { getApiErrorMessage } from "@/lib/errors";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+
+export function useBillingCardSetup(organizationId: string) {
+  const [error, setError] = useState("");
+  const [popup, setPopup] = useState<Window | null>(null);
+  const activeWindow = useRef<Window | null>(null);
+  const onCardSaved = useRef<(() => void) | undefined>(undefined);
+  const { refetch } = useOrganizationBilling(organizationId);
+  const session = useMutation({
+    mutationFn: async (opened: Window) => {
+      setError("");
+      const response = await organizationsCreatePaymentMethodSession(
+        withOrganizationHeader({ organizationId, path: { id: organizationId }, body: {} }),
+      );
+      if (!response.data?.portalUrl) throw new Error("Could not open card setup. Try again.");
+      const portal = new URL(response.data.portalUrl);
+      portal.pathname = portal.pathname.replace(/\/portal(?:\/.*)?$/, "/portal/settings");
+      if (!opened.closed) opened.location.replace(portal.toString());
+      return opened;
+    },
+    onSuccess: (opened) => {
+      if (!opened.closed) setPopup(opened);
+    },
+    onError: (cause, opened) => {
+      opened.close();
+      onCardSaved.current = undefined;
+      setError(getApiErrorMessage(cause, "Could not open card setup. Try again."));
+    },
+  });
+
+  useEffect(() => () => activeWindow.current?.close(), []);
+
+  useEffect(() => {
+    if (!popup) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const check = async () => {
+      if (cancelled) return;
+      const result = await refetch();
+      if (cancelled) return;
+      if (result.data?.hasPaymentMethod) {
+        const onSaved = onCardSaved.current;
+        onCardSaved.current = undefined;
+        setPopup(null);
+        onSaved?.();
+        return;
+      }
+      if (result.error) setError("Could not verify the card. Close the Polar window and try again.");
+      if (popup.closed) {
+        onCardSaved.current = undefined;
+        setPopup(null);
+        return;
+      }
+      timer = setTimeout(() => void check(), 2000);
+    };
+    void check();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      popup.close();
+      window.focus();
+    };
+  }, [popup, refetch]);
+
+  const open = (onSaved?: () => void) => {
+    setError("");
+    const width = 600;
+    const height = 750;
+    const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
+    const top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
+    const opened = window.open(
+      "about:blank",
+      "_blank",
+      `popup=yes,width=${width},height=${height},left=${Math.round(left)},top=${Math.round(top)}`,
+    );
+    if (!opened) {
+      setError("Allow pop-ups for SuperPlane, then try again.");
+      return;
+    }
+    onCardSaved.current = onSaved;
+    opened.opener = null;
+    activeWindow.current = opened;
+    session.mutate(opened);
+  };
+
+  return {
+    open,
+    error,
+    isPending: session.isPending || Boolean(popup),
+    opening: session.isPending,
+    waitingForCard: Boolean(popup),
+  };
+}

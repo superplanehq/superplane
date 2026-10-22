@@ -621,7 +621,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateGitHubIssue(t *testing.T) 
 		return len(orders)
 	}
 
-	createFromPayload := func(t *testing.T, factoryModel *models.Factory, payload map[string]any) (*core.WorkOrder, bool) {
+	createFromPayload := func(t *testing.T, factoryModel *models.Factory, payload map[string]any) (*core.WorkOrder, bool, *models.CanvasNodeExecution) {
 		t.Helper()
 		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, payload)
 		_, err := factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
@@ -629,14 +629,14 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateGitHubIssue(t *testing.T) 
 		order, created, err := NewFactoryContext(database.Conn(), canvas, nodeExecution).
 			CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds", DefaultOwnerID: r.User.String()})
 		require.NoError(t, err)
-		return order, created
+		return order, created, nodeExecution
 	}
 
 	t.Run("a second label on the same issue does not add a task", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		first, created := createFromPayload(t, factoryModel, issuePayload("labeled", "superplane", 12))
+		first, created, _ := createFromPayload(t, factoryModel, issuePayload("labeled", "superplane", 12))
 		require.True(t, created)
 		require.NotNil(t, first)
 		persisted, err := factoryModel.FindWorkOrder(database.Conn(), uuid.MustParse(first.ID))
@@ -644,9 +644,11 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateGitHubIssue(t *testing.T) 
 		require.Len(t, persisted.Assignees, 1)
 		require.NoError(t, persisted.UpdateAssignees(database.Conn(), nil, r.User))
 
-		second, created := createFromPayload(t, factoryModel, issuePayload("labeled", "benchmark", 12))
+		second, created, duplicateExecution := createFromPayload(t, factoryModel, issuePayload("labeled", "benchmark", 12))
 		assert.False(t, created)
 		assert.Nil(t, second)
+		require.NoError(t, database.Conn().First(duplicateExecution, "id = ?", duplicateExecution.ID).Error)
+		assert.Equal(t, first.ID, duplicateExecution.Metadata.Data()["existing_task_id"])
 		assert.Equal(t, 1, countOrders(factoryModel))
 		persisted, err = factoryModel.FindWorkOrder(database.Conn(), persisted.ID)
 		require.NoError(t, err)
@@ -668,7 +670,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateGitHubIssue(t *testing.T) 
 		require.NoError(t, err)
 		require.NoError(t, database.Conn().Model(closed).Update("state", models.FactoryWorkOrderStateClosed).Error)
 
-		order, created := createFromPayload(t, factoryModel, issuePayload("reopened", "", 12))
+		order, created, _ := createFromPayload(t, factoryModel, issuePayload("reopened", "", 12))
 		require.True(t, created)
 		require.NotNil(t, order)
 		assert.Equal(t, 2, countOrders(factoryModel))
@@ -688,7 +690,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateGitHubIssue(t *testing.T) 
 		)
 		require.NoError(t, err)
 
-		order, created := createFromPayload(t, factoryModel, issuePayload("opened", "", 5))
+		order, created, _ := createFromPayload(t, factoryModel, issuePayload("opened", "", 5))
 		require.True(t, created)
 		require.NotNil(t, order)
 		assert.Equal(t, 2, countOrders(factoryModel))

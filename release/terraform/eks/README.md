@@ -7,6 +7,7 @@ Deploy SuperPlane to EKS with RDS PostgreSQL.
 - [Terraform](https://www.terraform.io/downloads) >= 1.5.0
 - [AWS CLI](https://aws.amazon.com/cli/) installed and configured
 - kubectl installed
+- [Packer](https://developer.hashicorp.com/packer/install) 1.16.1 or later
 - AWS account with permissions to create EKS, EFS, RDS, S3, and VPC resources
 - A domain that you can configure in DNS
 
@@ -24,7 +25,39 @@ aws sts get-caller-identity
 
 Confirm the account ID before you create resources.
 
-### 2. Set your variables
+### 2. Select the runner AMI
+
+Runners are enabled by default, so Terraform requires a runner AMI before the
+first apply. The default fleet uses the amd64 AMI.
+
+In `us-east-1`, use the newest public SuperPlane AMI. `x86_64` is amd64:
+
+```bash
+aws ec2 describe-images \
+  --region us-east-1 \
+  --owners 802589444644 \
+  --filters 'Name=name,Values=superplane-runner-*' 'Name=is-public,Values=true' \
+  --query 'sort_by(Images,&CreationDate)[].[Architecture,ImageId,CreationDate]' \
+  --output table
+```
+
+In another region, build the AMI in that region. Follow
+[release/runner/packer/aws/README.md](../../runner/packer/aws/README.md):
+
+```bash
+cd ../../..   # repository root
+packer init release/runner/packer/aws/runner.pkr.hcl
+packer build \
+  -var architecture=amd64 \
+  -var instance_type=t3.medium \
+  -var aws_region=us-west-2 \
+  release/runner/packer/aws/runner.pkr.hcl
+cd release/terraform/eks
+```
+
+The build writes the AMI ID to `release/runner/packer/aws/manifest.json`.
+
+### 3. Set your variables
 
 ```bash
 test -f terraform.tfvars || cp terraform.tfvars.example terraform.tfvars
@@ -34,9 +67,13 @@ vim terraform.tfvars
 The only required ones are:
 
 ```
-domain_name       = "superplane.yourdomain.com"
-letsencrypt_email = "you@yourdomain.com"
+domain_name        = "superplane.yourdomain.com"
+letsencrypt_email  = "you@yourdomain.com"
+runner_image_amd64 = "ami-0123456789abcdef0"
 ```
+
+Terraform stops the plan when `runner_image_amd64` is empty. To install without
+runners, set `enable_runners = false` and skip the AMI build.
 
 You must control the domain so you can add its DNS record after deployment.
 If you are deploying outside `us-east-1`, also set `region` and two availability zones in that region:
@@ -51,7 +88,7 @@ Terraform generates a database password if you do not set one.
 To use a newer published chart, set `superplane_chart_version` in `terraform.tfvars`.
 Leave `superplane_image_tag` empty to use that chart's matching versioned image.
 
-### 3. Init, plan and apply
+### 4. Init, plan and apply
 
 ```bash
 terraform init
@@ -63,7 +100,7 @@ Review the plan before you apply it. A saved plan can contain secrets, and `terr
 
 The deployment takes 15-20 minutes.
 
-### 4. Configure kubectl
+### 5. Configure kubectl
 
 ```bash
 terraform output -raw kubectl_config_command
@@ -71,7 +108,7 @@ terraform output -raw kubectl_config_command
 
 Run the printed command. It uses the configured region and cluster name.
 
-### 5. Configure DNS
+### 6. Configure DNS
 
 After deployment, get the NLB DNS name:
 
@@ -84,7 +121,7 @@ Create a CNAME record in your DNS provider pointing your domain to the NLB DNS n
 For an existing installation, update its CNAME to the new Traefik NLB hostname.
 Replacing NGINX removes the old NLB. Plan for an interruption while the NLB and DNS change.
 
-### 6. Verify
+### 7. Verify
 
 ```bash
 kubectl get pods -n superplane
@@ -94,14 +131,14 @@ kubectl get pvc superplane-runner-active-logs -n superplane
 
 Access SuperPlane at `https://your-domain.com`
 
-### 7. Install Fleet Manager (optional)
+### 8. Install Fleet Manager
 
 Open **Set up runner fleets** during owner setup. Terraform passes the runner
-subnets, security group, instance profile, region, public SuperPlane URL,
-cluster name, and Fleet Manager role to SuperPlane. The wizard preloads these
-values. Build immutable amd64 and arm64 AMIs with Packer. Set
-`runner_image_amd64` and `runner_image_arm64`, and run `terraform apply` again.
-The wizard disables fleets whose architecture has no configured AMI.
+subnets, security group, instance profile, region, runner AMIs, public
+SuperPlane URL, cluster name, and Fleet Manager role to SuperPlane. The wizard
+preloads these values. For an arm64 fleet, build an arm64 AMI, set
+`runner_image_arm64`, and run `terraform apply` again. The wizard disables
+fleets whose architecture has no configured AMI.
 
 Terraform creates the AWS runner infrastructure, but it does not install Fleet
 Manager. SuperPlane creates a normal personal token when you generate the Helm

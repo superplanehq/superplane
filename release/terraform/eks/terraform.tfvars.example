@@ -8,6 +8,11 @@ domain_name = "superplane.example.com"
 # Email for Let's Encrypt certificate notifications
 letsencrypt_email = "admin@example.com"
 
+# Packer-built linux/amd64 runner AMI for the default fleet. Build it with
+# release/runner/packer/aws/runner.pkr.hcl before the first apply, for example
+# ami-0123456789abcdef0. Required when enable_runners is true.
+runner_image_amd64 = ""
+
 # -----------------------------------------------------------------------------
 # SuperPlane
 # -----------------------------------------------------------------------------
@@ -24,9 +29,9 @@ letsencrypt_email = "admin@example.com"
 
 # Create the runner security group, IAM roles, instance profile, and enable the
 # integrated Runner API. Install the standalone Fleet Manager chart after owner
-# setup with /admin/fleet-manager-setup.
+# setup with /admin/fleet-manager-setup. Set this to false to install without
+# runners.
 # enable_runners = true
-# runner_image_amd64 = "ami-0123456789abcdef0"
 # runner_image_arm64 = "ami-0fedcba9876543210"
 
 # -----------------------------------------------------------------------------

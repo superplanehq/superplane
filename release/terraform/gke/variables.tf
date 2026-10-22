@@ -153,7 +153,7 @@ variable "superplane_chart_version" {
 variable "enable_gcs_blob_storage" {
   description = "Store blobs (task logs and files) in a GCS bucket. SuperPlane uses Workload Identity to access the bucket. Runners require this."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "blob_bucket_name" {
@@ -173,9 +173,9 @@ variable "blob_bucket_force_destroy" {
 # -----------------------------------------------------------------------------
 
 variable "enable_runners" {
-  description = "Enable the runner API and create the runner network and the Fleet Manager service account. Requires enable_gcs_blob_storage."
+  description = "Enable the runner API and create the runner network and the Fleet Manager service account. Requires enable_gcs_blob_storage and runner_image_amd64."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "runner_subnet_cidr" {
@@ -191,7 +191,7 @@ variable "runner_zones" {
 }
 
 variable "runner_image_amd64" {
-  description = "Packer-built GCP image resource for linux/amd64 runner VMs."
+  description = "Packer-built GCP image resource for linux/amd64 runner VMs. Required when enable_runners is true. The default fleet uses this image."
   type        = string
   default     = ""
 }

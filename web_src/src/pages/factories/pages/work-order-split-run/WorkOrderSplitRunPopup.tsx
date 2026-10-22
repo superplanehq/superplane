@@ -21,7 +21,7 @@ import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
-import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
+import { useAnalysisPlanningSession, planningSessionCanStart } from "./useAnalysisPlanningSession";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
@@ -67,6 +67,12 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     workOrderId: orderId,
     enabled: canLookupSession,
     canUpdate,
+    refinementCanStart: planningSessionCanStart({
+      factoryLoaded: Boolean(factoryQuery.data),
+      planningEnabled: refinementEnabled,
+      isDraft: fixture.footer.kind === "draft",
+      analysisActive: isAnalyzing,
+    }),
     isUploading: fileUpload.isUploading,
     uploadFiles: fileUpload.uploadFiles,
     analysisDelivered: analysisFirstResultDelivered({

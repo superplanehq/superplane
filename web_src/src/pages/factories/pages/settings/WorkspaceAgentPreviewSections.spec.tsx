@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -18,7 +18,7 @@ vi.mock("@monaco-editor/react", () => ({
 }));
 
 const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
-const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+const agentPageFeatures = [FEATURE_WORKSPACE_SKILLS];
 
 describe("workspace agent preview fields", () => {
   beforeAll(() => {
@@ -52,7 +52,7 @@ describe("workspace agent preview fields", () => {
     expect(await screen.findByTestId("agent-setup-steps-editor", {}, { timeout: 8000 })).toBeInTheDocument();
   }, 10000);
 
-  it("hides setup and context cards without the workspace agent experiment", async () => {
+  it("shows setup and context cards without the workspace agent experiment", async () => {
     render(
       <FactoriesHarness
         pathSuffix={agentPath}
@@ -60,13 +60,13 @@ describe("workspace agent preview fields", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [] },
         }}
-        experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}
+        experimentalFeatures={[FEATURE_WORKSPACE_SKILLS]}
       />,
     );
 
     expect(await screen.findByTestId("factory-settings-agent", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("agent-setup-steps")).toBeInTheDocument();
+    expect(await screen.findByTestId("agent-cross-repo")).toBeInTheDocument();
   }, 10000);
 
   it("shows load errors when the resource request fails", async () => {

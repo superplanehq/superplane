@@ -46,15 +46,7 @@ export function VelocityPage() {
     return renderShell(header, <VelocityZeroState tasksHref={workOrdersPath(organizationId, routeSegment)} />);
   }
 
-  return renderShell(
-    header,
-    <VelocityReportView
-      model={model}
-      report={model.velocity.report}
-      organizationId={organizationId}
-      factoryKey={routeSegment}
-    />,
-  );
+  return renderShell(header, <VelocityReportView model={model} report={model.velocity.report} />);
 }
 
 /**
@@ -73,17 +65,7 @@ function renderShell(header: ReactNode, body: ReactNode) {
   );
 }
 
-function VelocityReportView({
-  model,
-  report,
-  organizationId,
-  factoryKey,
-}: {
-  model: VelocityPageModel;
-  report: VelocityReport;
-  organizationId: string;
-  factoryKey: string;
-}) {
+function VelocityReportView({ model, report }: { model: VelocityPageModel; report: VelocityReport }) {
   const [breakdown, setBreakdown] = useState<VelocityBreakdown>("origin");
   const flow = model.taskTime.flow;
   const automations = report.automations;
@@ -119,12 +101,7 @@ function VelocityReportView({
         />
       ) : null}
       {automations.length > 0 ? (
-        <VelocityAutomationsTable
-          automations={automations}
-          organizationId={organizationId}
-          factoryKey={factoryKey}
-          periodLabel={model.periodLabel}
-        />
+        <VelocityAutomationsTable automations={automations} periodLabel={model.periodLabel} />
       ) : null}
       <TaskTimeCard flow={flow} emptyLabel={taskTimeEmptyLabel(model)} />
       <CostCard totals={report.totals} points={report.points} />

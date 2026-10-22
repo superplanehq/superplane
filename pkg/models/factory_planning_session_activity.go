@@ -74,21 +74,21 @@ func (PlanningSessionActivity) TableName() string {
 	return "factory_planning_session_activities"
 }
 
-func (s *FactoryPlanningSession) UpsertActivity(tx *gorm.DB, activity PlanningSessionActivity) error {
+func (s *FactoryPlanningSession) UpsertActivity(tx *gorm.DB, activity PlanningSessionActivity) (bool, error) {
 	if activity.ID == uuid.Nil || activity.SessionID != s.ID || activity.SchemaVersion < 1 || activity.LastSequence < 0 {
-		return fmt.Errorf("%w: invalid activity", ErrFactoryPlanningSessionInvalid)
+		return false, fmt.Errorf("%w: invalid activity", ErrFactoryPlanningSessionInvalid)
 	}
 
 	var existing PlanningSessionActivity
 	err := tx.Select("id", "session_id").Where("id = ?", activity.ID).First(&existing).Error
 	if err == nil && existing.SessionID != s.ID {
-		return fmt.Errorf("%w: activity belongs to a different session", ErrFactoryPlanningSessionInvalid)
+		return false, fmt.Errorf("%w: activity belongs to a different session", ErrFactoryPlanningSessionInvalid)
 	}
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+		return false, err
 	}
 
-	return tx.Clauses(clause.OnConflict{
+	result := tx.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"schema_version", "provider", "status", "last_sequence", "snapshot", "started_at", "completed_at", "updated_at",
@@ -96,7 +96,11 @@ func (s *FactoryPlanningSession) UpsertActivity(tx *gorm.DB, activity PlanningSe
 		Where: clause.Where{Exprs: []clause.Expression{clause.Expr{
 			SQL: "factory_planning_session_activities.last_sequence < EXCLUDED.last_sequence",
 		}}},
-	}).Create(&activity).Error
+	}).Create(&activity)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
 }
 
 func ListPlanningSessionActivities(tx *gorm.DB, sessionID uuid.UUID) ([]PlanningSessionActivity, error) {

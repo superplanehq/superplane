@@ -13,7 +13,7 @@ import (
 
 func TestListAutomationsMentioningSkill(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
-func TestPRFeedbackOmitsCommitIdentityWhenWorkspaceAgentIsEnabled(t *testing.T) {
+func TestPRFeedbackOmitsCommitIdentity(t *testing.T) {
 	cases := []struct {
 		name     string
 		provider string
