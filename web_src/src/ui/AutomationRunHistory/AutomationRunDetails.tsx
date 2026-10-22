@@ -6,6 +6,7 @@ import { CopyButton } from "@/ui/CopyButton";
 import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import { RunIdCopy, RunStatusLabel } from "./RunIdentity";
 import { RunTimestamp } from "./RunTimestamp";
+import { IntakeRunHeading } from "./IntakeRunHeading";
 import { Skeleton } from "@/ui/skeleton";
 import type { AutomationRun, RunLogs, RunActivity } from "./types";
 
@@ -68,7 +69,7 @@ export function AutomationRunDetails({
         <ArrowLeft className="size-4" />
         Run history
       </Button>
-      <RunDetailsHeader run={run} tasksLoading={tasksLoading} />
+      {run.intake ? <IntakeRunHeading run={run} /> : <RunDetailsHeader run={run} tasksLoading={tasksLoading} />}
       <dl className="flex flex-wrap gap-x-16 gap-y-4 border-y border-border py-5 text-sm">
         {[
           ["Started", formatRunTime(run.startedAt)],
@@ -121,12 +122,8 @@ export function AutomationRunDetails({
                 {selected.error}
               </p>
             )}
-            <Tabs key={selected.id} defaultValue="logs">
-              <TabsList>
-                <TabsTrigger value="logs">Logs</TabsTrigger>
-                <TabsTrigger value="outputs">Outputs</TabsTrigger>
-                {selected.additionalInstructions ? <TabsTrigger value="instructions">Instructions</TabsTrigger> : null}
-              </TabsList>
+            <Tabs key={selected.id} defaultValue={selected.defaultTab ?? "logs"}>
+              <RunActivityTabList activity={selected} />
               <TabsContent value="logs" className="pt-5">
                 {renderLogs ? (
                   renderLogs(selected)
@@ -160,6 +157,20 @@ export function AutomationRunDetails({
         )}
       </div>
     </section>
+  );
+}
+
+function RunActivityTabList({ activity }: { activity: RunActivity }) {
+  const tabs = activity.defaultTab === "outputs" ? ["outputs", "logs"] : ["logs", "outputs"];
+  return (
+    <TabsList>
+      {tabs.map((tab) => (
+        <TabsTrigger key={tab} value={tab}>
+          {tab === "logs" ? "Logs" : (activity.outputsLabel ?? "Outputs")}
+        </TabsTrigger>
+      ))}
+      {activity.additionalInstructions ? <TabsTrigger value="instructions">Instructions</TabsTrigger> : null}
+    </TabsList>
   );
 }
 

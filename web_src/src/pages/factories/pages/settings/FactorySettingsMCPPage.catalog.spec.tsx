@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { OAUTH_CONNECTED_RESOURCE, OAUTH_NOT_CONNECTED_RESOURCE } from "../../__fixtures__/agentResourceFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -20,7 +20,7 @@ import {
 import type { FactoriesFixture } from "../../__fixtures__/factoryPageResponses";
 
 const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
-const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS];
 
 function emptyAgentResourcesFixture(): FactoriesFixture {
   return {

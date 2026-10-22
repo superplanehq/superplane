@@ -385,9 +385,9 @@ func TestMCPClientRoutesRequireSuperPlaneMCPServerFeature(t *testing.T) {
 	assert.Equal(t, required, revokeRule.RequiredExperimentalFeatures)
 }
 
-func TestMCPToolAndOAuthRoutesRequireWorkspaceMCPFeature(t *testing.T) {
+func TestMCPToolAndOAuthRoutesRequireFactoriesFeature(t *testing.T) {
 	rules := DefaultAuthorizationRules()
-	required := []string{features.FeatureFactories, features.FeatureWorkspaceMCP}
+	required := []string{features.FeatureFactories}
 	routes := []HTTPRoute{
 		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/tools"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/oauth:start"},

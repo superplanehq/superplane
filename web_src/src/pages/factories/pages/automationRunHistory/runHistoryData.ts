@@ -5,6 +5,7 @@ import type {
   FactoriesWorkOrder,
   SuperplaneComponentsNode,
 } from "@/api-client";
+import { intakeRunPresentation, type RunHistoryIntakeSource } from "./intakeRunData";
 import { formatCompactDuration } from "@/lib/duration";
 import type { AutomationRun, RunActivity, RunStatus } from "@/ui/AutomationRunHistory/types";
 import { findWorkOrderForAutomationRun } from "../../lib/factoryAutomationStatus";
@@ -25,9 +26,17 @@ export function runDuration(run: CanvasesCanvasRun, now: number): string {
   return Number.isFinite(start) && Number.isFinite(end) ? formatCompactDuration(Math.max(0, end - start)) : "—";
 }
 
-export function toAutomationRun(run: CanvasesCanvasRun, orders: FactoriesWorkOrder[], now: number): AutomationRun {
-  const order = findWorkOrderForAutomationRun(orders, run.id ?? "", run);
+export function toAutomationRun(
+  run: CanvasesCanvasRun,
+  orders: FactoriesWorkOrder[],
+  now: number,
+  intakeSource?: RunHistoryIntakeSource,
+): AutomationRun {
+  const order = intakeSource
+    ? orders.find((order) => Boolean(run.id) && order.sourceRunId === run.id)
+    : findWorkOrderForAutomationRun(orders, run.id ?? "", run);
   return {
+    ...(intakeSource ? intakeRunPresentation(run, intakeSource, recordedStatus(run), orders) : {}),
     id: run.id ?? "",
     title: run.rootEvent?.customName,
     task: order ? { id: order.key || order.id || "—", title: order.title || "Untitled task" } : undefined,
@@ -59,10 +68,12 @@ export function toRunActivities(
   if (run.rootEvent?.id) {
     activities.push({
       id: `event:${run.rootEvent.id}`,
-      name: "Run started",
+      name: "Source event",
       status: "Passed",
       logs: { state: "empty" },
       outputs: run.rootEvent.data,
+      defaultTab: "outputs",
+      outputsLabel: "Event data",
       recordedAt: run.createdAt,
     });
   }
@@ -92,7 +103,17 @@ function executionActivity(
     recordedAt: execution.createdAt,
     error: execution.result === "RESULT_FAILED" ? execution.resultMessage || undefined : undefined,
     logs: { state: "empty" },
+    defaultTab: activityDefaultTab(execution, node),
     outputs: execution.outputs && Object.keys(execution.outputs).length ? execution.outputs : undefined,
     additionalInstructions: typeof instructions === "string" && instructions.trim() ? instructions : undefined,
   };
+}
+
+function activityDefaultTab(
+  execution: CanvasesCanvasNodeExecution,
+  node?: SuperplaneComponentsNode,
+): "logs" | "outputs" {
+  if (execution.metadata?.runner_broker_task_id) return "logs";
+  if (!node || node.component?.startsWith("runner")) return "logs";
+  return "outputs";
 }

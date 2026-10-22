@@ -166,11 +166,16 @@ func TestFactoryPlanningSession_ProposeSurveyAndSendClearsIt(t *testing.T) {
 
 	require.NoError(t, session.ProposeSurvey(db, PlanningSessionSurvey{
 		Questions: []PlanningSessionSurveyQuestion{
-			{Prompt: "What is the priority?", Options: []string{"High", "Low"}},
+			{Prompt: "What is the priority?", Options: []string{"High", "Low"}, RecommendedOption: "Low"},
 			{Prompt: "What is the scope?", Options: []string{"One file", "The service"}},
 		},
 	}))
 	assert.Equal(t, "What is the priority?", session.CurrentSurvey().Questions[0].Prompt)
+	stored, err := FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Low", stored.CurrentSurvey().Questions[0].RecommendedOption)
+	assert.Equal(t, []string{"High", "Low"}, stored.CurrentSurvey().Questions[0].Options)
+	assert.Empty(t, stored.CurrentSurvey().Questions[1].RecommendedOption)
 
 	require.NoError(t, session.BeginWait(db))
 	require.NoError(t, session.SendUserMessage(db, "Priority: High\nScope: skipped", uuid.Nil))
@@ -187,6 +192,25 @@ func TestFactoryPlanningSession_ProposeSurveyRejectsEmptyQuestions(t *testing.T)
 	err := session.ProposeSurvey(db, PlanningSessionSurvey{})
 	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
 	assert.Empty(t, session.CurrentSurvey().Questions)
+}
+
+func TestFactoryPlanningSession_ProposeSurveyRejectsUnmatchedRecommendation(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-survey-recommendation")
+	db := database.DB(t.Context())
+	for _, recommendation := range []string{"Missing", "high", " High ", "Skip"} {
+		t.Run(recommendation, func(t *testing.T) {
+			err := session.ProposeSurvey(db, PlanningSessionSurvey{
+				Questions: []PlanningSessionSurveyQuestion{
+					{Prompt: "What is the priority?", Options: []string{"High", "Low"}, RecommendedOption: recommendation},
+				},
+			})
+			assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+			stored, err := FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+			require.NoError(t, err)
+			assert.Empty(t, stored.CurrentSurvey().Questions)
+		})
+	}
 }
 
 func TestFactoryPlanningSession_ProposeSurveyReplacesPrevious(t *testing.T) {

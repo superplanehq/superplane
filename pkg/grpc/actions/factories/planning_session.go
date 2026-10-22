@@ -524,8 +524,9 @@ func planningSessionSurveyQuestions(survey models.PlanningSessionSurvey) []*pb.P
 	questions := make([]*pb.PlanningSessionSurveyQuestion, 0, len(survey.Questions))
 	for _, question := range survey.Questions {
 		questions = append(questions, &pb.PlanningSessionSurveyQuestion{
-			Prompt:  question.Prompt,
-			Options: question.Options,
+			Prompt:            question.Prompt,
+			Options:           question.Options,
+			RecommendedOption: question.RecommendedOption,
 		})
 	}
 	return questions

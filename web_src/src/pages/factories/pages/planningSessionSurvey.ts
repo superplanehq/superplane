@@ -69,7 +69,7 @@ function planningSurveyQuestion(value: unknown): CreateWithAgentSurveyQuestion[]
   if (!value || typeof value !== "object") {
     return [];
   }
-  const question = value as { prompt?: unknown; options?: unknown };
+  const question = value as { prompt?: unknown; options?: unknown; recommendedOption?: unknown };
   const prompt = typeof question.prompt === "string" ? question.prompt.trim() : "";
   if (!prompt) {
     return [];
@@ -80,5 +80,13 @@ function planningSurveyQuestion(value: unknown): CreateWithAgentSurveyQuestion[]
   if (!options.length) {
     return [];
   }
-  return [{ prompt, options }];
+  return [
+    {
+      prompt,
+      options,
+      ...(typeof question.recommendedOption === "string" && question.recommendedOption
+        ? { recommendedOption: question.recommendedOption }
+        : {}),
+    },
+  ];
 }
