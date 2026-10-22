@@ -1460,6 +1460,7 @@ function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute
       return {
         json: fixture.organizationBilling ?? {
           plan: "trial",
+          productFeatures: { byo_key: true },
           planSource: "system",
           trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
           billingEnabled: true,
@@ -1510,6 +1511,7 @@ function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
     resolve: () => ({
       json: fixture.organizationBilling ?? {
         plan: "trial",
+        productFeatures: { byo_key: true },
         planSource: "system",
         trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
         billingEnabled: true,

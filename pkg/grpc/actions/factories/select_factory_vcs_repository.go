@@ -80,13 +80,17 @@ func SelectFactoryVCSProviderRepository(
 		previousIntegrationID := factory.OnboardingConfigValue().VCSIntegrationID
 		integrationID := integration.ID.String()
 		repositoryID := repository.RepositoryID
+		backlogRepositoryID := &repositoryID
+		if config := factory.OnboardingConfigValue(); config.BacklogRepository != "" && config.BacklogRepository != config.AppRepository {
+			backlogRepositoryID = nil
+		}
 		if updateErr := factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:    &integrationID,
 			VCSProvider:         &provider,
 			AppRepository:       &repository.FullName,
 			AppRepositoryID:     &repositoryID,
-			BacklogRepository:   &repository.FullName,
-			BacklogRepositoryID: &repositoryID,
+			BacklogRepository:   onboardingBacklogRepository(factory, repository.FullName),
+			BacklogRepositoryID: backlogRepositoryID,
 			DefaultBranch:       &repository.DefaultBranch,
 		}); updateErr != nil {
 			return updateErr
@@ -230,4 +234,13 @@ func rejectFactoryProviderSwitch(factory *models.Factory, provider string) error
 		return grpcerrors.InvalidArgument(nil, "version control provider cannot be changed")
 	}
 	return nil
+}
+
+// Keep an explicit backlog binding when the application repository changes.
+func onboardingBacklogRepository(factory *models.Factory, repository string) *string {
+	config := factory.OnboardingConfigValue()
+	if config.BacklogRepository != "" && config.BacklogRepository != config.AppRepository {
+		return nil
+	}
+	return &repository
 }

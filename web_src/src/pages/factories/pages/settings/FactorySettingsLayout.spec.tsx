@@ -410,32 +410,26 @@ describe("FactorySettingsLayout sidebar", () => {
   }, 10000);
 
   describe("organization-byok experimental feature", () => {
-    it("hides the LLM Models nav item when the feature is off", async () => {
-      render(
-        <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
-          factoriesFixture={defaultFactoriesFixture}
-        />,
-      );
+    it.each([{ features: [] }, { features: [FEATURE_ORGANIZATION_BYOK] }])(
+      "keeps the LLM Models nav item with features %j",
+      async ({ features }) => {
+        render(
+          <FactoriesHarness
+            pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+            factoriesFixture={defaultFactoriesFixture}
+            experimentalFeatures={features}
+          />,
+        );
 
-      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      expect(within(sidebar).queryByTestId("factory-settings-nav-organization-models")).not.toBeInTheDocument();
-    }, 10000);
+        const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+        expect(await within(sidebar).findByTestId("factory-settings-nav-organization-models")).toHaveTextContent(
+          "LLM Models",
+        );
+      },
+      10000,
+    );
 
-    it("shows the LLM Models nav item when the feature is on", async () => {
-      render(
-        <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
-          factoriesFixture={defaultFactoriesFixture}
-          experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
-        />,
-      );
-
-      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      expect(within(sidebar).getByTestId("factory-settings-nav-organization-models")).toHaveTextContent("LLM Models");
-    }, 10000);
-
-    it("redirects away from the LLM Models route when the feature is off", async () => {
+    it("keeps hosted models available when the feature is off", async () => {
       render(
         <FactoriesHarness
           pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
@@ -443,11 +437,34 @@ describe("FactorySettingsLayout sidebar", () => {
         />,
       );
 
-      await waitFor(() => {
-        expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
-      });
-      expect(screen.queryByTestId("factory-settings-llm-models")).not.toBeInTheDocument();
+      expect(await screen.findByTestId("llm-models-hosted", {}, { timeout: 8000 })).toBeInTheDocument();
+      expect(screen.queryByTestId("llm-models-provider-choices")).not.toBeInTheDocument();
     }, 10000);
+
+    it("allows hosted recovery from the model route when the product permission is off", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
+          factoriesFixture={{
+            ...defaultFactoriesFixture,
+            factories: defaultFactoriesFixture.factories.map((factory) => ({
+              ...factory,
+              onboarding: { ...factory.onboarding, agentHarness: "AGENT_HARNESS_CLAUDE_CODE" },
+            })),
+            organizationBilling: {
+              ...defaultFactoriesFixture.organizationBilling,
+              productFeatures: { byo_key: false },
+            },
+          }}
+          experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
+        />,
+      );
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: "Use SuperPlane" }));
+      expect(screen.getByRole("button", { name: "Switch to SuperPlane" })).toBeEnabled();
+      expect(screen.queryByTestId("llm-models-connect-anthropic")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("llm-models-empty-banner")).not.toBeInTheDocument();
+    });
 
     it("renders the LLM Models page when the feature is on", async () => {
       render(

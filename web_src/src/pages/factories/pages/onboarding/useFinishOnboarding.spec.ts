@@ -284,6 +284,24 @@ describe("provisionWorkspace", () => {
 });
 
 describe("afterWorkspaceProvisioned", () => {
+  it("opens the factory directly without skipping the import", async () => {
+    const navigate = vi.fn();
+    const onProvisioned = vi.fn();
+    await afterWorkspaceProvisioned({
+      factory: null,
+      organizationId: "org",
+      factoryId: "factory",
+      factoryKey: "PAY",
+      lineId: "line",
+      invalidateAccountOrganizations: vi.fn(),
+      navigate,
+      onProvisioned,
+      bypassAnalysis: true,
+      skipInitialImport: false,
+    });
+    expect(navigate).toHaveBeenCalled();
+    expect(onProvisioned).not.toHaveBeenCalled();
+  });
   it("opens the board directly when the user skipped importing", async () => {
     const navigate = vi.fn();
     const onProvisioned = vi.fn();

@@ -132,6 +132,7 @@ func Test__ListLineRunnerModels__MixedLineUnionsProviders(t *testing.T) {
 func Test__ListLineRunnerModels__IncludesCanvasModelsWhenAllowlistEmpty(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -146,6 +147,23 @@ func Test__ListLineRunnerModels__IncludesCanvasModelsWhenAllowlistEmpty(t *testi
 	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"claude-opus-5-5", "claude-sonnet-4-6"}, ids)
+}
+
+func Test__ListLineRunnerModels__DropsStoredBYOKModelWithoutAccess(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	planning := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "opus")
+	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: planning.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	require.NoError(t, err)
+	assert.Empty(t, ids)
 }
 
 func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testing.T) {

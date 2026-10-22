@@ -500,6 +500,9 @@ func switchFactoryModelSource(
 	var integration *models.Integration
 	if strings.TrimSpace(source) != modelSourceHosted {
 		provider := strings.TrimSpace(source)
+		if err := models.RequireOrganizationBYOKAccess(tx, factory.OrganizationID, provider); err != nil {
+			return nil, "", factoryErrorToStatus(err, "failed to switch model source")
+		}
 		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, reg.Encryptor, factory.OrganizationID, provider, apiKey, baseURL, apiType)
 		if err != nil {
 			return nil, "", err

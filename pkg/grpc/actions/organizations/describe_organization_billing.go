@@ -34,6 +34,11 @@ func DescribeOrganizationBilling(
 		return nil, grpcerrors.Internal(err, "failed to describe organization billing")
 	}
 
+	productFeatures, err := plan.ResolveProductFeatures(db)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load product permissions.")
+	}
+
 	credit, err := models.DescribeOrganizationLLMCredit(db, organizationID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to describe organization billing")
@@ -76,6 +81,7 @@ func DescribeOrganizationBilling(
 	}
 	return &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
+		ProductFeatures:             productFeatures,
 		RequirePaymentMethod:        models.BillingEnabled() && newBilling && plan.Catalog.RequirePaymentMethod,
 		HasPaymentMethod:            hasCard,
 		AvailablePlans:              available,

@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useAccount } from "@/contexts/useAccount";
 import { useGooglePurchaseTracking } from "@/hooks/useGooglePurchaseTracking";
@@ -153,9 +154,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     await Promise.all([refetchSpend(), refetchGrants(), refetchBilling()]);
   }, [refetchSpend, refetchGrants, refetchBilling]);
 
-  const syncFromPolar = useCallback(async () => {
-    await syncOrganizationBilling(organizationId);
-  }, [organizationId]);
+  const syncFromPolar = useBillingSyncCallback(organizationId);
 
   const subscription = useOrganizationSubscriptionActions(organizationId);
 
@@ -207,4 +206,9 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     invoices: metrics.invoices,
     grants: grantsQuery.data?.grants ?? [],
   };
+}
+
+function useBillingSyncCallback(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useCallback(() => syncOrganizationBilling(organizationId, queryClient), [organizationId, queryClient]);
 }
