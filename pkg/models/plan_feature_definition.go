@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -109,6 +110,26 @@ func ListFeatureOrganizations(tx *gorm.DB, featureKey, search string, limit, off
 	err := query.Select("organizations.id, organizations.name, organizations.slug, (grants.organization_id IS NOT NULL) AS enabled_grant, plans.id AS plan_id, plans.key AS plan_key, plans.name AS plan_name").
 		Order("organizations.name, organizations.id").Limit(limit).Offset(offset).Scan(&items).Error
 	return items, total, err
+}
+
+// lockPlanFeatureReferences validates keys and holds their shared row locks until
+// the reference write commits. Deletion takes an exclusive lock on the same row.
+// Callers must run this before locking plans to keep the lock order consistent.
+func lockPlanFeatureReferences(tx *gorm.DB, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	keys = slices.Clone(keys)
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
+	var features []PlanFeatureDefinition
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("key IN ?", keys).Order("key").Find(&features).Error; err != nil {
+		return err
+	}
+	if len(features) != len(keys) {
+		return fmt.Errorf("%w: unknown feature", ErrCatalogPlan)
+	}
+	return nil
 }
 
 func validatePlanFeatureDefinition(feature *PlanFeatureDefinition) error {
