@@ -11,7 +11,6 @@ export type AgentModelSource = "hosted" | "anthropic" | "openai" | "openrouter" 
 export type AgentModelProviderConnection = {
   provider: Exclude<AgentModelSource, "hosted">;
   connected: boolean;
-  integrationId?: string;
 };
 
 export function modelMatchesAgentSource(model: SelectableLLMModel, source: AgentModelSource | undefined): boolean {
@@ -24,9 +23,24 @@ export function modelMatchesAgentSource(model: SelectableLLMModel, source: Agent
   return model.source.id === SELECTABLE_LLM_SOURCE_BYOK && model.provider.id === source;
 }
 
+export function modelSourceFromIntegrationName(integrationName: string | undefined): AgentModelSource | null {
+  switch (integrationName?.trim()) {
+    case "claude":
+      return "anthropic";
+    case "openai":
+      return "openai";
+    case "openrouter":
+      return "openrouter";
+    case "customLlm":
+      return "custom";
+    default:
+      return null;
+  }
+}
+
 export function workspaceAgentModelSource(
   harness: FactoryOnboardingAgentHarness | undefined,
-  integrationId: string | undefined,
+  savedProvider: AgentModelSource | null,
   connections: AgentModelProviderConnection[],
 ): AgentModelSource | null {
   if (harness === "AGENT_HARNESS_SUPERPLANE") {
@@ -39,7 +53,7 @@ export function workspaceAgentModelSource(
     return null;
   }
 
-  const provider = connectedProvider(harness, integrationId, connections);
+  const provider = savedProvider ?? fallbackProvider(harness, connections);
   if (harness === "AGENT_HARNESS_CLAUDE_CODE") {
     if (provider === "anthropic" || provider === "openrouter" || provider === "custom") {
       return provider;
@@ -49,18 +63,10 @@ export function workspaceAgentModelSource(
   return provider ?? "hosted";
 }
 
-function connectedProvider(
+function fallbackProvider(
   harness: FactoryOnboardingAgentHarness | undefined,
-  integrationId: string | undefined,
   connections: AgentModelProviderConnection[],
 ): AgentModelProviderConnection["provider"] | null {
-  const savedId = integrationId?.trim() ?? "";
-  if (savedId) {
-    const match = connections.find((connection) => connection.connected && connection.integrationId === savedId);
-    if (match) {
-      return match.provider;
-    }
-  }
   if (harness === "AGENT_HARNESS_CLAUDE_CODE") {
     return firstConnected(connections, ["anthropic", "openrouter", "custom"]);
   }

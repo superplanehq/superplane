@@ -5,6 +5,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdateFactory } from "@/hooks/useFactoryData";
+import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { SELECTABLE_LLM_SOURCE_HOSTED, type SelectableLLMModel } from "@/lib/selectableLLMModels";
@@ -14,9 +15,8 @@ import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard } from "./FactorySettingsCard";
 import {
   modelMatchesAgentSource,
+  modelSourceFromIntegrationName,
   workspaceAgentModelSource,
-  type AgentModelProviderConnection,
-  type AgentModelSource,
 } from "./workspaceAgentModelSource";
 
 const MODEL_FIELD_ID = "agent-default-model-select";
@@ -143,26 +143,43 @@ function modelMatchesSavedProvider(model: SelectableLLMModel, provider: string):
 
 const AGENT_MODEL_PROVIDERS = ["anthropic", "openai", "openrouter", "custom"] as const;
 
-function useWorkspaceAgentModelSource(organizationId: string, factory?: FactoriesFactory | null) {
+function needsAgentConnections(factory?: FactoriesFactory | null): boolean {
   const harness = factory?.onboarding?.agentHarness;
-  const needsConnections =
+  return (
     Boolean(factory) &&
     harness !== "AGENT_HARNESS_SUPERPLANE" &&
     harness !== "AGENT_HARNESS_CODEX" &&
-    harness !== "AGENT_HARNESS_CURSOR";
-  const anthropic = useBYOKLLMModels(organizationId, "anthropic", needsConnections);
-  const openai = useBYOKLLMModels(organizationId, "openai", needsConnections);
-  const openrouter = useBYOKLLMModels(organizationId, "openrouter", needsConnections);
-  const custom = useBYOKLLMModels(organizationId, "custom", needsConnections);
-  const queries = [anthropic, openai, openrouter, custom];
-  const isLoading = !factory || (needsConnections && queries.some((query) => query.isLoading));
-  const connections: AgentModelProviderConnection[] = AGENT_MODEL_PROVIDERS.map((provider, index) => ({
+    harness !== "AGENT_HARNESS_CURSOR"
+  );
+}
+
+function useAgentProviderQueries(organizationId: string, enabled: boolean) {
+  return [
+    useBYOKLLMModels(organizationId, "anthropic", enabled),
+    useBYOKLLMModels(organizationId, "openai", enabled),
+    useBYOKLLMModels(organizationId, "openrouter", enabled),
+    useBYOKLLMModels(organizationId, "custom", enabled),
+  ];
+}
+
+function useWorkspaceAgentModelSource(organizationId: string, factory?: FactoriesFactory | null) {
+  const savedIntegrationId = factory?.onboarding?.agentIntegrationId?.trim() ?? "";
+  const needsConnections = needsAgentConnections(factory);
+  const needsSavedIntegration = needsConnections && savedIntegrationId !== "";
+  const integrations = useConnectedIntegrations(organizationId, { enabled: needsSavedIntegration });
+  const queries = useAgentProviderQueries(organizationId, needsConnections);
+  const connections = AGENT_MODEL_PROVIDERS.map((provider, index) => ({
     provider,
     connected: Boolean(queries[index]?.data?.connected),
-    integrationId: queries[index]?.data?.integrationId,
   }));
-  const source: AgentModelSource | undefined = isLoading
+  const savedIntegration = integrations.data?.find((integration) => integration.metadata?.id === savedIntegrationId);
+  const isLoading = !factory || queries.some((query) => query.isLoading) || integrations.isLoading;
+  const source = isLoading
     ? undefined
-    : (workspaceAgentModelSource(harness, factory?.onboarding?.agentIntegrationId, connections) ?? undefined);
+    : (workspaceAgentModelSource(
+        factory?.onboarding?.agentHarness,
+        modelSourceFromIntegrationName(savedIntegration?.metadata?.integrationName),
+        connections,
+      ) ?? undefined);
   return { source, isLoading };
 }

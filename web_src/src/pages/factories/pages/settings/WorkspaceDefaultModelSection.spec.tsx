@@ -87,6 +87,22 @@ describe("workspace default model", () => {
     expect(await screen.findByRole("option", { name: "Your keys: openai/gpt-5" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "SuperPlane: openai/gpt-5" })).not.toBeInTheDocument();
   }, 15000);
+
+  it("offers models for the saved connection when it is not the oldest key", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        orgIntegrations={secondOpenRouterConnections}
+        factoriesFixture={secondOpenRouterFixture()}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("agent-default-model-select", {}, { timeout: 8000 }));
+    expect(await screen.findByRole("option", { name: "Your keys: moonshotai/kimi-k2.6" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Your keys: anthropic/claude-sonnet-4-6" })).not.toBeInTheDocument();
+  }, 15000);
 });
 
 function hostedDefaultFixture() {
@@ -99,12 +115,41 @@ function codexDefaultFixture() {
 
 function withAgentHarness(
   fixture: typeof defaultFactoriesFixture,
-  agentHarness: "AGENT_HARNESS_SUPERPLANE" | "AGENT_HARNESS_CODEX",
+  agentHarness: "AGENT_HARNESS_SUPERPLANE" | "AGENT_HARNESS_CODEX" | "AGENT_HARNESS_CLAUDE_CODE",
+  agentIntegrationId?: string,
 ) {
   return {
     ...fixture,
     factories: fixture.factories.map((factory) =>
-      factory.id === PRIMARY_FACTORY_ID ? { ...factory, onboarding: { ...factory.onboarding, agentHarness } } : factory,
+      factory.id === PRIMARY_FACTORY_ID
+        ? { ...factory, onboarding: { ...factory.onboarding, agentHarness, agentIntegrationId } }
+        : factory,
     ),
+  };
+}
+
+const secondOpenRouterConnections = [
+  {
+    metadata: { id: "claude-1", name: "anthropic-key", integrationName: "claude" },
+    status: { state: "ready" as const },
+  },
+  {
+    metadata: { id: "openrouter-1", name: "router-old", integrationName: "openrouter" },
+    status: { state: "ready" as const },
+  },
+  {
+    metadata: { id: "openrouter-2", name: "router-new", integrationName: "openrouter" },
+    status: { state: "ready" as const },
+  },
+];
+
+function secondOpenRouterFixture() {
+  return {
+    ...withAgentHarness(defaultFactoriesFixture, "AGENT_HARNESS_CLAUDE_CODE", "openrouter-2"),
+    byokConnectedProviders: ["anthropic", "openrouter"],
+    byokCandidatesByProvider: {
+      anthropic: ["claude-sonnet-4-6"],
+      openrouter: ["moonshotai/kimi-k2.6"],
+    },
   };
 }

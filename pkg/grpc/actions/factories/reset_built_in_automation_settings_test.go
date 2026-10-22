@@ -12,14 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
@@ -604,6 +607,110 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 	require.NotNil(t, agent.Concurrency)
 	assert.Equal(t, 5, agent.Concurrency.EffectiveMax())
 	assert.Equal(t, false, findIntakeNode(version.Nodes, "create-pr").Configuration["draft"])
+}
+
+func TestResetKeepsEmptyStepOnWorkspaceDefault(t *testing.T) {
+	t.Run("hosted", func(t *testing.T) {
+		r, factory := resetTestFactory(t)
+		seedSelectableHostedModel(t)
+		enableInstanceSuperPlaneDefault(t)
+		db := database.DB(t.Context())
+		model := "claude-sonnet-4-6"
+		provider := models.UsageProviderAnthropic
+		require.NoError(t, factory.UpdateDefaultAgentModel(db, model, provider))
+		harness := models.FactoryOnboardingAgentHarnessSuperPlane
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AgentHarness: &harness}))
+
+		canvas := resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
+			findYAMLNode(t, doc, implementationAgentNodeID).Configuration["model"] = ""
+		})
+		require.NoError(t, resetTestOrganization(t, r))
+
+		node := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, implementationAgentNodeID)
+		require.NotNil(t, node)
+		assert.Equal(t, "", node.Configuration["model"])
+		saved, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model, saved.DefaultAgentModel)
+		assert.Equal(t, provider, saved.DefaultAgentModelProvider)
+
+		execution := workspaceDefaultExecution(db, r, canvas, factory, node.Configuration)
+		resolved, ok, err := runner.SelectableHostedFactoryDefault(execution)
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, core.DefaultHostedLLMModel{Provider: provider, Model: model}, resolved)
+		installation, err := execution.HostedLLM.DefaultModel()
+		require.NoError(t, err)
+		assert.NotEqual(t, model, installation.Model)
+	})
+
+	t.Run("bring-your-own-key", func(t *testing.T) {
+		r, factory := resetTestFactory(t)
+		db := database.DB(t.Context())
+		_, err := models.UpsertOrganizationBYOKModelAllowlist(
+			db,
+			r.Organization.ID,
+			models.UsageProviderAnthropic,
+			datatypes.JSONSlice[string]{"claude-opus-4-6"},
+		)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
+		})
+		integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "claude", "selected-agent", nil)
+		require.NoError(t, err)
+		require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+		integrationID := integration.ID.String()
+		harness := models.FactoryOnboardingAgentHarnessClaudeCode
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AgentHarness:       &harness,
+			AgentIntegrationID: &integrationID,
+		}))
+		model := "claude-opus-4-6"
+		require.NoError(t, factory.UpdateDefaultAgentModel(db, model, ""))
+		enableInstanceSuperPlaneDefault(t)
+
+		canvas := resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
+			agent := findYAMLNode(t, doc, implementationAgentNodeID)
+			agent.Component = "runnerClaudeCode"
+			agent.Configuration["model"] = ""
+			agent.Configuration["credentials"] = map[string]any{
+				"source":      "integration",
+				"integration": map[string]any{"name": integration.InstallationName},
+			}
+		})
+		require.NoError(t, resetTestOrganization(t, r))
+
+		node := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, implementationAgentNodeID)
+		require.NotNil(t, node)
+		assert.Equal(t, "", node.Configuration["model"])
+		saved, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model, saved.DefaultAgentModel)
+		assert.Empty(t, saved.DefaultAgentModelProvider)
+
+		resolved, err := runner.ModelOrFactoryDefault(
+			workspaceDefaultExecution(db, r, canvas, factory, node.Configuration),
+			node.ComponentName(),
+			"",
+		)
+		require.NoError(t, err)
+		assert.Equal(t, model, resolved)
+	})
+}
+
+func workspaceDefaultExecution(
+	db *gorm.DB,
+	r *support.ResourceRegistry,
+	canvas *models.Canvas,
+	factory *models.Factory,
+	configuration map[string]any,
+) core.ExecutionContext {
+	return core.ExecutionContext{
+		Configuration: configuration,
+		Factory:       contexts.NewFactoryContext(db, canvas, nil),
+		HostedLLM:     contexts.NewHostedLLMContext(db, r.Encryptor, r.Organization.ID, &factory.ID),
+	}
 }
 
 func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {
