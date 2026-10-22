@@ -682,7 +682,7 @@ func Test__ApplySubscriptionRenewalAdvancesPeriodAndGrantsIncluded(t *testing.T)
 			renewal.Data.ModifiedAt = polarTime{Time: firstEnd}
 			require.NoError(t, ApplySubscriptionEvent(t.Context(), db, renewal))
 
-			requireRenewedPeriod(t, db, r.Organization.ID, firstEnd, renewedEnd)
+			requirePeriod(t, db, r.Organization.ID, firstEnd, renewedEnd)
 			requireIncludedGrantExpiries(t, db, r.Organization.ID, firstEnd, renewedEnd)
 		})
 	}
@@ -713,11 +713,52 @@ func Test__ApplyOrderPaidSubscriptionCycleResyncsSubscription(t *testing.T) {
 	require.NoError(t, ApplyOrderPaid(t.Context(), db, order, nil))
 	require.NoError(t, ApplyOrderPaid(t.Context(), db, order, nil))
 
-	requireRenewedPeriod(t, db, r.Organization.ID, firstEnd, renewedEnd)
+	requirePeriod(t, db, r.Organization.ID, firstEnd, renewedEnd)
 	requireIncludedGrantExpiries(t, db, r.Organization.ID, firstEnd, renewedEnd)
 }
 
-func requireRenewedPeriod(t *testing.T, db *gorm.DB, orgID uuid.UUID, start, end time.Time) {
+func Test__ApplyOrderPaidSubscriptionCycleRecoversFromStaleSnapshot(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	db := database.Conn()
+	firstStart := time.Now().UTC().Truncate(time.Second)
+	firstEnd := firstStart.AddDate(0, 1, 0)
+	renewedEnd := firstEnd.AddDate(0, 1, 0)
+	subscriptionID := "sub_" + uuid.NewString()
+
+	first := subscriptionEvent(r.Organization.ID, subscriptionID, "active", firstStart, firstEnd)
+	first.Data.ModifiedAt = polarTime{Time: firstStart}
+	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, first))
+
+	stale := subscriptionEvent(r.Organization.ID, subscriptionID, "active", firstEnd, renewedEnd)
+	stale.Type = subscriptionCycledType
+	stale.Data.ModifiedAt = polarTime{Time: firstStart.Add(-time.Minute)}
+	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, stale))
+
+	requirePeriod(t, db, r.Organization.ID, firstStart, firstEnd)
+	requireIncludedGrantExpiries(t, db, r.Organization.ID, firstEnd)
+
+	fresh := polarSubscriptionJSON(subscriptionID, "active", r.Organization.ID.String(), firstEnd, renewedEnd)
+	fresh["modified_at"] = firstEnd.Format(time.RFC3339)
+	usePolarSubscriptionServer(t, r.Organization.ID.String(), []map[string]any{fresh})
+	order := &OrderWebhookEvent{
+		Type: orderPaidType,
+		Data: OrderData{
+			ID:            uuid.NewString(),
+			ProductID:     "prod_business",
+			BillingReason: billingReasonSubscriptionCycle,
+			Customer:      OrderCustomer{ID: "cust_polar_1", ExternalID: r.Organization.ID.String()},
+		},
+	}
+
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, order, nil))
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, order, nil))
+
+	requirePeriod(t, db, r.Organization.ID, firstEnd, renewedEnd)
+	requireIncludedGrantExpiries(t, db, r.Organization.ID, firstEnd, renewedEnd)
+}
+
+func requirePeriod(t *testing.T, db *gorm.DB, orgID uuid.UUID, start, end time.Time) {
 	t.Helper()
 	plan, err := models.FindOrganizationBillingPlan(db, orgID)
 	require.NoError(t, err)
