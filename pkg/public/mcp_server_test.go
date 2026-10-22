@@ -443,6 +443,8 @@ func TestMCPEphemeralLoopbackAuthorizeAndExchange(t *testing.T) {
 
 	form := url.Values{}
 	form.Set("consent", consent)
+	form.Set("organization_id", r.Organization.ID.String())
+	form.Set("workspaces_for", r.Organization.ID.String())
 	form.Set("factory_id", factory.ID.String())
 	postReq := httptest.NewRequest(http.MethodPost, "/oauth/authorize", strings.NewReader(form.Encode()))
 	postReq.Host = "localhost:8000"
@@ -471,6 +473,44 @@ func TestMCPEphemeralLoopbackAuthorizeAndExchange(t *testing.T) {
 	require.NotEmpty(t, tokenBody["refresh_token"])
 }
 
+func TestMCPAuthorizeWithoutMatchingWorkspacesForDoesNotCreateCode(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "OpenCode", "", "OPC")
+	require.NoError(t, err)
+
+	query := url.Values{}
+	query.Set("client_id", mcpserver.LocalClientID)
+	query.Set("redirect_uri", mcpserver.CursorRedirectURIs[0])
+	query.Set("response_type", "code")
+	query.Set("code_challenge", mcp.S256Challenge(mcpTestPKCEVerifier))
+	query.Set("code_challenge_method", "S256")
+	authReq := httptest.NewRequest(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil)
+	authReq.Host = "localhost:8000"
+	authReq.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	authRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(authRec, authReq)
+	require.Equal(t, http.StatusOK, authRec.Code)
+	assert.Contains(t, authRec.Body.String(), `name="factory_id" value="`+factory.ID.String()+`"`)
+
+	form := url.Values{}
+	form.Set("consent", mcpConsentToken(t, authRec.Body.String()))
+	form.Set("organization_id", r.Organization.ID.String())
+	form.Set("factory_id", factory.ID.String())
+	postReq := httptest.NewRequest(http.MethodPost, "/oauth/authorize", strings.NewReader(form.Encode()))
+	postReq.Host = "localhost:8000"
+	postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	postReq.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	postRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(postRec, postReq)
+	require.Equal(t, http.StatusOK, postRec.Code)
+	assert.NotEqual(t, http.StatusFound, postRec.Code)
+	assert.Contains(t, postRec.Body.String(), `name="workspaces_for" value="`+r.Organization.ID.String()+`"`)
+	assert.Empty(t, postRec.Header().Get("Location"))
+}
+
 func TestMCPAuthorizeConsentDoesNotShowCodexMetadataURL(t *testing.T) {
 	r := support.Setup(t)
 	server, _, token := setupTestServer(r, t)
@@ -492,8 +532,8 @@ func TestMCPAuthorizeConsentDoesNotShowCodexMetadataURL(t *testing.T) {
 	server.Router.ServeHTTP(authRec, authReq)
 	require.Equal(t, http.StatusOK, authRec.Code)
 	body := authRec.Body.String()
-	assert.Contains(t, body, "Choose the workspace Codex can use")
-	assert.NotContains(t, body, "Choose the workspace "+codexID)
+	assert.Contains(t, body, "Choose the organization, then the workspaces Codex can use")
+	assert.NotContains(t, body, "Choose the organization, then the workspaces "+codexID)
 }
 
 func exchangeMCPCode(server *Server, code, clientID, redirectURI string) *httptest.ResponseRecorder {
