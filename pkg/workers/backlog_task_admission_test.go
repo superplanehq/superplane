@@ -254,6 +254,25 @@ func Test__BacklogAdmission_QueuePositionsMatchAdmissionOrder(t *testing.T) {
 	assertOrganizationTaskCounts(t, r.Organization.ID, 1, 0)
 }
 
+func TestTaskAdmissionLineStartsDoNotPassRootBetweenLineItems(t *testing.T) {
+	r := support.Setup(t)
+	plan := setTaskPlanLimit(t, r, 1)
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+	fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Active"))
+	first, _ := fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "First line"))
+	root, _ := createBacklogAdmissionEvent(t, r)
+	last, _ := fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Last line"))
+	plan.ParallelTaskLimit = stepMaxParallelism(3)
+	require.NoError(t, models.SaveBillingPlan(database.DB(t.Context()), plan))
+	NewRunFinalizer("", r.Registry).sweepQueuedTasks(t.Context())
+	require.Nil(t, queueItemForDispatch(t, first.ID))
+	require.NotNil(t, queueItemForDispatch(t, last.ID), "the root event between line items must keep the next slot")
+	require.NoError(t, NewEventRouter("").LockAndProcessEvent(log.NewEntry(log.New()), *root, time.Now()))
+	var work int64
+	require.NoError(t, database.DB(t.Context()).Model(&models.CanvasNodeQueueItem{}).Where("event_id = ?", root.ID).Count(&work).Error)
+	require.Positive(t, work)
+}
+
 func Test__TaskAdmission_ActiveTaskStartsItsLine(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv(models.BillingEnabledEnv, "yes")

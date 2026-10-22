@@ -77,7 +77,7 @@ func LockTaskExecutionAdmission(tx *gorm.DB, executionID uuid.UUID) error {
 	err := tx.Table("workflow_node_executions AS e").Select("c.organization_id").
 		Joins("JOIN workflows c ON c.id = e.workflow_id").
 		Joins("JOIN workflow_nodes n ON n.workflow_id = e.workflow_id AND n.node_id = e.node_id").
-		Where("e.id = ? AND n.ref->'component'->>'name' IN ?", executionID, taskAdmissionLockComponents).
+		Where("e.id = ? AND COALESCE(NULLIF(BTRIM(e.metadata->>'frozenComponent'), ''), n.ref->'component'->>'name') IN ?", executionID, taskAdmissionLockComponents).
 		Scan(&owner).Error
 	if err != nil || owner.OrganizationID == uuid.Nil {
 		return err
@@ -157,13 +157,13 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 	if err != nil {
 		return nil, err
 	}
-	stopping := map[uuid.UUID]bool{}
+	continuable, err := continuableOrganizationTaskIDs(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
 	for i := range items {
 		item := &items[i]
-		shares, err := taskSharesLoadedSlot(tx, active, stopping, item.WorkOrderID)
-		if err != nil {
-			return nil, err
-		}
+		shares := slices.Contains(continuable, item.WorkOrderID)
 		if !shares {
 			if slots != nil && *slots <= 0 {
 				continue
@@ -186,6 +186,7 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 		if consumedSlot {
 			*slots--
 			active = append(active, item.WorkOrderID)
+			continuable = append(continuable, item.WorkOrderID)
 		}
 		if head == nil || (head.ID != item.ID && !(consumedSlot && head.WorkOrderID == item.WorkOrderID)) {
 			continue
@@ -220,46 +221,20 @@ func admitSharingQueuedTasks(tx *gorm.DB, orgID uuid.UUID, active []uuid.UUID) (
 	return admitted, nil
 }
 
-func taskSharesOrganizationSlot(tx *gorm.DB, orgID, workOrderID uuid.UUID) (bool, error) {
-	if workOrderID == uuid.Nil {
-		return false, nil
-	}
+// Replacements must wait for their old line runs to stop. Other active tasks
+// can continue line work without reserving another organization slot.
+func continuableOrganizationTaskIDs(tx *gorm.DB, orgID uuid.UUID) ([]uuid.UUID, error) {
 	active, err := ListActiveOrganizationTaskIDs(tx, orgID)
-	if err != nil || !slices.Contains(active, workOrderID) {
-		return false, err
+	if err != nil || len(active) == 0 {
+		return active, err
 	}
-	stopping, err := workOrderHasStoppingLineRun(tx, workOrderID)
-	if err != nil {
-		return false, err
-	}
-	return !stopping, nil
-}
-
-func taskSharesLoadedSlot(tx *gorm.DB, active []uuid.UUID, stopping map[uuid.UUID]bool, workOrderID uuid.UUID) (bool, error) {
-	if !slices.Contains(active, workOrderID) {
-		return false, nil
-	}
-	known, ok := stopping[workOrderID]
-	if !ok {
-		var err error
-		known, err = workOrderHasStoppingLineRun(tx, workOrderID)
-		if err != nil {
-			return false, err
-		}
-		stopping[workOrderID] = known
-	}
-	return !known, nil
-}
-
-// A replacement keeps the slot until its old run stops, so that run does not
-// count as other work the task can share with a new line start.
-func workOrderHasStoppingLineRun(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) {
-	var count int64
-	err := tx.Table("factory_work_order_executions AS e").
-		Joins("JOIN workflow_runs r ON r.id = e.run_id").
-		Where("e.work_order_id = ? AND r.state = ?", workOrderID, CanvasRunStateCancelling).
-		Count(&count).Error
-	return count > 0, err
+	var ids []uuid.UUID
+	err = tx.Model(&FactoryWorkOrder{}).Where("id IN ?", active).
+		Where(`NOT EXISTS (SELECT 1 FROM factory_work_order_executions e
+			JOIN workflow_runs r ON r.id = e.run_id
+			WHERE e.work_order_id = factory_work_orders.id AND r.state = ?)`, CanvasRunStateCancelling).
+		Pluck("id", &ids).Error
+	return ids, err
 }
 
 func checkOrganizationTaskAdmission(tx *gorm.DB, orgID, workOrderID uuid.UUID) error {

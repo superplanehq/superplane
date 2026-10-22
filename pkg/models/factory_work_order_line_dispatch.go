@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -214,11 +215,11 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return nil, err
 	}
 
-	shares, err := taskSharesOrganizationSlot(tx, l.OrganizationID, order.ID)
+	activeTasks, err := continuableOrganizationTaskIDs(tx, l.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
-	if !shares {
+	if !slices.Contains(activeTasks, order.ID) {
 		full, err := organizationAtTaskCapacity(tx, l.OrganizationID)
 		if err != nil {
 			return nil, err
