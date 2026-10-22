@@ -129,24 +129,55 @@ func Test__ListLineRunnerModels__MixedLineUnionsProviders(t *testing.T) {
 	assert.Equal(t, []string{"claude-sonnet-4-6", "gpt-5"}, ids)
 }
 
-func Test__ListLineRunnerModels__IncludesCanvasModelsWhenAllowlistEmpty(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
-	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
+func Test__ListLineRunnerModels__StoredBYOKModelsRespectAllowlists(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		organizationModels []string
+		factoryModels      []string
+		want               []string
+	}{
+		{name: "missing organization allowlist"},
+		{name: "empty organization allowlist", organizationModels: []string{}},
+		{
+			name:               "organization excludes stored model",
+			organizationModels: []string{"claude-sonnet-4-6"},
+			want:               []string{"claude-sonnet-4-6"},
+		},
+		{
+			name:               "factory excludes stored model",
+			organizationModels: []string{"claude-opus-4-6", "claude-sonnet-4-6"},
+			factoryModels:      []string{"claude-sonnet-4-6"},
+			want:               []string{"claude-sonnet-4-6"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+			factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			if tc.organizationModels != nil {
+				_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, tc.organizationModels)
+				require.NoError(t, err)
+			}
+			if tc.factoryModels != nil {
+				_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factoryModel.ID, models.UsageProviderAnthropic, models.UsageFundingSourceBYOK, tc.factoryModels)
+				require.NoError(t, err)
+			}
 
-	planning := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "opus")
-	implement := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "sonnet")
-	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
-		{Type: models.FactoryLineStepTypeRunApp, AppID: planning.ID, Entrypoint: "start"},
-		{Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: "start"},
-	})
-	require.NoError(t, err)
+			planning := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "claude-opus-4-6")
+			implement := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "claude-sonnet-4-6")
+			_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+				{Type: models.FactoryLineStepTypeRunApp, AppID: planning.ID, Entrypoint: "start"},
+				{Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: "start"},
+			})
+			require.NoError(t, err)
 
-	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
-	require.NoError(t, err)
-	assert.Equal(t, []string{"claude-opus-5-5", "claude-sonnet-4-6"}, ids)
+			ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, ids)
+		})
+	}
 }
 
 func Test__ListLineRunnerModels__DropsStoredBYOKModelWithoutAccess(t *testing.T) {
