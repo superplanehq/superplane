@@ -26,6 +26,7 @@ mkdir -p "${OUTPUT_DIR}"
 cd "${REPO_ROOT}"
 echo "* Resolving component release defaults"
 node release/superplane-helm-chart/update-component-release-defaults.js
+export COMPONENT_RELEASES_ALREADY_RESOLVED=yes
 bash release/superplane-single-host-tarball/build.sh "${VERSION}"
 single_host_dir="build/superplane-single-host-tarball-${VERSION}"
 cp "${single_host_dir}/superplane-single-host.tar.gz" "${OUTPUT_DIR}/"

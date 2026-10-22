@@ -6,7 +6,9 @@ installs SuperPlane on one VM with Docker Compose.
 `release/superplane/build-assets.sh` resolves the latest stable Runner and
 Fleet Manager tags before it builds the archive. It writes those tags into
 `release/superplane-helm-chart/helm/values.yaml`. If GitHub is unreachable,
-the committed values stay in place.
+the committed values stay in place. The Helm chart in that same release uses
+those tags. It does not call GitHub again. A standalone chart build still
+resolves the latest stable tags.
 
 `release/superplane-single-host-tarball/build.sh` reads `runnerVersion` and
 `fleetManagerVersion` from that file and writes them into the Compose file
