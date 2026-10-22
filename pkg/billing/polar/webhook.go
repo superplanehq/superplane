@@ -27,6 +27,7 @@ const (
 
 	subscriptionCreatedType    = "subscription.created"
 	subscriptionUpdatedType    = "subscription.updated"
+	subscriptionCycledType     = "subscription.cycled"
 	subscriptionActiveType     = "subscription.active"
 	subscriptionCanceledType   = "subscription.canceled"
 	subscriptionUncanceledType = "subscription.uncanceled"
@@ -39,6 +40,33 @@ var (
 	ErrWebhookSecretMissing    = errors.New("webhook secret is not configured")
 	ErrUnusableWebhookPayload  = errors.New("polar webhook payload cannot be applied")
 )
+
+type unsupportedWebhookEvent struct {
+	eventType string
+}
+
+func (e unsupportedWebhookEvent) Error() string {
+	if e.eventType == "" {
+		return ErrUnsupportedWebhookEvent.Error()
+	}
+	return ErrUnsupportedWebhookEvent.Error() + ": " + e.eventType
+}
+
+func (e unsupportedWebhookEvent) Unwrap() error {
+	return ErrUnsupportedWebhookEvent
+}
+
+func UnsupportedWebhookEventType(err error) string {
+	var unsupported unsupportedWebhookEvent
+	if !errors.As(err, &unsupported) {
+		return ""
+	}
+	return unsupported.eventType
+}
+
+func unsupportedWebhookEventError(eventType string) error {
+	return unsupportedWebhookEvent{eventType: eventType}
+}
 
 type OrderWebhookEvent struct {
 	Type string    `json:"type"`
@@ -109,7 +137,7 @@ func VerifyAndParseOrderPaid(headers http.Header, body []byte, secret string) (*
 		return nil, err
 	}
 	if event.Type != orderPaidType {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, event.Type)
+		return nil, unsupportedWebhookEventError(event.Type)
 	}
 	return event, nil
 }
@@ -202,7 +230,7 @@ func (p *ParsedWebhook) APIVersionMismatch() bool {
 
 func isSubscriptionEventType(eventType string) bool {
 	switch eventType {
-	case subscriptionCreatedType, subscriptionUpdatedType, subscriptionActiveType,
+	case subscriptionCreatedType, subscriptionUpdatedType, subscriptionCycledType, subscriptionActiveType,
 		subscriptionCanceledType, subscriptionUncanceledType, subscriptionRevokedType:
 		return true
 	default:
@@ -241,7 +269,7 @@ func VerifyAndParseWebhook(headers http.Header, body []byte, secret string) (*Pa
 		}
 		return &ParsedWebhook{Type: event.Type, APIVersion: apiVersion, Subscription: event}, nil
 	default:
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, envelope.Type)
+		return nil, unsupportedWebhookEventError(envelope.Type)
 	}
 }
 
@@ -273,7 +301,7 @@ func VerifyAndParseOrderEvent(headers http.Header, body []byte, secret string) (
 		return nil, err
 	}
 	if parsed.Order == nil {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, parsed.Type)
+		return nil, unsupportedWebhookEventError(parsed.Type)
 	}
 	return parsed.Order, nil
 }

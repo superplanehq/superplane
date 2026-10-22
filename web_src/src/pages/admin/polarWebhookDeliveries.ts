@@ -22,6 +22,7 @@ export const POLAR_WEBHOOK_EVENT_TYPES = [
   "order.refunded",
   "subscription.created",
   "subscription.updated",
+  "subscription.cycled",
   "subscription.active",
   "subscription.canceled",
   "subscription.uncanceled",
