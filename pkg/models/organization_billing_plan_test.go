@@ -88,6 +88,41 @@ func Test__InitialPaidPlanAddsConfiguredTrialCredit(t *testing.T) {
 	}
 }
 
+func Test__InitialPaidPlanTrialCreditIsNotRepeatedAfterReactivation(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	product := "prod_" + uuid.NewString()
+	plan := models.BillingPlan{
+		Key: "selected_" + uuid.NewString()[:8], Name: "Selected", Category: "paid", Visibility: "public",
+		TrialCreditCents: 1200, CreditFrequency: "none", CreditExpiration: "never", PolarProductID: &product,
+	}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+
+	apply := func(status string) *models.OrganizationBillingPlan {
+		now := time.Now()
+		end := now.AddDate(0, 1, 0)
+		saved, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+			ID: product, ProductID: product, Status: status, PeriodStart: &now, PeriodEnd: &end,
+		})
+		require.NoError(t, err)
+		return saved
+	}
+
+	before := describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros
+	apply(models.PolarSubscriptionStatusActive)
+	granted := describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros
+	require.Equal(t, before+models.CentsToMicros(1200), granted)
+
+	canceled := apply(models.PolarSubscriptionStatusCanceled)
+	require.Equal(t, models.BillingPlanTrial, canceled.Plan)
+	require.True(t, canceled.IsOpenTrial(time.Now()))
+
+	apply(models.PolarSubscriptionStatusActive)
+	assert.Equal(t, granted, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+}
+
 func Test__ApplyPolarSubscriptionReplacesAdminTrialWithPaid(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))

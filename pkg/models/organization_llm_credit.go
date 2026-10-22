@@ -31,6 +31,8 @@ const (
 	CreditBalanceBucketGrant    = "grant"
 
 	canceledIncludedGrantPrefix = "canceled:"
+
+	initialPlanTrialCreditNote = "Initial billing plan trial credit"
 )
 
 var (
@@ -188,6 +190,14 @@ func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingP
 		return nil
 	}
 
+	granted, err := initialPlanTrialCreditGranted(tx, next.OrganizationID)
+	if err != nil {
+		return err
+	}
+	if granted {
+		return nil
+	}
+
 	welcome, err := findWelcomeGrant(tx, next.OrganizationID)
 	if err != nil {
 		return err
@@ -198,9 +208,20 @@ func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingP
 	}
 	_, err = insertCreditAdjustment(tx, CreditBalanceAdjustment{
 		OrganizationID: next.OrganizationID,
-		Note:           "Initial billing plan trial credit",
+		Note:           initialPlanTrialCreditNote,
 	}, LLMCreditGrantKindTrialAdjustment, CentsToMicros(next.Catalog.TrialCreditCents), welcome.ExpiresAt, now)
 	return err
+}
+
+// initialPlanTrialCreditGranted reports whether the initial paid plan trial
+// credit was already added. A canceled subscription can restore an unexpired
+// trial, and a later reactivation must not grant the credit again.
+func initialPlanTrialCreditGranted(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	var count int64
+	err := tx.Model(&OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ? AND note = ?", orgID, LLMCreditGrantKindTrialAdjustment, initialPlanTrialCreditNote).
+		Count(&count).Error
+	return count > 0, err
 }
 
 func SetWelcomeGrantExpiresAt(tx *gorm.DB, orgID uuid.UUID, endsAt time.Time) error {
