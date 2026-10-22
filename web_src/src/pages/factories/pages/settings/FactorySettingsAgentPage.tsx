@@ -22,7 +22,6 @@ export function FactorySettingsAgentPage() {
   const { has } = useExperimentalFeature(page.organizationId);
   const showSkills = has(FEATURE_WORKSPACE_SKILLS);
   const showAgentSetup = has(FEATURE_WORKSPACE_AGENT);
-  const showMcp = page.showAgentMCP;
   usePageTitle([AGENT_RESOURCES_COPY.agentTitle, page.factory?.name ?? "Workspace"]);
 
   return (
@@ -48,7 +47,7 @@ export function FactorySettingsAgentPage() {
             canUpdate={page.canUpdate}
           />
         ) : null}
-        {showMcp ? <WorkspaceMCPServers page={page} /> : null}
+        <WorkspaceMCPServers page={page} />
         {showSkills ? (
           <WorkspaceSkillsSection
             organizationId={page.organizationId}

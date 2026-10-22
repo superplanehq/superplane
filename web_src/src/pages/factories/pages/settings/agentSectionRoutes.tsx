@@ -2,7 +2,7 @@ import { Outlet, Route } from "react-router";
 
 import { RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactorySettingsAgentPage } from "./FactorySettingsAgentPage";
 import { FactorySettingsMCPConnectionPage } from "./FactorySettingsMCPConnectionPage";
@@ -19,11 +19,9 @@ export const agentSectionRoute = (
     path="agent"
     element={
       <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS]}>
-          <div className="min-h-full bg-sidebar dark:bg-background">
-            <Outlet />
-          </div>
-        </RequireExperimentalFeature>
+        <div className="min-h-full bg-sidebar dark:bg-background">
+          <Outlet />
+        </div>
       </RequirePermission>
     }
   >
@@ -36,14 +34,7 @@ export const agentSectionRoute = (
         </RequireExperimentalFeature>
       }
     />
-    <Route
-      path="mcp/:resourceId"
-      element={
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MCP}>
-          <FactorySettingsMCPConnectionPage />
-        </RequireExperimentalFeature>
-      }
-    />
+    <Route path="mcp/:resourceId" element={<FactorySettingsMCPConnectionPage />} />
     <Route
       path="skills/new"
       element={

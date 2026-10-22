@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources, useFactoryAgentResourceTools } from "@/hooks/useFactoryAgentResources";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
@@ -51,7 +51,7 @@ export function AgentResourcesEditor({
   flat?: boolean;
 }) {
   const features = useExperimentalFeature(organizationId);
-  const showMcp = Boolean(organizationId && factoryId && factoryKey && features.has(FEATURE_WORKSPACE_MCP));
+  const showMcp = Boolean(organizationId && factoryId && factoryKey);
   const showSkills = Boolean(organizationId && factoryId && factoryKey && features.has(FEATURE_WORKSPACE_SKILLS));
   if (!showMcp && !showSkills) {
     return null;
