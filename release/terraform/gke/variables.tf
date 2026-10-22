@@ -22,6 +22,16 @@ variable "letsencrypt_email" {
   type        = string
 }
 
+variable "runner_image_amd64" {
+  description = "Packer-built GCP image resource for linux/amd64 runner VMs. The default fleet uses this image."
+  type        = string
+
+  validation {
+    condition     = trimspace(var.runner_image_amd64) != ""
+    error_message = "Set runner_image_amd64 to a Packer-built GCP image, for example projects/PROJECT/global/images/IMAGE_NAME. Build it with release/runner/packer/gce/runner.pkr.hcl."
+  }
+}
+
 # -----------------------------------------------------------------------------
 # Optional Variables - GCP
 # -----------------------------------------------------------------------------
@@ -150,12 +160,6 @@ variable "superplane_chart_version" {
 # Optional Variables - Blob Storage
 # -----------------------------------------------------------------------------
 
-variable "enable_gcs_blob_storage" {
-  description = "Store blobs (task logs and files) in a GCS bucket. SuperPlane uses Workload Identity to access the bucket. Runners require this."
-  type        = bool
-  default     = false
-}
-
 variable "blob_bucket_name" {
   description = "Name of the GCS bucket for blobs. Leave empty to use <project_id>-superplane-blobs."
   type        = string
@@ -172,12 +176,6 @@ variable "blob_bucket_force_destroy" {
 # Optional Variables - Runners
 # -----------------------------------------------------------------------------
 
-variable "enable_runners" {
-  description = "Enable the runner API and create the runner network and the Fleet Manager service account. Requires enable_gcs_blob_storage."
-  type        = bool
-  default     = false
-}
-
 variable "runner_subnet_cidr" {
   description = "CIDR range of the runner subnetwork. It must not overlap other subnetworks or GKE ranges in the network."
   type        = string
@@ -188,12 +186,6 @@ variable "runner_zones" {
   description = "Zones for runner VMs. Fleet Manager tries the next zone when a zone has no capacity. Leave empty to use var.zone."
   type        = list(string)
   default     = []
-}
-
-variable "runner_image_amd64" {
-  description = "Packer-built GCP image resource for linux/amd64 runner VMs."
-  type        = string
-  default     = ""
 }
 
 variable "runner_image_arm64" {

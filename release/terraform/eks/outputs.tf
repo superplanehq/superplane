@@ -44,37 +44,37 @@ output "vpc_id" {
 
 output "runner_private_subnet_ids" {
   description = "Private subnet IDs for runner VMs"
-  value       = var.enable_runners ? aws_subnet.private[*].id : []
+  value       = aws_subnet.private[*].id
 }
 
 output "runner_security_group_id" {
   description = "Outbound-only security group ID for runner VMs"
-  value       = var.enable_runners ? aws_security_group.runners[0].id : null
+  value       = aws_security_group.runners.id
 }
 
 output "fleet_manager_role_arn" {
   description = "IAM role ARN for the standalone Fleet Manager service account"
-  value       = var.enable_runners ? aws_iam_role.fleet_manager[0].arn : null
+  value       = aws_iam_role.fleet_manager.arn
 }
 
 output "runner_instance_profile_name" {
   description = "IAM instance profile name for runner VMs"
-  value       = var.enable_runners ? aws_iam_instance_profile.runner[0].name : null
+  value       = aws_iam_instance_profile.runner.name
 }
 
 output "runner_region" {
   description = "AWS region for runner VMs"
-  value       = var.enable_runners ? var.region : null
+  value       = var.region
 }
 
 output "runner_image_amd64" {
   description = "Packer-built AMI configured for linux/amd64 runner VMs"
-  value       = var.enable_runners ? var.runner_image_amd64 : null
+  value       = var.runner_image_amd64
 }
 
 output "runner_image_arm64" {
   description = "Packer-built AMI configured for linux/arm64 runner VMs"
-  value       = var.enable_runners ? var.runner_image_arm64 : null
+  value       = var.runner_image_arm64
 }
 
 # -----------------------------------------------------------------------------
