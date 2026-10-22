@@ -22,6 +22,11 @@ resource "google_compute_subnetwork" "runners" {
       condition     = var.enable_gcs_blob_storage
       error_message = "Runners need enable_gcs_blob_storage = true. The API and worker pods do not share filesystem blob storage."
     }
+
+    precondition {
+      condition     = trimspace(var.runner_image_amd64) != ""
+      error_message = "Runners need runner_image_amd64. Build the image with release/runner/packer/gce/runner.pkr.hcl and set runner_image_amd64 = \"projects/PROJECT/global/images/IMAGE_NAME\". Set enable_runners = false to install without runners."
+    }
   }
 }
 

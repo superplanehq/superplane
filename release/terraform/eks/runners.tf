@@ -19,6 +19,13 @@ resource "aws_security_group" "runners" {
   tags = {
     Name = "${var.cluster_name}-runners"
   }
+
+  lifecycle {
+    precondition {
+      condition     = trimspace(var.runner_image_amd64) != ""
+      error_message = "Runners need runner_image_amd64. Build the AMI with release/runner/packer/aws/runner.pkr.hcl and set runner_image_amd64 = \"ami-...\". Set enable_runners = false to install without runners."
+    }
+  }
 }
 
 resource "aws_iam_role" "runner" {
