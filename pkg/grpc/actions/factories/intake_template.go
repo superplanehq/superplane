@@ -267,7 +267,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 		Position:    yaml.Position{X: 160, Y: createY},
 	})
 
-	if request.Source == models.FactoryIntakeSourceGitHubIssues {
+	if intakeSourceSupportsDefaultOwner(request.Source) {
 		nodes[len(nodes)-1].Configuration["defaultOwnerId"] = request.Settings.DefaultOwnerID
 	}
 

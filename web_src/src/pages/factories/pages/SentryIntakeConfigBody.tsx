@@ -3,6 +3,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { useState, type Dispatch, type SetStateAction } from "react";
 
 import { INTAKE_SETTINGS_COPY, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import { IntakeDefaultOwnerField } from "./IntakeDefaultOwnerField";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 
@@ -32,6 +33,12 @@ export function SentryIntakeConfigBody({
     <div className="flex min-h-0 flex-1 flex-col" data-testid="sentry-intake-config">
       <div className="min-h-0 flex-1 overflow-y-auto px-10 py-6">
         <div className="space-y-8">
+          <IntakeDefaultOwnerField
+            organizationId={organizationId}
+            value={settings.defaultOwnerId}
+            disabled={savePending}
+            onChange={(defaultOwnerId) => onSettingsChange((current) => ({ ...current, defaultOwnerId }))}
+          />
           <SentryIntakeFilterFields
             sourceId="sentry-exceptions"
             settings={settings}

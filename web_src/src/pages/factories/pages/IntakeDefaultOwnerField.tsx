@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { buildOrgUserDisplayMap } from "@/lib/orgUserDisplay";
 import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
-import type { IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import { intakeSourceSupportsDefaultOwner, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 
 export function IntakeDefaultOwnerField({
   organizationId,
@@ -58,7 +58,7 @@ export function IntakeDefaultOwnerField({
   );
 }
 
-export function GitHubIntakeDefaultOwner({
+export function IntakeSourceDefaultOwner({
   sourceId,
   organizationId,
   draft,
@@ -71,7 +71,7 @@ export function GitHubIntakeDefaultOwner({
   disabled?: boolean;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
 }) {
-  if (sourceId !== "github-issues" || !organizationId) {
+  if (!intakeSourceSupportsDefaultOwner(sourceId) || !organizationId) {
     return null;
   }
 
