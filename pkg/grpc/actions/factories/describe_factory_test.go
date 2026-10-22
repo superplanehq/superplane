@@ -159,3 +159,35 @@ func createDescribeMetricsExecution(
 	}
 	require.NoError(t, db.Create(&execution).Error)
 }
+
+func Test__DescribeFactory_ReportsSavedAgentModelSource(t *testing.T) {
+	r := support.Setup(t)
+	ctx := t.Context()
+	db := database.DB(ctx)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	older := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+	saved := createReadyOnboardingIntegration(t, r.Organization.ID, "openrouter")
+	require.NoError(t, db.Model(&models.Integration{}).Where("id = ?", older).Update("created_at", time.Now().Add(-time.Hour)).Error)
+	harness := models.FactoryOnboardingAgentHarnessClaudeCode
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AgentHarness:       &harness,
+		AgentIntegrationID: &saved,
+	}))
+
+	resp, err := DescribeFactory(ctx, IntakeDependencies{}, r.Organization.ID.String(), factoryModel.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, "openrouter", resp.Factory.GetAgentModelSource())
+
+	listed, err := ListFactories(ctx, r.Organization.ID.String())
+	require.NoError(t, err)
+	var found *pb.Factory
+	for _, item := range listed.GetFactories() {
+		if item.GetId() == factoryModel.ID.String() {
+			found = item
+		}
+	}
+	require.NotNil(t, found)
+	assert.Equal(t, "openrouter", found.GetAgentModelSource())
+}

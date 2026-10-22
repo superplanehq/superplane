@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func serializeFactory(factory *models.Factory) *pb.Factory {
+func serializeFactory(tx *gorm.DB, factory *models.Factory) (*pb.Factory, error) {
 	serialized := &pb.Factory{
 		Id:          factory.ID.String(),
 		Name:        factory.Name,
@@ -34,7 +34,22 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 	serialized.VcsCapabilities = serializeFactoryVCSCapabilities(factory.OnboardingConfigValue().EffectiveVCSProvider())
 	serialized.DefaultAgentModel = factory.DefaultAgentModel
 	serialized.DefaultAgentModelProvider = factory.DefaultAgentModelProvider
-	return serialized
+	if err := attachAgentModelSource(tx, factory, serialized); err != nil {
+		return nil, err
+	}
+	return serialized, nil
+}
+
+func attachAgentModelSource(tx *gorm.DB, factory *models.Factory, serialized *pb.Factory) error {
+	if tx == nil || factory == nil || serialized == nil {
+		return nil
+	}
+	source, err := activeFactoryModelSource(tx, factory)
+	if err != nil {
+		return err
+	}
+	serialized.AgentModelSource = source
+	return nil
 }
 
 func serializeFactoryVCSCapabilities(provider string) *pb.FactoryVCSCapabilities {
@@ -98,13 +113,17 @@ func serializeOptionalID(id *uuid.UUID) string {
 }
 
 func serializeFactoryWithLines(
+	tx *gorm.DB,
 	factory *models.Factory,
 	lines []models.FactoryLine,
 	metricsByLine map[uuid.UUID]*pb.FactoryLineMetrics,
-) *pb.Factory {
-	serialized := serializeFactory(factory)
+) (*pb.Factory, error) {
+	serialized, err := serializeFactory(tx, factory)
+	if err != nil {
+		return nil, err
+	}
 	serialized.Lines = serializeFactoryLines(lines, metricsByLine)
-	return serialized
+	return serialized, nil
 }
 
 func serializeFactoryWithLineMetrics(
@@ -113,13 +132,13 @@ func serializeFactoryWithLineMetrics(
 	lines []models.FactoryLine,
 ) (*pb.Factory, error) {
 	if len(lines) == 0 {
-		return serializeFactoryWithLines(factory, lines, nil), nil
+		return serializeFactoryWithLines(tx, factory, lines, nil)
 	}
 	metricsByLine, err := loadFactoryLineMetrics(tx, factory.ID)
 	if err != nil {
 		return nil, err
 	}
-	return serializeFactoryWithLines(factory, lines, metricsByLine), nil
+	return serializeFactoryWithLines(tx, factory, lines, metricsByLine)
 }
 
 func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
@@ -463,12 +482,16 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	}
 }
 
-func serializeFactories(factories []models.Factory, linesByFactory map[uuid.UUID][]models.FactoryLine) []*pb.Factory {
+func serializeFactories(tx *gorm.DB, factories []models.Factory, linesByFactory map[uuid.UUID][]models.FactoryLine) ([]*pb.Factory, error) {
 	result := make([]*pb.Factory, len(factories))
 	for i := range factories {
-		result[i] = serializeFactoryWithLines(&factories[i], linesByFactory[factories[i].ID], nil)
+		serialized, err := serializeFactoryWithLines(tx, &factories[i], linesByFactory[factories[i].ID], nil)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = serialized
 	}
-	return result
+	return result, nil
 }
 
 type workOrderUsageView struct {

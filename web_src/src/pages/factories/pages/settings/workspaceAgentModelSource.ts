@@ -8,11 +8,6 @@ import {
 
 export type AgentModelSource = "hosted" | "anthropic" | "openai" | "openrouter" | "custom";
 
-export type AgentModelProviderConnection = {
-  provider: Exclude<AgentModelSource, "hosted">;
-  connected: boolean;
-};
-
 export function modelMatchesAgentSource(model: SelectableLLMModel, source: AgentModelSource | undefined): boolean {
   if (!source) {
     return false;
@@ -23,25 +18,9 @@ export function modelMatchesAgentSource(model: SelectableLLMModel, source: Agent
   return model.source.id === SELECTABLE_LLM_SOURCE_BYOK && model.provider.id === source;
 }
 
-export function modelSourceFromIntegrationName(integrationName: string | undefined): AgentModelSource | null {
-  switch (integrationName?.trim()) {
-    case "claude":
-      return "anthropic";
-    case "openai":
-      return "openai";
-    case "openrouter":
-      return "openrouter";
-    case "customLlm":
-      return "custom";
-    default:
-      return null;
-  }
-}
-
 export function workspaceAgentModelSource(
   harness: FactoryOnboardingAgentHarness | undefined,
-  savedProvider: AgentModelSource | null,
-  connections: AgentModelProviderConnection[],
+  reportedSource: string | undefined,
 ): AgentModelSource | null {
   if (harness === "AGENT_HARNESS_SUPERPLANE") {
     return "hosted";
@@ -52,35 +31,18 @@ export function workspaceAgentModelSource(
   if (harness === "AGENT_HARNESS_CURSOR") {
     return null;
   }
-
-  const provider = savedProvider ?? fallbackProvider(harness, connections);
-  if (harness === "AGENT_HARNESS_CLAUDE_CODE") {
-    if (provider === "anthropic" || provider === "openrouter" || provider === "custom") {
-      return provider;
-    }
-    return null;
-  }
-  return provider ?? "hosted";
+  return parseAgentModelSource(reportedSource);
 }
 
-function fallbackProvider(
-  harness: FactoryOnboardingAgentHarness | undefined,
-  connections: AgentModelProviderConnection[],
-): AgentModelProviderConnection["provider"] | null {
-  if (harness === "AGENT_HARNESS_CLAUDE_CODE") {
-    return firstConnected(connections, ["anthropic", "openrouter", "custom"]);
+function parseAgentModelSource(value: string | undefined): AgentModelSource | null {
+  switch (value?.trim()) {
+    case "hosted":
+    case "anthropic":
+    case "openai":
+    case "openrouter":
+    case "custom":
+      return value.trim() as AgentModelSource;
+    default:
+      return null;
   }
-  return firstConnected(connections, ["anthropic", "openai", "openrouter", "custom"]);
-}
-
-function firstConnected(
-  connections: AgentModelProviderConnection[],
-  order: AgentModelProviderConnection["provider"][],
-): AgentModelProviderConnection["provider"] | null {
-  for (const provider of order) {
-    if (connections.some((connection) => connection.connected && connection.provider === provider)) {
-      return provider;
-    }
-  }
-  return null;
 }

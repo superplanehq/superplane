@@ -88,12 +88,12 @@ describe("workspace default model", () => {
     expect(screen.queryByRole("option", { name: "SuperPlane: openai/gpt-5" })).not.toBeInTheDocument();
   }, 15000);
 
-  it("offers models for the saved connection when it is not the oldest key", async () => {
+  it("offers models for the saved connection when the connection list is unavailable", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
         pathSuffix={agentPath}
-        orgIntegrations={secondOpenRouterConnections}
+        orgIntegrations={anthropicOnlyConnections}
         factoriesFixture={secondOpenRouterFixture()}
         experimentalFeatures={agentPageFeatures}
       />,
@@ -128,24 +128,20 @@ function withAgentHarness(
   };
 }
 
-const secondOpenRouterConnections = [
+const anthropicOnlyConnections = [
   {
     metadata: { id: "claude-1", name: "anthropic-key", integrationName: "claude" },
-    status: { state: "ready" as const },
-  },
-  {
-    metadata: { id: "openrouter-1", name: "router-old", integrationName: "openrouter" },
-    status: { state: "ready" as const },
-  },
-  {
-    metadata: { id: "openrouter-2", name: "router-new", integrationName: "openrouter" },
     status: { state: "ready" as const },
   },
 ];
 
 function secondOpenRouterFixture() {
+  const fixture = withAgentHarness(defaultFactoriesFixture, "AGENT_HARNESS_CLAUDE_CODE", "openrouter-2");
   return {
-    ...withAgentHarness(defaultFactoriesFixture, "AGENT_HARNESS_CLAUDE_CODE", "openrouter-2"),
+    ...fixture,
+    factories: fixture.factories.map((factory) =>
+      factory.id === PRIMARY_FACTORY_ID ? { ...factory, agentModelSource: "openrouter" } : factory,
+    ),
     byokConnectedProviders: ["anthropic", "openrouter"],
     byokCandidatesByProvider: {
       anthropic: ["claude-sonnet-4-6"],

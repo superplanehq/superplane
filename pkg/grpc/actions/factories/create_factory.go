@@ -31,7 +31,12 @@ func CreateFactory(ctx context.Context, organizationID string, req *pb.CreateFac
 		return nil, factoryErrorToStatus(err, "failed to create factory")
 	}
 
+	serialized, err := serializeFactory(database.DB(ctx), factory)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory")
+	}
+
 	return &pb.CreateFactoryResponse{
-		Factory: serializeFactory(factory),
+		Factory: serialized,
 	}, nil
 }

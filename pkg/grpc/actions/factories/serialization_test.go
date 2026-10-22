@@ -500,7 +500,8 @@ func TestSerializeFactory_IncludesPlanningDefaults(t *testing.T) {
 		PlanningConfidence: false,
 	}
 
-	serialized := serializeFactory(factory)
+	serialized, err := serializeFactory(nil, factory)
+	require.NoError(t, err)
 	require.NotNil(t, serialized.Planning)
 	assert.True(t, serialized.Planning.Enabled)
 	assert.True(t, serialized.Planning.Clarity)

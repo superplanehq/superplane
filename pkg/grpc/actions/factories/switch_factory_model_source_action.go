@@ -43,13 +43,18 @@ func SwitchFactoryModelSource(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to switch model source")
 	}
-	factory, err := findFactory(database.DB(ctx), orgID, req.GetId())
+	db := database.DB(ctx)
+	factory, err := findFactory(db, orgID, req.GetId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to switch model source")
+	}
+	serialized, err := serializeFactory(db, factory)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to switch model source")
 	}
 
 	return &pb.SwitchFactoryModelSourceResponse{
-		Factory:       serializeFactory(factory),
+		Factory:       serialized,
 		IntegrationId: integrationID,
 	}, nil
 }

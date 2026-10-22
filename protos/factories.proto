@@ -1124,6 +1124,10 @@ message Factory {
   string default_agent_model = 15;
   // Provider for a hosted default. Empty for a bring-your-own-key model.
   string default_agent_model_provider = 16;
+  // Model source the active agent can use.
+  // hosted, anthropic, openai, openrouter, custom, or empty.
+  // Workspace editors can read this without integrations access.
+  string agent_model_source = 17;
 }
 
 // Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
