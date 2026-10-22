@@ -614,7 +614,7 @@ func TestRunnerPlanningSessionSurvey(t *testing.T) {
 	db := database.DB(t.Context())
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/surveys", bytes.NewReader([]byte(
-		`{"questions":[{"prompt":"What is the priority?","options":["High","Low"]}]}`,
+		`{"questions":[{"prompt":"What is the priority?","options":["High","Low"],"recommended_option":"High"}]}`,
 	)))
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
@@ -626,6 +626,7 @@ func TestRunnerPlanningSessionSurvey(t *testing.T) {
 	require.Len(t, reloaded.CurrentSurvey().Questions, 1)
 	assert.Equal(t, "What is the priority?", reloaded.CurrentSurvey().Questions[0].Prompt)
 	assert.Equal(t, []string{"High", "Low"}, reloaded.CurrentSurvey().Questions[0].Options)
+	assert.Equal(t, "High", reloaded.CurrentSurvey().Questions[0].RecommendedOption)
 }
 
 func TestRunnerPlanningSessionRecordsAgentMessage(t *testing.T) {

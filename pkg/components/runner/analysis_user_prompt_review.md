@@ -56,6 +56,8 @@ Decide yourself:
 
 Write each survey question as one plain question. Keep each option under 12 words. Use everyday words. Put the option you recommend first.
 
+When you have enough context, set `recommended_option` to that option's exact text. Omit the field when context is not enough. Do not write Recommended inside the option text. Never recommend Skip. The user still chooses.
+
 Good option: Title, description, and assignees
 
 ## 3. Score Clarity
