@@ -47,7 +47,6 @@ function VerificationPreview({ source, detail = false }: { source: VerificationS
               maximumAttempts: 3,
               runnerIntegrationIds: [],
             }}
-            healthy
             onSave={(next) => console.log("Save PR feedback", next)}
             onClose={() => console.log("Close feedback")}
             agent={{

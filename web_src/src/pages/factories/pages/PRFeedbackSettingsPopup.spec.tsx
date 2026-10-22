@@ -159,8 +159,8 @@ function renderChecksPopup(
           githubIntegrationId={githubIntegrationId}
           vcsProvider={vcsProvider}
           settings={settings}
-          healthy
           onSave={onSave}
+          onDelete={vi.fn()}
           onClose={vi.fn()}
           fixed={false}
         />
@@ -222,7 +222,6 @@ function renderAutomationPopup(props: { canvasId?: string } = {}) {
           <TooltipProvider>
             <PRFeedbackSettingsPopup
               settings={discussionDraft()}
-              healthy
               automationGraph={automationGraph}
               onSave={vi.fn()}
               onClose={vi.fn()}
@@ -252,7 +251,6 @@ function renderAgentSettingsPopup(
       <MemoryRouter initialEntries={[initialPath]}>
         <PRFeedbackSettingsPopup
           settings={settings}
-          healthy
           automationGraph={automationGraph}
           agent={{
             draft: PLANNING_REVIEW_DRAFT,
@@ -270,6 +268,36 @@ function renderAgentSettingsPopup(
     </QueryClientProvider>,
   );
 }
+
+describe("PRFeedbackSettingsPopup general tab", () => {
+  it.each([
+    ["discussion", discussionDraft()],
+    ["checks", checksDraft()],
+  ] as const)("starts %s configuration without a Health block", (_source, settings) => {
+    renderChecksPopup(vi.fn(), settings, "org-1", "gh-1");
+
+    expect(screen.queryByRole("heading", { name: "Health" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Ready")).not.toBeInTheDocument();
+    expect(screen.queryByText("Needs repair")).not.toBeInTheDocument();
+    expect(screen.queryByText("This automation can receive a mention and address it.")).not.toBeInTheDocument();
+    expect(screen.queryByText("This automation can wait for checks and start a fix.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open the Automation tab and repair the steps.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete automation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+
+    if (settings.source === "discussion") {
+      expect(screen.getByRole("radiogroup", { name: "How to handle human comments?" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("radiogroup", { name: "Which bot comments should SuperPlane address?" }),
+      ).toBeInTheDocument();
+      return;
+    }
+
+    expect(screen.getByTestId("pr-feedback-check-names-picker")).toBeInTheDocument();
+    expect(screen.getByLabelText("Maximum automatic fix attempts")).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: "Additional integration access" })).toBeInTheDocument();
+  });
+});
 
 describe("PRFeedbackSettingsPopup discussion", () => {
   beforeEach(() => {
