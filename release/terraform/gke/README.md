@@ -11,32 +11,29 @@ a runner VM when a task is queued and deletes the VM when the task ends.
 Do the steps in this order:
 
 1. [Prepare the project](#1-prepare-the-project).
-2. [Install SuperPlane](#2-install-superplane).
-3. [Install Fleet Manager](#3-install-fleet-manager).
+2. [Build the runner image](#2-build-the-runner-image).
+3. [Install SuperPlane](#3-install-superplane).
+4. [Install Fleet Manager](#4-install-fleet-manager).
 
 ## What Terraform creates
 
-| Part | Resources | Variable |
-| --- | --- | --- |
-| SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release | Always |
-| Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` |
-| Runner network | Runner subnetwork, deny-all ingress firewall rule, `superplane-fleet-mgr` service account | `enable_runners` |
-| Fleet Manager infrastructure | Service account, Workload Identity binding, and setup metadata | `enable_runners` |
-
-A new install sets both flags to `true` in `terraform.tfvars` before the first
-apply. The variable defaults stay `false`. An existing install that omitted
-these settings keeps local blob files.
+| Part | Resources |
+| --- | --- |
+| SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release |
+| Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding |
+| Runner network | Runner subnetwork, deny-all ingress firewall rule |
+| Fleet Manager infrastructure | `superplane-fleet-mgr` service account, Workload Identity binding, and setup metadata |
 
 ## Prerequisites
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) 1.5.0 or later.
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) and `kubectl`.
+- [Packer](https://developer.hashicorp.com/packer/install) 1.16.1 or later,
+  `curl`, and `jq`.
 - A GCP project with billing enabled.
 - An account with the Owner role on the project, or with permission to create
   GKE, Cloud SQL, Compute Engine, GCS, and IAM resources.
 - A DNS zone where you can create an A record.
-- For runners: [Packer](https://developer.hashicorp.com/packer/install) 1.16.1
-  or later, `curl`, and `jq`.
 
 Run all `terraform` commands in this directory (`release/terraform/gke`).
 
@@ -85,7 +82,49 @@ fails, flush it or use `8.8.8.8`. The apex nameservers must match the
 registrar. Mixed nameservers (for example DigitalOcean and Squarespace)
 make some resolvers return `NXDOMAIN`.
 
-## 2. Install SuperPlane
+## 2. Build the runner image
+
+Terraform requires a runner image before the first apply. The default fleet
+uses the amd64 image. Build it with Packer. Follow
+[release/runner/packer/gce/README.md](../../runner/packer/gce/README.md):
+
+```bash
+cd ../../..   # repository root
+packer init release/runner/packer/gce/runner.pkr.hcl
+packer build \
+  -var project_id="$PROJECT_ID" \
+  -var architecture=amd64 \
+  -var machine_type=e2-standard-4 \
+  release/runner/packer/gce/runner.pkr.hcl
+cd release/terraform/gke
+```
+
+The image goes into the `superplane-runner-amd64` image family. The build
+writes the image name to `release/runner/packer/gce/manifest.json`. Use the
+immutable image resource in step 3:
+
+```text
+projects/PROJECT/global/images/IMAGE_NAME
+```
+
+The default build uses a public IP address in the `default` network and SSH on
+TCP 22. If the network blocks inbound SSH, use Identity-Aware Proxy. The
+subnetwork must have Cloud NAT so that the build can download packages. Allow
+inbound TCP 22 from `35.235.240.0/20`:
+
+```bash
+cd ../../..   # repository root
+packer build \
+  -var project_id="$PROJECT_ID" \
+  -var architecture=amd64 \
+  -var machine_type=e2-standard-4 \
+  -var use_iap=true \
+  -var subnetwork=SUBNETWORK \
+  release/runner/packer/gce/runner.pkr.hcl
+cd release/terraform/gke
+```
+
+## 3. Install SuperPlane
 
 ### Configure Terraform
 
@@ -96,21 +135,18 @@ cp terraform.tfvars.example terraform.tfvars
 Set the required values in `terraform.tfvars`:
 
 ```hcl
-project_id        = "my-gcp-project"
-domain_name       = "superplane.example.com"
-static_ip_name    = "superplane-ip"
-letsencrypt_email = "admin@example.com"
+project_id         = "my-gcp-project"
+domain_name        = "superplane.example.com"
+static_ip_name     = "superplane-ip"
+letsencrypt_email  = "admin@example.com"
+runner_image_amd64 = "projects/PROJECT/global/images/IMAGE_NAME"
 
 # Confirm the release exists before you apply.
 superplane_image_tag     = ""
 superplane_chart_version = "1.0.0-rc3"
-
-enable_gcs_blob_storage = true
-enable_runners          = true
 ```
 
-Set both flags in this file. Do not rely on the variable defaults. Those
-defaults stay `false` so an existing install keeps its current blob storage.
+Terraform stops the plan when `runner_image_amd64` is empty.
 
 The default node type is `e2-standard-2`. Keep that type, or use a larger
 type. The API, the runner API, and the runner workers share one log disk.
@@ -134,10 +170,6 @@ If the chart is not published yet, set `superplane_chart_path` to
 `../../superplane-helm-chart/helm` and leave `superplane_chart_version`
 empty. Also set `superplane_image_tag`. The checked-in chart appVersion
 is a placeholder, not a published image.
-
-With `enable_gcs_blob_storage = false`, SuperPlane stores blobs on pod
-volumes. Each pod has its own volume, and the data is lost when a pod restarts.
-Use this setting only for a short evaluation.
 
 ### Apply
 
@@ -183,54 +215,11 @@ that Certificate must be `Ready`.
 Open `https://superplane.example.com`. Create the owner account. The owner
 account is the installation admin.
 
-## 3. Install Fleet Manager
+## 4. Install Fleet Manager
 
-Do these steps after the installation in step 2 works.
+Do these steps after the installation in step 3 works.
 
-### 3.1 Build the runner image
-
-Build the image with Packer. Follow
-[release/runner/packer/gce/README.md](../../runner/packer/gce/README.md).
-For the default fleet, build the amd64 image:
-
-```bash
-cd ../../..   # repository root
-packer init release/runner/packer/gce/runner.pkr.hcl
-packer build \
-  -var project_id="$PROJECT_ID" \
-  -var architecture=amd64 \
-  -var machine_type=e2-standard-4 \
-  release/runner/packer/gce/runner.pkr.hcl
-cd release/terraform/gke
-```
-
-The image goes into the `superplane-runner-amd64` image family. Set the
-immutable image resource in `terraform.tfvars`, and apply the stack again:
-
-```hcl
-runner_image_amd64 = "projects/PROJECT/global/images/IMAGE_NAME"
-runner_image_arm64 = "projects/PROJECT/global/images/ARM_IMAGE_NAME"
-```
-
-The default build uses a public IP address and SSH on TCP 22. If the
-network blocks inbound SSH, build after the apply. Use Identity-Aware Proxy
-and the runner subnetwork:
-
-```bash
-cd ../../..   # repository root
-packer build \
-  -var project_id="$PROJECT_ID" \
-  -var architecture=amd64 \
-  -var machine_type=e2-standard-4 \
-  -var use_iap=true \
-  -var subnetwork=superplane-runners \
-  release/runner/packer/gce/runner.pkr.hcl
-cd release/terraform/gke
-```
-
-Allow inbound TCP 22 from `35.235.240.0/20` for IAP.
-
-### 3.2 Install the standalone Fleet Manager
+### 4.1 Install the standalone Fleet Manager
 
 Open **Set up runner fleets** during owner setup. Terraform passes the public
 SuperPlane URL and these values to SuperPlane. The wizard preloads them into
@@ -268,7 +257,7 @@ The log must not show configuration or permission errors.
 
 To change fleets, edit the standalone chart values and run `helm upgrade`.
 
-### 3.3 Run a task
+### 4.2 Run a task
 
 1. Create a canvas.
 2. Add a Manual Run trigger.
@@ -305,17 +294,18 @@ must stop and Fleet Manager must delete it after the task.
 | `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
 | `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the standalone Fleet Manager image. Set this for private GCP registries so nodes keep pull access. |
 | `superplane_image_tag` | empty | Image tag override. Empty uses the chart appVersion. A local chart requires an explicit tag. Versioned, legacy self-hosted, and local tags are supported. |
-| `enable_gcs_blob_storage` | `false` | Store blobs in GCS. Set this to `true` in `terraform.tfvars` for a new install. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |
 | `superplane_chart_path` | empty | Path to a local chart. Empty installs the published chart. |
 | `superplane_chart_version` | `1.0.0-rc3` | Published chart version. Use a stable `1.x` chart when one exists. Do not use chart `0.30.0` or any lower chart. |
-| `enable_runners` | `false` | Enable the runner API and create the runner network. Set this to `true` in `terraform.tfvars` for a new install. |
+| `runner_image_amd64` | none | Required. Packer-built image for the default amd64 fleet. |
+| `runner_image_arm64` | empty | Packer-built image for an arm64 fleet. |
 | `runner_subnet_cidr` | `172.20.0.0/24` | Range of the runner subnetwork. |
 | `runner_zones` | `[zone]` | Zones for runner VMs. |
 
-For an arm64 fleet, build the arm64 image and use zones that have the machine
-type. For example, T2A machines are not available in all zones.
+For an arm64 fleet, build the arm64 image, set `runner_image_arm64`, and use
+zones that have the machine type. For example, T2A machines are not available
+in all zones.
 
 ## Troubleshooting
 

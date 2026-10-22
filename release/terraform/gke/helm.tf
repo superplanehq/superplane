@@ -55,21 +55,21 @@ resource "kubectl_manifest" "letsencrypt_issuer" {
 locals {
   superplane_chart_local = var.superplane_chart_path != ""
 
-  gcs_blob_storage_values = local.gcs_blob_storage_enabled ? yamlencode({
+  gcs_blob_storage_values = yamlencode({
     serviceAccount = {
       create = true
       name   = local.app_service_account_name
       annotations = {
-        "iam.gke.io/gcp-service-account" = google_service_account.app[0].email
+        "iam.gke.io/gcp-service-account" = google_service_account.app.email
       }
     }
     blobStorage = {
       provider = "gcs"
-      bucket   = google_storage_bucket.blobs[0].name
+      bucket   = google_storage_bucket.blobs.name
     }
-  }) : ""
+  })
 
-  runner_api_values = local.runners_enabled ? yamlencode({
+  runner_api_values = yamlencode({
     runner = {
       api = {
         enabled = true
@@ -78,7 +78,7 @@ locals {
         enabled = true
       }
     }
-  }) : ""
+  })
 
   fleet_manager_setup_values = yamlencode({
     # The published chart still defaults both components to v0.1.0.
@@ -89,21 +89,21 @@ locals {
       fleetManagerVersion = "v0.1.3"
     }
     fleetManagerSetup = {
-      enabled            = local.runners_enabled
-      provider           = local.runners_enabled ? "gcp" : ""
+      enabled            = true
+      provider           = "gcp"
       managerId          = var.cluster_name
       namespace          = var.superplane_namespace
       serviceAccountName = local.fleet_manager_service_account_name
-      infrastructure = local.runners_enabled ? {
+      infrastructure = {
         superplaneUrl        = "https://${var.domain_name}"
         projectId            = var.project_id
         zones                = local.runner_zones
-        subnetwork           = google_compute_subnetwork.runners[0].id
+        subnetwork           = google_compute_subnetwork.runners.id
         networkTags          = [local.runner_network_tag]
         imageAmd64           = var.runner_image_amd64
         imageArm64           = var.runner_image_arm64
-        fleetManagerIdentity = google_service_account.fleet_manager[0].email
-      } : null
+        fleetManagerIdentity = google_service_account.fleet_manager.email
+      }
     }
   })
 
