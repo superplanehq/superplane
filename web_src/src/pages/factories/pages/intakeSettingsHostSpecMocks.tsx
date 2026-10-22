@@ -73,5 +73,5 @@ vi.mock("@/hooks/useOrganizationData", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ currentUserId: "alice" }),
+  usePermissions: () => ({ currentUserId: "alice", canAct: () => false }),
 }));
