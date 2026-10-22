@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -541,6 +542,14 @@ func (w *NodeExecutor) executeActionNode(
 	}
 
 	ctx.Logger = logger
+	if err := polar.AssertOrganizationPaymentMethod(tx, workflow.OrganizationID); err != nil {
+		// Only a confirmed missing card fails the node. Temporary verification
+		// errors roll back the transaction, so the pending execution is retried.
+		if !errors.Is(err, models.ErrPaymentMethodRequired) {
+			return err
+		}
+		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+	}
 	if err := action.Execute(ctx); err != nil {
 		logger = withFactoryOrder(logger, tx, execution.RunID)
 		logger = withRejectedHostedCredit(logger, workflow.OrganizationID, err)
