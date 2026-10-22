@@ -4,7 +4,7 @@ import { formatWorkOrderIdentifier } from "./workspaceKey";
 
 // Running when the dispatch is still active, or when a step is still in
 // flight. Dispatch state can lag behind step executions.
-function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
+export function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
   return (order.lineDispatches ?? []).some((dispatch) => {
     if (dispatch.state === "STATE_ACTIVE") {
       return true;
@@ -189,6 +189,18 @@ export function getWorkOrderDisplayKey(order: FactoriesWorkOrder, factoryKey?: s
   return "—";
 }
 
+/** A scheduled start stays in Backlog until a line execution actually begins. */
+export function isWorkOrderQueuedForStart(order: FactoriesWorkOrder): boolean {
+  if (order.state !== "STATE_OPEN" || order.queuedTasks?.some((queue) => queue.taskActive)) {
+    return false;
+  }
+  const dispatches = order.lineDispatches ?? [];
+  return (
+    dispatches.some((dispatch) => dispatch.queueItem && !dispatch.stepExecutions?.length) &&
+    !dispatches.some((dispatch) => dispatch.stepExecutions?.some(isActiveWorkOrderExecution))
+  );
+}
+
 export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderDisplayStatus {
   if (order.state === "STATE_CLOSED") {
     if (order.result === "RESULT_PR_CLOSED") {
@@ -209,11 +221,11 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "completed";
   }
 
-  if (order.state === "STATE_DRAFT") {
+  if (order.state === "STATE_DRAFT" || isWorkOrderQueuedForStart(order)) {
     return "draft";
   }
 
-  if (hasActiveLineDispatch(order)) {
+  if (hasActiveLineDispatch(order) || order.queuedTasks?.some((queue) => queue.taskActive)) {
     return "running";
   }
 

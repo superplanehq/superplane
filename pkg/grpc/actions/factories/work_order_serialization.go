@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"slices"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -82,6 +83,13 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return err
 	})
 
+	var admission *workOrderTaskAdmission
+	g.Go(func() error {
+		var err error
+		admission, err = loadWorkOrderTaskAdmission(db.WithContext(gctx), factory.OrganizationID)
+		return err
+	})
+
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
@@ -117,6 +125,8 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 	}
 	serialized.Checks = checks
 	serialized.PlanningSession = planningByOrder[order.ID]
+	serialized.QueuedTasks = admission.queued[order.ID]
+	serialized.TaskLimitReached = admission.limitReached(order.ID)
 	return serialized, nil
 }
 
@@ -183,6 +193,13 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		return err
 	})
 
+	var admission *workOrderTaskAdmission
+	g.Go(func() error {
+		var err error
+		admission, err = loadWorkOrderTaskAdmission(db.WithContext(gctx), factory.OrganizationID)
+		return err
+	})
+
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
@@ -202,6 +219,8 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		serialized.PullRequests = pullRequestsByOrder[orders[i].ID]
 		serialized.CheckScores = serializeCheckScores(checksByOrder[orders[i].ID])
 		serialized.PlanningSession = planningByOrder[orders[i].ID]
+		serialized.QueuedTasks = admission.queued[orders[i].ID]
+		serialized.TaskLimitReached = admission.limitReached(orders[i].ID)
 		result[i] = serialized
 	}
 
@@ -417,4 +436,38 @@ func executionIDsFromDispatches(
 		}
 	}
 	return ids
+}
+
+type workOrderTaskAdmission struct {
+	queued map[uuid.UUID][]*pb.QueuedTask
+	active []uuid.UUID
+	limit  *int
+}
+
+func (a *workOrderTaskAdmission) limitReached(orderID uuid.UUID) bool {
+	return a.limit != nil && len(a.active) >= *a.limit && !slices.Contains(a.active, orderID)
+}
+
+func loadWorkOrderTaskAdmission(db *gorm.DB, orgID uuid.UUID) (*workOrderTaskAdmission, error) {
+	queued, err := models.ListOrganizationQueuedTasks(db, orgID)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[uuid.UUID][]*pb.QueuedTask, len(queued))
+	active, err := models.ListActiveOrganizationTaskIDs(db, orgID)
+	if err != nil {
+		return nil, err
+	}
+	for _, task := range queued {
+		item := &pb.QueuedTask{Id: task.ID.String(), Position: int32(task.Position), Name: task.Name, StartsLine: task.StartsLine, TaskActive: slices.Contains(active, task.WorkOrderID)}
+		if task.LineDispatchID != uuid.Nil {
+			item.LineDispatchId = task.LineDispatchID.String()
+		}
+		result[task.WorkOrderID] = append(result[task.WorkOrderID], item)
+	}
+	limit, err := models.ResolveOrganizationParallelTaskLimit(db, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return &workOrderTaskAdmission{queued: result, active: active, limit: limit}, nil
 }

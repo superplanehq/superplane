@@ -469,18 +469,6 @@ func Test__DispatchWorkOrder__RejectsModelNotOnLine(t *testing.T) {
 }
 
 func Test__DispatchWorkOrder__FillsMissingTitleBeforeStart(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-
-	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
-	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
-		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
-	})
-	require.NoError(t, err)
-
 	longLine := strings.Repeat("a", 300)
 	skippedLead := "\n\n  ![shot](sp-file://abc)\nnull\nUntitled task\nn/a\n"
 	tests := []struct {
@@ -613,6 +601,17 @@ func Test__DispatchWorkOrder__FillsMissingTitleBeforeStart(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			db := database.DB(t.Context())
+			factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+			line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+				{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+			})
+			require.NoError(t, err)
+
 			order, err := factoryModel.CreateWorkOrder(db, "Seed title", tc.description, &r.User, nil, nil)
 			require.NoError(t, err)
 			title := tc.title
