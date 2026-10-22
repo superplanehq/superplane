@@ -10,7 +10,7 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 
 import { HEADER_MCP_RESOURCE, INLINE_SKILL } from "../__fixtures__/agentResourceFixtures";
@@ -374,8 +374,8 @@ describe("PlanningReviewForm model options", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     vi.mocked(useExperimentalFeature).mockReturnValue({
-      has: (feature: string) => feature === FEATURE_WORKSPACE_MCP || feature === FEATURE_WORKSPACE_SKILLS,
-      enabledExperimentalFeatures: [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS],
+      has: (feature: string) => feature === FEATURE_WORKSPACE_SKILLS,
+      enabledExperimentalFeatures: [FEATURE_WORKSPACE_SKILLS],
       isLoading: false,
       organizationReady: true,
     });

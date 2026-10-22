@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   FEATURE_SUPERPLANE_MCP_SERVER,
   FEATURE_WORKSPACE_AGENT,
-  FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 
@@ -35,12 +34,7 @@ type Story = StoryObj<typeof meta>;
 
 const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 
-const agentExperimentalFeatures = [
-  FEATURE_WORKSPACE_AGENT,
-  FEATURE_WORKSPACE_MCP,
-  FEATURE_WORKSPACE_SKILLS,
-  FEATURE_SUPERPLANE_MCP_SERVER,
-];
+const agentExperimentalFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS, FEATURE_SUPERPLANE_MCP_SERVER];
 
 function agentHarness(fixture: FactoriesFixture) {
   return (

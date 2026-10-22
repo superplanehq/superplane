@@ -7,7 +7,6 @@ import type { FactoriesFactoryMcpClient } from "@/api-client";
 import {
   FEATURE_SUPERPLANE_MCP_SERVER,
   FEATURE_WORKSPACE_AGENT,
-  FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 import {
@@ -28,7 +27,7 @@ const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 const settingsAgentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
 const superplaneMcpServerPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/superplane-mcp-server`;
 const mcpConfigurePath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
-const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS];
 
 function connectedMcpClient(id: string, clientName: string): FactoriesFactoryMcpClient {
   return {
@@ -61,7 +60,7 @@ describe("FactorySettingsMCPPage", () => {
     Element.prototype.scrollIntoView ??= vi.fn();
   });
 
-  it("hides Agent from settings and the rail when workspace features are off", async () => {
+  it("shows the Agent rail when workspace features are off", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
@@ -71,13 +70,13 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("factories-nav-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-label", "Agent");
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
       "MCP Server",
     );
   }, 10000);
 
-  it("shows the Agent rail icon when SuperPlane Agent is on and keeps MCP Server", async () => {
+  it("shows the Agent rail when the user can update factories", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
@@ -94,29 +93,27 @@ describe("FactorySettingsMCPPage", () => {
     );
   }, 10000);
 
-  it("hides the Agent rail icon when only MCP or skills is on", async () => {
-    for (const features of [[FEATURE_WORKSPACE_MCP], [FEATURE_WORKSPACE_SKILLS]]) {
-      const view = render(
-        <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
-          factoriesFixture={defaultFactoriesFixture}
-          experimentalFeatures={features}
-        />,
-      );
+  it("shows the Agent rail when only skills is on", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_WORKSPACE_SKILLS]}
+      />,
+    );
 
-      await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      expect(screen.queryByTestId("factories-nav-agent")).not.toBeInTheDocument();
-      view.unmount();
-    }
+    await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-label", "Agent");
   }, 10000);
 
-  it("redirects away from the settings Agent address when the feature is off", async () => {
+  it("opens Agent and MCP servers when experimental flags are off", async () => {
     render(<FactoriesHarness pathSuffix={settingsAgentPath} factoriesFixture={defaultFactoriesFixture} />);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
-    });
-    expect(screen.queryByTestId("factory-settings-agent")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("factory-settings-agent", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("agent-resources-connections-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-skills")).not.toBeInTheDocument();
   }, 10000);
 
   it("redirects the legacy agent-resources route to MCP", async () => {
@@ -392,7 +389,7 @@ describe("FactorySettingsMCPPage", () => {
       "MCP Server",
     );
     expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("factories-nav-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-label", "Agent");
   }, 10000);
 
   it("hides inbound MCP on the Agent page", async () => {
