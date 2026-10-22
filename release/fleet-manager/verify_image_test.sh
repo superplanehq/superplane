@@ -19,7 +19,8 @@ for argument in "$@"; do
 done
 
 printf '%s\n' "${reference}" >>"${TEST_REFERENCE_LOG}"
-if [[ "${reference}" == *:v1.2.3@sha256:* ]]; then
+image_name="${reference##*/}"
+if [[ "${image_name}" == *:*@sha256:* ]]; then
   echo "Docker references with both a tag and digest are not supported" >&2
   exit 1
 fi
@@ -65,6 +66,24 @@ if grep -F -- ":v1.2.3@${TEST_IMAGE_DIGEST}" "${TEST_REFERENCE_LOG}" >/dev/null;
 fi
 if [ "$(grep -Fxc -- "docker://ghcr.io/superplanehq/fleet-manager@${TEST_IMAGE_DIGEST}" "${TEST_REFERENCE_LOG}")" -ne 3 ]; then
   echo "Digest verification must inspect the immutable digest reference" >&2
+  exit 1
+fi
+
+: >"${TEST_REFERENCE_LOG}"
+PATH="${TEST_DIRECTORY}/bin:${PATH}" \
+  bash "${REPO_ROOT}/release/fleet-manager/verify-image.sh" \
+    ghcr.io/superplanehq/fleet-manager:v1.2.3-docker \
+    "${TEST_IMAGE_DIGEST}" \
+    v1.2.3 \
+    "${TEST_SOURCE_SHA}" >/dev/null
+
+grep -Fx -- "docker://ghcr.io/superplanehq/fleet-manager:v1.2.3-docker" "${TEST_REFERENCE_LOG}" >/dev/null
+if grep -F -- ":v1.2.3-docker@${TEST_IMAGE_DIGEST}" "${TEST_REFERENCE_LOG}" >/dev/null; then
+  echo "Docker image verification must not combine a tag and digest" >&2
+  exit 1
+fi
+if [ "$(grep -Fxc -- "docker://ghcr.io/superplanehq/fleet-manager@${TEST_IMAGE_DIGEST}" "${TEST_REFERENCE_LOG}")" -ne 3 ]; then
+  echo "Docker image verification must inspect the immutable digest reference" >&2
   exit 1
 fi
 

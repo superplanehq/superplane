@@ -448,4 +448,19 @@ if grep -qx 'helm push' "${CURL_SEQUENCE}"; then
 fi
 test -f "${TMP_DIR}/chart-output/superplane-1.2.3.tgz"
 
+: >"${CURL_SEQUENCE}"
+export CURL_MODE=success
+export COMPONENT_RELEASES_ALREADY_RESOLVED=yes
+(
+  cd "${REPO_ROOT}"
+  bash "${BUILD_SCRIPT}" v1.2.3 "${TMP_DIR}/chart-output-reused" >"${TMP_DIR}/reuse-stdout" 2>"${TMP_DIR}/reuse-stderr"
+)
+unset COMPONENT_RELEASES_ALREADY_RESOLVED
+if grep -q '^curl ' "${CURL_SEQUENCE}"; then
+  echo "chart build looked up releases after the archive resolve" >&2
+  exit 1
+fi
+cmp -s "${VALUES_BACKUP}" "${VALUES_PATH}"
+test -f "${TMP_DIR}/chart-output-reused/superplane-1.2.3.tgz"
+
 echo "Chart component release default tests passed."
