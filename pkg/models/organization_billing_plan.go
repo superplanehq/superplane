@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -253,10 +254,26 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 }
 
 // ActivateOrganizationBillingPlan assigns a public plan after the caller verifies its payment requirements.
+// It assigns None when no public paid plans are available.
 // Subscription plans must be activated by a Polar subscription event instead.
 func ActivateOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, planKey string) (*OrganizationBillingPlan, error) {
 	catalog, err := FindBillingPlan(tx, planKey)
-	if err != nil || catalog.Category != "paid" || catalog.Visibility != "public" || catalog.PriceCents != 0 || catalog.PolarProductID != nil {
+	if err != nil {
+		return nil, ErrInvalidBillingPlan
+	}
+	if catalog.Key == BillingPlanNone {
+		plans, err := ListBillingPlans(tx)
+		if err != nil {
+			return nil, err
+		}
+		if slices.ContainsFunc(plans, func(plan BillingPlan) bool {
+			return plan.Category == "paid" && plan.Visibility == "public"
+		}) {
+			return nil, ErrInvalidBillingPlan
+		}
+		return setOrganizationBillingPlan(tx, orgID, catalog, BillingPlanSourceSystem, nil)
+	}
+	if catalog.Category != "paid" || catalog.Visibility != "public" || catalog.PriceCents != 0 || catalog.PolarProductID != nil {
 		return nil, ErrInvalidBillingPlan
 	}
 	return setOrganizationBillingPlan(tx, orgID, catalog, BillingPlanSourceSystem, nil)
