@@ -9,7 +9,10 @@ export const CREDIT_GRANT_KIND_TRIAL_ADJUSTMENT = "trial_adjustment";
 export const CREDIT_GRANT_KIND_TOPUP_ADJUSTMENT = "topup_adjustment";
 export const CREDIT_GRANT_KIND_ADMIN_ADJUSTMENT = "admin_adjustment";
 
+export const CREDIT_GRANT_KIND_INCLUDED_ADJUSTMENT = "included_adjustment";
+
 const CREDIT_ADJUSTMENT_KINDS = [
+  CREDIT_GRANT_KIND_INCLUDED_ADJUSTMENT,
   CREDIT_GRANT_KIND_TRIAL_ADJUSTMENT,
   CREDIT_GRANT_KIND_TOPUP_ADJUSTMENT,
   CREDIT_GRANT_KIND_ADMIN_ADJUSTMENT,
@@ -21,6 +24,8 @@ export function isCreditAdjustmentKind(kind: string | undefined): boolean {
 
 export function creditGrantSourceLabel(kind: string | undefined): string {
   switch (kind) {
+    case CREDIT_GRANT_KIND_INCLUDED_ADJUSTMENT:
+      return "Included adjustment";
     case CREDIT_GRANT_KIND_TRIAL_ADJUSTMENT:
       return "Trial adjustment";
     case CREDIT_GRANT_KIND_TOPUP_ADJUSTMENT:
@@ -80,7 +85,12 @@ export function welcomeCreditExpiryDetail(
   expiresAt: string | undefined,
   now: Date = new Date(),
 ): string | null {
-  if (kind !== CREDIT_GRANT_KIND_WELCOME && kind !== CREDIT_GRANT_KIND_INCLUDED && kind !== CREDIT_GRANT_KIND_TOPUP) {
+  if (
+    kind !== CREDIT_GRANT_KIND_INCLUDED_ADJUSTMENT &&
+    kind !== CREDIT_GRANT_KIND_WELCOME &&
+    kind !== CREDIT_GRANT_KIND_INCLUDED &&
+    kind !== CREDIT_GRANT_KIND_TOPUP
+  ) {
     return null;
   }
   if (!expiresAt) {
