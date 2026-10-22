@@ -183,7 +183,10 @@ test("proposeUpdate publishes scores spec and survey on one route", async () => 
         verifiability: { score: 5, summary: "Existing tests cover the change." },
       },
       spec: "# Retry refunds\n",
-      survey: { questions: [{ prompt: "Which service?", options: ["Payments", "Billing"] }] },
+      survey: { questions: [
+        { prompt: "Which service?", options: ["Payments", "Billing"], recommended_option: "Billing" },
+        { prompt: "Which scope?", options: ["One page", "All pages"] },
+      ] },
     });
     assert.deepEqual(result, { status: "shown" });
     assert.equal(calls.length, 1);
@@ -195,7 +198,10 @@ test("proposeUpdate publishes scores spec and survey on one route", async () => 
         verifiability: { score: 5, summary: "Existing tests cover the change." },
       },
       spec: "# Retry refunds",
-      survey: { questions: [{ prompt: "Which service?", options: ["Payments", "Billing"] }] },
+      survey: { questions: [
+        { prompt: "Which service?", options: ["Payments", "Billing"], recommended_option: "Billing" },
+        { prompt: "Which scope?", options: ["One page", "All pages"] },
+      ] },
     });
   } finally {
     global.fetch = previousFetch;
@@ -337,6 +343,9 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
     ["propose_update", "inspect_attachment"],
   );
   const [updateTool, inspectTool] = tools;
+  const questionSchema = updateTool.inputSchema.properties.survey.properties.questions.items;
+  assert.equal(questionSchema.properties.recommended_option.type, "string");
+  assert.ok(!questionSchema.required.includes("recommended_option"));
   assert.match(updateTool.description, /clarity, complexity, and verifiability/);
   assert.match(updateTool.description, /1 through 3/);
   assert.deepEqual(inspectTool.inputSchema.required, ["path"]);

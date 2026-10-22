@@ -65,6 +65,9 @@ function surveyQuestions(input) {
           .map((option) => String(option || "").trim())
           .filter(Boolean)
       : [],
+    ...(question && question.recommended_option
+      ? { recommended_option: String(question.recommended_option) }
+      : {}),
   }));
 }
 
@@ -402,6 +405,10 @@ const UPDATE_TOOL = {
               properties: {
                 prompt: { type: "string" },
                 options: { type: "array", items: { type: "string" } },
+                recommended_option: {
+                  type: "string",
+                  description: "Exact text of the recommended option. Omit when context is not enough.",
+                },
               },
               required: ["prompt", "options"],
             },
