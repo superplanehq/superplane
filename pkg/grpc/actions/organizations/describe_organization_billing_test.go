@@ -281,32 +281,59 @@ func TestBusinessCheckoutSuccessURLIncludesCheckoutID(t *testing.T) {
 }
 
 func TestLegacyBusinessCheckoutRemainsAvailable(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "yes")
-	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
-	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
-		switch req.URL.Path {
-		case "/customers/external/" + r.Organization.ID.String():
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_legacy", "external_id": r.Organization.ID.String()}))
-		case "/checkouts/":
-			var body map[string]any
-			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
-			require.Equal(t, []any{"prod_business"}, body["products"])
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"url": "https://polar.sh/checkout/legacy"}))
-		default:
-			t.Errorf("unexpected Polar request %s", req.URL.Path)
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-	})
-	usePolarTestServer(t, server)
-	response, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
-	require.NoError(t, err)
-	require.True(t, response.BillingEnabled)
-	require.True(t, response.SubscriptionCheckoutEnabled)
-	checkout, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
-	require.NoError(t, err)
-	require.Equal(t, "https://polar.sh/checkout/legacy", checkout.CheckoutUrl)
+	for _, tc := range []struct {
+		name, catalogProduct, envProduct, wantProduct string
+	}{
+		{"environment fallback", "", "prod_business", "prod_business"},
+		{"catalog without environment", "prod_catalog", "", "prod_catalog"},
+		{"catalog overrides environment", "prod_catalog", "prod_environment", "prod_catalog"},
+		{"unconfigured", "", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			db := database.DB(t.Context())
+			catalog, err := models.FindBillingPlan(db, models.BillingPlanBusiness)
+			require.NoError(t, err)
+			originalProduct := catalog.PolarProductID
+			t.Cleanup(func() {
+				require.NoError(t, database.Conn().Model(catalog).Update("polar_product_id", originalProduct).Error)
+			})
+			var catalogProduct *string
+			if tc.catalogProduct != "" {
+				catalogProduct = &tc.catalogProduct
+			}
+			require.NoError(t, db.Model(catalog).Update("polar_product_id", catalogProduct).Error)
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			t.Setenv("POLAR_BUSINESS_PRODUCT_ID", tc.envProduct)
+			server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+				switch req.URL.Path {
+				case "/customers/external/" + r.Organization.ID.String():
+					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_legacy", "external_id": r.Organization.ID.String()}))
+				case "/checkouts/":
+					var body map[string]any
+					require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+					require.Equal(t, []any{tc.wantProduct}, body["products"])
+					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"url": "https://polar.sh/checkout/legacy"}))
+				default:
+					t.Errorf("unexpected Polar request %s", req.URL.Path)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+			})
+			usePolarTestServer(t, server)
+			response, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+			require.NoError(t, err)
+			require.True(t, response.BillingEnabled)
+			require.Equal(t, tc.wantProduct != "", response.SubscriptionCheckoutEnabled)
+			checkout, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+			if tc.wantProduct == "" {
+				require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, "https://polar.sh/checkout/legacy", checkout.CheckoutUrl)
+		})
+	}
 }
 
 func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
