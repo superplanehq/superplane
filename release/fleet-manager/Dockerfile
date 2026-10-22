@@ -25,6 +25,16 @@ LABEL org.opencontainers.image.source="https://github.com/superplanehq/superplan
 COPY --from=build /fleet-manager /usr/local/bin/fleet-manager
 ENTRYPOINT ["/usr/local/bin/fleet-manager"]
 
+FROM docker:27-cli AS docker
+ARG FLEET_MANAGER_VERSION=dev
+ARG SOURCE_REVISION=unknown
+LABEL org.opencontainers.image.source="https://github.com/superplanehq/superplane" \
+  org.opencontainers.image.revision="${SOURCE_REVISION}" \
+  org.opencontainers.image.version="${FLEET_MANAGER_VERSION}"
+COPY --from=build /fleet-manager /usr/local/bin/fleet-manager
+COPY --chmod=755 release/fleet-manager/docker-entrypoint.sh /usr/local/bin/fleet-manager-docker-entrypoint
+ENTRYPOINT ["/usr/local/bin/fleet-manager-docker-entrypoint"]
+
 FROM docker:27-cli AS local
 RUN apk add --no-cache postgresql-client
 COPY --from=build /fleet-manager /usr/local/bin/fleet-manager

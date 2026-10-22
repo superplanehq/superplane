@@ -3,13 +3,7 @@ import { Input, InputGroup } from "@/components/Input/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import {
-  bpsToPercentInput,
-  centsToDollarInput,
-  dollarInputToCents,
-  hostedProviderLabel,
-  percentInputToBps,
-} from "@/lib/hostedCredit";
+import { bpsToPercentInput, hostedProviderLabel, percentInputToBps } from "@/lib/hostedCredit";
 import { uniqueSortedModelIds } from "@/lib/hostedLLMModels";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import {
@@ -29,13 +23,12 @@ export function HostedLLMSettings() {
   const model = useHostedLLMSettings();
 
   return (
-    <section className="border-t border-slate-200 py-6 dark:border-gray-700/70">
+    <section className="py-6">
       <div className="max-w-2xl">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Hosted LLM</p>
         <h2 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">SuperPlane-hosted models</h2>
         <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Configure provider keys, model allowlists, welcome credit, and markup for SuperPlane-hosted runner
-          credentials.
+          Configure provider keys, model allowlists, and markup for SuperPlane-hosted runner credentials.
         </Text>
       </div>
 
@@ -44,12 +37,10 @@ export function HostedLLMSettings() {
       ) : (
         <>
           <HostedLLMPolicyFields
-            welcomeDollars={model.welcomeDollars}
             markupPercent={model.markupPercent}
             warningPercent={model.warningPercent}
             savingPolicy={model.savingPolicy}
             policyChanged={model.policyChanged}
-            onWelcomeChange={model.setWelcomeDollars}
             onMarkupChange={model.setMarkupPercent}
             onWarningChange={model.setWarningPercent}
             onSave={model.savePolicy}
@@ -86,7 +77,6 @@ export function HostedLLMSettings() {
 function useHostedLLMSettings() {
   const [settings, setSettings] = useState<InstallationLLMSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [welcomeDollars, setWelcomeDollars] = useState("50.00");
   const [markupPercent, setMarkupPercent] = useState("20");
   const [warningPercent, setWarningPercent] = useState("20");
   const [savingPolicy, setSavingPolicy] = useState(false);
@@ -96,7 +86,6 @@ function useHostedLLMSettings() {
 
   const applySettings = useCallback((data: InstallationLLMSettings) => {
     setSettings(data);
-    setWelcomeDollars(centsToDollarInput(data.welcome_grant_cents));
     setMarkupPercent(bpsToPercentInput(data.markup_bps));
     setWarningPercent(bpsToPercentInput(data.warning_threshold_bps));
     setProviders((current) => {
@@ -134,7 +123,6 @@ function useHostedLLMSettings() {
     try {
       applySettings(
         await patchInstallationLLMPolicy({
-          welcome_grant_cents: dollarInputToCents(welcomeDollars),
           markup_bps: percentInputToBps(markupPercent),
           warning_threshold_bps: percentInputToBps(warningPercent),
         }),
@@ -168,8 +156,7 @@ function useHostedLLMSettings() {
   const providerActions = useHostedLLMProviderActions(providers, setProviders, applySettings);
   const policyChanged =
     settings != null &&
-    (dollarInputToCents(welcomeDollars) !== settings.welcome_grant_cents ||
-      percentInputToBps(markupPercent) !== settings.markup_bps ||
+    (percentInputToBps(markupPercent) !== settings.markup_bps ||
       percentInputToBps(warningPercent) !== settings.warning_threshold_bps);
   const savedDefaultModelKey = defaultModelKeyFromSettings(settings);
   const defaultModelOptions = hostedDefaultModelOptions(settings?.providers ?? [], providers);
@@ -178,8 +165,6 @@ function useHostedLLMSettings() {
   return {
     settings,
     loading,
-    welcomeDollars,
-    setWelcomeDollars,
     markupPercent,
     setMarkupPercent,
     warningPercent,
@@ -275,22 +260,18 @@ function useHostedLLMProviderActions(
 }
 
 function HostedLLMPolicyFields({
-  welcomeDollars,
   markupPercent,
   warningPercent,
   savingPolicy,
   policyChanged,
-  onWelcomeChange,
   onMarkupChange,
   onWarningChange,
   onSave,
 }: {
-  welcomeDollars: string;
   markupPercent: string;
   warningPercent: string;
   savingPolicy: boolean;
   policyChanged: boolean;
-  onWelcomeChange: (value: string) => void;
   onMarkupChange: (value: string) => void;
   onWarningChange: (value: string) => void;
   onSave: () => void;
@@ -298,20 +279,6 @@ function HostedLLMPolicyFields({
   return (
     <>
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <div>
-          <Label className="mb-2 block text-left">Welcome grant (USD)</Label>
-          <InputGroup>
-            <Input
-              data-testid="installation-llm-welcome"
-              value={welcomeDollars}
-              onChange={(event) => onWelcomeChange(event.target.value)}
-              placeholder="50.00"
-            />
-          </InputGroup>
-          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Granted once when an organization is created. Set to 0 to disable grants.
-          </Text>
-        </div>
         <div>
           <Label className="mb-2 block text-left">Markup percent</Label>
           <InputGroup>

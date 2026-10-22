@@ -1373,6 +1373,8 @@ message FactoryIntake {
     // Projects that still create a task. Required for a Sentry intake.
     // Sentry exception intakes only. Values are project slugs.
     repeated string sentry_project_ids = 23;
+    // Organization user ID. Omitted updates preserve the selection; empty clears it.
+    optional string default_owner_id = 24;
   }
 
   string id = 1;
@@ -1518,6 +1520,8 @@ message FactoryPRFeedbackHandler {
     bool ignore_bots = 2;
     // GitHub usernames of bots to react to even without the mention.
     repeated string allowed_bots = 3;
+    // Start a run for every bot comment except comments SuperPlane wrote.
+    bool address_all_bots = 4;
   }
 
   message CheckSettings {
@@ -1750,6 +1754,8 @@ message FactoryIntakeItem {
   string body = 4;
   string url = 5;
   google.protobuf.Timestamp created_at = 6;
+  // Nonempty when an exact search match cannot be imported by this intake.
+  string disabled_reason = 7;
 }
 
 message SearchFactoryIntakeItemsRequest {

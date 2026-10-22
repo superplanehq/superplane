@@ -30,7 +30,7 @@ Score all three sub-parameters together. Each score is an integer from 1 through
 
 Clarity is how well the task is defined: outcome, scope, and done. 3 means those are decided. 2 means a choice is still open. 1 means the task does not say what should change. Do not describe agent fit in the Clarity summary.
 
-Complexity is whether one agent finishes this in one run without steering. 3 means one run covers the work. 2 means the agent will likely need steering. 1 means the work is too big or tangled. Name the size problem, not missing decisions. Do not name tests or proof in the Complexity summary. Proof belongs to Verifiability.
+Complexity is whether one agent finishes this in one run without steering. 3 means one run covers the work. 2 means the agent will likely need steering. 1 means the work is too big or tangled. A change can span the UI and backend and still fit one run. Lower the score only for a concrete obstacle that will likely need human help. Name the size problem, not missing decisions. Do not name tests or proof in the Complexity summary. Proof belongs to Verifiability.
 
 Verifiability is whether the run can prove the change works. 3 means tests, a build, or another check the agent can run covers the change. 2 means a check covers only part of the change. 1 means only a person can judge the result. Name the proof, or the missing proof, in the summary.
 

@@ -66,6 +66,7 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Login()
 		steps.session.Visit("/admin/settings")
 		steps.assertOnInstallationSettingsPage()
+		steps.openNetworkSettings()
 		steps.enablePrivateNetworkAccess()
 		steps.saveInstallationSettings()
 		steps.assertPrivateNetworkAccessEnabled()
@@ -78,6 +79,7 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Login()
 		steps.session.Visit("/admin/settings")
 		steps.assertOnInstallationSettingsPage()
+		steps.openEmailSettings()
 		steps.assertSMTPSettingsSaveDisabled()
 		steps.enableSMTPSettings()
 		steps.fillInSMTPSettings("smtp.example.com", "587", "smtp-user", "smtp-pass", "SuperPlane", "noreply@example.com", true)
@@ -162,7 +164,16 @@ func (s *adminSteps) clickExitImpersonation() {
 
 func (s *adminSteps) assertOnInstallationSettingsPage() {
 	s.session.AssertText("Installation Settings")
+	s.session.AssertText("Reset one automation")
+}
+
+func (s *adminSteps) openNetworkSettings() {
+	s.session.Click(q.Locator("role=tab[name='Network']"))
 	s.session.AssertText("Private network access")
+}
+
+func (s *adminSteps) openEmailSettings() {
+	s.session.Click(q.Locator("role=tab[name='Email']"))
 	s.session.AssertText("SMTP configuration")
 }
 

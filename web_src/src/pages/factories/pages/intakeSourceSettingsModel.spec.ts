@@ -17,6 +17,14 @@ import {
 } from "./intakeSourceSettingsModel";
 
 describe("intakeSourceSettingsModel", () => {
+  it("round trips the default owner and sends an explicit clear only for GitHub", () => {
+    const selected = intakeSettingsFromApi("GitHub issues", { defaultOwnerId: "alice" });
+    expect(intakeSettingsToApi(selected, "github-issues").defaultOwnerId).toBe("alice");
+    const cleared = { ...selected, defaultOwnerId: "" };
+    expect(intakeSettingsToApi(cleared, "github-issues").defaultOwnerId).toBe("");
+    expect(intakeSettingsToApi(selected, "jira-issues").defaultOwnerId).toBeUndefined();
+    expect(intakeSettingsFromApi("GitHub issues", {}).defaultOwnerId).toBe("");
+  });
   it("adds and removes a label", () => {
     expect(toggleIntakeLabel([], "bug")).toEqual(["bug"]);
     expect(toggleIntakeLabel(["bug", "enhancement"], "bug")).toEqual(["enhancement"]);

@@ -61,7 +61,7 @@ func TestAdminLLMSettings(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
 
-	t.Run("admin can load defaults and update welcome grant", func(t *testing.T) {
+	t.Run("admin can load defaults and update markup", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "GET",
 			path:       "/admin/api/installation/llm-settings",
@@ -78,8 +78,7 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.Len(t, settings.Providers, 3)
 
 		body, err := json.Marshal(map[string]any{
-			"welcome_grant_cents": 2500,
-			"markup_bps":          1000,
+			"markup_bps": 1000,
 		})
 		require.NoError(t, err)
 		response = execRequest(server, requestParams{
@@ -91,7 +90,7 @@ func TestAdminLLMSettings(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
-		assert.Equal(t, int64(2500), settings.WelcomeGrantCents)
+		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
 		assert.Equal(t, 1000, settings.MarkupBPS)
 	})
 
@@ -358,6 +357,66 @@ func TestAdminOrganizationBillingPlanHiddenWhenBillingDisabled(t *testing.T) {
 	}
 }
 
+func TestAdminCatalogPlanAssignment(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	catalog := models.BillingPlan{Key: "support_plan", Name: "Support plan", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	t.Cleanup(func() {
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, "none", nil)
+		require.NoError(t, err)
+		require.NoError(t, models.DeleteBillingPlan(database.Conn(), catalog.ID))
+	})
+
+	regular, err := models.CreateAccount("Catalog user", "catalog-user@example.com")
+	require.NoError(t, err)
+	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+	denied := execRequest(server, requestParams{method: "GET", path: "/admin/api/billing-plans", authCookie: regularToken})
+	require.Equal(t, http.StatusNotFound, denied.Code)
+
+	response := execRequest(server, requestParams{method: "GET", path: "/admin/api/billing-plans", authCookie: token})
+	require.Equal(t, http.StatusOK, response.Code)
+	var plans []models.BillingPlan
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plans))
+	found := false
+	for _, plan := range plans {
+		if plan.Key == catalog.Key {
+			found = true
+			require.Equal(t, catalog.ID, plan.ID)
+		}
+	}
+	require.True(t, found, "private catalog plan must be listed")
+
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+	previous, err := models.ResolveOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	catalog.RequirePaymentMethod = true
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	response = execRequest(server, requestParams{method: "PUT", path: path, authCookie: token, body: []byte(`{"plan":"support_plan"}`), contentType: "application/json"})
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	require.Contains(t, response.Body.String(), "Plans that require a payment method cannot be assigned by an admin")
+	unchanged, err := models.ResolveOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, previous.PlanID, unchanged.PlanID)
+	require.Equal(t, previous.PlanSource, unchanged.PlanSource)
+
+	catalog.RequirePaymentMethod = false
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	response = execRequest(server, requestParams{method: "PUT", path: path, authCookie: token, body: []byte(`{"plan":"support_plan"}`), contentType: "application/json"})
+	require.Equal(t, http.StatusOK, response.Code)
+	var saved map[string]any
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &saved))
+	require.Equal(t, catalog.Key, saved["catalog_key"])
+	assigned, err := models.ResolveOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, catalog.ID, assigned.PlanID)
+
+	response = execRequest(server, requestParams{method: "GET", path: path, authCookie: token})
+	require.Equal(t, http.StatusOK, response.Code)
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &saved))
+	require.Equal(t, catalog.Key, saved["catalog_key"])
+}
+
 func TestAdminOrganizationBillingPlan(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
@@ -415,6 +474,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 				"items": []map[string]any{
 					{
 						"id":                   "sub_admin_sync",
+						"product_id":           "prod_business",
 						"status":               "active",
 						"current_period_start": periodStart.Format(time.RFC3339),
 						"current_period_end":   periodEnd.Format(time.RFC3339),
@@ -451,7 +511,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 	t.Run("PUT rejects Polar-managed organizations", func(t *testing.T) {
 		now := time.Now()
 		end := now.AddDate(0, 1, 0)
-		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
+		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 			ID:          "sub_admin_put",
 			Status:      models.PolarSubscriptionStatusActive,
 			PeriodStart: &now,
@@ -587,5 +647,97 @@ func TestAdminOrganizationBillingPlanTrialEnd(t *testing.T) {
 			require.NotNil(t, before.ExpiresAt)
 			assert.True(t, welcome.ExpiresAt.Equal(*before.ExpiresAt), planName)
 		}
+	})
+}
+
+func TestAdminOrganizationBillingPlanCustomTrialEnd(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	catalog := models.BillingPlan{
+		Key:              "custom_trial",
+		Name:             "Custom trial",
+		Category:         "trial",
+		Visibility:       "private",
+		CreditFrequency:  "none",
+		CreditExpiration: "never",
+		TrialLengthDays:  30,
+	}
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	t.Cleanup(func() {
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, "none", nil)
+		require.NoError(t, err)
+		require.NoError(t, models.DeleteBillingPlan(database.Conn(), catalog.ID))
+	})
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+
+	t.Run("PUT rejects a missing end", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        []byte(`{"plan":"custom_trial"}`),
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "trial end date is required")
+	})
+
+	t.Run("PUT rejects an end that is not in the future", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"plan":          "custom_trial",
+			"trial_ends_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "choose a future date")
+	})
+
+	t.Run("PUT stores the end and reopens expired welcome credit", func(t *testing.T) {
+		ended := time.Now().Add(-time.Hour)
+		require.NoError(t, database.Conn().Model(&models.OrganizationLLMCreditGrant{}).
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			Update("expires_at", ended).Error)
+
+		trialEnd := time.Now().Add(18 * 24 * time.Hour).UTC().Truncate(time.Second)
+		body, err := json.Marshal(map[string]any{
+			"plan":          "custom_trial",
+			"trial_ends_at": trialEnd.Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, "custom_trial", plan.Plan)
+		assert.Equal(t, "custom_trial", plan.CatalogKey)
+		assert.Equal(t, "trial", plan.CatalogCategory)
+		require.NotNil(t, plan.TrialEndsAt)
+		parsed, err := time.Parse(time.RFC3339, *plan.TrialEndsAt)
+		require.NoError(t, err)
+		assert.True(t, parsed.Equal(trialEnd))
+
+		var welcome models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&welcome).Error)
+		require.NotNil(t, welcome.ExpiresAt)
+		assert.True(t, welcome.ExpiresAt.Equal(trialEnd))
+
+		summary, err := models.DescribeOrganizationLLMCredit(database.Conn(), r.Organization.ID)
+		require.NoError(t, err)
+		assert.Equal(t, welcome.AmountMicros, summary.WelcomeRemainingMicros)
 	})
 }

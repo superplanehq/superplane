@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
 import { Button } from "@/components/ui/button";
 import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
-import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
+import {
+  FLEET_MANAGER_WIZARD_STEPS,
+  omittedFleetWizardStep,
+  singleHostInstall,
+  type FleetManagerWizardStep,
+} from "@/lib/fleetManagerWizard";
 import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import type { FirstRunChrome } from "@/pages/factories/pages/onboarding/first-run/firstRunTypes";
 import type { FirstRunSphereProps } from "@/pages/factories/pages/onboarding/first-run/FirstRunSpherePane";
@@ -33,6 +38,7 @@ const RESUMABLE_STEPS: OwnerSetupStep[] = [
   "license",
   "smtp",
   "fleet-intro",
+  "fleet-docker",
   ...FLEET_MANAGER_WIZARD_STEPS.map((step) => `fleet-${step}` as OwnerSetupStep),
 ];
 
@@ -41,11 +47,12 @@ type SetupOwnerStatus = "disabled" | "required" | "in_progress" | "complete";
 interface SetupOwnerStatusResponse {
   status: SetupOwnerStatus;
   step?: string;
+  beacon_enabled?: boolean;
 }
 
 type OwnerSetupEntry =
   | { kind: "redirect"; to: string }
-  | { kind: "owner" }
+  | { kind: "owner"; beaconEnabled: boolean }
   | { kind: "resume"; step: OwnerSetupStep; email: string; orgSlug: string };
 
 function isResumableStep(step: string | undefined): step is OwnerSetupStep {
@@ -98,7 +105,7 @@ async function resolveOwnerSetupEntry(): Promise<OwnerSetupEntry> {
   }
 
   if (status.status === "required") {
-    return { kind: "owner" };
+    return { kind: "owner", beaconEnabled: status.beacon_enabled === true };
   }
 
   const account = await fetchSignedInAccount();
@@ -171,6 +178,7 @@ function ownerSetupStepNumber(step: OwnerSetupStep) {
   if (step === "fleet-provider") return 5;
   if (step === "fleet-fleets") return 6;
   if (step === "fleet-values") return 7;
+  if (step === "fleet-docker") return 6;
   if (step === "fleet-install") return 8;
   return OWNER_SETUP_STEPS;
 }
@@ -179,12 +187,28 @@ function fleetManagerOrganizationId(slug: string | null) {
   return slug ?? "";
 }
 
+function useAlignFleetStep(
+  step: OwnerSetupStep,
+  installationType: string | undefined,
+  metadataLoaded: boolean,
+  goToStep: (step: OwnerSetupStep) => void,
+) {
+  useEffect(() => {
+    if (!metadataLoaded) return;
+    const active = fleetWizardStep(step);
+    if (!active) return;
+    const next = omittedFleetWizardStep(active, installationType);
+    if (next) goToStep(`fleet-${next}`);
+  }, [goToStep, installationType, metadataLoaded, step]);
+}
+
 function fleetWizardStep(step: OwnerSetupStep): FleetManagerWizardStep | null {
   if (!step.startsWith("fleet-") || step === "fleet-intro") return null;
   return step.slice("fleet-".length) as FleetManagerWizardStep;
 }
 
 function fleetStepBefore(step: OwnerSetupStep): OwnerSetupStep {
+  if (step === "fleet-docker") return "fleet-provider";
   const active = fleetWizardStep(step);
   if (!active) return "fleet-intro";
   const index = FLEET_MANAGER_WIZARD_STEPS.indexOf(active);
@@ -220,7 +244,13 @@ function OwnerFleetSetupSteps({
 }) {
   if (!pendingOrganizationSlug) return null;
   if (step === "fleet-intro") {
-    return <FleetManagerStep onContinue={() => setStep("fleet-provider")} onSkip={finishInstallation} />;
+    return (
+      <FleetManagerStep
+        singleHost={singleHostInstall(fleetSetup.metadata?.installationType)}
+        onContinue={() => setStep("fleet-provider")}
+        onSkip={finishInstallation}
+      />
+    );
   }
   if (!activeFleetStep) return null;
 
@@ -230,6 +260,14 @@ function OwnerFleetSetupSteps({
       setup={fleetSetup}
       onBack={previousFleetStep}
       onNext={() => {
+        if (
+          activeFleetStep === "provider" &&
+          fleetSetup.draft?.provider === "docker" &&
+          fleetSetup.metadata?.installationType === "single-host"
+        ) {
+          setStep("fleet-docker");
+          return;
+        }
         const next = FLEET_MANAGER_WIZARD_STEPS[fleetStepIndex + 1];
         if (next) setStep(`fleet-${next}`);
       }}
@@ -244,12 +282,17 @@ interface OwnerSetupEntryActions {
   setPendingOrganizationSlug: (slug: string | null) => void;
   setStep: (step: OwnerSetupStep) => void;
   setPhase: (phase: "loading" | "ready") => void;
+  setBeaconEnabled: (enabled: boolean) => void;
 }
 
 function applyOwnerSetupEntry(entry: OwnerSetupEntry, actions: OwnerSetupEntryActions) {
   if (entry.kind === "redirect") {
     window.location.href = entry.to;
     return;
+  }
+
+  if (entry.kind === "owner") {
+    actions.setBeaconEnabled(entry.beaconEnabled);
   }
 
   if (entry.kind === "resume") {
@@ -282,10 +325,11 @@ function ownerSetupChrome(args: {
 const OwnerSetup: React.FC = () => {
   const [phase, setPhase] = useState<"loading" | "ready">("loading");
   const [step, setStep] = useState<OwnerSetupStep>("owner");
+  const [beaconEnabled, setBeaconEnabled] = useState(false);
   const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
   const activeFleetStep = fleetWizardStep(step);
   const fleetSetup = useFleetManagerSetup(
-    activeFleetStep !== null,
+    step === "fleet-intro" || activeFleetStep !== null,
     fleetManagerOrganizationId(pendingOrganizationSlug),
   );
   const saveSetupProgress = useQueuedSetupProgress();
@@ -307,6 +351,7 @@ const OwnerSetup: React.FC = () => {
   const account = useOwnerAccountForm({
     setPendingOrganizationSlug,
     onOwnerCreated,
+    shareInstallReport: beaconEnabled,
   });
 
   useEffect(() => {
@@ -319,6 +364,7 @@ const OwnerSetup: React.FC = () => {
           setPendingOrganizationSlug,
           setStep,
           setPhase,
+          setBeaconEnabled,
         });
       }
     });
@@ -338,6 +384,8 @@ const OwnerSetup: React.FC = () => {
     },
     [saveSetupProgress],
   );
+
+  useAlignFleetStep(step, fleetSetup.metadata?.installationType, fleetSetup.metadata != null, goToStep);
 
   const fleetStepIndex = activeFleetStep ? FLEET_MANAGER_WIZARD_STEPS.indexOf(activeFleetStep) : -1;
 
@@ -376,6 +424,9 @@ const OwnerSetup: React.FC = () => {
           onLastNameChange={account.setLastName}
           onPasswordChange={account.setPassword}
           onConfirmPasswordChange={account.setConfirmPassword}
+          showInstallReport={beaconEnabled}
+          shareOwnerIdentity={account.shareOwnerIdentity}
+          onShareOwnerIdentityChange={account.setShareOwnerIdentity}
           onSubmit={account.handleOwnerSubmit}
         />
       )}

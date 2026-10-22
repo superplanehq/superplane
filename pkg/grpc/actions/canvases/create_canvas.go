@@ -35,6 +35,40 @@ func CreateCanvas(
 	nodes []models.Node,
 	edges []models.Edge,
 ) (*pb.CreateCanvasResponse, error) {
+	return createCanvas(ctx, nil, registry, encryptor, authService, webhookBaseURL, organizationID, name, description, factoryID, nodes, edges)
+}
+
+func CreateCanvasInTransaction(
+	ctx context.Context,
+	tx *gorm.DB,
+	registry *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+	organizationID uuid.UUID,
+	name string,
+	description string,
+	factoryID *uuid.UUID,
+	nodes []models.Node,
+	edges []models.Edge,
+) (*pb.CreateCanvasResponse, error) {
+	return createCanvas(ctx, tx, registry, encryptor, authService, webhookBaseURL, organizationID, name, description, factoryID, nodes, edges)
+}
+
+func createCanvas(
+	ctx context.Context,
+	tx *gorm.DB,
+	registry *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+	organizationID uuid.UUID,
+	name string,
+	description string,
+	factoryID *uuid.UUID,
+	nodes []models.Node,
+	edges []models.Edge,
+) (*pb.CreateCanvasResponse, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
@@ -66,7 +100,11 @@ func CreateCanvas(
 		UpdatedAt:      &now,
 	}
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	db := tx
+	if db == nil {
+		db = database.Conn()
+	}
+	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := validateCanvasFactoryID(tx, organizationID, factoryID); err != nil {
 			return err
 		}
@@ -144,20 +182,25 @@ func CreateCanvas(
 		return nil, classifyCanvasCreateError(err)
 	}
 
+	readDB := database.DB(ctx)
+	if tx != nil {
+		readDB = tx
+	}
+
 	var user *models.User
 	if canvas.CreatedBy != nil {
-		user, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
+		user, err = models.FindMaybeDeletedUserByIDInTransaction(readDB, canvas.OrganizationID.String(), canvas.CreatedBy.String())
 		if err != nil {
 			return nil, classifyCanvasCreateError(err)
 		}
 	}
 
-	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), &canvas)
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(readDB, &canvas)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load canvas spec")
 	}
 
-	proto, err := serializePreparedCanvas(database.DB(ctx), &canvas, liveVersion, user, nil)
+	proto, err := serializePreparedCanvas(readDB, &canvas, liveVersion, user, nil)
 	if err != nil {
 		return nil, classifyCanvasCreateError(err)
 	}

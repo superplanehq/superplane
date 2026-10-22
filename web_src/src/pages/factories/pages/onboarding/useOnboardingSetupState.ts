@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useOnboardingInitialImportChoice } from "./onboardingInitialImportChoice";
 import { isAgentStepReady } from "./onboardingAgentReadiness";
 import {
   fixtureIssueCount,
@@ -101,6 +102,8 @@ export function useOnboardingSetupState(
     persistVcsHostKey?: string;
     /** Keeps the repository choice when the page reloads before that choice is saved. */
     persistRepoKey?: string;
+    /** Keeps the import choice across reloads and integration redirects for this workspace. */
+    persistInitialImportKey?: string;
   },
 ) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
@@ -124,6 +127,7 @@ export function useOnboardingSetupState(
   const [issuesRepo, setIssuesRepo] = useState<string | null>(() => options?.initial?.issuesRepo ?? null);
   const [issuesDiscovering, setIssuesDiscovering] = useState(false);
   const [issuesDiscovered, setIssuesDiscovered] = useState(() => Boolean(options?.initial?.issuesChoice));
+  const [skipInitialImport, setSkipInitialImport] = useOnboardingInitialImportChoice(options);
   const [issuesChoice, setIssuesChoice] = useState<IssuesChoiceId | null>(() => options?.initial?.issuesChoice ?? null);
   /** True after Continue to coding agent — starts backlog analysis. */
   const [issuesCommitted, setIssuesCommitted] = useState(false);
@@ -291,6 +295,8 @@ export function useOnboardingSetupState(
     issuesDiscovered,
     startIssuesDiscovery,
     issuesChoice,
+    skipInitialImport,
+    setSkipInitialImport,
     setIssuesChoice,
     issuesCommitted,
     commitIssuesStep,

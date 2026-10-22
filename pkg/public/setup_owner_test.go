@@ -171,12 +171,47 @@ func patchSetupOwnerProgress(t *testing.T, server *Server, authCookie string, st
 }
 
 func TestSetupOwnerStatusRequired(t *testing.T) {
+	t.Setenv("SUPERPLANE_BEACON_ENABLED", "no")
 	server := setupOwnerTestServer(t)
 
 	status := getSetupOwnerStatus(t, server, "")
 	assert.Equal(t, setupOwnerStatusRequired, status["status"])
 	assert.NotContains(t, status, "step")
 	assert.NotContains(t, status, "organization_slug")
+	assert.Equal(t, false, status["beacon_enabled"])
+}
+
+func TestSetupOwnerStatusReportsBeacon(t *testing.T) {
+	t.Setenv("SUPERPLANE_BEACON_ENABLED", "yes")
+	t.Setenv("SUPERPLANE_INSTALLATION_TYPE", "kubernetes")
+	server := setupOwnerTestServer(t)
+
+	status := getSetupOwnerStatus(t, server, "")
+	assert.Equal(t, true, status["beacon_enabled"])
+}
+
+func TestSetupOwnerPersistsShareOwnerIdentity(t *testing.T) {
+	server := setupOwnerTestServer(t)
+	body, err := json.Marshal(map[string]any{
+		"email":                "owner@example.com",
+		"first_name":           "Owner",
+		"last_name":            "User",
+		"password":             "Password1",
+		"share_owner_identity": true,
+	})
+	require.NoError(t, err)
+
+	response := execRequest(server, requestParams{
+		method:      http.MethodPost,
+		path:        "/api/v1/setup-owner",
+		body:        body,
+		contentType: "application/json",
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+
+	metadata, err := models.GetInstallationMetadata(database.Conn())
+	require.NoError(t, err)
+	assert.True(t, metadata.ShareOwnerIdentity)
 }
 
 func TestSetupOwnerStatusInProgress(t *testing.T) {
@@ -204,6 +239,17 @@ func TestSetupOwnerProgressUpdate(t *testing.T) {
 	status := getSetupOwnerStatus(t, server, authCookie)
 	assert.Equal(t, setupOwnerStatusInProgress, status["status"])
 	assert.Equal(t, models.OwnerSetupStepSMTP, status["step"])
+}
+
+func TestSetupOwnerProgressAcceptsDockerStep(t *testing.T) {
+	server := setupOwnerTestServer(t)
+	authCookie := submitOwnerForm(t, server)
+
+	response := patchSetupOwnerProgress(t, server, authCookie, models.OwnerSetupStepFleetDocker)
+	assert.Equal(t, http.StatusOK, response.Code)
+
+	status := getSetupOwnerStatus(t, server, authCookie)
+	assert.Equal(t, models.OwnerSetupStepFleetDocker, status["step"])
 }
 
 func TestSetupOwnerProgressRejectsUnknownStep(t *testing.T) {

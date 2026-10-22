@@ -30,8 +30,6 @@ export interface WorkspaceNextStepContext {
 }
 
 export interface WorkspaceNextStepBanner {
-  doneCount: number;
-  totalCount: number;
   /** First incomplete step; drives the single CTA. */
   activeStep: WorkspaceNextStep;
   title: string;
@@ -40,9 +38,6 @@ export interface WorkspaceNextStepBanner {
   ctaLabel: string;
   canDefer: boolean;
 }
-
-/** GitHub and the repository are already set during onboarding. */
-const ONBOARDING_COMPLETED_STEP_COUNT = 2;
 
 type WorkspaceNextStepDefinition = Omit<WorkspaceNextStep, "done"> & {
   isDone: (ctx: WorkspaceNextStepContext) => boolean;
@@ -82,10 +77,6 @@ export const WORKSPACE_NEXT_STEPS_COPY = {
 
 const WORKSPACE_NEXT_STEPS = [COMMENTS_NEXT_STEP, CHECKS_NEXT_STEP];
 
-export function workspaceNextStepsProgressCopy(done: number, total: number): string {
-  return `${done}/${total}`;
-}
-
 export function isWorkspaceNextStepsQueryReady(query: {
   isPending: boolean;
   isError?: boolean;
@@ -117,8 +108,6 @@ export function workspaceNextStepBanner(steps: WorkspaceNextStep[]): WorkspaceNe
     return null;
   }
   return {
-    doneCount: ONBOARDING_COMPLETED_STEP_COUNT + steps.filter((step) => step.done).length,
-    totalCount: ONBOARDING_COMPLETED_STEP_COUNT + steps.length,
     activeStep,
     title: activeStep.bannerTitle,
     badgeLabel: activeStep.badgeLabel,

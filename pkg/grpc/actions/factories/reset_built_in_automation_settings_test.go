@@ -106,11 +106,11 @@ func resetTestPublishCanvas(t *testing.T, r *support.ResourceRegistry, canvas *m
 	t.Helper()
 	doc.Metadata.ID, doc.Metadata.Name = canvas.ID.String(), canvas.Name
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	nodes, edges, err := doc.Parse(r.Registry, r.Organization.ID.String())
+	nodes, edges, err := doc.Parse(r.Registry, canvas.OrganizationID.String())
 	require.NoError(t, err)
 	require.NoError(t, canvases.PublishGeneratedCanvasNodesWithOwner(ctx, database.DB(t.Context()), canvas, nil, "Install test template", nodes, edges,
-		changesets.CanvasPublisherOptions{Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
-	reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+		changesets.CanvasPublisherOptions{Registry: r.Registry, OrgID: canvas.OrganizationID, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
+	reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), canvas.OrganizationID, canvas.ID)
 	require.NoError(t, err)
 	*canvas = *reloaded
 }
@@ -255,9 +255,11 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 	cases := []struct {
 		source          string
 		restrictAuthors bool
+		paused          bool
 	}{
 		{source: models.FactoryIntakeSourceGitHubIssues},
 		{source: models.FactoryIntakeSourceGitHubIssues, restrictAuthors: true},
+		{source: models.FactoryIntakeSourceGitHubIssues, paused: true},
 		{source: models.FactoryIntakeSourceJiraIssues},
 		{source: models.FactoryIntakeSourceSentryExceptions},
 		{source: models.FactoryIntakeSourceDependabotAlerts},
@@ -272,11 +274,17 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		if tc.restrictAuthors {
 			name += "/authors-with-access"
 		}
+		if tc.paused {
+			name += "/paused"
+		}
 		t.Run(name, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
 			settings := intakeSettingsOrDefault(source, intakeSettings{})
 			switch source {
 			case models.FactoryIntakeSourceGitHubIssues:
+				if tc.restrictAuthors {
+					settings.DefaultOwnerID = r.User.String()
+				}
 				settings.Labels = []string{"urgent"}
 				settings.LabelFilterMode = intakeLabelFilterExclude
 				settings.Assignment = intakeAssignmentUnassigned
@@ -332,10 +340,15 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			intake, err := factory.CreateIntake(database.DB(t.Context()), canvas.ID, source)
 			require.NoError(t, err)
 			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			var paused *bool
+			if source == models.FactoryIntakeSourceGitHubIssues {
+				paused = &tc.paused
+			}
 			updated, err := UpdateFactoryIntake(ctx, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}, r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
-				FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), Settings: serializeIntakeSettings(source, settings),
+				FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), Settings: serializeIntakeSettings(source, settings), Paused: paused,
 			})
 			require.NoError(t, err)
+			assert.Equal(t, tc.paused, updated.Intake.GetPaused())
 			expected := updated.Intake.Settings
 			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceJiraIssues {
 				// The editor action historically retains filters, but restores
@@ -348,6 +361,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				require.NoError(t, err)
 				defaultSpec := models.LiveCanvasSpec{Nodes: defaults.Nodes(), Edges: defaults.Edges()}
 				restored := serializeIntakeSettings(source, intakeSettingsFromGraph(source, resolveIntakeGraph(source, defaultSpec), defaultSpec))
+				assert.Empty(t, restored.GetDefaultOwnerId())
 				assert.Equal(t, expected.GetLabels(), restored.GetLabels())
 				assert.Equal(t, expected.GetLabelFilterMode(), restored.GetLabelFilterMode())
 				assert.Equal(t, expected.GetAssignment(), restored.GetAssignment())
@@ -360,6 +374,10 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				}
 			}
 			require.NoError(t, resetTestOrganization(t, r))
+			listed, err := ListFactoryIntakes(ctx, r.Organization.ID.String(), &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+			require.NoError(t, err)
+			require.Len(t, listed.Intakes, 1)
+			assert.Equal(t, tc.paused, listed.Intakes[0].GetPaused())
 			version := resetTestLiveVersion(t, canvas)
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 			actual := intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
@@ -383,7 +401,7 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 				r, factory := resetTestFactory(t)
 				require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
 				request := prFeedbackBuildRequest{
-					Repository: "acme/app", Mention: "@review", IgnoreBots: false, AllowedBots: []string{},
+					Repository: "acme/app", Mention: "@review", IgnoreBots: false, AddressAllBots: true, AllowedBots: []string{},
 					CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
 					Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent},
 				}
@@ -428,7 +446,20 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 				if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
 					assert.Equal(t, "@review", actual.Mention)
 					assert.False(t, actual.IgnoreBots)
+					assert.True(t, actual.AddressAllBots)
 					assert.Empty(t, actual.AllowedBots)
+					prompt := ""
+					runner := findIntakeNode(version.Nodes, prFeedbackRunnerNodeID)
+					require.NotNil(t, runner)
+					steps, _ := runner.Configuration["steps"].([]any)
+					for _, item := range steps {
+						step, _ := item.(map[string]any)
+						if step["name"] == "Address PR feedback" {
+							prompt, _ = step["prompt"].(string)
+						}
+					}
+					assert.Contains(t, prompt, "Read every bot comment, including comments with no mention.")
+					assert.Contains(t, prompt, "Ignore comments SuperPlane already wrote.")
 				} else {
 					assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
 				}

@@ -5,7 +5,7 @@ export const SENTRY_INTAKE_SETUP_COPY = {
   wizardStepConnectExisting: "Choose the Sentry organization that SuperPlane will monitor.",
   wizardStepProject: "Which Sentry projects should create tasks?",
   wizardStepProjectHelper: "Select one or more projects. SuperPlane listens for new issues.",
-  importExistingHelper: "SuperPlane adds the 10 newest unresolved issues from these projects.",
+  importExistingHelper: "SuperPlane adds up to 3 of the newest unresolved issues from these projects.",
   importExistingHelperOff: "SuperPlane does not import existing issues.",
   wizardConnect: "Connect Sentry",
   wizardContinue: "Continue",

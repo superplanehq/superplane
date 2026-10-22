@@ -196,6 +196,10 @@ func (f *Factory) IsOnboardingComplete() bool {
 	return f.OnboardingCompletedAt != nil
 }
 
+func (c FactoryOnboardingConfig) ReadyForCompletion() error {
+	return validateFactoryOnboardingReady(c)
+}
+
 // IsInitialOnboarding reports whether account onboarding created the workspace.
 func (f *Factory) IsInitialOnboarding() bool {
 	return f.OnboardingConfigValue().InitialOnboardingAttemptID != ""

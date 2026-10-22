@@ -2,16 +2,17 @@
 
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "Usage: release/fleet-manager/publish-image.sh <version> <oci-archive>" >&2
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+  echo "Usage: release/fleet-manager/publish-image.sh <version> <oci-archive> [tag]" >&2
   exit 1
 fi
 
 VERSION="$1"
 OCI_ARCHIVE="$2"
+TAG="${3:-${VERSION}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_REPOSITORY="${FLEET_MANAGER_IMAGE_REPO:-ghcr.io/superplanehq/fleet-manager}"
-IMAGE="${IMAGE_REPOSITORY}:${VERSION}"
+IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-${FLEET_MANAGER_IMAGE_REPO:-ghcr.io/superplanehq/fleet-manager}}"
+IMAGE="${IMAGE_REPOSITORY}:${TAG}"
 SKOPEO=(bash "${SCRIPT_DIR}/run-skopeo.sh")
 
 node "${SCRIPT_DIR}/../component-release.js" validate-version "${VERSION}" >/dev/null

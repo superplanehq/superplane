@@ -123,8 +123,8 @@ describe("DatadogIntakeSetupDialog", () => {
       await screen.findByRole("heading", { name: DATADOG_INTAKE_SETUP_COPY.wizardStepService }),
     ).toBeInTheDocument();
     expect(screen.getByText(DATADOG_INTAKE_SETUP_COPY.wizardStepServiceHelper)).toBeInTheDocument();
-    expect(screen.getByText(DATADOG_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent("10 newest");
-    expect(screen.getByTestId("datadog-skip-initial-import")).toBeChecked();
+    expect(screen.getByText(DATADOG_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent("up to 3");
+    expect(screen.getByTestId("datadog-skip-initial-import")).not.toBeChecked();
     expect(screen.getByTestId("datadog-setup-finish")).toBeDisabled();
   });
 
@@ -160,7 +160,7 @@ describe("DatadogIntakeSetupDialog", () => {
     renderDialog(onCreated);
 
     expect(await screen.findByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
-    expect(screen.getByTestId("datadog-skip-initial-import")).toBeChecked();
+    expect(screen.getByTestId("datadog-skip-initial-import")).not.toBeChecked();
     await user.click(screen.getByTestId("datadog-skip-initial-import"));
     expect(screen.getByText(DATADOG_INTAKE_SETUP_COPY.importExistingHelperOff)).toBeInTheDocument();
     await user.click(screen.getByTestId("datadog-service-checkout"));

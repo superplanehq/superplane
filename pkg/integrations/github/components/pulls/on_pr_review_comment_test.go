@@ -1,6 +1,7 @@
 package pulls
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -478,4 +479,47 @@ func Test__OnPRReviewComment__Setup(t *testing.T) {
 		assert.Equal(t, "pull_request_review_comment", webhookRequest.EventType)
 		assert.Empty(t, webhookRequest.EventTypes)
 	})
+}
+
+func TestOnPRReviewCommentAddressAllBots(t *testing.T) {
+	trigger := &OnPRReviewComment{}
+	configuration := map[string]any{
+		"repository":     "test",
+		"contentFilter":  "@superplaneagent",
+		"ignoreBots":     true,
+		"addressAllBots": true,
+		"commentScope":   "replies",
+	}
+	cases := []struct {
+		name     string
+		userType string
+		login    string
+		body     string
+		want     int
+	}{
+		{name: "other bot without mention starts a run", userType: "Bot", login: "coderabbitai[bot]", body: "please fix the race", want: 1},
+		{name: "superplane comment does not start a run", userType: "Bot", login: "superplaneagent[bot]", body: "@superplaneagent please", want: 0},
+		{name: "human without mention does not start a run", userType: "User", login: "octocat", body: "please fix the race", want: 0},
+		{name: "human mention starts a run", userType: "User", login: "octocat", body: "@superplaneagent please", want: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := []byte(fmt.Sprintf(
+				`{"action":"created","comment":{"body":%q,"in_reply_to_id":99,"user":{"login":%q,"type":%q}},"pull_request":{"number":1}}`,
+				tc.body, tc.login, tc.userType,
+			))
+			events := &contexts.EventContext{}
+			code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+				Body:          body,
+				Headers:       signedHeaders(body, "test-secret", "pull_request_review_comment"),
+				Logger:        logrus.NewEntry(logrus.New()),
+				Configuration: configuration,
+				Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
+				Events:        events,
+			})
+			assert.Equal(t, http.StatusOK, code)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, events.Count())
+		})
+	}
 }

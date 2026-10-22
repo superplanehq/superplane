@@ -1,3 +1,5 @@
+import type { BillingPlan } from "./billingPlansApi";
+import { OrganizationFeatureGrants } from "./OrganizationFeatureGrants";
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Input, InputGroup } from "@/components/Input/input";
@@ -13,7 +15,6 @@ import { Wallet } from "lucide-react";
 
 import {
   creditRemainingCents,
-  formatUtcTrialEnd,
   useOrgLLMCredit,
   utcCalendarDate,
   type CreditBalanceBucket,
@@ -26,12 +27,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export const ADMIN_POLAR_MANAGED_PLAN_COPY =
   "This organization uses Polar for billing. Cancel or change the subscription in Polar.";
-export const ADMIN_LOCAL_PLAN_COPY = "No Polar subscription. Set Trial, Business, or None for this organization.";
+export const ADMIN_LOCAL_PLAN_COPY = "Select a plan without a payment requirement. Manage paid subscriptions in Polar.";
 export const ADMIN_PLAN_UNKNOWN_COPY = "SuperPlane could not load the billing plan. Refresh the page and try again.";
 export const ADMIN_SET_BALANCE_HELP_COPY =
   "Enter the new remaining balance. SuperPlane adds the difference to the credit history as an adjustment.";
 export const ADMIN_NO_ACTIVE_TRIAL_COPY = "This organization has no active trial credit.";
-export const ADMIN_INCLUDED_USAGE_COPY = "The Business subscription sets this value.";
+export const ADMIN_INCLUDED_USAGE_COPY = "Plan grants set this balance.";
 export const ADMIN_TRIAL_ENDS_LABEL = "Trial ends";
 export const ADMIN_TRIAL_ENDS_HELP = "Trial credit stays usable until this date. Dates use UTC.";
 export const ADMIN_TRIAL_ENDS_ERROR = "Choose a future date.";
@@ -59,12 +60,12 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
         <Text className="text-gray-500 text-sm dark:text-gray-400">Loading hosted credit...</Text>
       ) : credit.credit ? (
         <OrgHostedCreditCard
+          orgId={orgId}
           {...credit}
           credit={credit.credit}
           polarManaged={credit.plan?.polar_managed === true}
           planKnown={credit.plan != null}
           savedPlan={credit.plan}
-          savedTrialEndsAt={credit.plan?.trial_ends_at ?? null}
           showPlanControls={billingProductEnabled}
         />
       ) : null}
@@ -73,32 +74,40 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
 }
 
 function OrgBillingPlanField(args: {
+  catalog: BillingPlan[];
+  catalogError: string;
   polarManaged: boolean;
   planKnown: boolean;
   planValue: string;
   setPlanValue: (value: string) => void;
-  savedTrialEndsAt: string | null;
   trialEndsOn: string;
   setTrialEndsOn: (value: string) => void;
   trialEndInvalid: boolean;
   savingPlan: boolean;
   savePlan: () => void;
 }) {
-  const planLocked = !args.planKnown || args.polarManaged;
-  const showTrialEndField = args.planKnown && !args.polarManaged && args.planValue === "trial";
-  const savedTrialEnd = formatUtcTrialEnd(args.savedTrialEndsAt);
-  const showTrialEnd = args.planKnown && !args.polarManaged && (showTrialEndField || savedTrialEnd != null);
+  const planEditable = args.planKnown && !args.polarManaged;
+  const catalogLocked = !!args.catalogError || args.catalog.length === 0;
+  const selectedCategory = args.catalog.find((plan) => plan.key === args.planValue)?.category;
+  const showTrialEnd = planEditable && selectedCategory === "trial";
   return (
     <div className="mb-4 max-w-sm">
       <Label className="mb-2 block text-left">Billing plan</Label>
-      <Select disabled={planLocked} value={args.planValue} onValueChange={args.setPlanValue}>
+      {args.catalogError && <p role="alert">{args.catalogError}</p>}
+      <Select disabled={!planEditable || catalogLocked} value={args.planValue} onValueChange={args.setPlanValue}>
         <SelectTrigger data-testid="admin-org-billing-plan">
           <SelectValue placeholder="Select a plan" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="trial">Trial</SelectItem>
-          <SelectItem value="business">Business</SelectItem>
-          <SelectItem value="none">None</SelectItem>
+          {args.catalog.map((plan) => (
+            <SelectItem
+              key={plan.key}
+              value={plan.key}
+              disabled={plan.key === "business_legacy" || plan.require_payment_method}
+            >
+              {plan.name}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -109,40 +118,38 @@ function OrgBillingPlanField(args: {
           <Label className="mb-2 block text-left" htmlFor="admin-org-trial-ends-input">
             {ADMIN_TRIAL_ENDS_LABEL}
           </Label>
-          {showTrialEndField ? (
-            <>
-              <Input
-                id="admin-org-trial-ends-input"
-                type="date"
-                data-testid="admin-org-trial-ends-input"
-                value={args.trialEndsOn}
-                min={utcCalendarDate(new Date())}
-                aria-invalid={args.trialEndInvalid}
-                onChange={(event) => args.setTrialEndsOn(event.target.value)}
-              />
-              <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">{ADMIN_TRIAL_ENDS_HELP}</Text>
-              {args.trialEndInvalid ? (
-                <Text className="mt-1 text-xs text-red-600 dark:text-red-400">{ADMIN_TRIAL_ENDS_ERROR}</Text>
-              ) : null}
-            </>
-          ) : (
-            <Text data-testid="admin-org-trial-ends" className="text-sm text-gray-900 dark:text-gray-100">
-              {savedTrialEnd}
-            </Text>
-          )}
+          <Input
+            id="admin-org-trial-ends-input"
+            type="date"
+            data-testid="admin-org-trial-ends-input"
+            value={args.trialEndsOn}
+            min={utcCalendarDate(new Date())}
+            aria-invalid={args.trialEndInvalid}
+            onChange={(event) => args.setTrialEndsOn(event.target.value)}
+          />
+          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">{ADMIN_TRIAL_ENDS_HELP}</Text>
+          {args.trialEndInvalid ? (
+            <Text className="mt-1 text-xs text-red-600 dark:text-red-400">{ADMIN_TRIAL_ENDS_ERROR}</Text>
+          ) : null}
         </div>
       ) : null}
-      {planLocked ? null : (
+      {planEditable ? (
         <Button
           type="button"
           className="mt-3"
           data-testid="admin-org-billing-plan-save"
           onClick={args.savePlan}
-          disabled={args.savingPlan}
+          disabled={
+            args.savingPlan ||
+            catalogLocked ||
+            args.catalog.some(
+              (plan) => plan.key === args.planValue && (plan.key === "business_legacy" || plan.require_payment_method),
+            )
+          }
         >
           {args.savingPlan ? "Saving..." : "Save plan"}
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -158,6 +165,9 @@ function billingPlanHelp(planKnown: boolean, polarManaged: boolean): string {
 }
 
 function OrgHostedCreditCard(args: {
+  orgId: string;
+  catalog: BillingPlan[];
+  catalogError: string;
   credit: OrganizationLLMCredit;
   grants: OrganizationsOrganizationCreditGrant[];
   polarManaged: boolean;
@@ -172,7 +182,6 @@ function OrgHostedCreditCard(args: {
   planValue: string;
   setPlanValue: (value: string) => void;
   savingBalance: CreditBalanceBucket | null;
-  savedTrialEndsAt: string | null;
   trialEndsOn: string;
   setTrialEndsOn: (value: string) => void;
   trialEndInvalid: boolean;
@@ -191,11 +200,12 @@ function OrgHostedCreditCard(args: {
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
       {args.showPlanControls ? (
         <OrgBillingPlanField
+          catalog={args.catalog}
+          catalogError={args.catalogError}
           polarManaged={args.polarManaged}
           planKnown={args.planKnown}
           planValue={args.planValue}
           setPlanValue={args.setPlanValue}
-          savedTrialEndsAt={args.savedTrialEndsAt}
           trialEndsOn={args.trialEndsOn}
           setTrialEndsOn={args.setTrialEndsOn}
           trialEndInvalid={args.trialEndInvalid}
@@ -244,6 +254,9 @@ function OrgHostedCreditCard(args: {
         savingMarkup={args.savingMarkup}
         saveMarkup={args.saveMarkup}
       />
+      {args.showPlanControls && (
+        <OrganizationFeatureGrants key={args.savedPlan?.catalog_key || args.savedPlan?.plan} orgId={args.orgId} />
+      )}
       <CreditHistory grants={args.grants} loadFailed={args.grantsLoadFailed} onRetry={() => void args.reloadGrants()} />
     </div>
   );
@@ -315,7 +328,7 @@ function MarkupOverrideField(args: {
         />
       </InputGroup>
       <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        Leave empty to use the installation markup. Organization members cannot see this value.
+        Leave empty to use the plan or installation markup. Organization members cannot see this value.
       </Text>
       <Button
         type="button"
@@ -418,7 +431,7 @@ function balanceChangeCopy(changeCents: number | null): string {
   if (changeCents === 0) {
     return "No change.";
   }
-  return `Ledger change: ${formatCreditGrantAmount(changeCents)}`;
+  return `Balance change: ${formatCreditGrantAmount(changeCents)}`;
 }
 
 function trialBalanceLocked(
@@ -429,7 +442,7 @@ function trialBalanceLocked(
 }
 
 function isOpenNonPolarTrial(plan: OrganizationBillingPlan | null, now: Date = new Date()): boolean {
-  if (plan == null || plan.polar_managed || plan.plan !== "trial" || plan.trial_ends_at == null) {
+  if (plan == null || plan.polar_managed || plan.catalog_category !== "trial" || plan.trial_ends_at == null) {
     return false;
   }
   const endsAt = new Date(plan.trial_ends_at);

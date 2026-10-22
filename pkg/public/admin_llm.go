@@ -93,10 +93,12 @@ type addOrganizationLLMCreditRequest struct {
 }
 
 type setOrganizationCreditBalanceRequest struct {
-	Bucket                 string `json:"bucket"`
-	TargetCents            int64  `json:"target_cents"`
-	ExpectedRemainingCents int64  `json:"expected_remaining_cents"`
-	Note                   string `json:"note"`
+	ExpirationChoice       *string    `json:"expiration"`
+	ExpiresAt              *time.Time `json:"expires_at"`
+	Bucket                 string     `json:"bucket"`
+	TargetCents            int64      `json:"target_cents"`
+	ExpectedRemainingCents int64      `json:"expected_remaining_cents"`
+	Note                   string     `json:"note"`
 }
 
 // organizationCreditGrantResponse matches the OrganizationCreditGrant JSON
@@ -121,12 +123,18 @@ type organizationLLMMarkupRequest struct {
 }
 
 type organizationBillingPlanResponse struct {
-	Plan                    string  `json:"plan"`
-	PlanSource              string  `json:"plan_source"`
-	PolarSubscriptionStatus string  `json:"polar_subscription_status"`
-	PolarManaged            bool    `json:"polar_managed"`
-	TrialEndsAt             *string `json:"trial_ends_at"`
-	CurrentPeriodEnd        *string `json:"current_period_end"`
+	CreditExpiration        string    `json:"credit_expiration"`
+	CreditValidityDays      *int      `json:"credit_validity_days"`
+	CatalogID               uuid.UUID `json:"catalog_id"`
+	CatalogKey              string    `json:"catalog_key"`
+	CatalogName             string    `json:"catalog_name"`
+	CatalogCategory         string    `json:"catalog_category"`
+	Plan                    string    `json:"plan"`
+	PlanSource              string    `json:"plan_source"`
+	PolarSubscriptionStatus string    `json:"polar_subscription_status"`
+	PolarManaged            bool      `json:"polar_managed"`
+	TrialEndsAt             *string   `json:"trial_ends_at"`
+	CurrentPeriodEnd        *string   `json:"current_period_end"`
 }
 
 type organizationBillingPlanRequest struct {
@@ -151,15 +159,17 @@ func (s *Server) adminUpdateInstallationLLMSettings(w http.ResponseWriter, r *ht
 		return
 	}
 
+	if req.WelcomeGrantCents != nil {
+		http.Error(w, "Edit trial credit in Billing plans", http.StatusBadRequest)
+		return
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		current, err := models.GetInstallationLLMSettings(tx)
 		if err != nil {
 			return err
 		}
 		next := *current
-		if req.WelcomeGrantCents != nil {
-			next.WelcomeGrantCents = *req.WelcomeGrantCents
-		}
 		if req.MarkupBPS != nil {
 			next.MarkupBPS = *req.MarkupBPS
 		}
@@ -458,12 +468,14 @@ func (s *Server) adminSetOrganizationCreditBalance(w http.ResponseWriter, r *htt
 
 	db := database.DB(r.Context())
 	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
-		OrganizationID: orgID,
-		Bucket:         req.Bucket,
-		TargetMicros:   targetMicros,
-		ExpectedMicros: expectedMicros,
-		Note:           req.Note,
-		ActorAccountID: actor,
+		OrganizationID:   orgID,
+		ExpirationChoice: req.ExpirationChoice,
+		ExpiresAt:        req.ExpiresAt,
+		Bucket:           req.Bucket,
+		TargetMicros:     targetMicros,
+		ExpectedMicros:   expectedMicros,
+		Note:             req.Note,
+		ActorAccountID:   actor,
 	})
 	if err != nil {
 		writeCreditBalanceError(w, err)
@@ -496,6 +508,7 @@ func writeCreditBalanceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, models.ErrCreditBalanceChanged):
 		http.Error(w, "The balance changed. Reload and try again.", http.StatusConflict)
 	case errors.Is(err, models.ErrCreditBalanceBucket),
+		errors.Is(err, models.ErrCreditExpiration),
 		errors.Is(err, models.ErrCreditBalanceNegative),
 		errors.Is(err, errCreditCentsOutOfRange):
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -551,6 +564,15 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 	respondJSON(w, response)
 }
 
+func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
+	plans, err := models.ListBillingPlans(database.DB(r.Context()))
+	if err != nil {
+		http.Error(w, "Failed to load billing plans", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, plans)
+}
+
 func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
 	if !models.BillingEnabled() {
 		http.Error(w, "Billing is not available", http.StatusNotFound)
@@ -593,7 +615,7 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 	}
 
 	planName := strings.TrimSpace(req.Plan)
-	trialEndsAt, err := trialEndForAdminPlan(planName, req.TrialEndsAt)
+	trialEndsAt, err := trialEndForAdminPlan(database.Conn(), planName, req.TrialEndsAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -620,6 +642,12 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 		return organizationBillingPlanResponse{}, err
 	}
 	return organizationBillingPlanResponse{
+		CatalogID:               plan.PlanID,
+		CatalogKey:              plan.Catalog.Key,
+		CatalogName:             plan.Catalog.Name,
+		CatalogCategory:         plan.Catalog.Category,
+		CreditExpiration:        plan.Catalog.CreditExpiration,
+		CreditValidityDays:      plan.Catalog.CreditValidityDays,
 		Plan:                    plan.Plan,
 		PlanSource:              plan.PlanSource,
 		PolarSubscriptionStatus: plan.PolarSubscriptionStatus,
@@ -629,8 +657,9 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 	}, nil
 }
 
-func trialEndForAdminPlan(planName string, raw *string) (*time.Time, error) {
-	if planName != models.BillingPlanTrial {
+func trialEndForAdminPlan(tx *gorm.DB, planName string, raw *string) (*time.Time, error) {
+	catalog, err := models.FindBillingPlan(tx, planName)
+	if err != nil || catalog.Category != "trial" {
 		return nil, nil
 	}
 	if raw == nil || strings.TrimSpace(*raw) == "" {
@@ -684,9 +713,13 @@ func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettings
 		})
 	}
 
+	catalog, err := models.FindBillingPlan(tx, models.BillingPlanTrial)
+	if err != nil {
+		return installationLLMSettingsResponse{}, err
+	}
 	defaultModel := models.InstallationDefaultHostedLLMModel(settings)
 	return installationLLMSettingsResponse{
-		WelcomeGrantCents:     settings.WelcomeGrantCents,
+		WelcomeGrantCents:     catalog.TrialCreditCents,
 		MarkupBPS:             settings.MarkupBPS,
 		WarningThresholdBPS:   settings.WarningThresholdBPS,
 		DefaultHostedProvider: defaultModel.Provider,

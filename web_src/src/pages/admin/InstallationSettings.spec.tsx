@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 
@@ -68,7 +69,11 @@ const mockInstallationSettingsFetch = () => {
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      const body = url.includes("/llm-settings") ? llmSettingsResponse : installationSettingsResponse;
+      const body = url.includes("/llm-settings")
+        ? llmSettingsResponse
+        : url.includes("/built-in-automations")
+          ? { automations: [{ id: "intake:github-issues", name: "GitHub issues" }] }
+          : installationSettingsResponse;
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -96,23 +101,63 @@ describe("InstallationSettings", () => {
 
     renderInstallationSettings();
 
-    expect(await screen.findByText("Network policy")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Reset one automation" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Automations",
+      "Email",
+      "Hosted LLM",
+      "Network",
+    ]);
     expect(screen.queryByText(/onboarding templates/i)).not.toBeInTheDocument();
-    expect(await screen.findByText("SuperPlane-hosted models")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Signups" })).not.toBeInTheDocument();
     expect(screen.queryByText("Signup access")).not.toBeInTheDocument();
     expect(screen.queryByText("Public signups")).not.toBeInTheDocument();
     expect(screen.queryByTestId("installation-signups-switch")).not.toBeInTheDocument();
   });
 
+  it("shows one settings section at a time", async () => {
+    const user = userEvent.setup();
+    mockInstallationSettingsFetch();
+
+    renderInstallationSettings();
+
+    expect(await screen.findByRole("heading", { name: "Reset one automation" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "SMTP configuration" })).not.toBeInTheDocument();
+    expect(screen.queryByText("SuperPlane-hosted models")).not.toBeInTheDocument();
+    expect(screen.queryByText("Network policy")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Email" }));
+    expect(await screen.findByRole("heading", { name: "SMTP configuration" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Reset one automation" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Hosted LLM" }));
+    expect(await screen.findByText("SuperPlane-hosted models")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "SMTP configuration" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Network" }));
+    expect(await screen.findByText("Network policy")).toBeInTheDocument();
+    expect(screen.queryByText("SuperPlane-hosted models")).not.toBeInTheDocument();
+  });
+
   it("shows signup access settings when waitlist config is complete", async () => {
+    const user = userEvent.setup();
     waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "portal-1";
     waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID = "form-1";
     mockInstallationSettingsFetch();
 
     renderInstallationSettings();
 
+    expect((await screen.findAllByRole("tab")).map((tab) => tab.textContent)).toEqual([
+      "Automations",
+      "Email",
+      "Hosted LLM",
+      "Network",
+      "Signups",
+    ]);
+    await user.click(screen.getByRole("tab", { name: "Signups" }));
     expect(await screen.findByText("Signup access")).toBeInTheDocument();
     expect(screen.getByText("Public signups")).toBeInTheDocument();
     expect(screen.getByTestId("installation-signups-switch")).toBeInTheDocument();
+    expect(screen.queryByText("Network policy")).not.toBeInTheDocument();
   });
 });
