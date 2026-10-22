@@ -427,7 +427,6 @@ func Test__finishFactoryAgentResourceOAuthConnectRejectsDuplicateURL(t *testing.
 
 func Test__CreateFactoryAgentResourceCreatesSetupCommands(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -446,7 +445,6 @@ func Test__CreateFactoryAgentResourceCreatesSetupCommands(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceCreatesContextRepo(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -473,7 +471,6 @@ func Test__CreateFactoryAgentResourceRejectsInaccessibleContextRepo(t *testing.T
 	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
 
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	const githubUserID = int64(42)
 	const installationID = int64(707)
@@ -541,7 +538,6 @@ func Test__CreateFactoryAgentResourceRejectsInaccessibleContextRepo(t *testing.T
 
 func Test__CreateFactoryAgentResourceRejectsDuplicateContextRepo(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -566,7 +562,6 @@ func Test__CreateFactoryAgentResourceRejectsDuplicateContextRepo(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceReplacesSetupCommands(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -588,7 +583,6 @@ func Test__UpdateFactoryAgentResourceReplacesSetupCommands(t *testing.T) {
 
 func Test__ListFactoryAgentResourcesFiltersByNewKinds(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -615,21 +609,4 @@ func Test__ListFactoryAgentResourcesFiltersByNewKinds(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, repoList.GetResources(), 1)
-}
-
-func Test__CreateFactoryAgentResourceRequiresAgentFeatureForNewKinds(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
-	db := database.DB(t.Context())
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-
-	_, err = CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
-		FactoryId: factory.ID.String(),
-		Kind:      pb.FactoryAgentResource_KIND_SETUP_COMMAND,
-		Enabled:   true,
-		Commands:  []string{"npm ci"},
-	})
-	require.Error(t, err)
-	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 }

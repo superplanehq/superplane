@@ -9,6 +9,7 @@ export function useBillingCardSetup(organizationId: string) {
   const [error, setError] = useState("");
   const [popup, setPopup] = useState<Window | null>(null);
   const activeWindow = useRef<Window | null>(null);
+  const onCardSaved = useRef<(() => void) | undefined>(undefined);
   const { refetch } = useOrganizationBilling(organizationId);
   const session = useMutation({
     mutationFn: async (opened: Window) => {
@@ -27,6 +28,7 @@ export function useBillingCardSetup(organizationId: string) {
     },
     onError: (cause, opened) => {
       opened.close();
+      onCardSaved.current = undefined;
       setError(getApiErrorMessage(cause, "Could not open card setup. Try again."));
     },
   });
@@ -39,22 +41,21 @@ export function useBillingCardSetup(organizationId: string) {
     let timer: ReturnType<typeof setTimeout>;
     const check = async () => {
       if (cancelled) return;
-      if (popup.closed) {
-        const result = await refetch();
-        if (cancelled) return;
-        if (!result.data?.hasPaymentMethod && result.error) {
-          setError("Could not verify the card. Close the Polar window and try again.");
-        }
-        setPopup(null);
-        return;
-      }
       const result = await refetch();
       if (cancelled) return;
       if (result.data?.hasPaymentMethod) {
+        const onSaved = onCardSaved.current;
+        onCardSaved.current = undefined;
         setPopup(null);
+        onSaved?.();
         return;
       }
       if (result.error) setError("Could not verify the card. Close the Polar window and try again.");
+      if (popup.closed) {
+        onCardSaved.current = undefined;
+        setPopup(null);
+        return;
+      }
       timer = setTimeout(() => void check(), 2000);
     };
     void check();
@@ -66,12 +67,22 @@ export function useBillingCardSetup(organizationId: string) {
     };
   }, [popup, refetch]);
 
-  const open = () => {
-    const opened = window.open("about:blank", "_blank");
+  const open = (onSaved?: () => void) => {
+    setError("");
+    const width = 600;
+    const height = 750;
+    const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
+    const top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
+    const opened = window.open(
+      "about:blank",
+      "_blank",
+      `popup=yes,width=${width},height=${height},left=${Math.round(left)},top=${Math.round(top)}`,
+    );
     if (!opened) {
       setError("Allow pop-ups for SuperPlane, then try again.");
       return;
     }
+    onCardSaved.current = onSaved;
     opened.opener = null;
     activeWindow.current = opened;
     session.mutate(opened);

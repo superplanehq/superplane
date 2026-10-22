@@ -150,7 +150,7 @@ variable "enable_runners" {
 }
 
 variable "runner_image_amd64" {
-  description = "Packer-built AMI ID for linux/amd64 runner VMs."
+  description = "Packer-built AMI ID for linux/amd64 runner VMs. Required when enable_runners is true. The default fleet uses this AMI."
   type        = string
   default     = ""
 }

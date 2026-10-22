@@ -119,7 +119,3 @@ export const RunPermalink: Story = {
   args: { source: "planning", detail: true },
   parameters: { msw: { handlers: factoryHistoryHandlers("planning") } },
 };
-export const FeatureDisabled: Story = {
-  args: { source: "github-issues" },
-  parameters: { msw: { handlers: factoryHistoryHandlers("github-issues", false) } },
-};

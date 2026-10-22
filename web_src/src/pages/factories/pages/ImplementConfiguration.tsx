@@ -95,7 +95,7 @@ function OwnedImplementConfiguration({
   onSave: SaveSettings;
   onClose?: () => void;
 }) {
-  const settings = useImplementSettingsDraft([agent, ...nodes], true);
+  const settings = useImplementSettingsDraft([agent, ...nodes]);
   if (!settings.draft) return null;
   return (
     <ImplementConfigurationView
