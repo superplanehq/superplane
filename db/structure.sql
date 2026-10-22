@@ -3855,6 +3855,13 @@ CREATE INDEX idx_factory_work_order_events_work_order_created ON public.factory_
 
 
 --
+-- Name: idx_factory_work_order_executions_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_executions_created_at ON public.factory_work_order_executions USING btree (created_at);
+
+
+--
 -- Name: idx_factory_work_order_executions_factory_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3887,13 +3894,6 @@ CREATE INDEX idx_factory_work_order_executions_work_order_line_active ON public.
 --
 
 CREATE INDEX idx_factory_work_order_line_dispatches_active ON public.factory_work_order_line_dispatches USING btree (work_order_id) WHERE ((state)::text = 'active'::text);
-
-
---
--- Name: idx_factory_work_order_line_dispatches_created_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_line_dispatches_created_at ON public.factory_work_order_line_dispatches USING btree (created_at);
 
 
 --

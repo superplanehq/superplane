@@ -60,14 +60,18 @@ func TestBuildBeaconPayload(t *testing.T) {
 	_, err = factoryModel.CreateWorkOrder(db, "Created", "", &user.ID, nil, nil)
 	require.NoError(t, err)
 
+	queued, err := factoryModel.CreateWorkOrder(db, "Queued", "", &user.ID, nil, nil)
+	require.NoError(t, err)
+	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, queued.ID, line, false)
+
 	started, err := factoryModel.CreateWorkOrder(db, "Started", "", &user.ID, nil, nil)
 	require.NoError(t, err)
-	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, started.ID, line)
-	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, started.ID, line)
+	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, started.ID, line, true)
+	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, started.ID, line, true)
 
 	finished, err := factoryModel.CreateWorkOrder(db, "Finished", "", &user.ID, nil, nil)
 	require.NoError(t, err)
-	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, finished.ID, line)
+	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, finished.ID, line, true)
 	_, err = finished.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
 	require.NoError(t, err)
 	_, err = finished.Close(db, models.FactoryWorkOrderResultCompleted, &user.ID)
@@ -75,7 +79,7 @@ func TestBuildBeaconPayload(t *testing.T) {
 
 	rejected, err := factoryModel.CreateWorkOrder(db, "Rejected", "", &user.ID, nil, nil)
 	require.NoError(t, err)
-	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, rejected.ID, line)
+	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, rejected.ID, line, true)
 	_, err = rejected.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
 		ToState: models.FactoryWorkOrderStateClosed,
 		Result:  models.FactoryWorkOrderResultRejected,
@@ -84,7 +88,7 @@ func TestBuildBeaconPayload(t *testing.T) {
 
 	stale, err := factoryModel.CreateWorkOrder(db, "Stale", "", &user.ID, nil, nil)
 	require.NoError(t, err)
-	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, stale.ID, line)
+	insertBeaconDispatch(t, db, organization.ID, factoryModel.ID, stale.ID, line, true)
 	_, err = stale.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
 	require.NoError(t, err)
 	_, err = stale.Close(db, models.FactoryWorkOrderResultCompleted, &user.ID)
@@ -92,6 +96,9 @@ func TestBuildBeaconPayload(t *testing.T) {
 	outsideWindow := time.Now().Add(-8 * 24 * time.Hour)
 	require.NoError(t, db.Model(stale).Update("created_at", outsideWindow).Error)
 	require.NoError(t, db.Model(&models.FactoryWorkOrderLineDispatch{}).
+		Where("work_order_id = ?", stale.ID).
+		Update("created_at", outsideWindow).Error)
+	require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).
 		Where("work_order_id = ?", stale.ID).
 		Update("created_at", outsideWindow).Error)
 	require.NoError(t, db.Model(&models.FactoryWorkOrderEvent{}).
@@ -109,7 +116,7 @@ func TestBuildBeaconPayload(t *testing.T) {
 	assert.Equal(t, payload.InstallationID, again.InstallationID)
 	assert.False(t, payload.InstalledAt.IsZero())
 	assert.Equal(t, developmentVersion, payload.Version)
-	assert.Equal(t, int64(4), payload.TasksCreated7d)
+	assert.Equal(t, int64(5), payload.TasksCreated7d)
 	assert.Equal(t, int64(3), payload.TasksStarted7d)
 	assert.Equal(t, int64(1), payload.TasksFinished7d)
 	assert.Empty(t, payload.OwnerEmail)
@@ -146,6 +153,7 @@ func insertBeaconDispatch(
 	factoryID uuid.UUID,
 	orderID uuid.UUID,
 	line *models.FactoryLine,
+	started bool,
 ) {
 	t.Helper()
 	now := time.Now()
@@ -162,4 +170,21 @@ func insertBeaconDispatch(
 		UpdatedAt:      now,
 	}
 	require.NoError(t, db.Create(&row).Error)
+	if !started {
+		return
+	}
+
+	require.NoError(t, db.Create(&models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: organizationID,
+		FactoryID:      factoryID,
+		WorkOrderID:    orderID,
+		LineID:         line.ID,
+		LineDispatchID: row.ID,
+		StepIndex:      0,
+		StepName:       line.Name,
+		Status:         models.FactoryWorkOrderExecutionStatusPending,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}).Error)
 }

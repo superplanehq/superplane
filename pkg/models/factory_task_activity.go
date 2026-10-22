@@ -9,8 +9,10 @@ import (
 )
 
 // FactoryTaskActivityCounts is how many tasks were created, started, or
-// finished in a window. Finished means closed as completed. A task with
-// more than one start in the window counts once.
+// finished in a window. Started means a step execution was created. A
+// queued task has no execution yet, so it does not count. Finished means
+// closed as completed. A task with more than one start in the window
+// counts once.
 type FactoryTaskActivityCounts struct {
 	Created  int64
 	Started  int64
@@ -26,7 +28,7 @@ func CountFactoryTaskActivitySince(tx *gorm.DB, since time.Time) (FactoryTaskAct
 
 	if err := tx.Raw(`
 		SELECT COUNT(DISTINCT work_order_id)
-		FROM factory_work_order_line_dispatches
+		FROM factory_work_order_executions
 		WHERE created_at >= ?
 	`, since).Scan(&counts.Started).Error; err != nil {
 		return counts, err
