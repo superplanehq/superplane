@@ -302,9 +302,8 @@ describe("OrgLLMCreditSection Polar verification", () => {
     const user = userEvent.setup();
     const view = render(<OrgLLMCreditSection orgId="org-1" />);
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeEnabled();
-    const warning =
-      "SuperPlane shows an active Polar subscription, but Polar reports none. You can assign a plan manually.";
-    expect(screen.getByText(warning)).toBeInTheDocument();
+    const warning = "No active Polar subscription";
+    expect(screen.getByRole("alert")).toHaveTextContent(warning);
     expect(screen.getByText("sub_stored")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View subscription in Polar" })).toHaveAttribute(
       "href",
@@ -312,12 +311,31 @@ describe("OrgLLMCreditSection Polar verification", () => {
     );
     await user.click(screen.getByTestId("admin-org-billing-plan"));
     await user.click(await screen.findByRole("option", { name: "Business Manual" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(warning);
     await user.click(screen.getByTestId("admin-org-billing-plan-save"));
     await waitFor(() => expect(screen.queryByText(warning)).not.toBeInTheDocument());
     view.unmount();
     render(<OrgLLMCreditSection orgId="org-1" />);
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeEnabled();
     expect(screen.queryByText(warning)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["business_legacy", true],
+    ["business_manual", false],
+    ["pay_as_you_go", false],
+    ["trial", false],
+  ] as const)("warns only when the saved %s plan requires a subscription", async (key, warns) => {
+    mockOrgCreditFetch({
+      plan: { ...billingPlan(false), catalog_key: key, polar_subscription_verification: "none" },
+    });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+    await screen.findByTestId("admin-org-billing-plan");
+    if (warns) {
+      expect(screen.getByRole("alert")).toHaveTextContent("No active Polar subscription");
+      return;
+    }
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("locks editing when verification fails even for a local plan", async () => {

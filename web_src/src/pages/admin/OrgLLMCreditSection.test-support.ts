@@ -21,7 +21,14 @@ export const credit: OrganizationLLMCredit = {
 
 export const catalog = [
   { key: "trial", name: "Trial", category: "trial", require_payment_method: false },
-  { key: "business_legacy", name: "Business", category: "paid", require_payment_method: true },
+  {
+    key: "business_legacy",
+    name: "Business",
+    category: "paid",
+    require_payment_method: true,
+    polar_product_id: "prod_business",
+    price_cents: 2500,
+  },
   { key: "business_manual", name: "Business Manual", category: "paid", require_payment_method: false },
   { key: "pay_as_you_go", name: "Pay-as-you-go", category: "paid", require_payment_method: true },
   { key: "none", name: "None", category: "none", require_payment_method: false },
