@@ -102,8 +102,6 @@ spec:
                 name: {{ include "secrets.linear.name" . }}
             {{- end }}
           env:
-            - name: ENCRYPTION_WRITE_FORMAT
-              value: {{ .Values.encryption.writeFormat | quote }}
             - name: START_PUBLIC_API
               value: "yes"
             - name: START_GRPC_GATEWAY
