@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -132,25 +132,12 @@ describe("PRFeedbackSettingsHost", () => {
     });
   });
 
-  it("shows the shared automation workspace with factory run links", () => {
+  it("opens the configured handler's runs from an old automation link", () => {
     renderHost();
 
-    expect(useCanvas).toHaveBeenCalledWith("org-1", "app-pr-discussion", { enabled: true });
-    const automation = within(screen.getByTestId("pr-feedback-settings")).getByTestId("pr-feedback-automation");
-    expect(within(automation).getAllByText("Find Pull Request").length).toBeGreaterThan(0);
-    const headerRow = screen.getByTestId("settings-automation-header-row");
-    expect(within(headerRow).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
-    const edit = within(automation).getByRole("link", { name: "Edit automation" });
-    expect(edit).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/rf/automations/app-pr-discussion?configure=1&agent=1&from=lines&lineId=line-plan",
-    );
-    expect(useInfiniteCanvasRuns).toHaveBeenCalledWith("app-pr-discussion", {}, true);
-    const sidebar = within(automation).getByTestId("factory-automation-runs-sidebar");
-    expect(within(sidebar).getByRole("link", { name: "Please fix the lint error" })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/rf/automations/app-pr-discussion?run=run-pr-1&from=lines&lineId=line-plan",
-    );
+    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("table", { name: "Runs" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open run run-pr-1" })).toBeInTheDocument();
+    expect(screen.queryByTestId("pr-feedback-automation")).not.toBeInTheDocument();
   });
 });

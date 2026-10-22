@@ -72,16 +72,12 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
-// FeatureFactoryRunHistory gates the new Implement run history and details.
-const FeatureFactoryRunHistory = "factory_run_history"
-
 func released() *bool {
 	v := true
 	return &v
 }
 
 var registry = []Feature{
-	{ID: FeatureFactoryRunHistory, Label: "Factory Run History", Description: "Show the new Implement run history, activity, outputs, and logs"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
