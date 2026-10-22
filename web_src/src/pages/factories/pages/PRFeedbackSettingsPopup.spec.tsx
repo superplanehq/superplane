@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -237,10 +237,19 @@ function renderAutomationPopup(props: { canvasId?: string } = {}) {
   );
 }
 
-function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, showVisualEvidenceSetting: boolean) {
+function SearchProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{location.search}</output>;
+}
+
+function renderAgentSettingsPopup(
+  settings: PRFeedbackDraftSettings,
+  showVisualEvidenceSetting: boolean,
+  initialPath = "/",
+) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialPath]}>
         <PRFeedbackSettingsPopup
           settings={settings}
           healthy
@@ -256,6 +265,7 @@ function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, showVisualE
           initialTab="agent"
           fixed={false}
         />
+        <SearchProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -525,9 +535,13 @@ describe("PRFeedbackSettingsPopup automation", () => {
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
   });
 
-  it("hides visual evidence for check-repair agents", () => {
-    renderAgentSettingsPopup(checksDraft(), false);
+  it("opens a checks Agent link on General and hides the Agent tab", () => {
+    renderAgentSettingsPopup(checksDraft(), false, "/?prFeedbackSettings=agent");
 
-    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
+    expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pr-feedback-settings-tab-general")).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("planning-review-editor")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("prFeedbackSettings=agent");
   });
 });
