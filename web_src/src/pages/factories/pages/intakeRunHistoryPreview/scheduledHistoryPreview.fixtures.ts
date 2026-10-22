@@ -1,6 +1,6 @@
 import type { IntakeRunOutcome, IntakeRunPreview } from "./intakeRunPreviewModel";
 
-type ScheduledOutcome = Exclude<IntakeRunOutcome, "filtered" | "cancelled">;
+type ScheduledOutcome = Exclude<IntakeRunOutcome, "filtered" | "cancelled" | "existing">;
 const OUTCOMES: ScheduledOutcome[] = ["processing", "created", "no-proposal", "failed", "unknown"];
 const SUMMARIES: Record<ScheduledOutcome, string> = {
   created: "The scheduled review proposed a task and added it to Backlog.",
