@@ -2,6 +2,7 @@ import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as FactoryIntakeDataModule from "@/hooks/useFactoryIntakeData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
+import type * as OrganizationDataModule from "@/hooks/useOrganizationData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { vi } from "bun:test";
 
@@ -60,4 +61,9 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   ...unmockedSrc<typeof FactoryIntakeDataModule>("hooks/useFactoryIntakeData"),
   useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
   useDeleteFactoryIntake: () => ({ mutateAsync: deleteIntake, isPending: false, error: null }),
+}));
+
+vi.mock("@/hooks/useOrganizationData", () => ({
+  ...unmockedSrc<typeof OrganizationDataModule>("hooks/useOrganizationData"),
+  useOrganizationUsers: () => ({ data: [], isLoading: false, isError: false }),
 }));

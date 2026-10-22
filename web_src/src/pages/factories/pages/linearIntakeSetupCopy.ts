@@ -7,7 +7,7 @@ export const LINEAR_INTAKE_SETUP_COPY = {
   wizardStepTeam: "Which Linear team should create tasks?",
   wizardStepTeamHelper:
     "Select one team. SuperPlane creates a task when an issue is created in that team. You can narrow this to projects and labels.",
-  importExistingHelper: "SuperPlane adds the 10 newest open issues that match these settings.",
+  importExistingHelper: "SuperPlane adds up to 3 of the newest open issues that match these settings.",
   importExistingHelperOff: "SuperPlane does not import existing issues.",
   wizardConnect: "Connect Linear",
   wizardConnecting: "Connecting...",

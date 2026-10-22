@@ -1374,14 +1374,16 @@ message FactoryIntake {
     // Projects that still create a task. Required for a Sentry intake.
     // Sentry exception intakes only. Values are project slugs.
     repeated string sentry_project_ids = 23;
+    // Organization user ID. Omitted updates preserve the selection; empty clears it.
+    optional string default_owner_id = 24;
     // Linear team that the intake listens to. Required for a new Linear
     // intake. An older intake that has projects and no team still works.
     // Linear issue intakes only.
-    string linear_team_id = 24;
+    string linear_team_id = 25;
     // Create a task for an issue that has no project. Applies only when
     // linear_project_ids is not empty. Omitted means true.
     // Linear issue intakes only.
-    optional bool linear_include_issues_without_project = 25;
+    optional bool linear_include_issues_without_project = 26;
   }
 
   string id = 1;
@@ -1527,6 +1529,8 @@ message FactoryPRFeedbackHandler {
     bool ignore_bots = 2;
     // GitHub usernames of bots to react to even without the mention.
     repeated string allowed_bots = 3;
+    // Start a run for every bot comment except comments SuperPlane wrote.
+    bool address_all_bots = 4;
   }
 
   message CheckSettings {

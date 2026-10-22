@@ -282,6 +282,9 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			settings := intakeSettingsOrDefault(source, intakeSettings{})
 			switch source {
 			case models.FactoryIntakeSourceGitHubIssues:
+				if tc.restrictAuthors {
+					settings.DefaultOwnerID = r.User.String()
+				}
 				settings.Labels = []string{"urgent"}
 				settings.LabelFilterMode = intakeLabelFilterExclude
 				settings.Assignment = intakeAssignmentUnassigned
@@ -360,6 +363,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				require.NoError(t, err)
 				defaultSpec := models.LiveCanvasSpec{Nodes: defaults.Nodes(), Edges: defaults.Edges()}
 				restored := serializeIntakeSettings(source, intakeSettingsFromGraph(source, resolveIntakeGraph(source, defaultSpec), defaultSpec))
+				assert.Empty(t, restored.GetDefaultOwnerId())
 				assert.Equal(t, expected.GetLabels(), restored.GetLabels())
 				assert.Equal(t, expected.GetLabelFilterMode(), restored.GetLabelFilterMode())
 				assert.Equal(t, expected.GetAssignment(), restored.GetAssignment())
@@ -402,7 +406,7 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 				r, factory := resetTestFactory(t)
 				require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
 				request := prFeedbackBuildRequest{
-					Repository: "acme/app", Mention: "@review", IgnoreBots: false, AllowedBots: []string{},
+					Repository: "acme/app", Mention: "@review", IgnoreBots: false, AddressAllBots: true, AllowedBots: []string{},
 					CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
 					Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent},
 				}
@@ -447,7 +451,20 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 				if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
 					assert.Equal(t, "@review", actual.Mention)
 					assert.False(t, actual.IgnoreBots)
+					assert.True(t, actual.AddressAllBots)
 					assert.Empty(t, actual.AllowedBots)
+					prompt := ""
+					runner := findIntakeNode(version.Nodes, prFeedbackRunnerNodeID)
+					require.NotNil(t, runner)
+					steps, _ := runner.Configuration["steps"].([]any)
+					for _, item := range steps {
+						step, _ := item.(map[string]any)
+						if step["name"] == "Address PR feedback" {
+							prompt, _ = step["prompt"].(string)
+						}
+					}
+					assert.Contains(t, prompt, "Read every bot comment, including comments with no mention.")
+					assert.Contains(t, prompt, "Ignore comments SuperPlane already wrote.")
 				} else {
 					assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
 				}

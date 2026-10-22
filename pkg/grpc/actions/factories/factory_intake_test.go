@@ -18,6 +18,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
 
@@ -51,6 +52,99 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		return response.GetIntake()
 	}
+
+	t.Run("default owner survives API saves and explicit clearing", func(t *testing.T) {
+		f := newFactory(t)
+		intake := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: &pb.FactoryIntake_Settings{
+			DefaultOwnerId: proto.String(r.User.String()), Labels: []string{"urgent"}, ReopenedIssues: proto.Bool(false),
+		}})
+		require.Equal(t, r.User.String(), intake.GetSettings().GetDefaultOwnerId())
+		update := func(settings *pb.FactoryIntake_Settings) *pb.FactoryIntake {
+			t.Helper()
+			response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: intake.Id, Settings: settings})
+			require.NoError(t, err)
+			return response.Intake
+		}
+		// Decode the same JSON shape as the REST gateway. Empty and absent must differ.
+		request := &pb.FactoryIntake_Settings{}
+		require.NoError(t, protojson.Unmarshal([]byte(`{"defaultOwnerId":""}`), request))
+		cleared := update(request)
+		assert.Empty(t, cleared.Settings.GetDefaultOwnerId())
+		assert.Equal(t, intake.Settings.GetLabels(), cleared.Settings.GetLabels())
+		assert.Equal(t, intake.Settings.GetReopenedIssues(), cleared.Settings.GetReopenedIssues())
+		selected := update(&pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(r.User.String())})
+		omitted := proto.Clone(selected.Settings).(*pb.FactoryIntake_Settings)
+		omitted.DefaultOwnerId = nil
+		require.Equal(t, r.User.String(), update(omitted).Settings.GetDefaultOwnerId())
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: f.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.Intakes, 1)
+		assert.Equal(t, r.User.String(), listed.Intakes[0].Settings.GetDefaultOwnerId())
+	})
+
+	t.Run("unchanged unavailable owner does not block other settings", func(t *testing.T) {
+		f := newFactory(t)
+		account, err := models.CreateAccount(support.RandomName("left"), support.RandomName("left")+"@example.com")
+		require.NoError(t, err)
+		member, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
+		require.NoError(t, err)
+		intake := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: &pb.FactoryIntake_Settings{
+			DefaultOwnerId: proto.String(member.ID.String()), Labels: []string{"urgent"},
+		}})
+		require.NoError(t, database.DB(t.Context()).Delete(member).Error)
+
+		next := proto.Clone(intake.GetSettings()).(*pb.FactoryIntake_Settings)
+		next.Labels = []string{"billing"}
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: f.ID.String(), IntakeId: intake.GetId(), Settings: next,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, member.ID.String(), response.GetIntake().GetSettings().GetDefaultOwnerId())
+		assert.Equal(t, []string{"billing"}, response.GetIntake().GetSettings().GetLabels())
+
+		changed := proto.Clone(next).(*pb.FactoryIntake_Settings)
+		changed.DefaultOwnerId = proto.String(uuid.NewString())
+		_, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: f.ID.String(), IntakeId: intake.GetId(), Settings: changed,
+		})
+		require.Error(t, err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("rejects invalid default owners on create and update", func(t *testing.T) {
+		f := newFactory(t)
+		intake := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		otherOrg, err := models.CreateOrganization(support.RandomName("other-org"), "")
+		require.NoError(t, err)
+		account, err := models.CreateAccount(support.RandomName("foreign"), support.RandomName("foreign")+"@example.com")
+		require.NoError(t, err)
+		foreign, err := models.CreateUser(otherOrg.ID, account.ID, account.Email, account.Name)
+		require.NoError(t, err)
+		deletedAccount, err := models.CreateAccount(support.RandomName("deleted"), support.RandomName("deleted")+"@example.com")
+		require.NoError(t, err)
+		deleted, err := models.CreateUser(r.Organization.ID, deletedAccount.ID, deletedAccount.Email, deletedAccount.Name)
+		require.NoError(t, err)
+		require.NoError(t, database.DB(t.Context()).Delete(deleted).Error)
+		key, err := models.CreateAPIKey(database.DB(t.Context()), r.Organization.ID, support.RandomName("key"), nil, r.User, nil, nil)
+		require.NoError(t, err)
+		for _, owner := range []string{"invalid", uuid.NewString(), foreign.ID.String(), deleted.ID.String(), key.ID.String()} {
+			settings := &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(owner)}
+			_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{FactoryId: f.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: settings})
+			require.Error(t, err)
+			code, _, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.InvalidArgument, code)
+			_, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: intake.Id, Settings: settings})
+			require.Error(t, err)
+			code, _, ok = grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.InvalidArgument, code)
+		}
+		_, err = CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{FactoryId: f.ID.String(), Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
+		require.Error(t, err)
+	})
 
 	t.Run("creating an intake builds a live canvas that can run", func(t *testing.T) {
 		factory := newFactory(t)

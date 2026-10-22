@@ -177,6 +177,7 @@ export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 
 export type CreateFactoryIntake = (input: {
   source: FactoriesFactoryIntakeSource;
+  skipInitialImport?: boolean;
   integrationId?: string;
   resourceId?: string;
   settings?: FactoriesFactoryIntakeSettings;
@@ -219,6 +220,7 @@ async function removeProvisionedIntake(
 export async function provisionGithubIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  skipInitialImport?: boolean;
 }): Promise<FactoriesFactoryIntake> {
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === GITHUB_INTAKE_SOURCE);
@@ -226,12 +228,16 @@ export async function provisionGithubIntake(args: {
     return existing;
   }
 
-  return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
+  return args.createIntake({
+    source: GITHUB_INTAKE_SOURCE,
+    ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
+  });
 }
 
 export async function provisionJiraIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  skipInitialImport?: boolean;
   deleteIntake: DeleteFactoryIntake;
   integrationId: string;
   resourceId: string;
@@ -248,6 +254,7 @@ export async function provisionJiraIntake(args: {
 
   const created = await args.createIntake({
     source: JIRA_INTAKE_SOURCE,
+    ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
     integrationId: args.integrationId,
     resourceId: args.resourceId,
     ...(args.settings ? { settings: args.settings } : {}),
@@ -286,6 +293,7 @@ function linearIntakeMatches(intake: FactoriesFactoryIntake, integrationId: stri
 export async function provisionLinearIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  skipInitialImport?: boolean;
   deleteIntake: DeleteFactoryIntake;
   integrationId: string;
   scope: LinearIntakeScope;
@@ -301,6 +309,7 @@ export async function provisionLinearIntake(args: {
 
   return args.createIntake({
     source: LINEAR_INTAKE_SOURCE,
+    ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
     integrationId: args.integrationId,
     settings: linearIntakeScopeToApi(args.scope),
   });
@@ -313,6 +322,7 @@ export async function provisionOnboardingIntake(args: {
   vcsProvider?: string;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  skipInitialImport?: boolean;
   deleteIntake: DeleteFactoryIntake;
   issuesChoice: IssuesChoiceId | null;
   jira?: {
@@ -339,6 +349,7 @@ export async function provisionOnboardingIntake(args: {
     return provisionJiraIntake({
       listIntakes: args.listIntakes,
       createIntake: args.createIntake,
+      skipInitialImport: args.skipInitialImport,
       deleteIntake: args.deleteIntake,
       integrationId: args.jira.integrationId,
       resourceId: args.jira.projectId,
@@ -352,6 +363,7 @@ export async function provisionOnboardingIntake(args: {
     return provisionLinearIntake({
       listIntakes: args.listIntakes,
       createIntake: args.createIntake,
+      skipInitialImport: args.skipInitialImport,
       deleteIntake: args.deleteIntake,
       integrationId: args.linear.integrationId,
       scope: args.linear.scope,
@@ -362,6 +374,7 @@ export async function provisionOnboardingIntake(args: {
   return provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
+    skipInitialImport: args.skipInitialImport,
   });
 }
 
