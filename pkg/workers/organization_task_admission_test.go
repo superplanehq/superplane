@@ -466,14 +466,13 @@ func Test__OrganizationQueue_InvalidWaiterPreservesExecutionOwningDispatch(t *te
 	order := fixture.createOpenWorkOrder(t, r, "Still owned")
 	dispatch, running := fixture.dispatchLine(t, order)
 	db := database.DB(t.Context())
-	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		queued, err := dispatch.EnqueueOrStartStep(tx, order, 1)
-		if err != nil {
-			return err
-		}
-		require.NotNil(t, queued.QueueItem)
-		return tx.Model(queued.QueueItem).Update("step_index", 999).Error
-	}))
+	// The running step already holds this task's slot, so the next step would
+	// start. Store the invalid waiter directly to exercise sweep cleanup.
+	require.NoError(t, db.Create(&models.FactoryWorkOrderQueueItem{
+		ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: fixture.factory.ID,
+		WorkOrderID: order.ID, LineID: dispatch.LineID, LineDispatchID: dispatch.ID,
+		StepIndex: 999, StepName: "invalid", CreatedAt: time.Now(),
+	}).Error)
 	plan.ParallelTaskLimit = stepMaxParallelism(2)
 	require.NoError(t, models.SaveBillingPlan(db, plan))
 	NewRunFinalizer("", r.Registry).sweepQueuedTasks(t.Context())

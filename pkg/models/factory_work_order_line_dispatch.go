@@ -214,19 +214,25 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return nil, err
 	}
 
-	full, err := organizationAtTaskCapacity(tx, l.OrganizationID)
+	shares, err := taskSharesOrganizationSlot(tx, l.OrganizationID, order.ID)
 	if err != nil {
 		return nil, err
 	}
-	if full {
-		return l.enqueueStep(tx, order, stepIndex)
-	}
-	queued, err := hasEligibleQueuedTask(tx, l.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
-	if queued {
-		return l.enqueueStep(tx, order, stepIndex)
+	if !shares {
+		full, err := organizationAtTaskCapacity(tx, l.OrganizationID)
+		if err != nil {
+			return nil, err
+		}
+		if full {
+			return l.enqueueStep(tx, order, stepIndex)
+		}
+		queued, err := hasEligibleQueuedTask(tx, l.OrganizationID)
+		if err != nil {
+			return nil, err
+		}
+		if queued {
+			return l.enqueueStep(tx, order, stepIndex)
+		}
 	}
 
 	step := admissionStep(line, l, stepIndex)

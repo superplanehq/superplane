@@ -247,6 +247,29 @@ func Test__BacklogAdmission_QueuePositionsMatchAdmissionOrder(t *testing.T) {
 	assertOrganizationTaskCounts(t, r.Organization.ID, 1, 0)
 }
 
+func Test__TaskAdmission_ActiveTaskStartsItsLine(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	setTaskPlanLimit(t, r, 1)
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+	db := database.DB(t.Context())
+	order, err := fixture.factory.CreateWorkOrder(db, "Reviewed task", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "start", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}})},
+		{NodeID: "review", Type: models.NodeTypeComponent},
+	}, []models.Edge{{SourceID: "start", TargetID: "review", Channel: "default"}})
+	require.NoError(t, db.Model(canvas).Update("factory_id", fixture.factory.ID).Error)
+	event := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "start", "default", nil, map[string]any{
+		"workOrder": map[string]any{"id": order.ID.String()},
+	})
+	require.NoError(t, NewEventRouter("").LockAndProcessEvent(log.NewEntry(log.New()), *event, time.Now()))
+
+	_, result := fixture.dispatchLine(t, order)
+	require.NotNil(t, result.Run, "an active task must start its line on the slot it already holds")
+	require.Nil(t, result.QueueItem)
+}
+
 func Test__TaskAdmission_RootAutomationsShareSlotAndCancelIndependently(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv(models.BillingEnabledEnv, "yes")

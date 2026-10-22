@@ -70,18 +70,11 @@ func LockTaskStatusExecutionAdmission(tx *gorm.DB, executionID uuid.UUID) error 
 	return LockOrganizationTaskAdmission(tx, owner.OrganizationID)
 }
 
-// LockTaskExecutionAdmission locks before the execution row. Factory canvas
-// execution can close an order and release queued work, so it uses the same
-// organization lock as dispatch. Executions outside a factory do not lock.
+// LockTaskExecutionAdmission locks before the execution row only when this
+// execution can change task admission. Other component calls must not hold
+// the organization lock while they wait on the network.
 func LockTaskExecutionAdmission(tx *gorm.DB, executionID uuid.UUID) error {
-	var owner struct{ OrganizationID uuid.UUID }
-	err := tx.Table("workflow_node_executions AS e").Select("c.organization_id").
-		Joins("JOIN workflows c ON c.id = e.workflow_id AND c.factory_id IS NOT NULL").
-		Where("e.id = ?", executionID).Scan(&owner).Error
-	if err != nil || owner.OrganizationID == uuid.Nil {
-		return err
-	}
-	return LockOrganizationTaskAdmission(tx, owner.OrganizationID)
+	return LockTaskStatusExecutionAdmission(tx, executionID)
 }
 
 // CheckTaskRootEventAdmission applies organization capacity to a factory root
@@ -117,22 +110,15 @@ func ListQueuedTaskOrganizationIDs(tx *gorm.DB) ([]uuid.UUID, error) {
 }
 
 // AdmitQueuedForOrganization selects globally by enqueue time and ID, skipping
-// locally full steps. Each pass inspects at most one candidate batch and stops
-// when capacity is full. Results include removed queue items for publication.
-// The organization lock remains outside candidate savepoints.
+// locally full steps. Each pass inspects at most one candidate batch. A full
+// organization still admits a task that already holds a slot. Results include
+// removed queue items for publication. The organization lock remains outside
+// candidate savepoints.
 func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineStepResult, error) {
 	if err := LockOrganizationTaskAdmission(tx, orgID); err != nil {
 		return nil, err
 	}
 	slots, err := organizationAvailableTaskSlots(tx, orgID)
-	if err != nil || (slots != nil && *slots <= 0) {
-		return nil, err
-	}
-	var items []FactoryWorkOrderQueueItem
-	if err := eligibleQueuedTasks(tx, orgID).Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
-		return nil, err
-	}
-	head, err := nextQueuedOrganizationTask(tx, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -140,16 +126,39 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 	if err != nil {
 		return nil, err
 	}
+	if slots != nil && *slots <= 0 && len(active) == 0 {
+		return nil, nil
+	}
+	var items []FactoryWorkOrderQueueItem
+	if err := eligibleQueuedTasks(tx, orgID).Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
+		return nil, err
+	}
+	// A full organization only admits tasks that already hold a slot. Those
+	// tasks skip ordering, so the pass must not inspect unrelated candidates.
+	var head *OrganizationQueuedTask
+	if slots == nil || *slots > 0 {
+		head, err = nextQueuedOrganizationTask(tx, orgID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	stopping := map[uuid.UUID]bool{}
 	var admitted []*FactoryLineStepResult
 	for i := range items {
-		if slots != nil && *slots <= 0 {
-			break
-		}
 		item := &items[i]
-		// A pending root event is not a line item. Leave newer line items
-		// queued until the event router admits that older task.
-		if head != nil && head.RunID != uuid.Nil && head.WorkOrderID != item.WorkOrderID && !queuedLineItemBefore(item, head) {
-			break
+		shares, err := taskSharesLoadedSlot(tx, active, stopping, item.WorkOrderID)
+		if err != nil {
+			return nil, err
+		}
+		if !shares {
+			if slots != nil && *slots <= 0 {
+				continue
+			}
+			// A pending root event is not a line item. Leave newer line items
+			// queued until the event router admits that older task.
+			if head != nil && head.RunID != uuid.Nil && head.WorkOrderID != item.WorkOrderID && !queuedLineItemBefore(item, head) {
+				continue
+			}
 		}
 		result, err := admitQueuedTask(tx, item)
 		if err != nil {
@@ -164,6 +173,48 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 		}
 	}
 	return admitted, nil
+}
+
+func taskSharesOrganizationSlot(tx *gorm.DB, orgID, workOrderID uuid.UUID) (bool, error) {
+	if workOrderID == uuid.Nil {
+		return false, nil
+	}
+	active, err := ListActiveOrganizationTaskIDs(tx, orgID)
+	if err != nil || !slices.Contains(active, workOrderID) {
+		return false, err
+	}
+	stopping, err := workOrderHasStoppingLineRun(tx, workOrderID)
+	if err != nil {
+		return false, err
+	}
+	return !stopping, nil
+}
+
+func taskSharesLoadedSlot(tx *gorm.DB, active []uuid.UUID, stopping map[uuid.UUID]bool, workOrderID uuid.UUID) (bool, error) {
+	if !slices.Contains(active, workOrderID) {
+		return false, nil
+	}
+	known, ok := stopping[workOrderID]
+	if !ok {
+		var err error
+		known, err = workOrderHasStoppingLineRun(tx, workOrderID)
+		if err != nil {
+			return false, err
+		}
+		stopping[workOrderID] = known
+	}
+	return !known, nil
+}
+
+// A replacement keeps the slot until its old run stops, so that run does not
+// count as other work the task can share with a new line start.
+func workOrderHasStoppingLineRun(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) {
+	var count int64
+	err := tx.Table("factory_work_order_executions AS e").
+		Joins("JOIN workflow_runs r ON r.id = e.run_id").
+		Where("e.work_order_id = ? AND r.state = ?", workOrderID, CanvasRunStateCancelling).
+		Count(&count).Error
+	return count > 0, err
 }
 
 func checkOrganizationTaskAdmission(tx *gorm.DB, orgID, workOrderID uuid.UUID) error {
