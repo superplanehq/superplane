@@ -51,6 +51,28 @@ func Test__ListRuns__ReturnsRunsWithRootEventsAndExecutionRefs(t *testing.T) {
 	assert.False(t, response.HasNextPage)
 }
 
+func Test__ListRuns__ReturnsExistingTaskDecision(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "trigger", Type: models.NodeTypeTrigger},
+		{NodeID: "create", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "createWorkOrder"}})},
+	}, nil)
+	root := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run := createFinishedRun(t, root, models.CanvasRunResultPassed)
+	execution := createRunExecution(t, run, root.ID, "create", models.CanvasNodeExecutionResultPassed)
+	taskID := uuid.New().String()
+	require.NoError(t, db.Model(&execution).Update("metadata", datatypes.NewJSONType(map[string]any{"existing_task_id": taskID, "unrelated": "private execution data"})).Error)
+	response, err := ListRuns(t.Context(), db, canvas, 0, nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, response.Runs, 1)
+	require.Len(t, response.Runs[0].Executions, 1)
+	assert.Equal(t, taskID, response.Runs[0].Executions[0].ExistingTaskId)
+	detail, err := DescribeRun(t.Context(), db, canvas, run.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, taskID, detail.Run.Executions[0].ExistingTaskId)
+}
+
 // A passed filter can emit on either branch. Lists must expose that evidence
 // without loading output payloads or interpreting the current canvas version.
 func Test__ListRuns__ReturnsRecordedChannelsAndHistoricalComponents(t *testing.T) {

@@ -5,7 +5,7 @@ import type {
   FactoriesWorkOrder,
   SuperplaneComponentsNode,
 } from "@/api-client";
-import { intakeRunPresentation, type RunHistoryIntakeSource } from "./intakeRunData";
+import { intakeRunPresentation, recordedExistingTaskId, type RunHistoryIntakeSource } from "./intakeRunData";
 import { formatCompactDuration } from "@/lib/duration";
 import type { AutomationRun, RunActivity, RunStatus } from "@/ui/AutomationRunHistory/types";
 import { findWorkOrderForAutomationRun } from "../../lib/factoryAutomationStatus";
@@ -32,9 +32,7 @@ export function toAutomationRun(
   now: number,
   intakeSource?: RunHistoryIntakeSource,
 ): AutomationRun {
-  const order = intakeSource
-    ? orders.find((order) => Boolean(run.id) && order.sourceRunId === run.id)
-    : findWorkOrderForAutomationRun(orders, run.id ?? "", run);
+  const order = intakeSource ? intakeWorkOrder(run, orders) : findWorkOrderForAutomationRun(orders, run.id ?? "", run);
   return {
     ...(intakeSource ? intakeRunPresentation(run, intakeSource, recordedStatus(run), orders) : {}),
     id: run.id ?? "",
@@ -47,6 +45,13 @@ export function toAutomationRun(
     error: run.errors?.filter(Boolean).join("\n") || undefined,
     activities: [],
   };
+}
+
+function intakeWorkOrder(run: CanvasesCanvasRun, orders: FactoriesWorkOrder[]): FactoriesWorkOrder | undefined {
+  const created = orders.find((order) => Boolean(run.id) && order.sourceRunId === run.id);
+  if (created) return created;
+  const existingTaskId = recordedExistingTaskId(run);
+  return existingTaskId ? orders.find((order) => order.id === existingTaskId) : undefined;
 }
 
 export function toRunActivities(

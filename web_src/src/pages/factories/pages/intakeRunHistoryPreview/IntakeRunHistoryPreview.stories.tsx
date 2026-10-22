@@ -91,7 +91,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const GitHub: Story = { name: "GitHub" };
+export const GitHub: Story = {
+  name: "GitHub",
+  argTypes: {
+    view: { options: ["history", "created", "existing", "filtered", "processing", "failed", "unknown", "cancelled"] },
+  },
+};
 export const Sentry: Story = { args: { sourceId: "sentry-exceptions" } };
 export const Dependabot: Story = { args: { sourceId: "dependabot-alerts" } };
 export const Linear: Story = { args: { sourceId: "linear-issues" } };
