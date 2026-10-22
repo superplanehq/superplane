@@ -107,7 +107,8 @@ export const Configuration: Story = {
 };
 export const WithInstructions: Story = {
   args: {
-    additionalInstructions: "Changes to billing must support customers on legacy annual plans.",
+    additionalInstructions:
+      "In our project, small features often touch both the UI and backend. That alone does not make them complex.",
   },
 };
 export const AutoStart: Story = { args: { autoStart: true } };
