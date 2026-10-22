@@ -414,11 +414,7 @@ describe("PRFeedbackSettingsPopup check names", () => {
     await user.click(screen.getByTestId("pr-feedback-check-option-e2e"));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
 
-    expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({
-        checkNames: ["e2e"],
-      }),
-    );
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ checkNames: ["e2e"] }));
   });
 });
 
