@@ -236,7 +236,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
     id: "linear-issues",
     name: "Linear issues",
-    description: "Create a task when a Linear issue is added to a selected project.",
+    description: "Create a task when a Linear issue is created in the selected team.",
     iconSrc: linearIcon,
     iconAlt: "Linear",
     tabLabel: "Linear",
@@ -353,7 +353,7 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
 
     const name = intakeDisplayName(intake.name, source.name);
     const settings = intakeSettingsFromApi(name, intake.settings);
-    if (source.id === "linear-issues" && settings.linearProjectIds.length === 0) {
+    if (source.id === "linear-issues" && !settings.linearTeamId && settings.linearProjectIds.length === 0) {
       settings.linearProjectIds = linearProjectIdsFromResource(intake.resourceId);
     }
     if (source.id === "sentry-exceptions" && settings.sentryProjectIds.length === 0) {

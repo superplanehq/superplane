@@ -269,7 +269,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     githubOwner,
     jiraProjectId: jira.jiraProjectId,
     jiraCompletion: jira.jiraCompletion,
-    linearProjectIds: linear.linearProjectIds,
+    linearScope: linear.linearScope,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;

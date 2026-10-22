@@ -19,11 +19,11 @@ func Test__LinearIntakeItemSource__SearchScope(t *testing.T) {
 	for _, tc := range []struct{ name, fields, reason string }{
 		{"allowed", `"project":{"id":"p1"},"labels":{"nodes":[{"name":"bug"}]}`, ""},
 		{"wrong project", `"project":{"id":"p2"},"labels":{"nodes":[{"name":"bug"}]}`, "This issue is not in the selected projects."},
-		{"no project", `"project":null,"labels":{"nodes":[{"name":"bug"}]}`, "This issue has no project."},
+		{"no project", `"project":null,"labels":{"nodes":[{"name":"bug"}]}`, "This issue is not in the selected projects."},
 		{"completed", `"project":{"id":"p1"},"state":{"type":"completed"},"labels":{"nodes":[{"name":"bug"}]}`, "This issue is closed or canceled."},
 		{"canceled", `"project":{"id":"p1"},"state":{"type":"canceled"},"labels":{"nodes":[{"name":"bug"}]}`, "This issue is closed or canceled."},
 		{"labels", `"project":{"id":"p1"},"labels":{"nodes":[{"name":"chore"}]}`, "This issue has no matching intake labels."},
-		{"multiple restrictions", `"project":null,"state":{"type":"completed"},"labels":{"nodes":[]}`, "This issue has no project. This issue is closed or canceled. This issue has no matching intake labels."},
+		{"multiple restrictions", `"project":null,"state":{"type":"completed"},"labels":{"nodes":[]}`, "This issue is not in the selected projects. This issue is closed or canceled. This issue has no matching intake labels."},
 	} {
 		for _, query := range []string{"ENG-123", "eng-123", "https://linear.app/acme/issue/eng-123/fix", "please find eng-123 for me", "123", " 123 "} {
 			t.Run(tc.name+"/"+query, func(t *testing.T) {
@@ -47,7 +47,7 @@ func Test__LinearIntakeItemSource__SearchScope(t *testing.T) {
 					linear.OAuthAccessToken: {Name: linear.OAuthAccessToken, Value: []byte("token")},
 				}})
 				require.NoError(t, err)
-				source := &linearIntakeItemSource{linear: client, projectIDs: []string{"p1"}, labels: []string{"bug"}}
+				source := &linearIntakeItemSource{linear: client, scope: linear.IssueScope{ProjectIDs: []string{"p1"}}, labels: []string{"bug"}}
 				items, err := source.Search(context.Background(), query, 5)
 				require.NoError(t, err)
 				if bareNumber && tc.reason != "" {
@@ -109,9 +109,9 @@ func Test__LinearIntakeItemSource__Search__ExcludedExactMatchesDoNotShrinkThePag
 	require.NoError(t, err)
 
 	items, err := (&linearIntakeItemSource{
-		linear:     client,
-		projectIDs: []string{"p1"},
-		labels:     []string{"bug"},
+		linear: client,
+		scope:  linear.IssueScope{ProjectIDs: []string{"p1"}},
+		labels: []string{"bug"},
 	}).Search(context.Background(), "1", limit)
 	require.NoError(t, err)
 	require.Len(t, items, limit)
@@ -121,4 +121,55 @@ func Test__LinearIntakeItemSource__Search__ExcludedExactMatchesDoNotShrinkThePag
 		gotIDs = append(gotIDs, item.ID)
 	}
 	assert.Equal(t, wantIDs, gotIDs)
+}
+
+func Test__LinearIntakeItemSource__TeamScope(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		scope  linear.IssueScope
+		fields string
+		reason string
+	}{
+		{"team accepts a ticket without a project", linear.IssueScope{TeamID: "t1"}, `"team":{"id":"t1"},"project":null`, ""},
+		{"team accepts a ticket in a project", linear.IssueScope{TeamID: "t1"}, `"team":{"id":"t1"},"project":{"id":"p9"}`, ""},
+		{"team rejects another team", linear.IssueScope{TeamID: "t1"}, `"team":{"id":"t2"},"project":null`, "This issue is not in the selected team."},
+		{"projects accept a ticket without a project when included", linear.IssueScope{TeamID: "t1", ProjectIDs: []string{"p1"}, IncludeNoProject: true}, `"team":{"id":"t1"},"project":null`, ""},
+		{"projects reject a ticket without a project by default", linear.IssueScope{TeamID: "t1", ProjectIDs: []string{"p1"}}, `"team":{"id":"t1"},"project":null`, "This issue is not in the selected projects."},
+		{"projects reject another project", linear.IssueScope{TeamID: "t1", ProjectIDs: []string{"p1"}, IncludeNoProject: true}, `"team":{"id":"t1"},"project":{"id":"p2"}`, "This issue is not in the selected projects."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			exact := `{"id":"exact","identifier":"ENG-123","title":"Fix checkout",` + tc.fields + `}`
+			response := func(body string) *http.Response {
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}
+			}
+			httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+				response(`{"data":{"issues":{"nodes":[]}}}`),
+				response(`{"data":{"issues":{"nodes":[` + exact + `]}}}`),
+				response(`{"data":{"issue":` + exact + `}}`),
+				response(`{"data":{"issue":` + exact + `}}`),
+			}}
+			client, err := linear.NewClient(httpContext, &contexts.IntegrationContext{CurrentSecrets: map[string]core.IntegrationSecret{
+				linear.OAuthAccessToken: {Name: linear.OAuthAccessToken, Value: []byte("token")},
+			}})
+			require.NoError(t, err)
+			source := &linearIntakeItemSource{linear: client, scope: tc.scope}
+
+			items, err := source.Search(context.Background(), "ENG-123", 5)
+			require.NoError(t, err)
+			require.Len(t, items, 1)
+			assert.Equal(t, tc.reason, items[0].DisabledReason)
+
+			item, err := source.Get(context.Background(), "exact")
+			if tc.reason != "" {
+				require.ErrorIs(t, err, errIntakeItemNotFound)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "exact", item.ID)
+
+			available, err := source.IsItemAvailable(context.Background(), "exact")
+			require.NoError(t, err)
+			assert.True(t, available)
+		})
+	}
 }
