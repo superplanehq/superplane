@@ -55,9 +55,6 @@ const FeatureFactoryCustomAutomations = "factory_custom_automations"
 // for general use.
 const FeatureWorkspaceAgent = "workspace_agent"
 
-// FeatureWorkspaceMCP gates workspace MCP settings, MCP APIs, and MCP attach.
-const FeatureWorkspaceMCP = "workspace_mcp"
-
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
 
@@ -96,7 +93,6 @@ var registry = []Feature{
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
 	{ID: FeatureWorkspaceAgent, Label: "SuperPlane Agent", Description: "Show the SuperPlane Agent page"},
-	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture", Released: released()},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},

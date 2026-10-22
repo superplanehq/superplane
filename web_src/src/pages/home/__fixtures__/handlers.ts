@@ -177,11 +177,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Show the SuperPlane Agent page",
             },
             {
-              id: "workspace_mcp",
-              label: "Workspace MCP",
-              description: "Add MCP servers for workspace agents",
-            },
-            {
               id: "workspace_skills",
               label: "Workspace Skills",
               description: "Add skills for workspace agents",
