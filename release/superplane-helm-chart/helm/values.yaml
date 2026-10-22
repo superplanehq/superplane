@@ -157,6 +157,8 @@ polar:
   enabled: false
   accessToken: ""
   environment: "sandbox"
+  # Optional. Use superplane-inc for the production Polar dashboard.
+  dashboardOrganizationSlug: ""
   webhookSecret: ""
   # Optional. Overrides the Polar API version that SuperPlane pins in code.
   apiVersion: ""
