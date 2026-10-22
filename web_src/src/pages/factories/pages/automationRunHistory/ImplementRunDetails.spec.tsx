@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router";
-import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun, FactoriesWorkOrder } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { FactoryAutomationRunHistory } from "./FactoryAutomationRunHistory";
 
@@ -13,10 +13,6 @@ const api = vi.hoisted(() => ({
   canvasesDescribeCanvasVersion: vi.fn(),
 }));
 vi.mock("../../../../api-client/sdk.gen", () => api);
-const taskData: { orders: FactoriesWorkOrder[] } = { orders: [] };
-vi.mock("@/hooks/useFactoryData", () => ({
-  useFactoryWorkOrders: () => ({ data: taskData.orders, isLoading: false }),
-}));
 vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: () => {} }));
 vi.mock("@/ui/Runs/RunInspectorRunnerLogs", () => ({
   RunnerLogsTerminal: () => <p data-testid="runner-logs">Saved runner output</p>,
@@ -78,15 +74,13 @@ describe("Implement run details hydration", () => {
     client.clear();
   });
   it("links a recorded existing task to its canonical task page", async () => {
-    taskData.orders = [
-      { id: "existing-task", key: "SP-42", number: "42", title: "Fix checkout", sourceRunId: "original-run" },
-    ];
     const run: CanvasesCanvasRun = {
       id: "duplicate-run",
       state: "STATE_FINISHED",
       result: "RESULT_PASSED",
       versionId: "version",
       createdAt: new Date().toISOString(),
+      task: { id: "existing-task", key: "SP-42", title: "Fix checkout" },
       rootEvent: {
         id: "duplicate-event",
         data: { type: "github.issue", data: { issue: { number: 42, title: "Fix checkout" } } },
@@ -139,7 +133,6 @@ describe("Implement run details hydration", () => {
       fireEvent.click(screen.getByRole("link", { name: "Task SP-42" }));
       await waitFor(() => expect(screen.getByText("Task details")).toBeInTheDocument());
     } finally {
-      taskData.orders = [];
       client.clear();
     }
   });

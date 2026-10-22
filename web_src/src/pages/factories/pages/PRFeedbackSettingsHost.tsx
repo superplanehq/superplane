@@ -152,7 +152,6 @@ export function PRFeedbackSettingsHost({
       handlerId={handler.id}
       canvasId={handler.canvasId}
       settings={prFeedbackDraftFromHandler(handler)}
-      healthy={Boolean(handler.healthy)}
       onClose={onClose}
     />
   );
@@ -169,7 +168,6 @@ function PRFeedbackSettingsLoaded({
   handlerId,
   canvasId,
   settings,
-  healthy,
   onClose,
 }: {
   organizationId: string;
@@ -183,7 +181,6 @@ function PRFeedbackSettingsLoaded({
   handlerId: string;
   canvasId?: string;
   settings: PRFeedbackDraftSettings;
-  healthy: boolean;
   onClose: () => void;
 }) {
   const [saveError, setSaveError] = useState<string | undefined>();
@@ -202,7 +199,6 @@ function PRFeedbackSettingsLoaded({
       githubIntegrationId={githubIntegrationId}
       vcsProvider={vcsProvider}
       settings={settings}
-      healthy={healthy}
       automationGraph={automation.graph}
       automationLoading={automation.isLoading}
       automationError={automation.isError}
