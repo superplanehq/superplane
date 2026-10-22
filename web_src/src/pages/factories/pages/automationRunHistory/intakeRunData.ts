@@ -57,9 +57,13 @@ function recordedIntakeOutcome(
       execution.outputChannels?.length === 1 &&
       execution.outputChannels[0] === "false",
   );
-  if (sourceId === "scheduled-intake")
-    return rejected.some((execution) => execution.nodeId === "has-proposal") ? "no-proposal" : "unknown";
-  return rejected.length > 0 ? "filtered" : "unknown";
+  if (rejected.length > 0) {
+    if (sourceId === "scheduled-intake")
+      return rejected.some((execution) => execution.nodeId === "has-proposal") ? "no-proposal" : "unknown";
+    return "filtered";
+  }
+  if (run.task?.id) return "created";
+  return "unknown";
 }
 
 export function recordedExistingTaskId(run: CanvasesCanvasRun): string | undefined {
