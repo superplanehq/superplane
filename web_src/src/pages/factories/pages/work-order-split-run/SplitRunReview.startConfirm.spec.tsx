@@ -146,24 +146,38 @@ describe("SplitRunReview start confirm", () => {
     expect(screen.queryByTestId("split-run-start-confirm")).not.toBeInTheDocument();
   });
 
-  it("asks before Start when a review sub-parameter is 2", async () => {
+  it.each([
+    { clarity: 2, complexity: 3, verifiability: 3 },
+    { clarity: 3, complexity: 2, verifiability: 3 },
+    { clarity: 3, complexity: 3, verifiability: 2 },
+    { clarity: 2, complexity: 2, verifiability: 2 },
+  ])("starts on the first click when review scores are yellow or green: %j", async (scores) => {
     const user = userEvent.setup();
     const onStart = vi.fn();
-    renderConfirmReview(onStart, reviewTaskFooter({ clarity: 3, complexity: 2, verifiability: 3 }));
+    renderConfirmReview(onStart, reviewTaskFooter(scores));
 
     await user.click(screen.getByRole("button", { name: "Start" }));
-    expect(onStart).not.toHaveBeenCalled();
-    expect(screen.getByText(START_CONFIRM_COPY.mid)).toBeInTheDocument();
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("split-run-start-confirm")).not.toBeInTheDocument();
   });
 
-  it("explains an unclear review task when Clarity is 1", async () => {
+  it.each([
+    { clarity: 1, complexity: 3, verifiability: 3 },
+    { clarity: 3, complexity: 1, verifiability: 3 },
+    { clarity: 3, complexity: 3, verifiability: 1 },
+  ])("asks before starting when a review score is red: %j", async (scores) => {
     const user = userEvent.setup();
     const onStart = vi.fn();
-    renderConfirmReview(onStart, reviewTaskFooter({ clarity: 1, complexity: 3, verifiability: 3 }));
+    renderConfirmReview(onStart, reviewTaskFooter(scores));
 
     await user.click(screen.getByRole("button", { name: "Start" }));
     expect(onStart).not.toHaveBeenCalled();
-    expect(screen.getByText(START_CONFIRM_COPY.low)).toBeInTheDocument();
+    const dialog = screen.getByTestId("split-run-start-confirm");
+    expect(
+      within(dialog).getByText(scores.clarity === 1 ? START_CONFIRM_COPY.low : START_CONFIRM_COPY.mid),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: START_CONFIRM_COPY.confirm }));
+    expect(onStart).toHaveBeenCalledTimes(1);
   });
 
   it("still asks when a legacy score is 3", async () => {
