@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"github.com/superplanehq/superplane/pkg/features"
 	"sync"
 	"testing"
 	"time"
@@ -24,6 +25,7 @@ import (
 
 func Test__UpdateFactoryOnboarding(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 
 	t.Run("new factory is incomplete in create response", func(t *testing.T) {
@@ -292,6 +294,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 
 	for _, provider := range []string{"github", models.ProviderBitbucket} {
@@ -302,6 +305,10 @@ func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 			agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
 			appID, lineID := createOnboardingResources(t, r, factory)
 			req := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
+			if provider == models.ProviderBitbucket {
+				source := pb.FactoryOnboarding_ISSUES_SOURCE_SKIP
+				req.IssuesSource = &source
+			}
 			complete := true
 			req.Complete = &complete
 
@@ -591,4 +598,19 @@ func clearHostedLLMProviders(t *testing.T, db *gorm.DB) {
 			require.NoError(t, upsertErr)
 		}
 	})
+}
+
+func TestFactoryOnboardingRejectsBYOKAfterRevocation(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), AgentIntegrationId: &integrationID})
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+	// Store an old preference directly to represent a previously allowed setup.
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AgentIntegrationID: &integrationID}))
+	complete := true
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), Complete: &complete})
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
 }

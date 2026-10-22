@@ -71,8 +71,8 @@ describe("firstRunTicketSource", () => {
     });
   });
 
-  it("requires a GitHub connection for analysis", () => {
-    expect(canAnalyzeTicketSource({ ticketSource: "github-issues" })).toBe(false);
+  it("allows GitHub Issues selection before repository connection", () => {
+    expect(canAnalyzeTicketSource({ ticketSource: "github-issues" })).toBe(true);
     expect(canAnalyzeTicketSource({ ticketSource: "github-issues", githubConnected: true })).toBe(true);
     expect(canAnalyzeTicketSource({ ticketSource: null })).toBe(false);
   });

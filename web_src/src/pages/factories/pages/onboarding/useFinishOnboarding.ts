@@ -1,3 +1,6 @@
+import { useBYOKAccess } from "@/hooks/useBYOKAccess";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
+import { resolveOnboardingAgent } from "./onboardingAgentReadiness";
 import type {
   FactoriesFactory,
   FactoriesFactoryIntakeSettings,
@@ -58,6 +61,8 @@ export function finishOnboardingError(args: {
   if (!args.appRepository || !args.backlogRepository) {
     return "Select the code repository and the backlog repository.";
   }
+  const intakeError = githubIntakeRepositoryError(args.issuesChoice, args.vcsHost);
+  if (intakeError) return intakeError;
   if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
     return "Connect Jira, then choose a project.";
   }
@@ -103,6 +108,7 @@ export async function afterWorkspaceProvisioned(args: {
   invalidateAccountOrganizations: () => void;
   navigate: ReturnType<typeof useNavigate>;
   skipInitialImport?: boolean;
+  bypassAnalysis?: boolean;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }): Promise<void> {
   let organizationId = args.organizationId;
@@ -121,7 +127,7 @@ export async function afterWorkspaceProvisioned(args: {
   args.invalidateAccountOrganizations();
   markWorkspaceGettingStarted(organizationId, args.factoryId);
   const destination = { organizationId, factoryKey: args.factoryKey, lineId: args.lineId };
-  if (args.onProvisioned && !args.skipInitialImport) {
+  if (args.onProvisioned && !args.skipInitialImport && !args.bypassAnalysis) {
     args.onProvisioned(destination);
     return;
   }
@@ -272,6 +278,33 @@ function agentIntegrationIdForPlan(plan: OnboardingAgentPlan, selections: Integr
   return selections[plan.integrationName]?.id;
 }
 
+async function verifyOnboardingPlan(
+  access: ReturnType<typeof useBYOKAccess>,
+  usage: ReturnType<typeof useOrganizationWorkspaceUsage>,
+  savedPlan: OnboardingAgentPlan | undefined,
+) {
+  try {
+    const byokAllowed = await access.verify();
+    if (byokAllowed) return { plan: savedPlan, byokAllowed };
+    const hosted = await usage.refetch();
+    if (hosted.error || !hosted.data) throw new Error("SuperPlane could not load hosted models. Try again.");
+    const plan = resolveOnboardingAgent({
+      connected: new Set(),
+      hostedModels: { anthropic: [], openai: [], openrouter: [] },
+      defaultHostedProvider: hosted.data.defaultHostedProvider,
+      defaultHostedModel: hosted.data.defaultHostedModel,
+    });
+    if (!plan)
+      throw new Error(
+        "No hosted default model is available. Ask your administrator to configure a SuperPlane-hosted model.",
+      );
+    return { plan, byokAllowed };
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, "SuperPlane could not verify model access. Try again."));
+    return undefined;
+  }
+}
+
 export function useFinishOnboarding(args: {
   organizationId: string;
   factoryId: string;
@@ -300,6 +333,8 @@ export function useFinishOnboarding(args: {
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
+  const access = useBYOKAccess(args.organizationId);
+  const usage = useOrganizationWorkspaceUsage(args.organizationId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const skipInitialImport = !args.factory?.onboarding?.initial && args.setup.skipInitialImport;
@@ -310,7 +345,10 @@ export function useFinishOnboarding(args: {
   // click, and provisioning would save that stale (often empty) answer over
   // the one `saveIssues` already stored.
   return async (issuesChoiceOverride?: IssuesChoiceId) => {
-    const appRepository = args.setup.selectedRepo;
+    const verified = await verifyOnboardingPlan(access, usage, args.plan);
+    if (!verified) return;
+    const { plan, byokAllowed } = verified;
+    const appRepository = args.setup.selectedRepo ?? "";
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
     const workspaceName = args.setup.workspaceName.trim();
     const issuesChoice = issuesChoiceOverride ?? args.setup.issuesChoice;
@@ -326,7 +364,7 @@ export function useFinishOnboarding(args: {
       vcsHost,
       remainingCreditCents: args.remainingCreditCents,
       hostedModelsLoading: args.hostedModelsLoading,
-      plan: args.plan,
+      plan,
       issuesChoice,
       jiraReady: Boolean(jira?.ready),
       jiraProjectId: args.jiraProjectId,
@@ -337,7 +375,7 @@ export function useFinishOnboarding(args: {
       showErrorToast(error);
       return;
     }
-    if (!appRepository || !backlogRepository || !vcs?.id || !args.plan) {
+    if (!plan || !vcs?.id) {
       return;
     }
 
@@ -353,9 +391,9 @@ export function useFinishOnboarding(args: {
         issuesChoice,
         skipInitialImport,
         vcs: { id: vcs.id, provider: vcsHost },
-        agentPlan: args.plan,
-        agentRewrite: agentRewriteFromPlan(args.plan, selections),
-        agentIntegrationId: agentIntegrationIdForPlan(args.plan, selections),
+        agentPlan: plan,
+        agentRewrite: agentRewriteFromPlan(plan, selections),
+        agentIntegrationId: agentIntegrationIdForPlan(plan, selections),
         jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId, args.jiraCompletion),
         linear: linearIntakeBinding(issuesChoice, linear?.id, args.linearProjectIds),
       });
@@ -373,6 +411,7 @@ export function useFinishOnboarding(args: {
         navigate,
         onProvisioned: args.onProvisioned,
         skipInitialImport,
+        bypassAnalysis: !byokAllowed,
       });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
@@ -380,4 +419,8 @@ export function useFinishOnboarding(args: {
       args.setSaving(false);
     }
   };
+}
+
+function githubIntakeRepositoryError(choice: IssuesChoiceId | null | undefined, host: VcsHostId | null | undefined) {
+  return choice === "vcs" && host === "bitbucket" ? "GitHub Issues requires a GitHub repository." : null;
 }

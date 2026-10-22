@@ -40,8 +40,10 @@ vi.mock("@/hooks/useMe", () => ({
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: (feature: string) => feature !== "new_billing" || billingState.newBilling,
+    has: (feature: string) =>
+      feature === "organization_byok" ? billingState.byok : feature !== "new_billing" || billingState.newBilling,
     enabledExperimentalFeatures: [],
+    organizationReady: true,
     isLoading: false,
   }),
 }));
@@ -78,16 +80,26 @@ vi.mock("./useGitHubOnboarding", () => ({
 const billingState = {
   enabled: false,
   newBilling: false,
+  byok: false,
   availablePlans: undefined as OrganizationsBillingPlanOption[] | undefined,
 };
 const refetchBilling = vi.fn(async () => ({
-  data: { billingEnabled: billingState.enabled, availablePlans: billingState.availablePlans },
+  data: {
+    billingEnabled: billingState.enabled,
+    availablePlans: billingState.availablePlans,
+    productFeatures: { byo_key: true },
+  },
 }));
 vi.mock("@/hooks/useOrganizationBilling", () => ({
   organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
   useOrganizationBilling: () => ({
-    data: { billingEnabled: billingState.enabled, availablePlans: billingState.availablePlans },
+    data: {
+      billingEnabled: billingState.enabled,
+      availablePlans: billingState.availablePlans,
+      productFeatures: { byo_key: true },
+    },
     isPending: false,
+    isSuccess: true,
     refetch: refetchBilling,
   }),
 }));
@@ -124,7 +136,7 @@ function setupState(): OnboardingSetupApi {
     useOnboardingSetupState("Payments Service", {
       simulateDiscovery: false,
       connected: new Set(["github"]),
-      initial: { vcsHost: "github" },
+      initial: { vcsHost: "github", issuesChoice: "vcs", selectedRepo: "acme/api" },
     }),
   );
   return result.current;
@@ -188,6 +200,7 @@ function StatefulSetup({ model }: { model: OnboardingPageModel }) {
 }
 
 function renderStatefulSetup(overrides: Partial<OnboardingPageModel>) {
+  billingState.byok = overrides.bringYourOwnKey ?? false;
   render(
     <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=agent"]}>
       <StatefulSetup model={pageModel({ openSection: "agent", ...overrides })} />
@@ -196,6 +209,7 @@ function renderStatefulSetup(overrides: Partial<OnboardingPageModel>) {
 }
 
 function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=issues") {
+  billingState.byok = model.bringYourOwnKey;
   render(
     <MemoryRouter initialEntries={[path]}>
       <FirstRunSetup model={model} />
@@ -209,6 +223,7 @@ describe("FirstRunSetup chrome", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
     navigateSpy.mockClear();
+    billingState.byok = false;
     billingState.enabled = false;
     billingState.newBilling = false;
     billingState.availablePlans = [{ key: "free", name: "Free" }];
@@ -299,7 +314,9 @@ describe("FirstRunSetup chrome", () => {
   it("shows the factory sphere on welcome", () => {
     render(
       <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
-        <FirstRunSetup model={pageModel({ openSection: "vcs" })} />
+        <FirstRunSetup
+          model={pageModel({ openSection: "vcs", setup: { ...setupState(), issuesChoice: null, selectedRepo: null } })}
+        />
       </MemoryRouter>,
     );
 
@@ -313,7 +330,7 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-art-stage")).toContainElement(screen.getByTestId("first-run-signed-in"));
   });
 
-  it("shows the model source before the backlog for a bring-your-own-key organization", async () => {
+  it("shows model setup after repository setup for an eligible organization", async () => {
     const user = userEvent.setup();
     const model = pageModel({
       hostedModelsAvailable: true,
@@ -332,7 +349,10 @@ describe("FirstRunSetup chrome", () => {
   });
 
   it("keeps SuperPlane-hosted models as the choice and own key as a link", () => {
-    renderSetup(pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }));
+    renderSetup(
+      pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }),
+      "/org-1/workspaces/PAY/setup?step=agent",
+    );
 
     const source = screen.getByTestId("first-run-model-source");
     const buttons = within(source).getAllByRole("button");
@@ -342,7 +362,7 @@ describe("FirstRunSetup chrome", () => {
     expect(buttons[1]).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("opens the backlog when SuperPlane-hosted models stay selected", async () => {
+  it("finishes setup with hosted models after model selection", async () => {
     const user = userEvent.setup();
     const model = pageModel({
       hostedAgentReady: true,
@@ -350,23 +370,15 @@ describe("FirstRunSetup chrome", () => {
       bringYourOwnKey: true,
       openSection: "agent",
     });
+    billingState.byok = true;
     render(
       <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=agent"]}>
         <StatefulSetup model={model} />
       </MemoryRouter>,
     );
-
-    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue }));
-
-    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /GitHub Issues/ })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: /^Jira/ })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: /^Linear/ })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
-
-    await user.click(screen.getByTestId("first-run-analyze-tickets"));
-    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
+    await user.click(screen.getByTestId("first-run-finish-setup"));
+    await waitFor(() => expect(model.finish).toHaveBeenCalled());
+    expect(screen.queryByTestId("first-run-tickets")).not.toBeInTheDocument();
   });
 
   it("shows provider keys when the organization chooses its own key", async () => {
@@ -380,31 +392,27 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
   });
 
-  it.each([true, false])("saves the agent before opening the backlog (saved: %s)", async (saved) => {
+  it("blocks the model screen while provisioning is in progress", async () => {
     const user = userEvent.setup();
-    let completeSave!: (saved: boolean) => void;
-    const saveAgent = vi.fn(
+    let complete!: () => void;
+    const finish = vi.fn(
       () =>
-        new Promise<boolean>((resolve) => {
-          completeSave = resolve;
+        new Promise<void>((resolve) => {
+          complete = resolve;
         }),
     );
     const model = pageModel({
       hostedModelsAvailable: true,
       bringYourOwnKey: true,
       agentCredentialChoice: "own-key",
-      openSection: "agent",
       setup: { ...withRepository(), connected: new Set(["github", "claude"]) },
-      saveAgent,
+      finish,
     });
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=agent");
-
     await user.click(screen.getByTestId("first-run-finish-setup"));
-
-    expect(saveAgent).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("first-run-tickets")).not.toBeInTheDocument();
-    await act(async () => completeSave(saved));
-    expect(Boolean(screen.queryByTestId("first-run-tickets"))).toBe(saved);
+    expect(finish).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+    await act(async () => complete());
   });
 
   it("offers a custom provider on the agent card when that flag is on", async () => {
@@ -423,43 +431,30 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("agent-step")).toHaveAttribute("data-custom-provider", "yes");
   });
 
-  it("sends a bring-your-own-key organization back to the model source when none is chosen", () => {
-    renderSetup(pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }));
+  it("shows model-source choices after the earlier steps are complete", () => {
+    renderSetup(
+      pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }),
+      "/org-1/workspaces/PAY/setup?step=agent",
+    );
 
     expect(screen.getByTestId("first-run-model-source")).toBeInTheDocument();
   });
 
-  it("scans the backlog after a saved model source", async () => {
+  it("saves intake before opening repository setup", async () => {
     const user = userEvent.setup();
-    const model = pageModel({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      bringYourOwnKey: true,
-      agentCredentialChoice: "hosted",
-      setup: { ...setupState(), issuesChoice: "vcs" },
-    });
-
+    const model = pageModel({ setup: { ...setupState(), issuesChoice: "vcs" } });
     renderSetup(model);
-    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
-
-    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
+    await user.click(screen.getByRole("button", { name: "Continue to repository" }));
+    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+    expect(await screen.findByTestId("first-run-host")).toBeInTheDocument();
+    expect(model.finish).not.toHaveBeenCalled();
   });
 
-  it("hides the model source from an organization without the bring-your-own-key flag", async () => {
+  it("opens the factory without model setup when BYOK is unavailable", async () => {
     const user = userEvent.setup();
-    const model = pageModel({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      openSection: "repo",
-      setup: { ...withRepository(), issuesChoice: "vcs" },
-    });
-
+    const model = pageModel({ hostedAgentReady: true, hostedModelsAvailable: true, setup: withRepository() });
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=repo");
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.choose.continueReady }));
-
-    expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-model-source")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
     expect(screen.queryByTestId("first-run-model-source")).not.toBeInTheDocument();
   });
@@ -471,12 +466,18 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.queryByTestId("first-run-model-source")).not.toBeInTheDocument();
   });
 
-  it("waits to choose the agent screen while the bring-your-own-key flag is loading", () => {
-    renderSetup(pageModel({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKeyLoading: true }));
+  it.each(["jira", "linear"] as const)("requires a project before honoring a %s repository return", (source) => {
+    const model = pageModel({
+      setup: { ...withRepository(), issuesChoice: source, connected: new Set(["github", source]) },
+    });
+    renderSetup(model, "/org-1/workspaces/PAY/setup?step=repo");
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(model.finish).not.toHaveBeenCalled();
+  });
 
-    const continueButton = screen.getByTestId("first-run-analyze-tickets");
-    expect(continueButton).toBeDisabled();
-    expect(continueButton).toHaveTextContent(FIRST_RUN_COPY.agent.loading);
+  it("keeps intake available while model access loads", () => {
+    renderSetup(pageModel({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKeyLoading: true }));
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
@@ -491,9 +492,8 @@ describe("FirstRunSetup chrome", () => {
         hostedModelsAvailable: true,
         setup: { ...withRepository(), issuesChoice: "vcs", skipInitialImport },
       });
-      renderSetup(model);
-      expect(screen.getByTestId("first-run-analyze-tickets")).toHaveAccessibleName(FIRST_RUN_COPY.tickets.continue);
-      await user.click(screen.getByTestId("first-run-analyze-tickets"));
+      renderSetup(model, "/org-1/workspaces/PAY/setup?step=repo");
+      await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.choose.continueReady }));
       expect(await screen.findByRole("button", { name: "Finish with selected plan" })).toBeInTheDocument();
       expect(model.finish).not.toHaveBeenCalled();
       await user.click(screen.getByRole("button", { name: "Finish with selected plan" }));
@@ -501,7 +501,7 @@ describe("FirstRunSetup chrome", () => {
     },
   );
 
-  it.each(["issues", "billing"])("finishes with the legacy trial when new billing is off at step %s", async (step) => {
+  it.each(["repo", "billing"])("finishes with the legacy trial when new billing is off at step %s", async (step) => {
     billingState.enabled = true;
     billingState.newBilling = false;
     refetchBilling.mockClear();
@@ -513,15 +513,16 @@ describe("FirstRunSetup chrome", () => {
     });
     renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
     expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("first-run-analyze-tickets"));
-    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
-    expect(refetchBilling).not.toHaveBeenCalled();
+    await user.click(
+      screen.getByRole("button", { name: step === "repo" ? FIRST_RUN_COPY.choose.continueReady : "Continue" }),
+    );
+    await waitFor(() => expect(model.finish).toHaveBeenCalled());
   });
 
   it.each([
-    { step: "issues", availablePlans: [] },
+    { step: "repo", availablePlans: [] },
     { step: "billing", availablePlans: [] },
-    { step: "issues", availablePlans: undefined },
+    { step: "repo", availablePlans: undefined },
     { step: "billing", availablePlans: undefined },
   ])("skips plan selection when no plans are available (%j)", async ({ step, availablePlans }) => {
     billingState.enabled = true;
@@ -535,8 +536,10 @@ describe("FirstRunSetup chrome", () => {
     });
     renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
     expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("first-run-analyze-tickets"));
-    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
+    await user.click(
+      screen.getByRole("button", { name: step === "repo" ? FIRST_RUN_COPY.choose.continueReady : "Continue" }),
+    );
+    await waitFor(() => expect(model.finish).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
   });
 });

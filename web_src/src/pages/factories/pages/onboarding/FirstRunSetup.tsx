@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { FirstRunHeading, FirstRunShell } from "./first-run/FirstRunShell";
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
@@ -32,34 +34,21 @@ import {
 
 const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   welcome: 0,
-  host: 1,
-  connect: 1,
-  choose: 2,
-  tickets: 3,
-  agent: 4,
-  billing: 5,
+  tickets: 1,
+  host: 2,
+  connect: 2,
+  choose: 3,
+  billing: 4,
+  agent: 5,
 };
 
-// A bring-your-own-key organization chooses the model source before the backlog.
-const STEP_INDEX_FOR_SCREEN_AGENT_FIRST: Record<FirstRunScreen, number> = {
-  ...STEP_INDEX_FOR_SCREEN,
-  agent: 3,
-  tickets: 4,
-};
-
-// The reverse path walks the exact screens in reverse order.
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
-  host: "welcome",
+  tickets: "welcome",
+  host: "tickets",
   connect: "host",
   choose: "connect",
-  tickets: "choose",
-  agent: "tickets",
-};
-
-const BACK_SCREEN_AGENT_FIRST: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
-  ...BACK_SCREEN,
-  agent: "choose",
-  tickets: "agent",
+  billing: "choose",
+  agent: "billing",
 };
 
 function firstNameOf(name: string | undefined): string | undefined {
@@ -73,8 +62,7 @@ function signOut() {
 }
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
-  if (target === "billing") return () => flow.goToScreen(flow.ticketsFinishSetup ? "tickets" : "agent");
-  const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
+  const backScreen = target === "agent" && !flow.hasBillingStep ? "choose" : BACK_SCREEN[target];
   // Bitbucket has no separate connect screen.
   if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
     return () => flow.goToScreen("host");
@@ -82,15 +70,9 @@ function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => 
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
 
-/** Hosted credentials provision from this screen, so it shows finish progress. */
-function ticketsContinueLabel(ticketsFinishSetup: boolean): string {
-  return ticketsFinishSetup ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue;
-}
-
 function TicketsScreenHost({
   flow,
   model,
-  saving,
   chrome,
   sphere,
   initialWorkspace,
@@ -98,11 +80,9 @@ function TicketsScreenHost({
   initialWorkspace: boolean;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
-  saving: boolean;
   chrome: FirstRunChrome;
   sphere?: FirstRunSphereProps;
 }) {
-  const finishing = flow.blockingAction === "finishing-setup" || (flow.ticketsFinishSetup && saving);
   return (
     <FirstRunTicketsScreen
       initialImportLimit={initialWorkspace ? 3 : undefined}
@@ -112,16 +92,12 @@ function TicketsScreenHost({
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      continueLabel={
-        flow.ticketsFinishSetup && !flow.hasBillingStep && !initialWorkspace && model.setup.skipInitialImport
-          ? FIRST_RUN_COPY.finish.action
-          : ticketsContinueLabel(flow.ticketsFinishSetup && !flow.hasBillingStep)
-      }
-      continuePending={flow.agentGatePending}
-      saving={flow.blockingAction === "saving-ticket-source" || finishing}
-      savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
+      continueLabel="Continue to repository"
+      continuePending={false}
+      saving={flow.blockingAction === "saving-ticket-source"}
+      savingLabel={FIRST_RUN_COPY.tickets.saving}
       githubConnected={model.setup.connected.has("github")}
-      onConnectGitHub={() => void flow.connectGitHubIssues()}
+      onConnectGitHub={() => flow.selectTicketSource("github-issues")}
       jiraConnected={model.setup.connected.has("jira")}
       jiraProjects={model.jiraProjects}
       jiraProjectsLoading={model.jiraProjectsLoading}
@@ -327,10 +303,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       onLogOut: signOut,
       organizationSwitch: otherOrganizations.length > 0 ? { currentOrganizationRouteId: organizationId } : undefined,
       workspaceSwitch: hasOtherWorkspace ? { organizationId, currentFactoryId: factoryId, factories } : undefined,
-      stepIndex:
-        target === "billing"
-          ? FIRST_RUN_STEP_COUNT - Number(flow.skipAgentScreen)
-          : (flow.agentBeforeTickets ? STEP_INDEX_FOR_SCREEN_AGENT_FIRST : STEP_INDEX_FOR_SCREEN)[target],
+      stepIndex: STEP_INDEX_FOR_SCREEN[target] - Number(target === "agent" && !flow.hasBillingStep),
       stepCount: FIRST_RUN_STEP_COUNT - Number(flow.skipAgentScreen) + Number(flow.hasBillingStep),
       onBack: backActionFor(target, flow),
       busy: flow.busy,
@@ -359,7 +332,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         firstName={firstNameOf(account?.name)}
         chrome={chromeFor("welcome")}
         sphere={sphereFor("welcome", setup.selectedRepo)}
-        onGetStarted={() => flow.goToScreen("host")}
+        onGetStarted={() => flow.goToScreen("tickets")}
       />
     );
   }
@@ -378,12 +351,11 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
 
   if (flow.screen === "billing") {
     return (
-      <FirstRunBillingScreen
+      <OnboardingPlanScreen
+        flow={flow}
         organizationId={organizationId}
         chrome={chromeFor("billing")}
-        saving={flow.busy}
         sphere={sphereFor("billing", setup.selectedRepo, model.githubOwner)}
-        onContinue={flow.finishSetup}
       />
     );
   }
@@ -394,7 +366,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         initialWorkspace={factory?.onboarding?.initial === true}
         flow={flow}
         model={model}
-        saving={model.saving}
         chrome={chromeFor("tickets")}
         sphere={sphereFor("tickets", setup.selectedRepo, model.githubOwner)}
       />
@@ -409,20 +380,57 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
       saving={flow.busy}
       loading={model.agentLoading}
-      hasBillingStep={flow.hasBillingStep}
+      hasBillingStep={false}
       hostedAgentReady={model.hostedAgentReady}
       showCustomProvider={model.customProvider}
       modelSource={{
-        offered: flow.agentBeforeTickets,
+        offered: model.bringYourOwnKey && model.hostedModelsAvailable,
         choice: flow.credentialChoice,
         onSelect: flow.selectCredentialChoice,
       }}
       onRequestConnect={model.requestConnect}
       modelPicker={model.agentModelPicker}
       onContinue={() => {
-        if (flow.agentBeforeTickets && !flow.credentialChoice) flow.selectCredentialChoice("hosted");
+        if (model.bringYourOwnKey && !flow.credentialChoice) flow.selectCredentialChoice("hosted");
         void flow.continueFromAgent();
       }}
+    />
+  );
+}
+
+function OnboardingPlanScreen({
+  flow,
+  organizationId,
+  chrome,
+  sphere,
+}: {
+  flow: FirstRunSetupFlow;
+  organizationId: string;
+  chrome: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
+}) {
+  if (!flow.hasBillingStep)
+    return (
+      <FirstRunShell testId="first-run-complete" chrome={chrome} busy={flow.busy} visual="preview">
+        <FirstRunHeading headline="Complete workspace setup">
+          <p>
+            {flow.accessError
+              ? "SuperPlane could not verify model access. Try again."
+              : "Continue with the models available to your organization."}
+          </p>
+        </FirstRunHeading>
+        <Button disabled={flow.busy} onClick={() => void flow.finishSetup()}>
+          Continue
+        </Button>
+      </FirstRunShell>
+    );
+  return (
+    <FirstRunBillingScreen
+      organizationId={organizationId}
+      chrome={chrome}
+      saving={flow.busy}
+      sphere={sphere}
+      onContinue={flow.finishSetup}
     />
   );
 }

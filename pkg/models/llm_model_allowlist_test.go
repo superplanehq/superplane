@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"github.com/superplanehq/superplane/pkg/features"
 	"testing"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ import (
 
 func Test__OrganizationBYOKModelAllowlist(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 
 	empty, err := models.FindOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic)
@@ -52,6 +54,7 @@ func Test__OrganizationBYOKModelAllowlist(t *testing.T) {
 
 func Test__ResolveSelectableLLMModels(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

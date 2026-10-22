@@ -1,7 +1,8 @@
+import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
+import { FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 
 import {
   type FactorySettingsNavGroup,
@@ -24,12 +25,13 @@ const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
 function visibleFactorySettingsNavGroups(
   groups: FactorySettingsNavGroup[],
   hasExperimentalFeature: (featureId: string) => boolean,
+  byokAllowed: boolean,
 ): FactorySettingsNavGroup[] {
   const hiddenNavItemIds = new Set<string>();
   if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
     hiddenNavItemIds.add(WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID);
   }
-  if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
+  if (!byokAllowed) {
     hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);
   }
   if (hiddenNavItemIds.size === 0) {
@@ -54,7 +56,8 @@ export function useVisibleFactorySettingsNavGroups(organizationId: string): Fact
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const billingProductEnabled = useBillingProductEnabled();
   const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading);
-  const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
+  const byok = useBYOKAccess(organizationId);
+  const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature, byok.allowed);
   if (billingProductEnabled) {
     return visible;
   }

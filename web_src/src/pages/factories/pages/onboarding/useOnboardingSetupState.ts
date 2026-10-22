@@ -166,10 +166,8 @@ export function useOnboardingSetupState(
 
   const resetIssuesState = useCallback(() => {
     clearDiscoveryTimer();
-    setIssuesRepo(null);
     setIssuesDiscovering(false);
     setIssuesDiscovered(false);
-    setIssuesChoice(null);
     setIssuesCommitted(false);
   }, [clearDiscoveryTimer]);
 
@@ -190,12 +188,13 @@ export function useOnboardingSetupState(
   const selectRepo = useCallback(
     (repo: string) => {
       rememberRepository(options?.persistRepoKey, repo);
+      setIssuesRepo((current) => (current === selectedRepo ? null : current));
       setSelectedRepo(repo);
       setRepoCommitted(false);
       resetIssuesState();
       suggestWorkspaceName(workspaceNameFromRepository(repo));
     },
-    [options?.persistRepoKey, resetIssuesState, suggestWorkspaceName],
+    [options?.persistRepoKey, resetIssuesState, suggestWorkspaceName, selectedRepo],
   );
 
   const clearRepository = useCallback(() => {

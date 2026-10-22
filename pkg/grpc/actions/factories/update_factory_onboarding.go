@@ -41,11 +41,25 @@ func UpdateFactoryOnboarding(
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 
-	if req.Complete != nil && *req.Complete {
-		config, configErr := factory.OnboardingConfigAfter(patch)
-		if configErr != nil {
-			return nil, factoryErrorToStatus(configErr, "failed to update factory onboarding")
+	config, err := factory.OnboardingConfigAfter(patch)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+	if config.AgentIntegrationID != "" && (patch.AgentIntegrationID != nil || patch.AgentHarness != nil || req.GetComplete()) {
+		integration, err := findReadyOnboardingIntegration(db, orgID, config.AgentIntegrationID)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 		}
+		provider := ""
+		if integration.AppName == models.CustomLLMAppName {
+			provider = models.UsageProviderCustom
+		}
+		if err := models.RequireOrganizationBYOKAccess(db, orgID, provider); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+	}
+
+	if req.Complete != nil && *req.Complete {
 		if validationErr := validateFactoryOnboardingResources(db, orgID, factory, config); validationErr != nil {
 			return nil, factoryErrorToStatus(validationErr, "failed to update factory onboarding")
 		}
@@ -156,6 +170,9 @@ func validateFactoryOnboardingResources(
 	factory *models.Factory,
 	config models.FactoryOnboardingConfig,
 ) error {
+	if config.IssuesSource == models.FactoryOnboardingIssuesSourceVCS && config.EffectiveVCSProvider() != models.ProviderGitHub {
+		return invalidArgument("GitHub Issues requires a GitHub repository")
+	}
 	if config.VCSIntegrationID != "" {
 		integration, err := findReadyOnboardingIntegration(db, organizationID, config.VCSIntegrationID)
 		if err != nil {
