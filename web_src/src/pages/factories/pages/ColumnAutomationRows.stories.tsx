@@ -55,6 +55,16 @@ const VERIFY: ColumnAutomation = {
   action: "Run the Verify agent",
 };
 
+const PR_CLOSURE: ColumnAutomation = {
+  ...GITHUB_INTAKE,
+  id: "pr-closure",
+  kind: "pr-closure",
+  name: "PR Closure",
+  trigger: "On pull request merge",
+  action: "Close the task",
+  catalogId: "pr-closure",
+};
+
 const meta = {
   title: "Factories/Components/ColumnAutomationRows",
   component: ColumnAutomationRows,
@@ -113,6 +123,11 @@ function Board() {
           automations={[]}
           onAdd={() => undefined}
           cards={[{ title: "Ship idempotent refund retries", meta: "Review #6812" }]}
+        />
+        <Lane
+          title="Done"
+          automations={[PR_CLOSURE]}
+          cards={[{ title: "Show velocity automation names as text", meta: "Merged #8778" }]}
         />
       </WorkOrderKanbanBoard>
     </div>

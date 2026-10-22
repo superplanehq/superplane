@@ -1,4 +1,4 @@
-import { Plus, Settings2 } from "lucide-react";
+import { History, Plus, Settings2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -81,6 +81,8 @@ function ColumnAutomationRow({
 }) {
   const disabled = automation.health === "disabled";
   const needsRepair = automation.health === "needs-repair";
+  const historyOnly = automation.kind === "pr-closure";
+  const ActionIcon = historyOnly ? History : Settings2;
   const headline = columnAutomationHeadline(automation);
   const className = cn(
     ROW_CLASSNAME,
@@ -100,10 +102,10 @@ function ColumnAutomationRow({
         />
       ) : null}
       {onRowAction ? (
-        <Settings2
+        <ActionIcon
           className="size-3.5 shrink-0 text-muted-foreground"
           aria-hidden
-          data-testid={`${testId}-settings-${automation.id}`}
+          data-testid={`${testId}-${historyOnly ? "history" : "settings"}-${automation.id}`}
         />
       ) : null}
     </>
