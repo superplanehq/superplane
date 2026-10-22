@@ -79,7 +79,7 @@ Complexity is whether a coding agent finishes this task in one run, with no stee
 Assume a capable agent that has the full repository, the plan you write, and the tests. It reads code well, follows an existing pattern well, and runs commands to check its work. It struggles when it must guess at taste, product intent, or context that is not written down.
 
 Judge from what you found in the repository, not from the task text alone:
-- Size: whether the work fits one run. Count the seams the agent must touch, not the lines of the description.
+- Size: whether the work fits one run. Consider the work involved, not the number of files or layers it touches.
 - Pattern: a similar change already exists to copy.
 - Judgment: taste, product calls, or context that is not written down.
 - Blast radius: migrations, auth, billing, production data, or work that is hard to undo.
@@ -89,13 +89,15 @@ Judge from what you found in the repository, not from the task text alone:
 Start at 3 for a bounded change that has a pattern in the repository. Move down only for a concrete reason you found in the code, and name that reason in the summary.
 
 - A judgment call that the plan already decides does not lower the score. Only open judgment does.
-- Touching two or three files in one area is normal. Only crossing areas that need different context lowers the score.
+- A small feature can need changes in the UI, API, and backend. That alone does not lower the score.
+- Passing a setting through existing layers is normal work. Score it 3 when the path is clear and established patterns cover the change.
+- Before lowering the score, name a concrete obstacle that will likely need human help. Examples include an unresolved interface or a dependency the agent cannot access.
 - A long task description is not a large task. A short one is not a small task. Score the work, not the text.
 
 ### Anchors
 
 - 3: fits one run. A pattern exists or the change is contained.
-- 2: fits one run, but expect steering: the change crosses areas with different context, or one judgment call is open.
+- 2: fits one run, but a concrete obstacle will likely need human help. Name that obstacle, not just the affected areas.
 - 1: does not fit one run, or depends on unwritten context, or touches irreversible or security-sensitive work. Name a narrower scope for this task, or a human step.
 
 Be direct when the task is too big for one run. Say so in the Complexity summary. Then name the narrower scope for this task. Do not soften a 1 to spare the user; a wrong 3 costs them a failed run.
