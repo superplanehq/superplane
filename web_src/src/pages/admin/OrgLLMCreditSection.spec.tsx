@@ -548,7 +548,8 @@ describe("OrgLLMCreditSection balances", () => {
     expect(screen.queryByText("No credit grants yet.")).not.toBeInTheDocument();
 
     grantsFailed = false;
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    const creditHistory = within(screen.getByTestId("admin-org-credit-history"));
+    await user.click(creditHistory.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Trial adjustment")).toBeInTheDocument();
     expect(screen.queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
   });

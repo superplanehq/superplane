@@ -417,6 +417,9 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	now := time.Now()
 
 	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := LockOrganizationTaskAdmission(tx, o.OrganizationID); err != nil {
+			return err
+		}
 		// Reverting `open → draft` while a line dispatch is still active would
 		// desync the FSM from the executor. Mirror the dispatch guard here.
 		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
@@ -622,6 +625,9 @@ func (o *FactoryWorkOrder) ClearAutoStart(tx *gorm.DB) (bool, error) {
 }
 
 func (o *FactoryWorkOrder) LockForUpdate(tx *gorm.DB) error {
+	if err := LockOrganizationTaskAdmission(tx, o.OrganizationID); err != nil {
+		return err
+	}
 	var locked FactoryWorkOrder
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ?", o.ID).
