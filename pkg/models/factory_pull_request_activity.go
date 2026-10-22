@@ -42,6 +42,19 @@ type FactoryPullRequestAccessResult struct {
 }
 
 func (p *FactoryPullRequest) CreateActivity(tx *gorm.DB, params FactoryPullRequestActivityParams) (*FactoryPullRequestActivityResult, error) {
+	var result *FactoryPullRequestActivityResult
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := LockOrganizationTaskAdmission(inner, p.OrganizationID); err != nil {
+			return err
+		}
+		var err error
+		result, err = p.createActivity(inner, params)
+		return err
+	})
+	return result, err
+}
+
+func (p *FactoryPullRequest) createActivity(tx *gorm.DB, params FactoryPullRequestActivityParams) (*FactoryPullRequestActivityResult, error) {
 	if params.RunID == uuid.Nil {
 		return nil, fmt.Errorf("%w: run id is required", ErrFactoryPullRequestInvalid)
 	}
@@ -63,6 +76,12 @@ func (p *FactoryPullRequest) CreateActivity(tx *gorm.DB, params FactoryPullReque
 		return p.existingActivityResult(tx, existing, access)
 	}
 	if !errors.Is(err, ErrFactoryPullRequestActivityNotFound) {
+		return nil, err
+	}
+	if err := checkOrganizationTaskAdmission(tx, p.OrganizationID, p.WorkOrderID); err != nil {
+		if errors.Is(err, ErrOrganizationTaskCapacity) {
+			return &FactoryPullRequestActivityResult{Outcome: FactoryPullRequestActivityOutcomeWaiting}, nil
+		}
 		return nil, err
 	}
 

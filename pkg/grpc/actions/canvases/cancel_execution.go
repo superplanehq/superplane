@@ -28,6 +28,9 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 
 	var cancelled bool
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, canvas.OrganizationID); err != nil {
+			return err
+		}
 		execution, err := models.FindNodeExecutionInTransaction(tx, canvas.ID, executionID)
 		if err != nil {
 			return grpcerrors.NotFound(err, "execution not found")
