@@ -1,4 +1,3 @@
-import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
@@ -14,9 +13,6 @@ import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
 /** Nav item id for the SuperPlane MCP Server (inbound MCP clients). */
 const WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID = "workspace-superplane-mcp-server";
 
-/** Nav item id for the organization LLM Models settings page, gated behind `FEATURE_ORGANIZATION_BYOK`. */
-const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
-
 /**
  * Drops nav items whose experimental features are off, and skips any group
  * left with no items. The source groups stay static so other consumers
@@ -25,14 +21,10 @@ const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
 function visibleFactorySettingsNavGroups(
   groups: FactorySettingsNavGroup[],
   hasExperimentalFeature: (featureId: string) => boolean,
-  byokAllowed: boolean,
 ): FactorySettingsNavGroup[] {
   const hiddenNavItemIds = new Set<string>();
   if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
     hiddenNavItemIds.add(WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID);
-  }
-  if (!byokAllowed) {
-    hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);
   }
   if (hiddenNavItemIds.size === 0) {
     return groups;
@@ -56,8 +48,7 @@ export function useVisibleFactorySettingsNavGroups(organizationId: string): Fact
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const billingProductEnabled = useBillingProductEnabled();
   const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading);
-  const byok = useBYOKAccess(organizationId);
-  const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature, byok.allowed);
+  const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
   if (billingProductEnabled) {
     return visible;
   }

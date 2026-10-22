@@ -248,19 +248,23 @@ describe("useOnboardingSetupState", () => {
     expect(result.current.issueCount).toBeUndefined();
   });
 
-  it("clears the selected repository when the GitHub connection changes", () => {
+  it.each(["acme/payments", "acme/backlog"])("updates intake after an account switch with backlog %s", (backlog) => {
     const connected = new Set<IntegrationId>(["github"]);
-    const { result } = renderHook(() => useOnboardingSetupState("Payments", { connected, simulateDiscovery: false }));
-
-    act(() => {
-      result.current.selectVcsHost("github");
-      result.current.selectRepo("acme/payments");
-    });
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        connected,
+        simulateDiscovery: false,
+        initial: { vcsHost: "github", selectedRepo: "acme/payments", issuesRepo: backlog, issuesChoice: "vcs" },
+      }),
+    );
     expect(result.current.selectedRepo).toBe("acme/payments");
 
     act(() => result.current.clearRepository());
     expect(result.current.selectedRepo).toBeNull();
     expect(result.current.repoReady).toBe(false);
+    act(() => result.current.selectRepo("other/service"));
+    expect(result.current.summary.issuesRepo).toBe(backlog === "acme/payments" ? "other/service" : backlog);
+    expect(result.current.issuesChoice).toBe("vcs");
   });
 
   it("marks the agent step ready when remaining credit is greater than zero", () => {

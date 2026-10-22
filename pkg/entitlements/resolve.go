@@ -45,7 +45,7 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 	if err != nil {
 		return nil, err
 	}
-	productFeatures, err := models.ResolveOrganizationProductFeatures(tx, orgID)
+	productFeatures, err := plan.ResolveProductFeatures(tx)
 	if err != nil {
 		return nil, err
 	}

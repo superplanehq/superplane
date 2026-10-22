@@ -34,7 +34,7 @@ func DescribeOrganizationBilling(
 		return nil, grpcerrors.Internal(err, "failed to describe organization billing")
 	}
 
-	productFeatures, err := models.ResolveOrganizationProductFeatures(db, organizationID)
+	productFeatures, err := plan.ResolveProductFeatures(db)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "Could not load product permissions.")
 	}

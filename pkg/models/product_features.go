@@ -18,11 +18,16 @@ func ResolveOrganizationProductFeatures(tx *gorm.DB, orgID uuid.UUID) (map[strin
 	if err != nil {
 		return nil, err
 	}
+	return plan.ResolveProductFeatures(tx)
+}
+
+// ResolveProductFeatures uses the loaded plan to resolve organization grants.
+func (p *OrganizationBillingPlan) ResolveProductFeatures(tx *gorm.DB) (map[string]bool, error) {
 	definitions, err := ListPlanFeatureDefinitions(tx)
 	if err != nil {
 		return nil, err
 	}
-	grants, err := ListOrganizationFeatureGrants(tx, orgID)
+	grants, err := ListOrganizationFeatureGrants(tx, p.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +39,7 @@ func ResolveOrganizationProductFeatures(tx *gorm.DB, orgID uuid.UUID) (map[strin
 	}
 	resolved := make(map[string]bool, len(definitions))
 	for _, feature := range definitions {
-		resolved[feature.Key] = !BillingEnabled() || !feature.Gated || slices.Contains(plan.Catalog.Features, feature.Key) || enabled[feature.Key]
+		resolved[feature.Key] = !BillingEnabled() || !feature.Gated || slices.Contains(p.Catalog.Features, feature.Key) || enabled[feature.Key]
 	}
 	return resolved, nil
 }

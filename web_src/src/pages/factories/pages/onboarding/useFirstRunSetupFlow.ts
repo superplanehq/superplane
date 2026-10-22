@@ -157,15 +157,17 @@ function useFirstRunNavigation(
   // Final setup steps require a repository and a complete intake choice.
   let screen = availableScreen;
   const intakePending = intakeLookupPending(model);
+  const githubPending = connection.onboarding.isPending;
   if ((screen === "billing" || screen === "agent") && !model.setup.selectedRepo) screen = "host";
   if ((screen === "billing" || screen === "agent") && !intakePrerequisitesSatisfied(model)) screen = "tickets";
   useEffect(() => {
+    if (githubPending && !initialFirstRunScreen(searchParams)) return;
     const step = screen === "billing" || screen === "welcome" || screen === "host" ? screen : STEP_FOR_SCREEN[screen];
     if (!step || searchParams.get("step") === step || (screen === "tickets" && intakePending)) return;
     const updated = new URLSearchParams(searchParams);
     updated.set("step", step);
     setSearchParams(updated, { replace: true });
-  }, [screen, intakePending, searchParams, setSearchParams]);
+  }, [screen, intakePending, githubPending, searchParams, setSearchParams]);
   return { screen, goToScreen };
 }
 

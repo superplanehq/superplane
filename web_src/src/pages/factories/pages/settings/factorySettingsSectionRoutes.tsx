@@ -1,4 +1,3 @@
-import { RequireBYOKAccess } from "./RequireBYOKAccess";
 import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
@@ -193,9 +192,7 @@ export const factorySettingsSectionRoutes = [
     path="organization/models"
     element={
       <RequirePermission resource="org" action="read">
-        <RequireBYOKAccess>
-          <FactoryOrganizationLLMModelsPage />
-        </RequireBYOKAccess>
+        <FactoryOrganizationLLMModelsPage />
       </RequirePermission>
     }
   />,

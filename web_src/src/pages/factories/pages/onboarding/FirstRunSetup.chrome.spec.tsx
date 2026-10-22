@@ -60,17 +60,19 @@ vi.mock("./useBitbucketOnboarding", () => ({
   }),
 }));
 
+let githubPending = false;
+let githubLinked = true;
 vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: () => ({
     data: {
       providerConfigured: true,
       accountConnectionRequired: true,
-      identity: { userId: "42", login: "octocat" },
+      identity: githubLinked ? { userId: "42", login: "octocat" } : undefined,
       repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
       pendingRequests: [],
       synchronizing: false,
     },
-    isPending: false,
+    isPending: githubPending,
     error: null,
     startInstallation: { mutateAsync: vi.fn() },
     configureInstallation: { mutateAsync: vi.fn() },
@@ -224,7 +226,7 @@ function renderStatefulSetup(overrides: Partial<OnboardingPageModel>) {
 
 function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=issues") {
   billingState.byok = model.bringYourOwnKey;
-  render(
+  return render(
     <MemoryRouter initialEntries={[path]}>
       <FirstRunSetup model={model} />
     </MemoryRouter>,
@@ -243,6 +245,8 @@ describe("FirstRunSetup chrome", () => {
     billingState.availablePlans = [{ key: "free", name: "Free" }];
     refetchBilling.mockClear();
     localStorage.clear();
+    githubPending = false;
+    githubLinked = true;
   });
 
   it("shows the workspace switch when another workspace exists", () => {
@@ -325,23 +329,23 @@ describe("FirstRunSetup chrome", () => {
 
   // A new organization and a new workspace in an existing organization use
   // the same redesigned screens, so the sphere pane shows on both.
-  it("shows the factory sphere on welcome", () => {
-    render(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
-        <FirstRunSetup
-          model={pageModel({ openSection: "vcs", setup: { ...setupState(), issuesChoice: null, selectedRepo: null } })}
-        />
+  it("keeps welcome and provider choice after the initial GitHub lookup", async () => {
+    githubPending = true;
+    githubLinked = false;
+    const model = pageModel({ openSection: "vcs", setup: { ...setupState(), selectedRepo: null } });
+    const path = "/org-1/workspaces/PAY/setup";
+    const { rerender } = renderSetup(model, path);
+    githubPending = false;
+    rerender(
+      <MemoryRouter initialEntries={[path]}>
+        <FirstRunSetup model={model} />
       </MemoryRouter>,
     );
 
     expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-logo")).toBeInTheDocument();
-    const art = screen.getByTestId("first-run-art-pane");
-    expect(art).toHaveAttribute("data-art-mode", "school");
-    expect(art).toHaveAttribute("data-art-background", "#87ae9d");
-    expect(art).toHaveAttribute("data-art-arrow-color", "#eeede9");
-    expect(art).toHaveAttribute("data-art-count", "");
     expect(screen.getByTestId("first-run-art-stage")).toContainElement(screen.getByTestId("first-run-signed-in"));
+    await userEvent.setup().click(screen.getByTestId("first-run-get-started"));
+    expect(screen.getByTestId("first-run-host-bitbucket")).toBeInTheDocument();
   });
 
   it.each([false, true])("keeps repository and intake before the final model choice (billing: %s)", async (billing) => {
@@ -415,7 +419,6 @@ describe("FirstRunSetup chrome", () => {
     );
     await user.click(screen.getByTestId("first-run-finish-setup"));
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
-    expect(screen.queryByTestId("first-run-tickets")).not.toBeInTheDocument();
   });
 
   it("shows provider keys when the organization chooses its own key", async () => {

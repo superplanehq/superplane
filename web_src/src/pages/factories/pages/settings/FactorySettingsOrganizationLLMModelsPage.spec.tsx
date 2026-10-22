@@ -437,6 +437,19 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(screen.queryByTestId("llm-models-connect-custom")).not.toBeInTheDocument();
   });
 
+  it.each(["rollout", "permission"])("switches an existing key to hosted models without BYOK %s", async (gate) => {
+    if (gate === "rollout") enabledFeatures = [];
+    if (gate === "permission") productAllowed = false;
+    setConnected("anthropic", ["claude-opus-4-6"]);
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+    expect(screen.queryByTestId("llm-models-provider-anthropic")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("llm-models-empty-banner")).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Use SuperPlane" }));
+    await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
+    expect(switchSource).toHaveBeenCalledWith({ source: "hosted", apiKey: undefined });
+  });
+
   it("hides the custom provider until both BYOK flags are on", () => {
     enabledFeatures = ["organization_byok"];
     renderPage("AGENT_HARNESS_SUPERPLANE");
