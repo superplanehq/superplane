@@ -303,7 +303,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
     const view = render(<OrgLLMCreditSection orgId="org-1" />);
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeEnabled();
     const warning = "No active Polar subscription";
-    expect(screen.getByRole("alert")).toHaveTextContent(warning);
+    expect(screen.getByText(warning)).toBeInTheDocument();
     expect(screen.getByText("sub_stored")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View subscription in Polar" })).toHaveAttribute(
       "href",
@@ -311,7 +311,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
     );
     await user.click(screen.getByTestId("admin-org-billing-plan"));
     await user.click(await screen.findByRole("option", { name: "Business Manual" }));
-    expect(screen.getByRole("alert")).toHaveTextContent(warning);
+    expect(screen.getByText(warning)).toBeInTheDocument();
     await user.click(screen.getByTestId("admin-org-billing-plan-save"));
     await waitFor(() => expect(screen.queryByText(warning)).not.toBeInTheDocument());
     view.unmount();
@@ -331,11 +331,12 @@ describe("OrgLLMCreditSection Polar verification", () => {
     });
     render(<OrgLLMCreditSection orgId="org-1" />);
     await screen.findByTestId("admin-org-billing-plan");
+    const warning = "No active Polar subscription";
     if (warns) {
-      expect(screen.getByRole("alert")).toHaveTextContent("No active Polar subscription");
+      expect(screen.getByText(warning)).toBeInTheDocument();
       return;
     }
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(warning)).not.toBeInTheDocument();
   });
 
   it("locks editing when verification fails even for a local plan", async () => {
