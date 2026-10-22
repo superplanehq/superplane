@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -50,10 +52,12 @@ func Test__HandlePolarWebhook(t *testing.T) {
 
 	t.Run("unsupported event", func(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		hook := capturePolarWebhookLogs(t)
 		body := []byte(`{"type":"order.updated","data":{"id":"order_1"}}`)
 		rec := signedPolarWebhook(t, secret, body)
 		server.handlePolarWebhook(rec.recorder, rec.request)
 		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
+		requirePolarWebhookWarning(t, hook, "order.updated")
 	})
 
 	t.Run("unusable payload", func(t *testing.T) {
@@ -221,6 +225,151 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		server.handlePolarWebhook(rec.recorder, rec.request)
 		assert.Equal(t, http.StatusInternalServerError, rec.recorder.Code)
 	})
+}
+
+func Test__HandlePolarWebhookSubscriptionCycled(t *testing.T) {
+	r := support.Setup(t)
+	server := &Server{}
+	secret := "whsec_test-secret"
+	t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+
+	subscriptionID := "sub_cycle_" + uuid.NewString()
+	firstStart := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+	firstEnd := firstStart.AddDate(0, 1, 0)
+	nextStart := firstEnd
+	nextEnd := nextStart.AddDate(0, 1, 0)
+	renewedAt := time.Now().UTC().Truncate(time.Second)
+	postSubscription(t, server, secret, "subscription.updated", subscriptionID, r.Organization.ID, firstStart, firstEnd, renewedAt.Add(-time.Minute))
+	welcomeBefore := creditGrantCount(t, r.Organization.ID, models.LLMCreditGrantKindWelcome)
+
+	postSubscription(t, server, secret, "subscription.cycled", subscriptionID, r.Organization.ID, nextStart, nextEnd, renewedAt)
+	postSubscription(t, server, secret, "subscription.cycled", subscriptionID, r.Organization.ID, nextStart, nextEnd, renewedAt)
+	postSubscription(t, server, secret, "subscription.updated", subscriptionID, r.Organization.ID, nextStart, nextEnd, renewedAt.Add(time.Second))
+
+	plan, err := models.FindOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, plan.CurrentPeriodStart)
+	require.NotNil(t, plan.CurrentPeriodEnd)
+	assert.True(t, plan.CurrentPeriodStart.Equal(nextStart))
+	assert.True(t, plan.CurrentPeriodEnd.Equal(nextEnd))
+	requireIncludedGrant(t, r.Organization.ID, subscriptionID, nextEnd, plan.Catalog.CreditAmountCents)
+	assert.Equal(t, welcomeBefore, creditGrantCount(t, r.Organization.ID, models.LLMCreditGrantKindWelcome))
+
+	staleStart := nextEnd
+	staleEnd := staleStart.AddDate(0, 1, 0)
+	postSubscription(t, server, secret, "subscription.cycled", subscriptionID, r.Organization.ID, staleStart, staleEnd, renewedAt.Add(-time.Hour))
+
+	plan, err = models.FindOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, plan.CurrentPeriodStart)
+	require.NotNil(t, plan.CurrentPeriodEnd)
+	assert.True(t, plan.CurrentPeriodStart.Equal(nextStart))
+	assert.True(t, plan.CurrentPeriodEnd.Equal(nextEnd))
+	assert.Equal(t, 0, includedGrantCount(t, r.Organization.ID, subscriptionID, staleEnd))
+}
+
+func postSubscription(
+	t *testing.T,
+	server *Server,
+	secret, eventType, subscriptionID string,
+	orgID uuid.UUID,
+	start, end, modified time.Time,
+) {
+	t.Helper()
+	body := []byte(fmt.Sprintf(`{
+		"type": %q,
+		"data": {
+			"id": %q,
+			"status": "active",
+			"product_id": "prod_business",
+			"modified_at": %q,
+			"current_period_start": %q,
+			"current_period_end": %q,
+			"customer": {"id": "cust_1", "external_id": %q}
+		}
+	}`, eventType, subscriptionID, modified.UTC().Format(time.RFC3339), start.UTC().Format(time.RFC3339), end.UTC().Format(time.RFC3339), orgID.String()))
+	rec := signedPolarWebhook(t, secret, body)
+	server.handlePolarWebhook(rec.recorder, rec.request)
+	require.Equal(t, http.StatusAccepted, rec.recorder.Code)
+}
+
+func requireIncludedGrant(t *testing.T, orgID uuid.UUID, subscriptionID string, periodEnd time.Time, amountCents int64) {
+	t.Helper()
+	assert.Equal(t, 1, includedGrantCount(t, orgID, subscriptionID, periodEnd))
+	grants, err := models.ListOrganizationLLMCreditGrants(database.Conn(), orgID)
+	require.NoError(t, err)
+	key := models.IncludedGrantKey(subscriptionID, periodEnd)
+	for _, grant := range grants {
+		if grant.Kind != models.LLMCreditGrantKindIncluded || grant.PolarOrderID == nil || *grant.PolarOrderID != key {
+			continue
+		}
+		assert.Equal(t, models.CentsToMicros(amountCents), grant.AmountMicros)
+		require.NotNil(t, grant.ExpiresAt)
+		assert.True(t, grant.ExpiresAt.Equal(periodEnd.UTC()))
+		return
+	}
+	require.Fail(t, "expected an included grant for the new period")
+}
+
+func includedGrantCount(t *testing.T, orgID uuid.UUID, subscriptionID string, periodEnd time.Time) int {
+	t.Helper()
+	grants, err := models.ListOrganizationLLMCreditGrants(database.Conn(), orgID)
+	require.NoError(t, err)
+	key := models.IncludedGrantKey(subscriptionID, periodEnd)
+	count := 0
+	for _, grant := range grants {
+		if grant.Kind == models.LLMCreditGrantKindIncluded && grant.PolarOrderID != nil && *grant.PolarOrderID == key {
+			count++
+		}
+	}
+	return count
+}
+
+func creditGrantCount(t *testing.T, orgID uuid.UUID, kind string) int {
+	t.Helper()
+	grants, err := models.ListOrganizationLLMCreditGrants(database.Conn(), orgID)
+	require.NoError(t, err)
+	count := 0
+	for _, grant := range grants {
+		if grant.Kind == kind {
+			count++
+		}
+	}
+	return count
+}
+
+func capturePolarWebhookLogs(t *testing.T) *logtest.Hook {
+	t.Helper()
+	logger := log.StandardLogger()
+	previous := logger.ReplaceHooks(make(log.LevelHooks))
+	for _, hooks := range previous {
+		for _, existing := range hooks {
+			logger.AddHook(existing)
+		}
+	}
+	hook := logtest.NewGlobal()
+	t.Cleanup(func() {
+		logger.ReplaceHooks(previous)
+	})
+	return hook
+}
+
+func requirePolarWebhookWarning(t *testing.T, hook *logtest.Hook, eventType string) {
+	t.Helper()
+	for _, entry := range hook.AllEntries() {
+		if entry.Level != log.WarnLevel {
+			continue
+		}
+		if entry.Message != "ignored unsupported polar webhook event" {
+			continue
+		}
+		assert.Contains(t, fmt.Sprint(entry.Data["error"]), eventType)
+		assert.Equal(t, eventType, entry.Data["polar_event_type"])
+		return
+	}
+	require.Fail(t, "expected a warning for the unsupported polar event")
 }
 
 type signedPolarWebhookCall struct {
