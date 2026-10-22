@@ -75,7 +75,7 @@ function BacklogPreview({ source, detail = false }: { source: BacklogStorySource
 }
 
 const meta = {
-  title: "Factories/Pages/Automation run history/Backlog",
+  title: "Factories/Components/Run history/Integration scenarios/Backlog",
   component: BacklogPreview,
   decorators: [withFactoriesTheme],
   parameters: { layout: "fullscreen" },

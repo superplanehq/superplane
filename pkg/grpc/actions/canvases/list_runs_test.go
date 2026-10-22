@@ -51,6 +51,50 @@ func Test__ListRuns__ReturnsRunsWithRootEventsAndExecutionRefs(t *testing.T) {
 	assert.False(t, response.HasNextPage)
 }
 
+// A passed filter can emit on either branch. Lists must expose that evidence
+// without loading output payloads or interpreting the current canvas version.
+func Test__ListRuns__ReturnsRecordedChannelsAndHistoricalComponents(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "trigger", Type: models.NodeTypeTrigger},
+		{NodeID: "filter", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "if"}})},
+	}, nil)
+	root := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	rejected := createFinishedRun(t, root, models.CanvasRunResultPassed)
+	rejectedExecution := createRunExecution(t, rejected, root.ID, "filter", models.CanvasNodeExecutionResultPassed)
+	support.EmitCanvasEventForNode(t, canvas.ID, "filter", "false", &rejectedExecution.ID)
+	support.EmitCanvasEventForNode(t, canvas.ID, "filter", "false", &rejectedExecution.ID)
+	nextRoot := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	accepted := createFinishedRun(t, nextRoot, models.CanvasRunResultPassed)
+	acceptedExecution := createRunExecution(t, accepted, nextRoot.ID, "filter", models.CanvasNodeExecutionResultPassed)
+	support.EmitCanvasEventForNode(t, canvas.ID, "filter", "true", &acceptedExecution.ID)
+	// Later canvas edits must not change the interpretation of recorded runs.
+	require.NoError(t, db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "filter").Update("ref", datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "other"}})).Error)
+	newVersion := models.CanvasVersion{
+		ID: uuid.New(), WorkflowID: canvas.ID,
+		Nodes: datatypes.NewJSONSlice([]models.Node{{ID: "filter", Type: models.NodeTypeComponent, Ref: models.NodeRef{Component: &models.ComponentRef{Name: "other"}}}}),
+		Edges: datatypes.NewJSONSlice([]models.Edge{}),
+	}
+	require.NoError(t, db.Create(&newVersion).Error)
+	require.NoError(t, db.Model(canvas).Update("live_version_id", newVersion.ID).Error)
+	response, err := ListRuns(t.Context(), db, canvas, 0, nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, response.Runs, 2)
+	channels := map[string][]string{}
+	for _, run := range response.Runs {
+		require.Len(t, run.Executions, 1)
+		assert.Equal(t, "if", run.Executions[0].ComponentName)
+		channels[run.Id] = run.Executions[0].OutputChannels
+	}
+	assert.Equal(t, []string{"false"}, channels[rejected.ID.String()])
+	assert.Equal(t, []string{"true"}, channels[accepted.ID.String()])
+	detail, err := DescribeRun(t.Context(), db, canvas, rejected.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"false"}, detail.Run.Executions[0].OutputChannels)
+	assert.Equal(t, "if", detail.Run.Executions[0].ComponentName)
+}
+
 func Test__ListRuns__ReturnsRunsWithQueueItems(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(
