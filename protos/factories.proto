@@ -2951,6 +2951,7 @@ message PlanningSessionActivity {
 message PlanningSessionSurveyQuestion {
   string prompt = 1;
   repeated string options = 2;
+  string recommended_option = 3;
 }
 
 message PlanningSessionSurvey {

@@ -18,7 +18,7 @@ func TestSerializePlanningSessionSummary_KeepsBoardFields(t *testing.T) {
 		WaitState: models.PlanningWaitPending,
 		SurveyID:  &surveyID,
 		Survey: datatypes.NewJSONType(models.PlanningSessionSurvey{
-			Questions: []models.PlanningSessionSurveyQuestion{{Prompt: "Which API?", Options: []string{"REST"}}},
+			Questions: []models.PlanningSessionSurveyQuestion{{Prompt: "Which API?", Options: []string{"REST"}, RecommendedOption: "REST"}},
 		}),
 	}
 
@@ -32,6 +32,7 @@ func TestSerializePlanningSessionSummary_KeepsBoardFields(t *testing.T) {
 	require.Len(t, summary.Survey.Questions, 1)
 	assert.Equal(t, "Which API?", summary.Survey.Questions[0].Prompt)
 	assert.Equal(t, []string{"REST"}, summary.Survey.Questions[0].Options)
+	assert.Equal(t, "REST", summary.Survey.Questions[0].RecommendedOption)
 }
 
 func TestSerializePlanningSessionSummary_OmitsEmptySurvey(t *testing.T) {
