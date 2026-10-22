@@ -519,6 +519,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		}))
 		defer activeServer.Close()
 		t.Setenv("POLAR_API_BASE_URL", activeServer.URL)
+		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 		now := time.Now()
 		end := now.AddDate(0, 1, 0)
 		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
