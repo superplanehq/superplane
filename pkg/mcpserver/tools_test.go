@@ -26,13 +26,13 @@ func enableFactories(t *testing.T, orgID uuid.UUID) {
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureSuperPlaneMCPServer))
 }
 
-func toolClaims(r *support.ResourceRegistry, factoryID uuid.UUID) *AccessClaims {
+func toolClaims(r *support.ResourceRegistry, factoryIDs ...uuid.UUID) *AccessClaims {
 	return &AccessClaims{
-		UserID:    r.User,
-		OrgID:     r.Organization.ID,
-		FactoryID: factoryID,
-		Resource:  "http://localhost:8000/mcp",
-		Scopes:    append([]string{}, GrantedScopes...),
+		UserID:     r.User,
+		OrgID:      r.Organization.ID,
+		FactoryIDs: factoryIDs,
+		Resource:   "http://localhost:8000/mcp",
+		Scopes:     append([]string{}, GrantedScopes...),
 	}
 }
 
@@ -840,4 +840,140 @@ func memberIndex(t *testing.T, members []any, email string) int {
 	}
 	t.Fatalf("member %s not found", email)
 	return -1
+}
+
+func TestListWorkspacesReturnsTheGrantedSet(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	alpha, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "ALP")
+	require.NoError(t, err)
+	beta, err := models.CreateFactory(db, r.Organization.ID, "Beta", "", "BET")
+	require.NoError(t, err)
+	_, err = models.CreateFactory(db, r.Organization.ID, "Ungranted", "", "UNG")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	// A granted workspace that was deleted, or never existed, is left out.
+	claims := toolClaims(r, alpha.ID, beta.ID, uuid.New())
+	result, err := runtime.CallTool(ctx, claims, "list_workspaces", map[string]any{})
+	require.NoError(t, err)
+
+	workspaces, ok := decodeToolJSON(t, result)["workspaces"].([]any)
+	require.True(t, ok)
+	require.Len(t, workspaces, 2)
+	first, _ := workspaces[0].(map[string]any)
+	second, _ := workspaces[1].(map[string]any)
+	assert.Equal(t, map[string]any{"id": alpha.ID.String(), "key": "ALP", "name": "Alpha"}, first)
+	assert.Equal(t, map[string]any{"id": beta.ID.String(), "key": "BET", "name": "Beta"}, second)
+}
+
+func TestTaskToolsActInTheNamedWorkspace(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	alpha, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "ALP")
+	require.NoError(t, err)
+	beta, err := models.CreateFactory(db, r.Organization.ID, "Beta", "", "BET")
+	require.NoError(t, err)
+	inAlpha, err := alpha.CreateWorkOrder(db, "In Alpha", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	claims := toolClaims(r, alpha.ID, beta.ID)
+
+	created, err := runtime.CallTool(ctx, claims, "create_task", map[string]any{"title": "In Beta", "workspace": "BET"})
+	require.NoError(t, err)
+	createdID, _ := decodeToolJSON(t, created)["id"].(string)
+	stored, err := models.FindUnscopedWorkOrder(db, uuid.MustParse(createdID))
+	require.NoError(t, err)
+	assert.Equal(t, beta.ID, stored.FactoryID)
+
+	listed, err := runtime.CallTool(ctx, claims, "list_tasks", map[string]any{"workspace": alpha.ID.String()})
+	require.NoError(t, err)
+	tasks, _ := decodeToolJSON(t, listed)["tasks"].([]any)
+	require.Len(t, tasks, 1)
+	row, _ := tasks[0].(map[string]any)
+	assert.Equal(t, inAlpha.ID.String(), row["id"])
+
+	_, err = runtime.CallTool(ctx, claims, "get_task", map[string]any{"task": inAlpha.ID.String(), "workspace": "BET"})
+	require.Error(t, err)
+	assert.Equal(t, "Not found", err.Error())
+}
+
+func TestTaskToolsNeedAWorkspaceWhenSeveralAreGranted(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	alpha, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "ALP")
+	require.NoError(t, err)
+	beta, err := models.CreateFactory(db, r.Organization.ID, "Beta", "", "BET")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, toolClaims(r, alpha.ID, beta.ID), "list_tasks", map[string]any{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "list_workspaces")
+
+	_, err = runtime.CallTool(ctx, toolClaims(r, alpha.ID), "list_tasks", map[string]any{})
+	require.NoError(t, err)
+}
+
+func TestTaskToolsRejectUngrantedWorkspaces(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	granted, err := models.CreateFactory(db, r.Organization.ID, "Granted", "", "GRA")
+	require.NoError(t, err)
+	sibling, err := models.CreateFactory(db, r.Organization.ID, "Sibling", "", "SIB")
+	require.NoError(t, err)
+	otherOrg := support.CreateOrganization(t, r, r.User)
+	foreign, err := models.CreateFactory(db, otherOrg.ID, "Foreign", "", "FOR")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	claims := toolClaims(r, granted.ID, uuid.New())
+	for name, ref := range map[string]string{
+		"sibling id":           sibling.ID.String(),
+		"sibling key":          "SIB",
+		"foreign organization": foreign.ID.String(),
+		"foreign key":          "FOR",
+		"unknown":              "NOPE",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := runtime.CallTool(ctx, claims, "create_task", map[string]any{"title": "Nope", "workspace": ref})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "Workspace not found")
+		})
+	}
+
+	count := func(factoryID uuid.UUID) int64 {
+		var rows int64
+		require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factoryID).Count(&rows).Error)
+		return rows
+	}
+	assert.Zero(t, count(sibling.ID))
+	assert.Zero(t, count(foreign.ID))
+}
+
+func TestToolsOfferTheWorkspaceArgumentOnWorkspaceTools(t *testing.T) {
+	for _, tool := range Tools() {
+		properties, _ := tool.InputSchema["properties"].(map[string]any)
+		_, hasWorkspace := properties["workspace"]
+		switch tool.Name {
+		case "list_workspaces", "list_members":
+			assert.False(t, hasWorkspace, tool.Name)
+		default:
+			assert.True(t, hasWorkspace, tool.Name)
+			assert.NotContains(t, tool.Description, "this workspace", tool.Name)
+		}
+	}
 }

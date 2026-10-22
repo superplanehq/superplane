@@ -348,6 +348,8 @@ function SuperPlaneMCPClientRow({
 }) {
   const clientName = mcpClientDisplayName(client);
   const userName = mcpClientUserName(client);
+  const otherWorkspaceNames = client.otherWorkspaceNames ?? [];
+  const otherWorkspaces = otherWorkspaceNames.join(", ");
   const when = formatRelativeTime(client.createdAt);
   const absoluteWhen = client.createdAt ? formatTimestampInUserTimezone(client.createdAt) : undefined;
 
@@ -361,7 +363,18 @@ function SuperPlaneMCPClientRow({
             alt={userName}
             className="size-6 shrink-0 bg-muted text-[10px] text-muted-foreground"
           />
-          <span className="truncate text-[13px] font-medium text-foreground">{userName}</span>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-medium text-foreground">{userName}</div>
+            {otherWorkspaceNames.length > 0 ? (
+              <div
+                className="truncate text-[12px] text-muted-foreground"
+                title={otherWorkspaces}
+                data-testid={`superplane-mcp-client-other-workspaces-${client.id}`}
+              >
+                {SUPERPLANE_MCP_SERVER_COPY.alsoReaches}: {otherWorkspaces}
+              </div>
+            ) : null}
+          </div>
         </div>
       </td>
       <td className="overflow-hidden py-2.5 pr-3">

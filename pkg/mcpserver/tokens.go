@@ -14,20 +14,27 @@ const AccessTokenTTL = time.Hour
 const ConsentTTL = 10 * time.Minute
 
 type AccessClaims struct {
-	UserID    uuid.UUID
-	OrgID     uuid.UUID
-	FactoryID uuid.UUID
-	ClientID  string
-	Resource  string
-	Scopes    []string
+	UserID     uuid.UUID
+	OrgID      uuid.UUID
+	FactoryIDs []uuid.UUID
+	ClientID   string
+	Resource   string
+	Scopes     []string
 }
 
 func MintAccessToken(signer *jwt.Signer, claims AccessClaims, ttl time.Duration) (string, error) {
 	if signer == nil {
 		return "", fmt.Errorf("jwt signer is required")
 	}
-	if claims.UserID == uuid.Nil || claims.OrgID == uuid.Nil || claims.FactoryID == uuid.Nil {
+	if claims.UserID == uuid.Nil || claims.OrgID == uuid.Nil || len(claims.FactoryIDs) == 0 {
 		return "", fmt.Errorf("access token scope is incomplete")
+	}
+	factoryIDs := make([]string, 0, len(claims.FactoryIDs))
+	for _, id := range claims.FactoryIDs {
+		if id == uuid.Nil {
+			return "", fmt.Errorf("access token scope is incomplete")
+		}
+		factoryIDs = append(factoryIDs, id.String())
 	}
 	clientID := strings.TrimSpace(claims.ClientID)
 	if clientID == "" {
@@ -40,14 +47,14 @@ func MintAccessToken(signer *jwt.Signer, claims AccessClaims, ttl time.Duration)
 	if ttl <= 0 {
 		ttl = AccessTokenTTL
 	}
-	return signer.GenerateWithClaims(ttl, map[string]string{
-		"purpose":    AccessTokenPurpose,
-		"sub":        claims.UserID.String(),
-		"org_id":     claims.OrgID.String(),
-		"factory_id": claims.FactoryID.String(),
-		"client_id":  clientID,
-		"aud":        resource,
-		"scope":      strings.Join(normalizeScopes(claims.Scopes), " "),
+	return signer.GenerateWithJSONClaims(ttl, map[string]any{
+		"purpose":     AccessTokenPurpose,
+		"sub":         claims.UserID.String(),
+		"org_id":      claims.OrgID.String(),
+		"factory_ids": factoryIDs,
+		"client_id":   clientID,
+		"aud":         resource,
+		"scope":       strings.Join(normalizeScopes(claims.Scopes), " "),
 	})
 }
 
@@ -75,7 +82,7 @@ func ParseAccessToken(signer *jwt.Signer, token, resource string) (*AccessClaims
 	if err != nil {
 		return nil, err
 	}
-	factoryID, err := parseClaimUUID(claims, "factory_id")
+	factoryIDs, err := parseFactoryIDsClaim(claims)
 	if err != nil {
 		return nil, err
 	}
@@ -85,12 +92,12 @@ func ParseAccessToken(signer *jwt.Signer, token, resource string) (*AccessClaims
 	}
 	scope, _ := claims["scope"].(string)
 	return &AccessClaims{
-		UserID:    userID,
-		OrgID:     orgID,
-		FactoryID: factoryID,
-		ClientID:  clientID,
-		Resource:  audience,
-		Scopes:    strings.Fields(scope),
+		UserID:     userID,
+		OrgID:      orgID,
+		FactoryIDs: factoryIDs,
+		ClientID:   clientID,
+		Resource:   audience,
+		Scopes:     strings.Fields(scope),
 	}, nil
 }
 
@@ -154,6 +161,34 @@ func parseClaimUUID(claims map[string]any, key string) (uuid.UUID, error) {
 		return uuid.Nil, fmt.Errorf("invalid %s", key)
 	}
 	return id, nil
+}
+
+// parseFactoryIDsClaim reads the workspace list. Access tokens minted before
+// multi-workspace grants carry one `factory_id` claim instead. Read that as a
+// one-item list until those tokens expire.
+func parseFactoryIDsClaim(claims map[string]any) ([]uuid.UUID, error) {
+	raw, ok := claims["factory_ids"]
+	if !ok {
+		id, err := parseClaimUUID(claims, "factory_id")
+		if err != nil {
+			return nil, fmt.Errorf("invalid factory_ids")
+		}
+		return []uuid.UUID{id}, nil
+	}
+	items, ok := raw.([]any)
+	if !ok || len(items) == 0 {
+		return nil, fmt.Errorf("invalid factory_ids")
+	}
+	ids := make([]uuid.UUID, 0, len(items))
+	for _, item := range items {
+		text, _ := item.(string)
+		id, err := uuid.Parse(strings.TrimSpace(text))
+		if err != nil || id == uuid.Nil {
+			return nil, fmt.Errorf("invalid factory_ids")
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 func stringClaim(claims map[string]any, key string) string {

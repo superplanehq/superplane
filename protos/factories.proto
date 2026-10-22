@@ -3047,6 +3047,7 @@ message FactoryMCPClient {
   string user_email = 5;
   google.protobuf.Timestamp created_at = 6;
   string user_avatar_url = 7;
+  repeated string other_workspace_names = 8;
 }
 
 message ListFactoryMCPClientsRequest {
