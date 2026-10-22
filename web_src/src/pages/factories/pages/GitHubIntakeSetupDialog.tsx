@@ -62,8 +62,8 @@ function SetupFooter({ setup, onCreated }: { setup: GitHubIntakeSetupModel; onCr
   return (
     <div className="space-y-3">
       <IntakeSkipInitialImportField
-        checked={!setup.skipInitialImport}
-        onCheckedChange={(importExisting) => setup.setSkipInitialImport(!importExisting)}
+        checked={setup.skipInitialImport}
+        onCheckedChange={setup.setSkipInitialImport}
         helper={
           setup.skipInitialImport
             ? GITHUB_INTAKE_SETUP_COPY.importExistingHelperOff

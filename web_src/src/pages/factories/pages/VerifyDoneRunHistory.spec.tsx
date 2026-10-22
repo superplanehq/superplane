@@ -33,6 +33,7 @@ const settings: PRFeedbackDraftSettings = {
   repository: "acme/payments",
   mention: "@superplane",
   ignoreBots: true,
+  addressAllBots: false,
   allowedBots: [],
   checkNames: [],
   maximumAttempts: 3,

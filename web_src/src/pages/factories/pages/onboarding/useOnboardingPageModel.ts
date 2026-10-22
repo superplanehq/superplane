@@ -356,6 +356,7 @@ function onboardingSetupOptions(
     initial: initialSetupState(onboarding),
     persistVcsHostKey: factoryId,
     persistRepoKey: factoryId,
+    persistInitialImportKey: factoryId,
   };
 }
 

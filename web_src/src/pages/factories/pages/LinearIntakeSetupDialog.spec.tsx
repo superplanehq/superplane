@@ -73,7 +73,7 @@ describe("LinearIntakeSetupDialog", () => {
     expect(
       await screen.findByRole("heading", { name: LINEAR_INTAKE_SETUP_COPY.wizardStepProject }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("linear-skip-initial-import")).toBeChecked();
+    expect(screen.getByTestId("linear-skip-initial-import")).not.toBeChecked();
     expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.importExistingHelper)).toBeInTheDocument();
     expect(screen.getByTestId("linear-setup-finish")).toBeDisabled();
   });

@@ -6,6 +6,35 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
 
 describe("FirstRunTicketsScreen", () => {
+  it("explains the first workspace cap without offering to skip", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="github-issues"
+        initialImportLimit={3}
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Import up to 3 existing issues to get started.")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Skip initial import/ })).not.toBeInTheDocument();
+  });
+
+  it("lets later workspaces skip the initial import", async () => {
+    const onChange = vi.fn();
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="github-issues"
+        onSkipInitialImportChange={onChange}
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+    const checkbox = screen.getByRole("checkbox", { name: /Skip initial import/ });
+    expect(checkbox).not.toBeChecked();
+    await userEvent.setup().click(checkbox);
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
   it("keeps analysis stopped until a ticket system is selected", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
