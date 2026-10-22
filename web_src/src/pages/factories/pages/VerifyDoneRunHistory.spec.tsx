@@ -8,7 +8,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
-import { resetHostMocks, useCanvas } from "./IntakeSettingsHost.spec.fixtures";
+import { resetHostMocks, useCanvas, useInfiniteCanvasRuns } from "./IntakeSettingsHost.spec.fixtures";
 import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 
 let enabled = true;
@@ -85,6 +85,19 @@ describe("Verify and Done run history", () => {
   beforeEach(() => {
     resetHostMocks();
     enabled = true;
+    const runs = useInfiniteCanvasRuns();
+    useInfiniteCanvasRuns.mockReturnValue({
+      ...runs,
+      data: {
+        ...runs.data,
+        pages: runs.data.pages.map((page: { runs: Array<{ id?: string }> }) => ({
+          ...page,
+          runs: page.runs.map((run) =>
+            run.id === "run-intake-1" ? { ...run, task: { id: "task", key: "SP-123", title: "Linked task" } } : run,
+          ),
+        })),
+      },
+    });
   });
 
   it.each(
