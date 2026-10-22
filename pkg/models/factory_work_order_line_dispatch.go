@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -214,19 +215,25 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return nil, err
 	}
 
-	full, err := organizationAtTaskCapacity(tx, l.OrganizationID)
+	activeTasks, err := continuableOrganizationTaskIDs(tx, l.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
-	if full {
-		return l.enqueueStep(tx, order, stepIndex)
-	}
-	queued, err := hasEligibleQueuedTask(tx, l.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
-	if queued {
-		return l.enqueueStep(tx, order, stepIndex)
+	if !slices.Contains(activeTasks, order.ID) {
+		full, err := organizationAtTaskCapacity(tx, l.OrganizationID)
+		if err != nil {
+			return nil, err
+		}
+		if full {
+			return l.enqueueStep(tx, order, stepIndex)
+		}
+		queued, err := hasEligibleQueuedTask(tx, l.OrganizationID)
+		if err != nil {
+			return nil, err
+		}
+		if queued {
+			return l.enqueueStep(tx, order, stepIndex)
+		}
 	}
 
 	step := admissionStep(line, l, stepIndex)

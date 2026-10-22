@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +21,51 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
+
+func TestOrganizationQueueActiveReviewTaskKeepsItsSlotForLineWork(t *testing.T) {
+	for _, queued := range []bool{false, true} {
+		t.Run(fmt.Sprintf("queued=%t", queued), func(t *testing.T) {
+			r := support.Setup(t)
+			setTaskPlanLimit(t, r, 1)
+			fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1)})
+			order := fixture.createOpenWorkOrder(t, r, "Active review")
+			db := database.DB(t.Context())
+			var dispatch *models.FactoryWorkOrderLineDispatch
+			if queued {
+				_, running := fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Step blocker"))
+				dispatch, _ = fixture.dispatchLine(t, order)
+				finishRun(t, running.Run, models.CanvasRunResultPassed)
+				require.NoError(t, running.Execution.MarkFinished(db, models.CanvasRunResultPassed))
+			}
+			pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/42"})
+			require.NoError(t, err)
+			run, err := models.CreateCanvasRunInTransaction(db, fixture.line.Steps[0].AppID, fixture.line.Steps[0].Entrypoint, models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			require.NoError(t, pullRequest.LinkRun(db, run.ID, "Review"))
+			other := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1)})
+			waiter, waiting := other.dispatchLine(t, other.createOpenWorkOrder(t, r, "Older waiting task"))
+			require.NotNil(t, waiting.QueueItem)
+			if queued {
+				require.NoError(t, db.Model(&models.FactoryWorkOrderQueueItem{}).Where("line_dispatch_id = ?", waiter.ID).Update("created_at", time.Now().Add(-time.Minute)).Error)
+				NewRunFinalizer("", r.Registry).sweepQueuedTasks(t.Context())
+				require.Nil(t, queueItemForDispatch(t, dispatch.ID))
+				require.Len(t, executionsForOrder(t, order.ID), 1)
+			} else {
+				_, started := fixture.dispatchLine(t, order)
+				require.NotNil(t, started.Run, "the active review already reserves this task's organization slot")
+			}
+			require.NotNil(t, queueItemForDispatch(t, waiter.ID))
+			active, err := models.ListActiveOrganizationTaskIDs(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.Equal(t, []uuid.UUID{order.ID}, active)
+			// The organization exception does not bypass the separate step limit.
+			_, blocked := fixture.dispatchLine(t, order)
+			require.NotNil(t, blocked.QueueItem)
+			NewRunFinalizer("", r.Registry).sweepQueuedTasks(t.Context())
+			require.NotNil(t, queueItemForDispatch(t, blocked.QueueItem.LineDispatchID))
+		})
+	}
+}
 
 func Test__OrganizationQueue_ConcurrentDispatchesReserveSharedSlots(t *testing.T) {
 	r := support.Setup(t)
@@ -461,11 +507,18 @@ func Test__OrganizationQueue_SweepPublishesAdmittedWorkspaceAfterCommit(t *testi
 
 func Test__OrganizationQueue_InvalidWaiterPreservesExecutionOwningDispatch(t *testing.T) {
 	r := support.Setup(t)
-	plan := setTaskPlanLimit(t, r, 1)
-	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10), stepMaxParallelism(10)})
+	setTaskPlanLimit(t, r, 2)
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10), stepMaxParallelism(1)})
+	db := database.DB(t.Context())
+	blocker := fixture.createOpenWorkOrder(t, r, "Step blocker")
+	var blocking *models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, result, err := fixture.line.DispatchFrom(tx, blocker, 1)
+		blocking = result
+		return err
+	}))
 	order := fixture.createOpenWorkOrder(t, r, "Still owned")
 	dispatch, running := fixture.dispatchLine(t, order)
-	db := database.DB(t.Context())
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		queued, err := dispatch.EnqueueOrStartStep(tx, order, 1)
 		if err != nil {
@@ -474,8 +527,8 @@ func Test__OrganizationQueue_InvalidWaiterPreservesExecutionOwningDispatch(t *te
 		require.NotNil(t, queued.QueueItem)
 		return tx.Model(queued.QueueItem).Update("step_index", 999).Error
 	}))
-	plan.ParallelTaskLimit = stepMaxParallelism(2)
-	require.NoError(t, models.SaveBillingPlan(db, plan))
+	finishRun(t, blocking.Run, models.CanvasRunResultPassed)
+	require.NoError(t, blocking.Execution.MarkFinished(db, models.CanvasRunResultPassed))
 	NewRunFinalizer("", r.Registry).sweepQueuedTasks(t.Context())
 	assert.Nil(t, queueItemForDispatch(t, dispatch.ID))
 	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, reloadDispatch(t, dispatch.ID).State)
