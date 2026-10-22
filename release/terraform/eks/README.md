@@ -25,10 +25,23 @@ aws sts get-caller-identity
 
 Confirm the account ID before you create resources.
 
-### 2. Build the runner AMI
+### 2. Select the runner AMI
 
 Runners are enabled by default, so Terraform requires a runner AMI before the
-first apply. The default fleet uses the amd64 AMI. Build it in the region that you deploy to. Follow
+first apply. The default fleet uses the amd64 AMI.
+
+In `us-east-1`, use the newest public SuperPlane AMI. `x86_64` is amd64:
+
+```bash
+aws ec2 describe-images \
+  --region us-east-1 \
+  --owners 802589444644 \
+  --filters 'Name=name,Values=superplane-runner-*' 'Name=is-public,Values=true' \
+  --query 'sort_by(Images,&CreationDate)[].[Architecture,ImageId,CreationDate]' \
+  --output table
+```
+
+In another region, build the AMI in that region. Follow
 [release/runner/packer/aws/README.md](../../runner/packer/aws/README.md):
 
 ```bash
@@ -37,7 +50,7 @@ packer init release/runner/packer/aws/runner.pkr.hcl
 packer build \
   -var architecture=amd64 \
   -var instance_type=t3.medium \
-  -var aws_region=us-east-1 \
+  -var aws_region=us-west-2 \
   release/runner/packer/aws/runner.pkr.hcl
 cd release/terraform/eks
 ```
