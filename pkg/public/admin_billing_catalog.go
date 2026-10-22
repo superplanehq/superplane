@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 	"net/http"
-	"slices"
 )
 
 func (s *Server) adminSaveBillingPlan(w http.ResponseWriter, r *http.Request) {
@@ -28,17 +27,6 @@ func (s *Server) adminSaveBillingPlan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		plan.ID = parsed
-	}
-	definitions, err := models.ListPlanFeatureDefinitions(database.DB(r.Context()))
-	if err != nil {
-		writeCatalogError(w, err)
-		return
-	}
-	for _, key := range plan.Features {
-		if !slices.ContainsFunc(definitions, func(feature models.PlanFeatureDefinition) bool { return feature.Key == key }) {
-			http.Error(w, "Unknown feature", 400)
-			return
-		}
 	}
 	if err := models.SaveBillingPlan(database.DB(r.Context()), &plan); err != nil {
 		writeCatalogError(w, err)
@@ -90,6 +78,14 @@ func (s *Server) adminSaveFeatureDefinition(w http.ResponseWriter, r *http.Reque
 	respondJSON(w, feature)
 }
 
+func (s *Server) adminDeleteFeatureDefinition(w http.ResponseWriter, r *http.Request) {
+	if err := models.DeletePlanFeatureDefinition(database.DB(r.Context()), mux.Vars(r)["featureKey"]); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) adminOrganizationFeatures(w http.ResponseWriter, r *http.Request) {
 	orgID, ok := parseAdminOrgID(w, r)
 	if !ok {
@@ -100,15 +96,6 @@ func (s *Server) adminOrganizationFeatures(w http.ResponseWriter, r *http.Reques
 		var grant models.OrganizationFeatureGrant
 		if err := json.NewDecoder(r.Body).Decode(&grant); err != nil {
 			http.Error(w, "Invalid feature grant", 400)
-			return
-		}
-		definitions, err := models.ListPlanFeatureDefinitions(db)
-		if err != nil {
-			writeCatalogError(w, err)
-			return
-		}
-		if !slices.ContainsFunc(definitions, func(feature models.PlanFeatureDefinition) bool { return feature.Key == grant.FeatureKey }) {
-			http.Error(w, "Unknown feature", 400)
 			return
 		}
 		grant.OrganizationID = orgID

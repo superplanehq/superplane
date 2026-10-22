@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { BillingPlanFeatures } from "./BillingPlanFeatures";
@@ -8,6 +8,7 @@ export function Features() {
   const [features, setFeatures] = useState<FeatureDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const retryButton = useRef<HTMLButtonElement>(null);
   useReportPageReady(!loading, { failed: !!error });
   const load = async () => {
     try {
@@ -33,7 +34,7 @@ export function Features() {
       {error && (
         <div role="alert" className="flex items-center justify-between rounded-lg border p-4 text-sm">
           {error}
-          <Button variant="outline" onClick={() => void load()}>
+          <Button ref={retryButton} variant="outline" onClick={() => void load()}>
             Try again
           </Button>
         </div>
@@ -43,7 +44,9 @@ export function Features() {
           Loading features...
         </p>
       ) : (
-        !error && <BillingPlanFeatures features={features} onSaved={load} />
+        !error && (
+          <BillingPlanFeatures features={features} onSaved={load} refreshErrorFocus={() => retryButton.current} />
+        )
       )}
     </div>
   );
