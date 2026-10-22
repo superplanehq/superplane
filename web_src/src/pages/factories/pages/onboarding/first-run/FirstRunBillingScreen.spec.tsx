@@ -108,6 +108,8 @@ it.each(["payg", "pro"])("verifies the saved card before finishing plan %s", asy
   } finally {
     window.open = previousOpen;
   }
+  expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
+  expect(await screen.findByText("Waiting for your saved card…")).toBeInTheDocument();
   expect(document.querySelector("iframe")).toBeNull();
   expect(selectPlan).not.toHaveBeenCalled();
   expect(finish).not.toHaveBeenCalled();
@@ -133,7 +135,10 @@ it("lets the user retry when the browser blocks the card setup window", async ()
     await user.click(await screen.findByRole("button", { name: /Pay-as-you-go/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Allow pop-ups for SuperPlane, then try again.");
     expect(createSession).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Add payment method" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Pay-as-you-go/ })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: /Pay-as-you-go/ }));
+    expect(window.open).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("button", { name: "Finish setup" })).toBeDisabled();
   } finally {
     window.open = previousOpen;
