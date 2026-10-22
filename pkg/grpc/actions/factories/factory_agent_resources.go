@@ -403,14 +403,10 @@ func modelKindToProto(kind string) pb.FactoryAgentResource_Kind {
 }
 
 func requireAgentResourceKindFeature(orgID uuid.UUID, kind string) error {
-	switch kind {
-	case models.FactoryAgentResourceKindSkill:
-		return requireEnabledFeature(orgID, features.FeatureWorkspaceSkills, errWorkspaceSkillsDisabled)
-	case models.FactoryAgentResourceKindSetup, models.FactoryAgentResourceKindContextRepo:
-		return requireEnabledFeature(orgID, features.FeatureWorkspaceAgent, errWorkspaceAgentDisabled)
-	default:
+	if kind != models.FactoryAgentResourceKindSkill {
 		return nil
 	}
+	return requireEnabledFeature(orgID, features.FeatureWorkspaceSkills, errWorkspaceSkillsDisabled)
 }
 
 func requireEnabledFeature(orgID uuid.UUID, featureID string, disabled error) error {

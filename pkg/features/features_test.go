@@ -65,13 +65,10 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
-	t.Run("known id returns workspace agent feature", func(t *testing.T) {
-		f, ok := Get(FeatureWorkspaceAgent)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureWorkspaceAgent, f.ID)
-		assert.Equal(t, "SuperPlane Agent", f.Label)
-		assert.Equal(t, "Show the SuperPlane Agent page", f.Description)
-		assert.Nil(t, f.Released)
+	t.Run("retired workspace agent flag is absent", func(t *testing.T) {
+		feature, ok := Get("workspace_agent")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
 	})
 
 	t.Run("known id returns workspace skills feature", func(t *testing.T) {
@@ -175,7 +172,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
-	assert.True(t, Exists(FeatureWorkspaceAgent))
+	assert.False(t, Exists("workspace_agent"))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
