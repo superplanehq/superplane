@@ -203,7 +203,7 @@ services:
               cpuMillicores: 2000
               memoryMb: 8192
               diskGb: 30
-              capabilities: [docker]
+              # Omit capabilities docker: the runner image has no Docker client.
             docker:
               image: ghcr.io/superplanehq/runner:${RUNNER_VERSION:-v0.2.0}
               architecture: ${RUNNER_ARCH:-amd64}

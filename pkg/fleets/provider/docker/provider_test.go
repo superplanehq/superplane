@@ -46,10 +46,11 @@ func TestProviderLifecycle(t *testing.T) {
 		},
 	}
 	p, err := newProvider(Config{
-		Image:        "runner:dev",
-		RunnerAPIURL: "http://app:8000",
-		Network:      "superplane_default",
-		Volumes:      []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		FleetManagerID: "coolify",
+		Image:          "runner:dev",
+		RunnerAPIURL:   "http://app:8000",
+		Network:        "superplane_default",
+		Volumes:        []string{"/var/run/docker.sock:/var/run/docker.sock"},
 	}, commands, slog.Default())
 	if err != nil {
 		t.Fatal(err)
@@ -61,6 +62,16 @@ func TestProviderLifecycle(t *testing.T) {
 	}
 	if len(resources) != 1 || resources[0].RunnerID != "runner-1" {
 		t.Fatalf("resources = %#v", resources)
+	}
+	listArgs := strings.Join(commands.calls[0].args, " ")
+	for _, expected := range []string{
+		"label=superplane.managed-runner=true",
+		"label=superplane.fleet-manager-id=coolify",
+		"label=superplane.fleet-id=e1-large-amd64",
+	} {
+		if !strings.Contains(listArgs, expected) {
+			t.Fatalf("list args %q do not contain %q", listArgs, expected)
+		}
 	}
 
 	encoded, err := p.BuildBootstrap(provider.RunnerBootstrap{
@@ -86,6 +97,7 @@ func TestProviderLifecycle(t *testing.T) {
 	createArgs := strings.Join(commands.calls[1].args, " ")
 	for _, expected := range []string{
 		"--network superplane_default",
+		"--label superplane.fleet-manager-id=coolify",
 		"runner:dev",
 		"--url http://app:8000",
 		"--registration-token one-time-token",
@@ -112,12 +124,22 @@ func TestProviderReportsDockerErrors(t *testing.T) {
 		outputs: [][]byte{[]byte("daemon unavailable")},
 		errors:  []error{errors.New("exit status 1")},
 	}
-	p, err := newProvider(Config{Image: "runner:dev"}, commands, nil)
+	p, err := newProvider(Config{
+		FleetManagerID: "coolify",
+		Image:          "runner:dev",
+	}, commands, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := p.List(context.Background(), "fleet"); err == nil ||
 		!strings.Contains(err.Error(), "daemon unavailable") {
 		t.Fatalf("List error = %v", err)
+	}
+}
+
+func TestNewRequiresFleetManagerID(t *testing.T) {
+	if _, err := newProvider(Config{Image: "runner:dev"}, &fakeCommandRunner{}, nil); err == nil ||
+		!strings.Contains(err.Error(), "Fleet Manager ID is required") {
+		t.Fatalf("New error = %v", err)
 	}
 }

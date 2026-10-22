@@ -223,7 +223,7 @@ services:
               cpuMillicores: 2000
               memoryMb: 8192
               diskGb: 30
-              capabilities: [docker]
+              # Omit capabilities docker: the runner image has no Docker client.
             docker:
               image: superplane-runner:coolify
               architecture: ${RUNNER_ARCH:-amd64}
