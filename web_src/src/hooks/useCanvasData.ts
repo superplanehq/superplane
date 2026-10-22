@@ -127,6 +127,8 @@ function consoleDataFromYaml(
 }
 
 // Query Keys
+const INCLUDE_TASK_QUERY_TOKEN = "includeTask";
+
 export const canvasKeys = {
   all: ["canvases"] as const,
   lists: () => [...canvasKeys.all, "list"] as const,
@@ -160,8 +162,10 @@ export const canvasKeys = {
       "infinite",
       ...(filters?.states?.length ? ["states", ...filters.states] : []),
       ...(filters?.results?.length ? ["results", ...filters.results] : []),
+      ...(filters?.includeTask ? [INCLUDE_TASK_QUERY_TOKEN] : []),
     ] as const,
-  run: (canvasId: string, runId: string) => [...canvasKeys.runs(), canvasId, runId] as const,
+  run: (canvasId: string, runId: string, includeTask = false) =>
+    [...canvasKeys.runs(), canvasId, runId, ...(includeTask ? [INCLUDE_TASK_QUERY_TOKEN] : [])] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
   nodeQueueItems: () => [...canvasKeys.all, "nodeQueueItems"] as const,
@@ -736,13 +740,14 @@ export const useDeleteCanvas = (organizationId: string) => {
 export type CanvasRunsFilters = {
   states?: CanvasesCanvasRunState[];
   results?: CanvasesCanvasRunResult[];
+  includeTask?: boolean;
 };
 
-export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
+export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true, includeTask = false) => {
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: canvasKeys.run(canvasId, runId!),
+    queryKey: canvasKeys.run(canvasId, runId!, includeTask),
     queryFn: async () => {
       const response = await canvasesDescribeRun(
         withOrganizationHeader({
@@ -750,6 +755,7 @@ export const useDescribeRun = (canvasId: string, runId: string | null, enabled =
             canvasId,
             runId: runId!,
           },
+          ...(includeTask ? { query: { includeTask: true } } : {}),
         }),
       );
       const described = response.data;
@@ -757,7 +763,9 @@ export const useDescribeRun = (canvasId: string, runId: string | null, enabled =
         return described;
       }
 
-      const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, runId!));
+      const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(
+        canvasKeys.run(canvasId, runId!, includeTask),
+      );
       return upsertRunIntoDescribeRunData(current, described.run);
     },
     refetchOnWindowFocus: false,
@@ -803,6 +811,7 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
             limit,
             ...(filters.states?.length ? { states: filters.states } : {}),
             ...(filters.results?.length ? { results: filters.results } : {}),
+            ...(filters.includeTask ? { includeTask: true } : {}),
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),

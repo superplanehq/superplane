@@ -69,7 +69,7 @@ export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): Canv
   if (queryKey[index] === "states") {
     index += 1;
     const states: CanvasesCanvasRunState[] = [];
-    while (index < queryKey.length && queryKey[index] !== "results") {
+    while (index < queryKey.length && queryKey[index] !== "results" && queryKey[index] !== "includeTask") {
       states.push(queryKey[index] as CanvasesCanvasRunState);
       index += 1;
     }
@@ -81,7 +81,7 @@ export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): Canv
   if (queryKey[index] === "results") {
     index += 1;
     const results: CanvasesCanvasRunResult[] = [];
-    while (index < queryKey.length) {
+    while (index < queryKey.length && queryKey[index] !== "includeTask") {
       results.push(queryKey[index] as CanvasesCanvasRunResult);
       index += 1;
     }
@@ -151,6 +151,7 @@ function mergeCanvasRunFields(existing: CanvasesCanvasRun, incoming: CanvasesCan
     updatedAt: incoming.updatedAt ?? existing.updatedAt,
     versionId: incoming.versionId ?? existing.versionId,
     parent: incoming.parent ?? existing.parent,
+    task: incoming.task ?? existing.task,
     totalTokens: keepRecordedMetric(existing.totalTokens, incoming.totalTokens),
     costCents: keepRecordedMetric(existing.costCents, incoming.costCents),
     models: keepRecordedModels(existing.models, incoming.models),

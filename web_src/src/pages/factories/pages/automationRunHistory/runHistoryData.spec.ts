@@ -10,8 +10,8 @@ describe("Implement run history data", () => {
         result: "RESULT_FAILED",
         createdAt: "2026-10-19T10:00:00Z",
         finishedAt: "2026-10-19T10:00:42Z",
+        task: { id: "task-1", key: "SP-42", title: "Fix retries" },
       },
-      [{ id: "task-1", key: "SP-42", title: "Fix retries", sourceRunId: "run-1" }],
       Date.now(),
     );
     expect(run.status).toBe("Failed");
@@ -19,10 +19,14 @@ describe("Implement run history data", () => {
     expect(run.duration).toBe("42s");
   });
   it("does not invent a passed result or completion time for incomplete records", () => {
-    const run = toAutomationRun({ id: "unknown", state: "STATE_FINISHED", result: "RESULT_UNKNOWN" }, [], Date.now());
+    const run = toAutomationRun({ id: "unknown", state: "STATE_FINISHED", result: "RESULT_UNKNOWN" }, Date.now());
     expect(run.status).toBe("Unknown");
     expect(run.duration).toBe("—");
     expect(run.task).toBeUndefined();
+  });
+  it("shows the task id when the key is empty and a placeholder when the title is empty", () => {
+    const run = toAutomationRun({ id: "run-1", task: { id: "task-1", key: "", title: "" } }, Date.now());
+    expect(run.task).toEqual({ id: "task-1", title: "Untitled task" });
   });
   it("uses recorded execution IDs and historical step names, retaining retry attempts and outputs", () => {
     const executions = [

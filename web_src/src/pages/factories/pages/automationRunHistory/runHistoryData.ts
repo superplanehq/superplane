@@ -2,12 +2,10 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
-  FactoriesWorkOrder,
   SuperplaneComponentsNode,
 } from "@/api-client";
 import { formatCompactDuration } from "@/lib/duration";
 import type { AutomationRun, RunActivity, RunStatus } from "@/ui/AutomationRunHistory/types";
-import { findWorkOrderForAutomationRun } from "../../lib/factoryAutomationStatus";
 
 export function recordedStatus(record: Pick<CanvasesCanvasRun, "state" | "result">): RunStatus {
   if (record.state === "STATE_CANCELLING") return "Cancelling";
@@ -25,18 +23,28 @@ export function runDuration(run: CanvasesCanvasRun, now: number): string {
   return Number.isFinite(start) && Number.isFinite(end) ? formatCompactDuration(Math.max(0, end - start)) : "—";
 }
 
-export function toAutomationRun(run: CanvasesCanvasRun, orders: FactoriesWorkOrder[], now: number): AutomationRun {
-  const order = findWorkOrderForAutomationRun(orders, run.id ?? "", run);
+export function toAutomationRun(run: CanvasesCanvasRun, now: number): AutomationRun {
   return {
     id: run.id ?? "",
     title: run.rootEvent?.customName,
-    task: order ? { id: order.key || order.id || "—", title: order.title || "Untitled task" } : undefined,
+    task: taskFromRun(run),
     status: recordedStatus(run),
     startedAt: run.createdAt ?? "",
     finishedAt: run.finishedAt,
     duration: runDuration(run, now),
     error: run.errors?.filter(Boolean).join("\n") || undefined,
     activities: [],
+  };
+}
+
+function taskFromRun(run: CanvasesCanvasRun): AutomationRun["task"] {
+  const task = run.task;
+  if (!task?.id) {
+    return undefined;
+  }
+  return {
+    id: task.key || task.id,
+    title: task.title || "Untitled task",
   };
 }
 
