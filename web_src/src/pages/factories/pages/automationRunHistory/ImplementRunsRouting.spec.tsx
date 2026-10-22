@@ -1,18 +1,11 @@
-import { cloneElement, createRef } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
+import { organizationKeys } from "@/hooks/useOrganizationData";
+import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
 import { MergeConfidenceConfigShell } from "../MergeConfidenceConfigShell";
 import { DEFAULT_SPLIT_CONFIG_DELETE_COPY } from "../splitConfigDeleteCopy";
-
-const access = vi.hoisted(() => ({
-  enabled: false,
-  isLoading: false,
-  organizationReady: true,
-  retryOrganization: vi.fn(),
-}));
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ ...access, has: (id: string) => id === "factory_run_history" && access.enabled }),
-}));
 
 vi.mock("./FactoryAutomationRunHistory", () => ({
   FactoryAutomationRunHistory: ({ onSelectRun }: { onSelectRun: (id: string | null) => void }) => (
@@ -27,41 +20,9 @@ vi.mock("../SettingsAutomationWorkspace", () => ({
 }));
 
 describe("Implement Runs routing", () => {
-  it.each([
-    {
-      nodeId: "implementation-agent-no-issue",
-      enabled: false,
-      isLoading: false,
-      organizationReady: true,
-      expected: false,
-    },
-    {
-      nodeId: "implementation-agent-no-issue",
-      enabled: true,
-      isLoading: true,
-      organizationReady: true,
-      expected: false,
-    },
-    {
-      nodeId: "implementation-agent-no-issue",
-      enabled: true,
-      isLoading: false,
-      organizationReady: false,
-      expected: false,
-    },
-    {
-      nodeId: "implementation-agent-no-issue",
-      enabled: true,
-      isLoading: false,
-      organizationReady: true,
-      expected: true,
-    },
-    { nodeId: "on-pr-risk", enabled: true, isLoading: false, organizationReady: true, expected: true },
-  ])(
-    "gates Implement history while preserving the old view: %j",
-    ({ nodeId, enabled, isLoading, organizationReady, expected }) => {
-      Object.assign(access, { enabled, isLoading, organizationReady });
-      access.retryOrganization.mockClear();
+  it.each(["implementation-agent-no-issue", "on-pr-risk"])(
+    "opens %s history without an experimental feature lookup",
+    (nodeId) => {
       const onSelectRun = vi.fn();
       const view = (
         <MergeConfidenceConfigShell
@@ -101,30 +62,13 @@ describe("Implement Runs routing", () => {
           layoutFitNonce={null}
         />
       );
-      const { rerender } = render(view);
-      if (isLoading || !organizationReady) {
-        if (isLoading) expect(screen.getByRole("status")).toBeInTheDocument();
-        else {
-          expect(screen.getByRole("alert")).toBeInTheDocument();
-          fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-          expect(access.retryOrganization).toHaveBeenCalledTimes(1);
-        }
-        expect(screen.queryByTestId("existing-canvas")).not.toBeInTheDocument();
-        expect(onSelectRun).not.toHaveBeenCalled();
-        Object.assign(access, { isLoading: false, organizationReady: true });
-        rerender(cloneElement(view));
-        expect(screen.getByTestId("connected-history")).toBeInTheDocument();
-        expect(onSelectRun).not.toHaveBeenCalled();
-        return;
-      }
-      if (expected) {
-        fireEvent.click(screen.getByTestId("connected-history"));
-        expect(onSelectRun).toHaveBeenCalledWith("selected-run");
-        expect(screen.queryByTestId("existing-canvas")).not.toBeInTheDocument();
-      } else {
-        expect(screen.getByTestId("existing-canvas")).toBeInTheDocument();
-        expect(screen.queryByTestId("connected-history")).not.toBeInTheDocument();
-      }
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      client.setQueryData(experimentalFeaturesKeys.registry(), { features: [] });
+      client.setQueryData(organizationKeys.details("org"), { spec: { enabledExperimentalFeatures: [] } });
+      render(<QueryClientProvider client={client}>{view}</QueryClientProvider>);
+      fireEvent.click(screen.getByTestId("connected-history"));
+      expect(onSelectRun).toHaveBeenCalledWith("selected-run");
+      expect(screen.queryByTestId("existing-canvas")).not.toBeInTheDocument();
     },
   );
 });

@@ -1,8 +1,5 @@
-import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 
-import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
-import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
   normalizePRFeedbackDraft,
@@ -91,84 +88,5 @@ export function PRFeedbackSettingsFooter({
         {savePending ? PR_FEEDBACK_SETTINGS_COPY.saving : PR_FEEDBACK_SETTINGS_COPY.save}
       </Button>
     </footer>
-  );
-}
-
-export function PRFeedbackAutomationTab({
-  graph,
-  canvasId,
-  runHrefFor,
-  editHref,
-  loading,
-  error,
-  onRetry,
-}: {
-  graph?: IntakeAutomationGraph;
-  canvasId?: string;
-  runHrefFor?: RunsSidebarHrefForRun;
-  editHref?: string;
-  loading: boolean;
-  error: boolean;
-  onRetry?: () => void;
-}) {
-  if (!graph || graph.nodes.length === 0) {
-    return (
-      <PRFeedbackAutomationEmpty
-        message={automationEmptyMessage(loading, error)}
-        onRetry={error ? onRetry : undefined}
-        editHref={editHref}
-      />
-    );
-  }
-
-  return (
-    <SettingsAutomationWorkspace
-      graph={graph}
-      testId="pr-feedback-automation"
-      canvasId={canvasId}
-      runHrefFor={runHrefFor}
-      workflowNodes={graph.specNodes}
-      editHref={editHref}
-      editLabel={PR_FEEDBACK_SETTINGS_COPY.editAutomation}
-    />
-  );
-}
-
-function automationEmptyMessage(loading: boolean, error: boolean): string {
-  if (loading) {
-    return PR_FEEDBACK_SETTINGS_COPY.automationLoading;
-  }
-  return error ? PR_FEEDBACK_SETTINGS_COPY.automationError : PR_FEEDBACK_SETTINGS_COPY.automationEmpty;
-}
-
-function PRFeedbackAutomationEmpty({
-  message,
-  onRetry,
-  editHref,
-}: {
-  message: string;
-  onRetry?: () => void;
-  editHref?: string;
-}) {
-  return (
-    <section
-      className="relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
-      aria-label="Automation"
-      data-testid="pr-feedback-automation"
-    >
-      <p className="workspace-body-text text-muted-foreground">{message}</p>
-      {onRetry ? (
-        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-          {PR_FEEDBACK_SETTINGS_COPY.retryAutomation}
-        </Button>
-      ) : null}
-      {editHref ? (
-        <SettingsAutomationCanvasEdit
-          href={editHref}
-          label={PR_FEEDBACK_SETTINGS_COPY.editAutomation}
-          testId="settings-automation-edit"
-        />
-      ) : null}
-    </section>
   );
 }

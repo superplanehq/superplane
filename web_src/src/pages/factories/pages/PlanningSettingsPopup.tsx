@@ -1,6 +1,4 @@
 import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
-import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
-import { Button } from "@/components/ui/button";
 
 import { type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
@@ -9,7 +7,6 @@ import { PlanningSettingsFooter } from "./PlanningSettingsConfiguration";
 import { PlanningSettingsMenu } from "./PlanningSettingsMenu";
 import { PlanningSettingsConfiguration } from "./PlanningSettingsConfiguration";
 import { usePlanningSettingsDraft } from "./usePlanningSettingsDraft";
-import { SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
   PLANNING_SETTINGS_COPY,
@@ -33,7 +30,6 @@ interface PlanningSettingsPopupProps {
   savePending?: boolean;
   saveError?: string;
   canvasId?: string;
-  runHrefFor?: RunsSidebarHrefForRun;
   agent?: PlanningReviewAgentSlot;
   onClose: () => void;
   fixed?: boolean;
@@ -54,7 +50,6 @@ export function PlanningSettingsPopup({
   savePending = false,
   saveError,
   canvasId,
-  runHrefFor,
   agent,
   onClose,
   fixed = true,
@@ -108,15 +103,6 @@ export function PlanningSettingsPopup({
           error={automationError}
           onRetry={onRetryAutomation}
         />
-      ) : tab === "automation" ? (
-        <PlanningAutomationTab
-          graph={automationGraph}
-          canvasId={canvasId}
-          runHrefFor={runHrefFor}
-          loading={automationLoading}
-          error={automationError}
-          onRetry={onRetryAutomation}
-        />
       ) : (
         <PlanningSettingsConfiguration
           draft={editor.draft}
@@ -138,54 +124,5 @@ export function PlanningSettingsPopup({
         />
       ) : null}
     </PopupShell>
-  );
-}
-
-function PlanningAutomationTab({
-  graph,
-  canvasId,
-  runHrefFor,
-  loading,
-  error,
-  onRetry,
-}: {
-  graph?: IntakeAutomationGraph;
-  canvasId?: string;
-  runHrefFor?: RunsSidebarHrefForRun;
-  loading: boolean;
-  error: boolean;
-  onRetry?: () => void;
-}) {
-  if (!graph || graph.nodes.length === 0) {
-    return (
-      <section
-        className="relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
-        aria-label="Automation"
-        data-testid="planning-automation"
-      >
-        <p className="workspace-body-text text-muted-foreground">
-          {loading
-            ? PLANNING_SETTINGS_COPY.automationLoading
-            : error
-              ? PLANNING_SETTINGS_COPY.automationError
-              : PLANNING_SETTINGS_COPY.automationEmpty}
-        </p>
-        {error && onRetry ? (
-          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-            {PLANNING_SETTINGS_COPY.retry}
-          </Button>
-        ) : null}
-      </section>
-    );
-  }
-
-  return (
-    <SettingsAutomationWorkspace
-      graph={graph}
-      testId="planning-automation"
-      canvasId={canvasId}
-      runHrefFor={runHrefFor}
-      workflowNodes={graph.specNodes}
-    />
   );
 }
