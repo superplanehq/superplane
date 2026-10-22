@@ -388,6 +388,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const setupFinished = model.provisionedDestination != null;
   const newBilling = useExperimentalFeature(organizationId).has(FEATURE_NEW_BILLING);
   const billing = useOrganizationBilling(organizationId);
+  const hasBillingStep =
+    newBilling && billing.data?.billingEnabled === true && Boolean(billing.data.availablePlans?.length);
   const blocking = useFirstRunBlockingAction();
   const { connection, githubReady, githubReturned, installScope, checkingGitHub } = useFirstRunGitHub({
     organizationId,
@@ -416,7 +418,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
           showErrorToast("Could not load billing plans. Try again.");
           return;
         }
-        if (!result.data.billingEnabled) return model.finish(issuesChoice);
+        if (!result.data.billingEnabled || !result.data.availablePlans?.length) return model.finish(issuesChoice);
         if (await model.saveAgent()) navigation.goToScreen("billing");
       },
     },
@@ -441,9 +443,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   return {
     ...navigation,
     ...commands,
-    screen:
-      navigation.screen === "billing" && (!newBilling || !billing.data?.billingEnabled) ? "tickets" : navigation.screen,
-    hasBillingStep: newBilling && billing.data?.billingEnabled === true,
+    screen: navigation.screen === "billing" && !hasBillingStep ? "tickets" : navigation.screen,
+    hasBillingStep,
     finishSetup: () =>
       blocking.run("finishing-setup", async () => {
         await model.finish();

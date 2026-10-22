@@ -11,8 +11,7 @@ export function BillingCardSetup({
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Save a card securely with Polar. Card setup does not charge you or start a subscription. Polar opens in a new
-        window. This page updates when your card is saved.
+        Save a card securely with Polar. Card setup does not charge you or start a subscription.
       </p>
       <Button type="button" disabled={disabled || setup.isPending} onClick={setup.open}>
         {setup.opening ? "Opening card setup…" : "Add payment method"}

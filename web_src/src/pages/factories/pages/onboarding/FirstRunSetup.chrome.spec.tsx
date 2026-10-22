@@ -5,7 +5,7 @@ import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory } from "@/api-client";
+import type { FactoriesFactory, OrganizationsBillingPlanOption } from "@/api-client";
 import { unmockedPackage } from "@/test/unmockedModule";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
@@ -75,12 +75,18 @@ vi.mock("./useGitHubOnboarding", () => ({
   useGitHubInstallationChecks: vi.fn(),
 }));
 
-const billingState = { enabled: false, newBilling: false };
-const refetchBilling = vi.fn(async () => ({ data: { billingEnabled: billingState.enabled } }));
+const billingState = {
+  enabled: false,
+  newBilling: false,
+  availablePlans: undefined as OrganizationsBillingPlanOption[] | undefined,
+};
+const refetchBilling = vi.fn(async () => ({
+  data: { billingEnabled: billingState.enabled, availablePlans: billingState.availablePlans },
+}));
 vi.mock("@/hooks/useOrganizationBilling", () => ({
   organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
   useOrganizationBilling: () => ({
-    data: { billingEnabled: billingState.enabled },
+    data: { billingEnabled: billingState.enabled, availablePlans: billingState.availablePlans },
     isPending: false,
     refetch: refetchBilling,
   }),
@@ -205,6 +211,7 @@ describe("FirstRunSetup chrome", () => {
     navigateSpy.mockClear();
     billingState.enabled = false;
     billingState.newBilling = false;
+    billingState.availablePlans = [{ key: "free", name: "Free" }];
     refetchBilling.mockClear();
     localStorage.clear();
   });
@@ -509,5 +516,27 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
     expect(refetchBilling).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { step: "issues", availablePlans: [] },
+    { step: "billing", availablePlans: [] },
+    { step: "issues", availablePlans: undefined },
+    { step: "billing", availablePlans: undefined },
+  ])("skips plan selection when no plans are available (%j)", async ({ step, availablePlans }) => {
+    billingState.enabled = true;
+    billingState.newBilling = true;
+    billingState.availablePlans = availablePlans;
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      setup: { ...withRepository(), issuesChoice: "vcs" },
+    });
+    renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
+    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
+    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
+    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
   });
 });

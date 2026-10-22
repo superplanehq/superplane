@@ -50,9 +50,6 @@ function billingPlanChoices(
   if (currentOption && !availablePlans.some((option) => option.key === currentOption.key)) {
     return [currentOption, ...availablePlans];
   }
-  if (billing && availablePlans.length === 0) {
-    return [{ key: "none", name: "None", priceCents: "0" }];
-  }
   return availablePlans;
 }
 
@@ -78,8 +75,7 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
   const [checkoutReturned, setCheckoutReturned] = useState(searchParams.get("subscribed") === "1");
   const currentOption = currentPlanOption(billing.data);
   const plans = billingPlanChoices(billing.data, currentOption);
-  const noPlans = billing.isSuccess && plans[0]?.key === "none";
-  const selectedKey = noPlans ? "none" : requestedPlanKey;
+  const selectedKey = requestedPlanKey;
   const plan = plans.find((option) => option.key === selectedKey);
   const currentPlan = isCurrentBillingPlan(plan, billing.data);
   const needsCard =
@@ -142,7 +138,6 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
   return {
     billing,
     plans,
-    noPlans,
     plan,
     currentOption,
     currentPlan,
@@ -223,7 +218,6 @@ export function FirstRunBillingScreen({
   const {
     billing,
     plans,
-    noPlans,
     plan,
     currentOption,
     currentPlan,
@@ -240,11 +234,7 @@ export function FirstRunBillingScreen({
   return (
     <FirstRunShell testId="first-run-billing" chrome={chrome} busy={busy} sphere={sphere} visual="preview" width="wide">
       <FirstRunHeading headline="Choose a plan">
-        <p>
-          {noPlans
-            ? "No plans are available. Finish setup with no plan."
-            : "Select a plan for your organization to finish setup."}
-        </p>
+        <p>Select a plan for your organization to finish setup.</p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
         {billing.isPending && <p role="status">Loading plans…</p>}
