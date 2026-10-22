@@ -175,6 +175,7 @@ function dropMissingWorkOrder(
     queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
     exact: true,
   });
+  clearOpenRunTaskLabels(queryClient, orderId);
 }
 
 async function refreshUpdatedWorkOrder(
@@ -202,9 +203,72 @@ async function refreshUpdatedWorkOrder(
     factoryQueryKeys.historicalWorkOrders(organizationId, factoryId),
     (orders) => patchCachedWorkOrderList(orders, orderId, order),
   );
+  refreshOpenRunTaskLabels(queryClient, order);
   for (const queryKey of unknownMembershipKeys) {
     void queryClient.invalidateQueries({ queryKey });
   }
+}
+
+function isIncludeTaskRunQuery(queryKey: readonly unknown[]): boolean {
+  return queryKey[0] === "canvases" && queryKey[1] === "runs" && queryKey.includes("includeTask");
+}
+
+function refreshOpenRunTaskLabels(queryClient: WorkOrderQueryClient, order: FactoriesWorkOrder) {
+  if (!order.id) return;
+  const label = { id: order.id, key: order.key || order.id, title: order.title || "Untitled task" };
+  queryClient.setQueriesData({ predicate: (query) => isIncludeTaskRunQuery(query.queryKey) }, (data) =>
+    patchIncludeTaskLabels(data, order.id!, label),
+  );
+}
+
+function clearOpenRunTaskLabels(queryClient: WorkOrderQueryClient, orderId: string) {
+  queryClient.setQueriesData({ predicate: (query) => isIncludeTaskRunQuery(query.queryKey) }, (data) =>
+    patchIncludeTaskLabels(data, orderId, undefined),
+  );
+}
+
+function patchIncludeTaskLabels(
+  data: unknown,
+  orderId: string,
+  label: { id: string; key: string; title: string } | undefined,
+): unknown {
+  if (!data || typeof data !== "object") return data;
+  if ("pages" in data && Array.isArray(data.pages)) {
+    let changed = false;
+    const pages = data.pages.map((page) => {
+      if (!page || typeof page !== "object" || !("runs" in page) || !Array.isArray(page.runs)) return page;
+      let pageChanged = false;
+      const runs = page.runs.map((run: unknown) => {
+        const next = patchRunTask(run, orderId, label);
+        if (next !== run) pageChanged = true;
+        return next;
+      });
+      if (!pageChanged) return page;
+      changed = true;
+      return { ...page, runs };
+    });
+    return changed ? { ...data, pages } : data;
+  }
+  if ("run" in data) {
+    const next = patchRunTask(data.run, orderId, label);
+    return next === data.run ? data : { ...data, run: next };
+  }
+  return data;
+}
+
+function patchRunTask(
+  run: unknown,
+  orderId: string,
+  label: { id: string; key: string; title: string } | undefined,
+): unknown {
+  if (!run || typeof run !== "object" || !("task" in run)) return run;
+  const task = run.task;
+  if (!task || typeof task !== "object" || !("id" in task) || task.id !== orderId) return run;
+  if (!label) {
+    const { task: _removed, ...rest } = run;
+    return rest;
+  }
+  return { ...run, task: { ...task, id: label.id, key: label.key, title: label.title } };
 }
 
 function invalidateFactoryWorkOrdersOnReconnect(
@@ -222,6 +286,9 @@ function invalidateFactoryWorkOrdersOnReconnect(
     factoryId,
     cachedWorkOrderIds(queryClient, organizationId, factoryId),
   );
+  void queryClient.invalidateQueries({
+    predicate: (query) => isIncludeTaskRunQuery(query.queryKey),
+  });
 }
 
 export function invalidateFactoryWorkOrderQueries(

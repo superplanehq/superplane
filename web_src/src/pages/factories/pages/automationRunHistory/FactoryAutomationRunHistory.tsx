@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import type { CanvasesCanvasRun, FactoriesWorkOrder } from "@/api-client";
+import type { CanvasesCanvasRun } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useCanvasVersion, useDescribeRun, useEventExecutions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
-import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { AutomationRunHistory } from "@/ui/AutomationRunHistory/AutomationRunHistory";
 import { AutomationRunDetails } from "@/ui/AutomationRunHistory/AutomationRunDetails";
 import { RunnerLogsTerminal } from "@/ui/Runs/RunInspectorRunnerLogs";
 import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import type { RunHistoryIntakeSource } from "./intakeRunData";
-import { runDuration, toAutomationRun, toRunActivities } from "./runHistoryData";
+import { runDuration, taskPageNumber, toAutomationRun, toRunActivities } from "./runHistoryData";
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
-
-const emptyOrders: FactoriesWorkOrder[] = [];
 
 interface FactoryAutomationRunHistoryProps {
   intakeSource?: RunHistoryIntakeSource;
@@ -25,18 +22,16 @@ interface FactoryAutomationRunHistoryProps {
 }
 
 export function FactoryAutomationRunHistory(props: FactoryAutomationRunHistoryProps) {
-  const { canvasId, organizationId, factoryId, selectedRunId, onSelectRun, intakeSource } = props;
+  const { canvasId, organizationId, selectedRunId, onSelectRun, intakeSource } = props;
   useCanvasRuntimeWebsocket(canvasId, organizationId, true);
-  const runsQuery = useInfiniteCanvasRuns(canvasId);
-  const tasksQuery = useFactoryWorkOrders(organizationId, factoryId, { includeArchived: true });
+  const runsQuery = useInfiniteCanvasRuns(canvasId, { includeTask: true });
   const runs = useMemo(
     () => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []).filter((run) => run.id) ?? [],
     [runsQuery.data],
   );
-  const orders = tasksQuery.data ?? emptyOrders;
   const mappedRuns = useMemo(
-    () => runs.map((run) => toAutomationRun(run, orders, Date.now(), intakeSource)),
-    [runs, orders, intakeSource],
+    () => runs.map((run) => toAutomationRun(run, [], Date.now(), intakeSource)),
+    [runs, intakeSource],
   );
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -45,18 +40,7 @@ export function FactoryAutomationRunHistory(props: FactoryAutomationRunHistoryPr
   }, []);
   return (
     <div className="min-h-0 flex-1 overflow-auto p-6" data-testid="implement-run-history">
-      {tasksQuery.isError && (
-        <DataError message="Task links could not be loaded." onRetry={() => void tasksQuery.refetch()} />
-      )}
-      {selectedRunId ? (
-        <FactoryAutomationRunDetails
-          key={selectedRunId}
-          {...props}
-          orders={orders}
-          now={now}
-          tasksLoading={tasksQuery.isLoading}
-        />
-      ) : null}
+      {selectedRunId ? <FactoryAutomationRunDetails key={selectedRunId} {...props} now={now} /> : null}
       <div hidden={Boolean(selectedRunId)}>
         {runsQuery.hasNextPage && (
           <p className="mb-3 text-xs text-muted-foreground">Search and filters apply to loaded runs.</p>
@@ -65,7 +49,6 @@ export function FactoryAutomationRunHistory(props: FactoryAutomationRunHistoryPr
           runs={mappedRuns.map((run, index) => ({ ...run, duration: runDuration(runs[index], now) }))}
           onSelectRun={(run) => onSelectRun(run.id)}
           loading={runsQuery.isLoading}
-          tasksLoading={tasksQuery.isLoading}
           error={runsQuery.isError && !runsQuery.isFetchNextPageError ? "Could not load run history." : undefined}
           onRetry={() => void runsQuery.refetch()}
           onLoadMore={
@@ -83,11 +66,9 @@ export function FactoryAutomationRunHistory(props: FactoryAutomationRunHistoryPr
   );
 }
 
-function FactoryAutomationRunDetails(
-  props: FactoryAutomationRunHistoryProps & { orders: FactoriesWorkOrder[]; now: number; tasksLoading: boolean },
-) {
+function FactoryAutomationRunDetails(props: FactoryAutomationRunHistoryProps & { now: number }) {
   const { canvasId, organizationId, selectedRunId, onSelectRun } = props;
-  const runQuery = useDescribeRun(canvasId, selectedRunId);
+  const runQuery = useDescribeRun(canvasId, selectedRunId, true, true);
   const run = runQuery.data?.run;
   const executionsQuery = useEventExecutions(canvasId, run?.rootEvent?.id ?? null);
   const versionQuery = useCanvasVersion(organizationId, canvasId, run?.versionId ?? "");
@@ -125,34 +106,27 @@ function LoadedFactoryAutomationRunDetails({
   canvasId,
   organizationId,
   onSelectRun,
-  orders,
   now,
   run,
   executionsQuery,
   versionQuery,
-  tasksLoading,
   intakeSource,
 }: FactoryAutomationRunHistoryProps & {
-  orders: FactoriesWorkOrder[];
   now: number;
-  tasksLoading: boolean;
   run: CanvasesCanvasRun;
   executionsQuery: ReturnType<typeof useEventExecutions>;
   versionQuery: ReturnType<typeof useCanvasVersion>;
 }) {
   const executions = executionsQuery.data?.executions ?? [];
   const nodes = versionQuery.data?.spec?.nodes ?? [];
-  const mappedRun = useMemo(() => toAutomationRun(run, orders, Date.now(), intakeSource), [run, orders, intakeSource]);
+  const mappedRun = useMemo(() => toAutomationRun(run, [], Date.now(), intakeSource), [run, intakeSource]);
   const { factoryKey, lineId } = useParams();
-  const taskOrder = mappedRun.task && orders.find((order) => (order.key || order.id) === mappedRun.task?.id);
+  const taskNumber = taskPageNumber(mappedRun.task?.id);
   const details = {
     ...mappedRun,
     task: mappedRun.task && {
       ...mappedRun.task,
-      url:
-        factoryKey && taskOrder?.number
-          ? workOrderDetailPath(organizationId, factoryKey, taskOrder.number, lineId)
-          : undefined,
+      url: factoryKey && taskNumber ? workOrderDetailPath(organizationId, factoryKey, taskNumber, lineId) : undefined,
     },
     duration: runDuration(run, now),
     activities: toRunActivities(run, executions, nodes),
@@ -170,7 +144,6 @@ function LoadedFactoryAutomationRunDetails({
       )}
       <AutomationRunDetails
         run={details}
-        tasksLoading={tasksLoading}
         onBack={() => onSelectRun(null)}
         onRetryLogs={() => void executionsQuery.refetch()}
         renderLogs={(activity) => {

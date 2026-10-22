@@ -76,6 +76,19 @@ function renderPage(view: React.ReactNode, path = "/") {
 describe("Verify and Done run history", () => {
   beforeEach(() => {
     resetHostMocks();
+    const runs = useInfiniteCanvasRuns();
+    useInfiniteCanvasRuns.mockReturnValue({
+      ...runs,
+      data: {
+        ...runs.data,
+        pages: runs.data.pages.map((page: { runs: Array<{ id?: string }> }) => ({
+          ...page,
+          runs: page.runs.map((run) =>
+            run.id === "run-intake-1" ? { ...run, task: { id: "task", key: "SP-123", title: "Linked task" } } : run,
+          ),
+        })),
+      },
+    });
   });
 
   it.each(["on-pr-risk", "on-pr-visual-evidence", "on-pr-closed"])("shows %s history by default", (nodeId) => {

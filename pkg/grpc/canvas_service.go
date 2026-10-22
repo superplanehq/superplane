@@ -293,7 +293,7 @@ func (s *CanvasService) ListRuns(ctx context.Context, req *pb.ListRunsRequest) (
 		return nil, err
 	}
 
-	return canvases.ListRuns(ctx, db, canvas, req.Limit, req.Before, req.States, req.Results)
+	return canvases.ListRuns(ctx, db, canvas, req.Limit, req.Before, req.States, req.Results, req.GetIncludeTask())
 }
 
 func (s *CanvasService) DescribeRun(ctx context.Context, req *pb.DescribeRunRequest) (*pb.DescribeRunResponse, error) {
@@ -303,7 +303,7 @@ func (s *CanvasService) DescribeRun(ctx context.Context, req *pb.DescribeRunRequ
 		return nil, err
 	}
 
-	return canvases.DescribeRun(ctx, db, canvas, req.RunId)
+	return canvases.DescribeRun(ctx, db, canvas, req.RunId, req.GetIncludeTask())
 }
 
 func (s *CanvasService) CancelRun(ctx context.Context, req *pb.CancelRunRequest) (*pb.CancelRunResponse, error) {
