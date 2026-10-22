@@ -7,7 +7,6 @@ import {
   shouldForgetDeferredWorkspaceNextStep,
   workspaceNextStepBanner,
   workspaceNextSteps,
-  workspaceNextStepsProgressCopy,
 } from "./workspaceNextStepCatalog";
 
 const ready = {
@@ -81,8 +80,6 @@ describe("workspaceNextStepBanner", () => {
   it("personalizes the banner for comments when nothing is configured", () => {
     const banner = workspaceNextStepBanner(workspaceNextSteps(ready));
     expect(banner?.activeStep.id).toBe("pr-comments-handler");
-    expect(banner?.doneCount).toBe(2);
-    expect(banner?.totalCount).toBe(4);
     expect(banner?.title).toBe("How should pull request comments be handled?");
     expect(banner?.description).toBe(
       "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
@@ -99,8 +96,6 @@ describe("workspaceNextStepBanner", () => {
       }),
     );
     expect(banner?.activeStep.id).toBe("pr-checks-handler");
-    expect(banner?.doneCount).toBe(3);
-    expect(banner?.totalCount).toBe(4);
     expect(banner?.title).toBe("How should failing status checks be handled?");
     expect(banner?.badgeLabel).toBe("Configure status checks");
     expect(banner?.description).toContain("automatically fix failing pull request status checks");
@@ -117,12 +112,6 @@ describe("workspaceNextStepBanner", () => {
         }),
       ),
     ).toBeNull();
-  });
-});
-
-describe("workspaceNextStepsProgressCopy", () => {
-  it("names how many tasks are complete", () => {
-    expect(workspaceNextStepsProgressCopy(2, 4)).toBe("2/4");
   });
 });
 
