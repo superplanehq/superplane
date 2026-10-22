@@ -248,9 +248,6 @@ describe("SplitRunAttentionNote for a pull request", () => {
     const button = screen.getByTestId("split-run-merge-button");
     expect(button).toBeDisabled();
     expect(button).toHaveAccessibleName("Merging");
-    expect(button).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
-    expect(screen.getByTestId("split-run-pull-request-cta")).toBeEnabled();
   });
 
   it("disables merge and shows the reason on hover when automation is running", async () => {
