@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
@@ -51,17 +50,8 @@ func CreateIntegration(
 	orgID = org.String()
 
 	if integrationName == models.CustomLLMAppName {
-		enabled, err := models.OrganizationHasExperimentalFeatures(
-			database.Conn(),
-			org,
-			features.FeatureOrganizationBYOK,
-			features.FeatureOrganizationBYOKCustomProvider,
-		)
-		if err != nil {
-			return nil, grpcerrors.Internal(err, "failed to read organization features")
-		}
-		if !enabled {
-			return nil, grpcerrors.PermissionDenied(nil, "Custom provider is not enabled for this organization.")
+		if err := ensureBYOKAccess(database.DB(ctx), org, models.UsageProviderCustom, "failed to read model access"); err != nil {
+			return nil, err
 		}
 	}
 

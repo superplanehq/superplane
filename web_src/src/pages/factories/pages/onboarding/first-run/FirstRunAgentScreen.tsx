@@ -120,7 +120,7 @@ export function FirstRunAgentScreen({
             onClick={onContinue}
             data-testid="first-run-finish-setup"
           >
-            {modelSource.offered || hasBillingStep ? FIRST_RUN_COPY.tickets.continue : FIRST_RUN_COPY.finish.action}
+            {hasBillingStep ? FIRST_RUN_COPY.tickets.continue : FIRST_RUN_COPY.finish.action}
           </LoadingButton>
         </div>
       </div>

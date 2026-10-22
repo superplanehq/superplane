@@ -432,7 +432,9 @@ describe("FactorySettingsLayout sidebar", () => {
       );
 
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      expect(within(sidebar).getByTestId("factory-settings-nav-organization-models")).toHaveTextContent("LLM Models");
+      expect(await within(sidebar).findByTestId("factory-settings-nav-organization-models")).toHaveTextContent(
+        "LLM Models",
+      );
     }, 10000);
 
     it("redirects away from the LLM Models route when the feature is off", async () => {
@@ -448,6 +450,24 @@ describe("FactorySettingsLayout sidebar", () => {
       });
       expect(screen.queryByTestId("factory-settings-llm-models")).not.toBeInTheDocument();
     }, 10000);
+
+    it("denies the direct model route when the product permission is off", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
+          factoriesFixture={{
+            ...defaultFactoriesFixture,
+            organizationBilling: {
+              ...defaultFactoriesFixture.organizationBilling,
+              productFeatures: { byo_key: false },
+            },
+          }}
+          experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
+        />,
+      );
+      expect(await screen.findByText(/does not have access to provider credentials/)).toBeInTheDocument();
+      expect(screen.queryByTestId("factory-settings-llm-models")).not.toBeInTheDocument();
+    });
 
     it("renders the LLM Models page when the feature is on", async () => {
       render(

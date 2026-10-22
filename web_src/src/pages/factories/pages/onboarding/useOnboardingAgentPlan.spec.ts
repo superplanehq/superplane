@@ -5,6 +5,8 @@ import { byokModelIds, agentUsableModelIds, useOnboardingAgentPlan } from "./use
 import { useOnboardingAgentModel } from "./onboardingAgentModel";
 import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
 
+vi.mock("@/hooks/useBYOKAccess", () => ({ useBYOKAccess: () => ({ allowed: true }) }));
+
 const keyModels = { ids: ["claude-sonnet-4-6", "claude-opus-5-5"], fetched: true, error: false };
 
 vi.mock("@/hooks/useLLMModelAllowlists", () => ({
