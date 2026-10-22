@@ -1214,10 +1214,10 @@ CREATE TABLE public.mcp_oauth_codes (
     code_challenge_method text NOT NULL,
     user_id uuid NOT NULL,
     organization_id uuid NOT NULL,
-    factory_id uuid NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     expires_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    factory_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -1231,11 +1231,11 @@ CREATE TABLE public.mcp_oauth_refresh_tokens (
     client_id text NOT NULL,
     user_id uuid NOT NULL,
     organization_id uuid NOT NULL,
-    factory_id uuid NOT NULL,
     resource text NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     expires_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    factory_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -5957,7 +5957,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261021193716	f
+20261021233128	f
 \.
 
 

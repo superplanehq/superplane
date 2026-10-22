@@ -41,12 +41,12 @@ type AuthorizeRequest struct {
 }
 
 type TokenIssue struct {
-	UserID    uuid.UUID
-	OrgID     uuid.UUID
-	FactoryID uuid.UUID
-	ClientID  string
-	Resource  string
-	Scopes    []string
+	UserID     uuid.UUID
+	OrgID      uuid.UUID
+	FactoryIDs []uuid.UUID
+	ClientID   string
+	Resource   string
+	Scopes     []string
 }
 
 type OAuthError struct {
@@ -255,7 +255,7 @@ func fetchClientMetadata(ctx context.Context, httpClient mcp.HTTPDoer, metadataU
 	}, nil
 }
 
-func CreateAuthorizationCode(tx *gorm.DB, req *AuthorizeRequest, userID, orgID, factoryID uuid.UUID) (string, error) {
+func CreateAuthorizationCode(tx *gorm.DB, req *AuthorizeRequest, userID, orgID uuid.UUID, factoryIDs []uuid.UUID) (string, error) {
 	raw, err := mcp.RandomToken()
 	if err != nil {
 		return "", err
@@ -269,7 +269,7 @@ func CreateAuthorizationCode(tx *gorm.DB, req *AuthorizeRequest, userID, orgID, 
 		CodeChallengeMethod: req.CodeChallengeMethod,
 		UserID:              userID,
 		OrganizationID:      orgID,
-		FactoryID:           factoryID,
+		FactoryIDs:          models.NewMCPOAuthFactoryIDs(factoryIDs),
 		Scopes:              datatypes.NewJSONSlice(GrantedScopes),
 		ExpiresAt:           time.Now().Add(AuthorizationCodeTTL),
 	})
@@ -305,6 +305,10 @@ func ExchangeAuthorizationCode(tx *gorm.DB, values url.Values, resource string) 
 	if stored.CodeChallengeMethod != "S256" || !mcp.VerifyS256(verifier, stored.CodeChallenge) {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "PKCE verification failed", Status: http.StatusBadRequest}
 	}
+	factoryIDs := stored.FactoryUUIDs()
+	if len(factoryIDs) == 0 {
+		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
+	}
 	if err := models.DeleteMCPOAuthCode(tx, stored); err != nil {
 		return nil, "", &OAuthError{Code: "server_error", Description: "failed to issue tokens", Status: http.StatusInternalServerError}
 	}
@@ -312,25 +316,19 @@ func ExchangeAuthorizationCode(tx *gorm.DB, values url.Values, resource string) 
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
 	}
 
-	refresh, err := storeRefreshToken(tx, TokenIssue{
-		UserID:    stored.UserID,
-		OrgID:     stored.OrganizationID,
-		FactoryID: stored.FactoryID,
-		ClientID:  stored.ClientID,
-		Resource:  stored.Resource,
-		Scopes:    []string(stored.Scopes),
-	})
+	issue := TokenIssue{
+		UserID:     stored.UserID,
+		OrgID:      stored.OrganizationID,
+		FactoryIDs: factoryIDs,
+		ClientID:   stored.ClientID,
+		Resource:   stored.Resource,
+		Scopes:     []string(stored.Scopes),
+	}
+	refresh, err := storeRefreshToken(tx, issue)
 	if err != nil {
 		return nil, "", &OAuthError{Code: "server_error", Description: "failed to issue refresh token", Status: http.StatusInternalServerError}
 	}
-	return &TokenIssue{
-		UserID:    stored.UserID,
-		OrgID:     stored.OrganizationID,
-		FactoryID: stored.FactoryID,
-		ClientID:  stored.ClientID,
-		Resource:  stored.Resource,
-		Scopes:    []string(stored.Scopes),
-	}, refresh, nil
+	return &issue, refresh, nil
 }
 
 func RefreshTokens(tx *gorm.DB, values url.Values, resource string) (*TokenIssue, string, *OAuthError) {
@@ -360,16 +358,20 @@ func RefreshTokens(tx *gorm.DB, values url.Values, resource string) (*TokenIssue
 		}
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "refresh token is not valid", Status: http.StatusBadRequest}
 	}
+	factoryIDs := stored.FactoryUUIDs()
+	if len(factoryIDs) == 0 {
+		return nil, "", &OAuthError{Code: "invalid_grant", Description: "refresh token is not valid", Status: http.StatusBadRequest}
+	}
 	if err := models.DeleteMCPOAuthRefreshToken(tx, stored); err != nil {
 		return nil, "", &OAuthError{Code: "server_error", Description: "failed to rotate refresh token", Status: http.StatusInternalServerError}
 	}
 	issue := TokenIssue{
-		UserID:    stored.UserID,
-		OrgID:     stored.OrganizationID,
-		FactoryID: stored.FactoryID,
-		ClientID:  stored.ClientID,
-		Resource:  stored.Resource,
-		Scopes:    []string(stored.Scopes),
+		UserID:     stored.UserID,
+		OrgID:      stored.OrganizationID,
+		FactoryIDs: factoryIDs,
+		ClientID:   stored.ClientID,
+		Resource:   stored.Resource,
+		Scopes:     []string(stored.Scopes),
 	}
 	refresh, err := storeRefreshToken(tx, issue)
 	if err != nil {
@@ -420,7 +422,7 @@ func storeRefreshToken(tx *gorm.DB, issue TokenIssue) (string, error) {
 		ClientID:       issue.ClientID,
 		UserID:         issue.UserID,
 		OrganizationID: issue.OrgID,
-		FactoryID:      issue.FactoryID,
+		FactoryIDs:     models.NewMCPOAuthFactoryIDs(issue.FactoryIDs),
 		Resource:       issue.Resource,
 		Scopes:         datatypes.NewJSONSlice(issue.Scopes),
 		ExpiresAt:      time.Now().Add(RefreshTokenTTL),
@@ -438,7 +440,7 @@ func AccessGrantIsActive(tx *gorm.DB, claims *AccessClaims, now time.Time) bool 
 	ok, err := models.HasMCPOAuthRefreshTokenForClient(
 		tx,
 		claims.OrgID,
-		claims.FactoryID,
+		claims.FactoryIDs,
 		claims.UserID,
 		claims.ClientID,
 		now,

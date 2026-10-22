@@ -43,7 +43,7 @@ func ListFactoryMCPClients(
 		return nil, factoryErrorToStatus(err, "failed to list MCP clients")
 	}
 
-	clients, err := serializeFactoryMCPClients(db, orgID, tokens)
+	clients, err := serializeFactoryMCPClients(db, orgID, factory.ID, tokens)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list MCP clients")
 	}
@@ -77,10 +77,7 @@ func RevokeFactoryMCPClient(
 		if err != nil {
 			return err
 		}
-		if err := models.DeleteMCPOAuthRefreshTokensForClient(tx, orgID, factory.ID, locked.UserID, locked.ClientID); err != nil {
-			return err
-		}
-		return models.DeleteMCPOAuthCodesForClient(tx, orgID, factory.ID, locked.UserID, locked.ClientID)
+		return models.RemoveFactoryFromMCPOAuthGrant(tx, orgID, factory.ID, locked.UserID, locked.ClientID)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to revoke MCP client")
@@ -107,7 +104,11 @@ func parseMCPClientID(raw string) (uuid.UUID, error) {
 	return id, nil
 }
 
-func serializeFactoryMCPClients(tx *gorm.DB, orgID uuid.UUID, tokens []models.MCPOAuthRefreshToken) ([]*pb.FactoryMCPClient, error) {
+func serializeFactoryMCPClients(
+	tx *gorm.DB,
+	orgID, factoryID uuid.UUID,
+	tokens []models.MCPOAuthRefreshToken,
+) ([]*pb.FactoryMCPClient, error) {
 	out := make([]*pb.FactoryMCPClient, 0, len(tokens))
 	if len(tokens) == 0 {
 		return out, nil
@@ -158,13 +159,23 @@ func serializeFactoryMCPClients(tx *gorm.DB, orgID uuid.UUID, tokens []models.MC
 		clientsByID[client.ClientID] = client
 	}
 
+	factories, err := models.ListFactories(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	workspaceNames := make(map[uuid.UUID]string, len(factories))
+	for _, factory := range factories {
+		workspaceNames[factory.ID] = factory.Name
+	}
+
 	for i := range tokens {
 		token := tokens[i]
 		client := &pb.FactoryMCPClient{
-			Id:         token.ID.String(),
-			ClientName: mcpClientName(token.ClientID, clientsByID),
-			UserId:     token.UserID.String(),
-			CreatedAt:  timestamppb.New(token.CreatedAt),
+			Id:                  token.ID.String(),
+			ClientName:          mcpClientName(token.ClientID, clientsByID),
+			UserId:              token.UserID.String(),
+			CreatedAt:           timestamppb.New(token.CreatedAt),
+			OtherWorkspaceNames: otherWorkspaceNames(token, factoryID, workspaceNames),
 		}
 		if user, ok := usersByID[token.UserID]; ok {
 			client.UserName = user.Name
@@ -176,6 +187,21 @@ func serializeFactoryMCPClients(tx *gorm.DB, orgID uuid.UUID, tokens []models.MC
 		out = append(out, client)
 	}
 	return out, nil
+}
+
+// otherWorkspaceNames names the workspaces a connection reaches besides the
+// one that lists it. Workspaces that no longer exist are left out.
+func otherWorkspaceNames(token models.MCPOAuthRefreshToken, factoryID uuid.UUID, names map[uuid.UUID]string) []string {
+	others := make([]string, 0)
+	for _, id := range token.FactoryUUIDs() {
+		if id == factoryID {
+			continue
+		}
+		if name, ok := names[id]; ok {
+			others = append(others, name)
+		}
+	}
+	return others
 }
 
 func mcpClientName(clientID string, clients map[string]models.MCPOAuthClient) string {

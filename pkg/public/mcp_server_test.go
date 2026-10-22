@@ -42,14 +42,14 @@ func mcpRequest(method, path string, body string) *http.Request {
 	return req
 }
 
-func mcpAccessClaims(r *support.ResourceRegistry, factoryID uuid.UUID) mcpserver.AccessClaims {
+func mcpAccessClaims(r *support.ResourceRegistry, factoryIDs ...uuid.UUID) mcpserver.AccessClaims {
 	return mcpserver.AccessClaims{
-		UserID:    r.User,
-		OrgID:     r.Organization.ID,
-		FactoryID: factoryID,
-		ClientID:  mcpserver.LocalClientID,
-		Resource:  "http://localhost:8000/mcp",
-		Scopes:    mcpserver.GrantedScopes,
+		UserID:     r.User,
+		OrgID:      r.Organization.ID,
+		FactoryIDs: factoryIDs,
+		ClientID:   mcpserver.LocalClientID,
+		Resource:   "http://localhost:8000/mcp",
+		Scopes:     mcpserver.GrantedScopes,
 	}
 }
 
@@ -60,7 +60,7 @@ func insertMCPAccessGrant(t *testing.T, claims mcpserver.AccessClaims) {
 		ClientID:       claims.ClientID,
 		UserID:         claims.UserID,
 		OrganizationID: claims.OrgID,
-		FactoryID:      claims.FactoryID,
+		FactoryIDs:     models.NewMCPOAuthFactoryIDs(claims.FactoryIDs),
 		Resource:       claims.Resource,
 		Scopes:         datatypes.NewJSONSlice(claims.Scopes),
 		ExpiresAt:      time.Now().Add(time.Hour),
@@ -90,7 +90,7 @@ func TestMCPTokenExchangeFailureCases(t *testing.T) {
 		CodeChallengeMethod: "S256",
 		UserID:              r.User,
 		OrganizationID:      r.Organization.ID,
-		FactoryID:           uuid.New(),
+		FactoryIDs:          models.NewMCPOAuthFactoryIDs([]uuid.UUID{uuid.New()}),
 		Scopes:              datatypes.NewJSONSlice(mcpserver.GrantedScopes),
 		ExpiresAt:           time.Now().Add(time.Minute),
 	}))
@@ -306,10 +306,10 @@ func TestMCPRevokedGrantReturns401(t *testing.T) {
 	server.Router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	require.NoError(t, models.DeleteMCPOAuthRefreshTokensForClient(
+	require.NoError(t, models.RemoveFactoryFromMCPOAuthGrant(
 		database.DB(t.Context()),
 		claims.OrgID,
-		claims.FactoryID,
+		factory.ID,
 		claims.UserID,
 		claims.ClientID,
 	))
@@ -340,12 +340,11 @@ func TestMCPRevokedPendingCodeDoesNotRestoreAccess(t *testing.T) {
 		CodeChallengeMethod: "S256",
 		UserID:              claims.UserID,
 		OrganizationID:      claims.OrgID,
-		FactoryID:           claims.FactoryID,
+		FactoryIDs:          models.NewMCPOAuthFactoryIDs(claims.FactoryIDs),
 		Scopes:              datatypes.NewJSONSlice(claims.Scopes),
 		ExpiresAt:           time.Now().Add(time.Minute),
 	}))
-	require.NoError(t, models.DeleteMCPOAuthRefreshTokensForClient(db, claims.OrgID, claims.FactoryID, claims.UserID, claims.ClientID))
-	require.NoError(t, models.DeleteMCPOAuthCodesForClient(db, claims.OrgID, claims.FactoryID, claims.UserID, claims.ClientID))
+	require.NoError(t, models.RemoveFactoryFromMCPOAuthGrant(db, claims.OrgID, factory.ID, claims.UserID, claims.ClientID))
 
 	values := url.Values{}
 	values.Set("grant_type", "authorization_code")
@@ -443,6 +442,7 @@ func TestMCPEphemeralLoopbackAuthorizeAndExchange(t *testing.T) {
 
 	form := url.Values{}
 	form.Set("consent", consent)
+	form.Set("organization_id", r.Organization.ID.String())
 	form.Set("factory_id", factory.ID.String())
 	postReq := httptest.NewRequest(http.MethodPost, "/oauth/authorize", strings.NewReader(form.Encode()))
 	postReq.Host = "localhost:8000"
@@ -492,8 +492,8 @@ func TestMCPAuthorizeConsentDoesNotShowCodexMetadataURL(t *testing.T) {
 	server.Router.ServeHTTP(authRec, authReq)
 	require.Equal(t, http.StatusOK, authRec.Code)
 	body := authRec.Body.String()
-	assert.Contains(t, body, "Choose the workspace Codex can use")
-	assert.NotContains(t, body, "Choose the workspace "+codexID)
+	assert.Contains(t, body, "Codex can use")
+	assert.NotContains(t, body, codexID)
 }
 
 func exchangeMCPCode(server *Server, code, clientID, redirectURI string) *httptest.ResponseRecorder {
@@ -523,4 +523,107 @@ func mcpConsentToken(t *testing.T, page string) string {
 	token := rest[:end]
 	require.NotEmpty(t, token)
 	return token
+}
+
+func TestMCPConsentFlowGrantsSeveralWorkspacesOfOneOrganization(t *testing.T) {
+	r := support.Setup(t)
+	server, _, accountToken := setupTestServer(r, t)
+	db := database.DB(t.Context())
+
+	other := support.CreateOrganization(t, r, r.User)
+	_, err := models.CreateUser(other.ID, r.Account.ID, r.Account.Email, r.Account.Name)
+	require.NoError(t, err)
+	for _, orgID := range []uuid.UUID{r.Organization.ID, other.ID} {
+		require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactories))
+		require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureSuperPlaneMCPServer))
+	}
+	alpha, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "ALP")
+	require.NoError(t, err)
+	beta, err := models.CreateFactory(db, r.Organization.ID, "Beta", "", "BET")
+	require.NoError(t, err)
+	elsewhere, err := models.CreateFactory(db, other.ID, "Elsewhere", "", "ELS")
+	require.NoError(t, err)
+
+	authorize := func(method string, values url.Values) *httptest.ResponseRecorder {
+		var req *http.Request
+		if method == http.MethodGet {
+			req = httptest.NewRequest(method, "/oauth/authorize?"+values.Encode(), nil)
+		} else {
+			req = httptest.NewRequest(method, "/oauth/authorize", strings.NewReader(values.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
+		req.Host = "localhost:8000"
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: accountToken})
+		rec := httptest.NewRecorder()
+		server.Router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	query := url.Values{}
+	query.Set("client_id", mcpserver.LocalClientID)
+	query.Set("redirect_uri", mcpserver.CursorRedirectURIs[0])
+	query.Set("response_type", "code")
+	query.Set("code_challenge", mcp.S256Challenge(mcpTestPKCEVerifier))
+	query.Set("code_challenge_method", "S256")
+	query.Set("state", "state-1")
+
+	organizationStep := authorize(http.MethodGet, query)
+	require.Equal(t, http.StatusOK, organizationStep.Code)
+	assert.Contains(t, organizationStep.Body.String(), r.Organization.Name)
+	assert.Contains(t, organizationStep.Body.String(), other.Name)
+	assert.NotContains(t, organizationStep.Body.String(), `name="factory_id"`)
+
+	form := url.Values{}
+	form.Set("consent", mcpConsentToken(t, organizationStep.Body.String()))
+	form.Set("step", "organization")
+	form.Set("organization_id", r.Organization.ID.String())
+	workspaceStep := authorize(http.MethodPost, form)
+	require.Equal(t, http.StatusOK, workspaceStep.Code)
+	assert.Contains(t, workspaceStep.Body.String(), `name="factory_id" value="`+alpha.ID.String()+`"`)
+	assert.Contains(t, workspaceStep.Body.String(), `name="factory_id" value="`+beta.ID.String()+`"`)
+	assert.NotContains(t, workspaceStep.Body.String(), elsewhere.ID.String())
+	assert.Contains(t, workspaceStep.Body.String(), "Change organization")
+
+	grant := url.Values{}
+	grant.Set("consent", mcpConsentToken(t, workspaceStep.Body.String()))
+	grant.Set("organization_id", r.Organization.ID.String())
+
+	empty := authorize(http.MethodPost, grant)
+	require.Equal(t, http.StatusBadRequest, empty.Code)
+	assert.Contains(t, empty.Body.String(), `name="factory_id" value="`+alpha.ID.String()+`"`)
+
+	grant.Set("factory_id", elsewhere.ID.String())
+	crossOrganization := authorize(http.MethodPost, grant)
+	require.Equal(t, http.StatusBadRequest, crossOrganization.Code)
+
+	back := url.Values{}
+	back.Set("consent", grant.Get("consent"))
+	back.Set("step", "organizations")
+	back.Set("organization_id", r.Organization.ID.String())
+	changed := authorize(http.MethodPost, back)
+	require.Equal(t, http.StatusOK, changed.Code)
+	assert.Contains(t, changed.Body.String(), other.Name)
+	assert.NotContains(t, changed.Body.String(), `name="factory_id"`)
+
+	grant.Del("factory_id")
+	grant.Add("factory_id", alpha.ID.String())
+	grant.Add("factory_id", beta.ID.String())
+	granted := authorize(http.MethodPost, grant)
+	require.Equal(t, http.StatusFound, granted.Code)
+	location, err := url.Parse(granted.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, "state-1", location.Query().Get("state"))
+	code := location.Query().Get("code")
+	require.NotEmpty(t, code)
+
+	exchanged := exchangeMCPCode(server, code, mcpserver.LocalClientID, mcpserver.CursorRedirectURIs[0])
+	require.Equal(t, http.StatusOK, exchanged.Code)
+	var tokenBody struct {
+		AccessToken string `json:"access_token"`
+	}
+	require.NoError(t, json.Unmarshal(exchanged.Body.Bytes(), &tokenBody))
+	claims, err := mcpserver.ParseAccessToken(server.jwt, tokenBody.AccessToken, "http://localhost:8000/mcp")
+	require.NoError(t, err)
+	assert.Equal(t, r.Organization.ID, claims.OrgID)
+	assert.Equal(t, []uuid.UUID{alpha.ID, beta.ID}, claims.FactoryIDs)
 }
