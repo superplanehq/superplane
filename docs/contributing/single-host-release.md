@@ -3,10 +3,14 @@
 Every SuperPlane release includes `superplane-single-host.tar.gz`. The archive
 installs SuperPlane on one VM with Docker Compose.
 
-`release/superplane-single-host-tarball/build.sh` builds the archive. It reads
-`runnerVersion` and `fleetManagerVersion` from
-`release/superplane-helm-chart/helm/values.yaml` and writes those versions into
-the Compose file and `install.sh`.
+`release/superplane/build-assets.sh` resolves the latest stable Runner and
+Fleet Manager tags before it builds the archive. It writes those tags into
+`release/superplane-helm-chart/helm/values.yaml`. If GitHub is unreachable,
+the committed values stay in place.
+
+`release/superplane-single-host-tarball/build.sh` reads `runnerVersion` and
+`fleetManagerVersion` from that file and writes them into the Compose file
+and `install.sh`.
 
 The archive contains:
 
