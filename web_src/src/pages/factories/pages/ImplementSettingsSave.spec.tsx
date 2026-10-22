@@ -8,7 +8,6 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
 import { organizationKeys } from "@/hooks/useOrganizationData";
-import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -51,10 +50,10 @@ function renderImplementSettings(
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const graph = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Keep this prompt" }]);
   client.setQueryData(experimentalFeaturesKeys.registry(), {
-    features: [{ id: FEATURE_FACTORY_RUN_HISTORY, released: false }],
+    features: [],
   });
   client.setQueryData(organizationKeys.details(graph.organizationId ?? ""), {
-    spec: { enabledExperimentalFeatures: [FEATURE_FACTORY_RUN_HISTORY] },
+    spec: { enabledExperimentalFeatures: [] },
   });
   render(
     <QueryClientProvider client={client}>
@@ -174,7 +173,7 @@ describe("Implement settings save", () => {
     const graph = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Keep this prompt" }]);
 
     function Harness() {
-      const settings = useImplementSettingsDraft(graph.specNodes, true);
+      const settings = useImplementSettingsDraft(graph.specNodes);
       return (
         <>
           <button type="button" onClick={() => settings.updatePullRequestDraft(false)}>

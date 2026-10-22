@@ -148,7 +148,7 @@ function storyRun(source: FactoryHistoryStorySource): CanvasesCanvasRun {
   };
 }
 
-export function factoryHistoryHandlers(source: FactoryHistoryStorySource, enabled = true) {
+export function factoryHistoryHandlers(source: FactoryHistoryStorySource) {
   const canvas = factoryHistoryStoryCanvas(source);
   const run = storyRun(source);
   const execution: CanvasesCanvasNodeExecution = {
@@ -175,13 +175,11 @@ export function factoryHistoryHandlers(source: FactoryHistoryStorySource, enable
       HttpResponse.json({
         organization: {
           metadata: { id: factoryHistoryStoryOrganization, name: "SuperPlane" },
-          spec: { enabledExperimentalFeatures: enabled ? ["factory_run_history"] : [] },
+          spec: { enabledExperimentalFeatures: [] },
         },
       }),
     ),
-    http.get("/account/experimental-features", () =>
-      HttpResponse.json({ features: [{ id: "factory_run_history", released: false }] }),
-    ),
+    http.get("/account/experimental-features", () => HttpResponse.json({ features: [] })),
     http.get("/api/v1/actions", () =>
       HttpResponse.json({
         actions: [
