@@ -243,31 +243,38 @@ func Test__HandlePolarWebhookSubscriptionCycled(t *testing.T) {
 	renewedAt := time.Now().UTC().Truncate(time.Second)
 	postSubscription(t, server, secret, "subscription.updated", subscriptionID, r.Organization.ID, firstStart, firstEnd, renewedAt.Add(-time.Minute))
 	welcomeBefore := creditGrantCount(t, r.Organization.ID, models.LLMCreditGrantKindWelcome)
+	firstPlan := requireSavedPeriod(t, r.Organization.ID, firstStart, firstEnd)
 
 	postSubscription(t, server, secret, "subscription.cycled", subscriptionID, r.Organization.ID, nextStart, nextEnd, renewedAt)
+	requireSavedPeriod(t, r.Organization.ID, nextStart, nextEnd)
+	requireIncludedGrant(t, r.Organization.ID, subscriptionID, nextEnd, firstPlan.Catalog.CreditAmountCents)
+	assert.Equal(t, welcomeBefore, creditGrantCount(t, r.Organization.ID, models.LLMCreditGrantKindWelcome))
+
 	postSubscription(t, server, secret, "subscription.cycled", subscriptionID, r.Organization.ID, nextStart, nextEnd, renewedAt)
+	requireSavedPeriod(t, r.Organization.ID, nextStart, nextEnd)
+	requireIncludedGrant(t, r.Organization.ID, subscriptionID, nextEnd, firstPlan.Catalog.CreditAmountCents)
+
 	postSubscription(t, server, secret, "subscription.updated", subscriptionID, r.Organization.ID, nextStart, nextEnd, renewedAt.Add(time.Second))
-
-	plan, err := models.FindOrganizationBillingPlan(database.Conn(), r.Organization.ID)
-	require.NoError(t, err)
-	require.NotNil(t, plan.CurrentPeriodStart)
-	require.NotNil(t, plan.CurrentPeriodEnd)
-	assert.True(t, plan.CurrentPeriodStart.Equal(nextStart))
-	assert.True(t, plan.CurrentPeriodEnd.Equal(nextEnd))
-	requireIncludedGrant(t, r.Organization.ID, subscriptionID, nextEnd, plan.Catalog.CreditAmountCents)
+	requireSavedPeriod(t, r.Organization.ID, nextStart, nextEnd)
+	requireIncludedGrant(t, r.Organization.ID, subscriptionID, nextEnd, firstPlan.Catalog.CreditAmountCents)
 	assert.Equal(t, welcomeBefore, creditGrantCount(t, r.Organization.ID, models.LLMCreditGrantKindWelcome))
 
 	staleStart := nextEnd
 	staleEnd := staleStart.AddDate(0, 1, 0)
 	postSubscription(t, server, secret, "subscription.cycled", subscriptionID, r.Organization.ID, staleStart, staleEnd, renewedAt.Add(-time.Hour))
+	requireSavedPeriod(t, r.Organization.ID, nextStart, nextEnd)
+	assert.Equal(t, 0, includedGrantCount(t, r.Organization.ID, subscriptionID, staleEnd))
+}
 
-	plan, err = models.FindOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+func requireSavedPeriod(t *testing.T, orgID uuid.UUID, start, end time.Time) *models.OrganizationBillingPlan {
+	t.Helper()
+	plan, err := models.FindOrganizationBillingPlan(database.Conn(), orgID)
 	require.NoError(t, err)
 	require.NotNil(t, plan.CurrentPeriodStart)
 	require.NotNil(t, plan.CurrentPeriodEnd)
-	assert.True(t, plan.CurrentPeriodStart.Equal(nextStart))
-	assert.True(t, plan.CurrentPeriodEnd.Equal(nextEnd))
-	assert.Equal(t, 0, includedGrantCount(t, r.Organization.ID, subscriptionID, staleEnd))
+	assert.True(t, plan.CurrentPeriodStart.Equal(start))
+	assert.True(t, plan.CurrentPeriodEnd.Equal(end))
+	return plan
 }
 
 func postSubscription(
