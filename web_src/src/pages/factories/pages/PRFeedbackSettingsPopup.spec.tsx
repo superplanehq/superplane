@@ -237,10 +237,14 @@ function renderAutomationPopup(props: { canvasId?: string } = {}) {
   );
 }
 
-function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, showVisualEvidenceSetting: boolean) {
+function renderAgentSettingsPopup(
+  settings: PRFeedbackDraftSettings,
+  showVisualEvidenceSetting: boolean,
+  initialPath = "/",
+) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialPath]}>
         <PRFeedbackSettingsPopup
           settings={settings}
           healthy
@@ -514,8 +518,8 @@ describe("PRFeedbackSettingsPopup automation", () => {
     expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
   });
 
-  it("puts Agent between General and Runs when the canvas has an agent", () => {
-    renderAgentSettingsPopup(discussionDraft(), true);
+  it("puts Agent between General and Runs for Fix pull request checks", () => {
+    renderAgentSettingsPopup(checksDraft(), true);
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Runs"]);
 
@@ -523,6 +527,16 @@ describe("PRFeedbackSettingsPopup automation", () => {
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
     expect(screen.getByRole("switch", { name: "Include visual evidence" })).not.toBeChecked();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+  });
+
+  it("opens General when Address PR feedback is linked to the Agent tab", () => {
+    renderAgentSettingsPopup(discussionDraft(), true, "/?prFeedbackSettings=agent");
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("planning-review-editor")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).toBeChecked();
   });
 
   it("hides visual evidence for check-repair agents", () => {
