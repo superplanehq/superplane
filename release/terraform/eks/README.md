@@ -27,8 +27,8 @@ Confirm the account ID before you create resources.
 
 ### 2. Build the runner AMI
 
-Terraform requires a runner AMI before the first apply. The default fleet uses
-the amd64 AMI. Build it in the region that you deploy to. Follow
+Runners are enabled by default, so Terraform requires a runner AMI before the
+first apply. The default fleet uses the amd64 AMI. Build it in the region that you deploy to. Follow
 [release/runner/packer/aws/README.md](../../runner/packer/aws/README.md):
 
 ```bash
@@ -59,7 +59,8 @@ letsencrypt_email  = "you@yourdomain.com"
 runner_image_amd64 = "ami-0123456789abcdef0"
 ```
 
-Terraform stops the plan when `runner_image_amd64` is empty.
+Terraform stops the plan when `runner_image_amd64` is empty. To install without
+runners, set `enable_runners = false` and skip the AMI build.
 
 You must control the domain so you can add its DNS record after deployment.
 If you are deploying outside `us-east-1`, also set `region` and two availability zones in that region:

@@ -410,21 +410,21 @@ locals {
       fleetManagerVersion = "v0.1.3"
     }
     fleetManagerSetup = {
-      enabled            = true
-      provider           = "aws"
+      enabled            = var.enable_runners
+      provider           = var.enable_runners ? "aws" : ""
       managerId          = var.cluster_name
       namespace          = var.superplane_namespace
       serviceAccountName = "superplane-fleet-manager"
-      infrastructure = {
+      infrastructure = var.enable_runners ? {
         superplaneUrl        = "https://${var.domain_name}"
         region               = var.region
         subnetIds            = aws_subnet.private[*].id
-        securityGroupIds     = [aws_security_group.runners.id]
+        securityGroupIds     = [aws_security_group.runners[0].id]
         imageAmd64           = var.runner_image_amd64
         imageArm64           = var.runner_image_arm64
-        fleetManagerIdentity = aws_iam_role.fleet_manager.arn
-        runnerIdentity       = aws_iam_instance_profile.runner.name
-      }
+        fleetManagerIdentity = aws_iam_role.fleet_manager[0].arn
+        runnerIdentity       = aws_iam_instance_profile.runner[0].name
+      } : null
     }
   })
 }
@@ -529,7 +529,7 @@ resource "helm_release" "superplane" {
   # Integrated Runner API and workers share active logs through EFS.
   set {
     name  = "runner.api.enabled"
-    value = "true"
+    value = var.enable_runners ? "true" : "false"
   }
 
   set {

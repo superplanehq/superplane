@@ -12,16 +12,6 @@ variable "letsencrypt_email" {
   type        = string
 }
 
-variable "runner_image_amd64" {
-  description = "Packer-built AMI ID for linux/amd64 runner VMs. The default fleet uses this AMI."
-  type        = string
-
-  validation {
-    condition     = trimspace(var.runner_image_amd64) != ""
-    error_message = "Set runner_image_amd64 to a Packer-built AMI ID, for example ami-0123456789abcdef0. Build it with release/runner/packer/aws/runner.pkr.hcl."
-  }
-}
-
 
 # -----------------------------------------------------------------------------
 # Optional Variables - AWS
@@ -151,6 +141,18 @@ variable "runner_active_log_volume_capacity" {
   description = "Nominal Kubernetes PV/PVC capacity for runner active logs. EFS grows elastically and does not reserve this capacity."
   type        = string
   default     = "1Gi"
+}
+
+variable "enable_runners" {
+  description = "Enable the runner API and create infrastructure for standalone Fleet Manager runner VMs."
+  type        = bool
+  default     = true
+}
+
+variable "runner_image_amd64" {
+  description = "Packer-built AMI ID for linux/amd64 runner VMs. Required when enable_runners is true. The default fleet uses this AMI."
+  type        = string
+  default     = ""
 }
 
 variable "runner_image_arm64" {

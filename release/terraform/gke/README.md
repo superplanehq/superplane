@@ -17,12 +17,18 @@ Do the steps in this order:
 
 ## What Terraform creates
 
-| Part | Resources |
-| --- | --- |
-| SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release |
-| Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding |
-| Runner network | Runner subnetwork, deny-all ingress firewall rule |
-| Fleet Manager infrastructure | `superplane-fleet-mgr` service account, Workload Identity binding, and setup metadata |
+| Part | Resources | Variable |
+| --- | --- | --- |
+| SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release | Always |
+| Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` |
+| Runner network | Runner subnetwork, deny-all ingress firewall rule | `enable_runners` |
+| Fleet Manager infrastructure | `superplane-fleet-mgr` service account, Workload Identity binding, and setup metadata | `enable_runners` |
+
+Both flags default to `true`. With runners enabled, Terraform requires
+`runner_image_amd64`. Set `enable_runners = false` to install without runners.
+
+An existing install that omitted these flags gets GCS blob storage and runners
+on the next apply. To keep local blob files, set both flags to `false`.
 
 ## Prerequisites
 
@@ -84,8 +90,8 @@ make some resolvers return `NXDOMAIN`.
 
 ## 2. Build the runner image
 
-Terraform requires a runner image before the first apply. The default fleet
-uses the amd64 image. Build it with Packer. Follow
+Runners are enabled by default, so Terraform requires a runner image before
+the first apply. The default fleet uses the amd64 image. Build it with Packer. Follow
 [release/runner/packer/gce/README.md](../../runner/packer/gce/README.md):
 
 ```bash
@@ -169,7 +175,8 @@ superplane_image_tag     = ""
 superplane_chart_version = "1.0.0-rc3"
 ```
 
-Terraform stops the plan when `runner_image_amd64` is empty.
+Terraform stops the plan when `enable_runners` is `true` and
+`runner_image_amd64` is empty.
 
 The default node type is `e2-standard-2`. Keep that type, or use a larger
 type. The API, the runner API, and the runner workers share one log disk.
@@ -193,6 +200,11 @@ If the chart is not published yet, set `superplane_chart_path` to
 `../../superplane-helm-chart/helm` and leave `superplane_chart_version`
 empty. Also set `superplane_image_tag`. The checked-in chart appVersion
 is a placeholder, not a published image.
+
+With `enable_gcs_blob_storage = false`, SuperPlane stores blobs on pod
+volumes. Each pod has its own volume, and the data is lost when a pod restarts.
+Runners need GCS blob storage. Use this setting only for a short evaluation
+without runners.
 
 ### Apply
 
@@ -317,11 +329,13 @@ must stop and Fleet Manager must delete it after the task.
 | `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
 | `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the standalone Fleet Manager image. Set this for private GCP registries so nodes keep pull access. |
 | `superplane_image_tag` | empty | Image tag override. Empty uses the chart appVersion. A local chart requires an explicit tag. Versioned, legacy self-hosted, and local tags are supported. |
+| `enable_gcs_blob_storage` | `true` | Store blobs in GCS. Runners require this. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |
 | `superplane_chart_path` | empty | Path to a local chart. Empty installs the published chart. |
 | `superplane_chart_version` | `1.0.0-rc3` | Published chart version. Use a stable `1.x` chart when one exists. Do not use chart `0.30.0` or any lower chart. |
-| `runner_image_amd64` | none | Required. Packer-built image for the default amd64 fleet. |
+| `enable_runners` | `true` | Enable the runner API and create the runner network. |
+| `runner_image_amd64` | empty | Packer-built image for the default amd64 fleet. Required when `enable_runners` is `true`. |
 | `runner_image_arm64` | empty | Packer-built image for an arm64 fleet. |
 | `runner_subnet_cidr` | `172.20.0.0/24` | Range of the runner subnetwork. |
 | `runner_zones` | `[zone]` | Zones for runner VMs. |
