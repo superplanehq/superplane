@@ -53,8 +53,9 @@ type PlanningSessionDraft struct {
 }
 
 type PlanningSessionSurveyQuestion struct {
-	Prompt  string   `json:"prompt"`
-	Options []string `json:"options"`
+	Prompt            string   `json:"prompt"`
+	Options           []string `json:"options"`
+	RecommendedOption string   `json:"recommended_option,omitempty"`
 }
 
 type PlanningSessionSurvey struct {
