@@ -25,7 +25,7 @@ export interface AutomationRun {
   source?: { reference: string; title: string; url?: string };
   intake?: { outcome: IntakeRunOutcome; summary: string; event: string };
   id: string;
-  task?: { id: string; title: string };
+  task?: { id: string; title: string; url?: string };
   status: RunStatus;
   startedAt: string;
   finishedAt?: string;

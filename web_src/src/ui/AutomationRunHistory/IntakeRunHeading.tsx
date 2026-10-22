@@ -32,9 +32,15 @@ export function IntakeRunHeading({ run }: { run: AutomationRun }) {
           <span>{intake.event}</span>
           {run.task ? (
             <span className="inline-flex items-center gap-2">
-              <span>
-                Task <code className="font-mono">{run.task.id}</code>
-              </span>
+              {run.task.url ? (
+                <a href={run.task.url} className="underline underline-offset-4 hover:text-foreground">
+                  Task <code className="font-mono">{run.task.id}</code>
+                </a>
+              ) : (
+                <span>
+                  Task <code className="font-mono">{run.task.id}</code>
+                </span>
+              )}
               <CopyButton
                 text={run.task.id}
                 ariaLabel={`Copy task ID ${run.task.id}`}
