@@ -90,6 +90,14 @@ func (s *Server) adminSaveFeatureDefinition(w http.ResponseWriter, r *http.Reque
 	respondJSON(w, feature)
 }
 
+func (s *Server) adminDeleteFeatureDefinition(w http.ResponseWriter, r *http.Request) {
+	if err := models.DeletePlanFeatureDefinition(database.DB(r.Context()), mux.Vars(r)["featureKey"]); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) adminOrganizationFeatures(w http.ResponseWriter, r *http.Request) {
 	orgID, ok := parseAdminOrgID(w, r)
 	if !ok {

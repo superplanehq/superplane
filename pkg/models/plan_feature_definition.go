@@ -64,6 +64,33 @@ func UpdatePlanFeatureDefinition(tx *gorm.DB, feature *PlanFeatureDefinition) er
 	return nil
 }
 
+// DeletePlanFeatureDefinition removes a feature key from every billing plan,
+// deletes every organization grant for the key, and deletes the definition.
+// The steps run in one transaction, so a failure leaves all records unchanged.
+func DeletePlanFeatureDefinition(tx *gorm.DB, key string) error {
+	return tx.Transaction(func(inner *gorm.DB) error {
+		var feature PlanFeatureDefinition
+		if err := inner.Clauses(clause.Locking{Strength: "UPDATE"}).Where("key = ?", key).First(&feature).Error; err != nil {
+			return err
+		}
+		if err := inner.Exec(`
+			UPDATE billing_plans
+			SET features = COALESCE((
+				SELECT jsonb_agg(element ORDER BY position)
+				FROM jsonb_array_elements_text(billing_plans.features) WITH ORDINALITY AS entries(element, position)
+				WHERE element <> ?
+			), '[]'::jsonb),
+			updated_at = now()
+			WHERE jsonb_exists(features, ?)`, key, key).Error; err != nil {
+			return err
+		}
+		if err := inner.Where("feature_key = ?", key).Delete(&OrganizationFeatureGrant{}).Error; err != nil {
+			return err
+		}
+		return inner.Delete(&feature).Error
+	})
+}
+
 func ListFeatureOrganizations(tx *gorm.DB, featureKey, search string, limit, offset int) ([]FeatureOrganization, int64, error) {
 	var feature PlanFeatureDefinition
 	if err := tx.Where("key = ?", featureKey).First(&feature).Error; err != nil {
