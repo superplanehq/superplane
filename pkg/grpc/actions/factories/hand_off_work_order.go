@@ -171,6 +171,9 @@ func HandOffWorkOrder(
 	var trackedPR *models.FactoryPullRequest
 	var dispatched *workOrderLineDispatchResult
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, orgID); err != nil {
+			return err
+		}
 		created, err := factory.CreateWorkOrder(tx, title, req.Description, &createdByID, assigneeIDs, nil)
 		if err != nil {
 			return err
