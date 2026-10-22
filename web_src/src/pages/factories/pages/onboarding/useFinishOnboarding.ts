@@ -102,6 +102,7 @@ export async function afterWorkspaceProvisioned(args: {
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   invalidateAccountOrganizations: () => void;
   navigate: ReturnType<typeof useNavigate>;
+  skipInitialImport?: boolean;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }): Promise<void> {
   let organizationId = args.organizationId;
@@ -120,7 +121,7 @@ export async function afterWorkspaceProvisioned(args: {
   args.invalidateAccountOrganizations();
   markWorkspaceGettingStarted(organizationId, args.factoryId);
   const destination = { organizationId, factoryKey: args.factoryKey, lineId: args.lineId };
-  if (args.onProvisioned) {
+  if (args.onProvisioned && !args.skipInitialImport) {
     args.onProvisioned(destination);
     return;
   }
@@ -145,6 +146,7 @@ export async function provisionWorkspace(args: {
   appRepository: string;
   backlogRepository: string;
   issuesChoice: IssuesChoiceId | null;
+  skipInitialImport?: boolean;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   vcs: { id: string; provider: VcsHostId };
   agentPlan: OnboardingAgentPlan;
@@ -205,6 +207,7 @@ export async function provisionWorkspace(args: {
     createIntake: args.createIntake,
     deleteIntake: args.deleteIntake,
     issuesChoice: args.issuesChoice,
+    skipInitialImport: args.skipInitialImport,
     jira: args.jira,
     linear: args.linear,
   });
@@ -299,6 +302,7 @@ export function useFinishOnboarding(args: {
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const skipInitialImport = !args.factory?.onboarding?.initial && args.setup.skipInitialImport;
   // A caller that just changed the issues answer in the same click (the
   // ticket screen's Analyze action) passes it here instead of reading
   // `args.setup.issuesChoice`. That value comes from a render captured before
@@ -347,6 +351,7 @@ export function useFinishOnboarding(args: {
         appRepository,
         backlogRepository,
         issuesChoice,
+        skipInitialImport,
         vcs: { id: vcs.id, provider: vcsHost },
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, selections),
@@ -367,6 +372,7 @@ export function useFinishOnboarding(args: {
         },
         navigate,
         onProvisioned: args.onProvisioned,
+        skipInitialImport,
       });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));

@@ -124,6 +124,7 @@ export function useOnboardingSetupState(
   const [issuesRepo, setIssuesRepo] = useState<string | null>(() => options?.initial?.issuesRepo ?? null);
   const [issuesDiscovering, setIssuesDiscovering] = useState(false);
   const [issuesDiscovered, setIssuesDiscovered] = useState(() => Boolean(options?.initial?.issuesChoice));
+  const [skipInitialImport, setSkipInitialImport] = useState(false);
   const [issuesChoice, setIssuesChoice] = useState<IssuesChoiceId | null>(() => options?.initial?.issuesChoice ?? null);
   /** True after Continue to coding agent — starts backlog analysis. */
   const [issuesCommitted, setIssuesCommitted] = useState(false);
@@ -291,6 +292,8 @@ export function useOnboardingSetupState(
     issuesDiscovered,
     startIssuesDiscovery,
     issuesChoice,
+    skipInitialImport,
+    setSkipInitialImport,
     setIssuesChoice,
     issuesCommitted,
     commitIssuesStep,

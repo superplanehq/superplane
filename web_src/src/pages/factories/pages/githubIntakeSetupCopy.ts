@@ -3,7 +3,7 @@ export const GITHUB_INTAKE_SETUP_COPY = {
   headline: "Which repository should create tasks?",
   helper: "SuperPlane listens for new issues.",
   repositoryLabel: "Repository",
-  importExistingHelper: "SuperPlane adds the 10 newest open issues from this repository.",
+  importExistingHelper: "SuperPlane adds up to 3 of the newest open issues from this repository.",
   importExistingHelperOff: "SuperPlane does not import existing issues.",
   wizardFinish: "Finish",
   wizardFinishing: "Finishing...",

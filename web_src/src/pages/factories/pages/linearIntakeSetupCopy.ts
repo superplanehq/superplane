@@ -7,7 +7,7 @@ export const LINEAR_INTAKE_SETUP_COPY = {
   wizardStepProject: "Which Linear projects should create tasks?",
   wizardStepProjectHelper:
     "Select one or more projects. SuperPlane creates a task when an issue is added to a selected project.",
-  importExistingHelper: "SuperPlane adds the 10 newest open issues from these projects.",
+  importExistingHelper: "SuperPlane adds up to 3 of the newest open issues from these projects.",
   importExistingHelperOff: "SuperPlane does not import existing issues.",
   wizardConnect: "Connect Linear",
   wizardConnecting: "Connecting...",

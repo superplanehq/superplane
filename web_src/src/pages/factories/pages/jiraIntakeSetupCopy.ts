@@ -6,7 +6,7 @@ export const JIRA_INTAKE_SETUP_COPY = {
   wizardStepConnectExisting: "Choose the Jira site that SuperPlane will monitor.",
   wizardStepProject: "Which Jira project should create tasks?",
   wizardStepProjectHelper: "SuperPlane listens for new issues.",
-  importExistingHelper: "SuperPlane adds the newest unresolved issues of this project.",
+  importExistingHelper: "SuperPlane adds up to 3 of the newest unresolved issues from this project.",
   importExistingHelperOff: "SuperPlane does not import existing issues.",
   wizardConnect: "Connect Jira",
   wizardConnecting: "Connecting...",

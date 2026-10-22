@@ -41,8 +41,8 @@ describe("GitHubIntakeSetupDialog", () => {
     expect(screen.getByRole("heading", { name: GITHUB_INTAKE_SETUP_COPY.headline })).toBeInTheDocument();
     expect(screen.getByText(GITHUB_INTAKE_SETUP_COPY.helper)).toBeInTheDocument();
     expect(screen.getByTestId("github-setup-repository")).toHaveTextContent("acme/payments-service");
-    expect(screen.getByText(GITHUB_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent("10 newest");
-    expect(screen.getByTestId("github-skip-initial-import")).toBeChecked();
+    expect(screen.getByText(GITHUB_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent("up to 3");
+    expect(screen.getByTestId("github-skip-initial-import")).not.toBeChecked();
   });
 
   it("creates a GitHub intake with the default import", async () => {
