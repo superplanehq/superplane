@@ -387,6 +387,8 @@ export interface FactoriesFixture {
   failSkillUsage?: boolean;
   restoredAgentResourcesById?: Record<string, FactoriesFactoryAgentResource>;
   failAgentResourceRestoreForIds?: string[];
+  /** Storybook: PUT /api/v1/factories/{id} fails before it saves. */
+  failFactoryUpdate?: boolean;
   /** SuperPlane MCP clients connected to a workspace. */
   mcpClientsByFactoryId?: Record<string, FactoriesFactoryMcpClient[]>;
   /** Tools returned by GET .../agent-resources/{id}/tools. */

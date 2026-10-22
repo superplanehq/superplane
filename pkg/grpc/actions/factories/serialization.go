@@ -32,6 +32,8 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 		serialized.PublicBadgeToken = *factory.PublicBadgeToken
 	}
 	serialized.VcsCapabilities = serializeFactoryVCSCapabilities(factory.OnboardingConfigValue().EffectiveVCSProvider())
+	serialized.DefaultAgentModel = factory.DefaultAgentModel
+	serialized.DefaultAgentModelProvider = factory.DefaultAgentModelProvider
 	return serialized
 }
 

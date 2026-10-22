@@ -61,6 +61,16 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 		}
 	}
 
+	if req.GetClearDefaultAgentModel() {
+		if err := factory.UpdateDefaultAgentModel(db, "", ""); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory")
+		}
+	} else if req.DefaultAgentModel != nil {
+		if err := setFactoryDefaultAgentModel(db, factory, req.GetDefaultAgentModel(), req.GetDefaultAgentModelProvider()); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory")
+		}
+	}
+
 	lines, err := factory.ListLines(db)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory")

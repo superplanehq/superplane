@@ -108,6 +108,32 @@ func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 	assert.Empty(t, reloaded.OnboardingConfigValue().AgentIntegrationID)
 }
 
+func Test__SwitchFactoryModelSource__ClearsStaleDefaultModel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, factory.UpdateDefaultAgentModel(db, "claude-sonnet-4-6", models.UsageProviderAnthropic))
+	stubProviderModels(r.Registry, "claude", []string{"claude-sonnet-4-6"})
+
+	_, _, err = SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceAnthropic,
+		"sk-test",
+		"",
+		"",
+	)
+	require.NoError(t, err)
+
+	reloaded, err := findFactory(db, r.Organization.ID, factory.ID.String())
+	require.NoError(t, err)
+	assert.Empty(t, reloaded.DefaultAgentModel)
+	assert.Empty(t, reloaded.DefaultAgentModelProvider)
+}
+
 func createTriggerOnlyCanvas(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID) *models.Canvas {
 	t.Helper()
 	now := time.Now()

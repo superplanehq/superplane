@@ -2,9 +2,6 @@ package factories
 
 import (
 	"context"
-	"sync"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -13,6 +10,9 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
+	"sync"
+	"testing"
 )
 
 func Test__UpdateFactory(t *testing.T) {
@@ -80,6 +80,52 @@ func Test__UpdateFactory(t *testing.T) {
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
+	})
+
+	t.Run("persists a selectable default model", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		seedSelectableHostedModel(t)
+
+		model := "claude-sonnet-4-6"
+		provider := models.UsageProviderAnthropic
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                        factory.ID.String(),
+			DefaultAgentModel:         &model,
+			DefaultAgentModelProvider: &provider,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, model, response.Factory.DefaultAgentModel)
+		assert.Equal(t, provider, response.Factory.DefaultAgentModelProvider)
+
+		saved, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Equal(t, model, saved.DefaultAgentModel)
+		assert.Equal(t, provider, saved.DefaultAgentModelProvider)
+
+		cleared, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                     factory.ID.String(),
+			ClearDefaultAgentModel: true,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, cleared.Factory.DefaultAgentModel)
+		assert.Empty(t, cleared.Factory.DefaultAgentModelProvider)
+	})
+
+	t.Run("rejects a model the workspace cannot select", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		model := "not-a-real-model"
+		provider := models.UsageProviderAnthropic
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                        factory.ID.String(),
+			DefaultAgentModel:         &model,
+			DefaultAgentModelProvider: &provider,
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("sets hosted spend limit", func(t *testing.T) {
@@ -300,5 +346,19 @@ func Test__UpdateFactory(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+}
+
+func seedSelectableHostedModel(t *testing.T) {
+	t.Helper()
+	_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
 	})
 }

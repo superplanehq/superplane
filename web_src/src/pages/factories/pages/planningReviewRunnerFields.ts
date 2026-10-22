@@ -162,8 +162,8 @@ const SUPERPLANE_AGENT_MODEL_FIELD: ConfigurationField = {
   type: "hosted-model",
   required: false,
   description:
-    "Select a SuperPlane-hosted model. The instance SuperPlane agent model is used when you do not select one.",
-  placeholder: "Instance SuperPlane agent model",
+    "The workspace default model is used when you do not select one. If the workspace has no default, the instance SuperPlane agent model is used.",
+  placeholder: "Workspace default model",
   typeOptions: { hostedModel: { provider: HOSTED_MODEL_ALL_PROVIDERS } },
 };
 

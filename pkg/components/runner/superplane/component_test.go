@@ -324,6 +324,71 @@ func TestRunSuperPlaneExecuteUsesNodeModelWhenDefaultIsMissing(t *testing.T) {
 	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 }
 
+func TestRunSuperPlaneExecuteUsesFactoryDefaultWhenStepModelIsEmpty(t *testing.T) {
+	req := executeSuperPlaneWithFactoryDefault(t, map[string]any{
+		"machineType": testRunnerMachineType,
+		"steps": []map[string]any{
+			{"name": "Hello", "type": "prompt", "prompt": "hello"},
+		},
+	}, core.FactoryDefaultAgentModel{
+		Provider: models.UsageProviderAnthropic,
+		Model:    "claude-opus-4-6",
+	}, core.DefaultHostedLLMModel{
+		Provider: models.UsageProviderAnthropic,
+		Model:    "claude-sonnet-4-6",
+	}, core.HostedLLMAccess{
+		APIKey:        "sk-hosted",
+		AllowedModels: []string{"claude-opus-4-6", "claude-sonnet-4-6"},
+	})
+	assert.Contains(t, commandText(req.Commands), "'claude-opus-4-6'")
+	assert.NotContains(t, commandText(req.Commands), "'claude-sonnet-4-6'")
+}
+
+func TestRunSuperPlaneExecuteUsesInstallationDefaultWhenFactoryDefaultIsEmpty(t *testing.T) {
+	req := executeSuperPlaneWithFactoryDefault(t, map[string]any{
+		"machineType": testRunnerMachineType,
+		"steps": []map[string]any{
+			{"name": "Hello", "type": "prompt", "prompt": "hello"},
+		},
+	}, core.FactoryDefaultAgentModel{}, core.DefaultHostedLLMModel{
+		Provider: models.UsageProviderOpenAI,
+		Model:    "gpt-5",
+	}, core.HostedLLMAccess{
+		APIKey:        "sk-hosted",
+		AllowedModels: []string{"gpt-5"},
+	})
+	assert.Contains(t, commandText(req.Commands), "'gpt-5'")
+}
+
+func TestRunSuperPlaneExecuteStepModelWinsOverFactoryDefault(t *testing.T) {
+	req := executeSuperPlaneWithFactoryDefault(t, map[string]any{
+		"machineType": testRunnerMachineType,
+		"model":       "anthropic::claude-sonnet-4-6",
+		"steps": []map[string]any{
+			{"name": "Hello", "type": "prompt", "prompt": "hello"},
+		},
+	}, core.FactoryDefaultAgentModel{
+		Provider: models.UsageProviderAnthropic,
+		Model:    "claude-opus-4-6",
+	}, core.DefaultHostedLLMModel{
+		Provider: models.UsageProviderOpenAI,
+		Model:    "gpt-5",
+	}, core.HostedLLMAccess{
+		APIKey:        "sk-hosted",
+		AllowedModels: []string{"claude-sonnet-4-6", "claude-opus-4-6"},
+	})
+	assert.Contains(t, commandText(req.Commands), "'claude-sonnet-4-6'")
+	assert.NotContains(t, commandText(req.Commands), "'claude-opus-4-6'")
+}
+
+func commandText(commands []runner.BrokerCommand) string {
+	text := ""
+	for _, command := range commands {
+		text += command.Command + "\n"
+	}
+	return text
+}
+
 func TestRunSuperPlaneExecuteRejectsMissingDefaultModel(t *testing.T) {
 	component := &RunSuperPlane{}
 	err := component.Execute(core.ExecutionContext{
@@ -395,9 +460,32 @@ func executeSuperPlaneWithConfig(
 	return req
 }
 
+func executeSuperPlaneWithFactoryDefault(
+	t *testing.T,
+	configuration map[string]any,
+	factoryDefault core.FactoryDefaultAgentModel,
+	defaultModel core.DefaultHostedLLMModel,
+	access core.HostedLLMAccess,
+) createTaskRequest {
+	t.Helper()
+	_, _, req := executeSuperPlaneRunWithFactory(t, configuration, &contexts.FactoryContext{Default: factoryDefault}, defaultModel, access)
+	return req
+}
+
 func executeSuperPlaneRun(
 	t *testing.T,
 	configuration map[string]any,
+	defaultModel core.DefaultHostedLLMModel,
+	access core.HostedLLMAccess,
+) (*contexts.HTTPContext, *contexts.ExecutionStateContext, createTaskRequest) {
+	t.Helper()
+	return executeSuperPlaneRunWithFactory(t, configuration, nil, defaultModel, access)
+}
+
+func executeSuperPlaneRunWithFactory(
+	t *testing.T,
+	configuration map[string]any,
+	factory *contexts.FactoryContext,
 	defaultModel core.DefaultHostedLLMModel,
 	access core.HostedLLMAccess,
 ) (*contexts.HTTPContext, *contexts.ExecutionStateContext, createTaskRequest) {
@@ -424,6 +512,7 @@ func executeSuperPlaneRun(
 		HTTP:          httpContext,
 		Secrets:       &contexts.SecretsContext{Values: map[string][]byte{}},
 		Webhook:       &contexts.NodeWebhookContext{},
+		Factory:       factory,
 		HostedLLM: &contexts.HostedLLMContext{
 			Default: defaultModel,
 			Access:  access,

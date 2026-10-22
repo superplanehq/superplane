@@ -427,6 +427,10 @@ func (f *recordingBitbucketFactory) VCSProvider() (string, error) {
 	return "", nil
 }
 
+func (f *recordingBitbucketFactory) DefaultAgentModel() (core.FactoryDefaultAgentModel, error) {
+	return core.FactoryDefaultAgentModel{}, nil
+}
+
 func Test__OnPush__RepositoryRouting(t *testing.T) {
 
 	trigger := &OnPush{}

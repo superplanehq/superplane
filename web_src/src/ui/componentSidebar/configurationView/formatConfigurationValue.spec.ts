@@ -130,6 +130,6 @@ describe("formatConfigurationValue", () => {
     expect(formatConfigurationValue(field, "hosted::openrouter::moonshotai/kimi-k2.6").displayText).toBe(
       "moonshotai/kimi-k2.6",
     );
-    expect(formatConfigurationValue(field, "").displayText).toBe("Instance SuperPlane agent model");
+    expect(formatConfigurationValue(field, "").displayText).toBe("Workspace default model");
   });
 });

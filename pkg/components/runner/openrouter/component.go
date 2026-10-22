@@ -2,6 +2,7 @@ package openrouter
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -68,7 +69,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenRouter integration used as ` + "`OPENROUTER_API_KEY`" + `.
-- **Model**: Required. Select a model from Organization LLM Models.
+- **Model**: The workspace default model is used when you do not select one.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -84,7 +85,6 @@ Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
 func (c *RunOpenRouter) Configuration() []configuration.Field {
 	model := runner.AgentModelField("openrouter")
-	model.Required = true
 	return []configuration.Field{
 		runner.MachineTypeField("machineType"),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
@@ -131,6 +131,13 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	spec, err := decodeRunOpenRouterSpec(ctx.Configuration)
 	if err != nil {
 		return err
+	}
+	spec.Model, err = runner.ModelOrFactoryDefault(ctx, ComponentName, spec.Model)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(spec.Model) == "" {
+		return fmt.Errorf("model is required")
 	}
 	if err := validateRunOpenRouterSpec(spec); err != nil {
 		return err

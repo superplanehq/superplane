@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -57,6 +58,21 @@ type FactoryContext interface {
 	// An empty value means GitHub. A caller that has no factory gets an
 	// empty value and keeps GitHub branch links.
 	VCSProvider() (string, error)
+	// DefaultAgentModel returns the workspace default model.
+	// Provider is empty for a bring-your-own-key model.
+	// Both empty means the workspace has no default.
+	// A caller that has no factory gets an empty model.
+	DefaultAgentModel() (FactoryDefaultAgentModel, error)
+}
+
+// FactoryDefaultAgentModel is the workspace model used when a step model is empty.
+type FactoryDefaultAgentModel struct {
+	Model    string
+	Provider string
+}
+
+func (m FactoryDefaultAgentModel) IsSet() bool {
+	return strings.TrimSpace(m.Model) != ""
 }
 
 type WorkOrderParams struct {

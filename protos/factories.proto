@@ -938,6 +938,13 @@ message UpdateFactoryRequest {
   // When true, Large and Full width badges show cost per merged pull request.
   // Absent means do not change. A public URL cannot turn this on.
   optional bool public_badge_show_cost = 9;
+  // Workspace default model id. Absent means do not change.
+  // The provider is empty for a bring-your-own-key model.
+  optional string default_agent_model = 10;
+  optional string default_agent_model_provider = 11;
+  // When true, remove the workspace default model.
+  // Takes precedence over the model fields.
+  bool clear_default_agent_model = 12;
 }
 
 message UpdateFactoryResponse {
@@ -1113,6 +1120,10 @@ message Factory {
   // Stable id in workspace URLs. Does not change when the workspace key changes.
   string url_id = 13;
   FactoryVCSCapabilities vcs_capabilities = 14;
+  // Model agents use when a step does not set one. Empty means no workspace default.
+  string default_agent_model = 15;
+  // Provider for a hosted default. Empty for a bring-your-own-key model.
+  string default_agent_model_provider = 16;
 }
 
 // Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.

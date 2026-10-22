@@ -56,7 +56,7 @@ func (c *RunSuperPlane) Description() string {
 func (c *RunSuperPlane) Documentation() string {
 	return `Runs a SuperPlane-hosted coding agent on a fleet runner.
 
-This agent uses SuperPlane-hosted models. Select a model on the node, or use the instance SuperPlane agent model. The node does not store an API key.
+This agent uses SuperPlane-hosted models. Select a model on the node, or use the workspace default model. If the workspace has no default, the instance SuperPlane agent model is used. The node does not store an API key.
 
 ## Prerequisites
 - The organization has hosted credit.
@@ -70,7 +70,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 
 ## Configuration
 - **Machine type**: Runner fleet available to the organization (required).
-- **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty. If the organization does not allow that model, SuperPlane uses another allowed model.
+- **Model**: Optional SuperPlane-hosted model. The workspace default model is used when you do not select one. If the workspace has no default, the instance SuperPlane agent model is used.
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
@@ -252,6 +252,13 @@ func resolveSuperPlaneRunModel(ctx core.ExecutionContext, spec RunSuperPlaneSpec
 func resolveSuperPlaneDefaultModel(ctx core.ExecutionContext) (core.DefaultHostedLLMModel, error) {
 	if ctx.HostedLLM == nil {
 		return core.DefaultHostedLLMModel{}, fmt.Errorf("hosted credentials are not available")
+	}
+	factoryDefault, ok, err := runner.SelectableHostedFactoryDefault(ctx)
+	if err != nil {
+		return core.DefaultHostedLLMModel{}, err
+	}
+	if ok {
+		return factoryDefault, nil
 	}
 	defaultModel, err := ctx.HostedLLM.DefaultModel()
 	if err != nil {

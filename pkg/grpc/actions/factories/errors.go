@@ -49,8 +49,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "hosted spend limit cannot be negative")
 	case errors.Is(err, models.ErrFactoryOnboardingNotComplete):
 		return grpcerrors.FailedPrecondition(err, "finish workspace setup before you change visibility")
-	case errors.Is(err, models.ErrModelNotInParentList):
-		return grpcerrors.InvalidArgument(err, "model is not in the parent selected-model list")
+	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
+		return grpcerrors.InvalidArgument(err, "this workspace cannot select that model")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidIssuesSource):
 		return grpcerrors.InvalidArgument(err, "invalid issues source")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidAgentHarness):

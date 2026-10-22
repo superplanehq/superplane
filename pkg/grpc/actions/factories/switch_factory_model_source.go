@@ -544,6 +544,9 @@ func switchFactoryModelSource(
 	if err := factory.UpdateOnboarding(tx, patch); err != nil {
 		return nil, "", err
 	}
+	if err := clearStaleFactoryDefaultModel(tx, factory, source); err != nil {
+		return nil, "", err
+	}
 
 	ownerID := versionOwnerID(ctx)
 	changed, err := rewriteFactoryCanvases(tx, factory, ownerID, rewrite)

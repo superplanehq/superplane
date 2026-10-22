@@ -41,6 +41,43 @@ type createTaskRequest struct {
 	DockerImage   string                             `json:"docker_image,omitempty"`
 }
 
+func TestRunClaudeCodeExecuteUsesFactoryDefaultWhenStepModelIsEmpty(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-default"}`))},
+		},
+	}
+	component := &RunClaudeCode{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"machineType": testRunnerMachineType,
+			"steps": []map[string]any{
+				{"name": "Fix tests", "type": "prompt", "prompt": "Fix the failing tests"},
+			},
+			"credentials": credentialsSecret("anthropic", "api_key"),
+		},
+		HTTP: httpContext,
+		Secrets: &contexts.SecretsContext{
+			Values: map[string][]byte{"anthropic/api_key": []byte("sk-test-key")},
+		},
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+		Factory: &contexts.FactoryContext{Default: core.FactoryDefaultAgentModel{
+			Model: "claude-sonnet-4-6",
+		}},
+		HostedLLM: &contexts.HostedLLMContext{},
+	})
+	require.NoError(t, err)
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), `'claude-sonnet-4-6'`)
+}
+
 func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")

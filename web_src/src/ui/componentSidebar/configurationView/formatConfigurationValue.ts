@@ -204,7 +204,7 @@ export function formatConfigurationValue(field: ConfigurationField, value: unkno
 function formatHostedModelValue(field: ConfigurationField, value: unknown): FormattedConfigurationValue {
   if (isEmptyValue(value)) {
     if (field.typeOptions?.hostedModel?.provider === HOSTED_MODEL_ALL_PROVIDERS) {
-      return { kind: "text", displayText: "Instance SuperPlane agent model" };
+      return { kind: "text", displayText: "Workspace default model" };
     }
     return { kind: "empty", displayText: EMPTY_DISPLAY_VALUE };
   }

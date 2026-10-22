@@ -2254,6 +2254,14 @@ func (l *lazyWebhookFactory) VCSProvider() (string, error) {
 	return inner.VCSProvider()
 }
 
+func (l *lazyWebhookFactory) DefaultAgentModel() (core.FactoryDefaultAgentModel, error) {
+	inner, err := l.load()
+	if err != nil {
+		return core.FactoryDefaultAgentModel{}, err
+	}
+	return inner.DefaultAgentModel()
+}
+
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {
 	tx := database.Conn()
 	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)

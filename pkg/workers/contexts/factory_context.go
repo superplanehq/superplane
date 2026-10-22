@@ -1159,6 +1159,22 @@ func (c *FactoryContext) VCSProvider() (string, error) {
 	return factory.OnboardingConfigValue().VCSProvider, nil
 }
 
+// DefaultAgentModel returns the saved workspace model.
+// A canvas that is not owned by a factory has no default.
+func (c *FactoryContext) DefaultAgentModel() (core.FactoryDefaultAgentModel, error) {
+	if c.canvas == nil || c.canvas.FactoryID == nil {
+		return core.FactoryDefaultAgentModel{}, nil
+	}
+	factory, err := c.currentFactory()
+	if err != nil {
+		return core.FactoryDefaultAgentModel{}, err
+	}
+	return core.FactoryDefaultAgentModel{
+		Model:    factory.DefaultAgentModel,
+		Provider: factory.DefaultAgentModelProvider,
+	}, nil
+}
+
 func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {

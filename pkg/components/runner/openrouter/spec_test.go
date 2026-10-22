@@ -45,7 +45,7 @@ func TestValidateRunOpenRouterSpecRejectsHostedCredentials(t *testing.T) {
 	require.Contains(t, err.Error(), "Run SuperPlane Agent")
 }
 
-func TestValidateRunOpenRouterSpecRequiresModel(t *testing.T) {
+func TestValidateRunOpenRouterSpecAllowsEmptyModel(t *testing.T) {
 	t.Parallel()
 
 	prompt := "fix tests"
@@ -59,9 +59,7 @@ func TestValidateRunOpenRouterSpecRequiresModel(t *testing.T) {
 			Integration: configuration.IntegrationRef{Name: "openrouter"},
 		},
 	}
-	err := validateRunOpenRouterSpec(spec)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "model is required")
+	require.NoError(t, validateRunOpenRouterSpec(spec))
 }
 
 func TestDecodeRunOpenRouterSpecIgnoresOmittedMaxTurns(t *testing.T) {
@@ -244,7 +242,7 @@ func validOpenRouterSpec(prompt string) RunOpenRouterSpec {
 	}
 }
 
-func TestValidateConfigurationOpenRouterRequiresModel(t *testing.T) {
+func TestValidateConfigurationOpenRouterAllowsEmptyModel(t *testing.T) {
 	t.Parallel()
 
 	fields := (&RunOpenRouter{}).Configuration()
@@ -254,12 +252,11 @@ func TestValidateConfigurationOpenRouterRequiresModel(t *testing.T) {
 			"source":      "integration",
 			"integration": map[string]any{"name": "openrouter"},
 		},
-		"steps": []map[string]any{
-			{"name": "Prompt", "type": "prompt", "prompt": "fix tests"},
+		"steps": []any{
+			map[string]any{"name": "Prompt", "type": "prompt", "prompt": "fix tests"},
 		},
 	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "model")
+	require.NoError(t, err)
 }
 
 func TestConfigurationOmitsMaxTurns(t *testing.T) {
