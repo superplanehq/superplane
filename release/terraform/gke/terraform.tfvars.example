@@ -15,6 +15,12 @@ static_ip_name = "superplane-ip"
 # Email for Let's Encrypt certificate notifications
 letsencrypt_email = "admin@example.com"
 
+# Packer-built linux/amd64 runner image for the default fleet. Build it with
+# release/runner/packer/gce/runner.pkr.hcl before the first apply, for example
+# projects/my-gcp-project/global/images/IMAGE_NAME. Required when
+# enable_runners is true.
+runner_image_amd64 = ""
+
 # -----------------------------------------------------------------------------
 # Optional Variables - GCP Region/Zone
 # -----------------------------------------------------------------------------
@@ -64,11 +70,6 @@ letsencrypt_email = "admin@example.com"
 # Optional. Empty uses the image version in the published chart.
 superplane_image_tag = ""
 
-# Set both before the first apply. The variable defaults stay false so an
-# existing install that omitted them keeps local blob files.
-enable_gcs_blob_storage = true
-enable_runners          = true
-
 # Required unless you set superplane_chart_path. Terraform downloads published
 # charts from oci://ghcr.io/superplanehq/superplane-chart.
 superplane_chart_version = "1.0.0-rc3"
@@ -94,7 +95,6 @@ superplane_chart_version = "1.0.0-rc3"
 
 # runner_zones       = ["us-central1-a", "us-central1-b"]
 # runner_subnet_cidr = "172.20.0.0/24"
-# runner_image_amd64 = "projects/example/global/images/superplane-runner-amd64"
 # runner_image_arm64 = "projects/example/global/images/superplane-runner-arm64"
 
 # After owner setup, use /admin/fleet-manager-setup. The page maps Terraform
