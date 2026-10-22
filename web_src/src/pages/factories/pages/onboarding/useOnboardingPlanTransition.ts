@@ -14,7 +14,7 @@ export function useOnboardingPlanTransition(
   const rollout = useExperimentalFeature(organizationId);
   const access = useBYOKAccess(organizationId);
   const billing = useOrganizationBilling(organizationId);
-  const [repositorySaved, setRepositorySaved] = useState(false);
+  const [ticketsSaved, setTicketsSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const hasBillingStep =
     rollout.has(FEATURE_NEW_BILLING) &&
@@ -32,9 +32,9 @@ export function useOnboardingPlanTransition(
     }
   }, [access, navigation, model]);
   useEffect(() => {
-    if (!repositorySaved || model.saving) return;
-    setRepositorySaved(false);
-    const continueFromRepository = async () => {
+    if (!ticketsSaved || model.saving) return;
+    setTicketsSaved(false);
+    const continueFromTickets = async () => {
       if (rollout.isLoading || !rollout.organizationReady) {
         showErrorToast("SuperPlane could not load billing settings. Try again.");
         return;
@@ -51,8 +51,8 @@ export function useOnboardingPlanTransition(
       await continueAfterPlan();
     };
     setPending(true);
-    void continueFromRepository().finally(() => setPending(false));
-  }, [repositorySaved, model.saving, rollout, billing, navigation, continueAfterPlan]);
+    void continueFromTickets().finally(() => setPending(false));
+  }, [ticketsSaved, model.saving, rollout, billing, navigation, continueAfterPlan]);
   const planActive =
     billing.data?.planCategory === "paid" &&
     billing.data.creditPurchaseAllowed &&
@@ -70,8 +70,8 @@ export function useOnboardingPlanTransition(
     hasBillingStep,
     skipAgentScreen: !access.allowed,
     accessError: access.error,
-    afterRepository: async () => {
-      setRepositorySaved(true);
+    afterTickets: async () => {
+      setTicketsSaved(true);
     },
     continueAfterPlan,
   };

@@ -164,9 +164,8 @@ function StatefulSetup({
   overrides: Partial<OnboardingPageModel>;
 }) {
   const setup = useOnboardingSetupState("Payments", {
-    connected: new Set([...connected, "jira"]),
+    connected,
     simulateDiscovery: false,
-    initial: { issuesChoice: "jira" },
   });
   return <FirstRunSetup model={pageModel(setup, { jiraProjectId: "PAY", ...overrides })} />;
 }
@@ -181,7 +180,6 @@ function renderSetup(connected: Set<IntegrationId>, overrides: Partial<Onboardin
 
 async function chooseBitbucket(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId("first-run-get-started"));
-  await user.click(screen.getByTestId("first-run-analyze-tickets"));
   await user.click(within(screen.getByTestId("first-run-host-bitbucket")).getByRole("button"));
   const workspace = screen.queryByRole("button", { name: "Use acme-team" });
   if (workspace) await user.click(workspace);
@@ -208,7 +206,6 @@ describe("FirstRunSetup Bitbucket", () => {
     renderSetup(new Set());
 
     await user.click(screen.getByTestId("first-run-get-started"));
-    await user.click(screen.getByTestId("first-run-analyze-tickets"));
 
     expect(within(screen.getByTestId("first-run-host-github")).getByRole("button")).toBeEnabled();
     expect(within(screen.getByTestId("first-run-host-bitbucket")).getByRole("button")).toBeEnabled();
@@ -339,7 +336,7 @@ describe("FirstRunSetup Bitbucket", () => {
     const user = userEvent.setup();
     const selectBitbucketRepository = vi.fn().mockResolvedValue(true);
     const requestConnect = vi.fn().mockResolvedValue(true);
-    renderSetup(new Set<IntegrationId>(["bitbucket"]), {
+    renderSetup(new Set<IntegrationId>(["bitbucket", "jira"]), {
       bitbucketIntegrationId: "bitbucket-1",
       selectBitbucketRepository,
       requestConnect,
@@ -351,12 +348,10 @@ describe("FirstRunSetup Bitbucket", () => {
 
     await waitFor(() => expect(selectBitbucketRepository).toHaveBeenCalledWith("acme-team/api"));
     expect(resources.calls).toContainEqual({ integrationId: "bitbucket-1", type: "repository", enabled: true });
-    await user.click(screen.getByTestId("first-run-back"));
-    await user.click(screen.getByTestId("first-run-back"));
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /GitHub Issues/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect GitHub" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Jira/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Jira/ }));
     expect(screen.getByRole("button", { name: /^Linear/ })).toBeInTheDocument();
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(requestConnect).not.toHaveBeenCalled();

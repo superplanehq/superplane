@@ -34,20 +34,20 @@ import {
 
 const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   welcome: 0,
-  tickets: 1,
-  host: 2,
-  connect: 2,
-  choose: 3,
+  host: 1,
+  connect: 1,
+  choose: 2,
+  tickets: 3,
   billing: 4,
   agent: 5,
 };
 
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
-  tickets: "welcome",
-  host: "tickets",
+  host: "welcome",
   connect: "host",
   choose: "connect",
-  billing: "choose",
+  tickets: "choose",
+  billing: "tickets",
   agent: "billing",
 };
 
@@ -62,7 +62,7 @@ function signOut() {
 }
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
-  const backScreen = target === "agent" && !flow.hasBillingStep ? "choose" : BACK_SCREEN[target];
+  const backScreen = target === "agent" && !flow.hasBillingStep ? "tickets" : BACK_SCREEN[target];
   // Bitbucket has no separate connect screen.
   if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
     return () => flow.goToScreen("host");
@@ -92,12 +92,18 @@ function TicketsScreenHost({
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      continueLabel="Continue to repository"
+      continueLabel={
+        flow.hasBillingStep || !flow.skipAgentScreen
+          ? FIRST_RUN_COPY.tickets.continue
+          : !initialWorkspace && model.setup.skipInitialImport
+            ? FIRST_RUN_COPY.finish.action
+            : FIRST_RUN_COPY.tickets.analyze
+      }
       continuePending={false}
-      saving={flow.blockingAction === "saving-ticket-source"}
+      saving={flow.busy}
       savingLabel={FIRST_RUN_COPY.tickets.saving}
       githubConnected={model.setup.connected.has("github")}
-      onConnectGitHub={() => flow.selectTicketSource("github-issues")}
+      onConnectGitHub={() => void flow.connectGitHubIssues()}
       jiraConnected={model.setup.connected.has("jira")}
       jiraProjects={model.jiraProjects}
       jiraProjectsLoading={model.jiraProjectsLoading}
@@ -332,7 +338,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         firstName={firstNameOf(account?.name)}
         chrome={chromeFor("welcome")}
         sphere={sphereFor("welcome", setup.selectedRepo)}
-        onGetStarted={() => flow.goToScreen("tickets")}
+        onGetStarted={() => flow.goToScreen("host")}
       />
     );
   }

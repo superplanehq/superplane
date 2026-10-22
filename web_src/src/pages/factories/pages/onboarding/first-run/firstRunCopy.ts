@@ -120,8 +120,8 @@ export const FIRST_RUN_COPY = {
     moreLater: "You can add more repositories later.",
   },
   tickets: {
-    headline: "Choose your intake source",
-    intro: "Choose where SuperPlane reads issues. You will select a code repository next.",
+    headline: "Choose the backlog to scan",
+    intro: "SuperPlane reads these tickets and scores each one by how likely an agent can complete it.",
     githubIssues: "GitHub Issues",
     jira: "Jira",
     linear: "Linear",
@@ -149,8 +149,7 @@ export const FIRST_RUN_COPY = {
     hostedModelsHelper: "SuperPlane runs the agents. You do not connect a provider.",
     loading: "Checking agent availability…",
   },
-  // Shared by every screen that provisions the workspace. Hosted credentials
-  // move that action from the agent screen to the ticket screen.
+  // Shared by every screen that provisions the workspace.
   finish: {
     action: "Finish setup",
     saving: "Finishing setup…",

@@ -31,14 +31,14 @@ function mount() {
   const finish = vi.fn(async () => {});
   const goToScreen = vi.fn();
   const hook = renderHook(() =>
-    useOnboardingPlanTransition({ saving: false, finish }, { screen: "choose", goToScreen }, "org"),
+    useOnboardingPlanTransition({ saving: false, finish }, { screen: "tickets", goToScreen }, "org"),
   );
   return { ...hook, finish, goToScreen };
 }
 
 it("opens the plan step before model access is resolved", async () => {
   const { result, finish, goToScreen } = mount();
-  await act(async () => result.current.afterRepository());
+  await act(async () => result.current.afterTickets());
   await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("billing"));
   expect(verify).not.toHaveBeenCalled();
   expect(finish).not.toHaveBeenCalled();
@@ -63,10 +63,10 @@ it("keeps setup open when product permission cannot be verified", async () => {
   expect(goToScreen).not.toHaveBeenCalled();
   expect(toast).toHaveBeenCalled();
 });
-it("keeps repository setup open when billing lookup fails", async () => {
+it("keeps ticket setup open when billing lookup fails", async () => {
   lookupFailed = true;
   const { result, finish, goToScreen } = mount();
-  await act(async () => result.current.afterRepository());
+  await act(async () => result.current.afterTickets());
   await waitFor(() => expect(toast).toHaveBeenCalled());
   expect(finish).not.toHaveBeenCalled();
   expect(goToScreen).not.toHaveBeenCalled();
@@ -77,7 +77,7 @@ it.each(["rollout-off", "billing-off", "no-plans"])("omits the plan step for %s"
   if (condition === "billing-off") billing.billingEnabled = false;
   if (condition === "no-plans") billing.availablePlans = [];
   const { result, goToScreen } = mount();
-  await act(async () => result.current.afterRepository());
+  await act(async () => result.current.afterTickets());
   await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("agent"));
   expect(goToScreen).not.toHaveBeenCalledWith("billing");
 });

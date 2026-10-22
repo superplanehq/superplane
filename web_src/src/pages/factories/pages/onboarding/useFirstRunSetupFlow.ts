@@ -1,5 +1,4 @@
 import { useOnboardingPlanTransition } from "./useOnboardingPlanTransition";
-import { showErrorToast } from "@/lib/toast";
 import type { MeVcsProviderRepository } from "@/api-client";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { startPublicGitHubAppCreate } from "@/lib/githubAppManifest";
@@ -59,6 +58,18 @@ function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen | 
   return null;
 }
 
+function resumeFirstRunScreen(args: {
+  savedStep: WizardStepId;
+  githubPending: boolean;
+  githubReturned: boolean;
+  installationAppReady: boolean;
+}): FirstRunScreen {
+  if (args.savedStep !== "vcs") return SCREEN_FOR_STEP[args.savedStep];
+  if (args.githubPending) return "connect";
+  if (args.githubReturned || args.installationAppReady) return "choose";
+  return "welcome";
+}
+
 // A linked GitHub identity opens repository selection. Sign-in stores that
 // identity, so a later workspace does not ask the person to connect again.
 function screenWithGitHubConnection(
@@ -102,14 +113,19 @@ function screenWithVcsConnection(
 function useFirstRunNavigation(
   model: OnboardingPageModel,
   connection: GitHubConnectionState,
-  github: { ready: boolean },
+  github: { ready: boolean; returned: boolean },
 ) {
   const [searchParams, setSearchParams] = useSearchParams();
   // Back from repository selection must not forward to it again.
   const [stayOnConnect, setStayOnConnect] = useState(false);
   const openedScreen =
     initialFirstRunScreen(searchParams) ??
-    (model.setup.issuesChoice ? (model.setup.selectedRepo ? "billing" : "host") : "welcome");
+    resumeFirstRunScreen({
+      savedStep: model.openSection,
+      githubPending: connection.onboarding.isPending,
+      githubReturned: github.returned,
+      installationAppReady: connection.appConfigured && !connection.accountConnectionRequired,
+    });
 
   const availableScreen = screenWithVcsConnection(openedScreen, model.setup.vcsHost, {
     pending: connection.onboarding.isPending,
@@ -138,11 +154,11 @@ function useFirstRunNavigation(
     if (openedScreen !== "connect") setStayOnConnect(false);
   }, [openedScreen]);
 
-  // External returns cannot skip intake or repository setup.
+  // Final setup steps require a repository and a complete intake choice.
   let screen = availableScreen;
   const intakePending = intakeLookupPending(model);
-  if (screen !== "welcome" && screen !== "tickets" && !intakePrerequisitesSatisfied(model)) screen = "tickets";
   if ((screen === "billing" || screen === "agent") && !model.setup.selectedRepo) screen = "host";
+  if ((screen === "billing" || screen === "agent") && !intakePrerequisitesSatisfied(model)) screen = "tickets";
   useEffect(() => {
     const step = screen === "billing" || screen === "welcome" || screen === "host" ? screen : STEP_FOR_SCREEN[screen];
     if (!step || searchParams.get("step") === step || (screen === "tickets" && intakePending)) return;
@@ -216,8 +232,8 @@ function saveSelectedRepository(args: {
 
 function continueFromTicketSource(args: {
   model: OnboardingPageModel;
+  afterTickets: () => Promise<void>;
   blocking: FirstRunBlocking;
-  navigation: ReturnType<typeof useFirstRunNavigation>;
 }) {
   return args.blocking.run("saving-ticket-source", async () => {
     const issuesChoice = selectedIssuesChoice(args.model);
@@ -225,13 +241,13 @@ function continueFromTicketSource(args: {
     args.model.setup.setIssuesChoice(issuesChoice);
     args.model.setup.commitIssuesStep();
     if (!(await args.model.saveIssues(issuesChoice))) return;
-    args.navigation.goToScreen("host");
+    await args.afterTickets();
   });
 }
 
 function useFirstRunCommands(args: {
   model: OnboardingPageModel;
-  afterRepository: () => Promise<void>;
+  afterTickets: () => Promise<void>;
   connection: GitHubConnectionState;
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: FirstRunBlocking;
@@ -244,22 +260,18 @@ function useFirstRunCommands(args: {
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
       if (await saveRepository()) {
-        await args.afterRepository();
+        navigation.goToScreen("tickets");
       }
     });
   const chooseVcsHost = (host: VcsHostId) => {
     if (host === "gitlab") return;
-    if (host !== "github" && model.setup.issuesChoice === "vcs") {
-      showErrorToast("GitHub Issues requires a GitHub repository. Select GitHub or change the intake source.");
-      return;
-    }
     model.setup.selectVcsHost(host);
     navigation.goToScreen(host === "bitbucket" ? "choose" : "connect");
   };
   const connectBitbucket = () => {
     void model.requestConnect("bitbucket");
   };
-  const continueFromTickets = () => continueFromTicketSource({ model, blocking, navigation });
+  const continueFromTickets = () => continueFromTicketSource({ model, afterTickets: args.afterTickets, blocking });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
       const returnPath = githubConnectReturnPath(onboardingStepPath(`${location.pathname}${location.search}`, "repo"));
@@ -288,6 +300,13 @@ function useFirstRunCommands(args: {
         throw error;
       }
     });
+  const connectGitHubIssues = () =>
+    blocking.runUntilNavigation("opening-github", async () => {
+      model.setup.setIssuesChoice("vcs");
+      if (!(await model.saveIssues("vcs"))) return false;
+      await waitForBrowserPaint();
+      return model.requestConnect("github");
+    });
   const connectIssueTracker = (source: "jira" | "linear") =>
     blocking.runUntilNavigation(source === "jira" ? "connecting-jira" : "connecting-linear", async () => {
       model.setup.setIssuesChoice(source);
@@ -307,6 +326,7 @@ function useFirstRunCommands(args: {
     chooseVcsHost,
     connectBitbucket,
     connectGitHub,
+    connectGitHubIssues,
     createGitHubApp,
     connectJira: () => connectIssueTracker("jira"),
     connectLinear: () => connectIssueTracker("linear"),
@@ -323,7 +343,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const setupFinished = model.provisionedDestination != null;
   const blocking = useFirstRunBlockingAction();
-  const { connection, githubReady, installScope, checkingGitHub } = useFirstRunGitHub({
+  const { connection, githubReady, githubReturned, installScope, checkingGitHub } = useFirstRunGitHub({
     organizationId,
     factoryId,
     setupFinished,
@@ -332,11 +352,12 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const bitbucketConnect = useFirstRunBitbucket({ organizationId, setupFinished, blocking });
   const navigation = useFirstRunNavigation(model, connection, {
     ready: githubReady,
+    returned: githubReturned,
   });
   const planTransition = useOnboardingPlanTransition(model, navigation, organizationId);
   const commands = useFirstRunCommands({
     model,
-    afterRepository: planTransition.afterRepository,
+    afterTickets: planTransition.afterTickets,
     connection,
     navigation,
     blocking,

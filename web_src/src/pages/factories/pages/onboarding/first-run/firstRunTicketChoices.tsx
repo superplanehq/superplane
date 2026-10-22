@@ -11,6 +11,7 @@ export function FirstRunTicketChoices({
   githubAvailable,
   ticketSource,
   saving,
+  githubConnected,
   jiraConnected,
   jiraProjects,
   jiraProjectsLoading,
@@ -24,6 +25,7 @@ export function FirstRunTicketChoices({
   linearProjectsError,
   linearProjectIds,
   onSelectTicketSource,
+  onConnectGitHub,
   onConnectJira,
   onSelectJiraProject,
   onRetryJiraProjects,
@@ -65,7 +67,9 @@ export function FirstRunTicketChoices({
             icon={<IntegrationChoiceIcon name="github" />}
             title={copy.githubIssues}
             detail={copy.githubIssuesHelper}
-            connected={false}
+            connectLabel="GitHub"
+            connected={githubConnected}
+            onConnect={onConnectGitHub}
             selected={ticketSource === "github-issues"}
             disabled={saving}
             onSelect={() => onSelectTicketSource("github-issues")}

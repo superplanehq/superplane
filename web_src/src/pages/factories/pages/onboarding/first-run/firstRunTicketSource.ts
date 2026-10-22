@@ -41,7 +41,7 @@ export function canAnalyzeTicketSource(args: {
   linearConnected?: boolean;
   linearProjectIds?: string[];
 }): boolean {
-  if (args.ticketSource === "github-issues") return true;
+  if (args.ticketSource === "github-issues") return Boolean(args.githubConnected);
   if (args.ticketSource === "jira") return Boolean(args.jiraConnected && args.jiraProjectId);
   if (args.ticketSource === "linear") return Boolean(args.linearConnected && args.linearProjectIds?.length);
   return false;
