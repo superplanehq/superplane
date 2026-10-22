@@ -129,7 +129,3 @@ export const RunPermalink: Story = {
   args: { source: "merge-confidence", detail: true },
   parameters: { msw: { handlers: factoryHistoryHandlers("merge-confidence") } },
 };
-export const FeatureDisabled: Story = {
-  args: { source: "merge-confidence" },
-  parameters: { msw: { handlers: factoryHistoryHandlers("merge-confidence", false) } },
-};

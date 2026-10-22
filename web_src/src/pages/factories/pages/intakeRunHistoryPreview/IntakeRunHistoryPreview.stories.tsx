@@ -83,7 +83,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Shared run history components with sample data for each intake, Planning, Implement, and Verify. Open rows for details. Use Controls for loading, empty, and error states. The app uses these components behind factory_run_history.",
+          "Shared run history components with sample data for each intake, Planning, Implement, and Verify. Open rows for details. Use Controls for loading, empty, and error states. The app uses these components for automation run history.",
       },
     },
   },

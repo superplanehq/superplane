@@ -214,7 +214,7 @@ function prFeedbackGraph(): IntakeAutomationGraph {
   };
 }
 
-function renderAutomationPopup(props: { canvasId?: string; runHrefFor?: (runId: string) => string } = {}) {
+function renderAutomationPopup(props: { canvasId?: string } = {}) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -226,9 +226,7 @@ function renderAutomationPopup(props: { canvasId?: string; runHrefFor?: (runId: 
               automationGraph={automationGraph}
               onSave={vi.fn()}
               onClose={vi.fn()}
-              editAutomationHref="/org-1/workspaces/RF/apps/app-pr-feedback?configure=1&agent=1"
               canvasId={props.canvasId}
-              runHrefFor={props.runHrefFor}
               initialTab="automation"
               fixed={false}
             />
@@ -512,14 +510,14 @@ describe("PRFeedbackSettingsPopup automation", () => {
   it("hides the Agent tab when the canvas has no agent", () => {
     renderAutomationPopup();
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Automation"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
     expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
   });
 
-  it("puts Agent between General and Automation when the canvas has an agent", () => {
+  it("puts Agent between General and Runs when the canvas has an agent", () => {
     renderAgentSettingsPopup(discussionDraft(), true);
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Automation"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Runs"]);
 
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
@@ -531,41 +529,5 @@ describe("PRFeedbackSettingsPopup automation", () => {
     renderAgentSettingsPopup(checksDraft(), false);
 
     expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
-  });
-
-  it("shows the automation in display mode at native zoom", () => {
-    renderAutomationPopup();
-
-    const automation = screen.getByTestId("pr-feedback-automation");
-    expect(automation).toHaveAccessibleName("Automation");
-    expect(within(automation).getAllByText("Find Pull Request").length).toBeGreaterThan(0);
-    const headerRow = screen.getByTestId("settings-automation-header-row");
-    expect(within(headerRow).getByRole("tab", { name: "General" })).toBeInTheDocument();
-    expect(within(headerRow).getByRole("tab", { name: "Automation" })).toBeInTheDocument();
-    expect(within(headerRow).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
-    const edit = within(automation).getByRole("link", { name: "Edit automation" });
-    expect(edit).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-pr-feedback?configure=1&agent=1");
-    expect(document.querySelector(".sp-canvas-editing")).toBeNull();
-    expect(within(automation).queryByRole("button", { name: /Add next component/ })).not.toBeInTheDocument();
-    expect(within(automation).queryByText("passed")).not.toBeInTheDocument();
-    expect(within(automation).queryByText("failed")).not.toBeInTheDocument();
-    expect(within(automation).queryByText("notFound")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
-  });
-
-  it("lists canvas runs beside the automation when a canvas id is given", () => {
-    renderAutomationPopup({
-      canvasId: "app-pr-feedback",
-      runHrefFor: (runId) => `/org-1/workspaces/RF/apps/app-pr-feedback?run=${runId}`,
-    });
-
-    const sidebar = within(screen.getByTestId("pr-feedback-automation")).getByTestId("factory-automation-runs-sidebar");
-    expect(within(sidebar).getByText("Runs")).toBeInTheDocument();
-    expect(within(sidebar).getByText("Please fix the lint error")).toBeInTheDocument();
-    expect(within(sidebar).getByRole("link", { name: "Please fix the lint error" })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/RF/apps/app-pr-feedback?run=run-pr-1",
-    );
   });
 });
