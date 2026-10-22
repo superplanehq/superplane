@@ -1,7 +1,6 @@
-import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { useEffect, useRef, useState } from "react";
 
-import { PRFeedbackAutomationTab, PRFeedbackSettingsFooter } from "./PRFeedbackSettingsChrome";
+import { PRFeedbackSettingsFooter } from "./PRFeedbackSettingsChrome";
 import {
   PRFeedbackChecksFields,
   PRFeedbackDiscussionFields,
@@ -35,9 +34,7 @@ interface PRFeedbackSettingsPopupProps {
   savePending?: boolean;
   deletePending?: boolean;
   saveError?: string;
-  editAutomationHref?: string;
   canvasId?: string;
-  runHrefFor?: RunsSidebarHrefForRun;
   agent?: PlanningReviewAgentSlot;
   onClose: () => void;
   fixed?: boolean;
@@ -60,9 +57,7 @@ export function PRFeedbackSettingsPopup({
   savePending = false,
   deletePending = false,
   saveError,
-  editAutomationHref,
   canvasId,
-  runHrefFor,
   agent,
   onClose,
   fixed = true,
@@ -111,16 +106,6 @@ export function PRFeedbackSettingsPopup({
           canvasId={canvasId}
           selectedRunId={history.selectedRunId}
           onSelectRun={history.setSelectedRunId}
-          loading={automationLoading}
-          error={automationError}
-          onRetry={onRetryAutomation}
-        />
-      ) : tab === "automation" ? (
-        <PRFeedbackAutomationTab
-          graph={automationGraph}
-          canvasId={canvasId}
-          runHrefFor={runHrefFor}
-          editHref={editAutomationHref}
           loading={automationLoading}
           error={automationError}
           onRetry={onRetryAutomation}

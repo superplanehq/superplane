@@ -7,8 +7,6 @@ import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
 import { cn } from "@/lib/utils";
 import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
 import { ImplementConfiguration } from "./ImplementConfiguration";
 import { useImplementSettingsDraft } from "./implementSettingsDraft";
@@ -89,11 +87,7 @@ export function MergeConfidenceConfigShell(props: MergeConfidenceConfigShellProp
 }
 
 function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
-  const features = useExperimentalFeature(props.organizationId);
-  const simplifiedImplement = Boolean(
-    features.has(FEATURE_FACTORY_RUN_HISTORY) &&
-      props.graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID),
-  );
+  const simplifiedImplement = Boolean(props.graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID));
   return (
     <>
       <PopupHeader
@@ -262,32 +256,13 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     focusNonce,
     layoutFitNonce,
   } = props;
-  const features = useExperimentalFeature(organizationId);
-  const runHistoryEnabled = features.has(FEATURE_FACTORY_RUN_HISTORY);
-  const implementSettings = useImplementSettingsDraft(graph?.specNodes, runHistoryEnabled);
+  const implementSettings = useImplementSettingsDraft(graph?.specNodes);
   const implementAgent = implementSettingsNode(props);
-  if (implementAgent && runHistoryEnabled && implementSettings.draft) {
+  if (implementAgent && implementSettings.draft) {
     return <ImplementSettingsScreen settings={implementSettings} body={props} />;
   }
   const historyContext = automationHistoryContext(props);
-  if (historyContext && features.isLoading) {
-    return (
-      <p role="status" className="p-6 text-sm text-muted-foreground">
-        Loading run history…
-      </p>
-    );
-  }
-  if (historyContext && !features.organizationReady) {
-    return (
-      <div role="alert" className="p-6 text-sm">
-        <p>Could not load run history access.</p>
-        <Button variant="outline" className="mt-3" onClick={features.retryOrganization}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
-  if (historyContext && features.has(FEATURE_FACTORY_RUN_HISTORY)) {
+  if (historyContext) {
     const history = { ...historyContext, selectedRunId, onSelectRun: onSelectedRunIdChange };
     return <FactoryAutomationRunHistory {...history} />;
   }

@@ -3,7 +3,6 @@ import { useFactory, useFactoryAutomations, useUpdateFactory } from "@/hooks/use
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
 
-import { factoryAppRunPath } from "../lib/factoryPagePaths";
 import { findBacklogAutomationApp } from "../lib/linePhaseRuns";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
@@ -32,7 +31,6 @@ export function PlanningSettingsHost({
   organizationId,
   factoryId,
   factoryKey,
-  lineId,
   initialTab = "general",
   onClose,
 }: PlanningSettingsHostProps) {
@@ -68,7 +66,6 @@ export function PlanningSettingsHost({
       organizationId={organizationId}
       factoryId={factoryId}
       factoryKey={factoryKey}
-      lineId={lineId}
       canvasId={canvasId}
       canvasLoading={appsQuery.isPending}
       canvasError={appsQuery.isError}
@@ -86,7 +83,6 @@ function PlanningSettingsLoaded({
   organizationId,
   factoryId,
   factoryKey,
-  lineId,
   canvasId,
   canvasLoading,
   canvasError,
@@ -146,11 +142,6 @@ function PlanningSettingsLoaded({
         }
       }}
       canvasId={canvasId}
-      runHrefFor={
-        canvasId
-          ? (runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
-          : undefined
-      }
       agent={{
         draft: agent.draft ?? undefined,
         isLoading: canvasLoading || agent.isLoading,
