@@ -420,6 +420,60 @@ describe("useFactoryWebsocket", () => {
       pageParams: [undefined],
       pages: [{ runs: [{ id: "run-3", task: { id: "order-9", key: "SP-9", title: "Other task" } }] }],
     });
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(false);
+  });
+
+  it.each([
+    ["source run", { sourceRunId: "run-1" }],
+    ["line execution", { lineDispatches: [{ stepExecutions: [{ run: { id: "run-1" } }] }] }],
+    ["pull request activity", { pullRequests: [{ activities: [{ run: { id: "run-1" } }] }] }],
+  ])("links an open history run when a task gains a %s", async (_link, order) => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue(
+      describeResponse({ id: "order-1", key: "SP-42", title: "Created task", ...order }),
+    );
+    const { queryClient } = renderFactoryWebsocket();
+    const historyKey = canvasKeys.infiniteRuns("canvas-1", { includeTask: true });
+    const otherKey = canvasKeys.infiniteRuns("canvas-2", { includeTask: true });
+    const detailKey = canvasKeys.run("canvas-1", "run-1", true);
+    queryClient.setQueryData(historyKey, {
+      pageParams: [undefined, "cursor"],
+      pages: [
+        { runs: [{ id: "run-1" }, { id: "run-child", parent: { id: "run-1" } }] },
+        { runs: [{ id: "run-kept", task: { id: "order-9", key: "SP-9", title: "Other task" } }] },
+      ],
+    });
+    queryClient.setQueryData(detailKey, { run: { id: "run-1" } });
+    queryClient.setQueryData(otherKey, {
+      pageParams: [undefined],
+      pages: [{ runs: [{ id: "run-3" }] }],
+    });
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    const label = { id: "order-1", key: "SP-42", title: "Created task" };
+    expect(queryClient.getQueryData(historyKey)).toEqual({
+      pageParams: [undefined, "cursor"],
+      pages: [
+        {
+          runs: [
+            { id: "run-1", task: label },
+            { id: "run-child", parent: { id: "run-1" }, task: label },
+          ],
+        },
+        { runs: [{ id: "run-kept", task: { id: "order-9", key: "SP-9", title: "Other task" } }] },
+      ],
+    });
+    expect(queryClient.getQueryData(detailKey)).toEqual({ run: { id: "run-1", task: label } });
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(detailKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryData(otherKey)).toEqual({
+      pageParams: [undefined],
+      pages: [{ runs: [{ id: "run-3" }] }],
+    });
   });
 
   it("ignores events for a different factory", async () => {
