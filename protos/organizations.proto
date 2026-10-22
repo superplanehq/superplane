@@ -288,6 +288,30 @@ service Organizations {
     };
   }
 
+  rpc SelectBillingPlan(SelectBillingPlanRequest) returns (CreateBusinessCheckoutResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/select-plan"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Select billing plan";
+      description: "Activates a plan without a base fee or starts checkout for a paid subscription";
+      tags: "Organization";
+    };
+  }
+
+  rpc CreatePaymentMethodSession(CreatePaymentMethodSessionRequest) returns (CreateBillingPortalSessionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/payment-method-session"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Set up payment method";
+      description: "Opens Polar payment settings without creating a charge or subscription";
+      tags: "Organization";
+    };
+  }
+
   rpc SyncOrganizationBilling(SyncOrganizationBillingRequest) returns (DescribeOrganizationBillingResponse) {
     option (google.api.http) = {
       post: "/api/v1/organizations/{id}/billing/sync"
@@ -777,6 +801,7 @@ message CreateBillingPortalSessionRequest {
 
 message CreateBillingPortalSessionResponse {
   string portal_url = 1;
+  string session_token = 2;
 }
 
 message ListOrganizationCreditGrantsRequest {
@@ -846,6 +871,30 @@ message DescribeOrganizationBillingResponse {
   int64 plan_price_cents = 18;
   bool plan_per_seat = 19;
   string plan_category = 20;
+  string catalog_key = 21;
+  bool hosted_execution_allowed = 22;
+  bool require_payment_method = 23;
+  bool has_payment_method = 24;
+  repeated BillingPlanOption available_plans = 25;
+}
+
+message BillingPlanOption {
+  string key = 1;
+  string name = 2;
+  int64 price_cents = 3;
+  bool per_seat = 4;
+  bool require_payment_method = 5;
+  bool subscription_required = 6;
+}
+
+message SelectBillingPlanRequest {
+  string id = 1;
+  string plan_key = 2;
+  string return_path = 3;
+}
+
+message CreatePaymentMethodSessionRequest {
+  string id = 1;
 }
 
 message CreateBusinessCheckoutRequest {

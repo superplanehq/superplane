@@ -5,11 +5,13 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -38,12 +40,44 @@ func DescribeOrganizationBilling(
 	}
 
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
+	newBilling, err := models.OrganizationHasExperimentalFeatures(db, organizationID, features.FeatureNewBilling)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
+	}
+	hasCard := false
+	if billingEnabled && newBilling && hasCustomer {
+		hasCard, err = polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())
+		if err != nil {
+			return nil, polarBillingError(err, "Could not verify the payment method.")
+		}
+	}
+	available := []*pb.BillingPlanOption{}
+	checkoutEnabled := models.BillingEnabled() && polar.SubscriptionCheckoutEnabled()
+	if billingEnabled && newBilling {
+		checkoutEnabled = false
+		catalog, err := models.ListBillingPlans(db)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "Could not load billing plans.")
+		}
+		for _, item := range catalog {
+			if item.Visibility != "public" || item.Category != "paid" {
+				continue
+			}
+			checkoutEnabled = checkoutEnabled || item.PolarProductID != nil
+			available = append(available, &pb.BillingPlanOption{Key: item.Key, Name: item.Name, PriceCents: item.PriceCents, PerSeat: item.PerSeat, RequirePaymentMethod: item.RequirePaymentMethod, SubscriptionRequired: item.PolarProductID != nil || item.PriceCents != 0})
+		}
+	}
 	return &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
+		RequirePaymentMethod:        models.BillingEnabled() && newBilling && plan.Catalog.RequirePaymentMethod,
+		HasPaymentMethod:            hasCard,
+		AvailablePlans:              available,
 		PlanName:                    plan.Catalog.Name,
 		PlanCategory:                plan.Catalog.Category,
 		PlanPriceCents:              plan.Catalog.PriceCents,
 		PlanPerSeat:                 plan.Catalog.PerSeat,
+		CatalogKey:                  plan.Catalog.Key,
+		HostedExecutionAllowed:      !models.BillingEnabled() || plan.AllowsHostedExecution(time.Now()) && (!newBilling || !plan.Catalog.RequirePaymentMethod || hasCard),
 		PlanSource:                  plan.PlanSource,
 		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
 		TrialEndsAt:                 protoTimestamp(plan.TrialEndsAt),
@@ -51,7 +85,7 @@ func DescribeOrganizationBilling(
 		CurrentPeriodEnd:            protoTimestamp(plan.CurrentPeriodEnd),
 		CreditPurchaseAllowed:       plan.AllowsCreditPurchase(),
 		BillingEnabled:              billingEnabled,
-		SubscriptionCheckoutEnabled: models.BillingEnabled() && polar.SubscriptionCheckoutEnabled(),
+		SubscriptionCheckoutEnabled: checkoutEnabled,
 		HasBillingCustomer:          hasCustomer,
 		RemainingCreditCents:        pricebook.MicrosToCents(credit.RemainingMicros),
 		IncludedRemainingCents:      pricebook.MicrosToCents(credit.IncludedRemainingMicros),

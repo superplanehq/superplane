@@ -105,6 +105,9 @@ func (p *OrganizationBillingPlan) IsActiveBusiness() bool {
 	if p.PlanSource == BillingPlanSourceAdmin {
 		return true
 	}
+	if p.PlanSource == BillingPlanSourceSystem && p.Catalog.ID != uuid.Nil && p.Catalog.PolarProductID == nil && p.Catalog.PriceCents == 0 {
+		return true
+	}
 	if PolarSubscriptionIsPaid(p.PolarSubscriptionStatus) {
 		return true
 	}
@@ -246,10 +249,26 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 	if catalog.RequirePaymentMethod {
 		return nil, errors.New("Plans that require a payment method cannot be assigned by an admin")
 	}
-	planName = catalog.ResponsePlan()
+	return setOrganizationBillingPlan(tx, orgID, catalog, BillingPlanSourceAdmin, trialEndsAt)
+}
 
+// ActivateOrganizationBillingPlan assigns a public plan after the caller verifies its payment requirements.
+// Subscription plans must be activated by a Polar subscription event instead.
+func ActivateOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, planKey string) (*OrganizationBillingPlan, error) {
+	catalog, err := FindBillingPlan(tx, planKey)
+	if err != nil || catalog.Category != "paid" || catalog.Visibility != "public" || catalog.PriceCents != 0 || catalog.PolarProductID != nil {
+		return nil, ErrInvalidBillingPlan
+	}
+	return setOrganizationBillingPlan(tx, orgID, catalog, BillingPlanSourceSystem, nil)
+}
+
+func setOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, catalog *BillingPlan, source string, trialEndsAt *time.Time) (*OrganizationBillingPlan, error) {
+	if orgID == uuid.Nil {
+		return nil, fmt.Errorf("organization is required")
+	}
+	planName := catalog.ResponsePlan()
 	var saved *OrganizationBillingPlan
-	err = tx.Transaction(func(inner *gorm.DB) error {
+	err := tx.Transaction(func(inner *gorm.DB) error {
 		existing, err := lockOrganizationBillingPlan(inner, orgID)
 		if err != nil {
 			return err
@@ -264,7 +283,7 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 			Plan:           planName,
 			PlanID:         catalog.ID,
 			Catalog:        *catalog,
-			PlanSource:     BillingPlanSourceAdmin,
+			PlanSource:     source,
 			UpdatedAt:      now,
 		}
 		if catalog.Category == "trial" {
@@ -275,7 +294,7 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 			next.TrialStartedAt = adminTrialStart(existing, now)
 			next.TrialEndsAt = &trialEnd
 		}
-		if existing != nil {
+		if existing != nil && (source == BillingPlanSourceAdmin || existing.PlanSource == source) {
 			next.PolarSubscriptionID = existing.PolarSubscriptionID
 			next.PolarSubscriptionStatus = existing.PolarSubscriptionStatus
 			next.CancelAtPeriodEnd = existing.CancelAtPeriodEnd
@@ -283,7 +302,7 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 			next.CurrentPeriodStart = existing.CurrentPeriodStart
 			next.CurrentPeriodEnd = existing.CurrentPeriodEnd
 		}
-		if existing == nil || existing.PlanID != next.PlanID || existing.PlanSource != BillingPlanSourceAdmin {
+		if existing == nil || existing.PlanID != next.PlanID || existing.PlanSource != source {
 			next.CurrentPeriodStart = nil
 			next.CurrentPeriodEnd = nil
 		}
@@ -312,6 +331,9 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 
 		saved, err = loadedOrganizationBillingPlan(inner, orgID)
 		if err != nil {
+			return err
+		}
+		if err := addInitialPlanTrialCredit(inner, existing, saved); err != nil {
 			return err
 		}
 		if catalog.Category == "trial" && trialEndsAt != nil && saved.TrialEndsAt != nil {
@@ -433,6 +455,9 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 
 		saved, err = loadedOrganizationBillingPlan(inner, orgID)
 		if err != nil {
+			return err
+		}
+		if err := addInitialPlanTrialCredit(inner, existing, saved); err != nil {
 			return err
 		}
 		grantIncluded = shouldGrantIncludedUsage(existing, saved)

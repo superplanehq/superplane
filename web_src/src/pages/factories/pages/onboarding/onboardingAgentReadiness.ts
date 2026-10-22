@@ -233,9 +233,9 @@ export function shouldShowHostedCreditGrant(grantTotalCents: number): boolean {
 
 export function hostedCreditGrantCopy(remainingCreditCents: number): string {
   if (remainingCreditCents > 0) {
-    return `This organization has ${formatUsdCents(remainingCreditCents)} of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.`;
+    return `This organization has ${formatUsdCents(remainingCreditCents)} of trial usage for machines and managed models. Contact an installation admin to keep hosted runs after the trial.`;
   }
-  return "Trial credit is used up. Subscribe to Business or connect a provider to continue.";
+  return "Trial credit is used up. Contact an installation admin or connect a provider to continue.";
 }
 
 function planForConnectedProvider(

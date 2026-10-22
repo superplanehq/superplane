@@ -531,3 +531,11 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(showErrorToast).toHaveBeenCalledWith("GitHub token expired");
   });
 });
+
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
+  useOrganizationBilling: () => ({
+    data: { billingEnabled: false },
+    refetch: async () => ({ data: { billingEnabled: false } }),
+  }),
+}));
