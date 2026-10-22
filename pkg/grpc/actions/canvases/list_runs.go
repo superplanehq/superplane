@@ -142,6 +142,9 @@ func SerializeCanvasRuns(
 		result = append(result, serializedRun)
 	}
 
+	if err := attachExecutionSummaries(db, runs, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -164,7 +167,14 @@ func SerializeCanvasRun(
 		parent = *parentRun
 	}
 
-	return serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, parent, childRunsByExecutionID)
+	serialized, err := serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, parent, childRunsByExecutionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := attachExecutionSummaries(db, []models.CanvasRun{run}, []*pb.CanvasRun{serialized}); err != nil {
+		return nil, err
+	}
+	return serialized, nil
 }
 
 func serializeCanvasRunWithQueueItemInputs(
