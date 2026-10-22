@@ -195,6 +195,31 @@ func (a *FactoryPullRequestRun) Finalize(tx *gorm.DB, run *CanvasRun) error {
 	return nil
 }
 
+// ContinueFixes resumes automatic fixes after the attempt limit paused them.
+// Attempts that exist before this call stop counting toward the limit. It
+// fails when the activity is not paused or a person already continued it.
+func (a *FactoryPullRequestRun) ContinueFixes(tx *gorm.DB) error {
+	now := time.Now()
+	result := tx.Model(&FactoryPullRequestRun{}).
+		Where("pull_request_id = ? AND run_id = ?", a.PullRequestID, a.RunID).
+		Where("state = ?", FactoryPullRequestActivityStateLimitReached).
+		Where("fixes_continued_at IS NULL").
+		Updates(map[string]any{
+			"fixes_continued_at": now,
+			"updated_at":         now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrFactoryPullRequestFixesNotPaused
+	}
+
+	a.FixesContinuedAt = &now
+	a.UpdatedAt = now
+	return nil
+}
+
 func FindPullRequestActivityByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryPullRequestRun, error) {
 	var activity FactoryPullRequestRun
 	err := tx.Where("run_id = ?", runID).First(&activity).Error
@@ -439,31 +464,6 @@ func (p *FactoryPullRequest) countAttemptsSinceReset(tx *gorm.DB, handlerID uuid
 		return 0, err
 	}
 	return int(count), nil
-}
-
-// ContinueFixes resumes automatic fixes after the attempt limit paused them.
-// Attempts that exist before this call stop counting toward the limit. It
-// fails when the activity is not paused or a person already continued it.
-func (a *FactoryPullRequestRun) ContinueFixes(tx *gorm.DB) error {
-	now := time.Now()
-	result := tx.Model(&FactoryPullRequestRun{}).
-		Where("pull_request_id = ? AND run_id = ?", a.PullRequestID, a.RunID).
-		Where("state = ?", FactoryPullRequestActivityStateLimitReached).
-		Where("fixes_continued_at IS NULL").
-		Updates(map[string]any{
-			"fixes_continued_at": now,
-			"updated_at":         now,
-		})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrFactoryPullRequestFixesNotPaused
-	}
-
-	a.FixesContinuedAt = &now
-	a.UpdatedAt = now
-	return nil
 }
 
 func (p *FactoryPullRequest) latestPassedEvaluationAt(tx *gorm.DB, handlerID uuid.UUID) (*time.Time, error) {

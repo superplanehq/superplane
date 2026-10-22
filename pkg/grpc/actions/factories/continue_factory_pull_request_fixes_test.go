@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -186,6 +187,37 @@ func Test__ContinueFactoryPullRequestFixes(t *testing.T) {
 
 		requireCode(t, err, codes.FailedPrecondition)
 		assert.Len(t, triggerEvents(t, fixture), 3)
+	})
+
+	// The continue and the new trigger event share one transaction. When the
+	// event insert fails, the continue must roll back with it.
+	t.Run("rolls back the continue when the event insert fails", func(t *testing.T) {
+		fixture := pauseFixes(t, models.FactoryPullRequestStateOpen)
+
+		cause := errors.New("event insert failed")
+		const callback = "test:continue_fixes_event_insert_failure"
+		require.NoError(t, database.Conn().Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
+			table := tx.Statement.Table
+			if table == "" && tx.Statement.Schema != nil {
+				table = tx.Statement.Schema.Table
+			}
+			if table != "workflow_events" {
+				return
+			}
+			_ = tx.AddError(cause)
+		}))
+		t.Cleanup(func() { require.NoError(t, database.Conn().Callback().Create().Remove(callback)) })
+
+		_, err := ContinueFactoryPullRequestFixes(t.Context(), orgID, continueFixesRequest(fixture))
+
+		requireCode(t, err, codes.Internal)
+		activity, findErr := models.FindPullRequestActivityByRunID(db, fixture.activity.RunID)
+		require.NoError(t, findErr)
+		assert.Nil(t, activity.FixesContinuedAt)
+		assert.Len(t, triggerEvents(t, fixture), 2)
+		var runCount int64
+		require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", fixture.canvas.ID).Count(&runCount).Error)
+		assert.Equal(t, int64(2), runCount)
 	})
 
 	t.Run("rejects an activity from another organization", func(t *testing.T) {
