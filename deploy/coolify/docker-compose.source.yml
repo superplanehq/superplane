@@ -228,14 +228,13 @@ services:
               image: superplane-runner:coolify
               architecture: ${RUNNER_ARCH:-amd64}
               runnerApiUrl: http://app:8000
-              network: superplane-runners
+              network: ${RUNNER_NETWORK:-${COMPOSE_PROJECT_NAME}_runners}
               extraHosts:
                 - host.docker.internal:host-gateway
 
 networks:
   default:
   runners:
-    name: superplane-runners
 
 volumes:
   pgdata:

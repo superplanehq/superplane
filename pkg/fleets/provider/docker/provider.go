@@ -91,16 +91,21 @@ func (p *Provider) List(
 		`{{.Label "` + labelRunnerID + `"}}`,
 		`{{.Label "` + labelFleetID + `"}}`,
 		"{{.State}}",
+		`{{.Label "` + labelFleetManagerID + `"}}`,
 	}, "\t")
-	output, err := p.docker.Run(
-		ctx,
+	args := []string{
 		"ps",
 		"-a",
-		"--filter", "label="+labelManaged+"=true",
-		"--filter", "label="+labelFleetManagerID+"="+p.config.FleetManagerID,
-		"--filter", "label="+labelFleetID+"="+fleetID,
-		"--format", format,
-	)
+		"--filter", "label=" + labelManaged + "=true",
+		"--filter", "label=" + labelFleetID + "=" + fleetID,
+	}
+	if p.config.Network != "" {
+		args = append(args, "--filter", "network="+p.config.Network)
+	} else {
+		args = append(args, "--filter", "label="+labelFleetManagerID+"="+p.config.FleetManagerID)
+	}
+	args = append(args, "--format", format)
+	output, err := p.docker.Run(ctx, args...)
 	if err != nil {
 		return nil, dockerError("list runner containers", output, err)
 	}
@@ -111,7 +116,14 @@ func (p *Provider) List(
 			continue
 		}
 		fields := strings.Split(line, "\t")
-		if len(fields) != 4 || fields[0] == "" || fields[1] == "" {
+		if len(fields) != 5 || fields[0] == "" || fields[1] == "" {
+			continue
+		}
+		managerID := strings.TrimSpace(fields[4])
+		if managerID != "" && managerID != p.config.FleetManagerID {
+			continue
+		}
+		if managerID == "" && p.config.Network == "" {
 			continue
 		}
 		resources = append(resources, provider.Resource{

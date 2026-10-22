@@ -11,8 +11,10 @@
 #   echo "env://coolify-v1:$(openssl rand -base64 32)"
 # After owner setup, create an installation-admin personal token, set
 # INSTALLATION_ADMIN_TOKEN, and restart Fleet Manager.
+# Set FLEET_MANAGER_VERSION to a Fleet Manager release that publishes the
+# -docker image. fleet-manager/v0.1.4 does not include that image.
+# RUNNER_VERSION defaults to v0.2.0.
 # On ARM, set RUNNER_FLEET_ID=e1-large-arm64 and RUNNER_ARCH=arm64.
-# Runner and Fleet Manager tags default to the Helm componentReleases pins.
 
 services:
   init:
@@ -173,7 +175,7 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
 
   fleet-manager:
-    image: ghcr.io/superplanehq/fleet-manager:${FLEET_MANAGER_VERSION:-v0.1.4}-docker
+    image: ghcr.io/superplanehq/fleet-manager:${FLEET_MANAGER_VERSION:?}-docker
     pull_policy: always
     restart: unless-stopped
     depends_on:
@@ -208,14 +210,13 @@ services:
               image: ghcr.io/superplanehq/runner:${RUNNER_VERSION:-v0.2.0}
               architecture: ${RUNNER_ARCH:-amd64}
               runnerApiUrl: http://app:8000
-              network: superplane-runners
+              network: ${RUNNER_NETWORK:-${COMPOSE_PROJECT_NAME}_runners}
               extraHosts:
                 - host.docker.internal:host-gateway
 
 networks:
   default:
   runners:
-    name: superplane-runners
 
 volumes:
   pgdata:
