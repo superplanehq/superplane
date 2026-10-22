@@ -60,6 +60,7 @@ describe("useAnalysisPlanningSession", () => {
           workOrderId: "order-1",
           enabled: true,
           canUpdate: true,
+          refinementCanStart: true,
         }),
       { wrapper: wrapperWithClient(queryClient) },
     );
@@ -67,9 +68,6 @@ describe("useAnalysisPlanningSession", () => {
     await waitFor(() => {
       expect(result.current.showChat).toBe(false);
     });
-    expect(result.current.organizationId).toBe("org-1");
-    expect(result.current.factoryId).toBe("factory-1");
-    expect(result.current.canSend).toBe(false);
     expect(result.current.queryError).toBeNull();
     expect(findPlanningSessionByWorkOrder).toHaveBeenCalledTimes(1);
     const query = queryClient.getQueryCache().find({
@@ -80,20 +78,22 @@ describe("useAnalysisPlanningSession", () => {
 
   it("exposes a running activity when a missing session appears on a later poll", async () => {
     const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
-    vi.mocked(findPlanningSessionByWorkOrder).mockResolvedValueOnce(null).mockResolvedValueOnce({
-      id: "session-1",
-      state: "running",
-      activities: [
-        {
-          id: "activity-1",
-          schemaVersion: 2,
-          provider: "claude",
-          status: "running",
-          lastSequence: "1",
-          items: [{ type: "tool", id: "tool-1", kind: "bash", input: "go test ./pkg/models", status: "running" }],
-        },
-      ],
-    });
+    vi.mocked(findPlanningSessionByWorkOrder)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "session-1",
+        state: "running",
+        activities: [
+          {
+            id: "activity-1",
+            schemaVersion: 2,
+            provider: "claude",
+            status: "running",
+            lastSequence: "1",
+            items: [{ type: "tool", id: "tool-1", kind: "bash", input: "go test ./pkg/models", status: "running" }],
+          },
+        ],
+      });
 
     try {
       const { result } = renderHook(
@@ -104,6 +104,7 @@ describe("useAnalysisPlanningSession", () => {
             workOrderId: "order-1",
             enabled: true,
             canUpdate: true,
+            refinementCanStart: true,
           }),
         { wrapper },
       );

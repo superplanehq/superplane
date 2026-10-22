@@ -40,6 +40,8 @@ type AnalysisPlanningSessionArgs = {
   workOrderId?: string;
   enabled: boolean;
   canUpdate: boolean;
+  /** Poll a missing session only when a refinement run can still start. */
+  refinementCanStart?: boolean;
   analysisDelivered?: boolean;
   isUploading?: boolean;
   uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
@@ -47,14 +49,29 @@ type AnalysisPlanningSessionArgs = {
 
 const LIVE_SESSION_REFETCH_INTERVAL_MS = 15_000;
 
+export function planningSessionCanStart(input: {
+  factoryLoaded: boolean;
+  planningEnabled: boolean;
+  isDraft: boolean;
+  analysisActive: boolean;
+}): boolean {
+  return input.factoryLoaded && input.planningEnabled && (input.isDraft || input.analysisActive);
+}
+
 /**
- * Poll while the session is missing, starting, or running. The first turn
- * has no live connection yet, so the open chat relies on the stored
- * activity snapshots this refresh delivers. Only an ended session stops
- * the refresh.
+ * Poll a live session until it ends. The first turn has no live connection
+ * yet, so the open chat relies on stored activity from this refresh. Poll a
+ * missing session only when refinement can still start. An open task that
+ * cannot start refinement keeps the first lookup and does not refresh again.
  */
-function planningSessionNeedsPolling(session: PlanningSessionPayload | null | undefined): boolean {
-  return !session?.id || session.state !== "ended";
+function planningSessionNeedsPolling(
+  session: PlanningSessionPayload | null | undefined,
+  refinementCanStart: boolean,
+): boolean {
+  if (session?.id) {
+    return session.state !== "ended";
+  }
+  return refinementCanStart;
 }
 
 function usePlanningSessionLookup(
@@ -167,6 +184,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     workOrderId = "",
     enabled,
     canUpdate,
+    refinementCanStart = false,
     analysisDelivered = false,
     isUploading = false,
     uploadFiles,
@@ -180,7 +198,10 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     factoryId,
     workOrderId,
     enabled,
-    poll: planningSessionNeedsPolling(queryClient.getQueryData<PlanningSessionPayload | null>(queryKey)),
+    poll: planningSessionNeedsPolling(
+      queryClient.getQueryData<PlanningSessionPayload | null>(queryKey),
+      refinementCanStart,
+    ),
   });
   const session = query.data ?? null;
   useRefreshAnalysisWorkOrder({

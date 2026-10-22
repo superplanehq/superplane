@@ -731,6 +731,41 @@ func TestRunnerPlanningSessionActivityPublishesBoardUpdate(t *testing.T) {
 	assert.Equal(t, session.FactoryID.String(), published[0].factoryID)
 	assert.Equal(t, session.DraftWorkOrderID.String(), published[0].orderID)
 	assert.Equal(t, factoryevents.EventTypeOrderUpdated, published[0].reason)
+
+	repeat := fmt.Sprintf(`{
+		"schema_version":2,
+		"activity_id":%q,
+		"provider":"claude",
+		"turn":1,
+		"sequence":1,
+		"status":"running",
+		"started_at":%d,
+		"items":[{"type":"tool","id":"tool-1","kind":"bash","input":"go test ./pkg/models","status":"running"}]
+	}`, activityID.String(), startedAt)
+	req = httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), bytes.NewReader([]byte(repeat)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Len(t, published, 1)
+
+	newer := fmt.Sprintf(`{
+		"schema_version":2,
+		"activity_id":%q,
+		"provider":"claude",
+		"turn":1,
+		"sequence":2,
+		"status":"running",
+		"started_at":%d,
+		"items":[{"type":"tool","id":"tool-1","kind":"bash","input":"go test ./pkg/public","status":"running"}]
+	}`, activityID.String(), startedAt)
+	req = httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), bytes.NewReader([]byte(newer)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Len(t, published, 2)
+	assert.Equal(t, session.DraftWorkOrderID.String(), published[1].orderID)
 }
 
 func TestRunnerPlanningSessionIgnoresStaleActivitySnapshot(t *testing.T) {
