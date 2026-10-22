@@ -14,7 +14,9 @@ import (
 
 const organizationTaskAdmissionBatchSize = 100
 
-var ErrOrganizationTaskCapacity = errors.New("organization task capacity is full")
+// ErrOrganizationTaskCapacity means this task cannot start without exceeding
+// the organization limit or passing an older eligible task.
+var ErrOrganizationTaskCapacity = errors.New("organization task capacity reached")
 
 // ResolveOrganizationParallelTaskLimit uses the effective plan, including trial
 // and subscription expiry. A nil limit means unlimited organization capacity.
@@ -68,69 +70,44 @@ func LockTaskStatusExecutionAdmission(tx *gorm.DB, executionID uuid.UUID) error 
 	return LockOrganizationTaskAdmission(tx, owner.OrganizationID)
 }
 
-// LockTaskExecutionAdmission takes the organization lock before execution
-// callbacks can attach task activity or change work order state.
+// LockTaskExecutionAdmission locks before the execution row. Factory canvas
+// execution can close an order and release queued work, so it uses the same
+// organization lock as dispatch. Executions outside a factory do not lock.
 func LockTaskExecutionAdmission(tx *gorm.DB, executionID uuid.UUID) error {
 	var owner struct{ OrganizationID uuid.UUID }
 	err := tx.Table("workflow_node_executions AS e").Select("c.organization_id").
-		Joins("JOIN workflows c ON c.id = e.workflow_id").
-		Where("e.id = ? AND c.factory_id IS NOT NULL", executionID).Scan(&owner).Error
+		Joins("JOIN workflows c ON c.id = e.workflow_id AND c.factory_id IS NOT NULL").
+		Where("e.id = ?", executionID).Scan(&owner).Error
 	if err != nil || owner.OrganizationID == uuid.Nil {
 		return err
 	}
 	return LockOrganizationTaskAdmission(tx, owner.OrganizationID)
 }
 
-// CheckTaskRootEventAdmission admits task root events in the same organization
-// queue as line steps. Descendants and reserved line runs share their task slot.
+// CheckTaskRootEventAdmission applies organization capacity to a factory root
+// event that names an existing draft or open task. Events without that task
+// association continue. A capacity error leaves the event pending.
 func CheckTaskRootEventAdmission(tx *gorm.DB, canvas *Canvas, event *CanvasEvent) error {
-	if canvas.FactoryID == nil || event.ExecutionID != nil {
+	if canvas == nil || event == nil || canvas.FactoryID == nil {
 		return nil
 	}
-	if err := LockOrganizationTaskAdmission(tx, canvas.OrganizationID); err != nil {
-		return err
-	}
-	var reserved int64
-	if err := tx.Model(&FactoryWorkOrderExecution{}).Where("run_id = ?", event.RunID).Count(&reserved).Error; err != nil {
-		return err
-	}
-	if reserved > 0 {
+	workOrderID := workOrderIDFromEventData(event.Data.Data())
+	if workOrderID == nil {
 		return nil
 	}
-	run, err := FindUnscopedCanvasRun(tx, event.RunID)
-	if err != nil || run.ParentRunID != nil {
-		return err
-	}
-	orderID := workOrderIDFromEventData(event.Data.Data())
-	if orderID == nil {
+	var order FactoryWorkOrder
+	err := tx.Where("id = ? AND organization_id = ? AND factory_id = ?", *workOrderID, canvas.OrganizationID, *canvas.FactoryID).
+		First(&order).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil
 	}
-	workspace, err := FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
 	if err != nil {
 		return err
 	}
-	order, err := workspace.FindWorkOrder(tx, *orderID)
-	if err != nil {
-		return err
+	if !order.IsDispatchable() {
+		return nil
 	}
-	if order.State != FactoryWorkOrderStateDraft && !order.IsOpen() {
-		return ErrOrganizationTaskCapacity
-	}
-	if err := checkOrganizationTaskAdmission(tx, canvas.OrganizationID, *orderID); err != nil {
-		return err
-	}
-	active, err := ListActiveOrganizationTaskIDs(tx, canvas.OrganizationID)
-	if err != nil || slices.Contains(active, *orderID) {
-		return err
-	}
-	next, err := nextQueuedOrganizationTask(tx, canvas.OrganizationID)
-	if err != nil {
-		return err
-	}
-	if next != nil && next.ID != event.ID {
-		return ErrOrganizationTaskCapacity
-	}
-	return nil
+	return checkOrganizationTaskAdmission(tx, canvas.OrganizationID, order.ID)
 }
 
 func ListQueuedTaskOrganizationIDs(tx *gorm.DB) ([]uuid.UUID, error) {
@@ -155,20 +132,24 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 	if err := eligibleQueuedTasks(tx, orgID).Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
 		return nil, err
 	}
-	var admitted []*FactoryLineStepResult
-	roots, err := listQueuedRootTasks(tx, orgID)
+	head, err := nextQueuedOrganizationTask(tx, orgID)
 	if err != nil {
 		return nil, err
 	}
+	active, err := ListActiveOrganizationTaskIDs(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	var admitted []*FactoryLineStepResult
 	for i := range items {
 		if slots != nil && *slots <= 0 {
 			break
 		}
 		item := &items[i]
-		for _, root := range roots {
-			if root.CreatedAt.Before(item.CreatedAt) || (root.CreatedAt.Equal(item.CreatedAt) && root.ID.String() < item.ID.String()) {
-				return admitted, nil
-			}
+		// A pending root event is not a line item. Leave newer line items
+		// queued until the event router admits that older task.
+		if head != nil && head.RunID != uuid.Nil && head.WorkOrderID != item.WorkOrderID && !queuedLineItemBefore(item, head) {
+			break
 		}
 		result, err := admitQueuedTask(tx, item)
 		if err != nil {
@@ -176,23 +157,25 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 		}
 		if result != nil {
 			admitted = append(admitted, result)
-			if slots != nil && result.Run != nil {
+			if slots != nil && result.Run != nil && !slices.Contains(active, item.WorkOrderID) {
 				*slots--
+				active = append(active, item.WorkOrderID)
 			}
 		}
 	}
 	return admitted, nil
 }
 
-func organizationAtTaskCapacity(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
-	slots, err := organizationAvailableTaskSlots(tx, orgID)
-	return slots != nil && *slots <= 0, err
-}
-
-func checkOrganizationTaskAdmission(tx *gorm.DB, orgID, orderID uuid.UUID) error {
+func checkOrganizationTaskAdmission(tx *gorm.DB, orgID, workOrderID uuid.UUID) error {
+	if workOrderID == uuid.Nil {
+		return nil
+	}
 	active, err := ListActiveOrganizationTaskIDs(tx, orgID)
-	if err != nil || slices.Contains(active, orderID) {
+	if err != nil {
 		return err
+	}
+	if slices.Contains(active, workOrderID) {
+		return nil
 	}
 	limit, err := ResolveOrganizationParallelTaskLimit(tx, orgID)
 	if err != nil {
@@ -201,7 +184,26 @@ func checkOrganizationTaskAdmission(tx *gorm.DB, orgID, orderID uuid.UUID) error
 	if limit != nil && len(active) >= *limit {
 		return ErrOrganizationTaskCapacity
 	}
+	next, err := nextQueuedOrganizationTask(tx, orgID)
+	if err != nil {
+		return err
+	}
+	if next != nil && next.WorkOrderID != workOrderID {
+		return ErrOrganizationTaskCapacity
+	}
 	return nil
+}
+
+func queuedLineItemBefore(item *FactoryWorkOrderQueueItem, head *OrganizationQueuedTask) bool {
+	if order := item.CreatedAt.Compare(head.CreatedAt); order != 0 {
+		return order < 0
+	}
+	return item.ID.String() < head.ID.String()
+}
+
+func organizationAtTaskCapacity(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	slots, err := organizationAvailableTaskSlots(tx, orgID)
+	return slots != nil && *slots <= 0, err
 }
 
 func organizationAvailableTaskSlots(tx *gorm.DB, orgID uuid.UUID) (*int64, error) {
@@ -210,8 +212,11 @@ func organizationAvailableTaskSlots(tx *gorm.DB, orgID uuid.UUID) (*int64, error
 		return nil, err
 	}
 	active, err := ListActiveOrganizationTaskIDs(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
 	slots := int64(*limit - len(active))
-	return &slots, err
+	return &slots, nil
 }
 
 // Finished execution history does not release a reservation while its replaced
@@ -243,7 +248,7 @@ func queuedTaskCandidate(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*Factory
 	if errors.Is(err, ErrFactoryWorkOrderNotFound) {
 		return dispatch, nil, nil, nil
 	}
-	if err != nil || (!order.IsOpen() && order.State != FactoryWorkOrderStateDraft) {
+	if err != nil || !order.IsDispatchable() {
 		return dispatch, nil, nil, err
 	}
 	line, err := workspace.FindLine(tx, item.LineID)
@@ -283,9 +288,10 @@ func admitQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*FactoryLine
 		}
 		var err error
 		result, err = dispatch.StartStep(candidate, order, item.StepIndex)
-		if err != nil {
+		if err != nil || order.IsOpen() {
 			return err
 		}
+		// A queued initial dispatch stays draft until its run exists.
 		return order.TransitionOnDispatch(candidate, nil)
 	})
 	if errors.Is(err, errQueuedTaskUnstartable) {
@@ -332,9 +338,12 @@ func discardQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem, dispatch *F
 }
 
 func hasEligibleQueuedTask(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
-	roots, err := listQueuedRootTasks(tx, orgID)
-	if err != nil || len(roots) > 0 {
-		return len(roots) > 0, err
+	roots, err := listQueuedRootTasks(tx, orgID, 1)
+	if err != nil {
+		return false, err
+	}
+	if len(roots) > 0 {
+		return true, nil
 	}
 	var items []FactoryWorkOrderQueueItem
 	if err := eligibleQueuedTasks(tx, orgID).Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {

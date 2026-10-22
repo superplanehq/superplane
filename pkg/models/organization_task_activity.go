@@ -23,8 +23,14 @@ func ListActiveOrganizationTaskIDs(tx *gorm.DB, orgID uuid.UUID) ([]uuid.UUID, e
 			FROM factory_work_order_executions e
 			WHERE e.organization_id = ? AND e.status IN ?
 			UNION
+			SELECT e.work_order_id
+			FROM factory_work_order_executions e
+			JOIN workflow_runs r ON r.id = e.run_id
+			WHERE e.organization_id = ? AND r.state <> ?
+			UNION
 			SELECT e.work_order_id FROM active_runs a
 			JOIN factory_work_order_executions e ON e.run_id = a.id
+			WHERE a.active_id <> a.id
 			UNION
 			SELECT s.draft_work_order_id FROM active_runs a
 			JOIN factory_planning_sessions s ON s.canvas_run_id = a.id
@@ -47,6 +53,7 @@ func ListActiveOrganizationTaskIDs(tx *gorm.DB, orgID uuid.UUID) ([]uuid.UUID, e
 		WHERE o.organization_id = ?`,
 		orgID, []string{CanvasRunStatePending, CanvasRunStateStarted, CanvasRunStateCancelling},
 		orgID, []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning},
+		orgID, CanvasRunStateFinished,
 		CanvasEventStateRouted, orgID).Scan(&ids).Error
 	return ids, err
 }
