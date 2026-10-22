@@ -38,6 +38,7 @@ describe("IntakeSettingsHost Sentry settings", () => {
     expect(within(dialog).queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
     const form = within(dialog).getByTestId("merge-confidence-config-form");
     expect(within(form).getByTestId("sentry-project-picker")).toBeInTheDocument();
+    expect(within(form).getByRole("button", { name: "Default task owner" })).toBeInTheDocument();
     expect(within(form).getByRole("checkbox", { name: "A new issue is created" })).toBeChecked();
     expect(within(form).getByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "true");
 
@@ -63,6 +64,25 @@ describe("IntakeSettingsHost Sentry settings", () => {
       }),
       integrationId: "sentry-1",
       resourceId: "payments,growth",
+    });
+  });
+
+  it("saves a default task owner with the Sentry intake settings", async () => {
+    useCanvas.mockReturnValue(sentryCanvasResult());
+    const user = userEvent.setup();
+    renderHost({ intake: SENTRY_INTAKE });
+
+    const form = within(screen.getByTestId("merge-confidence-config-form"));
+    await user.click(form.getByRole("button", { name: "Default task owner" }));
+    await user.click(await screen.findByRole("option", { name: "Alice" }));
+    await user.click(form.getByTestId("sentry-intake-config-save"));
+
+    expect(updateIntake).toHaveBeenLastCalledWith({
+      intakeId: "intake-sentry",
+      settings: expect.objectContaining({
+        defaultOwnerId: "alice",
+        sentryProjectIds: ["payments"],
+      }),
     });
   });
 
