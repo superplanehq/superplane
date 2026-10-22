@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router";
 import type { CanvasesCanvasRun, FactoriesWorkOrder } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useCanvasVersion, useDescribeRun, useEventExecutions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
@@ -10,6 +11,7 @@ import { RunnerLogsTerminal } from "@/ui/Runs/RunInspectorRunnerLogs";
 import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import type { RunHistoryIntakeSource } from "./intakeRunData";
 import { runDuration, toAutomationRun, toRunActivities } from "./runHistoryData";
+import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 
 const emptyOrders: FactoriesWorkOrder[] = [];
 
@@ -141,8 +143,17 @@ function LoadedFactoryAutomationRunDetails({
   const executions = executionsQuery.data?.executions ?? [];
   const nodes = versionQuery.data?.spec?.nodes ?? [];
   const mappedRun = useMemo(() => toAutomationRun(run, orders, Date.now(), intakeSource), [run, orders, intakeSource]);
+  const { factoryKey, lineId } = useParams();
+  const taskOrder = mappedRun.task && orders.find((order) => (order.key || order.id) === mappedRun.task?.id);
   const details = {
     ...mappedRun,
+    task: mappedRun.task && {
+      ...mappedRun.task,
+      url:
+        factoryKey && taskOrder?.number
+          ? workOrderDetailPath(organizationId, factoryKey, taskOrder.number, lineId)
+          : undefined,
+    },
     duration: runDuration(run, now),
     activities: toRunActivities(run, executions, nodes),
   };
