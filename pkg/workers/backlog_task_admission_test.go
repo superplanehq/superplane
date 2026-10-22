@@ -219,7 +219,14 @@ func Test__BacklogAdmission_UnscheduleKeepsTaskInBacklogAndAdvancesQueue(t *test
 	order, err = fixture.factory.FindWorkOrder(db, order.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateOpen, order.State, "admission must move the task out of Backlog")
-	assert.Len(t, executionsForOrder(t, order.ID), 1)
+	require.Len(t, executionsForOrder(t, order.ID), 1)
+	dispatch, err = order.FindActiveLineDispatch(db)
+	require.NoError(t, err, "admission must preserve the scheduled traversal")
+	assert.Nil(t, queueItemForDispatch(t, dispatch.ID), "the started draft must leave the queue")
+	assignees, err := order.ListAssignees(db)
+	require.NoError(t, err)
+	require.Len(t, assignees, 1)
+	assert.Equal(t, r.User, assignees[0].UserID, "admission must preserve the owner assigned when scheduling")
 }
 
 func Test__BacklogAdmission_QueuePositionsMatchAdmissionOrder(t *testing.T) {

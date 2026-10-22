@@ -25,7 +25,6 @@ func ListActiveOrganizationTaskIDs(tx *gorm.DB, orgID uuid.UUID) ([]uuid.UUID, e
 			UNION
 			SELECT e.work_order_id FROM active_runs a
 			JOIN factory_work_order_executions e ON e.run_id = a.id
-			WHERE a.active_id <> a.id
 			UNION
 			SELECT s.draft_work_order_id FROM active_runs a
 			JOIN factory_planning_sessions s ON s.canvas_run_id = a.id

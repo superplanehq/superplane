@@ -61,6 +61,49 @@ func ListOrganizationQueuedTasks(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationQu
 	return queued, nil
 }
 
+func (o *FactoryWorkOrder) CancelQueuedTask(tx *gorm.DB, queueID uuid.UUID) (*RunCancellationResult, error) {
+	if err := LockOrganizationTaskAdmission(tx, o.OrganizationID); err != nil {
+		return nil, err
+	}
+	if err := o.LockForUpdate(tx); err != nil {
+		return nil, err
+	}
+	queued, err := ListOrganizationQueuedTasks(tx, o.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	for _, task := range queued {
+		if task.ID != queueID || task.FactoryID != o.FactoryID || task.WorkOrderID != o.ID {
+			continue
+		}
+		if task.LineDispatchID != uuid.Nil {
+			item := &FactoryWorkOrderQueueItem{ID: task.ID, LineDispatchID: task.LineDispatchID}
+			dispatch, err := FindWorkOrderLineDispatch(tx, task.LineDispatchID)
+			if err != nil {
+				return nil, err
+			}
+			if err := discardQueuedTask(tx, item, dispatch, CanvasRunResultCancelled); err != nil {
+				return nil, err
+			}
+			if !task.StartsLine {
+				return nil, nil
+			}
+			active, err := ListActiveOrganizationTaskIDs(tx, o.OrganizationID)
+			if err != nil || slices.Contains(active, o.ID) {
+				return nil, err
+			}
+			_, err = o.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateDraft, SkipSame: true})
+			return nil, err
+		}
+		run, err := FindUnscopedCanvasRun(tx, task.RunID)
+		if err != nil {
+			return nil, err
+		}
+		return run.RequestCancellation(tx, nil)
+	}
+	return nil, ErrTaskNoLongerQueued
+}
+
 func listQueuedRootTasks(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationQueuedTask, error) {
 	var queued []OrganizationQueuedTask
 	err := tx.Table("workflow_events AS e").
@@ -109,47 +152,4 @@ func nextQueuedOrganizationTask(tx *gorm.DB, orgID uuid.UUID) (*OrganizationQueu
 		}
 	}
 	return nil, nil
-}
-
-func (o *FactoryWorkOrder) CancelQueuedTask(tx *gorm.DB, queueID uuid.UUID) (*RunCancellationResult, error) {
-	if err := LockOrganizationTaskAdmission(tx, o.OrganizationID); err != nil {
-		return nil, err
-	}
-	if err := o.LockForUpdate(tx); err != nil {
-		return nil, err
-	}
-	queued, err := ListOrganizationQueuedTasks(tx, o.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
-	for _, task := range queued {
-		if task.ID != queueID || task.FactoryID != o.FactoryID || task.WorkOrderID != o.ID {
-			continue
-		}
-		if task.LineDispatchID != uuid.Nil {
-			item := &FactoryWorkOrderQueueItem{ID: task.ID, LineDispatchID: task.LineDispatchID}
-			dispatch, err := FindWorkOrderLineDispatch(tx, task.LineDispatchID)
-			if err != nil {
-				return nil, err
-			}
-			if err := discardQueuedTask(tx, item, dispatch, CanvasRunResultCancelled); err != nil {
-				return nil, err
-			}
-			if !task.StartsLine {
-				return nil, nil
-			}
-			active, err := ListActiveOrganizationTaskIDs(tx, o.OrganizationID)
-			if err != nil || slices.Contains(active, o.ID) {
-				return nil, err
-			}
-			_, err = o.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateDraft, SkipSame: true})
-			return nil, err
-		}
-		run, err := FindUnscopedCanvasRun(tx, task.RunID)
-		if err != nil {
-			return nil, err
-		}
-		return run.RequestCancellation(tx, nil)
-	}
-	return nil, ErrTaskNoLongerQueued
 }
