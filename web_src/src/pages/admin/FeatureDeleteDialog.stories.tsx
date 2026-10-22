@@ -25,7 +25,7 @@ function InteractiveDialog(args: ComponentProps<typeof FeatureDeleteDialog>) {
         <FeatureDeleteDialog
           {...args}
           returnFocus={trigger}
-          survivorFocus={survivor}
+          survivorFocus={() => survivor}
           onDeleted={async () => {
             await args.onDeleted();
             setDeleted(true);
@@ -51,7 +51,7 @@ const meta = {
   args: {
     feature: { key: "custom_reports", label: "Custom reports", gated: true },
     returnFocus: null,
-    survivorFocus: null,
+    survivorFocus: () => null,
     onDeleted: async () => console.log("Feature deleted; refresh catalog"),
     onClose: () => console.log("Close feature delete dialog"),
   },

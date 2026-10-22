@@ -246,7 +246,7 @@ it("restores focus to the row trigger when the user dismisses after a delete err
   expect(screen.getByRole("button", { name: "Delete Reports" })).toBeInTheDocument();
 });
 
-it("shows the catalog load error after a successful delete without repeating the delete", async () => {
+it("focuses catalog retry after a successful delete and failed refresh without repeating the delete", async () => {
   let deletes = 0;
   let loads = 0;
   vi.stubGlobal(
@@ -267,6 +267,7 @@ it("shows the catalog load error after a successful delete without repeating the
   await user.click(await screen.findByRole("button", { name: "Delete Reports" }));
   await user.click(screen.getByRole("button", { name: "Delete feature" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load features");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toHaveFocus());
   expect(showErrorToast).not.toHaveBeenCalled();
   expect(deletes).toBe(1);
   await user.click(screen.getByRole("button", { name: "Try again" }));

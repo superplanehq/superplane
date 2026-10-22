@@ -23,9 +23,11 @@ import { billingCatalogRequest, type FeatureDefinition } from "./billingPlansApi
 export function BillingPlanFeatures({
   features,
   onSaved,
+  refreshErrorFocus,
 }: {
   features: FeatureDefinition[];
   onSaved: () => Promise<void>;
+  refreshErrorFocus?: () => HTMLElement | null;
 }) {
   const returnFocus = useRef<HTMLButtonElement>(null);
   const organizationTrigger = useRef<HTMLButtonElement>(null);
@@ -97,7 +99,9 @@ export function BillingPlanFeatures({
         <FeatureDeleteDialog
           feature={pendingDelete.feature}
           returnFocus={pendingDelete.trigger}
-          survivorFocus={createButton.current}
+          survivorFocus={() =>
+            createButton.current?.isConnected ? createButton.current : (refreshErrorFocus?.() ?? null)
+          }
           onDeleted={onSaved}
           onClose={() => setPendingDelete(null)}
         />

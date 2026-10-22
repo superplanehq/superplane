@@ -19,7 +19,7 @@ export function FeatureDeleteDialog({
 }: {
   feature: FeatureDefinition;
   returnFocus: HTMLElement | null;
-  survivorFocus: HTMLElement | null;
+  survivorFocus: () => HTMLElement | null;
   onDeleted: () => Promise<void>;
   onClose: () => void;
 }) {
@@ -51,8 +51,8 @@ export function FeatureDeleteDialog({
         showCloseButton={!deleting}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          // The row trigger is removed after a successful delete, so focus a control that remains.
-          (succeeded.current ? survivorFocus : returnFocus)?.focus();
+          // Read the target on close because a failed refresh replaces the catalog with a retry action.
+          (succeeded.current ? survivorFocus() : returnFocus)?.focus();
         }}
       >
         <DialogHeader>
