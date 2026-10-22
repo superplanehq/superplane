@@ -543,3 +543,54 @@ func Test__OrganizationQueue_InvalidWaiterPreservesExecutionOwningDispatch(t *te
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, current.Status)
 }
+
+func Test__OrganizationQueue_LineAdmissionDoesNotPassOlderRootEvent(t *testing.T) {
+	r := support.Setup(t)
+	plan := setTaskPlanLimit(t, r, 1)
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+	fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Holder"))
+	_, older := fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Older line"))
+	require.NotNil(t, older.QueueItem)
+	root, _ := createBacklogAdmissionEvent(t, r)
+	_, newer := fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Newer line"))
+	require.NotNil(t, newer.QueueItem)
+
+	plan.ParallelTaskLimit = stepMaxParallelism(3)
+	db := database.DB(t.Context())
+	require.NoError(t, models.SaveBillingPlan(db, plan))
+	NewRunFinalizer("", r.Registry).sweepQueuedTasks(t.Context())
+
+	assert.Nil(t, queueItemForDispatch(t, older.QueueItem.LineDispatchID), "the oldest line must start")
+	assert.NotNil(t, queueItemForDispatch(t, newer.QueueItem.LineDispatchID), "a newer line must not pass an older root event")
+	var stored models.CanvasEvent
+	require.NoError(t, db.First(&stored, "id = ?", root.ID).Error)
+	assert.Equal(t, models.CanvasEventStatePending, stored.State)
+}
+
+func Test__OrganizationQueue_ActiveTaskStartsBehindInactiveBatch(t *testing.T) {
+	r := support.Setup(t)
+	setTaskPlanLimit(t, r, 1)
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10), stepMaxParallelism(10)})
+	order := fixture.createOpenWorkOrder(t, r, "Active")
+	dispatch, running := fixture.dispatchLine(t, order)
+	require.NotNil(t, running.Run)
+	for range 100 {
+		_, queued := fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Waiting"))
+		require.NotNil(t, queued.QueueItem)
+	}
+	db := database.DB(t.Context())
+	require.NoError(t, db.Create(&models.FactoryWorkOrderQueueItem{
+		ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: fixture.factory.ID,
+		WorkOrderID: order.ID, LineID: dispatch.LineID, LineDispatchID: dispatch.ID,
+		StepIndex: 1, StepName: "next", CreatedAt: time.Now(),
+	}).Error)
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+		return err
+	}))
+
+	assert.Nil(t, queueItemForDispatch(t, dispatch.ID), "the active task must start the step it already holds a slot for")
+	assert.Len(t, executionsForOrder(t, order.ID), 2)
+	assertOrganizationTaskCounts(t, r.Organization.ID, 2, 100)
+}
