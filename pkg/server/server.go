@@ -483,25 +483,23 @@ func buildGRPCServices(
 	jwtSigner *jwt.Signer,
 	licenseService *licensing.Service,
 	keyStore *encryption.Store,
-	migrationsEnabled bool,
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
 
 	return grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:                     baseURL,
-		WebhooksBaseURL:             webhooksBaseURL,
-		RunnerAPIBaseURL:            runnerAPIBaseURL,
-		Encryptor:                   encryptor,
-		EncryptionStore:             keyStore,
-		EncryptionMigrationsEnabled: migrationsEnabled,
-		AuthService:                 authService,
-		Registry:                    registry,
-		OIDCProvider:                oidcProvider,
-		AgentService:                agentService,
-		JWTSigner:                   jwtSigner,
-		Entitlements:                licenseService,
-		Enterprise:                  features,
+		BaseURL:          baseURL,
+		WebhooksBaseURL:  webhooksBaseURL,
+		RunnerAPIBaseURL: runnerAPIBaseURL,
+		Encryptor:        encryptor,
+		EncryptionStore:  keyStore,
+		AuthService:      authService,
+		Registry:         registry,
+		OIDCProvider:     oidcProvider,
+		AgentService:     agentService,
+		JWTSigner:        jwtSigner,
+		Entitlements:     licenseService,
+		Enterprise:       features,
 	})
 }
 
@@ -883,16 +881,13 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
-	migrationsEnabled := keyStore != nil && !encryptionConfig.legacyWrites
-	if migrationsEnabled {
-		if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
-			rabbitMQURL, err := config.RabbitMQURL()
-			if err != nil {
-				panic(err)
-			}
-			worker := workers.NewApplicationEncryptionMigrationWorker(rabbitMQURL, encryptorInstance, registry, models.ApplicationEncryptedStorage())
-			go worker.Start(context.Background())
+	if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
+		rabbitMQURL, err := config.RabbitMQURL()
+		if err != nil {
+			panic(err)
 		}
+		worker := workers.NewApplicationEncryptionMigrationWorker(rabbitMQURL, encryptorInstance, registry, models.ApplicationEncryptedStorage())
+		go worker.Start(context.Background())
 	}
 
 	agentProvider, agentService := buildAgentService(authService)
@@ -912,7 +907,6 @@ func Start() {
 			jwtSigner,
 			licenseService,
 			keyStore,
-			migrationsEnabled,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)
