@@ -1,3 +1,7 @@
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
+import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
+import { showErrorToast } from "@/lib/toast";
 import type { MeVcsProviderRepository } from "@/api-client";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { startPublicGitHubAppCreate } from "@/lib/githubAppManifest";
@@ -38,7 +42,7 @@ import {
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
-export type FirstRunScreen = "welcome" | "host" | "connect" | "choose" | "tickets" | "agent";
+export type FirstRunScreen = "welcome" | "host" | "connect" | "choose" | "tickets" | "agent" | "billing";
 const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   vcs: "connect",
   repo: "choose",
@@ -57,6 +61,7 @@ const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
 /** Null means no step was requested, so the flow resumes from saved progress. */
 function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen | null {
   const requestedStep = searchParams.get("step");
+  if (requestedStep === "billing") return "billing";
   if (isWizardStepId(requestedStep)) return SCREEN_FOR_STEP[requestedStep];
   return null;
 }
@@ -151,7 +156,7 @@ function useFirstRunNavigation(
   connection: GitHubConnectionState,
   github: { ready: boolean; returned: boolean },
 ) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [requestedScreen, setRequestedScreen] = useState<FirstRunScreen | null>(() =>
     initialFirstRunScreen(searchParams),
   );
@@ -184,6 +189,11 @@ function useFirstRunNavigation(
   });
 
   const goToScreen = (next: FirstRunScreen) => {
+    if (next === "billing" || searchParams.get("step") === "billing") {
+      const updated = new URLSearchParams(searchParams);
+      updated.set("step", next === "billing" ? "billing" : (STEP_FOR_SCREEN[next] ?? "vcs"));
+      setSearchParams(updated, { replace: true });
+    }
     const step = STEP_FOR_SCREEN[next];
     if (step) {
       openStep.current = step;
@@ -376,6 +386,8 @@ function useFirstRunCommands(args: {
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const setupFinished = model.provisionedDestination != null;
+  const newBilling = useExperimentalFeature(organizationId).has(FEATURE_NEW_BILLING);
+  const billing = useOrganizationBilling(organizationId);
   const blocking = useFirstRunBlockingAction();
   const { connection, githubReady, githubReturned, installScope, checkingGitHub } = useFirstRunGitHub({
     organizationId,
@@ -395,7 +407,19 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     returned: githubReturned,
   });
   const commands = useFirstRunCommands({
-    model,
+    model: {
+      ...model,
+      finish: async (issuesChoice?: IssuesChoiceId) => {
+        if (!newBilling) return model.finish(issuesChoice);
+        const result = await billing.refetch();
+        if (result.error || !result.data) {
+          showErrorToast("Could not load billing plans. Try again.");
+          return;
+        }
+        if (!result.data.billingEnabled) return model.finish(issuesChoice);
+        if (await model.saveAgent()) navigation.goToScreen("billing");
+      },
+    },
     agentGate,
     connection,
     navigation,
@@ -417,6 +441,13 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   return {
     ...navigation,
     ...commands,
+    screen:
+      navigation.screen === "billing" && (!newBilling || !billing.data?.billingEnabled) ? "tickets" : navigation.screen,
+    hasBillingStep: newBilling && billing.data?.billingEnabled === true,
+    finishSetup: () =>
+      blocking.run("finishing-setup", async () => {
+        await model.finish();
+      }),
     selectBitbucketIdentity,
     vcsHost: model.setup.vcsHost,
     bitbucketForgeConfigured: bitbucketConnect.configured,
@@ -438,7 +469,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bitbucketInstallUrl: bitbucketConnect.installUrl,
     copyBitbucketInstallLink: bitbucketConnect.copyInstallLink,
     grantBitbucketAccess: bitbucketConnect.grantAccess,
-    // The ticket screen is the last screen, so it finishes setup.
+    // This path saves the backlog before the final plan choice.
     ticketsFinishSetup: agentGate === "skip" || agentGate === "first",
     skipAgentScreen: agentGate === "skip",
     agentBeforeTickets: agentGate === "first",

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -24,6 +25,102 @@ func Test__EnsureOrganizationBillingPlanIsTrial(t *testing.T) {
 	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
 	require.NotNil(t, plan.TrialEndsAt)
 	assert.True(t, plan.IsOpenTrial(time.Now()))
+}
+
+func Test__InitialPaidPlanAddsConfiguredTrialCredit(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		trialCents int64
+		polar      bool
+	}{
+		{name: "pay as you go without trial"},
+		{name: "pay as you go with trial", trialCents: 1000},
+		{name: "subscription without trial", polar: true},
+		{name: "subscription with trial", trialCents: 1200, polar: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			restoreInstallationLLMSettings(t)
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+			plan := models.BillingPlan{
+				Key: "selected_" + uuid.NewString()[:8], Name: "Selected", Category: "paid", Visibility: "public",
+				TrialCreditCents: tc.trialCents, CreditFrequency: "none", CreditExpiration: "never",
+			}
+			product := "prod_" + uuid.NewString()
+			if tc.polar {
+				plan.PolarProductID = &product
+			}
+			require.NoError(t, models.SaveBillingPlan(db, &plan))
+			execution := dispatchWorkOrderExecution(t, r)
+			recordHostedPromptUsage(t, db, r.Organization.ID, requireExecutionRunID(t, execution))
+			before := describeCredit(t, db, r.Organization.ID)
+			require.Positive(t, before.BilledMicros)
+			require.Less(t, before.BilledMicros, models.CentsToMicros(1200))
+			if tc.polar {
+				_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+					ID: product, ProductID: product, Status: models.PolarSubscriptionStatusIncomplete,
+				})
+				require.NoError(t, err)
+				require.Equal(t, before.WelcomeRemainingMicros, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+			}
+
+			selectPlan := func() {
+				if tc.polar {
+					now := time.Now()
+					end := now.AddDate(0, 1, 0)
+					_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+						ID: product, ProductID: product, Status: models.PolarSubscriptionStatusActive,
+						PeriodStart: &now, PeriodEnd: &end,
+					})
+					require.NoError(t, err)
+					return
+				}
+				_, err := models.ActivateOrganizationBillingPlan(db, r.Organization.ID, plan.Key)
+				require.NoError(t, err)
+			}
+			selectPlan()
+			want := before.WelcomeRemainingMicros + models.CentsToMicros(tc.trialCents)
+			require.Equal(t, want, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+			selectPlan()
+			assert.Equal(t, want, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+		})
+	}
+}
+
+func Test__InitialPaidPlanTrialCreditIsNotRepeatedAfterReactivation(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	product := "prod_" + uuid.NewString()
+	plan := models.BillingPlan{
+		Key: "selected_" + uuid.NewString()[:8], Name: "Selected", Category: "paid", Visibility: "public",
+		TrialCreditCents: 1200, CreditFrequency: "none", CreditExpiration: "never", PolarProductID: &product,
+	}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+
+	apply := func(status string) *models.OrganizationBillingPlan {
+		now := time.Now()
+		end := now.AddDate(0, 1, 0)
+		saved, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+			ID: product, ProductID: product, Status: status, PeriodStart: &now, PeriodEnd: &end,
+		})
+		require.NoError(t, err)
+		return saved
+	}
+
+	before := describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros
+	apply(models.PolarSubscriptionStatusActive)
+	granted := describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros
+	require.Equal(t, before+models.CentsToMicros(1200), granted)
+
+	canceled := apply(models.PolarSubscriptionStatusCanceled)
+	require.Equal(t, models.BillingPlanTrial, canceled.Plan)
+	require.True(t, canceled.IsOpenTrial(time.Now()))
+
+	apply(models.PolarSubscriptionStatusActive)
+	assert.Equal(t, granted, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
 }
 
 func Test__ApplyPolarSubscriptionReplacesAdminTrialWithPaid(t *testing.T) {
