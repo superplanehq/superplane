@@ -15,6 +15,8 @@ import {
 import { getResponseErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
+import { useBYOKAccess } from "./useBYOKAccess";
+
 import { factoryQueryKeys } from "./useFactoryData";
 import { hostedLLMModelsQueryKey } from "./useHostedLLMModels";
 
@@ -79,6 +81,7 @@ export function useBYOKLLMModels(
   enabled: boolean,
   factoryId?: string,
 ) {
+  const access = useBYOKAccess(organizationId);
   return useQuery({
     queryKey: byokLLMModelsQueryKey(organizationId ?? "", provider ?? "", factoryId),
     queryFn: async () => {
@@ -91,7 +94,13 @@ export function useBYOKLLMModels(
       );
       return response.data ?? {};
     },
-    enabled: Boolean(organizationId && provider && enabled),
+    enabled: Boolean(
+      organizationId &&
+        provider &&
+        enabled &&
+        access.allowed &&
+        (provider !== "custom" || access.customProviderAllowed),
+    ),
     staleTime: 30 * 1000,
   });
 }

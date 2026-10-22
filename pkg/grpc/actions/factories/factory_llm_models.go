@@ -24,6 +24,11 @@ func ListFactoryLLMModels(
 	}
 	factoryID := factory.ID
 
+	if req.GetFundingSource() == models.UsageFundingSourceBYOK {
+		if err := models.RequireOrganizationBYOKAccess(database.DB(ctx), orgID, req.GetProvider()); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to list factory models")
+		}
+	}
 	parent, err := models.ResolveSelectableLLMModels(database.DB(ctx), orgID, nil, req.GetProvider(), req.GetFundingSource())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory models")
