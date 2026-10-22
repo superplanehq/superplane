@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
   organizationsCancelOrganizationSubscription,
@@ -16,14 +16,25 @@ export function organizationBillingQueryKey(organizationId: string) {
   return ["organizations", organizationId, "billing"] as const;
 }
 
-export async function syncOrganizationBilling(organizationId: string) {
-  await organizationsSyncOrganizationBilling(
+export async function syncOrganizationBilling(organizationId: string, queryClient: QueryClient) {
+  const response = await organizationsSyncOrganizationBilling(
     withOrganizationHeader({
       organizationId,
       path: { id: organizationId },
       body: {},
     }),
   );
+  if (!response.data) throw new Error("SuperPlane could not synchronize billing. Try again.");
+  queryClient.setQueryData(organizationBillingQueryKey(organizationId), response.data);
+  await invalidateOrganizationModelAccess(queryClient, organizationId);
+}
+
+export function invalidateOrganizationModelAccess(queryClient: QueryClient, organizationId: string) {
+  return queryClient.invalidateQueries({
+    predicate: (query) =>
+      query.queryKey[1] === organizationId &&
+      ((query.queryKey[0] === "organizations" && query.queryKey[2] !== "billing") || query.queryKey[0] === "factories"),
+  });
 }
 
 export function useOrganizationBilling(organizationId: string | undefined) {

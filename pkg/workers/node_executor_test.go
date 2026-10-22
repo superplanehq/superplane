@@ -645,3 +645,58 @@ func TestNodeExecutorRetriesWhenPaymentMethodVerificationFails(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, models.CanvasNodeExecutionStatePending, saved.State)
 }
+
+// Saved configurations must be checked at execution time after a rollout is removed.
+func TestNodeExecutorBYOKRevocation(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	calls := 0
+	r.Registry.Actions["runnerCodex"] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name:        "runnerCodex",
+		ExecuteFunc: func(ctx core.ExecutionContext) error { calls++; return ctx.ExecutionState.Pass() },
+	})
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "agent", Type: models.NodeTypeComponent,
+		Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}}),
+	}}, nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "agent", "default", nil)
+	newExecution := func() *models.CanvasNodeExecution {
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, "agent", event.ID, event.ID)
+		require.NoError(t, db.Model(execution).Update("configuration", datatypes.NewJSONType(map[string]any{"credentials": map[string]any{"source": "integration"}})).Error)
+		return execution
+	}
+	start := func() *models.CanvasNodeExecution {
+		execution := newExecution()
+		require.NoError(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID))
+		result, err := models.FindNodeExecution(canvas.ID, execution.ID)
+		require.NoError(t, err)
+		return result
+	}
+	require.Equal(t, models.CanvasNodeExecutionResultPassed, start().Result)
+	require.Equal(t, 1, calls)
+	// A temporary entitlement lookup failure must retry rather than fail the run.
+	lookupFailure := errors.New("temporary product-feature lookup failure")
+	failLookup := true
+	callbackName := "test:byok_lookup_failure"
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if failLookup && tx.Statement.Table == "plan_feature_definitions" {
+			tx.AddError(lookupFailure)
+		}
+	}))
+	t.Cleanup(func() { _ = db.Callback().Query().Remove(callbackName) })
+	retry := newExecution()
+	require.ErrorIs(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(retry.ID), lookupFailure)
+	reloaded, err := models.FindNodeExecution(canvas.ID, retry.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionStatePending, reloaded.State)
+	require.Equal(t, 1, calls)
+	failLookup = false
+	require.NoError(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(retry.ID))
+	require.Equal(t, 2, calls)
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	denied := start()
+	require.Equal(t, models.CanvasNodeExecutionResultFailed, denied.Result)
+	require.Contains(t, denied.ResultMessage, "does not have access")
+	require.Equal(t, 2, calls)
+}

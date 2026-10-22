@@ -153,3 +153,14 @@ func TestCheckRequiredExperimentalFeatures(t *testing.T) {
 		assert.Equal(t, codes.PermissionDenied, status.Code(err))
 	})
 }
+
+func TestModelSourceRouteAllowsHostedRecoveryWithoutBYOK(t *testing.T) {
+	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
+	org, err := models.CreateOrganization("hosted-recovery-"+uuid.NewString()[:8], "")
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+	request := httptestRequest(t, map[string]string{"x-user-id": uuid.NewString(), "x-organization-id": org.ID.String()})
+	_, err = NewGatewayAuthorizer(allowingPermissionChecker{}).AuthorizeHTTP(t.Context(), request,
+		HTTPRoute{Method: "POST", Pattern: "/api/v1/factories/{id}/model-source"}, map[string]string{"id": uuid.NewString()})
+	require.NoError(t, err)
+}

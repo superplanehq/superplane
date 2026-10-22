@@ -68,7 +68,7 @@ it("keeps setup blocked when plans cannot load", async () => {
   const finish = renderBilling();
   expect(await screen.findByRole("alert")).toHaveTextContent("Could not load plans.");
   expect(screen.queryByRole("button", { name: /None/ })).toBeNull();
-  expect(screen.getByRole("button", { name: "Finish setup" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   expect(selectPlan).not.toHaveBeenCalled();
   expect(finish).not.toHaveBeenCalled();
 });
@@ -78,7 +78,7 @@ it("activates a plan without a card or checkout when neither is required", async
   const finish = renderBilling();
   expect(screen.queryByRole("button", { name: "Check payment status" })).toBeNull();
   await user.click(await screen.findByRole("button", { name: /Free/ }));
-  await user.click(screen.getByRole("button", { name: "Finish setup" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
   await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
   expect(selectPlan).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -114,11 +114,11 @@ it.each(["payg", "pro"])("verifies the saved card before finishing plan %s", asy
   expect(selectPlan).not.toHaveBeenCalled();
   expect(finish).not.toHaveBeenCalled();
   expect(popup.close).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "Finish setup" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   billing = { ...billing, hasPaymentMethod: true };
   await waitFor(() => expect(popup.close).toHaveBeenCalled(), { timeout: 4000 });
-  await waitFor(() => expect(screen.getByRole("button", { name: "Finish setup" })).toBeEnabled());
-  await user.click(screen.getByRole("button", { name: "Finish setup" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: "Continue" }));
   await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
   expect(selectPlan).toHaveBeenCalledTimes(planKey === "payg" ? 1 : 0);
   if (planKey === "payg") {
@@ -139,7 +139,7 @@ it("lets the user retry when the browser blocks the card setup window", async ()
     expect(screen.getByRole("button", { name: /Pay-as-you-go/ })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: /Pay-as-you-go/ }));
     expect(window.open).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("button", { name: "Finish setup" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   } finally {
     window.open = previousOpen;
   }
@@ -167,7 +167,7 @@ it("syncs a returning subscription and only continues when it is active", async 
   const finish = renderBilling("/org-1/workspaces/pay/setup?step=billing&subscribed=1");
   await waitFor(() => expect(syncBilling).toHaveBeenCalledTimes(1));
   await user.click(await screen.findByRole("button", { name: /Pro/ }));
-  await user.click(screen.getByRole("button", { name: "Finish setup" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
   await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
   expect(selectPlan).not.toHaveBeenCalled();
 });
@@ -187,7 +187,7 @@ it("finishes a different plan after checkout when the subscription is not active
   const finish = renderBilling("/org-1/workspaces/pay/setup?step=billing&plan=pro&subscribed=1");
   await waitFor(() => expect(syncBilling).toHaveBeenCalledTimes(1));
   await user.click(await screen.findByRole("button", { name: /Free/ }));
-  await user.click(screen.getByRole("button", { name: "Finish setup" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
   await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
   expect(selectPlan).toHaveBeenCalledWith(
     expect.objectContaining({ body: expect.objectContaining({ planKey: "free" }) }),
@@ -232,7 +232,7 @@ it("enables setup when the card window closes after the card is saved", async ()
     billing = { ...billing, hasPaymentMethod: true };
     popup.closed = true;
     await waitFor(() => expect(describeBilling.mock.calls.length).toBeGreaterThan(callsBeforeClose), { timeout: 3000 });
-    expect(screen.getByRole("button", { name: "Finish setup" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
   } finally {
     window.open = previousOpen;
   }
@@ -255,7 +255,7 @@ it("finishes setup with an active private plan that is not listed", async () => 
   expect(current).toHaveTextContent("Current plan");
   expect(current).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: /Free/ })).toBeDisabled();
-  await user.click(screen.getByRole("button", { name: "Finish setup" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
   await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
   expect(selectPlan).not.toHaveBeenCalled();
 });

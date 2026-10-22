@@ -149,8 +149,7 @@ export const FIRST_RUN_COPY = {
     hostedModelsHelper: "SuperPlane runs the agents. You do not connect a provider.",
     loading: "Checking agent availability…",
   },
-  // Shared by every screen that provisions the workspace. Hosted credentials
-  // move that action from the agent screen to the ticket screen.
+  // Shared by every screen that provisions the workspace.
   finish: {
     action: "Finish setup",
     saving: "Finishing setup…",
