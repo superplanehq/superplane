@@ -372,7 +372,9 @@ function linearProjectRebind(
   intake: ConfiguredLineIntakeSource,
   next: IntakeSourceSettings,
 ): { integrationId?: string; resourceId?: string } {
-  if (intake.source.id !== "linear-issues") {
+  // An intake with a team saves its projects as settings. Only an older
+  // intake that has projects and no team still binds to them.
+  if (intake.source.id !== "linear-issues" || next.linearTeamId) {
     return {};
   }
   const projects = next.linearProjectIds.join(",");
