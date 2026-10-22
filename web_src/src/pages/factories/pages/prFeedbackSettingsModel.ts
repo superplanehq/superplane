@@ -113,6 +113,7 @@ export interface PRFeedbackDraftSettings {
   repository: string;
   mention: string;
   ignoreBots: boolean;
+  addressAllBots: boolean;
   allowedBots: string[];
   checkNames: string[];
   maximumAttempts: number;
@@ -129,6 +130,7 @@ export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHa
     repository: handlerDraftRepository(handler),
     mention: handlerDraftMention(discussion?.mention),
     ignoreBots: discussion?.ignoreBots !== false,
+    addressAllBots: discussion?.addressAllBots === true,
     allowedBots: discussion?.allowedBots ?? [],
     checkNames: checks?.names ?? [],
     maximumAttempts: checks?.maximumAttempts ?? 3,
@@ -164,6 +166,7 @@ export function normalizePRFeedbackDraft(draft: PRFeedbackDraftSettings): PRFeed
     repository: draft.repository.trim(),
     mention: draft.mention.trim(),
     ignoreBots: draft.ignoreBots,
+    addressAllBots: draft.addressAllBots,
     allowedBots: normalizeAllowedBots(draft.allowedBots),
     checkNames: normalizeUniqueStrings(draft.checkNames),
     maximumAttempts: draft.maximumAttempts,
@@ -261,6 +264,7 @@ export function prFeedbackSettingsToApi(draft: PRFeedbackDraftSettings): Factori
       mention: draft.mention,
       ignoreBots: draft.ignoreBots,
       allowedBots: draft.allowedBots,
+      addressAllBots: draft.addressAllBots,
     },
   };
 }

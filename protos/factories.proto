@@ -1520,6 +1520,8 @@ message FactoryPRFeedbackHandler {
     bool ignore_bots = 2;
     // GitHub usernames of bots to react to even without the mention.
     repeated string allowed_bots = 3;
+    // Start a run for every bot comment except comments SuperPlane wrote.
+    bool address_all_bots = 4;
   }
 
   message CheckSettings {
