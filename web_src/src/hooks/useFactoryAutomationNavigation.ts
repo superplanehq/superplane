@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 
 export type FactoryAutomationSettingsTab = "general" | "agent" | "automation" | "runs";
 type HistoryScope = { organizationId?: string; factoryId?: string };
 
-/** Preserve legacy tabs without the flag; share flagged tabs and runs through the URL. */
+/** Share supported automation tabs and runs through the URL. */
 export function useFactoryAutomationNavigation({
   organizationId,
   factoryId,
@@ -29,16 +27,14 @@ export function useFactoryAutomationNavigation({
   eligible?: boolean;
 }) {
   const scope = historyScope(organizationId, factoryId, graph, agent);
-  const features = useExperimentalFeature(scope.organizationId);
-  const enabled = eligible && features.has(FEATURE_FACTORY_RUN_HISTORY);
   const [params, setParams] = useSearchParams();
   const [legacyTab, setLegacyTab] = useState(initialTab);
   const selectedRunId = params.get("automationRun");
-  const requested = enabled ? (params.get(parameter) ?? (selectedRunId ? "runs" : initialTab)) : legacyTab;
-  const tab = resolveSettingsTab(requested, { hasGeneral, hasAgent, historyEnabled: enabled });
+  const requested = eligible ? (params.get(parameter) ?? (selectedRunId ? "runs" : initialTab)) : legacyTab;
+  const tab = resolveSettingsTab(requested, { hasGeneral, hasAgent, historyEnabled: eligible });
 
   const setTab = (next: FactoryAutomationSettingsTab) => {
-    if (!enabled) {
+    if (!eligible) {
       setLegacyTab(next);
       return;
     }
@@ -59,7 +55,7 @@ export function useFactoryAutomationNavigation({
       return updated;
     });
   };
-  return { ...scope, enabled, tab, setTab, selectedRunId, setSelectedRunId };
+  return { ...scope, enabled: eligible, tab, setTab, selectedRunId, setSelectedRunId };
 }
 
 function historyScope(

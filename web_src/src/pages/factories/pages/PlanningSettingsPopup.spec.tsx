@@ -366,11 +366,11 @@ describe("PlanningSettingsPopup", () => {
     expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toBeInTheDocument();
   });
 
-  it("shows Configuration and Automation tabs when the history flag is off", () => {
+  it("shows Configuration and Runs tabs by default", () => {
     renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { agent: true });
 
     expect(screen.getByTestId("planning-settings-tab-general")).toBeInTheDocument();
     expect(screen.queryByTestId("planning-settings-tab-agent")).not.toBeInTheDocument();
-    expect(screen.getByTestId("planning-settings-tab-automation")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-settings-tab-runs")).toBeInTheDocument();
   });
 });

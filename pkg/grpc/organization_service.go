@@ -195,6 +195,18 @@ func (s *OrganizationService) CreateBusinessCheckout(
 	return organizations.CreateBusinessCheckout(ctx, orgID, req, accountID, s.baseURL)
 }
 
+func (s *OrganizationService) SelectBillingPlan(ctx context.Context, req *pb.SelectBillingPlanRequest) (*pb.CreateBusinessCheckoutResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	accountID, _ := accountIDFromContext(ctx)
+	return organizations.SelectBillingPlan(ctx, orgID, req, accountID, s.baseURL)
+}
+
+func (s *OrganizationService) CreatePaymentMethodSession(ctx context.Context, req *pb.CreatePaymentMethodSessionRequest) (*pb.CreateBillingPortalSessionResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	accountID, _ := accountIDFromContext(ctx)
+	return organizations.CreatePaymentMethodSession(ctx, orgID, req, accountID)
+}
+
 func (s *OrganizationService) SyncOrganizationBilling(
 	ctx context.Context,
 	req *pb.SyncOrganizationBillingRequest,

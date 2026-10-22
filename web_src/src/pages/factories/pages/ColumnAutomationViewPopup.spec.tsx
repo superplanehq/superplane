@@ -307,7 +307,7 @@ function renderHost() {
 }
 
 describe("ColumnAutomationViewHost", () => {
-  it("opens the Implement agent on the split screen with that step selected", () => {
+  it("opens supported Implement settings without a canvas", () => {
     useCanvas.mockReturnValue({
       data: {
         metadata: { id: "app-refund-implementer", name: "Implement", liveVersionId: "version-live" },
@@ -333,8 +333,8 @@ describe("ColumnAutomationViewHost", () => {
 
     expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
     const dialog = screen.getByTestId("merge-confidence-config");
-    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
-    expect(within(dialog).getByRole("heading", { name: "Implement From Task Description" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("implement-settings-save")).toBeInTheDocument();
+    expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Start Implementation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();

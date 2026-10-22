@@ -18,14 +18,6 @@ import {
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import { DEFAULT_PLANNING_SETTINGS } from "./planningSettingsModel";
 
-let historyEnabled = true;
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (feature: string) => historyEnabled && feature === "factory_run_history",
-    isLoading: false,
-    organizationReady: true,
-  }),
-}));
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => ({ data: [], isLoading: false }),
 }));
@@ -34,7 +26,6 @@ vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: () => 
 describe("Backlog intake run history", () => {
   beforeEach(() => {
     resetHostMocks();
-    historyEnabled = true;
   });
 
   it.each([
@@ -55,15 +46,6 @@ describe("Backlog intake run history", () => {
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "General" }));
     expect(screen.getByTestId("intake-source-settings-save")).toBeInTheDocument();
-  });
-
-  it("keeps the legacy canvas when the flag is off", async () => {
-    historyEnabled = false;
-    const user = userEvent.setup();
-    renderHost();
-    await user.click(screen.getByRole("tab", { name: "Automation" }));
-    expect(screen.getByTestId("intake-source-automation")).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
   });
 
   it("shows the repository watched by Dependabot instead of the workspace default", () => {
@@ -92,7 +74,7 @@ describe("Backlog intake run history", () => {
     expect(screen.queryByTestId("planning-automation")).not.toBeInTheDocument();
   });
 
-  it("opens old Planning automation links as history when enabled", () => {
+  it("opens old Planning automation links as history", () => {
     renderPlanning("/?planningSettings=automation");
     expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("table")).toBeInTheDocument();

@@ -99,7 +99,7 @@ describe("AgentStep", () => {
     expect(screen.getByText("SuperPlane-hosted credit")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "This organization has $41.24 of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.",
+        "This organization has $41.24 of trial usage for machines and managed models. Contact an installation admin to keep hosted runs after the trial.",
       ),
     ).toBeInTheDocument();
   });
@@ -130,7 +130,7 @@ describe("AgentStep", () => {
 
     expect(screen.getByTestId("hosted-credit-grant")).toBeInTheDocument();
     expect(
-      screen.getByText("Trial credit is used up. Subscribe to Business or connect a provider to continue."),
+      screen.getByText("Trial credit is used up. Contact an installation admin or connect a provider to continue."),
     ).toBeInTheDocument();
   });
 
