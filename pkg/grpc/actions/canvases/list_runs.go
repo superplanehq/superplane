@@ -19,7 +19,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (*pb.ListRunsResponse, error) {
+func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result, includeTask bool) (*pb.ListRunsResponse, error) {
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
 	filters, err := buildCanvasRunFilters(states, results)
@@ -55,6 +55,11 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 		return nil, err
 	}
 	AttachCanvasRunUsage(db, serialized)
+	if includeTask {
+		if err := attachCanvasRunTasks(db, canvas, runs, serialized); err != nil {
+			return nil, err
+		}
+	}
 
 	return &pb.ListRunsResponse{
 		Runs:          serialized,
@@ -407,6 +412,33 @@ func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {
 		return timestamppb.New(*runs[len(runs)-1].CreatedAt)
 	}
 
+	return nil
+}
+
+func attachCanvasRunTasks(db *gorm.DB, canvas *models.Canvas, runs []models.CanvasRun, serialized []*pb.CanvasRun) error {
+	labels, err := models.ResolveCanvasRunTasks(db, canvas, runs)
+	if err != nil {
+		return grpcerrors.Internal(err, "failed to load run tasks")
+	}
+
+	for _, run := range serialized {
+		if run == nil {
+			continue
+		}
+		runID, err := uuid.Parse(run.GetId())
+		if err != nil {
+			continue
+		}
+		label, ok := labels[runID]
+		if !ok {
+			continue
+		}
+		run.Task = &pb.CanvasRunTask{
+			Id:    label.ID.String(),
+			Key:   label.Key,
+			Title: label.Title,
+		}
+	}
 	return nil
 }
 

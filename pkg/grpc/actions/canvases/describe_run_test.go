@@ -34,7 +34,7 @@ func Test__DescribeRun(t *testing.T) {
 		run := createFinishedRun(t, rootEvent, models.CanvasRunResultPassed)
 		execution := createRunExecution(t, run, rootEvent.ID, "node-1", models.CanvasNodeExecutionResultPassed)
 
-		response, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, run.ID.String())
+		response, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, run.ID.String(), false)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Run)
@@ -68,7 +68,7 @@ func Test__DescribeRun(t *testing.T) {
 		run := createStartedRun(t, rootEvent)
 		queueItem := support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
 
-		response, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, run.ID.String())
+		response, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, run.ID.String(), false)
 		require.NoError(t, err)
 		require.NotNil(t, response.Run)
 		require.Len(t, response.Run.QueueItems, 1)
@@ -117,7 +117,7 @@ func Test__DescribeRun(t *testing.T) {
 			"",
 		)
 
-		response, err := DescribeRun(context.Background(), database.DB(t.Context()), childCanvas, childRun.ID.String())
+		response, err := DescribeRun(context.Background(), database.DB(t.Context()), childCanvas, childRun.ID.String(), false)
 		require.NoError(t, err)
 		require.NotNil(t, response.Run)
 		assert.Equal(t, childRun.ID.String(), response.Run.Id)
@@ -134,7 +134,7 @@ func Test__DescribeRun(t *testing.T) {
 		rootEventTwo := support.EmitCanvasEventForNode(t, canvasTwo.ID, "trigger", "default", nil)
 		runTwo := createFinishedRun(t, rootEventTwo, models.CanvasRunResultPassed)
 
-		_, err := DescribeRun(context.Background(), database.DB(t.Context()), canvasOne, runTwo.ID.String())
+		_, err := DescribeRun(context.Background(), database.DB(t.Context()), canvasOne, runTwo.ID.String(), false)
 		require.Error(t, err)
 		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
@@ -142,7 +142,7 @@ func Test__DescribeRun(t *testing.T) {
 	t.Run("invalid run id -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
 
-		_, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, "not-a-uuid")
+		_, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, "not-a-uuid", false)
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
@@ -150,7 +150,7 @@ func Test__DescribeRun(t *testing.T) {
 	t.Run("missing run -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
 
-		_, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, uuid.New().String())
+		_, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, uuid.New().String(), false)
 		require.Error(t, err)
 		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
@@ -178,7 +178,7 @@ func Test__DescribeRun__IncludesUsageTotalsAndModels(t *testing.T) {
 		FundingSource:   models.UsageFundingSourceHosted,
 	}))
 
-	response, err := DescribeRun(context.Background(), db, canvas, run.ID.String())
+	response, err := DescribeRun(context.Background(), db, canvas, run.ID.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response.Run)
 	assert.Equal(t, run.ID.String(), response.Run.GetId())

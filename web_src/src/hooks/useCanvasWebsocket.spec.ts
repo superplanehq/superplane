@@ -238,6 +238,48 @@ describe("useCanvasWebsocket", () => {
     });
   });
 
+  it("patches the include-task describe cache and keeps the task label", async () => {
+    const queryClient = new QueryClient();
+    const task = { id: "task-1", key: "SP-1", title: "Linked task" };
+    queryClient.setQueryData(canvasKeys.run(testCanvasId, "run-1", true), {
+      run: {
+        id: "run-1",
+        canvasId: testCanvasId,
+        state: "STATE_STARTED",
+        rootEvent: { id: "event-1", nodeId: testNodeId },
+        executions: [],
+        task,
+      },
+    });
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("execution_started", {
+      id: "execution-1",
+      nodeId: testNodeId,
+      state: "STATE_STARTED",
+      updatedAt: "2026-06-01T12:00:00.000Z",
+      rootEvent: { id: "event-1", nodeId: testNodeId },
+    });
+    emitWebsocketMessage("run_finished", {
+      id: "run-1",
+      canvasId: testCanvasId,
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    await flushMessageQueue();
+
+    await waitFor(() => {
+      const described = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(
+        canvasKeys.run(testCanvasId, "run-1", true),
+      );
+      expect(described?.run?.state).toBe("STATE_FINISHED");
+      expect(described?.run?.executions?.[0]?.id).toBe("execution-1");
+      expect(described?.run?.task).toEqual(task);
+    });
+  });
+
   it("patches describe-run cache when an execution omits runId and matches the root event", async () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();

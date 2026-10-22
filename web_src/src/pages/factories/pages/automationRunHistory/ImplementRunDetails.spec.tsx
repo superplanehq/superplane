@@ -13,7 +13,6 @@ const api = vi.hoisted(() => ({
   canvasesDescribeCanvasVersion: vi.fn(),
 }));
 vi.mock("../../../../api-client/sdk.gen", () => api);
-vi.mock("@/hooks/useFactoryData", () => ({ useFactoryWorkOrders: () => ({ data: [], isLoading: false }) }));
 vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: () => {} }));
 vi.mock("@/ui/Runs/RunInspectorRunnerLogs", () => ({
   RunnerLogsTerminal: () => <p data-testid="runner-logs">Saved runner output</p>,
