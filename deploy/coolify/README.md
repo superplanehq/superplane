@@ -68,6 +68,8 @@ for the default path.
 4. `fleet-manager` reads that token and starts.
 
 Set `INSTALLATION_ADMIN_TOKEN` only when you replace that generated token.
+`fleet-token` then skips minting. After a password change, redeploy so
+`fleet-token` can replace a revoked token.
 
 ### Git / source (`docker-compose.source.yml`)
 

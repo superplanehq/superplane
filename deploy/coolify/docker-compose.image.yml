@@ -195,7 +195,7 @@ services:
   fleet-token:
     image: postgres:17.5
     user: "0:0"
-    restart: "no"
+    restart: on-failure
     exclude_from_hc: true
     depends_on:
       db:
@@ -205,6 +205,7 @@ services:
     volumes:
       - fleet-token:/token
     environment:
+      INSTALLATION_ADMIN_TOKEN: ${INSTALLATION_ADMIN_TOKEN:-}
       DB_HOST: db
       DB_PORT: "5432"
       DB_NAME: superplane
@@ -214,10 +215,15 @@ services:
     command:
       - |
         set -eu
-        token_file=/token/installation-admin-token
-        if [ -s "$$token_file" ]; then
-          echo "Fleet Manager token already exists."
+        if [ -n "$${INSTALLATION_ADMIN_TOKEN:-}" ]; then
+          echo "Using the supplied INSTALLATION_ADMIN_TOKEN. Skipping token mint."
           exit 0
+        fi
+        token_file=/token/installation-admin-token
+        pending_file=/token/installation-admin-token.pending
+        token_name=superplane.coolify.fleet-manager
+        if [ -s "$$token_file" ]; then
+          mv "$$token_file" "$$pending_file"
         fi
         echo "Waiting for the owner account."
         owner_user_id=""
@@ -232,33 +238,42 @@ services:
             sleep 2
           fi
         done
+        if [ -s "$$pending_file" ]; then
+          token_hash="$$(printf '%s' "$$(cat "$$pending_file")" | sha256sum | cut -d ' ' -f 1)"
+          stored_hash="$$(
+            PGPASSWORD="$$DB_PASSWORD" psql -X -Atq \
+              -h "$$DB_HOST" -p "$$DB_PORT" -U "$$DB_USERNAME" -d "$$DB_NAME" \
+              -v owner_user_id="$$owner_user_id" \
+              -v token_hash="$$token_hash" \
+              -v token_name="$$token_name" \
+              -c "SELECT token_hash FROM user_api_tokens WHERE user_id = :'owner_user_id'::uuid AND name = :'token_name' AND token_hash = :'token_hash' LIMIT 1" \
+              2>/dev/null || true
+          )"
+          if [ "$$stored_hash" = "$$token_hash" ]; then
+            mv "$$pending_file" "$$token_file"
+            echo "Fleet Manager token is still valid."
+            exit 0
+          fi
+          echo "Stored Fleet Manager token is missing or revoked. Minting a replacement."
+          rm -f "$$pending_file"
+        fi
         token="$$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
         token_hash="$$(printf '%s' "$$token" | sha256sum | cut -d ' ' -f 1)"
         PGPASSWORD="$$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 \
           -h "$$DB_HOST" -p "$$DB_PORT" -U "$$DB_USERNAME" -d "$$DB_NAME" \
           -v owner_user_id="$$owner_user_id" \
           -v token_hash="$$token_hash" \
-          -v token_name="Coolify Fleet Manager" <<'SQL'
+          -v token_name="$$token_name" <<'SQL'
         BEGIN;
-        WITH selected AS (
-          SELECT id FROM user_api_tokens
-          WHERE name = :'token_name'
-          ORDER BY created_at ASC, id ASC LIMIT 1
-        )
-        DELETE FROM user_api_tokens
-        WHERE name = :'token_name' AND id <> (SELECT id FROM selected);
-        UPDATE user_api_tokens
-        SET user_id = :'owner_user_id'::uuid, token_hash = :'token_hash', last_used_at = NULL
-        WHERE id = (
-          SELECT id FROM user_api_tokens
-          WHERE name = :'token_name'
-          ORDER BY created_at ASC, id ASC LIMIT 1
-        );
         INSERT INTO user_api_tokens (user_id, name, token_hash)
         SELECT :'owner_user_id'::uuid, :'token_name', :'token_hash'
         WHERE NOT EXISTS (
-          SELECT 1 FROM user_api_tokens WHERE name = :'token_name'
+          SELECT 1 FROM user_api_tokens
+          WHERE user_id = :'owner_user_id'::uuid AND name = :'token_name'
         );
+        UPDATE user_api_tokens
+        SET token_hash = :'token_hash', last_used_at = NULL
+        WHERE user_id = :'owner_user_id'::uuid AND name = :'token_name';
         COMMIT;
         SQL
         printf '%s' "$$token" > "$$token_file.tmp"

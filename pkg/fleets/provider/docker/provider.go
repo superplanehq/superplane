@@ -86,6 +86,43 @@ func (p *Provider) List(
 	ctx context.Context,
 	fleetID string,
 ) ([]provider.Resource, error) {
+	owned, err := p.listRunnerContainers(
+		ctx,
+		fleetID,
+		"label="+labelFleetManagerID+"="+p.config.FleetManagerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if p.config.Network == "" {
+		return owned, nil
+	}
+	onNetwork, err := p.listRunnerContainers(
+		ctx,
+		fleetID,
+		"network="+p.config.Network,
+	)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(owned))
+	for _, resource := range owned {
+		seen[resource.ID] = struct{}{}
+	}
+	for _, resource := range onNetwork {
+		if _, exists := seen[resource.ID]; exists {
+			continue
+		}
+		owned = append(owned, resource)
+	}
+	return owned, nil
+}
+
+func (p *Provider) listRunnerContainers(
+	ctx context.Context,
+	fleetID string,
+	extraFilter string,
+) ([]provider.Resource, error) {
 	format := strings.Join([]string{
 		"{{.ID}}",
 		`{{.Label "` + labelRunnerID + `"}}`,
@@ -98,13 +135,9 @@ func (p *Provider) List(
 		"-a",
 		"--filter", "label=" + labelManaged + "=true",
 		"--filter", "label=" + labelFleetID + "=" + fleetID,
+		"--filter", extraFilter,
+		"--format", format,
 	}
-	if p.config.Network != "" {
-		args = append(args, "--filter", "network="+p.config.Network)
-	} else {
-		args = append(args, "--filter", "label="+labelFleetManagerID+"="+p.config.FleetManagerID)
-	}
-	args = append(args, "--format", format)
 	output, err := p.docker.Run(ctx, args...)
 	if err != nil {
 		return nil, dockerError("list runner containers", output, err)
@@ -123,7 +156,7 @@ func (p *Provider) List(
 		if managerID != "" && managerID != p.config.FleetManagerID {
 			continue
 		}
-		if managerID == "" && p.config.Network == "" {
+		if managerID == "" && !strings.HasPrefix(extraFilter, "network=") {
 			continue
 		}
 		resources = append(resources, provider.Resource{
