@@ -387,8 +387,16 @@ func matchBitbucketContentFilter(filter string, event map[string]any) bool {
 	return matched
 }
 
-// bitbucketMentionMatches reports whether body contains mention as a whole
-// nickname. A longer nickname that only starts with the filter does not match.
+// bitbucketMentionAliases lists nicknames that name the same agent. Bitbucket
+// shows the app as SuperPlane. Canvases created before that change store
+// @superplaneagent, so both nicknames must keep starting runs.
+var bitbucketMentionAliases = [][]string{
+	{"superplane", "superplaneagent"},
+}
+
+// bitbucketMentionMatches reports whether body contains mention, or one of its
+// aliases, as a whole nickname. A longer nickname that only starts with the
+// filter does not match.
 func bitbucketMentionMatches(mention, body string) bool {
 	mention = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(mention), "@"))
 	if mention == "" {
@@ -396,16 +404,37 @@ func bitbucketMentionMatches(mention, body string) bool {
 	}
 
 	lower := strings.ToLower(body)
-	needle := "@" + mention
+	for _, nickname := range bitbucketMentionNicknames(mention) {
+		if containsBitbucketNickname(lower, nickname) {
+			return true
+		}
+	}
+	return false
+}
+
+// bitbucketMentionNicknames returns the lowercase nickname and its aliases.
+func bitbucketMentionNicknames(nickname string) []string {
+	for _, group := range bitbucketMentionAliases {
+		if slices.Contains(group, nickname) {
+			return group
+		}
+	}
+	return []string{nickname}
+}
+
+// containsBitbucketNickname reports whether lowerBody mentions the lowercase
+// nickname as a whole word.
+func containsBitbucketNickname(lowerBody, nickname string) bool {
+	needle := "@" + nickname
 	start := 0
 	for {
-		index := strings.Index(lower[start:], needle)
+		index := strings.Index(lowerBody[start:], needle)
 		if index < 0 {
 			return false
 		}
 		index += start
 		after := index + len(needle)
-		if after == len(lower) || !isBitbucketNicknameChar(lower[after]) {
+		if after == len(lowerBody) || !isBitbucketNicknameChar(lowerBody[after]) {
 			return true
 		}
 		start = after

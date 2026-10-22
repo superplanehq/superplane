@@ -77,7 +77,7 @@ func TestHandleBitbucketForgeEventRoutesOnlyTheInstalledRepository(t *testing.T)
 				body, err := json.Marshal(map[string]any{
 					"eventType":     forgeEvent,
 					"selfGenerated": selfGenerated,
-					"comment":       map[string]any{"id": 7, "content": map[string]any{"raw": "@superplaneagent fix conflicts"}, "user": map[string]any{"nickname": "ada"}},
+					"comment":       map[string]any{"id": 7, "content": map[string]any{"raw": "@SuperPlane fix conflicts"}, "user": map[string]any{"nickname": "ada"}},
 					"timestamp":     timestamp,
 					"workspace":     map[string]any{"uuid": "{" + workspace + "}"},
 					"repository":    map[string]any{"uuid": "{" + repositoryID + "}"},
@@ -107,7 +107,7 @@ func TestHandleBitbucketForgeEventRoutesOnlyTheInstalledRepository(t *testing.T)
 			data := event.Data.Data().(map[string]any)["data"].(map[string]any)
 			if commentEvent {
 				comment := data["comment"].(map[string]any)
-				assert.Equal(t, "@superplaneagent fix conflicts", comment["body"])
+				assert.Equal(t, "@SuperPlane fix conflicts", comment["body"])
 				assert.Equal(t, "https://bitbucket.org/acme/widgets/pull-requests/2#comment-7", comment["html_url"])
 				selfGenerated = true
 				require.Equal(t, http.StatusNoContent, post(token, workspaceID).Code)

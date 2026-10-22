@@ -29,10 +29,12 @@ const (
 	prFeedbackFindComponent     = "findPullRequest"
 	prFeedbackActivityComponent = "addPullRequestActivity"
 
-	prFeedbackDefaultName         = "Address PR feedback"
-	prFeedbackDefaultDescription  = "Address pull request comments and reviews after a mention."
-	prFeedbackDefaultMention      = "@superplaneagent"
-	prFeedbackCommentScopeReplies = "replies"
+	prFeedbackDefaultName        = "Address PR feedback"
+	prFeedbackDefaultDescription = "Address pull request comments and reviews after a mention."
+	prFeedbackDefaultMention     = "@superplaneagent"
+	// Bitbucket shows the app as SuperPlane, so users mention that name.
+	prFeedbackBitbucketDefaultMention = "@SuperPlane"
+	prFeedbackCommentScopeReplies     = "replies"
 
 	prFeedbackRunnerNodeName = "Address PR feedback"
 	prFeedbackMachineType    = runner.MachineTypeE1LargeAMD64
@@ -97,6 +99,15 @@ func prFeedbackVCSProvider(request prFeedbackBuildRequest) string {
 		return models.ProviderBitbucket
 	}
 	return models.ProviderGitHub
+}
+
+// prFeedbackDefaultMentionForProvider returns the mention that starts a run
+// on the given Git host. Unknown or empty providers mean GitHub.
+func prFeedbackDefaultMentionForProvider(provider string) string {
+	if prFeedbackVCSProvider(prFeedbackBuildRequest{VCSProvider: provider}) == models.ProviderBitbucket {
+		return prFeedbackBitbucketDefaultMention
+	}
+	return prFeedbackDefaultMention
 }
 
 func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {

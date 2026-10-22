@@ -58,7 +58,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		assert.Equal(t, prFeedbackDefaultName, handler.GetName())
 		assert.True(t, handler.GetHealthy())
 		assert.Equal(t, "acme/app", handler.GetSettings().GetSubject().GetRepository())
-		assert.Equal(t, prFeedbackDefaultMention, handler.GetSettings().GetDiscussion().GetMention())
+		assert.Equal(t, "@superplaneagent", handler.GetSettings().GetDiscussion().GetMention())
 		assert.True(t, handler.GetSettings().GetDiscussion().GetIgnoreBots())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
@@ -83,6 +83,10 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			prFeedbackAcknowledgeReviewReplyNodeID, prFeedbackReplyFindNodeID,
 			prFeedbackCommentAcknowledgeCommentIDExpression(), "reviewComment")
 		assertLivePRFeedbackConcurrency(t, canvas.ID, liveVersion.Nodes)
+
+		trigger := findIntakeNode(liveVersion.Nodes, prFeedbackCommentTriggerNodeID)
+		require.NotNil(t, trigger)
+		assert.Equal(t, "@superplaneagent", trigger.Configuration["contentFilter"])
 	})
 
 	t.Run("creation fails when no repository is available", func(t *testing.T) {
