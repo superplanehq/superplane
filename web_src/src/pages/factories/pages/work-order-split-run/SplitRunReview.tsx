@@ -68,16 +68,19 @@ function footerActionHandler({
   requestStart,
   onArchive,
   onReject,
+  onContinueFixes,
   onStop,
 }: {
   requestStart: () => void;
   onArchive: FooterCallback;
   onReject: FooterCallback;
+  onContinueFixes: FooterCallback;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
 }) {
   const directActions: Partial<Record<SplitRunFooterAction["kind"], FooterCallback>> = {
     archive: onArchive,
     reject: onReject,
+    "continue-fixes": onContinueFixes,
   };
   return (action: SplitRunFooterAction) => {
     if (action.kind === "start") {
@@ -125,6 +128,7 @@ export function SplitRunReview({
   onStart,
   onArchive,
   onReject,
+  onContinueFixes,
   onStop,
   startBusy = false,
   actionBusy = false,
@@ -149,6 +153,7 @@ export function SplitRunReview({
   onStart?: () => void | Promise<void>;
   onArchive?: () => void | Promise<void>;
   onReject?: () => void | Promise<void>;
+  onContinueFixes?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   startBusy?: boolean;
   actionBusy?: boolean;
@@ -189,7 +194,7 @@ export function SplitRunReview({
     setConfirmOpen(false);
     void onStart?.();
   };
-  const onAction = footerActionHandler({ requestStart, onArchive, onReject, onStop });
+  const onAction = footerActionHandler({ requestStart, onArchive, onReject, onContinueFixes, onStop });
   const handleAction = (action: SplitRunFooterAction) => {
     if (action.kind === "send-to-backlog") {
       setBacklogConfirmOpen(true);
