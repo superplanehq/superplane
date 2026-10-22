@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
 
 type DescribeWorkOrderResult = Awaited<ReturnType<typeof apiClient.factoriesDescribeWorkOrder>>;
@@ -375,6 +376,104 @@ describe("useFactoryWebsocket", () => {
       queryClient.getQueryData<Array<{ title?: string }>>(factoryQueryKeys.workOrders("org-1", "factory-1"))?.[0]
         ?.title,
     ).toBe("Newer");
+  });
+
+  it("updates open run history labels when a linked task is renamed", async () => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue(
+      describeResponse({ id: "order-1", key: "SP-42", title: "Renamed task" }),
+    );
+    const { queryClient } = renderFactoryWebsocket();
+    const historyKey = canvasKeys.infiniteRuns("canvas-1", { includeTask: true });
+    const otherKey = canvasKeys.infiniteRuns("canvas-2", { includeTask: true });
+    const detailKey = canvasKeys.run("canvas-1", "run-1", true);
+    queryClient.setQueryData(historyKey, {
+      pageParams: [undefined, "cursor"],
+      pages: [
+        { runs: [{ id: "run-1", task: { id: "order-1", key: "SP-42", title: "Old title" } }] },
+        { runs: [{ id: "run-2", task: { id: "order-1", key: "SP-42", title: "Old title" } }] },
+      ],
+    });
+    queryClient.setQueryData(detailKey, {
+      run: { id: "run-1", task: { id: "order-1", key: "SP-42", title: "Old title" } },
+    });
+    queryClient.setQueryData(otherKey, {
+      pageParams: [undefined],
+      pages: [{ runs: [{ id: "run-3", task: { id: "order-9", key: "SP-9", title: "Other task" } }] }],
+    });
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    expect(queryClient.getQueryData(historyKey)).toEqual({
+      pageParams: [undefined, "cursor"],
+      pages: [
+        { runs: [{ id: "run-1", task: { id: "order-1", key: "SP-42", title: "Renamed task" } }] },
+        { runs: [{ id: "run-2", task: { id: "order-1", key: "SP-42", title: "Renamed task" } }] },
+      ],
+    });
+    expect(queryClient.getQueryData(detailKey)).toEqual({
+      run: { id: "run-1", task: { id: "order-1", key: "SP-42", title: "Renamed task" } },
+    });
+    expect(queryClient.getQueryData(otherKey)).toEqual({
+      pageParams: [undefined],
+      pages: [{ runs: [{ id: "run-3", task: { id: "order-9", key: "SP-9", title: "Other task" } }] }],
+    });
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(false);
+  });
+
+  it.each([
+    ["source run", { sourceRunId: "run-1" }],
+    ["line execution", { lineDispatches: [{ stepExecutions: [{ run: { id: "run-1" } }] }] }],
+    ["pull request activity", { pullRequests: [{ activities: [{ run: { id: "run-1" } }] }] }],
+  ])("links an open history run when a task gains a %s", async (_link, order) => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue(
+      describeResponse({ id: "order-1", key: "SP-42", title: "Created task", ...order }),
+    );
+    const { queryClient } = renderFactoryWebsocket();
+    const historyKey = canvasKeys.infiniteRuns("canvas-1", { includeTask: true });
+    const otherKey = canvasKeys.infiniteRuns("canvas-2", { includeTask: true });
+    const detailKey = canvasKeys.run("canvas-1", "run-1", true);
+    queryClient.setQueryData(historyKey, {
+      pageParams: [undefined, "cursor"],
+      pages: [
+        { runs: [{ id: "run-1" }, { id: "run-child", parent: { id: "run-1" } }] },
+        { runs: [{ id: "run-kept", task: { id: "order-9", key: "SP-9", title: "Other task" } }] },
+      ],
+    });
+    queryClient.setQueryData(detailKey, { run: { id: "run-1" } });
+    queryClient.setQueryData(otherKey, {
+      pageParams: [undefined],
+      pages: [{ runs: [{ id: "run-3" }] }],
+    });
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    const label = { id: "order-1", key: "SP-42", title: "Created task" };
+    expect(queryClient.getQueryData(historyKey)).toEqual({
+      pageParams: [undefined, "cursor"],
+      pages: [
+        {
+          runs: [
+            { id: "run-1", task: label },
+            { id: "run-child", parent: { id: "run-1" }, task: label },
+          ],
+        },
+        { runs: [{ id: "run-kept", task: { id: "order-9", key: "SP-9", title: "Other task" } }] },
+      ],
+    });
+    expect(queryClient.getQueryData(detailKey)).toEqual({ run: { id: "run-1", task: label } });
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(detailKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryData(otherKey)).toEqual({
+      pageParams: [undefined],
+      pages: [{ runs: [{ id: "run-3" }] }],
+    });
   });
 
   it("ignores events for a different factory", async () => {

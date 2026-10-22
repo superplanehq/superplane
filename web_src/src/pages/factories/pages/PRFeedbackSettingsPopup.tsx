@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { PRFeedbackSettingsFooter } from "./PRFeedbackSettingsChrome";
-import {
-  PRFeedbackChecksFields,
-  PRFeedbackDiscussionFields,
-  PRFeedbackHealthSection,
-} from "./PRFeedbackSettingsFields";
+import { PRFeedbackChecksFields, PRFeedbackDiscussionFields } from "./PRFeedbackSettingsFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
 import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
@@ -24,7 +20,6 @@ interface PRFeedbackSettingsPopupProps {
   githubIntegrationId?: string;
   vcsProvider?: string;
   settings: PRFeedbackDraftSettings;
-  healthy: boolean;
   automationGraph?: IntakeAutomationGraph;
   automationLoading?: boolean;
   automationError?: boolean;
@@ -47,7 +42,6 @@ export function PRFeedbackSettingsPopup({
   githubIntegrationId,
   vcsProvider,
   settings,
-  healthy,
   automationGraph,
   automationLoading = false,
   automationError = false,
@@ -65,6 +59,7 @@ export function PRFeedbackSettingsPopup({
 }: PRFeedbackSettingsPopupProps) {
   const [draft, setDraft] = useState(settings);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const agentTabAvailable = Boolean(agent) && settings.source !== "checks";
   const history = useFactoryAutomationNavigation({
     organizationId,
     factoryId,
@@ -72,7 +67,7 @@ export function PRFeedbackSettingsPopup({
     agent,
     parameter: "prFeedbackSettings",
     initialTab,
-    hasAgent: Boolean(agent),
+    hasAgent: agentTabAvailable,
   });
   const { tab, setTab } = history;
   const settingsKey = JSON.stringify(settings);
@@ -93,7 +88,7 @@ export function PRFeedbackSettingsPopup({
         <FactoryAutomationSettingsTabs
           tab={tab}
           onTabChange={setTab}
-          hasAgent={Boolean(agent)}
+          hasAgent={agentTabAvailable}
           historyEnabled={history.enabled}
           label={PR_FEEDBACK_SETTINGS_COPY.tabsLabel}
           testId="pr-feedback-settings"
@@ -130,7 +125,6 @@ export function PRFeedbackSettingsPopup({
           githubIntegrationId={githubIntegrationId}
           vcsProvider={vcsProvider}
           draft={draft}
-          healthy={healthy}
           confirmDelete={confirmDelete}
           savePending={savePending}
           deletePending={deletePending}
@@ -151,7 +145,6 @@ function PRFeedbackGeneralTab({
   githubIntegrationId,
   vcsProvider,
   draft,
-  healthy,
   confirmDelete,
   savePending,
   deletePending,
@@ -166,7 +159,6 @@ function PRFeedbackGeneralTab({
   githubIntegrationId?: string;
   vcsProvider?: string;
   draft: PRFeedbackDraftSettings;
-  healthy: boolean;
   confirmDelete: boolean;
   savePending?: boolean;
   deletePending?: boolean;
@@ -183,7 +175,6 @@ function PRFeedbackGeneralTab({
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-          <PRFeedbackHealthSection healthy={healthy} checks={checks} />
           {checks ? (
             <PRFeedbackChecksFields
               organizationId={organizationId}

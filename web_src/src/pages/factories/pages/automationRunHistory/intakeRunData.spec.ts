@@ -25,6 +25,25 @@ const received: CanvasesCanvasRun = {
 const map = (run: CanvasesCanvasRun) => toAutomationRun(run, [], Date.now(), "github-issues");
 
 describe("Intake run evidence", () => {
+  it("keeps an indexed task when archived tasks are not loaded", () => {
+    const run = toAutomationRun(
+      { ...received, executions: [], task: { id: "task-1", key: "SP-9", title: "Indexed task" } },
+      [],
+      Date.now(),
+      "github-issues",
+    );
+    expect(run.intake?.outcome).toBe("created");
+    expect(run.task).toEqual({ id: "SP-9", title: "Indexed task" });
+  });
+  it("does not hide a recorded filter rejection behind an indexed task", () => {
+    const run = toAutomationRun(
+      { ...received, task: { id: "task-1", key: "SP-9", title: "Indexed task" } },
+      [],
+      Date.now(),
+      "github-issues",
+    );
+    expect(run.intake?.outcome).toBe("filtered");
+  });
   it("shows a received issue and a recorded filter rejection without a linked task", () => {
     const run = map(received);
     expect(run.source).toEqual({

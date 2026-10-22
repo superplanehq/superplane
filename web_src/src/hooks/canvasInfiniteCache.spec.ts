@@ -60,6 +60,21 @@ describe("parseRunsFiltersFromQueryKey", () => {
   it("returns empty filters for unfiltered infinite run query keys", () => {
     expect(parseRunsFiltersFromQueryKey(canvasKeys.infiniteRuns("canvas-1"))).toEqual({});
   });
+
+  it("stops before the include-task token so states and results stay valid", () => {
+    expect(
+      parseRunsFiltersFromQueryKey(
+        canvasKeys.infiniteRuns("canvas-1", {
+          states: ["STATE_FINISHED"],
+          results: ["RESULT_FAILED"],
+          includeTask: true,
+        }),
+      ),
+    ).toEqual({
+      states: ["STATE_FINISHED"],
+      results: ["RESULT_FAILED"],
+    });
+  });
 });
 
 describe("runMatchesFilters", () => {
@@ -104,6 +119,19 @@ describe("upsertRunIntoInfiniteData", () => {
     expect(next.pages[0]?.runs?.[0]?.state).toBe("STATE_FINISHED");
     expect(next.pages[0]?.runs?.[0]?.result).toBe("RESULT_PASSED");
     expect(next.pages[0]?.totalCount).toBe(1);
+  });
+
+  it("keeps an existing task when a live update omits it", () => {
+    const old = makeInfiniteRunsData([makeRun({ task: { id: "task-1", key: "SP-1", title: "Linked task" } })]);
+    const incoming = makeRun({
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    const next = upsertRunIntoInfiniteData(old, incoming, {})!;
+
+    expect(next.pages[0]?.runs?.[0]?.task).toEqual({ id: "task-1", key: "SP-1", title: "Linked task" });
   });
 
   it("preserves existing run details when a live update omits them", () => {
