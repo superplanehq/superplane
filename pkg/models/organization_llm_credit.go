@@ -177,53 +177,6 @@ func stampWelcomeCreditGrantedAt(tx *gorm.DB, accountID uuid.UUID, grantedAt tim
 		Update("welcome_credit_granted_at", grantedAt).Error
 }
 
-func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingPlan) error {
-	if previous == nil || previous.PlanSource == BillingPlanSourceAdmin || previous.Catalog.Category != "trial" ||
-		next.Catalog.Category != "paid" || next.Catalog.Visibility != "public" || next.Catalog.TrialCreditCents == 0 {
-		return nil
-	}
-	enabled, err := OrganizationHasExperimentalFeatures(tx, next.OrganizationID, features.FeatureNewBilling)
-	if err != nil {
-		return err
-	}
-	if !enabled {
-		return nil
-	}
-
-	granted, err := initialPlanTrialCreditGranted(tx, next.OrganizationID)
-	if err != nil {
-		return err
-	}
-	if granted {
-		return nil
-	}
-
-	welcome, err := findWelcomeGrant(tx, next.OrganizationID)
-	if err != nil {
-		return err
-	}
-	now := time.Now()
-	if !welcomeExpiryIsLive(welcome, now) {
-		return nil
-	}
-	_, err = insertCreditAdjustment(tx, CreditBalanceAdjustment{
-		OrganizationID: next.OrganizationID,
-		Note:           initialPlanTrialCreditNote,
-	}, LLMCreditGrantKindTrialAdjustment, CentsToMicros(next.Catalog.TrialCreditCents), welcome.ExpiresAt, now)
-	return err
-}
-
-// initialPlanTrialCreditGranted reports whether the initial paid plan trial
-// credit was already added. A canceled subscription can restore an unexpired
-// trial, and a later reactivation must not grant the credit again.
-func initialPlanTrialCreditGranted(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
-	var count int64
-	err := tx.Model(&OrganizationLLMCreditGrant{}).
-		Where("organization_id = ? AND kind = ? AND note = ?", orgID, LLMCreditGrantKindTrialAdjustment, initialPlanTrialCreditNote).
-		Count(&count).Error
-	return count > 0, err
-}
-
 func SetWelcomeGrantExpiresAt(tx *gorm.DB, orgID uuid.UUID, endsAt time.Time) error {
 	return tx.Model(&OrganizationLLMCreditGrant{}).
 		Where("organization_id = ? AND kind = ?", orgID, LLMCreditGrantKindWelcome).
@@ -1082,4 +1035,51 @@ func includedCreditDeltaForTarget(tx *gorm.DB, orgID uuid.UUID, target int64, no
 		return 0, errors.New("included balance is too large")
 	}
 	return needed - included, nil
+}
+
+func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingPlan) error {
+	if previous == nil || previous.PlanSource == BillingPlanSourceAdmin || previous.Catalog.Category != "trial" ||
+		next.Catalog.Category != "paid" || next.Catalog.Visibility != "public" || next.Catalog.TrialCreditCents == 0 {
+		return nil
+	}
+	enabled, err := OrganizationHasExperimentalFeatures(tx, next.OrganizationID, features.FeatureNewBilling)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return nil
+	}
+
+	granted, err := initialPlanTrialCreditGranted(tx, next.OrganizationID)
+	if err != nil {
+		return err
+	}
+	if granted {
+		return nil
+	}
+
+	welcome, err := findWelcomeGrant(tx, next.OrganizationID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	if !welcomeExpiryIsLive(welcome, now) {
+		return nil
+	}
+	_, err = insertCreditAdjustment(tx, CreditBalanceAdjustment{
+		OrganizationID: next.OrganizationID,
+		Note:           initialPlanTrialCreditNote,
+	}, LLMCreditGrantKindTrialAdjustment, CentsToMicros(next.Catalog.TrialCreditCents), welcome.ExpiresAt, now)
+	return err
+}
+
+// initialPlanTrialCreditGranted reports whether the initial paid plan trial
+// credit was already added. A canceled subscription can restore an unexpired
+// trial, and a later reactivation must not grant the credit again.
+func initialPlanTrialCreditGranted(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	var count int64
+	err := tx.Model(&OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ? AND note = ?", orgID, LLMCreditGrantKindTrialAdjustment, initialPlanTrialCreditNote).
+		Count(&count).Error
+	return count > 0, err
 }
