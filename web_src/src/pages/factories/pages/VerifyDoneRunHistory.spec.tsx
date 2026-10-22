@@ -51,7 +51,6 @@ function FeedbackPage() {
       factoryId="factory"
       canvasId="canvas"
       settings={{ ...settings, source: "checks" }}
-      healthy
       onSave={() => {}}
       onClose={() => {}}
     />
@@ -133,7 +132,6 @@ describe("Verify and Done run history", () => {
       <PRFeedbackSettingsPopup
         organizationId="org"
         settings={{ ...settings, source }}
-        healthy
         automationGraph={{ organizationId: "org", factoryId: "factory", nodes: [], edges: [] }}
         canvasId="canvas"
         onSave={() => {}}
