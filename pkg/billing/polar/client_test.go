@@ -697,3 +697,18 @@ func echoPolarVersion(handler http.HandlerFunc) http.HandlerFunc {
 		handler(w, r)
 	}
 }
+
+func TestSubscriptionDashboardURL(t *testing.T) {
+	for _, tc := range []struct{ name, environment, slug, id, want string }{
+		{"production", "production", "superplane-inc", "sub_123", "https://polar.sh/dashboard/superplane-inc/sales/subscriptions/sub_123"},
+		{"sandbox", "sandbox", "superplane-inc", "sub_123", "https://sandbox.polar.sh/dashboard/superplane-inc/sales/subscriptions/sub_123"},
+		{"no slug", "production", "", "sub_123", ""},
+		{"no id", "production", "superplane-inc", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("POLAR_ENVIRONMENT", tc.environment)
+			t.Setenv("POLAR_DASHBOARD_ORGANIZATION_SLUG", tc.slug)
+			assert.Equal(t, tc.want, SubscriptionDashboardURL(tc.id))
+		})
+	}
+}

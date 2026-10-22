@@ -3,6 +3,9 @@ package polar
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -216,4 +219,52 @@ func polarSubscriptionID(plan *models.OrganizationBillingPlan) string {
 		return ""
 	}
 	return strings.TrimSpace(*plan.PolarSubscriptionID)
+}
+
+// VerifyOrganizationSubscription checks every product without changing local billing.
+func VerifyOrganizationSubscription(ctx context.Context, orgID uuid.UUID) (string, error) {
+	if !Configured() {
+		return "not_configured", nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+	items, err := NewClientFromEnv().ListSubscriptions(ctx, orgID.String(), "")
+	if err != nil {
+		return "failed", err
+	}
+	active := false
+	now := time.Now()
+	for _, item := range items {
+		if externalID := item.organizationExternalID(); externalID != "" && externalID != orgID.String() {
+			return "failed", fmt.Errorf("polar subscription customer does not match organization")
+		}
+		status := strings.ToLower(strings.TrimSpace(item.Status))
+		switch status {
+		case "active", "trialing", "canceled", "unpaid", "revoked", "past_due", "incomplete", "incomplete_expired":
+		default:
+			return "failed", fmt.Errorf("unexpected Polar subscription status %q", item.Status)
+		}
+		if !item.EndedAt.Time.IsZero() && !item.EndedAt.Time.After(now) {
+			continue
+		}
+		if models.PolarSubscriptionIsPaid(status) || (item.CancelAtPeriodEnd && item.CurrentPeriodEnd.Time.After(now)) {
+			active = true
+		}
+	}
+	if active {
+		return "active", nil
+	}
+	return "none", nil
+}
+
+func SubscriptionDashboardURL(subscriptionID string) string {
+	slug := strings.TrimSpace(os.Getenv("POLAR_DASHBOARD_ORGANIZATION_SLUG"))
+	if slug == "" || strings.TrimSpace(subscriptionID) == "" {
+		return ""
+	}
+	host := "https://sandbox.polar.sh"
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("POLAR_ENVIRONMENT")), "production") {
+		host = "https://polar.sh"
+	}
+	return host + "/dashboard/" + url.PathEscape(slug) + "/sales/subscriptions/" + url.PathEscape(subscriptionID)
 }
