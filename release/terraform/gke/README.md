@@ -108,9 +108,24 @@ projects/PROJECT/global/images/IMAGE_NAME
 ```
 
 The default build uses a public IP address in the `default` network and SSH on
-TCP 22. If the network blocks inbound SSH, use Identity-Aware Proxy. The
-subnetwork must have Cloud NAT so that the build can download packages. Allow
-inbound TCP 22 from `35.235.240.0/20`:
+TCP 22. If the network blocks inbound SSH, use Identity-Aware Proxy. The build
+instance then has no external IP address. It needs Cloud NAT to download
+packages, and a firewall rule that allows TCP 22 from `35.235.240.0/20`.
+
+Create a temporary router, NAT, and firewall rule in the region of the
+Packer zone (default `us-central1-a`):
+
+```bash
+export REGION=us-central1
+
+gcloud compute routers create superplane-packer --network=default --region="$REGION"
+gcloud compute routers nats create superplane-packer --router=superplane-packer \
+  --region="$REGION" --auto-allocate-nat-external-ips --nat-all-subnet-ip-ranges
+gcloud compute firewall-rules create superplane-packer-iap --network=default \
+  --allow=tcp:22 --source-ranges=35.235.240.0/20
+```
+
+Build through IAP:
 
 ```bash
 cd ../../..   # repository root
@@ -119,9 +134,17 @@ packer build \
   -var architecture=amd64 \
   -var machine_type=e2-standard-4 \
   -var use_iap=true \
-  -var subnetwork=SUBNETWORK \
+  -var subnetwork=default \
   release/runner/packer/gce/runner.pkr.hcl
 cd release/terraform/gke
+```
+
+Delete the temporary resources before you apply. The Terraform NAT covers the
+same subnetworks, and two NAT gateways cannot serve one subnetwork:
+
+```bash
+gcloud compute firewall-rules delete superplane-packer-iap --quiet
+gcloud compute routers delete superplane-packer --region="$REGION" --quiet
 ```
 
 ## 3. Install SuperPlane
