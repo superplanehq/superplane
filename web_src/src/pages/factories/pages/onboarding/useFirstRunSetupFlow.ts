@@ -25,6 +25,7 @@ import {
   markGitHubInstallStarted,
   type GitHubInstallScope,
 } from "./githubInstallReturn";
+import type { LinearIntakeScope } from "../linearIntakeScope";
 import { githubConnectReturnPath } from "./onboardingGitHubConnect";
 import { useFirstRunBlockingAction, type FirstRunBlocking } from "./useFirstRunBlockingAction";
 import { useFirstRunBitbucket } from "./useFirstRunBitbucket";
@@ -137,11 +138,11 @@ function screenWithoutIncompleteBacklog(
   agentGate: OnboardingAgentGate,
   issuesChoice: IssuesChoiceId | null,
   jiraProjectId: string,
-  linearProjectIds: string[],
+  linearScope: LinearIntakeScope,
 ): FirstRunScreen {
   if (screen !== "agent" || agentGate !== "show") return screen;
   if (issuesChoice === "jira" && !jiraProjectId) return "tickets";
-  if (issuesChoice === "linear" && linearProjectIds.length === 0) return "tickets";
+  if (issuesChoice === "linear" && !linearScope.teamId) return "tickets";
   return screen;
 }
 
@@ -199,7 +200,7 @@ function useFirstRunNavigation(
       agentGate,
       model.setup.issuesChoice,
       model.jiraProjectId,
-      model.linearProjectIds,
+      model.linearScope,
     ),
     goToScreen,
   };
@@ -219,7 +220,6 @@ function ticketSelection(model: OnboardingPageModel) {
 
 function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
   const { ticketSource, issuesChoice } = ticketSelection(model);
-  if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (
     !issuesChoice ||
     !canAnalyzeTicketSource({
@@ -228,7 +228,7 @@ function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null
       jiraConnected: model.setup.connected.has("jira"),
       jiraProjectId: model.jiraProjectId,
       linearConnected: model.setup.connected.has("linear"),
-      linearProjectIds: model.linearProjectIds,
+      linearScope: model.linearScope,
     })
   ) {
     return null;

@@ -1,5 +1,6 @@
 import { JiraProjectStep } from "../../JiraIntakeSetupSteps";
-import { LinearProjectPicker } from "../../LinearProjectPicker";
+import { LinearIntakeScopeFields } from "../../LinearIntakeScopeFields";
+import type { LinearIntakeScope } from "../../linearIntakeScope";
 import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunPanel } from "./FirstRunShell";
@@ -20,18 +21,16 @@ export function FirstRunTicketChoices({
   linearAvailable,
   linearFeatureLoading,
   linearConnected,
-  linearProjects,
-  linearProjectsLoading,
-  linearProjectsError,
-  linearProjectIds,
+  organizationId,
+  linearIntegrationId,
+  linearScope,
   onSelectTicketSource,
   onConnectGitHub,
   onConnectJira,
   onSelectJiraProject,
   onRetryJiraProjects,
   onConnectLinear,
-  onToggleLinearProject,
-  onRetryLinearProjects,
+  onChangeLinearScope,
 }: {
   githubAvailable: boolean;
   ticketSource: FirstRunTicketSource | null;
@@ -45,18 +44,16 @@ export function FirstRunTicketChoices({
   linearAvailable: boolean;
   linearFeatureLoading: boolean;
   linearConnected: boolean;
-  linearProjects: TicketProject[];
-  linearProjectsLoading: boolean;
-  linearProjectsError: boolean;
-  linearProjectIds: string[];
+  organizationId: string;
+  linearIntegrationId: string;
+  linearScope: LinearIntakeScope;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onConnectGitHub?: () => void;
   onConnectJira?: () => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
   onConnectLinear?: () => void;
-  onToggleLinearProject?: (id: string) => void;
-  onRetryLinearProjects?: () => void;
+  onChangeLinearScope?: (scope: LinearIntakeScope) => void;
 }) {
   const copy = FIRST_RUN_COPY.tickets;
   return (
@@ -112,17 +109,13 @@ export function FirstRunTicketChoices({
         onSelectJiraProject={onSelectJiraProject}
         onRetryJiraProjects={onRetryJiraProjects}
       />
-      <FirstRunLinearProjectFields
-        linearAvailable={linearAvailable}
-        visible={ticketSource === "linear" && linearConnected}
-        copy={copy}
+      <FirstRunLinearScopeFields
+        visible={linearAvailable && ticketSource === "linear" && linearConnected}
         saving={saving}
-        linearProjects={linearProjects}
-        linearProjectsLoading={linearProjectsLoading}
-        linearProjectsError={linearProjectsError}
-        linearProjectIds={linearProjectIds}
-        onToggleLinearProject={onToggleLinearProject}
-        onRetryLinearProjects={onRetryLinearProjects}
+        organizationId={organizationId}
+        linearIntegrationId={linearIntegrationId}
+        linearScope={linearScope}
+        onChangeLinearScope={onChangeLinearScope}
       />
     </FirstRunPanel>
   );
@@ -193,44 +186,33 @@ function FirstRunFlaggedTicketRow({
   );
 }
 
-function FirstRunLinearProjectFields({
-  linearAvailable,
+function FirstRunLinearScopeFields({
   visible,
-  copy,
   saving,
-  linearProjects,
-  linearProjectsLoading,
-  linearProjectsError,
-  linearProjectIds,
-  onToggleLinearProject,
-  onRetryLinearProjects,
+  organizationId,
+  linearIntegrationId,
+  linearScope,
+  onChangeLinearScope,
 }: {
-  linearAvailable: boolean;
   visible: boolean;
-  copy: (typeof FIRST_RUN_COPY)["tickets"];
   saving: boolean;
-  linearProjects: TicketProject[];
-  linearProjectsLoading: boolean;
-  linearProjectsError: boolean;
-  linearProjectIds: string[];
-  onToggleLinearProject?: (id: string) => void;
-  onRetryLinearProjects?: () => void;
+  organizationId: string;
+  linearIntegrationId: string;
+  linearScope: LinearIntakeScope;
+  onChangeLinearScope?: (scope: LinearIntakeScope) => void;
 }) {
-  if (!linearAvailable || !visible) {
+  if (!visible) {
     return null;
   }
 
   return (
-    <div className="mt-4 border-t border-border pt-4" data-testid="first-run-linear-projects">
-      <p className="mb-3 text-[13px] font-medium">{copy.linearProjectHeading}</p>
+    <div className="mt-4 border-t border-border pt-4" data-testid="first-run-linear-scope">
       <fieldset disabled={saving} className="contents">
-        <LinearProjectPicker
-          projects={linearProjects}
-          selectedIds={linearProjectIds}
-          loading={linearProjectsLoading}
-          error={linearProjectsError}
-          onToggle={(id) => onToggleLinearProject?.(id)}
-          onRetry={() => onRetryLinearProjects?.()}
+        <LinearIntakeScopeFields
+          organizationId={organizationId}
+          integrationId={linearIntegrationId}
+          scope={linearScope}
+          onChange={(scope) => onChangeLinearScope?.(scope)}
         />
       </fieldset>
     </div>

@@ -58,8 +58,12 @@ export interface IntakeSourceSettings {
   datadogEnvironments: string[];
   /** Datadog service the trigger watches. Saved as the intake resource, not in settings. */
   datadogService: string;
-  /** Linear projects that still create a task. At least one is required. */
+  /** Linear team that creates tasks. Empty only for an older intake that has projects and no team. */
+  linearTeamId: string;
+  /** Linear projects that still create a task. Empty means every project of the team. */
   linearProjectIds: string[];
+  /** Create a task for an issue without a project. Applies when projects are selected. */
+  linearIncludeIssuesWithoutProject: boolean;
   /** Linear labels that still create a task. Empty means every label. */
   linearLabels: string[];
 }
@@ -90,7 +94,9 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   datadogRetriggeredAlerts: false,
   datadogEnvironments: [],
   datadogService: "",
+  linearTeamId: "",
   linearProjectIds: [],
+  linearIncludeIssuesWithoutProject: true,
   linearLabels: [],
 };
 
@@ -223,6 +229,7 @@ export function normalizeIntakeSourceSettings(
   const taskListIds = normalizeTaskListIds(draft.taskListIds);
   const datadogEnvironments = normalizeDatadogEnvironments(draft.datadogEnvironments);
   const datadogService = draft.datadogService.trim();
+  const linearTeamId = draft.linearTeamId.trim();
   const linearProjectIds = normalizeLinearValues(draft.linearProjectIds);
   const linearLabels = normalizeLinearValues(draft.linearLabels);
   const sentryProjectIds = normalizeLinearValues(draft.sentryProjectIds);
@@ -253,6 +260,7 @@ export function normalizeIntakeSourceSettings(
     taskListIds,
     datadogEnvironments,
     datadogService,
+    linearTeamId,
     linearProjectIds,
     linearLabels,
     sentryProjectIds,
@@ -311,6 +319,14 @@ function normalizeLinearValues(values: string[]): string[] {
     normalized.push(next);
   }
   return normalized;
+}
+
+/**
+ * A Linear intake needs a team. An older intake that has projects and no team
+ * can still save unchanged.
+ */
+export function linearIntakeScopeMissing(settings: IntakeSourceSettings): boolean {
+  return settings.linearTeamId.trim() === "" && settings.linearProjectIds.length === 0;
 }
 
 export function linearProjectIdsFromResource(resourceId: string | undefined): string[] {
@@ -381,9 +397,23 @@ export function intakeSettingsFromApi(
       settings?.datadogRetriggeredAlerts ?? DEFAULT_DATADOG_INTAKE_SETTINGS.datadogRetriggeredAlerts,
     datadogEnvironments: normalizeDatadogEnvironments(settings?.datadogEnvironments ?? []),
     datadogService: "",
-    linearProjectIds: normalizeLinearValues(settings?.linearProjectIds ?? []),
-    linearLabels: normalizeLinearValues(settings?.linearLabels ?? []),
+    ...linearScopeFromApi(settings),
     ...productiveFiltersFromApi(settings),
+  };
+}
+
+function linearScopeFromApi(
+  settings: FactoriesFactoryIntakeSettings | undefined,
+): Pick<
+  IntakeSourceSettings,
+  "linearTeamId" | "linearProjectIds" | "linearIncludeIssuesWithoutProject" | "linearLabels"
+> {
+  return {
+    linearTeamId: settings?.linearTeamId?.trim() ?? "",
+    linearProjectIds: normalizeLinearValues(settings?.linearProjectIds ?? []),
+    linearIncludeIssuesWithoutProject:
+      settings?.linearIncludeIssuesWithoutProject ?? DEFAULT_GITHUB_INTAKE_SETTINGS.linearIncludeIssuesWithoutProject,
+    linearLabels: normalizeLinearValues(settings?.linearLabels ?? []),
   };
 }
 
@@ -437,7 +467,9 @@ export function intakeSettingsToApi(
     datadogTriggeredAlerts: settings.datadogTriggeredAlerts,
     datadogRetriggeredAlerts: settings.datadogRetriggeredAlerts,
     datadogEnvironments: normalizeDatadogEnvironments(settings.datadogEnvironments),
+    linearTeamId: settings.linearTeamId.trim(),
     linearProjectIds: normalizeLinearValues(settings.linearProjectIds),
+    linearIncludeIssuesWithoutProject: settings.linearIncludeIssuesWithoutProject,
     linearLabels: normalizeLinearValues(settings.linearLabels),
   };
 }

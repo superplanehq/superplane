@@ -1,94 +1,102 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { writeOnboardingLinearProjects } from "./onboardingLinearProjects";
+import { EMPTY_LINEAR_INTAKE_SCOPE, type LinearIntakeScope } from "../linearIntakeScope";
+import { writeOnboardingLinearScope } from "./onboardingLinearScope";
 import { useOnboardingLinearBinding } from "./useOnboardingLinearBinding";
 
+type Resources = { data: { id: string; name: string }[]; isPending: boolean; isError: boolean };
+
 const linearResources = vi.hoisted(() => ({
-  data: [{ id: "project-1", name: "Platform" }] as { id: string; name: string }[],
-  isPending: false,
-  isError: false,
+  team: { data: [{ id: "team-1", name: "Platform" }], isPending: false, isError: false } as Resources,
+  project: { data: [{ id: "project-1", name: "Checkout" }], isPending: false, isError: false } as Resources,
 }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
-  useIntegrationResources: () => ({
-    data: linearResources.data,
-    isPending: linearResources.isPending,
-    isError: linearResources.isError,
+  useIntegrationResources: (_organizationId: string, _integrationId: string, resourceType: string) => ({
+    ...(resourceType === "team" ? linearResources.team : linearResources.project),
     refetch: vi.fn(),
   }),
 }));
 
+const STORAGE_KEY = "superplane:onboarding-linear-scope:factory-1:linear-1";
+const platformScope: LinearIntakeScope = { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" };
+
+function renderBinding() {
+  return renderHook(() => useOnboardingLinearBinding("org-1", "factory-1", { id: "linear-1", ready: true }));
+}
+
 describe("useOnboardingLinearBinding", () => {
   beforeEach(() => {
     localStorage.clear();
-    linearResources.data = [{ id: "project-1", name: "Platform" }];
-    linearResources.isPending = false;
-    linearResources.isError = false;
+    linearResources.team = { data: [{ id: "team-1", name: "Platform" }], isPending: false, isError: false };
+    linearResources.project = { data: [{ id: "project-1", name: "Checkout" }], isPending: false, isError: false };
   });
 
-  it("restores the stored projects when setup mounts with a ready Linear connection", () => {
-    writeOnboardingLinearProjects("factory-1", "linear-1", ["project-1"]);
+  it("restores the stored scope when setup mounts with a ready Linear connection", () => {
+    const stored = { teamId: "team-1", projectIds: ["project-1"], includeIssuesWithoutProject: false, labels: ["bug"] };
+    writeOnboardingLinearScope("factory-1", "linear-1", stored);
 
-    const { result } = renderHook(() =>
-      useOnboardingLinearBinding("org-1", "factory-1", { id: "linear-1", ready: true }),
-    );
+    const { result } = renderBinding();
 
-    expect(result.current.linearProjectIds).toEqual(["project-1"]);
+    expect(result.current.linearScope).toEqual(stored);
   });
 
-  it("persists a project chosen during setup", () => {
-    const { result } = renderHook(() =>
-      useOnboardingLinearBinding("org-1", "factory-1", { id: "linear-1", ready: true }),
-    );
+  it("persists a team chosen during setup", () => {
+    const { result } = renderBinding();
 
     act(() => {
-      result.current.toggleLinearProject("project-1");
+      result.current.changeLinearScope(platformScope);
     });
 
-    expect(result.current.linearProjectIds).toEqual(["project-1"]);
-    expect(localStorage.getItem("superplane:onboarding-linear-projects:factory-1:linear-1")).toBe(
-      JSON.stringify(["project-1"]),
-    );
+    expect(result.current.linearScope).toEqual(platformScope);
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null")).toEqual(platformScope);
   });
 
-  it("drops a saved project that Linear no longer returns", () => {
-    writeOnboardingLinearProjects("factory-1", "linear-1", ["project-1", "project-gone"]);
+  it("drops a saved team that Linear no longer returns", () => {
+    writeOnboardingLinearScope("factory-1", "linear-1", { ...platformScope, teamId: "team-gone" });
 
-    const { result } = renderHook(() =>
-      useOnboardingLinearBinding("org-1", "factory-1", { id: "linear-1", ready: true }),
-    );
+    const { result } = renderBinding();
 
-    expect(result.current.linearProjectIds).toEqual(["project-1"]);
-    expect(localStorage.getItem("superplane:onboarding-linear-projects:factory-1:linear-1")).toBe(
-      JSON.stringify(["project-1"]),
-    );
+    expect(result.current.linearScope).toEqual(EMPTY_LINEAR_INTAKE_SCOPE);
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
-  it("keeps a saved project until Linear returns the current list", () => {
-    writeOnboardingLinearProjects("factory-1", "linear-1", ["project-gone"]);
-    linearResources.isPending = true;
-    linearResources.data = [];
+  it("drops a saved project that Linear no longer returns for the team", () => {
+    writeOnboardingLinearScope("factory-1", "linear-1", {
+      ...platformScope,
+      projectIds: ["project-1", "project-gone"],
+    });
 
-    const { result } = renderHook(() =>
-      useOnboardingLinearBinding("org-1", "factory-1", { id: "linear-1", ready: true }),
-    );
+    const { result } = renderBinding();
 
-    expect(result.current.linearProjectIds).toEqual(["project-gone"]);
+    expect(result.current.linearScope).toEqual({ ...platformScope, projectIds: ["project-1"] });
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null")).toEqual({
+      ...platformScope,
+      projectIds: ["project-1"],
+    });
   });
 
-  it("keeps a saved project when Linear cannot return the list", () => {
-    writeOnboardingLinearProjects("factory-1", "linear-1", ["project-gone"]);
-    linearResources.isError = true;
-    linearResources.data = [];
+  it("keeps the saved scope until Linear returns the current lists", () => {
+    const stored = { ...platformScope, projectIds: ["project-gone"] };
+    writeOnboardingLinearScope("factory-1", "linear-1", stored);
+    linearResources.team = { data: [], isPending: true, isError: false };
+    linearResources.project = { data: [], isPending: true, isError: false };
 
-    const { result } = renderHook(() =>
-      useOnboardingLinearBinding("org-1", "factory-1", { id: "linear-1", ready: true }),
-    );
+    const { result } = renderBinding();
 
-    expect(result.current.linearProjectIds).toEqual(["project-gone"]);
-    expect(localStorage.getItem("superplane:onboarding-linear-projects:factory-1:linear-1")).toBe(
-      JSON.stringify(["project-gone"]),
-    );
+    expect(result.current.linearScope).toEqual(stored);
+  });
+
+  it("keeps the saved scope when Linear cannot return the lists", () => {
+    const stored = { ...platformScope, projectIds: ["project-gone"] };
+    writeOnboardingLinearScope("factory-1", "linear-1", stored);
+    linearResources.team = { data: [], isPending: false, isError: true };
+    linearResources.project = { data: [], isPending: false, isError: true };
+
+    const { result } = renderBinding();
+
+    expect(result.current.linearScope).toEqual(stored);
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null")).toEqual(stored);
   });
 });
