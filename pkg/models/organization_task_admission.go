@@ -71,30 +71,6 @@ func ListQueuedTaskOrganizationIDs(tx *gorm.DB) ([]uuid.UUID, error) {
 	return ids, err
 }
 
-func organizationAtTaskCapacity(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
-	slots, err := organizationAvailableTaskSlots(tx, orgID)
-	return slots != nil && *slots <= 0, err
-}
-
-func organizationAvailableTaskSlots(tx *gorm.DB, orgID uuid.UUID) (*int64, error) {
-	limit, err := ResolveOrganizationParallelTaskLimit(tx, orgID)
-	if err != nil || limit == nil {
-		return nil, err
-	}
-	var active int64
-	err = activeFactoryTaskReservations(tx).Where("organization_id = ?", orgID).Count(&active).Error
-	slots := int64(*limit) - active
-	return &slots, err
-}
-
-// Finished execution history does not release a reservation while its replaced
-// run is still stopping. Count that run until finalization confirms it stopped.
-func activeFactoryTaskReservations(tx *gorm.DB) *gorm.DB {
-	return tx.Model(&FactoryWorkOrderExecution{}).Where(`status IN ? OR EXISTS (
-		SELECT 1 FROM workflow_runs r WHERE r.id = factory_work_order_executions.run_id AND r.state <> ?
-	)`, []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning}, CanvasRunStateFinished)
-}
-
 // AdmitQueuedForOrganization selects globally by enqueue time and ID, skipping
 // locally full steps. Each pass inspects at most one candidate batch and stops
 // when capacity is full. Results include removed queue items for publication.
@@ -129,6 +105,30 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 		}
 	}
 	return admitted, nil
+}
+
+func organizationAtTaskCapacity(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	slots, err := organizationAvailableTaskSlots(tx, orgID)
+	return slots != nil && *slots <= 0, err
+}
+
+func organizationAvailableTaskSlots(tx *gorm.DB, orgID uuid.UUID) (*int64, error) {
+	limit, err := ResolveOrganizationParallelTaskLimit(tx, orgID)
+	if err != nil || limit == nil {
+		return nil, err
+	}
+	var active int64
+	err = activeFactoryTaskReservations(tx).Where("organization_id = ?", orgID).Count(&active).Error
+	slots := int64(*limit) - active
+	return &slots, err
+}
+
+// Finished execution history does not release a reservation while its replaced
+// run is still stopping. Count that run until finalization confirms it stopped.
+func activeFactoryTaskReservations(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&FactoryWorkOrderExecution{}).Where(`status IN ? OR EXISTS (
+		SELECT 1 FROM workflow_runs r WHERE r.id = factory_work_order_executions.run_id AND r.state <> ?
+	)`, []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning}, CanvasRunStateFinished)
 }
 
 // A candidate load does not lock rows: the outer organization lock serializes
