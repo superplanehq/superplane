@@ -137,6 +137,48 @@ cmp "${SPLIT_WORK_DIR}/prepared/runner/${SPLIT_VERSION}/checksums.txt" \
 cmp "${SPLIT_WORK_DIR}/prepared/runner/${SPLIT_VERSION}/runner.oci.tar" \
   "${SPLIT_RELEASE_DIR}/runner.oci.tar"
 
+SUM_VERSION="v0.1.0-rc.7"
+SUM_PART_LIMIT=40
+SUM_BUNDLE_LIMIT=50
+SUM_WORK_DIR="${TEST_DIR}/sum-work"
+SUM_RELEASE_DIR="${SUM_WORK_DIR}/build/runner/${SUM_VERSION}"
+SUM_CHECKSUMS="$(printf '%030d' 1)"
+SUM_ARCHIVE="$(printf '%030d' 2)"
+mkdir -p "${SUM_RELEASE_DIR}"
+printf '%s' "${SUM_CHECKSUMS}" >"${SUM_RELEASE_DIR}/checksums.txt"
+printf '%s' "${SUM_ARCHIVE}" >"${SUM_RELEASE_DIR}/runner.oci.tar"
+test "$(wc -c <"${SUM_RELEASE_DIR}/checksums.txt" | tr -d ' ')" -le "${SUM_PART_LIMIT}"
+test "$(wc -c <"${SUM_RELEASE_DIR}/runner.oci.tar" | tr -d ' ')" -le "${SUM_PART_LIMIT}"
+
+cd "${SUM_WORK_DIR}"
+COMPONENT_RELEASE_ARTIFACT_MAX_BYTES="${SUM_PART_LIMIT}" \
+  COMPONENT_RELEASE_ARTIFACT_BUNDLE_LIMIT_BYTES="${SUM_BUNDLE_LIMIT}" \
+  bash "${REPO_ROOT}/release/component-release-artifact.sh" \
+  push runner "${SUM_VERSION}" "${SUM_RELEASE_DIR}"
+tar -tzf "${ARTIFACT_TEST_STORE}/runner-${SUM_VERSION}.tar.gz" >"${TEST_DIR}/sum-bundle-paths"
+CHECKSUMS_IN_BUNDLE=0
+ARCHIVE_IN_BUNDLE=0
+if grep -F "${SUM_VERSION}/checksums.txt" "${TEST_DIR}/sum-bundle-paths" >/dev/null; then
+  CHECKSUMS_IN_BUNDLE=1
+fi
+if grep -F "${SUM_VERSION}/runner.oci.tar" "${TEST_DIR}/sum-bundle-paths" >/dev/null; then
+  ARCHIVE_IN_BUNDLE=1
+fi
+if [ "$((CHECKSUMS_IN_BUNDLE + ARCHIVE_IN_BUNDLE))" -ne 1 ]; then
+  echo "Error: files under the part limit still overflow one Semaphore artifact" >&2
+  exit 1
+fi
+mv "${SUM_WORK_DIR}/build" "${SUM_WORK_DIR}/prepared"
+mkdir -p "${SUM_WORK_DIR}/build/runner"
+COMPONENT_RELEASE_ARTIFACT_MAX_BYTES="${SUM_PART_LIMIT}" \
+  COMPONENT_RELEASE_ARTIFACT_BUNDLE_LIMIT_BYTES="${SUM_BUNDLE_LIMIT}" \
+  bash "${REPO_ROOT}/release/component-release-artifact.sh" \
+  pull runner "${SUM_VERSION}" "${SUM_RELEASE_DIR}"
+cmp "${SUM_WORK_DIR}/prepared/runner/${SUM_VERSION}/checksums.txt" \
+  "${SUM_RELEASE_DIR}/checksums.txt"
+cmp "${SUM_WORK_DIR}/prepared/runner/${SUM_VERSION}/runner.oci.tar" \
+  "${SUM_RELEASE_DIR}/runner.oci.tar"
+
 TAMPER_VERSION="v0.1.0-rc.5"
 TAMPER_WORK_DIR="${TEST_DIR}/tamper-work"
 TAMPER_RELEASE_DIR="${TAMPER_WORK_DIR}/build/runner/${TAMPER_VERSION}"

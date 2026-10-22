@@ -42,17 +42,28 @@ BUNDLE_NAME="${COMPONENT}-${VERSION}.tar.gz"
 BUNDLE_PATH="$(pwd)/${BUNDLE_NAME}"
 RELEASE_PARENT="$(dirname "${RELEASE_DIR}")"
 PARTS_MANIFEST_NAME="semaphore-artifact-parts.json"
-# Semaphore rejects one workflow artifact larger than 2 GiB. Keep each stored
-# file under 1536 MiB so the gzip bundle and every split piece stay below that cap.
+# Semaphore rejects one workflow artifact larger than 2 GiB. Each piece stays
+# under 1536 MiB. Files that remain in the gzip must also total under 2 GiB,
+# because those bytes do not shrink when they are already compressed.
 DEFAULT_MAX_PART_BYTES=1610612736
 SEMAPHORE_FILE_LIMIT_BYTES=2147483648
 
-max_part_bytes() {
-  local limit="${COMPONENT_RELEASE_ARTIFACT_MAX_BYTES:-${DEFAULT_MAX_PART_BYTES}}"
-  if ! [[ "${limit}" =~ ^[1-9][0-9]*$ ]]; then
-    echo "Error: COMPONENT_RELEASE_ARTIFACT_MAX_BYTES must be a positive integer" >&2
+positive_byte_limit() {
+  local name="$1"
+  local value="$2"
+  if ! [[ "${value}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: ${name} must be a positive integer" >&2
     exit 1
   fi
+  if [ "${value}" -gt "${SEMAPHORE_FILE_LIMIT_BYTES}" ]; then
+    echo "Error: ${name} must be at most 2 GiB" >&2
+    exit 1
+  fi
+}
+
+max_part_bytes() {
+  local limit="${COMPONENT_RELEASE_ARTIFACT_MAX_BYTES:-${DEFAULT_MAX_PART_BYTES}}"
+  positive_byte_limit "COMPONENT_RELEASE_ARTIFACT_MAX_BYTES" "${limit}"
   if [ "${limit}" -ge "${SEMAPHORE_FILE_LIMIT_BYTES}" ]; then
     echo "Error: COMPONENT_RELEASE_ARTIFACT_MAX_BYTES must be under 2 GiB" >&2
     exit 1
@@ -60,48 +71,86 @@ max_part_bytes() {
   printf '%s' "${limit}"
 }
 
+bundle_limit_bytes() {
+  local limit="${COMPONENT_RELEASE_ARTIFACT_BUNDLE_LIMIT_BYTES:-${DEFAULT_MAX_PART_BYTES}}"
+  positive_byte_limit "COMPONENT_RELEASE_ARTIFACT_BUNDLE_LIMIT_BYTES" "${limit}"
+  printf '%s' "${limit}"
+}
+
 list_large_release_files() {
-  node - "${RELEASE_DIR}" "$1" "${PARTS_MANIFEST_NAME}" <<'JS'
+  node - "${RELEASE_DIR}" "$1" "$2" "${PARTS_MANIFEST_NAME}" <<'JS'
 const fs = require("fs");
 const path = require("path");
 
 const dir = process.argv[2];
-const limit = Number(process.argv[3]);
-const manifestName = process.argv[4];
+const partLimit = Number(process.argv[3]);
+const bundleLimit = Number(process.argv[4]);
+const manifestName = process.argv[5];
 const safeName = /^[A-Za-z0-9._-]+$/;
+const files = [];
+let nestedBytes = 0;
 
-function walk(current, relativePath) {
-  for (const name of fs.readdirSync(current)) {
-    const full = path.join(current, name);
-    const rel = relativePath ? `${relativePath}/${name}` : name;
-    const stat = fs.lstatSync(full);
-    if (stat.isSymbolicLink()) {
-      continue;
+function consider(full, rel) {
+  const stat = fs.lstatSync(full);
+  if (stat.isSymbolicLink()) {
+    return;
+  }
+  if (stat.isDirectory()) {
+    for (const name of fs.readdirSync(full)) {
+      consider(path.join(full, name), `${rel}/${name}`);
     }
-    if (stat.isDirectory()) {
-      walk(full, rel);
-      continue;
-    }
-    if (!stat.isFile() || stat.size <= limit) {
-      continue;
-    }
-    if (rel.includes("/")) {
+    return;
+  }
+  if (!stat.isFile()) {
+    return;
+  }
+  if (rel.includes("/")) {
+    if (stat.size > partLimit || stat.size >= bundleLimit) {
       console.error(`Error: large release file in a subdirectory is not supported: ${rel}`);
       process.exit(1);
     }
-    if (name === manifestName) {
-      console.error(`Error: ${manifestName} is larger than one Semaphore artifact`);
-      process.exit(1);
-    }
-    if (!safeName.test(name)) {
-      console.error(`Error: large release file name is not safe: ${name}`);
-      process.exit(1);
-    }
-    process.stdout.write(`${name}\n`);
+    nestedBytes += stat.size;
+    return;
+  }
+  files.push({ name: rel, size: stat.size });
+}
+
+for (const name of fs.readdirSync(dir)) {
+  consider(path.join(dir, name), name);
+}
+
+const selected = new Set();
+for (const file of files) {
+  if (file.size > partLimit) {
+    selected.add(file.name);
   }
 }
 
-walk(dir, "");
+function remainingBytes() {
+  return nestedBytes + files.filter((file) => !selected.has(file.name)).reduce((sum, file) => sum + file.size, 0);
+}
+
+const bySize = [...files].sort((left, right) => right.size - left.size || left.name.localeCompare(right.name));
+while (remainingBytes() >= bundleLimit) {
+  const next = bySize.find((file) => !selected.has(file.name));
+  if (!next) {
+    console.error("Error: release bundle cannot fit in one Semaphore artifact");
+    process.exit(1);
+  }
+  selected.add(next.name);
+}
+
+for (const name of selected) {
+  if (name === manifestName) {
+    console.error(`Error: ${manifestName} is larger than one Semaphore artifact`);
+    process.exit(1);
+  }
+  if (!safeName.test(name)) {
+    console.error(`Error: large release file name is not safe: ${name}`);
+    process.exit(1);
+  }
+  process.stdout.write(`${name}\n`);
+}
 JS
 }
 
@@ -341,12 +390,13 @@ push_bundle() {
     exit 1
   fi
 
-  local limit work_dir large_file
+  local limit bundle_limit work_dir large_file
   local -a large_files
   limit="$(max_part_bytes)"
+  bundle_limit="$(bundle_limit_bytes)"
   work_dir="$(mktemp -d)"
   trap 'rm -rf "'"${work_dir}"'"' EXIT
-  list_large_release_files "${limit}" >"${work_dir}/large-files"
+  list_large_release_files "${limit}" "${bundle_limit}" >"${work_dir}/large-files"
   large_files=()
   while IFS= read -r large_file; do
     if [ -n "${large_file}" ]; then
