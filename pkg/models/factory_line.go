@@ -126,10 +126,12 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 // maxParallelism — the queue item created instead (Run and Execution nil).
 // Organization admission also returns removed queue items so callers can
 // publish updates after commit. Those results have no Run or Execution.
+// Retry and replacement include cancellation results for post-commit delivery.
 type FactoryLineStepResult struct {
-	Run       *CanvasRun
-	Execution *FactoryWorkOrderExecution
-	QueueItem *FactoryWorkOrderQueueItem
+	Run          *CanvasRun
+	Execution    *FactoryWorkOrderExecution
+	QueueItem    *FactoryWorkOrderQueueItem
+	Cancellation *RunCancellationResult
 }
 
 const onRunTriggerName = "onRun"

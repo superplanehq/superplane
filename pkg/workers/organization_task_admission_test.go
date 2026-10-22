@@ -238,8 +238,11 @@ func Test__OrganizationQueue_UnlimitedPlansPreserveStepCapacity(t *testing.T) {
 }
 
 func Test__OrganizationQueue_RetryAndReplacementAdmitOlderWorkspaceFirst(t *testing.T) {
-	for _, operation := range []string{"retry", "replace"} {
-		t.Run(operation, func(t *testing.T) {
+	for _, scenario := range []struct{ operation, state string }{
+		{"retry", models.CanvasRunStatePending}, {"replace", models.CanvasRunStatePending},
+		{"retry", models.CanvasRunStateStarted}, {"replace", models.CanvasRunStateStarted},
+	} {
+		t.Run(scenario.operation+"/"+scenario.state, func(t *testing.T) {
 			r := support.Setup(t)
 			setTaskPlanLimit(t, r, 1)
 			one := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10), stepMaxParallelism(10)})
@@ -247,7 +250,13 @@ func Test__OrganizationQueue_RetryAndReplacementAdmitOlderWorkspaceFirst(t *test
 			order := one.createOpenWorkOrder(t, r, "Rerun")
 			_, running := one.dispatchLine(t, order)
 			finishRun(t, running.Run, models.CanvasRunResultPassed)
-			require.Len(t, advanceFactoryLine(t, r, running.Run.ID), 1)
+			next := advanceFactoryLine(t, r, running.Run.ID)
+			require.Len(t, next, 1)
+			oldRun, err := models.FindUnscopedCanvasRun(database.DB(t.Context()), next[0].runID)
+			require.NoError(t, err)
+			if scenario.state == models.CanvasRunStateStarted {
+				require.NoError(t, NewRunInitializer("", r.Registry).initializeRun(oldRun.WorkflowID, oldRun.ID, runInitializerTriggerPending))
+			}
 			waiter, _ := two.dispatchLine(t, two.createOpenWorkOrder(t, r, "Older"))
 			var started []*models.FactoryLineStepResult
 			require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
@@ -257,7 +266,7 @@ func Test__OrganizationQueue_RetryAndReplacementAdmitOlderWorkspaceFirst(t *test
 				if err := order.LockForUpdate(tx); err != nil {
 					return err
 				}
-				if operation == "retry" {
+				if scenario.operation == "retry" {
 					_, results, err := order.RetryLineStep(tx, one.line, 1)
 					started = results
 					return err
@@ -270,8 +279,16 @@ func Test__OrganizationQueue_RetryAndReplacementAdmitOlderWorkspaceFirst(t *test
 				_, _, err = one.line.Dispatch(tx, order)
 				return err
 			}))
-			require.Len(t, started, 1)
-			assert.Equal(t, two.factory.ID, started[0].Execution.FactoryID)
+			oldRun, err = models.FindUnscopedCanvasRun(database.DB(t.Context()), oldRun.ID)
+			for _, result := range started {
+				assert.Nil(t, result.Run, "replacement must not start another run before cancellation finishes")
+			}
+			require.NoError(t, err)
+			require.Equal(t, models.CanvasRunStateCancelling, oldRun.State)
+			require.NoError(t, NewRunInitializer("", r.Registry).initializeRun(oldRun.WorkflowID, oldRun.ID, runInitializerTriggerPending))
+			NewRunFinalizer("", r.Registry).sweepQueuedTasks(t.Context())
+			assert.NotNil(t, queueItemForDispatch(t, waiter.ID), "cancelling runs retain organization capacity")
+			require.NoError(t, NewRunFinalizer("", r.Registry).finalizeRun(oldRun.WorkflowID, oldRun.ID, runFinalizerTriggerSweep))
 			assert.Nil(t, queueItemForDispatch(t, waiter.ID))
 			active, err := order.FindActiveLineDispatch(database.DB(t.Context()))
 			require.NoError(t, err)
@@ -279,6 +296,43 @@ func Test__OrganizationQueue_RetryAndReplacementAdmitOlderWorkspaceFirst(t *test
 			assertOrganizationTaskCounts(t, r.Organization.ID, 1, 1)
 		})
 	}
+}
+
+func Test__OrganizationQueue_FullCapacityDoesNotLoadCandidates(t *testing.T) {
+	r := support.Setup(t)
+	plan := setTaskPlanLimit(t, r, 1)
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+	fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Running"))
+	bad, _ := fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Unreadable waiter"))
+	db := database.DB(t.Context())
+	require.NoError(t, db.Exec("UPDATE factory_work_order_line_dispatches SET steps = '[42]'::jsonb WHERE id = ?", bad.ID).Error)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+		return err
+	}))
+	assert.NotNil(t, queueItemForDispatch(t, bad.ID))
+	plan.ParallelTaskLimit = stepMaxParallelism(2)
+	require.NoError(t, models.SaveBillingPlan(db, plan))
+	require.Error(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+		return err
+	}), "the unreadable candidate is only inspected when capacity is available")
+}
+
+func Test__OrganizationQueue_SweepBoundsAdmissionsAndContinuesNextPass(t *testing.T) {
+	r := support.Setup(t)
+	plan := setTaskPlanLimit(t, r, 1)
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(200)})
+	for range 102 {
+		fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Backlog"))
+	}
+	plan.ParallelTaskLimit = stepMaxParallelism(200)
+	require.NoError(t, models.SaveBillingPlan(database.DB(t.Context()), plan))
+	finalizer := NewRunFinalizer("", r.Registry)
+	finalizer.sweepQueuedTasks(t.Context())
+	assertOrganizationTaskCounts(t, r.Organization.ID, 101, 1)
+	finalizer.sweepQueuedTasks(t.Context())
+	assertOrganizationTaskCounts(t, r.Organization.ID, 102, 0)
 }
 
 func Test__OrganizationQueue_InitializationFailureReleasesCapacityAcrossWorkspaces(t *testing.T) {
@@ -407,7 +461,7 @@ func Test__OrganizationQueue_SweepPublishesAdmittedWorkspaceAfterCommit(t *testi
 
 func Test__OrganizationQueue_InvalidWaiterPreservesExecutionOwningDispatch(t *testing.T) {
 	r := support.Setup(t)
-	setTaskPlanLimit(t, r, 1)
+	plan := setTaskPlanLimit(t, r, 1)
 	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10), stepMaxParallelism(10)})
 	order := fixture.createOpenWorkOrder(t, r, "Still owned")
 	dispatch, running := fixture.dispatchLine(t, order)
@@ -420,6 +474,8 @@ func Test__OrganizationQueue_InvalidWaiterPreservesExecutionOwningDispatch(t *te
 		require.NotNil(t, queued.QueueItem)
 		return tx.Model(queued.QueueItem).Update("step_index", 999).Error
 	}))
+	plan.ParallelTaskLimit = stepMaxParallelism(2)
+	require.NoError(t, models.SaveBillingPlan(db, plan))
 	NewRunFinalizer("", r.Registry).sweepQueuedTasks(t.Context())
 	assert.Nil(t, queueItemForDispatch(t, dispatch.ID))
 	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, reloadDispatch(t, dispatch.ID).State)

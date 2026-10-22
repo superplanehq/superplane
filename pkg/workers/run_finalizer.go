@@ -634,7 +634,9 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	}
 
 	if execution.Status == models.FactoryWorkOrderExecutionStatusFinished {
-		return nil, nil, nil
+		admitted, err := models.AdmitQueuedForOrganization(tx, execution.OrganizationID)
+		pending, updates := factoryAdmissionOutcomes(admitted)
+		return pending, updates, err
 	}
 
 	if err := execution.MarkFinished(tx, run.Result); err != nil {

@@ -275,6 +275,13 @@ func publishDispatchedWorkOrder(
 	startedSteps []*models.FactoryLineStepResult,
 ) {
 	for _, result := range startedSteps {
+		if result != nil && result.Cancellation != nil {
+			cancellation := result.Cancellation
+			messages.PublishRunCancellationDrain(cancellation.Run.WorkflowID, cancellation.Drain)
+			if err := messages.NewCanvasRunMessage(cancellation.Run.WorkflowID.String(), cancellation.Run.ID.String()).Publish(); err != nil {
+				logger.WithError(err).Warn("Failed to publish replaced run cancellation")
+			}
+		}
 		publishPendingStepRun(logger, result)
 	}
 

@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const organizationTaskAdmissionBatchSize = 100
+
 // ResolveOrganizationParallelTaskLimit uses the effective plan, including trial
 // and subscription expiry. A nil limit means unlimited organization capacity.
 func ResolveOrganizationParallelTaskLimit(tx *gorm.DB, orgID uuid.UUID) (*int, error) {
@@ -70,29 +72,50 @@ func ListQueuedTaskOrganizationIDs(tx *gorm.DB) ([]uuid.UUID, error) {
 }
 
 func organizationAtTaskCapacity(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	slots, err := organizationAvailableTaskSlots(tx, orgID)
+	return slots != nil && *slots <= 0, err
+}
+
+func organizationAvailableTaskSlots(tx *gorm.DB, orgID uuid.UUID) (*int64, error) {
 	limit, err := ResolveOrganizationParallelTaskLimit(tx, orgID)
 	if err != nil || limit == nil {
-		return false, err
+		return nil, err
 	}
 	var active int64
-	err = tx.Model(&FactoryWorkOrderExecution{}).Where("organization_id = ?", orgID).
-		Where("status IN ?", []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning}).Count(&active).Error
-	return active >= int64(*limit), err
+	err = activeFactoryTaskReservations(tx).Where("organization_id = ?", orgID).Count(&active).Error
+	slots := int64(*limit) - active
+	return &slots, err
+}
+
+// Finished execution history does not release a reservation while its replaced
+// run is still stopping. Count that run until finalization confirms it stopped.
+func activeFactoryTaskReservations(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&FactoryWorkOrderExecution{}).Where(`status IN ? OR EXISTS (
+		SELECT 1 FROM workflow_runs r WHERE r.id = factory_work_order_executions.run_id AND r.state <> ?
+	)`, []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning}, CanvasRunStateFinished)
 }
 
 // AdmitQueuedForOrganization selects globally by enqueue time and ID, skipping
-// locally full steps. Results also include removed queue items for publication.
+// locally full steps. Each pass inspects at most one candidate batch and stops
+// when capacity is full. Results include removed queue items for publication.
 // The organization lock remains outside candidate savepoints.
 func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineStepResult, error) {
 	if err := LockOrganizationTaskAdmission(tx, orgID); err != nil {
 		return nil, err
 	}
+	slots, err := organizationAvailableTaskSlots(tx, orgID)
+	if err != nil || (slots != nil && *slots <= 0) {
+		return nil, err
+	}
 	var items []FactoryWorkOrderQueueItem
-	if err := tx.Where("organization_id = ?", orgID).Order("created_at, id").Find(&items).Error; err != nil {
+	if err := eligibleQueuedTasks(tx, orgID).Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
 		return nil, err
 	}
 	var admitted []*FactoryLineStepResult
 	for i := range items {
+		if slots != nil && *slots <= 0 {
+			break
+		}
 		item := &items[i]
 		result, err := admitQueuedTask(tx, item)
 		if err != nil {
@@ -100,6 +123,9 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 		}
 		if result != nil {
 			admitted = append(admitted, result)
+			if slots != nil && result.Run != nil {
+				*slots--
+			}
 		}
 	}
 	return admitted, nil
@@ -157,10 +183,6 @@ func admitQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*FactoryLine
 	if active >= int64(admissionStep(line, dispatch, item.StepIndex).EffectiveMaxParallelism()) {
 		return nil, nil
 	}
-	full, err := organizationAtTaskCapacity(tx, item.OrganizationID)
-	if err != nil || full {
-		return nil, err
-	}
 	var result *FactoryLineStepResult
 	// GORM creates a savepoint for this nested transaction. Run creation and
 	// deletion roll back together before an invalid candidate is cleaned up.
@@ -176,6 +198,24 @@ func admitQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*FactoryLine
 		return failQueuedTask(tx, item, dispatch, err)
 	}
 	return result, err
+}
+
+// Filter locally full steps before the bounded candidate batch, so a long
+// blocked queue cannot hide eligible work in another workspace.
+func eligibleQueuedTasks(tx *gorm.DB, orgID uuid.UUID) *gorm.DB {
+	return tx.Model(&FactoryWorkOrderQueueItem{}).
+		Where("organization_id = ?", orgID).
+		Where(`NOT EXISTS (
+			SELECT 1 FROM factory_lines l
+			JOIN factory_work_order_line_dispatches d ON d.id = factory_work_order_queue_items.line_dispatch_id
+			WHERE l.id = factory_work_order_queue_items.line_id
+			AND (SELECT COUNT(*) FROM factory_work_order_executions e
+				WHERE e.line_id = l.id AND e.step_index = factory_work_order_queue_items.step_index
+				AND (e.status IN ? OR EXISTS (SELECT 1 FROM workflow_runs r WHERE r.id = e.run_id AND r.state <> ?)))
+			>= COALESCE(NULLIF(GREATEST((COALESCE(l.steps->factory_work_order_queue_items.step_index,
+				d.steps->factory_work_order_queue_items.step_index)->>'max_parallelism')::int, 0), 0), ?)
+		)`, []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning}, CanvasRunStateFinished, DefaultFactoryLineStepMaxParallelism).
+		Order("created_at, id")
 }
 
 func failQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem, dispatch *FactoryWorkOrderLineDispatch, cause error) (*FactoryLineStepResult, error) {
@@ -199,7 +239,7 @@ func discardQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem, dispatch *F
 
 func hasEligibleQueuedTask(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
 	var items []FactoryWorkOrderQueueItem
-	if err := tx.Where("organization_id = ?", orgID).Order("created_at, id").Find(&items).Error; err != nil {
+	if err := eligibleQueuedTasks(tx, orgID).Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
 		return false, err
 	}
 	for i := range items {

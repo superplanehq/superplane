@@ -103,14 +103,9 @@ func lockFactoryLineForStepAdmission(tx *gorm.DB, lineID uuid.UUID) (*FactoryLin
 // maxParallelism caps.
 func countActiveFactoryStepExecutions(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (int64, error) {
 	var count int64
-	err := tx.
-		Model(&FactoryWorkOrderExecution{}).
+	err := activeFactoryTaskReservations(tx).
 		Where("line_id = ?", lineID).
 		Where("step_index = ?", stepIndex).
-		Where("status IN ?", []string{
-			FactoryWorkOrderExecutionStatusPending,
-			FactoryWorkOrderExecutionStatusRunning,
-		}).
 		Count(&count).
 		Error
 	if err != nil {
