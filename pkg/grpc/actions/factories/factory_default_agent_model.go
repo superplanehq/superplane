@@ -2,6 +2,7 @@ package factories
 
 import (
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -58,7 +59,142 @@ func factoryDefaultSelectableForSource(tx *gorm.DB, factory *models.Factory, sou
 	return selectableDefaultForSource(listed, factory.DefaultAgentModel, factory.DefaultAgentModelProvider, source), nil
 }
 
+type agentConnectionReader interface {
+	findIntegration(orgID, id uuid.UUID) (*models.Integration, error)
+	findReady(orgID uuid.UUID, provider string) (*models.Integration, error)
+}
+
+type dbAgentConnections struct {
+	tx *gorm.DB
+}
+
+func (c dbAgentConnections) findIntegration(orgID, id uuid.UUID) (*models.Integration, error) {
+	integration, err := models.FindIntegrationInTransaction(c.tx, orgID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return integration, nil
+}
+
+func (c dbAgentConnections) findReady(orgID uuid.UUID, provider string) (*models.Integration, error) {
+	return models.FindReadyBYOKIntegration(c.tx, orgID, provider)
+}
+
+type loadedAgentConnections struct {
+	byID        map[uuid.UUID]models.Integration
+	oldestReady map[agentConnectionKey]models.Integration
+}
+
+type agentConnectionKey struct {
+	org uuid.UUID
+	app string
+}
+
+func (c loadedAgentConnections) findIntegration(orgID, id uuid.UUID) (*models.Integration, error) {
+	integration, ok := c.byID[id]
+	if !ok || integration.OrganizationID != orgID {
+		return nil, nil
+	}
+	return &integration, nil
+}
+
+func (c loadedAgentConnections) findReady(orgID uuid.UUID, provider string) (*models.Integration, error) {
+	appName, err := models.BYOKIntegrationAppName(provider)
+	if err != nil {
+		return nil, err
+	}
+	integration, ok := c.oldestReady[agentConnectionKey{org: orgID, app: appName}]
+	if !ok {
+		return nil, nil
+	}
+	return &integration, nil
+}
+
+func loadAgentConnections(tx *gorm.DB, factories []models.Factory) (agentConnectionReader, error) {
+	organizationIDs := make([]uuid.UUID, 0, 1)
+	seenOrgs := make(map[uuid.UUID]struct{})
+	integrationIDs := make([]uuid.UUID, 0)
+	seenIDs := make(map[uuid.UUID]struct{})
+	needsLookup := false
+	for i := range factories {
+		if !factoryLooksUpAgentConnection(&factories[i]) {
+			continue
+		}
+		needsLookup = true
+		orgID := factories[i].OrganizationID
+		if _, seen := seenOrgs[orgID]; !seen {
+			seenOrgs[orgID] = struct{}{}
+			organizationIDs = append(organizationIDs, orgID)
+		}
+		id, ok := parsedAgentIntegrationID(factories[i].OnboardingConfigValue().AgentIntegrationID)
+		if !ok {
+			continue
+		}
+		if _, seen := seenIDs[id]; seen {
+			continue
+		}
+		seenIDs[id] = struct{}{}
+		integrationIDs = append(integrationIDs, id)
+	}
+	index := loadedAgentConnections{
+		byID:        map[uuid.UUID]models.Integration{},
+		oldestReady: map[agentConnectionKey]models.Integration{},
+	}
+	if !needsLookup {
+		return index, nil
+	}
+
+	integrations, err := models.ListIntegrationsByIDOrReadyApp(tx, organizationIDs, integrationIDs, agentConnectionApps)
+	if err != nil {
+		return nil, err
+	}
+	for _, integration := range integrations {
+		index.byID[integration.ID] = integration
+		if integration.State != models.IntegrationStateReady || !slices.Contains(agentConnectionApps, integration.AppName) {
+			continue
+		}
+		key := agentConnectionKey{org: integration.OrganizationID, app: integration.AppName}
+		if _, exists := index.oldestReady[key]; exists {
+			continue
+		}
+		index.oldestReady[key] = integration
+	}
+	return index, nil
+}
+
+func factoryLooksUpAgentConnection(factory *models.Factory) bool {
+	switch strings.TrimSpace(factory.OnboardingConfigValue().AgentHarness) {
+	case models.FactoryOnboardingAgentHarnessSuperPlane,
+		models.FactoryOnboardingAgentHarnessCodex,
+		models.FactoryOnboardingAgentHarnessCursor:
+		return false
+	default:
+		return true
+	}
+}
+
+func parsedAgentIntegrationID(raw string) (uuid.UUID, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return uuid.Nil, false
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+var agentConnectionApps = []string{"claude", "openai", "openrouter", models.CustomLLMAppName}
+
 func activeFactoryModelSource(tx *gorm.DB, factory *models.Factory) (string, error) {
+	return resolveFactoryModelSource(dbAgentConnections{tx: tx}, factory)
+}
+
+func resolveFactoryModelSource(connections agentConnectionReader, factory *models.Factory) (string, error) {
 	config := factory.OnboardingConfigValue()
 	switch strings.TrimSpace(config.AgentHarness) {
 	case models.FactoryOnboardingAgentHarnessSuperPlane:
@@ -68,30 +204,30 @@ func activeFactoryModelSource(tx *gorm.DB, factory *models.Factory) (string, err
 	case models.FactoryOnboardingAgentHarnessCursor:
 		return "", nil
 	case models.FactoryOnboardingAgentHarnessClaudeCode:
-		return claudeFactoryModelSource(tx, factory, config.AgentIntegrationID)
+		return claudeFactoryModelSource(connections, factory, config.AgentIntegrationID)
 	default:
-		return unspecifiedFactoryModelSource(tx, factory, config.AgentIntegrationID)
+		return unspecifiedFactoryModelSource(connections, factory, config.AgentIntegrationID)
 	}
 }
 
-func claudeFactoryModelSource(tx *gorm.DB, factory *models.Factory, integrationID string) (string, error) {
-	source, err := modelSourceFromAgentIntegration(tx, factory, integrationID)
+func claudeFactoryModelSource(connections agentConnectionReader, factory *models.Factory, integrationID string) (string, error) {
+	source, err := modelSourceFromAgentIntegration(connections, factory, integrationID)
 	if err != nil || source != "" {
 		return source, err
 	}
-	return firstReadyModelSource(tx, factory.OrganizationID, []string{
+	return firstReadyModelSource(connections, factory.OrganizationID, []string{
 		modelSourceAnthropic,
 		modelSourceOpenRouter,
 		modelSourceCustom,
 	})
 }
 
-func unspecifiedFactoryModelSource(tx *gorm.DB, factory *models.Factory, integrationID string) (string, error) {
-	source, err := modelSourceFromAgentIntegration(tx, factory, integrationID)
+func unspecifiedFactoryModelSource(connections agentConnectionReader, factory *models.Factory, integrationID string) (string, error) {
+	source, err := modelSourceFromAgentIntegration(connections, factory, integrationID)
 	if err != nil || source != "" {
 		return source, err
 	}
-	source, err = firstReadyModelSource(tx, factory.OrganizationID, []string{
+	source, err = firstReadyModelSource(connections, factory.OrganizationID, []string{
 		modelSourceAnthropic,
 		modelSourceOpenAI,
 		modelSourceOpenRouter,
@@ -103,20 +239,13 @@ func unspecifiedFactoryModelSource(tx *gorm.DB, factory *models.Factory, integra
 	return modelSourceHosted, nil
 }
 
-func modelSourceFromAgentIntegration(tx *gorm.DB, factory *models.Factory, integrationID string) (string, error) {
-	integrationID = strings.TrimSpace(integrationID)
-	if integrationID == "" {
+func modelSourceFromAgentIntegration(connections agentConnectionReader, factory *models.Factory, integrationID string) (string, error) {
+	id, ok := parsedAgentIntegrationID(integrationID)
+	if !ok {
 		return "", nil
 	}
-	id, err := uuid.Parse(integrationID)
-	if err != nil {
-		return "", nil
-	}
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", nil
-		}
+	integration, err := connections.findIntegration(factory.OrganizationID, id)
+	if err != nil || integration == nil {
 		return "", err
 	}
 	return modelSourceFromAppName(integration.AppName), nil
@@ -137,9 +266,9 @@ func modelSourceFromAppName(appName string) string {
 	}
 }
 
-func firstReadyModelSource(tx *gorm.DB, orgID uuid.UUID, sources []string) (string, error) {
+func firstReadyModelSource(connections agentConnectionReader, orgID uuid.UUID, sources []string) (string, error) {
 	for _, source := range sources {
-		integration, err := models.FindReadyBYOKIntegration(tx, orgID, source)
+		integration, err := connections.findReady(orgID, source)
 		if err != nil {
 			return "", err
 		}

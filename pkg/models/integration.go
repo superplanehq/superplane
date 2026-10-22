@@ -137,6 +137,37 @@ func ListIntegrations(db *gorm.DB, orgID uuid.UUID) ([]Integration, error) {
 	return integrations, nil
 }
 
+func ListIntegrationsByIDOrReadyApp(tx *gorm.DB, organizationIDs, integrationIDs []uuid.UUID, readyApps []string) ([]Integration, error) {
+	if len(organizationIDs) == 0 {
+		return nil, nil
+	}
+	if len(integrationIDs) == 0 && len(readyApps) == 0 {
+		return nil, nil
+	}
+
+	query := tx.Where("organization_id IN ?", organizationIDs)
+	switch {
+	case len(integrationIDs) == 0:
+		query = query.Where("state = ? AND app_name IN ?", IntegrationStateReady, readyApps)
+	case len(readyApps) == 0:
+		query = query.Where("id IN ?", integrationIDs)
+	default:
+		query = query.Where(
+			"id IN ? OR (state = ? AND app_name IN ?)",
+			integrationIDs,
+			IntegrationStateReady,
+			readyApps,
+		)
+	}
+
+	var integrations []Integration
+	err := query.Order("created_at ASC").Find(&integrations).Error
+	if err != nil {
+		return nil, err
+	}
+	return integrations, nil
+}
+
 // ListIntegrationsPage returns one page of connections for an organization.
 // Search matches the app name or the connection name. Results are ordered by
 // app name, then connection name.

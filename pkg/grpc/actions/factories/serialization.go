@@ -13,6 +13,10 @@ import (
 )
 
 func serializeFactory(tx *gorm.DB, factory *models.Factory) (*pb.Factory, error) {
+	return serializeResolvedFactory(tx, factory, nil)
+}
+
+func serializeResolvedFactory(tx *gorm.DB, factory *models.Factory, connections agentConnectionReader) (*pb.Factory, error) {
 	serialized := &pb.Factory{
 		Id:          factory.ID.String(),
 		Name:        factory.Name,
@@ -34,17 +38,23 @@ func serializeFactory(tx *gorm.DB, factory *models.Factory) (*pb.Factory, error)
 	serialized.VcsCapabilities = serializeFactoryVCSCapabilities(factory.OnboardingConfigValue().EffectiveVCSProvider())
 	serialized.DefaultAgentModel = factory.DefaultAgentModel
 	serialized.DefaultAgentModelProvider = factory.DefaultAgentModelProvider
-	if err := attachAgentModelSource(tx, factory, serialized); err != nil {
+	if err := attachAgentModelSource(tx, factory, serialized, connections); err != nil {
 		return nil, err
 	}
 	return serialized, nil
 }
 
-func attachAgentModelSource(tx *gorm.DB, factory *models.Factory, serialized *pb.Factory) error {
-	if tx == nil || factory == nil || serialized == nil {
+func attachAgentModelSource(tx *gorm.DB, factory *models.Factory, serialized *pb.Factory, connections agentConnectionReader) error {
+	if factory == nil || serialized == nil {
 		return nil
 	}
-	source, err := activeFactoryModelSource(tx, factory)
+	if connections == nil {
+		if tx == nil {
+			return nil
+		}
+		connections = dbAgentConnections{tx: tx}
+	}
+	source, err := resolveFactoryModelSource(connections, factory)
 	if err != nil {
 		return err
 	}
@@ -483,12 +493,17 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 }
 
 func serializeFactories(tx *gorm.DB, factories []models.Factory, linesByFactory map[uuid.UUID][]models.FactoryLine) ([]*pb.Factory, error) {
+	connections, err := loadAgentConnections(tx, factories)
+	if err != nil {
+		return nil, err
+	}
 	result := make([]*pb.Factory, len(factories))
 	for i := range factories {
-		serialized, err := serializeFactoryWithLines(tx, &factories[i], linesByFactory[factories[i].ID], nil)
+		serialized, err := serializeResolvedFactory(tx, &factories[i], connections)
 		if err != nil {
 			return nil, err
 		}
+		serialized.Lines = serializeFactoryLines(linesByFactory[factories[i].ID], nil)
 		result[i] = serialized
 	}
 	return result, nil
