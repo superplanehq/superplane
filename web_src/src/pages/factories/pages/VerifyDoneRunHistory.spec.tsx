@@ -8,7 +8,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
-import { resetHostMocks, useCanvas } from "./IntakeSettingsHost.spec.fixtures";
+import { resetHostMocks, useCanvas, useInfiniteCanvasRuns } from "./IntakeSettingsHost.spec.fixtures";
 import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 
 let enabled = true;
@@ -33,6 +33,7 @@ const settings: PRFeedbackDraftSettings = {
   repository: "acme/payments",
   mention: "@superplane",
   ignoreBots: true,
+  addressAllBots: false,
   allowedBots: [],
   checkNames: [],
   maximumAttempts: 3,
@@ -188,6 +189,85 @@ describe("Verify and Done run history", () => {
       expect(screen.queryByTestId("column-automation-view-canvas")).not.toBeInTheDocument();
     },
   );
+
+  it.each([true, false])("gates scheduled Backlog history with factory_run_history=%s", (historyEnabled) => {
+    enabled = historyEnabled;
+    useCanvas.mockReturnValue({
+      data: {
+        metadata: { id: "scheduled", factoryId: "factory" },
+        spec: {
+          nodes: [
+            {
+              id: "schedule",
+              type: "TYPE_TRIGGER",
+              component: "schedule",
+              configuration: { type: "days", hour: 9, minute: 0 },
+            },
+            { id: "scheduled-agent", type: "TYPE_ACTION", component: "runnerSuperPlane", configuration: { steps: [] } },
+            {
+              id: "has-proposal",
+              type: "TYPE_ACTION",
+              component: "if",
+              configuration: { expression: '{{ $["Agent"].data.result.title != nil }}' },
+            },
+          ],
+          edges: [],
+        },
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    useInfiniteCanvasRuns.mockReturnValue({
+      data: {
+        pages: [
+          {
+            runs: [
+              {
+                id: "scheduled-run",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                rootEvent: { id: "tick", data: { type: "schedule.tick", data: {} } },
+                executions: [
+                  {
+                    id: "proposal",
+                    nodeId: "has-proposal",
+                    componentName: "if",
+                    result: "RESULT_PASSED",
+                    outputChannels: ["false"],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      hasNextPage: false,
+    });
+    renderPage(
+      <ColumnAutomationViewHost
+        organizationId="org"
+        factoryId="factory"
+        factoryKey="SP"
+        canvasId="scheduled"
+        columnKey="backlog"
+        title="Scheduled intake"
+        initialTab="runs"
+        onClose={() => {}}
+      />,
+      "/?automationTab=runs",
+    );
+    if (!historyEnabled) {
+      expect(screen.getByTestId("column-automation-view-canvas")).toBeInTheDocument();
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      return;
+    }
+    expect(screen.getByRole("table", { name: "Runs" })).toBeInTheDocument();
+    expect(screen.getByText("No task proposed")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-canvas")).not.toBeInTheDocument();
+  });
 
   it("keeps the full editor available for custom automations without an Agent form", async () => {
     useCanvas.mockReturnValue({

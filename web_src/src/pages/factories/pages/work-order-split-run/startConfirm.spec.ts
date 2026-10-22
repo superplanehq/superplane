@@ -65,12 +65,15 @@ describe("startConfirm", () => {
     expect(needsStartConfirm({ clarity: 1, confidence: 3, scoreMax: 3 })).toBe(true);
   });
 
-  it("warns on the review scale when Confidence is 1 or either score is 2", () => {
+  it("warns on the review scale when Confidence is 1", () => {
     expect(startConfirmTone({ clarity: 3, confidence: 1, scoreMax: 3 })).toBe("mid");
-    expect(startConfirmTone({ clarity: 2, confidence: 3, scoreMax: 3 })).toBe("mid");
-    expect(startConfirmTone({ clarity: 3, confidence: 2, scoreMax: 3 })).toBe("mid");
-    expect(startConfirmBody({ clarity: 3, confidence: 2, scoreMax: 3 })).toBe(START_CONFIRM_COPY.mid);
-    expect(needsStartConfirm({ clarity: 3, confidence: 2, scoreMax: 3 })).toBe(true);
+    expect(startConfirmBody({ clarity: 3, confidence: 1, scoreMax: 3 })).toBe(START_CONFIRM_COPY.mid);
+  });
+
+  it("does not warn on the review scale for scores of 2", () => {
+    expect(needsStartConfirm({ clarity: 2, confidence: 3, scoreMax: 3 })).toBe(false);
+    expect(needsStartConfirm({ clarity: 3, confidence: 2, scoreMax: 3 })).toBe(false);
+    expect(startConfirmBody({ clarity: 2, confidence: 2, scoreMax: 3 })).toBeUndefined();
   });
 
   it("still asks on the review scale when a score is missing", () => {

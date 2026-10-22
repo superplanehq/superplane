@@ -100,7 +100,6 @@ export function IntakeSourceSettingsPopup({
     parameter: "settings",
     initialTab,
     hasAgent: Boolean(agent),
-    eligible: ["github-issues", "sentry-exceptions", "dependabot-alerts"].includes(sourceId),
   });
 
   const content = (
@@ -117,6 +116,7 @@ export function IntakeSourceSettingsPopup({
           organizationId={history.organizationId}
           factoryId={history.factoryId}
           canvasId={canvasId}
+          intakeSource={sourceId}
           selectedRunId={history.selectedRunId}
           onSelectRun={history.setSelectedRunId}
           loading={automationLoading}

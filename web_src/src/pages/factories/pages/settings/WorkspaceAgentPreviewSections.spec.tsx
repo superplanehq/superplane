@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -18,7 +18,7 @@ vi.mock("@monaco-editor/react", () => ({
 }));
 
 const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
-const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS];
 
 describe("workspace agent preview fields", () => {
   beforeAll(() => {
@@ -60,7 +60,7 @@ describe("workspace agent preview fields", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [] },
         }}
-        experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}
+        experimentalFeatures={[FEATURE_WORKSPACE_SKILLS]}
       />,
     );
 

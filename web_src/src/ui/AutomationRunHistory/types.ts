@@ -1,3 +1,5 @@
+import type { IntakeRunOutcome } from "./intakeRunOutcome";
+
 export type RunStatus = "Running" | "Passed" | "Failed" | "Cancelled" | "Pending" | "Cancelling" | "Unknown";
 
 export type RunLogs =
@@ -14,10 +16,14 @@ export interface RunActivity {
   logs: RunLogs;
   outputs?: Record<string, unknown>;
   additionalInstructions?: string;
+  defaultTab?: "logs" | "outputs";
+  outputsLabel?: string;
 }
 
 export interface AutomationRun {
   title?: string;
+  source?: { reference: string; title: string; url?: string };
+  intake?: { outcome: IntakeRunOutcome; summary: string; event: string };
   id: string;
   task?: { id: string; title: string };
   status: RunStatus;

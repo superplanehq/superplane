@@ -166,6 +166,7 @@ export function PRFeedbackDiscussionFields({
     const next = discussionBotSettings(mode, mode === "address" ? draft.allowedBots : []);
     onUpdate("ignoreBots", next.ignoreBots);
     onUpdate("allowedBots", next.allowedBots);
+    onUpdate("addressAllBots", next.addressAllBots);
   };
 
   return (
@@ -199,33 +200,15 @@ export function PRFeedbackDiscussionFields({
       </section>
 
       <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
-            {PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
-          </h3>
-          <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.wizardBotsIntro}</p>
-        </div>
+        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
+          {PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
+        </h3>
         <div
           className="flex flex-col gap-2"
           role="radiogroup"
           aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
         >
-          <IntakeSettingsRadioOption
-            name="pr-feedback-bot-mode"
-            value="ignore"
-            checked={botMode === "ignore"}
-            title={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreOption}
-            helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreHelper}
-            onChange={() => setBotModeAndDraft("ignore")}
-          />
-          <IntakeSettingsRadioOption
-            name="pr-feedback-bot-mode"
-            value="address"
-            checked={botMode === "address"}
-            title={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressOption}
-            helper={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressHelper}
-            onChange={() => setBotModeAndDraft("address")}
-          />
+          <DiscussionBotChoices botMode={botMode} onChange={setBotModeAndDraft} />
         </div>
         {botMode === "address" ? (
           <ReviewBotPicker
@@ -249,6 +232,41 @@ export function PRFeedbackDiscussionFields({
           />
         ) : null}
       </section>
+    </>
+  );
+}
+
+function DiscussionBotChoices({
+  botMode,
+  onChange,
+}: {
+  botMode: DiscussionBotMode;
+  onChange: (mode: DiscussionBotMode) => void;
+}) {
+  return (
+    <>
+      <IntakeSettingsRadioOption
+        name="pr-feedback-bot-mode"
+        value="all"
+        checked={botMode === "all"}
+        title={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsLabel}
+        helper={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsHelper}
+        onChange={() => onChange("all")}
+      />
+      <IntakeSettingsRadioOption
+        name="pr-feedback-bot-mode"
+        value="ignore"
+        checked={botMode === "ignore"}
+        title={PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreOption}
+        onChange={() => onChange("ignore")}
+      />
+      <IntakeSettingsRadioOption
+        name="pr-feedback-bot-mode"
+        value="address"
+        checked={botMode === "address"}
+        title={PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressOption}
+        onChange={() => onChange("address")}
+      />
     </>
   );
 }

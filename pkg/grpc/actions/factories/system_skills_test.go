@@ -21,7 +21,7 @@ import (
 
 func TestSystemSkillResourceProtection(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -78,7 +78,7 @@ func TestSystemSkillResourceProtection(t *testing.T) {
 
 func TestSystemSkillRestoreAndState(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	template, ok := runner.SystemSkillTemplateByID("refine-task")
 	require.True(t, ok)
@@ -99,11 +99,13 @@ func TestSystemSkillRestoreAndState(t *testing.T) {
 			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 			require.NoError(t, err)
 			original := tc.original
+			version := int32(1)
 			if original == "" {
 				original = template.Markdown("workspace-refine")
+				version = template.Version
 			}
 			resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "workspace-refine", true, models.FactoryAgentResourceConfig{
-				Markdown: original, SystemSkill: &models.FactorySystemSkill{TemplateID: tc.templateID, Version: 1},
+				Markdown: original, SystemSkill: &models.FactorySystemSkill{TemplateID: tc.templateID, Version: version},
 			})
 			require.NoError(t, err)
 			if tc.edit {
@@ -119,6 +121,10 @@ func TestSystemSkillRestoreAndState(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, listed.Resources, 1)
 			assert.Equal(t, tc.state, listed.Resources[0].GetSystemSkill().GetState())
+			assert.Equal(t, version, listed.Resources[0].GetSystemSkill().GetVersion())
+			if tc.state == pb.FactoryAgentResource_SystemSkill_STATE_UPDATE_AVAILABLE {
+				assert.Greater(t, listed.Resources[0].GetSystemSkill().GetLatestVersion(), version)
+			}
 			// Merely reading a stale template must not update it in this slice.
 			afterRead, err := factory.FindAgentResource(db, resource.ID)
 			require.NoError(t, err)
@@ -157,7 +163,7 @@ func TestSystemSkillRestoreAndState(t *testing.T) {
 
 func TestRestoreSystemSkillRejectsInvalidTargetsAndDisabledFeature(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

@@ -74,14 +74,6 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
-	t.Run("known id returns workspace MCP feature", func(t *testing.T) {
-		f, ok := Get(FeatureWorkspaceMCP)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureWorkspaceMCP, f.ID)
-		assert.Equal(t, "Workspace MCP", f.Label)
-		assert.Equal(t, "Add MCP servers for workspace agents", f.Description)
-	})
-
 	t.Run("known id returns workspace skills feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceSkills)
 		assert.True(t, ok)
@@ -137,6 +129,12 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, Feature{}, feature)
 	})
 
+	t.Run("retired workspace MCP flag is absent", func(t *testing.T) {
+		feature, ok := Get("workspace_mcp")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
+
 	t.Run("retired dependabot intake flag is absent", func(t *testing.T) {
 		feature, ok := Get("factory_dependabot_intake")
 		assert.False(t, ok)
@@ -178,7 +176,6 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.True(t, Exists(FeatureWorkspaceAgent))
-	assert.True(t, Exists(FeatureWorkspaceMCP))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
@@ -187,6 +184,7 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("factory_task_console"))
 	assert.False(t, Exists("factory_sentry_intake"))
+	assert.False(t, Exists("workspace_mcp"))
 	assert.False(t, Exists("factory_dependabot_intake"))
 	assert.False(t, Exists("factory_jira_intake"))
 	assert.False(t, Exists("factory_linear_intake"))

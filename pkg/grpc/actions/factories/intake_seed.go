@@ -28,16 +28,16 @@ const (
 	// intakeDependabotSeedSize is how many open Dependabot alerts a new intake
 	// imports. A repository with fewer open alerts gives fewer, so the seed is
 	// an upper bound.
-	intakeDependabotSeedSize = 30
+	intakeDependabotSeedSize = 3
 
 	// intakeGitHubIssueSeedSize is how many open GitHub issues a new intake
 	// imports. The wizard tells the user this number. Each imported issue
 	// starts a planning session, so the first batch stays small.
-	intakeGitHubIssueSeedSize = 10
+	intakeGitHubIssueSeedSize = 3
 
 	// intakeSentrySeedSize is how many unresolved Sentry issues a new intake
 	// imports. The wizard tells the user this number.
-	intakeSentrySeedSize = 10
+	intakeSentrySeedSize = 3
 
 	// intakeSentrySeedEventWindow is how many recent trigger events a reseed
 	// reads so it can drop issues that already sit on the intake.
@@ -45,11 +45,11 @@ const (
 
 	// intakeProductiveSeedSize is how many open Productive.io tasks a new
 	// intake imports. The wizard tells the user this number.
-	intakeProductiveSeedSize = 10
+	intakeProductiveSeedSize = 3
 
 	// intakeJiraSeedSize is how many unresolved Jira issues a new intake
 	// imports. The wizard tells the user this number.
-	intakeJiraSeedSize = 10
+	intakeJiraSeedSize = 3
 
 	// intakeJiraSeedEventWindow is how many recent trigger events a reseed
 	// reads so it can drop issues that already sit on the intake.
@@ -58,7 +58,7 @@ const (
 	// intakeDatadogSeedSize is how many open Datadog errors a new intake
 	// imports. The wizard tells the user this number. Datadog returns at
 	// most one page, so the seed is the newest of that page.
-	intakeDatadogSeedSize = 10
+	intakeDatadogSeedSize = 3
 
 	// intakeDatadogSearchPageSize is the Error Tracking search page. The
 	// seed sorts that page by last seen and keeps intakeDatadogSeedSize.

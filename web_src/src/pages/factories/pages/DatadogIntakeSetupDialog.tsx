@@ -179,8 +179,8 @@ function SetupFooter({ setup, onCreated }: { setup: DatadogIntakeSetupModel; onC
   return (
     <div className="space-y-3">
       <IntakeSkipInitialImportField
-        checked={!setup.skipInitialImport}
-        onCheckedChange={(importExisting) => setup.setSkipInitialImport(!importExisting)}
+        checked={setup.skipInitialImport}
+        onCheckedChange={setup.setSkipInitialImport}
         helper={
           setup.skipInitialImport
             ? DATADOG_INTAKE_SETUP_COPY.importExistingHelperOff

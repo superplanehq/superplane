@@ -9,18 +9,20 @@ import {
   BILLING_BUSINESS_NAME,
   BILLING_BUSINESS_PRICE,
   BILLING_BUSINESS_PRICE_PERIOD,
-  BILLING_CANCEL_LABEL,
-  BILLING_KEEP_LABEL,
   BILLING_UPGRADE_LABEL,
   billingBusinessPlanAction,
   billingCanCancelBusiness,
   billingCanKeepBusiness,
   billingSubscriptionEndsCopy,
 } from "../../lib/billingPlans";
+import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
 import { BillingCancelBusinessDialog } from "./BillingCancelBusinessDialog";
 
 export function BillingPlansSection({
+  planName,
+  planPriceCents,
+  planPerSeat,
   canManageBilling,
   creditPurchaseAllowed,
   planSource,
@@ -31,6 +33,9 @@ export function BillingPlansSection({
   onCancel,
   onKeep,
 }: {
+  planName?: string;
+  planPriceCents?: string;
+  planPerSeat?: boolean;
   canManageBilling: boolean;
   creditPurchaseAllowed: boolean;
   planSource?: string;
@@ -60,24 +65,19 @@ export function BillingPlansSection({
     planSource,
     cancelAtPeriodEnd,
   });
-  const endsCopy = businessAction === "ending" ? billingSubscriptionEndsCopy(currentPeriodEnd) : null;
+  const displayName = showCurrentBadge ? planName || BILLING_BUSINESS_NAME : BILLING_BUSINESS_NAME;
+  const endsCopy = businessAction === "ending" ? billingSubscriptionEndsCopy(currentPeriodEnd, displayName) : null;
 
   return (
     <FactorySettingsCard title="Plans" data-testid="billing-plans">
       <div data-testid="billing-plan-business">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-[13px] font-medium tracking-[-0.01em]">{BILLING_BUSINESS_NAME}</h3>
-          {showCurrentBadge ? (
-            <Badge variant="outline" className="text-muted-foreground" data-testid="billing-current-plan">
-              Current plan
-            </Badge>
-          ) : null}
-        </div>
-        <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
-          <span className="text-xl font-semibold tracking-[-0.02em]">{BILLING_BUSINESS_PRICE}</span>
-          <span className="text-xs text-muted-foreground">{BILLING_BUSINESS_PRICE_PERIOD}</span>
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">{BILLING_BUSINESS_DESCRIPTION}</p>
+        <BillingPlanDetails
+          displayName={displayName}
+          planName={planName}
+          planPriceCents={planPriceCents}
+          planPerSeat={planPerSeat}
+          showCurrentBadge={showCurrentBadge}
+        />
         {endsCopy ? (
           <p className="mt-2 text-sm text-muted-foreground" data-testid="billing-subscription-ends">
             {endsCopy}
@@ -99,7 +99,7 @@ export function BillingPlansSection({
               data-testid="billing-cancel-subscription"
               onClick={() => setConfirmOpen(true)}
             >
-              {BILLING_CANCEL_LABEL}
+              {`Cancel ${displayName}`}
             </Button>
           </div>
         ) : null}
@@ -111,7 +111,7 @@ export function BillingPlansSection({
               data-testid="billing-keep-subscription"
               onClick={() => void onKeep()}
             >
-              {pending ? "Keeping Business..." : BILLING_KEEP_LABEL}
+              {pending ? `Keeping ${displayName}...` : `Keep ${displayName}`}
             </Button>
           </div>
         ) : null}
@@ -129,6 +129,7 @@ export function BillingPlansSection({
         </a>
       </p>
       <BillingCancelBusinessDialog
+        planName={displayName}
         open={confirmOpen}
         pending={pending}
         currentPeriodEnd={currentPeriodEnd}
@@ -136,5 +137,54 @@ export function BillingPlansSection({
         onConfirm={onCancel ?? (async () => undefined)}
       />
     </FactorySettingsCard>
+  );
+}
+
+function BillingPlanDetails({
+  displayName,
+  planName,
+  planPriceCents,
+  planPerSeat,
+  showCurrentBadge,
+}: {
+  displayName: string;
+  planName?: string;
+  planPriceCents?: string;
+  planPerSeat?: boolean;
+  showCurrentBadge: boolean;
+}) {
+  const displayPrice =
+    showCurrentBadge && planPriceCents !== undefined
+      ? formatUsdCents(parseWorkOrderMetric(planPriceCents))
+      : BILLING_BUSINESS_PRICE;
+
+  return (
+    <>
+      {!showCurrentBadge && planName ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <h3 className="text-[13px] font-medium tracking-[-0.01em]">{planName}</h3>
+          <Badge variant="outline" className="text-muted-foreground" data-testid="billing-current-plan">
+            Current plan
+          </Badge>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-[13px] font-medium tracking-[-0.01em]">{displayName}</h3>
+        {showCurrentBadge ? (
+          <Badge variant="outline" className="text-muted-foreground" data-testid="billing-current-plan">
+            Current plan
+          </Badge>
+        ) : null}
+      </div>
+      <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
+        <span className="text-xl font-semibold tracking-[-0.02em]">{displayPrice}</span>
+        <span className="text-xs text-muted-foreground">
+          {showCurrentBadge && planPerSeat ? "per seat per month" : BILLING_BUSINESS_PRICE_PERIOD}
+        </span>
+      </p>
+      {displayName === BILLING_BUSINESS_NAME ? (
+        <p className="mt-1 text-sm text-muted-foreground">{BILLING_BUSINESS_DESCRIPTION}</p>
+      ) : null}
+    </>
   );
 }

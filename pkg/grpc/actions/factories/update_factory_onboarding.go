@@ -49,6 +49,11 @@ func UpdateFactoryOnboarding(
 		if validationErr := validateFactoryOnboardingResources(db, orgID, factory, config); validationErr != nil {
 			return nil, factoryErrorToStatus(validationErr, "failed to update factory onboarding")
 		}
+		if !wasComplete {
+			if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, db, factory, patch, config); err != nil {
+				return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+			}
+		}
 		err = factory.CompleteOnboarding(db, patch)
 	} else {
 		err = factory.UpdateOnboarding(db, patch)
@@ -91,6 +96,58 @@ func UpdateFactoryOnboarding(
 	return &pb.UpdateFactoryOnboardingResponse{
 		Factory: serialized,
 	}, nil
+}
+
+func ensureOnboardingDiscussionHandler(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID string,
+	db *gorm.DB,
+	factory *models.Factory,
+	patch models.FactoryOnboardingPatch,
+	config models.FactoryOnboardingConfig,
+) error {
+	if err := config.ReadyForCompletion(); err != nil {
+		return nil
+	}
+	repository := strings.TrimSpace(config.AppRepository)
+	if repository == "" {
+		return nil
+	}
+	if err := factory.UpdateOnboarding(db, patch); err != nil {
+		return err
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(
+			"SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
+			"factory-discussion-handler:"+factory.ID.String(),
+		).Error; err != nil {
+			return err
+		}
+		handlers, err := factory.ListPRFeedbackHandlers(tx)
+		if err != nil {
+			return err
+		}
+		for _, handler := range handlers {
+			if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+				return nil
+			}
+		}
+		_, err = createFactoryPRFeedbackHandler(ctx, deps, organizationID, tx, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			FactoryId: factory.ID.String(),
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+					Repository: repository,
+				},
+				Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+					Mention:        prFeedbackDefaultMention,
+					IgnoreBots:     true,
+					AddressAllBots: true,
+				},
+			},
+		})
+		return err
+	})
 }
 
 func validateFactoryOnboardingResources(

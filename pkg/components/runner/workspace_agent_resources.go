@@ -106,39 +106,28 @@ func AttachWorkspaceAgentResources(
 	// when those steps do not already clone.
 	files = appendWorkspaceCheckoutFile(files)
 
-	mcpEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceMCP)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: MCP feature check failed")
-		return environment, files
-	}
 	skillsEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceSkills)
 	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: skills feature check failed")
-		return environment, files
+		logger.WithError(err).Warn("skip workspace skills: skills feature check failed")
+		skillsEnabled = false
 	}
 	agentEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgent)
 	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: agent feature check failed")
-		return environment, files
-	}
-	if !mcpEnabled && !skillsEnabled && !agentEnabled {
-		return environment, files
+		logger.WithError(err).Warn("skip workspace setup and context: agent feature check failed")
+		agentEnabled = false
 	}
 
-	var mcpServers []models.FactoryAgentResource
-	if mcpEnabled {
-		mcpServers, err = factory.ListEnabledMCPServers(db)
-		if err != nil {
-			logger.WithError(err).Warn("skip workspace agent resources: list MCP failed")
-			return environment, files
-		}
+	mcpServers, err := factory.ListEnabledMCPServers(db)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace MCP: list failed")
+		mcpServers = nil
 	}
 	var skills []models.FactoryAgentResource
 	if skillsEnabled {
 		skills, err = factory.ListEnabledSkills(db)
 		if err != nil {
-			logger.WithError(err).Warn("skip workspace agent resources: list skills failed")
-			return environment, files
+			logger.WithError(err).Warn("skip workspace skills: list failed")
+			skills = nil
 		}
 	}
 	var setupCommands []string
@@ -147,7 +136,8 @@ func AttachWorkspaceAgentResources(
 		setupCommands, contextRepos, err = loadWorkspaceSetupAndContext(db, factory)
 		if err != nil {
 			logger.WithError(err).Warn("skip workspace setup and context: list failed")
-			return environment, files
+			setupCommands = nil
+			contextRepos = nil
 		}
 	}
 

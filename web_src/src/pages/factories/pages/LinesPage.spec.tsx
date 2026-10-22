@@ -17,7 +17,6 @@ import {
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
-  FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
@@ -705,7 +704,6 @@ describe("LinesPage board", () => {
   });
 
   it("opens an existing phase automation on the split config screen", async () => {
-    enabledExperimentalFeatures.add(FEATURE_WORKSPACE_MCP);
     enabledExperimentalFeatures.add(FEATURE_WORKSPACE_SKILLS);
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
@@ -916,7 +914,9 @@ describe("LinesPage next steps", () => {
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "How should pull request comments be handled?",
     );
-    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("2/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-next-steps")).not.toHaveTextContent("2/4");
+    expect(screen.getByTestId("workspace-next-steps")).not.toHaveTextContent("3/4");
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
     );
@@ -934,7 +934,9 @@ describe("LinesPage next steps", () => {
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "How should failing status checks be handled?",
     );
-    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("3/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-next-steps")).not.toHaveTextContent("2/4");
+    expect(screen.getByTestId("workspace-next-steps")).not.toHaveTextContent("3/4");
     expect(screen.getByTestId("workspace-next-step-cta-pr-checks-handler")).toHaveTextContent("Configure");
     expect(screen.getByTestId("workspace-next-step-later")).toHaveTextContent("Later");
   });
@@ -950,7 +952,9 @@ describe("LinesPage next steps", () => {
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
     const restore = screen.getByTestId("workspace-next-steps-restore");
-    expect(restore).toHaveTextContent("3/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(restore).not.toHaveTextContent("2/4");
+    expect(restore).not.toHaveTextContent("3/4");
     expect(restore).toHaveTextContent("Configure status checks");
     expect(screen.getByTestId("lines-detail-header")).toContainElement(restore);
     const trial = screen.queryByTestId("hosted-credit-header-kicker");
@@ -973,14 +977,18 @@ describe("LinesPage next steps", () => {
     const user = userEvent.setup();
     const { unmount } = renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
     await user.click(screen.getByTestId("workspace-next-step-later"));
-    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-next-steps-restore")).not.toHaveTextContent("2/4");
+    expect(screen.getByTestId("workspace-next-steps-restore")).not.toHaveTextContent("3/4");
     expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
     unmount();
 
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
-    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-next-steps-restore")).not.toHaveTextContent("2/4");
+    expect(screen.getByTestId("workspace-next-steps-restore")).not.toHaveTextContent("3/4");
     expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
   });
 
