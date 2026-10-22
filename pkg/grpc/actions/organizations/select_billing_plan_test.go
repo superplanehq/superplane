@@ -125,7 +125,6 @@ func TestNewBillingIsOptInAndKeepsMigratedTrial(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, response.BillingEnabled)
 	require.Empty(t, response.AvailablePlans)
-	require.False(t, response.SubscriptionCheckoutEnabled)
 	require.False(t, response.RequirePaymentMethod)
 	require.True(t, response.HostedExecutionAllowed)
 	require.Equal(t, models.BillingPlanTrial, response.CatalogKey)

@@ -8,18 +8,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/encryption"
 )
 
 func TestDatabaseSource(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	ctx := context.Background()
-	encryptor := crypto.NewAESGCMEncryptor([]byte("01234567890123456789012345678901"))
+	encryptor := encryption.NewEncryptor()
 	source := licensing.NewDatabaseSource(encryptor)
 	issuer := licensingtest.NewIssuer("test-2026-01")
 	account, err := models.CreateAccount("License Owner", "license-owner@example.com")

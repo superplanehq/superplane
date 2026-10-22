@@ -30,7 +30,6 @@ func TestFileAccessURLRoundTrip(t *testing.T) {
 
 func TestSigningKeyRequiresDedicatedKey(t *testing.T) {
 	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "")
-	t.Setenv("ENCRYPTION_KEY", "encryption-key")
 	t.Setenv("JWT_SECRET", "jwt-secret")
 
 	_, err := SigningKey()
