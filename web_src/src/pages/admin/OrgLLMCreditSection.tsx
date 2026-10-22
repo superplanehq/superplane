@@ -1,3 +1,4 @@
+import { OrganizationSeatLimit } from "./OrganizationSeatLimit";
 import type { BillingPlan } from "./billingPlansApi";
 import { OrganizationFeatureGrants } from "./OrganizationFeatureGrants";
 import { Heading } from "@/components/Heading/heading";
@@ -255,7 +256,13 @@ function OrgHostedCreditCard(args: {
         saveMarkup={args.saveMarkup}
       />
       {args.showPlanControls && (
-        <OrganizationFeatureGrants key={args.savedPlan?.catalog_key || args.savedPlan?.plan} orgId={args.orgId} />
+        <>
+          <OrganizationSeatLimit
+            key={`${args.orgId}-${args.savedPlan?.catalog_key || args.savedPlan?.plan}`}
+            orgId={args.orgId}
+          />
+          <OrganizationFeatureGrants key={args.savedPlan?.catalog_key || args.savedPlan?.plan} orgId={args.orgId} />
+        </>
       )}
       <CreditHistory grants={args.grants} loadFailed={args.grantsLoadFailed} onRetry={() => void args.reloadGrants()} />
     </div>

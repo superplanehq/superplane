@@ -51,6 +51,7 @@ message ListUsersRequest {
 
 message ListUsersResponse {
   repeated User users = 1;
+  optional int32 seat_limit = 2;
 }
 
 message User {

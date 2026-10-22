@@ -1363,6 +1363,17 @@ CREATE TABLE public.organization_llm_settings (
 
 
 --
+-- Name: organization_seat_limit_overrides; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_seat_limit_overrides (
+    organization_id uuid NOT NULL,
+    seat_limit integer,
+    CONSTRAINT organization_seat_limit_overrides_seat_limit_check CHECK ((seat_limit > 0))
+);
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2863,6 +2874,14 @@ ALTER TABLE ONLY public.organization_llm_credit_grants
 
 ALTER TABLE ONLY public.organization_llm_settings
     ADD CONSTRAINT organization_llm_settings_pkey PRIMARY KEY (organization_id);
+
+
+--
+-- Name: organization_seat_limit_overrides organization_seat_limit_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_limit_overrides
+    ADD CONSTRAINT organization_seat_limit_overrides_pkey PRIMARY KEY (organization_id);
 
 
 --
@@ -5459,6 +5478,14 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
+-- Name: organization_seat_limit_overrides organization_seat_limit_overrides_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_limit_overrides
+    ADD CONSTRAINT organization_seat_limit_overrides_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organizations organizations_created_by_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5986,7 +6013,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261022121656	f
+20261022133415	f
 \.
 
 

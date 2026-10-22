@@ -966,7 +966,7 @@ const mockSecretDetails = {
 };
 
 export function seedConfigurationStoryQueryCache(queryClient: QueryClient) {
-  queryClient.setQueryData(organizationKeys.users(STORY_DOMAIN_ID), mockUsers);
+  queryClient.setQueryData(organizationKeys.users(STORY_DOMAIN_ID), { users: mockUsers });
   queryClient.setQueryData(organizationKeys.roles(STORY_DOMAIN_ID), mockRoles);
   queryClient.setQueryData(organizationKeys.groups(STORY_DOMAIN_ID), mockGroups);
   queryClient.setQueryData(canvasKeys.list(STORY_ORGANIZATION_ID), mockCanvases);
