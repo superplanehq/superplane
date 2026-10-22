@@ -1,4 +1,5 @@
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 
 import { LinearLabelField } from "./LinearLabelField";
@@ -79,14 +80,18 @@ export function LinearIntakeScopeFields({
               />
             </div>
             {scope.teamId && scope.projectIds.length > 0 ? (
-              <label className="workspace-body-text mt-3 flex cursor-pointer items-center gap-2">
+              <Label
+                htmlFor="linear-include-no-project-input"
+                className="mt-3 cursor-pointer gap-2 text-[13px] leading-[19.5px] font-normal"
+              >
                 <Checkbox
+                  id="linear-include-no-project-input"
                   checked={scope.includeIssuesWithoutProject}
                   onChange={(event) => onChange({ ...scope, includeIssuesWithoutProject: event.target.checked })}
                   data-testid="linear-include-no-project"
                 />
                 {LINEAR_INTAKE_SETUP_COPY.includeNoProjectLabel}
-              </label>
+              </Label>
             ) : null}
           </fieldset>
           <fieldset className="min-w-0">
