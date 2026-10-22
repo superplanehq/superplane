@@ -100,6 +100,31 @@ describe("ColumnAutomationRows", () => {
     expect(screen.queryByTestId("rows-settings-intake-github")).not.toBeInTheDocument();
   });
 
+  it("offers run history for pull request closure", async () => {
+    const onRowAction = vi.fn();
+    const closure: ColumnAutomation = {
+      ...GITHUB_INTAKE,
+      id: "closure",
+      kind: "pr-closure",
+      name: "PR Closure",
+      catalogId: "pr-closure",
+    };
+    render(
+      <ColumnAutomationRows
+        title="Done"
+        automations={[closure]}
+        rowCount={1}
+        onRowAction={onRowAction}
+        testId="rows"
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId("rows-row-closure"));
+    expect(onRowAction).toHaveBeenCalledWith(closure, "settings");
+    expect(screen.getByTestId("rows-history-closure")).toBeInTheDocument();
+    expect(screen.queryByTestId("rows-settings-closure")).not.toBeInTheDocument();
+  });
+
   it("does not draw a box around the rows", () => {
     render(<ColumnAutomationRows title="Backlog" automations={[GITHUB_INTAKE]} rowCount={1} testId="rows" />);
 
