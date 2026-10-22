@@ -105,10 +105,26 @@ func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node model
 	if err != nil {
 		return nil, err
 	}
-	if stored := storedRunnerModel(node.Configuration); stored != "" && runnerFundingSource(node.Configuration) == models.UsageFundingSourceHosted {
-		ids = append(ids, stored)
+	stored := storedRunnerModel(node.Configuration)
+	if stored != "" {
+		include, err := storedRunnerModelIsAvailable(tx, orgID, provider, node.Configuration)
+		if err != nil {
+			return nil, err
+		}
+		if include {
+			ids = append(ids, stored)
+		}
 	}
 	return concreteLineRunnerModels(ids), nil
+}
+
+// storedRunnerModelIsAvailable keeps a stored BYOK model only while the
+// organization still has BYOK access. Hosted models stay available.
+func storedRunnerModelIsAvailable(tx *gorm.DB, orgID uuid.UUID, provider string, configuration map[string]any) (bool, error) {
+	if runnerFundingSource(configuration) == models.UsageFundingSourceHosted {
+		return true, nil
+	}
+	return models.OrganizationBYOKAccess(tx, orgID, provider)
 }
 
 func hostedSelectableLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, stored string) ([]string, error) {
