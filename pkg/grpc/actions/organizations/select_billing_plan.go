@@ -77,6 +77,12 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "Could not load the current plan.")
 	}
+	if strings.TrimSpace(req.GetPlanKey()) == models.BillingPlanNone {
+		if _, err := models.ActivateOrganizationBillingPlan(db, organizationID, models.BillingPlanNone); err != nil {
+			return nil, grpcerrors.FailedPrecondition(err, "Could not select this plan.")
+		}
+		return &pb.CreateBusinessCheckoutResponse{}, nil
+	}
 	catalog, err := models.FindBillingPlan(db, strings.TrimSpace(req.GetPlanKey()))
 	if err != nil || catalog.Category != "paid" || catalog.Visibility != "public" {
 		return nil, grpcerrors.InvalidArgument(nil, "Select an available paid plan.")

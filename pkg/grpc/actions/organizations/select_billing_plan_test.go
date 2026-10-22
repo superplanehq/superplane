@@ -1,6 +1,7 @@
 package organizations
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -58,6 +59,49 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	plan.RequirePaymentMethod = false
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
 	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
+}
+
+func TestSelectNoneBillingPlanWhenNoPublicPlansExist(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	cleanupDB := database.DB(context.WithoutCancel(t.Context()))
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	plans, err := models.ListBillingPlans(db)
+	require.NoError(t, err)
+	for _, plan := range plans {
+		if plan.Category != "paid" || plan.Visibility != "public" {
+			continue
+		}
+		original := plan
+		plan.Visibility = "private"
+		require.NoError(t, models.SaveBillingPlan(db, &plan))
+		t.Cleanup(func() { require.NoError(t, models.SaveBillingPlan(cleanupDB, &original)) })
+	}
+	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		t.Errorf("selecting None must not contact Polar: %s", req.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	usePolarTestServer(t, server)
+	plan := models.BillingPlan{Key: "private_" + uuid.NewString()[:8], Name: "Private", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	t.Cleanup(func() { require.NoError(t, models.DeleteBillingPlan(cleanupDB, plan.ID)) })
+	req := &pb.SelectBillingPlanRequest{PlanKey: models.BillingPlanNone}
+	response, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), req, r.Account.ID.String(), "http://localhost")
+	require.NoError(t, err)
+	require.Empty(t, response.CheckoutUrl)
+	current, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.BillingPlanNone, current.Plan)
+	require.Equal(t, models.BillingPlanNone, current.Catalog.Key)
+	require.Equal(t, models.BillingPlanSourceSystem, current.PlanSource)
+	require.False(t, current.AllowsHostedExecution(time.Now()))
+	require.False(t, current.AllowsCreditPurchase())
+
+	plan.Visibility = "public"
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), req, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 }
 
 func TestNewBillingIsOptInAndKeepsMigratedTrial(t *testing.T) {

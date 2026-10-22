@@ -63,6 +63,33 @@ beforeEach(() => {
   syncBilling.mockClear();
 });
 
+it.each([{ availablePlans: [] }, { availablePlans: undefined }])(
+  "finishes with None when no plans are available (%j)",
+  async ({ availablePlans }) => {
+    billing = { ...billing, availablePlans };
+    const user = userEvent.setup();
+    const finish = renderBilling();
+    expect(await screen.findByRole("button", { name: /None/ })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Finish setup" }));
+    await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
+    expect(selectPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.objectContaining({ planKey: "none" }) }),
+    );
+    expect(billing.catalogKey).toBe("none");
+    expect(createSession).not.toHaveBeenCalled();
+  },
+);
+
+it("keeps setup blocked when plans cannot load", async () => {
+  describeBilling.mockRejectedValueOnce(new Error("Billing unavailable"));
+  const finish = renderBilling();
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not load plans.");
+  expect(screen.queryByRole("button", { name: /None/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Finish setup" })).toBeDisabled();
+  expect(selectPlan).not.toHaveBeenCalled();
+  expect(finish).not.toHaveBeenCalled();
+});
+
 it("activates a plan without a card or checkout when neither is required", async () => {
   const user = userEvent.setup();
   const finish = renderBilling();

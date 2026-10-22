@@ -42,6 +42,20 @@ function currentPlanOption(
   };
 }
 
+function billingPlanChoices(
+  billing: OrganizationsDescribeOrganizationBillingResponse | undefined,
+  currentOption: OrganizationsBillingPlanOption | undefined,
+): OrganizationsBillingPlanOption[] {
+  const availablePlans = billing?.availablePlans ?? [];
+  if (currentOption && !availablePlans.some((option) => option.key === currentOption.key)) {
+    return [currentOption, ...availablePlans];
+  }
+  if (billing && availablePlans.length === 0) {
+    return [{ key: "none", name: "None", priceCents: "0" }];
+  }
+  return availablePlans;
+}
+
 function assertPlanActive(
   plan: OrganizationsBillingPlanOption,
   billing: OrganizationsDescribeOrganizationBillingResponse | undefined,
@@ -59,15 +73,13 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
   const cardSetup = useBillingCardSetup(organizationId);
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [selectedKey, setSelectedKey] = useState(searchParams.get("plan") ?? "");
+  const [requestedPlanKey, setRequestedPlanKey] = useState(searchParams.get("plan") ?? "");
   const [error, setError] = useState("");
   const [checkoutReturned, setCheckoutReturned] = useState(searchParams.get("subscribed") === "1");
-  const availablePlans = billing.data?.availablePlans ?? [];
   const currentOption = currentPlanOption(billing.data);
-  const plans =
-    currentOption && !availablePlans.some((option) => option.key === currentOption.key)
-      ? [currentOption, ...availablePlans]
-      : availablePlans;
+  const plans = billingPlanChoices(billing.data, currentOption);
+  const noPlans = billing.isSuccess && plans[0]?.key === "none";
+  const selectedKey = noPlans ? "none" : requestedPlanKey;
   const plan = plans.find((option) => option.key === selectedKey);
   const currentPlan = isCurrentBillingPlan(plan, billing.data);
   const needsCard =
@@ -88,7 +100,7 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
   }, [checkoutReturned, refresh]);
   useEffect(() => {
     if (selectedKey || !currentOption?.key) return;
-    setSelectedKey(currentOption.key);
+    setRequestedPlanKey(currentOption.key);
   }, [currentOption?.key, selectedKey]);
 
   const activate = useMutation({
@@ -130,12 +142,13 @@ function useOnboardingBilling(organizationId: string, onContinue: () => Promise<
   return {
     billing,
     plans,
+    noPlans,
     plan,
     currentOption,
     currentPlan,
     selectedKey,
     selectPlan: (option: OrganizationsBillingPlanOption) => {
-      setSelectedKey(option.key ?? "");
+      setRequestedPlanKey(option.key ?? "");
       setError("");
       if (option.subscriptionRequired && !isCurrentBillingPlan(option, billing.data)) {
         activate.mutate(option);
@@ -210,6 +223,7 @@ export function FirstRunBillingScreen({
   const {
     billing,
     plans,
+    noPlans,
     plan,
     currentOption,
     currentPlan,
@@ -226,7 +240,11 @@ export function FirstRunBillingScreen({
   return (
     <FirstRunShell testId="first-run-billing" chrome={chrome} busy={busy} sphere={sphere} visual="preview" width="wide">
       <FirstRunHeading headline="Choose a plan">
-        <p>Select a plan for your organization to finish setup.</p>
+        <p>
+          {noPlans
+            ? "No plans are available. Finish setup with no plan."
+            : "Select a plan for your organization to finish setup."}
+        </p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
         {billing.isPending && <p role="status">Loading plans…</p>}
@@ -243,9 +261,6 @@ export function FirstRunBillingScreen({
             onSelect={() => selectPlan(option)}
           />
         ))}
-        {billing.isSuccess && plans.length === 0 && (
-          <p role="alert">No plans are available. Contact an organization admin.</p>
-        )}
         {needsCard && <BillingCardSetup setup={cardSetup} disabled={busy} />}
         <LoadingButton
           type="button"
