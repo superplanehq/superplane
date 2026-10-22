@@ -60,6 +60,9 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 	if params.CanvasID == uuid.Nil || params.CanvasRunID == uuid.Nil || params.WorkOrderID == uuid.Nil {
 		return nil, ErrFactoryPlanningSessionInvalid
 	}
+	if err := LockOrganizationTaskAdmission(tx, f.OrganizationID); err != nil {
+		return nil, err
+	}
 	order, err := f.planningRefineWorkOrder(tx, params.WorkOrderID)
 	if err != nil {
 		return nil, err
@@ -76,6 +79,9 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 		return existing, nil
 	}
 	if !errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return nil, err
+	}
+	if err := checkOrganizationTaskAdmission(tx, f.OrganizationID, params.WorkOrderID); err != nil {
 		return nil, err
 	}
 

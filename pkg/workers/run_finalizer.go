@@ -70,6 +70,7 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 	go w.startExecutionFinishedConsumer(ctx)
 	go w.startEventTerminalConsumer(ctx)
 	go w.startQueueItemDeletedConsumer(ctx)
+	go w.startTaskAdmissionLoop(ctx)
 
 	//
 	// The database poller is supposed to catch runs that weren't finalized properly,
@@ -136,6 +137,9 @@ func (w *RunFinalizer) sweepCancellingRuns() error {
 
 		var cancellationResult *models.RunCancellationDrainResult
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			if err := models.LockRunOrganizationTaskAdmission(tx, run.ID); err != nil {
+				return err
+			}
 			result, err := run.DrainForCancellation(tx, run.CancelledBy)
 			if err != nil {
 				return err
@@ -375,6 +379,9 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	var factoryOrderUpdates []factoryWorkOrderUpdate
 	var mergeabilityRefresh *factoryPullRequestMergeabilityRefresh
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.LockRunOrganizationTaskAdmission(tx, runID); err != nil {
+			return err
+		}
 		var skipReason string
 		var err error
 		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger, eventCollector, executionCollector)
@@ -430,22 +437,9 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		w.logger.WithError(err).Warnf("Failed to publish run state message for run %s", runID)
 	}
 
-	for _, event := range newEvents {
-		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
-			return err
-		}
-	}
-
-	for _, execution := range executionUpdates {
-		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
-			return err
-		}
-	}
-
 	for _, nextFactoryLineRun := range nextFactoryLineRuns {
 		if err := messages.NewCanvasRunMessage(nextFactoryLineRun.workflowID.String(), nextFactoryLineRun.runID.String()).PublishPending(); err != nil {
 			w.logger.WithError(err).Warnf("Failed to publish pending run message for run %s", nextFactoryLineRun.runID)
-			return err
 		}
 	}
 
@@ -461,6 +455,18 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 			factoryevents.EventTypeLineStepExecutionCreated,
 		); err != nil {
 			w.logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", update.orderID)
+		}
+	}
+
+	for _, event := range newEvents {
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			return err
+		}
+	}
+
+	for _, execution := range executionUpdates {
+		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
+			return err
 		}
 	}
 
@@ -593,12 +599,17 @@ func factoryAdmissionOutcomes(admitted []*models.FactoryLineStepResult) ([]facto
 				factoryID: admission.Execution.FactoryID,
 				orderID:   admission.Execution.WorkOrderID,
 			})
+		} else if admission.QueueItem != nil {
+			orderUpdates = append(orderUpdates, factoryWorkOrderUpdate{factoryID: admission.QueueItem.FactoryID, orderID: admission.QueueItem.WorkOrderID})
 		}
 	}
 	return pendingRuns, orderUpdates
 }
 
 func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) ([]factoryLinePendingRun, []factoryWorkOrderUpdate, error) {
+	if err := models.LockRunOrganizationTaskAdmission(tx, runID); err != nil {
+		return nil, nil, err
+	}
 	//
 	// Finish current factory work order execution.
 	//
@@ -623,25 +634,35 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	}
 
 	if execution.Status == models.FactoryWorkOrderExecutionStatusFinished {
-		return nil, nil, nil
+		admitted, err := models.AdmitQueuedForOrganization(tx, execution.OrganizationID)
+		pending, updates := factoryAdmissionOutcomes(admitted)
+		return pending, updates, err
 	}
 
 	if err := execution.MarkFinished(tx, run.Result); err != nil {
 		return nil, nil, err
 	}
 
-	//
-	// The finished run freed a slot at its step: admit queued work orders
-	// while slots are free. Failed and cancelled runs free their slot the
-	// same way passed runs do.
-	//
-	admitted, err := models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
+	return w.advanceFactoryDispatchAndAdmit(tx, execution, run)
+}
+
+func (w *RunFinalizer) advanceFactoryDispatchAndAdmit(tx *gorm.DB, execution *models.FactoryWorkOrderExecution, run *models.CanvasRun) ([]factoryLinePendingRun, []factoryWorkOrderUpdate, error) {
+	result, err := w.advanceFactoryDispatch(tx, execution, run)
 	if err != nil {
 		return nil, nil, err
 	}
+	admitted, err := models.AdmitQueuedForOrganization(tx, execution.OrganizationID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if result != nil && result.Run != nil {
+		admitted = append([]*models.FactoryLineStepResult{result}, admitted...)
+	}
+	pending, updates := factoryAdmissionOutcomes(admitted)
+	return pending, updates, nil
+}
 
-	pendingRuns, orderUpdates := factoryAdmissionOutcomes(admitted)
-
+func (w *RunFinalizer) advanceFactoryDispatch(tx *gorm.DB, execution *models.FactoryWorkOrderExecution, run *models.CanvasRun) (*models.FactoryLineStepResult, error) {
 	//
 	// Advance (or finish) the line dispatch this step run belongs to. The
 	// dispatch's steps snapshot — not the live line — is authoritative for
@@ -649,7 +670,7 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	//
 	dispatch, err := models.LockWorkOrderLineDispatch(tx, execution.LineDispatchID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	//
@@ -658,26 +679,33 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	// this pass must neither finish nor advance it — doing so would
 	// cancel a live run or open a second step on the same traversal.
 	//
+	if !dispatch.IsActive() {
+		return nil, nil
+	}
+
 	openWork, err := dispatch.HasOpenWork(tx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if openWork {
-		return pendingRuns, orderUpdates, nil
+		return nil, nil
 	}
 
 	if run.Result != models.CanvasRunResultPassed {
-		return pendingRuns, orderUpdates, dispatch.Finish(tx, run.Result)
+		return nil, dispatch.Finish(tx, run.Result)
 	}
 
 	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
+	if errors.Is(err, models.ErrFactoryNotFound) {
+		return nil, dispatch.Finish(tx, models.CanvasRunResultCancelled)
+	}
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	workOrder, err := factory.FindWorkOrder(tx, execution.WorkOrderID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// The order closed while this step was running. The traversal is
@@ -685,27 +713,20 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	// doesn't keep a zombie active dispatch (which would block any
 	// re-dispatch after a reopen).
 	if !workOrder.IsOpen() {
-		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
+		return nil, dispatch.Finish(tx, models.CanvasRunResultCancelled)
 	}
 
 	nextIndex := execution.StepIndex + 1
 	if nextIndex >= len(dispatch.Steps) {
-		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultPassed)
+		return nil, dispatch.Finish(tx, models.CanvasRunResultPassed)
 	}
 
 	result, err := dispatch.EnqueueOrStartStep(tx, workOrder, nextIndex)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	if result.Run != nil {
-		pendingRuns = append(pendingRuns, factoryLinePendingRun{
-			workflowID: result.Run.WorkflowID,
-			runID:      result.Run.ID,
-		})
-	}
-
-	return pendingRuns, orderUpdates, nil
+	return result, nil
 }
 
 func finalizePullRequestActivityForRun(tx *gorm.DB, runID uuid.UUID) (*factoryWorkOrderUpdate, *factoryPullRequestMergeabilityRefresh, error) {

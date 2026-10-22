@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -468,18 +469,6 @@ func Test__DispatchWorkOrder__RejectsModelNotOnLine(t *testing.T) {
 }
 
 func Test__DispatchWorkOrder__FillsMissingTitleBeforeStart(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-
-	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
-	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
-		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
-	})
-	require.NoError(t, err)
-
 	longLine := strings.Repeat("a", 300)
 	skippedLead := "\n\n  ![shot](sp-file://abc)\nnull\nUntitled task\nn/a\n"
 	tests := []struct {
@@ -612,6 +601,17 @@ func Test__DispatchWorkOrder__FillsMissingTitleBeforeStart(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			db := database.DB(t.Context())
+			factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+			line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+				{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+			})
+			require.NoError(t, err)
+
 			order, err := factoryModel.CreateWorkOrder(db, "Seed title", tc.description, &r.User, nil, nil)
 			require.NoError(t, err)
 			title := tc.title
@@ -674,6 +674,15 @@ func Test__DispatchWorkOrder__ReplaceActiveLogsAdmittedRunOnItsOrder(t *testing.
 	var queuedBefore int64
 	require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", queued.ID).Count(&queuedBefore).Error)
 	require.Zero(t, queuedBefore, "the second order must wait for the step slot")
+
+	// The run stopped, but its factory execution still awaits finalization.
+	// Replacement can release this slot immediately and publish the waiter.
+	var oldExecution models.FactoryWorkOrderExecution
+	require.NoError(t, db.Where("work_order_id = ?", running.ID).First(&oldExecution).Error)
+	require.NotNil(t, oldExecution.RunID)
+	now := time.Now()
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", *oldExecution.RunID).
+		Updates(map[string]any{"state": models.CanvasRunStateFinished, "finished_at": &now}).Error)
 
 	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
 		FactoryId:     factoryModel.ID.String(),

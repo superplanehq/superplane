@@ -69,6 +69,9 @@ func UpdateWorkOrderStatus(
 	var fromState string
 	var changed bool
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, orgID); err != nil {
+			return err
+		}
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err
