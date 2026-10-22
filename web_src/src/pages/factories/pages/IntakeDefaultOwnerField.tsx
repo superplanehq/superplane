@@ -26,7 +26,7 @@ export function IntakeDefaultOwnerField({
         Default task owner
       </p>
       <p className="text-sm text-muted-foreground" id="intake-default-owner-help">
-        Assign this person when intake creates a task. Existing owner assignment rules take precedence.
+        Assign this person when intake creates a task.
       </p>
       <WorkOrderAssigneesPopover
         organizationId={organizationId}
