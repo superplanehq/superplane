@@ -132,7 +132,7 @@ activation stores the purchased quantity. The monthly total describes purchased
 capacity. Membership-based renewal estimates belong to
 [#8830](https://github.com/superplanehq/superplane/issues/8830).
 
-`occupied_seats` uses billing response field 27. Issue #8830 must reuse that
-field and allocate additional fields after it. An absent `seat_maximum` means
+`occupied_seats` uses billing response field 28. Issue #8830 must reuse that
+field and allocate additional fields after field 34. An absent `seat_maximum` means
 unlimited. An organization override replaces the target catalog maximum,
 including an unlimited override.
