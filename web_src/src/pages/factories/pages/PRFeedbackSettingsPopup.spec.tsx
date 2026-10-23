@@ -417,13 +417,24 @@ describe("PRFeedbackSettingsPopup agent tab", () => {
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
   });
 
-  it.each(sources)("sends the agent draft to the agent save for %s", async (_source, settings) => {
+  it.each(sources)("saves the selected agent model for %s", async (_source, settings) => {
     const user = userEvent.setup();
     const { onAgentSave } = renderAgentSettingsPopup(settings, { initialTab: "agent" });
 
+    expect(screen.getByRole("combobox")).toHaveTextContent("Claude Sonnet");
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("option", { name: "Claude Opus" }));
     await user.click(screen.getByTestId("planning-review-save"));
 
-    expect(onAgentSave).toHaveBeenCalledWith(expect.objectContaining({ components: expect.any(Array) }));
+    expect(onAgentSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        components: [
+          expect.objectContaining({
+            configuration: expect.objectContaining({ model: "opus" }),
+          }),
+        ],
+      }),
+    );
   });
 
   it("falls back to General for an agent deep link when the canvas has no agent", () => {
