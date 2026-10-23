@@ -386,6 +386,15 @@ groups Work Orders into:
 The list is ordered for actionability within each group and lets the user open
 the dedicated Work Order page.
 
+### Task admission queue
+
+The [task queue design](../design/task-queue.md) describes current admission
+behavior, including organization capacity, line step limits, ordering, and
+cancellation. Queue positions span all factories in an organization.
+A queued initial line start remains in Backlog until admission creates its
+execution. Task cards show the waiting task's position and can expose an action
+to remove its pending work.
+
 ## Automations Tab
 
 The Automations tab presents the Factory's Canvas-backed Automations as a

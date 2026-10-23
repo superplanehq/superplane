@@ -29,6 +29,15 @@ function pages(
 }
 
 describe("patchCachedWorkOrderList", () => {
+  it("updates queue positions and clears the queue status when pending work ends", () => {
+    const queued = patchCachedWorkOrderList([{ id: "wo-1" }], "wo-1", {
+      id: "wo-1",
+      queuedTasks: [{ id: "queue-1", position: 2 }],
+    });
+    expect(queued?.[0]?.queuedTasks).toEqual([{ id: "queue-1", position: 2 }]);
+    const admitted = patchCachedWorkOrderList(queued, "wo-1", { id: "wo-1" });
+    expect(admitted?.[0]?.queuedTasks).toBeUndefined();
+  });
   it("replaces a matching row", () => {
     const next = patchCachedWorkOrderList(
       [

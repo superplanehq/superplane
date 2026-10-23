@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -172,6 +173,19 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var runID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		// Task admission must lock the organization before the event, run,
+		// or planning session, matching line dispatch and run finalization.
+		if event.ExecutionID == nil {
+			canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
+			if err != nil {
+				return err
+			}
+			if canvas.FactoryID != nil {
+				if err := models.LockOrganizationTaskAdmission(tx, canvas.OrganizationID); err != nil {
+					return err
+				}
+			}
+		}
 		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
 			logger.Info("Event already being processed - skipping")
@@ -190,6 +204,14 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		return nil
 	})
 
+	if errors.Is(err, models.ErrOrganizationTaskCapacity) {
+		// Roll back routing and session attachment, keeping the root event in
+		// the durable queue. The pending-event sweep retries it after capacity
+		// is freed.
+		outcome = executorOutcomeSkipped
+		reason = executorReasonNone
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -299,6 +321,9 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, run.ID, nil
 	}
 
+	if err := models.CheckTaskRootEventAdmission(tx, canvas, event); err != nil {
+		return nil, uuid.Nil, err
+	}
 	if err := models.MaybeAttachAnalysisSession(tx, canvas, event, run); err != nil {
 		return nil, uuid.Nil, fmt.Errorf("attach analysis session for run %s: %w", run.ID, err)
 	}

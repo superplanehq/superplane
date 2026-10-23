@@ -78,3 +78,16 @@ export function answerPlanningSessionSurvey(
     },
   );
 }
+
+export function sendWorkOrderPlanningMessage(
+  organizationId: string,
+  factoryId: string,
+  workOrderId: string,
+  text: string,
+) {
+  return planningSessionRequest(
+    organizationId,
+    `/api/v1/factories/${factoryId}/work-orders/${workOrderId}/planning-session/messages`,
+    { method: "POST", body: JSON.stringify({ text }) },
+  );
+}

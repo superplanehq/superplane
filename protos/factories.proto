@@ -569,6 +569,18 @@ service Factories {
     };
   }
 
+  rpc CancelWorkOrderQueue(CancelWorkOrderQueueRequest) returns (CancelWorkOrderQueueResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/queue/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove a task from the queue";
+      description: "Cancels queued work without closing the task or stopping a run that has started";
+      tags: "Factory";
+    };
+  }
+
   rpc CloseWorkOrder(CloseWorkOrderRequest) returns (CloseWorkOrderResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{factory_id}/orders/{order_id}/close"
@@ -871,6 +883,10 @@ service Factories {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"
       body: "*"
+      additional_bindings {
+        post: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session/messages"
+        body: "*"
+      }
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Send planning session message";
@@ -1944,6 +1960,10 @@ message WorkOrder {
   // MCP client that created this task through a hand-off. Empty for
   // tasks that did not come from an MCP client.
   WorkOrderMcpClient mcp_client = 26;
+  // Pending work and its position in the organization task queue.
+  repeated QueuedTask queued_tasks = 27;
+  // True when starting this task would exceed the organization task limit.
+  bool task_limit_reached = 28;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -1978,6 +1998,33 @@ message WorkOrderSummary {
   WorkOrderMcpClient mcp_client = 21;
   // Canvas run that created this task. Needed to link intake history rows.
   string source_run_id = 22;
+  repeated QueuedTask queued_tasks = 23;
+  bool task_limit_reached = 24;
+}
+
+message QueuedTask {
+  string id = 1;
+  // One-based position across the organization's pending tasks.
+  int32 position = 2;
+  // Automation whose pending work this item identifies.
+  string name = 3;
+  // The line has no executions for this dispatch yet.
+  bool starts_line = 4;
+  string line_dispatch_id = 5;
+  // Other admitted automation work still holds this task slot.
+  bool task_active = 6;
+}
+
+message CancelWorkOrderQueueRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  // Identifies the pending work shown on the card. A stale request must not
+  // cancel a replacement or a run that has already been admitted.
+  string queue_id = 3;
+}
+
+message CancelWorkOrderQueueResponse {
+  WorkOrder order = 1;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -3041,6 +3088,8 @@ message SendPlanningSessionMessageRequest {
   string factory_id = 1;
   string session_id = 2;
   string text = 3;
+  // Use when the task has no planning session yet.
+  string work_order_id = 4;
 }
 
 message SendPlanningSessionMessageResponse {
