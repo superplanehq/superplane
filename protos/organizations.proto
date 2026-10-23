@@ -27,6 +27,23 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Organizations {
+  rpc AcceptInvitation(AcceptInvitationRequest) returns (google.protobuf.Struct) {
+    option (google.api.http) = { post: "/api/v1/invitations/{token}/accept" };
+  }
+
+  rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
+    option (google.api.http) = { post: "/api/v1/organizations/{id}/invitations" body: "*" };
+  }
+  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
+    option (google.api.http) = { get: "/api/v1/organizations/{id}/invitations" };
+  }
+  rpc ResendInvitation(ResendInvitationRequest) returns (ResendInvitationResponse) {
+    option (google.api.http) = { post: "/api/v1/organizations/{id}/invitations/{invitation_id}/resend" body: "*" };
+  }
+  rpc CancelInvitation(CancelInvitationRequest) returns (CancelInvitationResponse) {
+    option (google.api.http) = { delete: "/api/v1/organizations/{id}/invitations/{invitation_id}" };
+  }
+
   rpc DescribeOrganization(DescribeOrganizationRequest) returns (DescribeOrganizationResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}"
@@ -1245,3 +1262,55 @@ message OrganizationDeleted {
   string organization_id = 1;
   google.protobuf.Timestamp timestamp = 2;
 }
+
+// Tokens and token hashes are never part of an invitation resource.
+message OrganizationInvitation {
+  string id = 1;
+  string email = 2;
+  string role = 3;
+  string invited_by = 4;
+  string inviter_name = 5;
+  string state = 6;
+  google.protobuf.Timestamp sent_at = 7;
+  google.protobuf.Timestamp expires_at = 8;
+}
+
+message InvitationSeatSummary {
+  bool per_seat = 1;
+  optional int64 purchased = 2;
+  int64 occupied = 3;
+  int64 pending_invitations = 4;
+  optional int64 invitable = 5;
+  optional int64 purchasable = 6;
+  optional int64 member_limit = 7;
+}
+message CreateInvitationRequest {
+  string id = 1;
+  string email = 2;
+  // An organization role name. Defaults to Operator.
+  string role = 3;
+}
+message CreateInvitationResponse {
+  OrganizationInvitation invitation = 1;
+  string acceptance_url = 2;
+}
+message ListInvitationsRequest { string id = 1; }
+message ListInvitationsResponse {
+  repeated OrganizationInvitation invitations = 1;
+  InvitationSeatSummary seats = 2;
+}
+message ResendInvitationRequest {
+  string id = 1;
+  string invitation_id = 2;
+}
+message ResendInvitationResponse {
+  OrganizationInvitation invitation = 1;
+  string acceptance_url = 2;
+}
+message CancelInvitationRequest {
+  string id = 1;
+  string invitation_id = 2;
+}
+message CancelInvitationResponse {}
+
+message AcceptInvitationRequest { string token = 1; }

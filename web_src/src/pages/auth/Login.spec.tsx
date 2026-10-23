@@ -288,6 +288,48 @@ describe("Login signup-disabled return", () => {
     expect(screen.queryByRole("link", { name: "Continue with Google" })).not.toBeInTheDocument();
   });
 
+  it("carries an email invitation through signup when open registration is disabled", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/auth/config") {
+        return mockAuthConfig();
+      }
+      if (url === "/auth/magic-code/request") {
+        return new Response("{}", { status: 200 });
+      }
+      if (url.startsWith("/auth/magic-code/verify")) {
+        return new Response("Invalid code", { status: 401 });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderLogin("/signup?redirect=%2Finvitations%2Femail-token", "signup");
+
+    await screen.findByRole("button", { name: "Continue with email" });
+    await user.type(screen.getByPlaceholderText("you@example.com"), "invited@example.com");
+    await user.click(screen.getByRole("button", { name: "Continue with email" }));
+    await screen.findByPlaceholderText("Enter 6-digit code");
+    await user.type(screen.getByPlaceholderText("Enter 6-digit code"), "123456");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/auth/magic-code/verify?redirect=%2Finvitations%2Femail-token",
+      expect.objectContaining({ body: "email=invited%40example.com&code=123456&signup=true&invite_token=email-token" }),
+    );
+  });
+
+  it.each(["/invite/shared-token", "/invitations/email-token/other"])(
+    "keeps signup closed for %s",
+    async (redirect) => {
+      renderLogin(`/signup?redirect=${encodeURIComponent(redirect)}`, "signup");
+
+      expect(await screen.findByRole("heading", { name: "Signups are closed" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Continue with email" })).not.toBeInTheDocument();
+    },
+  );
+
   it("shows the waitlist after a provider callback when it is configured", async () => {
     authConfig.signupsBlockedByEnvironment = false;
     waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "portal-1";

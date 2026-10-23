@@ -417,7 +417,7 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.canCreateAccountFromRequest(r))
+	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.canCreateAccountFromRequest(r, gothUser.Email))
 	if err != nil {
 		a.handleProviderAuthError(w, r, gothUser, err)
 		return
@@ -607,17 +607,14 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !a.SignupsEnabled() && inviteToken == "" {
-		http.Error(w, SignupDisabledError, http.StatusForbidden)
+	invitedSignup := allowSignupFromInvite(r, email)
+	if inviteToken != "" && !invitedSignup {
+		http.Error(w, "The invitation is invalid or belongs to another email address.", http.StatusForbidden)
 		return
 	}
-
-	if inviteToken != "" {
-		inviteLink, err := models.FindInviteLinkByToken(database.DB(r.Context()), inviteToken)
-		if err != nil || !inviteLink.Enabled {
-			http.Error(w, "invite link not found or disabled", http.StatusForbidden)
-			return
-		}
+	if !invitedSignup && !a.SignupsEnabled() {
+		http.Error(w, SignupDisabledError, http.StatusForbidden)
+		return
 	}
 
 	if _, err := models.FindAccountByEmail(email); err == nil {
@@ -915,7 +912,7 @@ func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
 		return errAccountError
 	}
 
-	if allowSignupFromInvite(r) {
+	if allowSignupFromInvite(r, email) {
 		return nil
 	}
 
@@ -1186,8 +1183,8 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 	return account, true, nil
 }
 
-func (a *Handler) canCreateAccountFromRequest(r *http.Request) bool {
-	if allowSignupFromInvite(r) {
+func (a *Handler) canCreateAccountFromRequest(r *http.Request, email string) bool {
+	if allowSignupFromInvite(r, email) {
 		return true
 	}
 
@@ -1233,28 +1230,35 @@ func inviteRedirectPath(r *http.Request) string {
 	return getRedirectURL(r)
 }
 
-func allowSignupFromInvite(r *http.Request) bool {
-	redirectURL := inviteRedirectPath(r)
-	if !strings.HasPrefix(redirectURL, "/invite/") {
+func allowSignupFromInvite(r *http.Request, email string) bool {
+	token := invitationTokenFromRequest(r)
+	if token == "" {
 		return false
 	}
+	invitation, err := models.FindOrganizationInvitationByToken(database.DB(r.Context()), token)
+	if err != nil || invitation.EffectiveState(time.Now()) != models.InvitationStatePending {
+		return false
+	}
+	return utils.NormalizeEmail(invitation.Email) == utils.NormalizeEmail(email)
+}
 
-	parsedURL, err := url.Parse(redirectURL)
+func invitationTokenFromRequest(r *http.Request) string {
+	if token := strings.TrimSpace(r.FormValue("invite_token")); token != "" {
+		return token
+	}
+	parsedURL, err := url.Parse(inviteRedirectPath(r))
 	if err != nil {
-		return false
+		return ""
 	}
-
-	inviteToken := strings.TrimPrefix(parsedURL.Path, "/invite/")
-	if inviteToken == "" || strings.Contains(inviteToken, "/") {
-		return false
+	const prefix = "/invitations/"
+	if !strings.HasPrefix(parsedURL.Path, prefix) {
+		return ""
 	}
-
-	inviteLink, err := models.FindInviteLinkByToken(database.DB(r.Context()), inviteToken)
-	if err != nil || !inviteLink.Enabled {
-		return false
+	token := strings.TrimPrefix(parsedURL.Path, prefix)
+	if token == "" || strings.Contains(token, "/") {
+		return ""
 	}
-
-	return true
+	return token
 }
 
 func isSignupIntentFromRequest(r *http.Request) bool {

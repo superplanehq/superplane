@@ -30,6 +30,7 @@ import (
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/services"
 )
 
 type Services struct {
@@ -53,6 +54,7 @@ type Services struct {
 }
 
 type ServicesConfig struct {
+	EmailService     services.EmailService
 	BaseURL          string
 	WebhooksBaseURL  string
 	RunnerAPIBaseURL string
@@ -94,23 +96,22 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		return nil, err
 	}
 
+	organizationService := NewOrganizationService(cfg.AuthService, cfg.Registry, cfg.OIDCProvider, cfg.BaseURL, cfg.WebhooksBaseURL)
+	organizationService.invitations.Entitlements = entitlements
+	if cfg.EmailService != nil {
+		organizationService.invitations.EmailService = cfg.EmailService
+	}
 	return &Services{
-		Users:  NewUsersService(cfg.AuthService),
-		Groups: groups,
-		Roles:  roles,
-		Organizations: NewOrganizationService(
-			cfg.AuthService,
-			cfg.Registry,
-			cfg.OIDCProvider,
-			cfg.BaseURL,
-			cfg.WebhooksBaseURL,
-		),
-		Integrations: NewIntegrationService(cfg.Encryptor, cfg.Registry),
-		Secrets:      NewSecretService(cfg.Encryptor, cfg.AuthService),
-		Me:           NewMeService(cfg.AuthService),
-		Actions:      NewActionService(cfg.Registry),
-		Triggers:     NewTriggerService(cfg.Registry),
-		Widgets:      NewWidgetService(cfg.Registry),
+		Users:         NewUsersService(cfg.AuthService),
+		Groups:        groups,
+		Roles:         roles,
+		Organizations: organizationService,
+		Integrations:  NewIntegrationService(cfg.Encryptor, cfg.Registry),
+		Secrets:       NewSecretService(cfg.Encryptor, cfg.AuthService),
+		Me:            NewMeService(cfg.AuthService),
+		Actions:       NewActionService(cfg.Registry),
+		Triggers:      NewTriggerService(cfg.Registry),
+		Widgets:       NewWidgetService(cfg.Registry),
 		Canvases: NewCanvasService(
 			cfg.AuthService,
 			cfg.Registry,

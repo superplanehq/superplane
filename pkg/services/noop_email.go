@@ -19,11 +19,17 @@ type SentSupportFeedbackEmail struct {
 	Feedback SupportFeedback
 }
 
+type SentOrganizationInvitationEmail struct {
+	ToEmail string
+	Data    OrganizationInvitationTemplateData
+}
+
 type NoopEmailService struct {
-	mu                          sync.Mutex
-	magicCodeEmails             []SentMagicCodeEmail
-	workOrderNotificationEmails []SentWorkOrderNotificationEmail
-	supportFeedbackEmails       []SentSupportFeedbackEmail
+	organizationInvitationEmails []SentOrganizationInvitationEmail
+	mu                           sync.Mutex
+	magicCodeEmails              []SentMagicCodeEmail
+	workOrderNotificationEmails  []SentWorkOrderNotificationEmail
+	supportFeedbackEmails        []SentSupportFeedbackEmail
 }
 
 func NewNoopEmailService() *NoopEmailService {
@@ -103,7 +109,23 @@ func (s *NoopEmailService) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.organizationInvitationEmails = nil
 	s.magicCodeEmails = []SentMagicCodeEmail{}
 	s.workOrderNotificationEmails = []SentWorkOrderNotificationEmail{}
 	s.supportFeedbackEmails = []SentSupportFeedbackEmail{}
+}
+
+func (s *NoopEmailService) SendOrganizationInvitationEmail(toEmail string, data OrganizationInvitationTemplateData) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.organizationInvitationEmails = append(s.organizationInvitationEmails, SentOrganizationInvitationEmail{ToEmail: toEmail, Data: data})
+	return nil
+}
+
+func (s *NoopEmailService) SentOrganizationInvitationEmails() []SentOrganizationInvitationEmail {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	emails := make([]SentOrganizationInvitationEmail, len(s.organizationInvitationEmails))
+	copy(emails, s.organizationInvitationEmails)
+	return emails
 }
