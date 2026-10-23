@@ -567,13 +567,38 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 	respondJSON(w, response)
 }
 
+// adminBillingPlanListItem is an admin list response item. It is not a
+// persisted model and the reason is never accepted as deletion authorization.
+type adminBillingPlanListItem struct {
+	models.BillingPlan
+	DeleteDisabledReason *string `json:"delete_disabled_reason"`
+}
+
 func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
-	plans, err := models.ListBillingPlans(database.DB(r.Context()))
+	db := database.DB(r.Context())
+	plans, err := models.ListBillingPlans(db)
 	if err != nil {
 		http.Error(w, "Failed to load billing plans", http.StatusInternalServerError)
 		return
 	}
-	respondJSON(w, plans)
+	planIDs := make([]uuid.UUID, 0, len(plans))
+	for _, plan := range plans {
+		planIDs = append(planIDs, plan.ID)
+	}
+	assigned, err := models.ListAssignedBillingPlanIDs(db, planIDs)
+	if err != nil {
+		http.Error(w, "Failed to load billing plans", http.StatusInternalServerError)
+		return
+	}
+	items := make([]adminBillingPlanListItem, 0, len(plans))
+	for _, plan := range plans {
+		item := adminBillingPlanListItem{BillingPlan: plan}
+		if reason := plan.DeleteBlockReason(assigned.Contains(plan.ID)); reason != "" {
+			item.DeleteDisabledReason = &reason
+		}
+		items = append(items, item)
+	}
+	respondJSON(w, items)
 }
 
 func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
