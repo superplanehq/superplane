@@ -20,8 +20,8 @@ Open the template pull request against the current `release/v4.x` branch
 
 Before you copy the Compose file:
 
-1. Pin `SUPERPLANE_VERSION` to the current published GHCR tag.
-   Coolify rejects floating tags such as `latest`.
+1. Keep `SUPERPLANE_VERSION` pinned to `v1.0.0-rc5`, or the current
+   published GHCR tag. Coolify rejects floating tags such as `latest`.
 2. Keep `# logo: svgs/superplane.svg` and `# port: 8000`.
 3. Keep `SERVICE_URL_APP_8000` and `SERVICE_REALBASE64_32_ENCRYPTION`.
 4. Do not add `container_name`.

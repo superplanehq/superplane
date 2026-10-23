@@ -1,6 +1,6 @@
 # Coolify Git build pack: base directory /, this file as the Compose path.
 # Builds the runner and Fleet Manager from this repository.
-# Set SUPERPLANE_VERSION to a published ghcr tag.
+# SUPERPLANE_VERSION defaults to v1.0.0-rc5.
 # Coolify generates SERVICE_REALBASE64_32_ENCRYPTION and builds
 # ENCRYPTION_MASTER_KEYS. Keep that value. Do not paste a password.
 # Attach the public domain to service app on port 8000 (SERVICE_URL_APP_8000).
@@ -65,7 +65,7 @@ services:
       retries: 10
 
   app:
-    image: ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION:?}
+    image: ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION:-v1.0.0-rc5}
     pull_policy: always
     restart: unless-stopped
     stop_grace_period: 45s
@@ -171,8 +171,11 @@ services:
       ENABLE_PASSWORD_LOGIN: "yes"
       BLOCK_SIGNUP: "yes"
       REDIRECT_HTTP_REQUESTS: "yes"
+      SUPERPLANE_VERSION: ${SUPERPLANE_VERSION:-v1.0.0-rc5}
+      RUNNER_STABLE_VERSION: ${RUNNER_VERSION:-v0.2.1}
       SUPERPLANE_INSTALLATION_TYPE: single-host
       SUPERPLANE_BILLING_ENABLED: "no"
+      SUPERPLANE_BEACON_ENABLED: "yes"
       OTEL_ENABLED: "no"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-}
@@ -183,6 +186,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-single-host}
 
   runner-image:
     image: superplane-runner:${COMPOSE_PROJECT_NAME:-coolify}
