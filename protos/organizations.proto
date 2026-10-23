@@ -911,7 +911,14 @@ message DescribeOrganizationBillingResponse {
   bool has_payment_method = 24;
   repeated BillingPlanOption available_plans = 25;
   map<string, bool> product_features = 26;
-  optional int32 occupied_seats = 27;
+  optional int32 purchased_seats = 27;
+  optional int32 occupied_seats = 28;
+  optional int32 available_seats = 29;
+  optional int32 plan_maximum_seats = 30;
+  optional int32 purchasable_seats = 31;
+  optional int32 expected_renewal_seats = 32;
+  optional int64 current_monthly_total_cents = 33;
+  optional int64 expected_renewal_cents = 34;
 }
 
 message BillingPlanOption {

@@ -11,6 +11,7 @@ import {
 import { EMPTY_ORG_SPENDING_REPORT } from "../../__fixtures__/spendingReportFixtures";
 import {
   BUSINESS_ORGANIZATION_BILLING,
+  TEAM_ORGANIZATION_BILLING,
   DEFAULT_FACTORY_USAGE,
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
@@ -145,6 +146,49 @@ export const BillingCustomCreditTopUp: Story = {
     await userEvent.type(canvas.getByRole("textbox", { name: "Credit amount in USD" }), "100");
     await canvas.findByText("$105.79");
   },
+};
+
+export const BillingTeam: Story = {
+  name: "Billing (Team seats)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      factoriesFixture={{ ...defaultFactoriesFixture, organizationBilling: { ...TEAM_ORGANIZATION_BILLING } }}
+    />
+  ),
+};
+
+export const BillingTeamEnding: Story = {
+  name: "Billing (Team subscription ends)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        organizationBilling: { ...TEAM_ORGANIZATION_BILLING, cancelAtPeriodEnd: true },
+      }}
+    />
+  ),
+};
+
+export const BillingTeamLegacyCapacity: Story = {
+  name: "Billing (Team zero capacity, unlimited maximum)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        organizationBilling: {
+          ...TEAM_ORGANIZATION_BILLING,
+          purchasedSeats: 0,
+          availableSeats: 0,
+          currentMonthlyTotalCents: "0",
+          planMaximumSeats: undefined,
+          purchasableSeats: undefined,
+        },
+      }}
+    />
+  ),
 };
 
 export const BillingEmptyHistory: Story = {

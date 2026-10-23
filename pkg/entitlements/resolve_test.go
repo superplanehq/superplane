@@ -223,4 +223,26 @@ func TestResolveMemberLimits(t *testing.T) {
 	}
 }
 
+func TestResolveSeatsForPlanUsesLoadedPlan(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: seatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
+	loaded, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+
+	// Change the stored plan after the caller's read. Seat usage must follow
+	// the loaded plan so counts and prices stay consistent.
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 9).Error)
+
+	actual, err := ResolveSeatsForPlan(db, r.Organization.ID, loaded)
+	require.NoError(t, err)
+	require.Equal(t, SeatUsage{PerSeat: true, Purchased: seatCount(3), Occupied: 1, Available: seatCount(2), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(1)}, *actual)
+}
+
 func seatCount(quantity int) *int { return &quantity }

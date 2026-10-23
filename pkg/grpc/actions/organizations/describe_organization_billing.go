@@ -50,10 +50,6 @@ func DescribeOrganizationBilling(
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
 	}
-	seats, err := entitlements.ResolveSeats(db, organizationID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "Could not load seat usage.")
-	}
 	hasCard := false
 	if billingEnabled && newBilling && hasCustomer {
 		hasCard, err = polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())
@@ -98,9 +94,8 @@ func DescribeOrganizationBilling(
 			})
 		}
 	}
-	return &pb.DescribeOrganizationBillingResponse{
+	response := &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
-		OccupiedSeats:               new(int32(seats.Occupied)),
 		ProductFeatures:             productFeatures,
 		RequirePaymentMethod:        models.BillingEnabled() && newBilling && plan.Catalog.RequirePaymentMethod,
 		HasPaymentMethod:            hasCard,
@@ -126,7 +121,32 @@ func DescribeOrganizationBilling(
 		WelcomeRemainingCents:       pricebook.MicrosToCents(credit.WelcomeRemainingMicros),
 		AdminRemainingCents:         pricebook.MicrosToCents(credit.AdminRemainingMicros),
 		CancelAtPeriodEnd:           plan.CancelAtPeriodEnd,
-	}, nil
+	}
+	if !models.BillingEnabled() {
+		return response, nil
+	}
+
+	seats, err := entitlements.ResolveSeatsForPlan(db, organizationID, plan)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load seat usage.")
+	}
+	response.OccupiedSeats = new(int32(seats.Occupied))
+	if !seats.PerSeat {
+		return response, nil
+	}
+
+	response.PurchasedSeats = new(int32(*seats.Purchased))
+	response.AvailableSeats = new(int32(*seats.Available))
+	response.ExpectedRenewalSeats = new(int32(*seats.RenewalQuantity))
+	response.CurrentMonthlyTotalCents = new(int64(*seats.Purchased) * plan.Catalog.PriceCents)
+	response.ExpectedRenewalCents = new(int64(*seats.RenewalQuantity) * plan.Catalog.PriceCents)
+	if seats.PlanMaximum != nil {
+		response.PlanMaximumSeats = new(int32(*seats.PlanMaximum))
+	}
+	if seats.Purchasable != nil {
+		response.PurchasableSeats = new(int32(*seats.Purchasable))
+	}
+	return response, nil
 }
 
 func SyncOrganizationBilling(
