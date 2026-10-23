@@ -76,15 +76,16 @@ func DescribeOrganizationBilling(
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "Could not load billing plans.")
 		}
+		override, err := models.FindOrganizationSeatLimitOverride(db, organizationID)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "Could not load seat limits.")
+		}
 		for _, item := range catalog {
 			if item.Visibility != "public" || item.Category != "paid" {
 				continue
 			}
 			checkoutEnabled = checkoutEnabled || item.PolarProductID != nil
-			maximum, err := entitlements.SeatMaximumForPlan(db, organizationID, &item)
-			if err != nil {
-				return nil, grpcerrors.Internal(err, "Could not load seat limits.")
-			}
+			maximum := entitlements.SeatMaximum(item.SeatLimit, override)
 			var seatMaximum *int32
 			if maximum != nil {
 				seatMaximum = new(int32(*maximum))

@@ -51,7 +51,7 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 	}
 	result := &Entitlements{
 		PlanID: catalog.ID, PlanKey: catalog.Key, PlanName: catalog.Name,
-		PlanSeatLimit: catalog.SeatLimit, SeatLimitOverride: override, SeatLimit: seatMaximum(catalog.SeatLimit, override), ParallelTaskLimit: catalog.ParallelTaskLimit,
+		PlanSeatLimit: catalog.SeatLimit, SeatLimitOverride: override, SeatLimit: SeatMaximum(catalog.SeatLimit, override), ParallelTaskLimit: catalog.ParallelTaskLimit,
 		Features:         productFeatures,
 		CreditPolicy:     CreditPolicy{AmountCents: catalog.CreditAmountCents, Frequency: catalog.CreditFrequency, Expiration: catalog.CreditExpiration, ValidityDays: catalog.CreditValidityDays},
 		TrialCreditCents: catalog.TrialCreditCents, TrialLengthDays: catalog.TrialLengthDays, MarkupBPS: markup,

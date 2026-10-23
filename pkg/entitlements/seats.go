@@ -72,10 +72,12 @@ func SeatMaximumForPlan(tx *gorm.DB, orgID uuid.UUID, catalog *models.BillingPla
 	if err != nil {
 		return nil, err
 	}
-	return seatMaximum(catalog.SeatLimit, override), nil
+	return SeatMaximum(catalog.SeatLimit, override), nil
 }
 
-func seatMaximum(catalogLimit *int, override *models.OrganizationSeatLimitOverride) *int {
+// SeatMaximum applies a loaded organization override to a catalog limit.
+// A nil override limit means unlimited, rather than falling back to the catalog.
+func SeatMaximum(catalogLimit *int, override *models.OrganizationSeatLimitOverride) *int {
 	if override != nil {
 		return override.SeatLimit
 	}
