@@ -449,6 +449,7 @@ func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session/messages"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/survey-answer"},
 	}
 

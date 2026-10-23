@@ -1,20 +1,20 @@
 import type { FactoriesFactory, FactoriesWorkOrderArtifact } from "@/api-client";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import type { ReactNode } from "react";
 
 import { analysisFirstResultDelivered } from "../lib/analysisOutcome";
 import { factoryPlanningEnabled } from "../pages/planningSettingsModel";
-import { draftStripAnalysis } from "../pages/work-order-split-run/draftStripAnalysis";
+import { draftAnalysisQueued, draftStripAnalysis } from "../pages/work-order-split-run/draftStripAnalysis";
+import { SPLIT_RUN_ANALYZING_NOTE } from "../pages/work-order-split-run/splitRunFooter";
 import type { IntentAnalysisChat } from "../pages/work-order-split-run/intentAnalysisChat";
 import type { SplitRunFixture } from "../pages/work-order-split-run/splitRunMocks";
 import { useAnalysisPlanningSession } from "../pages/work-order-split-run/useAnalysisPlanningSession";
 
 export type MobileRefineChat = {
-  /** Refine chat for a Planning draft that has a session. Undefined otherwise. */
+  /** Refine chat for a Planning draft, including analysis recovery. */
   chat?: IntentAnalysisChat;
   loadFailed: boolean;
-  /** Lookup succeeded, but this draft has no planning session. */
-  sessionMissing: boolean;
 };
 
 /**
@@ -44,6 +44,13 @@ export function useMobileRefineChat({
   modelSelect?: ReactNode;
 }): MobileRefineChat {
   const refines = factoryPlanningEnabled(factory) && fixture.footer.kind === "draft";
+  const analysisQueued = draftAnalysisQueued(fixture);
+  const analysisActive = !analysisQueued && fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
+  const { data: workspaceUsage } = useOrganizationWorkspaceUsage(refines ? organizationId : "", 30, true);
+  const taskLimitReached =
+    workspaceUsage?.activeTaskCount != null
+      ? workspaceUsage.parallelTaskLimit != null && workspaceUsage.activeTaskCount >= workspaceUsage.parallelTaskLimit
+      : fixture.taskLimitReached;
   const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId, orderId });
   const analysis = useAnalysisPlanningSession({
     organizationId,
@@ -52,19 +59,17 @@ export function useMobileRefineChat({
     enabled: refines && Boolean(organizationId && factoryId && orderId),
     canUpdate,
     refinementCanStart: refines,
+    analysisActive,
+    analysisQueued,
     isUploading: fileUpload.isUploading,
     uploadFiles: fileUpload.uploadFiles,
     analysisDelivered: analysisFirstResultDelivered({ checks: fixture.checks, artifacts }),
   });
-  if (!refines) {
-    return { loadFailed: false, sessionMissing: false };
-  }
-  if (!analysis.showChat && !analysis.queryError) {
-    return { loadFailed: false, sessionMissing: !analysis.isLoading };
+  if (!refines || (!analysis.showChat && analysis.isLoading && !analysis.queryError)) {
+    return { loadFailed: false };
   }
   return {
-    chat: draftStripAnalysis({ factory, organizationId, factoryKey, fixture, analysis }, modelSelect),
+    chat: draftStripAnalysis({ factory, organizationId, factoryKey, fixture, analysis, taskLimitReached }, modelSelect),
     loadFailed: Boolean(analysis.queryError),
-    sessionMissing: false,
   };
 }

@@ -145,7 +145,11 @@ function AnalysisRequestChat({
                 activities={analysis.view.activities}
               />
             ) : null}
-            <AnalysisPlanControls analysis={analysis} chipsWorking={chipsWorking} position="conversation" />
+            <AnalysisPlanControls
+              analysis={images.pending.length ? { ...analysis, canAnalyze: false } : analysis}
+              chipsWorking={chipsWorking}
+              position="conversation"
+            />
             {state.showSurvey && analysis.view.survey ? (
               <WorkOrderIntentSurvey
                 survey={analysis.view.survey}

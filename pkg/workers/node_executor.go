@@ -309,6 +309,10 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	runCancellations := &RunCancellationNotifier{}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.LockTaskExecutionAdmission(tx, id); err != nil {
+			return err
+		}
+
 		//
 		// Try to lock the execution record for update.
 		// If we can't, it means another worker is already processing it.

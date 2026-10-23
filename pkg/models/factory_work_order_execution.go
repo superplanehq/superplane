@@ -226,12 +226,8 @@ func (e *FactoryWorkOrderExecution) abortForDeletedRun(tx *gorm.DB) error {
 }
 
 func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) error {
-	f, err := FindFactory(tx, e.OrganizationID, e.FactoryID)
-	if err != nil {
-		return err
-	}
-
-	order, err := f.FindWorkOrder(tx, e.WorkOrderID)
+	// Completion records history even after the workspace is soft-deleted.
+	order, err := FindUnscopedWorkOrder(tx, e.WorkOrderID)
 	if err != nil {
 		return err
 	}

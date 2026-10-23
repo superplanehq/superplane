@@ -3935,6 +3935,13 @@ CREATE INDEX idx_factory_work_order_executions_line_dispatch ON public.factory_w
 
 
 --
+-- Name: idx_factory_work_order_executions_organization_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_executions_organization_active ON public.factory_work_order_executions USING btree (organization_id) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying])::text[]));
+
+
+--
 -- Name: idx_factory_work_order_executions_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3981,6 +3988,13 @@ CREATE INDEX idx_factory_work_order_queue_items_factory ON public.factory_work_o
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_order_queue_items USING btree (work_order_id);
+
+
+--
+-- Name: idx_factory_work_order_queue_items_organization_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_queue_items_organization_created ON public.factory_work_order_queue_items USING btree (organization_id, created_at, id);
 
 
 --
@@ -6053,7 +6067,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261023153557	f
+20261023160832	f
 \.
 
 

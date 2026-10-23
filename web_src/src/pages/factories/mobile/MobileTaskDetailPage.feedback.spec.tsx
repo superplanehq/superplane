@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -17,7 +18,6 @@ import {
   RUNNING_WORK_ORDER,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
-import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileTaskDetailPage } from "./MobileTaskDetailPage";
 
 const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading: boolean; isError: boolean } => ({
@@ -26,15 +26,26 @@ const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading
   isError: false,
 }));
 
-const { findPlanningSession, liveCanvas } = vi.hoisted(() => ({
+const { findPlanningSession, sendWorkOrderPlanningMessage, analyzingOrderIds, liveCanvas } = vi.hoisted(() => ({
   findPlanningSession: vi.fn(),
+  sendWorkOrderPlanningMessage: vi.fn(),
+  analyzingOrderIds: { current: new Set<string>() },
   liveCanvas: { current: undefined as unknown },
 }));
 
 vi.mock("../pages/planningSessionClient", () => ({
   findPlanningSessionByWorkOrder: (...args: unknown[]) => findPlanningSession(...args),
   sendPlanningSessionMessage: vi.fn(),
+  sendWorkOrderPlanningMessage: (...args: unknown[]) => sendWorkOrderPlanningMessage(...args),
   answerPlanningSessionSurvey: vi.fn(),
+}));
+
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({ data: { activeTaskCount: 0, parallelTaskLimit: 1 } }),
+}));
+
+vi.mock("@/hooks/useBacklogAnalysisRuns", () => ({
+  useFactoryBacklogAnalysis: () => ({ analyzingOrderIds: analyzingOrderIds.current, runsByWorkOrder: new Map() }),
 }));
 
 vi.mock("../pages/usePlanningSessionLiveRun", () => ({
@@ -128,19 +139,52 @@ describe("MobileTaskDetailPage missing refinement session", () => {
   beforeEach(() => {
     findPlanningSession.mockReset();
     findPlanningSession.mockResolvedValue(null);
+    sendWorkOrderPlanningMessage.mockReset();
+    sendWorkOrderPlanningMessage.mockImplementation(() => new Promise(() => {}));
+    analyzingOrderIds.current = new Set();
     liveCanvas.current = undefined;
   });
 
-  it("keeps the description and explains why replies are not available", async () => {
+  it("lets a dequeued draft restart analysis before it has a planning session", async () => {
+    const user = userEvent.setup();
     useWorkOrder.mockReturnValue({ data: DRAFT_WORK_ORDER, isLoading: false, isError: false });
     renderTask(
       `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
     );
 
-    expect(await screen.findByText(MOBILE_TASK_COPY.noRefinementSession)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Description" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
+    const analyze = await screen.findByRole("button", { name: "Analyze" });
+    expect(screen.getByTestId("split-run-intent-composer")).toBeEnabled();
+    await user.click(analyze);
+
+    await waitFor(() =>
+      expect(sendWorkOrderPlanningMessage).toHaveBeenCalledWith(
+        "org-1",
+        PRIMARY_FACTORY_ID,
+        DRAFT_WORK_ORDER.id,
+        "Analyze this task.",
+      ),
+    );
+  });
+
+  it("shows the analysis queue position while it waits for a slot", async () => {
+    analyzingOrderIds.current = new Set([DRAFT_WORK_ORDER.id ?? ""]);
+    useWorkOrder.mockReturnValue({
+      data: {
+        ...DRAFT_WORK_ORDER,
+        queuedTasks: [{ id: "analysis-queue", name: "Task analysis", position: 2 }],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+
+    await screen.findByTestId("split-run-intent-composer");
+    expect(screen.getByRole("status")).toHaveTextContent("Queued #2");
+    expect(screen.getByTestId("split-run-intent-composer")).toBeDisabled();
+    expect(screen.queryByText("Analyzing task…")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(Analyze|Queue analysis)$/ })).not.toBeInTheDocument();
   });
 });
 
@@ -148,6 +192,23 @@ describe("MobileTaskDetailPage stored phase log", () => {
   beforeEach(() => {
     findPlanningSession.mockReset();
     findPlanningSession.mockResolvedValue(null);
+  });
+
+  it("keeps running status when another automation is queued on an active task", () => {
+    useWorkOrder.mockReturnValue({
+      data: {
+        ...RUNNING_WORK_ORDER,
+        queuedTasks: [{ id: "queue-follow-up", name: "Review", position: 2, taskActive: true }],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${RUNNING_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+
+    expect(screen.getByTestId("mobile-task-status")).toHaveTextContent("Running");
+    expect(screen.getByRole("status")).toHaveTextContent("Queued #2");
   });
 
   it.each([
