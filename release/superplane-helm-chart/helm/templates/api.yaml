@@ -112,8 +112,6 @@ spec:
                 name: {{ include "secrets.linear.name" . }}
             {{- end }}
           env:
-            - name: ENCRYPTION_WRITE_FORMAT
-              value: {{ .Values.encryption.writeFormat | quote }}
             - name: START_PUBLIC_API
               value: "yes"
             - name: START_EVENT_DISTRIBUTER
@@ -178,6 +176,8 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+            - name: SUPERPLANE_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
             {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
 {{- if .Values.fleetManagerSetup.enabled }}
             - name: FLEET_MANAGER_SETUP_CONFIG_PATH

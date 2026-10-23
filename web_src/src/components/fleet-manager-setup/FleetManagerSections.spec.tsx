@@ -65,7 +65,7 @@ describe("FleetManagerProviderSection", () => {
     const { setup, setProvider } = buildSetup();
     render(<FleetManagerProviderSection setup={setup} />);
 
-    await user.click(screen.getByRole("button", { name: "Azure" }));
-    expect(setProvider).toHaveBeenCalledWith("azure");
+    await user.click(screen.getByRole("button", { name: "GCP" }));
+    expect(setProvider).toHaveBeenCalledWith("gcp");
   });
 });

@@ -20,6 +20,7 @@ const (
 	OwnerSetupStepFleetFleets   = "fleet-fleets"
 	OwnerSetupStepFleetValues   = "fleet-values"
 	OwnerSetupStepFleetInstall  = "fleet-install"
+	OwnerSetupStepFleetDocker   = "fleet-docker"
 )
 
 type InstallationMetadata struct {
@@ -28,6 +29,7 @@ type InstallationMetadata struct {
 	AllowPrivateNetworkAccess bool
 	SignupsEnabled            bool
 	OwnerSetupStep            *string `gorm:"type:text"`
+	ShareOwnerIdentity        bool
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 }
@@ -42,6 +44,7 @@ var OwnerSetupSteps = []string{
 	OwnerSetupStepFleetFleets,
 	OwnerSetupStepFleetValues,
 	OwnerSetupStepFleetInstall,
+	OwnerSetupStepFleetDocker,
 }
 
 func IsOwnerSetupStep(step string) bool {
@@ -133,6 +136,22 @@ func SetOwnerSetupStepIfOpen(tx *gorm.DB, step string) (bool, error) {
 	return updated, err
 }
 
+// SetShareOwnerIdentity records whether weekly install reports may include
+// the owner email and the first organization name.
+func SetShareOwnerIdentity(tx *gorm.DB, share bool) error {
+	if _, err := findOrCreateInstallationMetadata(tx); err != nil {
+		return err
+	}
+
+	return tx.Model(&InstallationMetadata{}).
+		Where("id = ?", installationMetadataID).
+		Updates(map[string]any{
+			"share_owner_identity": share,
+			"updated_at":           time.Now(),
+		}).
+		Error
+}
+
 func UpdateInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) error {
 	if _, err := findOrCreateInstallationMetadata(tx); err != nil {
 		return err
@@ -152,7 +171,7 @@ func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error
 	var metadata InstallationMetadata
 	err := tx.Where("id = ?", installationMetadataID).First(&metadata).Error
 	if err == nil {
-		return &metadata, nil
+		return installationMetadataWithID(tx, &metadata)
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
@@ -175,5 +194,30 @@ func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error
 		return nil, err
 	}
 
-	return &metadata, nil
+	return installationMetadataWithID(tx, &metadata)
+}
+
+func installationMetadataWithID(tx *gorm.DB, metadata *InstallationMetadata) (*InstallationMetadata, error) {
+	if validInstallationID(metadata.InstallationID) {
+		return metadata, nil
+	}
+
+	next := uuid.NewString()
+	result := tx.Model(&InstallationMetadata{}).
+		Where("id = ? AND installation_id = ?", installationMetadataID, metadata.InstallationID).
+		Update("installation_id", next)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	if err := tx.Where("id = ?", installationMetadataID).First(metadata).Error; err != nil {
+		return nil, err
+	}
+
+	return metadata, nil
+}
+
+func validInstallationID(value string) bool {
+	parsed, err := uuid.Parse(value)
+	return err == nil && parsed != uuid.Nil
 }

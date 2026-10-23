@@ -50,7 +50,6 @@ export type PlanningReviewAgentSlot = {
   factoryKey?: string;
   automationId?: string;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
-  showVisualEvidenceSetting?: boolean;
 };
 
 /** Agent editor body. The column menu popup and the automation view Agent tab share this. */
@@ -66,7 +65,6 @@ export function PlanningReviewEditor({
   isLoading = false,
   showAutomationNote = true,
   showCancel = true,
-  showVisualEvidenceSetting = false,
 }: {
   initialDraft?: PlanningReviewDraft;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
@@ -79,7 +77,6 @@ export function PlanningReviewEditor({
   isLoading?: boolean;
   showAutomationNote?: boolean;
   showCancel?: boolean;
-  showVisualEvidenceSetting?: boolean;
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
@@ -127,7 +124,6 @@ export function PlanningReviewEditor({
             organizationId={organizationId}
             factoryId={factoryId}
             factoryKey={factoryKey}
-            showVisualEvidenceSetting={showVisualEvidenceSetting}
             onRestoreDefaultPrompt={restore.showRestore ? () => restore.setConfirmOpen(true) : undefined}
             restoreDefaultPromptDisabled={restore.isRestoring}
             restoreError={restore.restoreError}

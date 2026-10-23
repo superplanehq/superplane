@@ -18,6 +18,7 @@ export interface WorkOrderCreditFailureCopy {
 /** Result messages the runner stores when hosted credit blocks a node. */
 const CREDIT_FAILURE_MESSAGE: Record<string, WorkOrderCreditFailureReason> = {
   "This organization has no hosted credit.": "no_hosted_credit",
+  "Contact an installation admin to keep SuperPlane-hosted runs.": "hosted_subscription_required",
   "Subscribe to Business to keep SuperPlane-hosted runs.": "hosted_subscription_required",
   "This workspace has no remaining hosted credit.": "workspace_budget_empty",
 };
@@ -30,8 +31,8 @@ const CREDIT_FAILURE_COPY: Record<WorkOrderCreditFailureReason, WorkOrderCreditF
   },
   hosted_subscription_required: {
     label: "No plan",
-    message: "This agent run is blocked. SuperPlane hosted runs need a Business plan.",
-    actionLabel: "Subscribe",
+    message: "This agent run is blocked. SuperPlane hosted runs need an active plan.",
+    actionLabel: "View billing",
   },
   workspace_budget_empty: {
     label: "No workspace budget",

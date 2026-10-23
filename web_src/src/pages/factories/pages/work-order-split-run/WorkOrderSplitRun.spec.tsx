@@ -107,6 +107,7 @@ import { idleLiveLogStream } from "./PhaseLogCard.testHelpers";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
+import { workOrderPlanningSessionQueryKey } from "./useAnalysisPlanningSession";
 import { buildSplitRunFooter } from "./splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunFixture } from "./splitRunMocks";
 import { WORK_ORDER_FULL_PAGE_STORAGE_KEY } from "./workOrderFullPagePreference";
@@ -177,6 +178,7 @@ function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
   const view = render(ui(props));
   return {
     ...view,
+    queryClient: client,
     rerenderPopup: (next: ComponentProps<typeof WorkOrderSplitRunPopup> = props) => view.rerender(ui(next)),
   };
 }
@@ -268,6 +270,70 @@ describe("WorkOrderSplitRunPopup", () => {
       allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_REBASE"],
       headSha: "abc123",
     };
+  });
+
+  it("does not poll a missing session when Planning is off", async () => {
+    factoryPlanning.current = { enabled: false, clarity: false, confidence: false };
+    const { queryClient } = renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(findPlanningSessionMock).toHaveBeenCalledTimes(1);
+    });
+    const query = queryClient.getQueryCache().find({
+      queryKey: workOrderPlanningSessionQueryKey(
+        FACTORIES_ORGANIZATION_ID,
+        PRIMARY_FACTORY_ID,
+        DRAFT_WORK_ORDER.id ?? "",
+      ),
+    });
+    expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBeUndefined();
+  });
+
+  it("does not poll a missing session on a started task", async () => {
+    const { queryClient } = renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: RUNNING_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(findPlanningSessionMock).toHaveBeenCalledTimes(1);
+    });
+    const query = queryClient.getQueryCache().find({
+      queryKey: workOrderPlanningSessionQueryKey(
+        FACTORIES_ORGANIZATION_ID,
+        PRIMARY_FACTORY_ID,
+        RUNNING_WORK_ORDER.id ?? "",
+      ),
+    });
+    expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBeUndefined();
+  });
+
+  it("polls a missing session while a draft can start refinement", async () => {
+    const { queryClient } = renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(findPlanningSessionMock).toHaveBeenCalledTimes(1);
+    });
+    const query = queryClient.getQueryCache().find({
+      queryKey: workOrderPlanningSessionQueryKey(
+        FACTORIES_ORGANIZATION_ID,
+        PRIMARY_FACTORY_ID,
+        DRAFT_WORK_ORDER.id ?? "",
+      ),
+    });
+    expect((query?.options as { refetchInterval?: unknown } | undefined)?.refetchInterval).toBe(15_000);
   });
 
   it("does not put an expand control on the Log heading", () => {

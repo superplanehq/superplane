@@ -310,7 +310,7 @@ func jiraEventIssueKey(t *testing.T, event map[string]any) string {
 	return key
 }
 
-func Test__ProductiveSeedAsksForTenNewestTasks(t *testing.T) {
+func Test__ProductiveSeedAsksForThreeNewestTasks(t *testing.T) {
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		{
 			StatusCode: http.StatusOK,
@@ -332,7 +332,7 @@ func Test__ProductiveSeedAsksForTenNewestTasks(t *testing.T) {
 	require.Len(t, httpContext.Requests, 1)
 	query := httpContext.Requests[0].URL.Query()
 	assert.Equal(t, "42", query.Get("filter[project_id]"))
-	assert.Equal(t, "10", query.Get("page[size]"))
+	assert.Equal(t, "3", query.Get("page[size]"))
 	assert.Equal(t, "list-a,list-b", query.Get("filter[task_list_id]"))
 }
 
@@ -966,11 +966,11 @@ func Test__newestSentrySeedIssues__QueriesEachProjectAndCapsTheTotal(t *testing.
 	require.NoError(t, err)
 	require.Len(t, issues, intakeSentrySeedSize)
 	assert.Equal(t, "1", issues[0].ID)
-	assert.Equal(t, "10", issues[len(issues)-1].ID)
+	assert.Equal(t, "3", issues[len(issues)-1].ID)
 	require.Len(t, httpContext.Requests, 2)
 	assert.Contains(t, httpContext.Requests[0].URL.Path, "/projects/example/payments/issues/")
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/projects/example/growth/issues/")
-	assert.Contains(t, httpContext.Requests[0].URL.RawQuery, "limit=10")
+	assert.Contains(t, httpContext.Requests[0].URL.RawQuery, "limit=3")
 }
 
 func sentrySeedIssuePage(start, count int, newest time.Time) string {

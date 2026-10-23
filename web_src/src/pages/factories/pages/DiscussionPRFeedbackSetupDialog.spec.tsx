@@ -47,7 +47,7 @@ async function openBotsStep(user: ReturnType<typeof userEvent.setup>) {
 
 async function chooseAddressBots(user: ReturnType<typeof userEvent.setup>) {
   await openBotsStep(user);
-  await user.click(screen.getByRole("radio", { name: /Address bot comments/ }));
+  await user.click(screen.getByRole("radio", { name: /Choose bots/ }));
 }
 
 describe("discussionBotSettings", () => {
@@ -55,10 +55,17 @@ describe("discussionBotSettings", () => {
     expect(discussionBotSettings("ignore", ["coderabbitai"])).toEqual({
       ignoreBots: true,
       allowedBots: [],
+      addressAllBots: false,
     });
     expect(discussionBotSettings("address", ["coderabbitai"])).toEqual({
       ignoreBots: true,
       allowedBots: ["coderabbitai"],
+      addressAllBots: false,
+    });
+    expect(discussionBotSettings("all", ["coderabbitai"])).toEqual({
+      ignoreBots: true,
+      allowedBots: [],
+      addressAllBots: true,
     });
   });
 });
@@ -122,7 +129,7 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
       "Any human comment starts pull request feedback.",
     );
     await openBotsStep(user);
-    expect(screen.getByRole("radio", { name: /Ignore bot comments/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Ignore bots/ })).toBeChecked();
     expect(screen.queryByTestId("discussion-setup-bots-list")).not.toBeInTheDocument();
     expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveTextContent(
       "This test does not cover the new error path.",
@@ -210,14 +217,10 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("discussion-setup-back")).toHaveTextContent("Back to board");
     expect(screen.getByRole("heading", { name: "How to handle human comments?" })).toBeInTheDocument();
     await openBotsStep(user);
-    expect(screen.getByRole("heading", { name: "How to handle AI comments?" })).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "AI review bots often leave comments on pull requests. Choose whether SuperPlane should handle that feedback.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Ignore bot comments/ })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Address bot comments/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Which bot comments should SuperPlane address?" })).toBeInTheDocument();
+    expect(screen.queryByText("AI review bots often leave comments on pull requests.")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Ignore bots/ })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Choose bots/ })).toBeInTheDocument();
     expect(screen.getByTestId("discussion-setup-back")).toHaveTextContent("Back");
     await user.click(screen.getByTestId("discussion-setup-back"));
     expect(screen.getByRole("heading", { name: "How to handle human comments?" })).toBeInTheDocument();

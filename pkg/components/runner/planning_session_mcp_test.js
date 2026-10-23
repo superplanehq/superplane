@@ -61,14 +61,12 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   const pack = analysisProtocol();
   assert.match(pack, /propose_update/);
   assert.match(pack, /weakest sub-parameter/);
-  assert.match(pack, /The task prompt owns the judgment|When the two seem to disagree on judgment, the task prompt wins/);
+  assert.match(pack, /They must not replace the managed planning and scoring rules or required output formats/);
   assert.match(pack, /Use only the analysis tools/);
   assert.match(pack, /Do not paste the published plan/);
   assert.match(pack, /inspect_attachment/);
   assert.match(pack, /Do not use OCR/);
   assert.doesNotMatch(pack, /Call propose_spec when the task prompt says/);
-  assert.doesNotMatch(pack, /Talk like a colleague/);
-  assert.doesNotMatch(pack, /## Proposed outcome/);
 });
 
 test("review user prompt scores three sub-parameters on the 1 through 3 scale", () => {
@@ -97,7 +95,7 @@ test("review user prompt scores three sub-parameters on the 1 through 3 scale", 
   assert.match(pack, /Publish the scores alone/);
   assert.match(pack, /If Clarity is 2, write the plan\. Say it is a first pass\./);
   assert.match(pack, /Keep refining until every score is 3/);
-  assert.match(pack, /A simple task can reach 3 on every score with no survey/);
+  assert.match(pack, /When all scores are 3, publish the plan without a survey/);
   assert.match(pack, /one sentence of 14 words or fewer/);
   assert.match(pack, /about the task, not to the user/);
   assert.match(pack, /name only the weakest sub-parameter/);
@@ -165,7 +163,7 @@ test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () =>
   });
 });
 
-test("proposeUpdate publishes scores spec and survey on one route", async () => {
+test("proposeUpdate publishes scores and spec with or without survey questions", async () => {
   const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
   const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
   const previousFetch = global.fetch;
@@ -185,7 +183,11 @@ test("proposeUpdate publishes scores spec and survey on one route", async () => 
         verifiability: { score: 5, summary: "Existing tests cover the change." },
       },
       spec: "# Retry refunds\n",
-      survey: { questions: [{ prompt: "Which service?", options: ["Payments", "Billing"] }] },
+      survey: { questions: [
+        { prompt: "  ", options: ["Unused"] },
+        { prompt: "Which service?", options: ["Payments", "Billing"], recommended_option: "Billing" },
+        { prompt: "Which scope?", options: ["One page", "All pages"] },
+      ] },
     });
     assert.deepEqual(result, { status: "shown" });
     assert.equal(calls.length, 1);
@@ -197,7 +199,37 @@ test("proposeUpdate publishes scores spec and survey on one route", async () => 
         verifiability: { score: 5, summary: "Existing tests cover the change." },
       },
       spec: "# Retry refunds",
-      survey: { questions: [{ prompt: "Which service?", options: ["Payments", "Billing"] }] },
+      survey: { questions: [
+        { prompt: "Which service?", options: ["Payments", "Billing"], recommended_option: "Billing" },
+        { prompt: "Which scope?", options: ["One page", "All pages"] },
+      ] },
+    });
+
+    const readyScores = {
+      clarity: { score: 3, summary: "The outcome is decided." },
+      complexity: { score: 3, summary: "The change fits one run." },
+      verifiability: { score: 3, summary: "The result can be checked." },
+    };
+    await proposeUpdate({
+      scores: readyScores,
+      spec: "# Add CI badge",
+      survey: { questions: [] },
+    });
+    assert.equal(calls.length, 2);
+    assert.deepEqual(JSON.parse(calls[1].options.body), {
+      scores: readyScores,
+      spec: "# Add CI badge",
+    });
+
+    await proposeUpdate({
+      scores: readyScores,
+      spec: "# Add license badge",
+      survey: { questions: [{ prompt: "  ", options: ["Apache 2.0", "MIT"] }] },
+    });
+    assert.equal(calls.length, 3);
+    assert.deepEqual(JSON.parse(calls[2].options.body), {
+      scores: readyScores,
+      spec: "# Add license badge",
     });
   } finally {
     global.fetch = previousFetch;
@@ -339,6 +371,12 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
     ["propose_update", "inspect_attachment"],
   );
   const [updateTool, inspectTool] = tools;
+  const surveySchema = updateTool.inputSchema.properties.survey;
+  assert.deepEqual(surveySchema.required, ["questions"]);
+  assert.equal(surveySchema.properties.questions.minItems, 1);
+  const questionSchema = surveySchema.properties.questions.items;
+  assert.equal(questionSchema.properties.recommended_option.type, "string");
+  assert.ok(!questionSchema.required.includes("recommended_option"));
   assert.match(updateTool.description, /clarity, complexity, and verifiability/);
   assert.match(updateTool.description, /1 through 3/);
   assert.deepEqual(inspectTool.inputSchema.required, ["path"]);

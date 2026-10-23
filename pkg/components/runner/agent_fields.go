@@ -205,7 +205,7 @@ func AgentAdditionalInstructionsField() configuration.Field {
 		Name:        "additionalInstructions",
 		Label:       "Additional instructions",
 		Type:        configuration.FieldTypeText,
-		Description: "Additional requirements for implementation and pull request writing.",
+		Description: "Additional project requirements for the agent. Managed workflow rules still apply.",
 		TypeOptions: &configuration.TypeOptions{
 			Text: &configuration.TextTypeOptions{AllowExpressions: &allowExpressions},
 		},

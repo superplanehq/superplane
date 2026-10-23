@@ -41,12 +41,12 @@ function VerificationPreview({ source, detail = false }: { source: VerificationS
               repository: "superplanehq/superplane",
               mention: "@superplaneagent",
               ignoreBots: true,
+              addressAllBots: false,
               allowedBots: [],
               checkNames: ["CI"],
               maximumAttempts: 3,
               runnerIntegrationIds: [],
             }}
-            healthy
             onSave={(next) => console.log("Save PR feedback", next)}
             onClose={() => console.log("Close feedback")}
             agent={{
@@ -73,7 +73,7 @@ function VerificationPreview({ source, detail = false }: { source: VerificationS
   );
 }
 const meta = {
-  title: "Factories/Pages/Automation run history/Verify and Done",
+  title: "Factories/Components/Run history/Integration scenarios/Verify and Done",
   component: VerificationPreview,
   decorators: [withFactoriesTheme],
   parameters: { layout: "fullscreen" },
@@ -127,8 +127,4 @@ export const CustomDone: Story = {
 export const RunPermalink: Story = {
   args: { source: "merge-confidence", detail: true },
   parameters: { msw: { handlers: factoryHistoryHandlers("merge-confidence") } },
-};
-export const FeatureDisabled: Story = {
-  args: { source: "merge-confidence" },
-  parameters: { msw: { handlers: factoryHistoryHandlers("merge-confidence", false) } },
 };

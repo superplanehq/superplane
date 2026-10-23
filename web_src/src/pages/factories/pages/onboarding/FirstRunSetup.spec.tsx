@@ -106,7 +106,18 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
+
 vi.mock("./AgentStep", () => ({ AgentStep: () => <div data-testid="agent-step" /> }));
+
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({
+    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+  }),
+}));
 
 function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPageModel {
   const { result } = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
@@ -531,3 +542,12 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(showErrorToast).toHaveBeenCalledWith("GitHub token expired");
   });
 });
+
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
+  useOrganizationBilling: () => ({
+    data: { billingEnabled: false, productFeatures: { byo_key: true } },
+    isSuccess: true,
+    refetch: async () => ({ data: { billingEnabled: false, productFeatures: { byo_key: true } } }),
+  }),
+}));

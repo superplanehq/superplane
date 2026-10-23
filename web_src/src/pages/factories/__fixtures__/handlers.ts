@@ -1460,6 +1460,7 @@ function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute
       return {
         json: fixture.organizationBilling ?? {
           plan: "trial",
+          productFeatures: { byo_key: true },
           planSource: "system",
           trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
           billingEnabled: true,
@@ -1478,7 +1479,7 @@ function organizationBillingCancelRoute(fixture: FactoriesFixture): FactoriesRou
     resolve: () => {
       fixture.organizationBilling = {
         ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
-        plan: "business",
+        plan: fixture.organizationBilling?.plan ?? "business",
         planSource: "polar",
         creditPurchaseAllowed: true,
         cancelAtPeriodEnd: true,
@@ -1494,7 +1495,7 @@ function organizationBillingResumeRoute(fixture: FactoriesFixture): FactoriesRou
     resolve: () => {
       fixture.organizationBilling = {
         ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
-        plan: "business",
+        plan: fixture.organizationBilling?.plan ?? "business",
         planSource: "polar",
         creditPurchaseAllowed: true,
         cancelAtPeriodEnd: false,
@@ -1510,6 +1511,7 @@ function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
     resolve: () => ({
       json: fixture.organizationBilling ?? {
         plan: "trial",
+        productFeatures: { byo_key: true },
         planSource: "system",
         trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
         billingEnabled: true,
@@ -1532,6 +1534,66 @@ function hostedCreditCheckoutRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-checkout"),
     resolve: () => ({ json: { checkoutUrl: "https://buy.polar.sh/polar_c_storybook" } }),
+  };
+}
+
+function hostedCreditCheckoutQuoteRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-checkout-quote"),
+    resolve: (_match, method, _body, url) => {
+      if (method !== "GET") return null;
+      const product = fixture.hostedCreditProducts?.find((pack) => pack.id === url.searchParams.get("productId"));
+      if (!product) return { status: 400, json: { message: "Select an available credit amount." } };
+      const creditAmountCents = Number(url.searchParams.get("creditAmountCents"));
+      if (!Number.isSafeInteger(creditAmountCents) || creditAmountCents <= 0) {
+        return { status: 400, json: { message: "Enter a valid credit amount." } };
+      }
+      const subtotalCents = Math.ceil((creditAmountCents + 50) / 0.95);
+      return {
+        json: {
+          creditAmountCents: String(creditAmountCents),
+          processingFeeCents: String(subtotalCents - creditAmountCents),
+          fixedFeeCents: "50",
+          percentageFeeBps: 500,
+          percentageFeeCents: String(subtotalCents - creditAmountCents - 50),
+          subtotalCents: String(subtotalCents),
+          currency: "usd",
+        },
+      };
+    },
+  };
+}
+
+function billingPlanSelectionRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/select-plan"),
+    resolve: (_match, method, body) => {
+      if (method !== "POST") return null;
+      const plan = fixture.organizationBilling?.availablePlans?.find((option) => option.key === body?.planKey);
+      if (!plan) return { status: 400, json: { message: "Select an available plan." } };
+      if (plan.subscriptionRequired)
+        return { status: 503, json: { message: "Subscription checkout is unavailable in this preview." } };
+      if (plan.requirePaymentMethod && !fixture.organizationBilling?.hasPaymentMethod)
+        return { status: 400, json: { message: "Add a payment card before continuing." } };
+      fixture.organizationBilling = {
+        ...fixture.organizationBilling,
+        catalogKey: plan.key,
+        plan: plan.key,
+        planName: plan.name,
+        planCategory: "paid",
+        planPriceCents: plan.priceCents,
+        planPerSeat: plan.perSeat,
+        requirePaymentMethod: plan.requirePaymentMethod,
+      };
+      return { json: {} };
+    },
+  };
+}
+
+function paymentMethodSessionRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/payment-method-session"),
+    resolve: () => ({ status: 503, json: { message: "Card setup is unavailable in this preview." } }),
   };
 }
 
@@ -1639,12 +1701,15 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),
+    hostedCreditCheckoutQuoteRoute(fixture),
     organizationBillingSyncRoute(fixture),
     organizationBillingCancelRoute(fixture),
     organizationBillingResumeRoute(fixture),
     organizationBillingRoute(fixture),
     businessCheckoutRoute(),
     billingPortalSessionRoute(),
+    billingPlanSelectionRoute(fixture),
+    paymentMethodSessionRoute(),
   ];
 }
 

@@ -1,4 +1,5 @@
 import { useOrganization, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import type { OrganizationsCreateHostedCreditCheckoutBody } from "@/api-client";
 import {
   useCreateBillingPortalSession,
   useCreateHostedCreditCheckout,
@@ -30,14 +31,15 @@ export function useHostedCreditActions(
     checkoutPending: checkout.isPending,
     businessCheckoutPending: businessCheckout.isPending,
     portalPending: portal.isPending,
-    startCheckout: async (productId: string) => {
+    startCheckout: async (input: OrganizationsCreateHostedCreditCheckoutBody) => {
       rememberHostedCreditGrantSnapshot(organizationId, grantTotalCents);
       try {
-        const url = await checkout.mutateAsync(productId);
+        const url = await checkout.mutateAsync(input);
         window.location.assign(url);
       } catch (checkoutError) {
         clearHostedCreditGrantSnapshot(organizationId);
         showErrorToast(getApiErrorMessage(checkoutError, "Unable to start checkout."));
+        throw checkoutError;
       }
     },
     startBusinessCheckout: async () => {

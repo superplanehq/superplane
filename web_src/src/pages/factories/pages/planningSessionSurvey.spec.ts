@@ -9,6 +9,18 @@ import {
 } from "./planningSessionSurvey";
 
 describe("parsePlanningSurvey", () => {
+  it("reads the recommendation from raw API survey JSON", () => {
+    expect(
+      parsePlanningSurvey(
+        JSON.stringify({
+          questions: [{ prompt: "Which form?", options: ["Current", "New"], recommendedOption: "New" }],
+        }),
+      ),
+    ).toEqual({
+      questions: [{ prompt: "Which form?", options: ["Current", "New"], recommendedOption: "New" }],
+    });
+  });
+
   it("reads questions from survey JSON", () => {
     expect(
       parsePlanningSurvey(

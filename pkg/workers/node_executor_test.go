@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testcontexts "github.com/superplanehq/superplane/test/support/contexts"
@@ -580,4 +583,132 @@ func actionFailureLog(t *testing.T, buffer *bytes.Buffer) map[string]any {
 	}
 	require.NotNil(t, failure, "expected a failed to execute action log")
 	return failure
+}
+
+func TestNodeExecutorRejectsUsageWithoutRequiredCard(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	plan := models.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	plan.RequirePaymentMethod = true
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, "/customers/external/"+r.Organization.ID.String()+"/payment-methods", req.URL.Path)
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
+	}))
+	defer server.Close()
+	t.Setenv("POLAR_ACCESS_TOKEN", "test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "start", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}})},
+		{NodeID: "action", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+	}, []models.Edge{{SourceID: "start", TargetID: "action", Channel: "default"}})
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "action", event.ID, event.ID)
+	require.NoError(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID))
+	saved, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionResultFailed, saved.Result)
+	require.Contains(t, saved.ResultMessage, "payment method")
+}
+
+func TestNodeExecutorRetriesWhenPaymentMethodVerificationFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	plan := models.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	plan.RequirePaymentMethod = true
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		http.Error(w, "polar unavailable", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	t.Setenv("POLAR_ACCESS_TOKEN", "test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "start", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}})},
+		{NodeID: "action", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+	}, []models.Edge{{SourceID: "start", TargetID: "action", Channel: "default"}})
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "action", event.ID, event.ID)
+	err = newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID)
+	require.ErrorContains(t, err, "could not verify the organization payment method")
+	saved, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionStatePending, saved.State)
+}
+
+// Saved configurations must be checked at execution time after a rollout is removed.
+func TestNodeExecutorBYOKRevocation(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	settings, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+			"default_hosted_provider": settings.DefaultHostedProvider,
+			"default_hosted_model":    settings.DefaultHostedModel,
+		}).Error)
+	})
+	require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+		"default_hosted_provider": models.UsageProviderAnthropic,
+		"default_hosted_model":    "hosted-model",
+	}).Error)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	calls := 0
+	r.Registry.Actions["runnerCodex"] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name:        "runnerCodex",
+		ExecuteFunc: func(ctx core.ExecutionContext) error { calls++; return ctx.ExecutionState.Pass() },
+	})
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "agent", Type: models.NodeTypeComponent,
+		Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}}),
+	}}, nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "agent", "default", nil)
+	newExecution := func() *models.CanvasNodeExecution {
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, "agent", event.ID, event.ID)
+		require.NoError(t, db.Model(execution).Update("configuration", datatypes.NewJSONType(map[string]any{"credentials": map[string]any{"source": "integration"}})).Error)
+		return execution
+	}
+	start := func() *models.CanvasNodeExecution {
+		execution := newExecution()
+		require.NoError(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID))
+		result, err := models.FindNodeExecution(canvas.ID, execution.ID)
+		require.NoError(t, err)
+		return result
+	}
+	require.Equal(t, models.CanvasNodeExecutionResultPassed, start().Result)
+	require.Equal(t, 1, calls)
+	// A temporary entitlement lookup failure must retry rather than fail the run.
+	lookupFailure := errors.New("temporary product-feature lookup failure")
+	failLookup := true
+	callbackName := "test:byok_lookup_failure"
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if failLookup && tx.Statement.Table == "plan_feature_definitions" {
+			tx.AddError(lookupFailure)
+		}
+	}))
+	t.Cleanup(func() { _ = db.Callback().Query().Remove(callbackName) })
+	retry := newExecution()
+	require.ErrorIs(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(retry.ID), lookupFailure)
+	reloaded, err := models.FindNodeExecution(canvas.ID, retry.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionStatePending, reloaded.State)
+	require.Equal(t, 1, calls)
+	failLookup = false
+	require.NoError(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(retry.ID))
+	require.Equal(t, 2, calls)
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	denied := start()
+	require.Equal(t, models.CanvasNodeExecutionResultFailed, denied.Result)
+	require.Contains(t, denied.ResultMessage, "does not have access")
+	require.Equal(t, 2, calls)
 }

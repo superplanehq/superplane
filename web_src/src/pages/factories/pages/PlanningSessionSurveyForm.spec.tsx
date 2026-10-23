@@ -13,6 +13,38 @@ const twoQuestions = {
 };
 
 describe("PlanningSessionSurveyForm", () => {
+  it.each(["High", "Low"])("marks the recommendation and lets the user choose %s", async (choice) => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const survey = {
+      questions: [{ prompt: "What is the priority?", options: ["High", "Low"], recommendedOption: "High" }],
+    };
+    render(<PlanningSessionSurveyForm survey={survey} onSubmit={onSubmit} />);
+
+    const recommended = screen.getByRole("button", { name: "High Recommended" });
+    expect(screen.getAllByText("Recommended")).toHaveLength(1);
+    expect(recommended).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Low" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswer })).toBeDisabled();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await user.click(choice === "High" ? recommended : screen.getByRole("button", { name: choice }));
+
+    expect(onSubmit).toHaveBeenCalledWith(`What is the priority? ${choice}`);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([undefined, "Missing", "Skip"])("shows no mark for recommendation %s", (recommendedOption) => {
+    const survey = {
+      questions: [{ prompt: "What is the priority?", options: ["High", "Low"], recommendedOption }],
+    };
+    render(<PlanningSessionSurveyForm survey={survey} onSubmit={vi.fn()} />);
+
+    expect(screen.queryByText("Recommended")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toBeInTheDocument();
+  });
+
   it("advances after a choice and keeps that choice when navigating back", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

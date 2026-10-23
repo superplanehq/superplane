@@ -26,7 +26,13 @@ const CONFIRM_TONE: Record<DraftReadinessTone, StartConfirmTone | undefined> = {
 };
 
 export function startConfirmTone(scores: StartConfirmScores): StartConfirmTone | undefined {
-  return CONFIRM_TONE[draftReadiness(scores).tone];
+  const tone = CONFIRM_TONE[draftReadiness(scores).tone];
+  const reviewScale = scores.scoreMax != null && scores.scoreMax <= 3;
+  // Yellow review scores remain visible, but only red scores need confirmation.
+  if (reviewScale && tone === "mid" && (scores.confidence ?? 3) > 1) {
+    return undefined;
+  }
+  return tone;
 }
 
 export function startConfirmBody(scores: StartConfirmScores): string | undefined {

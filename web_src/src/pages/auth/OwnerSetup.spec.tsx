@@ -53,6 +53,8 @@ const fleetManagerMetadata = {
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
   runnerVersions: ["v0.1.0"],
+  stableRunnerVersion: "v0.2.0",
+  installationType: "",
   fleetPresets: [
     {
       id: "e1-large-amd64",
@@ -88,6 +90,7 @@ interface OwnerSetupFetchStubs {
   status?: unknown;
   account?: { status: number; body?: unknown };
   organizations?: unknown;
+  fleetManager?: typeof fleetManagerMetadata;
 }
 
 function stubAccountResponse(stubs: OwnerSetupFetchStubs) {
@@ -105,7 +108,7 @@ function stubOwnerSetupFetch(stubs: OwnerSetupFetchStubs = {}) {
     ["/api/v1/setup-owner", () => jsonResponse({ organization_id: "org-1", organization_slug: "acme" })],
     ["/account", () => stubAccountResponse(stubs)],
     ["/organizations", () => jsonResponse(stubs.organizations ?? [])],
-    ["/admin/api/installation/fleet-manager/setup", () => jsonResponse(fleetManagerMetadata)],
+    ["/admin/api/installation/fleet-manager/setup", () => jsonResponse(stubs.fleetManager ?? fleetManagerMetadata)],
   ];
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -125,7 +128,7 @@ function renderOwnerSetup() {
   );
 }
 
-async function reachFleetStep() {
+async function reachSmtpStep() {
   fireEvent.change(await screen.findByPlaceholderText("First name"), { target: { value: "Ada" } });
   fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
   fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "ada@example.com" } });
@@ -137,6 +140,10 @@ async function reachFleetStep() {
   fireEvent.click(screen.getByTestId("owner-setup-license-skip"));
 
   expect(await screen.findByTestId("owner-setup-smtp")).toBeInTheDocument();
+}
+
+async function reachFleetStep() {
+  await reachSmtpStep();
   fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
 
   expect(await screen.findByTestId("owner-setup-fleet")).toBeInTheDocument();
@@ -159,6 +166,66 @@ describe("OwnerSetup", () => {
   afterEach(() => {
     Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
     vi.unstubAllGlobals();
+  });
+
+  it("submits the checked install report on the owner account step", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "required", beacon_enabled: true },
+    });
+    renderOwnerSetup();
+
+    const report = await screen.findByTestId("owner-setup-install-report");
+    expect(report).toBeChecked();
+
+    fireEvent.change(screen.getByPlaceholderText("First name"), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
+    fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "ada@example.com" } });
+    fireEvent.change(screen.getByPlaceholderText("Password"), { target: { value: "Secret1x" } });
+    fireEvent.change(screen.getByPlaceholderText("Confirm password"), { target: { value: "Secret1x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+      const post = calls.find((call) => String(call[0]).endsWith("/api/v1/setup-owner") && call[1]?.method === "POST");
+      expect(post?.[1]?.body).toBe(
+        JSON.stringify({
+          email: "ada@example.com",
+          first_name: "Ada",
+          last_name: "Lovelace",
+          password: "Secret1x",
+          share_owner_identity: true,
+        }),
+      );
+    });
+  });
+
+  it("submits a cleared install report as opted out", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "required", beacon_enabled: true },
+    });
+    renderOwnerSetup();
+
+    fireEvent.click(await screen.findByTestId("owner-setup-install-report"));
+    fireEvent.change(screen.getByPlaceholderText("First name"), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
+    fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "ada@example.com" } });
+    fireEvent.change(screen.getByPlaceholderText("Password"), { target: { value: "Secret1x" } });
+    fireEvent.change(screen.getByPlaceholderText("Confirm password"), { target: { value: "Secret1x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+      const post = calls.find((call) => String(call[0]).endsWith("/api/v1/setup-owner") && call[1]?.method === "POST");
+      expect(JSON.parse(String(post?.[1]?.body)).share_owner_identity).toBe(false);
+    });
+  });
+
+  it("hides the install report when the beacon is off", async () => {
+    stubOwnerSetupFetch();
+    renderOwnerSetup();
+
+    expect(await screen.findByRole("heading", { name: "Create the owner account" })).toBeInTheDocument();
+    expect(screen.queryByTestId("owner-setup-install-report")).not.toBeInTheDocument();
   });
 
   it("shows the gold arrow preview without onboarding labels", async () => {
@@ -197,7 +264,7 @@ describe("OwnerSetup", () => {
 
     fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
 
-    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /fleet manager setup/i })).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-progress")).toBeInTheDocument();
 
@@ -211,7 +278,7 @@ describe("OwnerSetup", () => {
     await reachFleetStep();
 
     fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
-    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
@@ -226,7 +293,7 @@ describe("OwnerSetup", () => {
     for (const heading of [
       "Create the chart values",
       "Configure the default fleet",
-      "Choose a cloud provider",
+      "Choose where runners run",
       OWNER_SETUP_COPY.fleet.headline,
     ]) {
       fireEvent.click(screen.getByRole("button", { name: "Back" }));
@@ -237,6 +304,61 @@ describe("OwnerSetup", () => {
     expect(await screen.findByRole("heading", { name: OWNER_SETUP_COPY.smtp.headline })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
+  });
+
+  it("finishes single-host setup after SMTP without creating a Fleet Manager token", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "required", installation_type: "single-host" },
+    });
+    renderOwnerSetup();
+    await reachSmtpStep();
+
+    expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", "Step 3 of 3");
+    fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
+
+    await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
+    expect(createToken).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("owner-setup-fleet")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/setup-owner/progress",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ step: "" }) }),
+    );
+  });
+
+  it("leaves a cloud install off the This VM command", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-docker" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "This VM" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/enable-runners.sh/)).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/setup-owner/progress",
+        expect.objectContaining({ method: "PATCH", body: JSON.stringify({ step: "fleet-provider" }) }),
+      ),
+    );
+  });
+
+  it("finishes a legacy single-host setup saved on a fleet step", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-fleets", installation_type: "single-host" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
+    expect(screen.queryByRole("heading", { name: "Configure the default fleet" })).not.toBeInTheDocument();
+    expect(createToken).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/setup-owner/progress",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ step: "" }) }),
+    );
   });
 
   it("resumes the stored fleet step for the signed-in admin", async () => {

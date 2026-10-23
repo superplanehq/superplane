@@ -1,51 +1,67 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
-import type { FactoriesWorkOrder } from "@/api-client";
 import { FactoryAutomationRunHistory } from "./FactoryAutomationRunHistory";
 
-const queries = vi.hoisted(() => ({
-  runs: {
-    data: { pages: [{ runs: [{ id: "run-1", state: "STATE_FINISHED", result: "RESULT_PASSED" }] }] },
-    isLoading: false,
-  },
-  tasks: { data: undefined as FactoriesWorkOrder[] | undefined, isLoading: true },
+const hooks = vi.hoisted(() => ({
+  useInfiniteCanvasRuns: vi.fn(),
+  useDescribeRun: vi.fn(),
+  useFactoryWorkOrders: vi.fn(),
 }));
 vi.mock("@/hooks/useCanvasData", () => ({
-  useInfiniteCanvasRuns: () => queries.runs,
-  useDescribeRun: vi.fn(),
+  useInfiniteCanvasRuns: (...args: unknown[]) => hooks.useInfiniteCanvasRuns(...args),
+  useDescribeRun: (...args: unknown[]) => hooks.useDescribeRun(...args),
   useEventExecutions: vi.fn(),
   useCanvasVersion: vi.fn(),
 }));
-vi.mock("@/hooks/useFactoryData", () => ({ useFactoryWorkOrders: () => queries.tasks }));
+vi.mock("@/hooks/useFactoryData", () => ({
+  useFactoryWorkOrders: (...args: unknown[]) => hooks.useFactoryWorkOrders(...args),
+}));
 vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: () => {} }));
 
+const history = (
+  <FactoryAutomationRunHistory
+    canvasId="canvas"
+    organizationId="org"
+    factoryId="factory"
+    selectedRunId={null}
+    onSelectRun={() => {}}
+  />
+);
+
 describe("FactoryAutomationRunHistory", () => {
-  it("shows fetched runs before task links finish loading, then enriches the rows", () => {
-    const view = (
-      <FactoryAutomationRunHistory
-        canvasId="canvas"
-        organizationId="org"
-        factoryId="factory"
-        selectedRunId={null}
-        onSelectRun={() => {}}
-      />
-    );
-    const { rerender } = render(view);
-    expect(screen.getByRole("button", { name: "Open run run-1" })).toBeInTheDocument();
-    expect(screen.queryByText("No linked task")).not.toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "Loading task" })).toBeInTheDocument();
-    queries.tasks.data = [{ id: "task-1", key: "SP-123", title: "Linked task", sourceRunId: "run-1" }];
-    queries.tasks.isLoading = false;
-    rerender(
-      <FactoryAutomationRunHistory
-        canvasId="canvas"
-        organizationId="org"
-        factoryId="factory"
-        selectedRunId={null}
-        onSelectRun={() => {}}
-      />,
-    );
+  it("shows the task key and title from the run list without loading archived tasks", () => {
+    hooks.useInfiniteCanvasRuns.mockReturnValue({
+      data: {
+        pages: [
+          {
+            runs: [
+              {
+                id: "run-1",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                task: { id: "task-1", key: "SP-123", title: "Linked task" },
+              },
+            ],
+          },
+        ],
+      },
+      isLoading: false,
+    });
+    render(history);
+    expect(hooks.useInfiniteCanvasRuns).toHaveBeenCalledWith("canvas", { includeTask: true });
+    expect(hooks.useFactoryWorkOrders).not.toHaveBeenCalled();
     expect(screen.getByText("SP-123")).toBeInTheDocument();
     expect(screen.getByText("Linked task")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading task" })).not.toBeInTheDocument();
+  });
+
+  it("shows no task or source as soon as a run without a task loads", () => {
+    hooks.useInfiniteCanvasRuns.mockReturnValue({
+      data: { pages: [{ runs: [{ id: "run-1", state: "STATE_FINISHED", result: "RESULT_PASSED" }] }] },
+      isLoading: false,
+    });
+    render(history);
+    expect(screen.getByText("No task or source")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading task" })).not.toBeInTheDocument();
   });
 });

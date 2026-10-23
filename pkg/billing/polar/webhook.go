@@ -25,8 +25,11 @@ const (
 	orderRefundedType      = "order.refunded"
 	billingReasonPurchase  = "purchase"
 
+	billingReasonSubscriptionCycle = "subscription_cycle"
+
 	subscriptionCreatedType    = "subscription.created"
 	subscriptionUpdatedType    = "subscription.updated"
+	subscriptionCycledType     = "subscription.cycled"
 	subscriptionActiveType     = "subscription.active"
 	subscriptionCanceledType   = "subscription.canceled"
 	subscriptionUncanceledType = "subscription.uncanceled"
@@ -39,6 +42,20 @@ var (
 	ErrWebhookSecretMissing    = errors.New("webhook secret is not configured")
 	ErrUnusableWebhookPayload  = errors.New("polar webhook payload cannot be applied")
 )
+
+// UnsupportedWebhookEventError reports the type of a signed Polar event that
+// SuperPlane does not apply. It matches ErrUnsupportedWebhookEvent.
+type UnsupportedWebhookEventError struct {
+	EventType string
+}
+
+func (e *UnsupportedWebhookEventError) Error() string {
+	return fmt.Sprintf("%s: %s", ErrUnsupportedWebhookEvent, e.EventType)
+}
+
+func (e *UnsupportedWebhookEventError) Is(target error) bool {
+	return target == ErrUnsupportedWebhookEvent
+}
 
 type OrderWebhookEvent struct {
 	Type string    `json:"type"`
@@ -54,6 +71,8 @@ type OrderData struct {
 	BillingReason      string          `json:"billing_reason"`
 	RefundedAmount     int64           `json:"refunded_amount"`
 	NetAmount          int64           `json:"net_amount"`
+	Currency           string          `json:"currency"`
+	Metadata           map[string]any  `json:"metadata"`
 	ProductID          string          `json:"product_id"`
 	ExternalCustomerID string          `json:"external_customer_id"`
 	Customer           OrderCustomer   `json:"customer"`
@@ -109,7 +128,7 @@ func VerifyAndParseOrderPaid(headers http.Header, body []byte, secret string) (*
 		return nil, err
 	}
 	if event.Type != orderPaidType {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, event.Type)
+		return nil, &UnsupportedWebhookEventError{EventType: event.Type}
 	}
 	return event, nil
 }
@@ -121,11 +140,14 @@ type SubscriptionWebhookEvent struct {
 }
 
 type SubscriptionData struct {
+	ProductID          string        `json:"product_id"`
 	ID                 string        `json:"id"`
 	Status             string        `json:"status"`
+	Seats              *int          `json:"seats"`
 	CancelAtPeriodEnd  bool          `json:"cancel_at_period_end"`
 	ModifiedAt         polarTime     `json:"modified_at"`
 	CurrentPeriodStart polarTime     `json:"current_period_start"`
+	EndedAt            polarTime     `json:"ended_at"`
 	CurrentPeriodEnd   polarTime     `json:"current_period_end"`
 	CustomerID         string        `json:"customer_id"`
 	ExternalCustomerID string        `json:"external_customer_id"`
@@ -201,7 +223,7 @@ func (p *ParsedWebhook) APIVersionMismatch() bool {
 
 func isSubscriptionEventType(eventType string) bool {
 	switch eventType {
-	case subscriptionCreatedType, subscriptionUpdatedType, subscriptionActiveType,
+	case subscriptionCreatedType, subscriptionUpdatedType, subscriptionCycledType, subscriptionActiveType,
 		subscriptionCanceledType, subscriptionUncanceledType, subscriptionRevokedType:
 		return true
 	default:
@@ -240,7 +262,7 @@ func VerifyAndParseWebhook(headers http.Header, body []byte, secret string) (*Pa
 		}
 		return &ParsedWebhook{Type: event.Type, APIVersion: apiVersion, Subscription: event}, nil
 	default:
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, envelope.Type)
+		return nil, &UnsupportedWebhookEventError{EventType: envelope.Type}
 	}
 }
 
@@ -272,7 +294,7 @@ func VerifyAndParseOrderEvent(headers http.Header, body []byte, secret string) (
 		return nil, err
 	}
 	if parsed.Order == nil {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, parsed.Type)
+		return nil, &UnsupportedWebhookEventError{EventType: parsed.Type}
 	}
 	return parsed.Order, nil
 }

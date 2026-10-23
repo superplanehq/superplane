@@ -1,10 +1,9 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useId } from "react";
 
+import { AgentAdditionalInstructions } from "./AgentAdditionalInstructions";
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import { ImplementDurationDraftProvider } from "./ImplementDurationDraft";
 import { ImplementSettingRow } from "./ImplementSettingRow";
@@ -96,7 +95,7 @@ function OwnedImplementConfiguration({
   onSave: SaveSettings;
   onClose?: () => void;
 }) {
-  const settings = useImplementSettingsDraft([agent, ...nodes], true);
+  const settings = useImplementSettingsDraft([agent, ...nodes]);
   if (!settings.draft) return null;
   return (
     <ImplementConfigurationView
@@ -177,7 +176,13 @@ function ImplementConfigurationView({
             {pullRequest ? (
               <PullRequestSettings node={pullRequest} disabled={saving} onDraftChange={onPullRequestDraftChange} />
             ) : null}
-            <ImplementationInstructions draft={agentDraft} disabled={saving} onChange={onAgentDraftChange} />
+            <AgentAdditionalInstructions
+              draft={agentDraft}
+              disabled={saving}
+              onChange={onAgentDraftChange}
+              description="Add requirements for coding, testing, or pull request descriptions. Applies to future runs."
+              placeholder="For example: Avoid new production dependencies unless the task requires them."
+            />
           </div>
         </section>
         <ImplementSettingsFooter
@@ -188,53 +193,6 @@ function ImplementConfigurationView({
         />
       </div>
     </ImplementDurationDraftProvider>
-  );
-}
-
-function ImplementationInstructions({
-  draft,
-  disabled,
-  onChange,
-}: {
-  draft: PlanningReviewDraft;
-  disabled: boolean;
-  onChange: (draft: PlanningReviewDraft) => void;
-}) {
-  const id = useId();
-  const component = draft.components[0];
-  if (!component) return null;
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id} className="text-base sm:text-sm">
-        Additional instructions
-      </Label>
-      <p id={`${id}-help`} className="text-xs text-muted-foreground">
-        Add requirements for coding, testing, or pull request descriptions. Applies to future runs.
-      </p>
-      <Textarea
-        id={id}
-        aria-describedby={`${id}-help`}
-        disabled={disabled}
-        rows={5}
-        className="min-h-32 resize-y border-border bg-card shadow-none dark:border-border dark:bg-card"
-        placeholder="For example: Avoid new production dependencies unless the task requires them."
-        value={
-          typeof component.configuration.additionalInstructions === "string"
-            ? component.configuration.additionalInstructions
-            : ""
-        }
-        onChange={(event) =>
-          onChange({
-            ...draft,
-            components: draft.components.map((item) =>
-              item.id === component.id
-                ? { ...item, configuration: { ...item.configuration, additionalInstructions: event.target.value } }
-                : item,
-            ),
-          })
-        }
-      />
-    </div>
   );
 }
 

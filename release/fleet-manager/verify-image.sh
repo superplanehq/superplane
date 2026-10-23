@@ -14,7 +14,7 @@ SOURCE_SHA="$4"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKOPEO=(bash "${SCRIPT_DIR}/run-skopeo.sh")
 
-if [[ "${IMAGE}" != *:"${VERSION}" ]]; then
+if [[ "${IMAGE}" != *:"${VERSION}" && "${IMAGE}" != *:"${VERSION}-docker" ]]; then
   echo "Error: ${IMAGE} does not use the expected version tag ${VERSION}" >&2
   exit 1
 fi
@@ -25,7 +25,9 @@ if [ "${actual_digest}" != "${DIGEST}" ]; then
   exit 1
 fi
 
-immutable_image="${IMAGE%:${VERSION}}@${DIGEST}"
+repository="${IMAGE%:${VERSION}-docker}"
+repository="${repository%:${VERSION}}"
+immutable_image="${repository}@${DIGEST}"
 raw_manifest="$("${SKOPEO[@]}" inspect --raw "docker://${immutable_image}")"
 for architecture in amd64 arm64; do
   if ! jq -e --arg architecture "${architecture}" \

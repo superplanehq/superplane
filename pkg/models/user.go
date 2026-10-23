@@ -509,11 +509,7 @@ func CountActiveUsersByOrganizationIDs(orgIDs []string) (map[string]int64, error
 	return counts, nil
 }
 
-func CountActiveHumanUsersByOrganization(orgID string) (int64, error) {
-	return CountActiveHumanUsersByOrganizationInTransaction(database.Conn(), orgID)
-}
-
-func CountActiveHumanUsersByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64, error) {
+func CountActiveHumanUsersByOrganization(tx *gorm.DB, orgID string) (int64, error) {
 	var count int64
 	err := tx.
 		Model(&User{}).

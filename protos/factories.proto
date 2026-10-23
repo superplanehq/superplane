@@ -426,6 +426,20 @@ service Factories {
     };
   }
 
+  rpc ContinueFactoryPullRequestFixes(
+    ContinueFactoryPullRequestFixesRequest
+  ) returns (ContinueFactoryPullRequestFixesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/continue-fixes"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Continue factory pull request fixes";
+      description: "Resumes paused automatic fixes for a tracked pull request with a fresh attempt budget";
+      tags: "Factory";
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -1373,6 +1387,8 @@ message FactoryIntake {
     // Projects that still create a task. Required for a Sentry intake.
     // Sentry exception intakes only. Values are project slugs.
     repeated string sentry_project_ids = 23;
+    // Organization user ID. Omitted updates preserve the selection; empty clears it.
+    optional string default_owner_id = 24;
   }
 
   string id = 1;
@@ -1518,6 +1534,8 @@ message FactoryPRFeedbackHandler {
     bool ignore_bots = 2;
     // GitHub usernames of bots to react to even without the mention.
     repeated string allowed_bots = 3;
+    // Start a run for every bot comment except comments SuperPlane wrote.
+    bool address_all_bots = 4;
   }
 
   message CheckSettings {
@@ -1743,6 +1761,18 @@ message MergeFactoryPullRequestResponse {
   FactoryPullRequest pull_request = 1;
 }
 
+message ContinueFactoryPullRequestFixesRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  // Run of the paused activity that reached the attempt limit.
+  string run_id = 3;
+}
+
+message ContinueFactoryPullRequestFixesResponse {
+  // Root event that restarts the checks automation.
+  string event_id = 1;
+}
+
 message FactoryIntakeItem {
   string id = 1;
   string key = 2;
@@ -1750,6 +1780,8 @@ message FactoryIntakeItem {
   string body = 4;
   string url = 5;
   google.protobuf.Timestamp created_at = 6;
+  // Nonempty when an exact search match cannot be imported by this intake.
+  string disabled_reason = 7;
 }
 
 message SearchFactoryIntakeItemsRequest {
@@ -2945,6 +2977,7 @@ message PlanningSessionActivity {
 message PlanningSessionSurveyQuestion {
   string prompt = 1;
   repeated string options = 2;
+  string recommended_option = 3;
 }
 
 message PlanningSessionSurvey {

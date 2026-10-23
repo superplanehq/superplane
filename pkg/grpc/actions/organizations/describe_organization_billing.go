@@ -5,11 +5,14 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/entitlements"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -32,14 +35,77 @@ func DescribeOrganizationBilling(
 		return nil, grpcerrors.Internal(err, "failed to describe organization billing")
 	}
 
+	productFeatures, err := plan.ResolveProductFeatures(db)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load product permissions.")
+	}
+
 	credit, err := models.DescribeOrganizationLLMCredit(db, organizationID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to describe organization billing")
 	}
 
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
-	return &pb.DescribeOrganizationBillingResponse{
+	newBilling, err := models.OrganizationHasExperimentalFeatures(db, organizationID, features.FeatureNewBilling)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
+	}
+	hasCard := false
+	if billingEnabled && newBilling && hasCustomer {
+		hasCard, err = polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())
+		if err != nil {
+			return nil, polarBillingError(err, "Could not verify the payment method.")
+		}
+	}
+	available := []*pb.BillingPlanOption{}
+	checkoutEnabled := false
+	if billingEnabled && !newBilling {
+		productID, err := polar.BusinessCheckoutProductID(db)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "Could not load billing plans.")
+		}
+		checkoutEnabled = productID != ""
+	}
+	if billingEnabled && newBilling {
+		checkoutEnabled = false
+		catalog, err := models.ListBillingPlans(db)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "Could not load billing plans.")
+		}
+		override, err := models.FindOrganizationSeatLimitOverride(db, organizationID)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "Could not load seat limits.")
+		}
+		for _, item := range catalog {
+			if item.Visibility != "public" || item.Category != "paid" {
+				continue
+			}
+			checkoutEnabled = checkoutEnabled || item.PolarProductID != nil
+			maximum := entitlements.SeatMaximum(item.SeatLimit, override)
+			var seatMaximum *int32
+			if maximum != nil {
+				seatMaximum = new(int32(*maximum))
+			}
+			available = append(available, &pb.BillingPlanOption{
+				Key: item.Key, Name: item.Name, PriceCents: item.PriceCents,
+				PerSeat: item.PerSeat, SeatMaximum: seatMaximum,
+				RequirePaymentMethod: item.RequirePaymentMethod,
+				SubscriptionRequired: item.PerSeat || item.PolarProductID != nil || item.PriceCents != 0,
+			})
+		}
+	}
+	response := &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
+		ProductFeatures:             productFeatures,
+		RequirePaymentMethod:        models.BillingEnabled() && newBilling && plan.Catalog.RequirePaymentMethod,
+		HasPaymentMethod:            hasCard,
+		AvailablePlans:              available,
+		PlanName:                    plan.Catalog.Name,
+		PlanCategory:                plan.Catalog.Category,
+		PlanPriceCents:              plan.Catalog.PriceCents,
+		PlanPerSeat:                 plan.Catalog.PerSeat,
+		CatalogKey:                  plan.Catalog.Key,
+		HostedExecutionAllowed:      !models.BillingEnabled() || plan.AllowsHostedExecution(time.Now()) && (!newBilling || !plan.Catalog.RequirePaymentMethod || hasCard),
 		PlanSource:                  plan.PlanSource,
 		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
 		TrialEndsAt:                 protoTimestamp(plan.TrialEndsAt),
@@ -47,7 +113,7 @@ func DescribeOrganizationBilling(
 		CurrentPeriodEnd:            protoTimestamp(plan.CurrentPeriodEnd),
 		CreditPurchaseAllowed:       plan.AllowsCreditPurchase(),
 		BillingEnabled:              billingEnabled,
-		SubscriptionCheckoutEnabled: models.BillingEnabled() && polar.SubscriptionCheckoutEnabled(),
+		SubscriptionCheckoutEnabled: checkoutEnabled,
 		HasBillingCustomer:          hasCustomer,
 		RemainingCreditCents:        pricebook.MicrosToCents(credit.RemainingMicros),
 		IncludedRemainingCents:      pricebook.MicrosToCents(credit.IncludedRemainingMicros),
@@ -55,7 +121,32 @@ func DescribeOrganizationBilling(
 		WelcomeRemainingCents:       pricebook.MicrosToCents(credit.WelcomeRemainingMicros),
 		AdminRemainingCents:         pricebook.MicrosToCents(credit.AdminRemainingMicros),
 		CancelAtPeriodEnd:           plan.CancelAtPeriodEnd,
-	}, nil
+	}
+	if !models.BillingEnabled() {
+		return response, nil
+	}
+
+	seats, err := entitlements.ResolveSeatsForPlan(db, organizationID, plan)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load seat usage.")
+	}
+	response.OccupiedSeats = new(int32(seats.Occupied))
+	if !seats.PerSeat {
+		return response, nil
+	}
+
+	response.PurchasedSeats = new(int32(*seats.Purchased))
+	response.AvailableSeats = new(int32(*seats.Available))
+	response.ExpectedRenewalSeats = new(int32(*seats.RenewalQuantity))
+	response.CurrentMonthlyTotalCents = new(int64(*seats.Purchased) * plan.Catalog.PriceCents)
+	response.ExpectedRenewalCents = new(int64(*seats.RenewalQuantity) * plan.Catalog.PriceCents)
+	if seats.PlanMaximum != nil {
+		response.PlanMaximumSeats = new(int32(*seats.PlanMaximum))
+	}
+	if seats.Purchasable != nil {
+		response.PurchasableSeats = new(int32(*seats.Purchasable))
+	}
+	return response, nil
 }
 
 func SyncOrganizationBilling(
@@ -90,7 +181,14 @@ func CreateBusinessCheckout(
 	if err != nil {
 		return nil, err
 	}
-	if !models.BillingEnabled() || !polar.SubscriptionCheckoutEnabled() {
+	if !models.BillingEnabled() || !polar.Configured() {
+		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
+	}
+	productID, err := polar.BusinessCheckoutProductID(database.DB(ctx))
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load billing plans.")
+	}
+	if productID == "" {
 		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
 	}
 
@@ -122,10 +220,7 @@ func CreateBusinessCheckout(
 
 	session, err := client.CreateCheckout(
 		ctx,
-		polar.BusinessProductID(),
-		organizationID.String(),
-		businessCheckoutSuccessURL(baseURL, organizationID),
-		clientIPFromContext(ctx),
+		polar.CheckoutInput{ProductID: productID, ExternalCustomerID: organizationID.String(), SuccessURL: businessCheckoutSuccessURL(baseURL, organizationID), CustomerIP: clientIPFromContext(ctx)},
 	)
 	if err != nil {
 		return nil, polarBillingError(err, "failed to create Business checkout")

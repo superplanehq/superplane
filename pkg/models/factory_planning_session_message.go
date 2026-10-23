@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -214,7 +215,12 @@ func normalizePlanningSurvey(survey PlanningSessionSurvey) (PlanningSessionSurve
 		if len(options) == 0 {
 			return PlanningSessionSurvey{}, fmt.Errorf("%w: survey question needs an option", ErrFactoryPlanningSessionInvalid)
 		}
-		questions = append(questions, PlanningSessionSurveyQuestion{Prompt: prompt, Options: options})
+		if question.RecommendedOption != "" && !slices.Contains(options, question.RecommendedOption) {
+			return PlanningSessionSurvey{}, fmt.Errorf("%w: recommended option must match an option exactly", ErrFactoryPlanningSessionInvalid)
+		}
+		questions = append(questions, PlanningSessionSurveyQuestion{
+			Prompt: prompt, Options: options, RecommendedOption: question.RecommendedOption,
+		})
 	}
 	return PlanningSessionSurvey{Questions: questions}, nil
 }

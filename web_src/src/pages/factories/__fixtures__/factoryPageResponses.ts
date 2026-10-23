@@ -1,5 +1,6 @@
 import type {
   FactoriesDescribeFactoryVelocityResponse,
+  OrganizationsDescribeOrganizationBillingResponse,
   FactoriesFactory,
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
@@ -345,24 +346,7 @@ export interface FactoriesFixture {
     expiresAt?: string;
   }>;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
-  organizationBilling?: {
-    plan?: string;
-    planSource?: string;
-    polarSubscriptionStatus?: string;
-    trialEndsAt?: string;
-    currentPeriodStart?: string;
-    currentPeriodEnd?: string;
-    remainingCreditCents?: string;
-    includedRemainingCents?: string;
-    purchasedRemainingCents?: string;
-    welcomeRemainingCents?: string;
-    adminRemainingCents?: string;
-    billingEnabled?: boolean;
-    subscriptionCheckoutEnabled?: boolean;
-    creditPurchaseAllowed?: boolean;
-    hasBillingCustomer?: boolean;
-    cancelAtPeriodEnd?: boolean;
-  };
+  organizationBilling?: OrganizationsDescribeOrganizationBillingResponse;
   /** Count of POST /billing/sync calls in this fixture session. */
   billingSyncCalls?: number;
   /** Plan returned from Polar sync; applied to organizationBilling after the first sync. */
@@ -451,7 +435,28 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationSpendingReport: DEFAULT_ORG_SPENDING_REPORT,
   organizationCreditGrants: DEFAULT_CREDIT_GRANTS,
   organizationBilling: {
+    productFeatures: { byo_key: true },
     plan: "trial",
+    catalogKey: "trial",
+    hasPaymentMethod: false,
+    availablePlans: [
+      { key: "pay_as_you_go", name: "Pay-as-you-go", priceCents: "0", requirePaymentMethod: true },
+      {
+        key: "starter",
+        name: "Starter",
+        priceCents: "2000",
+        requirePaymentMethod: true,
+        subscriptionRequired: true,
+      },
+      {
+        key: "team",
+        name: "Team",
+        priceCents: "3000",
+        perSeat: true,
+        requirePaymentMethod: true,
+        subscriptionRequired: true,
+      },
+    ],
     planSource: "system",
     trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
     remainingCreditCents: "4124",

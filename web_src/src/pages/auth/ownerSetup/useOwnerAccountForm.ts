@@ -55,6 +55,8 @@ async function submitOwnerSetup(args: {
   firstName: string;
   lastName: string;
   password: string;
+  shareInstallReport: boolean;
+  shareOwnerIdentity: boolean;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
   setPendingOrganizationSlug: (slug: string | null) => void;
@@ -75,6 +77,7 @@ async function submitOwnerSetup(args: {
         first_name: args.firstName.trim(),
         last_name: args.lastName.trim(),
         password: args.password,
+        ...(args.shareInstallReport ? { share_owner_identity: args.shareOwnerIdentity } : {}),
       }),
     });
 
@@ -105,12 +108,14 @@ async function submitOwnerSetup(args: {
 export function useOwnerAccountForm(actions: {
   setPendingOrganizationSlug: (slug: string | null) => void;
   onOwnerCreated: (step: "license") => void;
+  shareInstallReport: boolean;
 }) {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [shareOwnerIdentity, setShareOwnerIdentity] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -127,6 +132,8 @@ export function useOwnerAccountForm(actions: {
       firstName,
       lastName,
       password,
+      shareInstallReport: actions.shareInstallReport,
+      shareOwnerIdentity,
       setError,
       setLoading,
       setPendingOrganizationSlug: actions.setPendingOrganizationSlug,
@@ -145,6 +152,8 @@ export function useOwnerAccountForm(actions: {
     setPassword,
     confirmPassword,
     setConfirmPassword,
+    shareOwnerIdentity,
+    setShareOwnerIdentity,
     loading,
     error,
     fieldErrors,

@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
 import { Button } from "@/components/ui/button";
 import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
-import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
+import {
+  FLEET_MANAGER_WIZARD_STEPS,
+  omittedFleetWizardStep,
+  singleHostInstall,
+  type FleetManagerWizardStep,
+} from "@/lib/fleetManagerWizard";
 import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import type { FirstRunChrome } from "@/pages/factories/pages/onboarding/first-run/firstRunTypes";
 import type { FirstRunSphereProps } from "@/pages/factories/pages/onboarding/first-run/FirstRunSpherePane";
@@ -33,6 +38,7 @@ const RESUMABLE_STEPS: OwnerSetupStep[] = [
   "license",
   "smtp",
   "fleet-intro",
+  "fleet-docker",
   ...FLEET_MANAGER_WIZARD_STEPS.map((step) => `fleet-${step}` as OwnerSetupStep),
 ];
 
@@ -41,12 +47,15 @@ type SetupOwnerStatus = "disabled" | "required" | "in_progress" | "complete";
 interface SetupOwnerStatusResponse {
   status: SetupOwnerStatus;
   step?: string;
+  beacon_enabled?: boolean;
+  installation_type?: string;
 }
 
 type OwnerSetupEntry =
   | { kind: "redirect"; to: string }
-  | { kind: "owner" }
-  | { kind: "resume"; step: OwnerSetupStep; email: string; orgSlug: string };
+  | { kind: "owner"; beaconEnabled: boolean; installationType: string }
+  | { kind: "resume"; step: OwnerSetupStep; email: string; orgSlug: string; installationType: string }
+  | { kind: "finish"; email: string; orgSlug: string; installationType: string };
 
 function isResumableStep(step: string | undefined): step is OwnerSetupStep {
   return (RESUMABLE_STEPS as string[]).includes(step ?? "");
@@ -98,7 +107,11 @@ async function resolveOwnerSetupEntry(): Promise<OwnerSetupEntry> {
   }
 
   if (status.status === "required") {
-    return { kind: "owner" };
+    return {
+      kind: "owner",
+      beaconEnabled: status.beacon_enabled === true,
+      installationType: status.installation_type ?? "",
+    };
   }
 
   const account = await fetchSignedInAccount();
@@ -121,7 +134,11 @@ async function resolveOwnerSetupEntry(): Promise<OwnerSetupEntry> {
   }
 
   const step = isResumableStep(status.step) ? status.step : "license";
-  return { kind: "resume", step, email: account.email, orgSlug };
+  const installationType = status.installation_type ?? "";
+  if (singleHostInstall(installationType) && step.startsWith("fleet-")) {
+    return { kind: "finish", email: account.email, orgSlug, installationType };
+  }
+  return { kind: "resume", step, email: account.email, orgSlug, installationType };
 }
 
 // Forward and back save the new step so a refresh resumes the same page.
@@ -171,6 +188,7 @@ function ownerSetupStepNumber(step: OwnerSetupStep) {
   if (step === "fleet-provider") return 5;
   if (step === "fleet-fleets") return 6;
   if (step === "fleet-values") return 7;
+  if (step === "fleet-docker") return 6;
   if (step === "fleet-install") return 8;
   return OWNER_SETUP_STEPS;
 }
@@ -179,12 +197,28 @@ function fleetManagerOrganizationId(slug: string | null) {
   return slug ?? "";
 }
 
+function useAlignFleetStep(
+  step: OwnerSetupStep,
+  installationType: string | undefined,
+  metadataLoaded: boolean,
+  goToStep: (step: OwnerSetupStep) => void,
+) {
+  useEffect(() => {
+    if (!metadataLoaded) return;
+    const active = fleetWizardStep(step);
+    if (!active) return;
+    const next = omittedFleetWizardStep(active, installationType);
+    if (next) goToStep(`fleet-${next}`);
+  }, [goToStep, installationType, metadataLoaded, step]);
+}
+
 function fleetWizardStep(step: OwnerSetupStep): FleetManagerWizardStep | null {
   if (!step.startsWith("fleet-") || step === "fleet-intro") return null;
   return step.slice("fleet-".length) as FleetManagerWizardStep;
 }
 
 function fleetStepBefore(step: OwnerSetupStep): OwnerSetupStep {
+  if (step === "fleet-docker") return "fleet-provider";
   const active = fleetWizardStep(step);
   if (!active) return "fleet-intro";
   const index = FLEET_MANAGER_WIZARD_STEPS.indexOf(active);
@@ -244,6 +278,9 @@ interface OwnerSetupEntryActions {
   setPendingOrganizationSlug: (slug: string | null) => void;
   setStep: (step: OwnerSetupStep) => void;
   setPhase: (phase: "loading" | "ready") => void;
+  setBeaconEnabled: (enabled: boolean) => void;
+  setInstallationType: (installationType: string) => void;
+  setFinishLegacySetup: (finish: boolean) => void;
 }
 
 function applyOwnerSetupEntry(entry: OwnerSetupEntry, actions: OwnerSetupEntryActions) {
@@ -252,19 +289,47 @@ function applyOwnerSetupEntry(entry: OwnerSetupEntry, actions: OwnerSetupEntryAc
     return;
   }
 
+  if (entry.kind === "owner") {
+    actions.setBeaconEnabled(entry.beaconEnabled);
+    actions.setInstallationType(entry.installationType);
+  }
+
   if (entry.kind === "resume") {
     actions.setEmail(entry.email);
     actions.setPendingOrganizationSlug(entry.orgSlug);
     actions.setStep(entry.step);
+    actions.setInstallationType(entry.installationType);
     writeSetupStepToAddress(entry.step);
+  }
+
+  if (entry.kind === "finish") {
+    actions.setEmail(entry.email);
+    actions.setPendingOrganizationSlug(entry.orgSlug);
+    actions.setStep("smtp");
+    actions.setInstallationType(entry.installationType);
+    actions.setFinishLegacySetup(true);
   }
 
   actions.setPhase("ready");
 }
 
+function useFinishLegacySetup(enabled: boolean, finishInstallation: () => void) {
+  const started = useRef(false);
+  useEffect(() => {
+    if (!enabled || started.current) return;
+    started.current = true;
+    finishInstallation();
+  }, [enabled, finishInstallation]);
+}
+
+function redirectAfterInstallation(orgSlug: string) {
+  window.location.href = newOrganizationLandingPath(orgSlug);
+}
+
 function ownerSetupChrome(args: {
   step: OwnerSetupStep;
   email: string;
+  installationType: string;
   goToStep: (step: OwnerSetupStep) => void;
 }): FirstRunChrome | undefined {
   const afterOwner = args.step !== "owner";
@@ -272,7 +337,7 @@ function ownerSetupChrome(args: {
 
   return {
     stepIndex: ownerSetupStepNumber(args.step) - 1,
-    stepCount: OWNER_SETUP_STEPS,
+    stepCount: singleHostInstall(args.installationType) ? 3 : OWNER_SETUP_STEPS,
     email: afterOwner ? args.email : undefined,
     onLogOut: afterOwner ? () => (window.location.href = "/logout?redirect=/setup") : undefined,
     onBack: backTarget ? () => args.goToStep(backTarget) : undefined,
@@ -282,19 +347,20 @@ function ownerSetupChrome(args: {
 const OwnerSetup: React.FC = () => {
   const [phase, setPhase] = useState<"loading" | "ready">("loading");
   const [step, setStep] = useState<OwnerSetupStep>("owner");
+  const [beaconEnabled, setBeaconEnabled] = useState(false);
+  const [installationType, setInstallationType] = useState("");
+  const [finishLegacySetup, setFinishLegacySetup] = useState(false);
   const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
   const activeFleetStep = fleetWizardStep(step);
   const fleetSetup = useFleetManagerSetup(
-    activeFleetStep !== null,
+    step === "fleet-intro" || activeFleetStep !== null,
     fleetManagerOrganizationId(pendingOrganizationSlug),
   );
   const saveSetupProgress = useQueuedSetupProgress();
   const { closeError, isClosing, finishInstallation } = useFinishInstallation({
     organizationSlug: pendingOrganizationSlug,
     saveSetupProgress,
-    onClosed: (orgSlug) => {
-      window.location.href = newOrganizationLandingPath(orgSlug);
-    },
+    onClosed: redirectAfterInstallation,
   });
 
   useReportPageReady(true);
@@ -307,7 +373,10 @@ const OwnerSetup: React.FC = () => {
   const account = useOwnerAccountForm({
     setPendingOrganizationSlug,
     onOwnerCreated,
+    shareInstallReport: beaconEnabled,
   });
+
+  useFinishLegacySetup(finishLegacySetup, finishInstallation);
 
   useEffect(() => {
     let cancelled = false;
@@ -319,6 +388,9 @@ const OwnerSetup: React.FC = () => {
           setPendingOrganizationSlug,
           setStep,
           setPhase,
+          setBeaconEnabled,
+          setInstallationType,
+          setFinishLegacySetup,
         });
       }
     });
@@ -339,9 +411,15 @@ const OwnerSetup: React.FC = () => {
     [saveSetupProgress],
   );
 
+  useAlignFleetStep(step, fleetSetup.metadata?.installationType, fleetSetup.metadata != null, goToStep);
+
   const fleetStepIndex = activeFleetStep ? FLEET_MANAGER_WIZARD_STEPS.indexOf(activeFleetStep) : -1;
+  const finishSmtpSetup = singleHostInstall(installationType) ? finishInstallation : () => goToStep("fleet-intro");
 
   if (phase === "loading") {
+    return null;
+  }
+  if (finishLegacySetup && !closeError) {
     return null;
   }
 
@@ -351,7 +429,7 @@ const OwnerSetup: React.FC = () => {
       contentSpacing="compact"
       visual="preview"
       sphere={OWNER_SETUP_PREVIEW}
-      chrome={ownerSetupChrome({ step, email: account.email, goToStep })}
+      chrome={ownerSetupChrome({ step, email: account.email, installationType, goToStep })}
     >
       {closeError && (
         <div className="mb-6" role="alert" data-testid="owner-setup-close-error">
@@ -376,15 +454,16 @@ const OwnerSetup: React.FC = () => {
           onLastNameChange={account.setLastName}
           onPasswordChange={account.setPassword}
           onConfirmPasswordChange={account.setConfirmPassword}
+          showInstallReport={beaconEnabled}
+          shareOwnerIdentity={account.shareOwnerIdentity}
+          onShareOwnerIdentityChange={account.setShareOwnerIdentity}
           onSubmit={account.handleOwnerSubmit}
         />
       )}
 
       {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={() => goToStep("smtp")} />}
 
-      {step === "smtp" && pendingOrganizationSlug && (
-        <SmtpStep onContinue={() => goToStep("fleet-intro")} onSkip={() => goToStep("fleet-intro")} />
-      )}
+      {step === "smtp" && pendingOrganizationSlug && <SmtpStep onContinue={finishSmtpSetup} onSkip={finishSmtpSetup} />}
 
       <OwnerFleetSetupSteps
         step={step}

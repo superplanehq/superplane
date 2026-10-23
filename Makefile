@@ -126,9 +126,6 @@ format.js:
 format.js.check:
 	cd web_src && npm run format:check
 
-terraform.format:
-	$(MAKE) -C release/terraform format
-
 dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
@@ -149,6 +146,9 @@ dev.setup:
 	$(MAKE) dev.setup.go
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
+ifeq ($(strip $(CI)),)
+	@$(MAKE) dev.setup.billing.catalog
+endif
 	@$(MAKE) dev.setup.runner.fleet
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
@@ -164,6 +164,11 @@ dev.setup.go:
 dev.setup.runner.fleet:
 	@$(MAKE) dev.test.is.running
 	@$(COMPOSE) exec -T app ./scripts/db_seed_local_runner_fleet.sh superplane_dev
+
+.PHONY: dev.setup.billing.catalog
+dev.setup.billing.catalog:
+	@$(MAKE) dev.test.is.running
+	@$(COMPOSE) exec -T app bash ./scripts/db_seed_local_billing_catalog.sh superplane_dev
 
 dev.clean.go.cache:
 	@$(MAKE) dev.test.is.running
@@ -352,9 +357,6 @@ check.test.ui.browser:
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
-
-terraform.check:
-	$(MAKE) -C release/terraform check
 
 check.tool.configs:
 	bash ./scripts/check_tool_config_guard.sh

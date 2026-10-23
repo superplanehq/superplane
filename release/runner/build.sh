@@ -156,6 +156,24 @@ echo "* Creating checksums.txt"
 rm -rf "${STAGING_DIR}"
 trap - EXIT
 
+source_revision="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
+echo "* Building runner container image"
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --progress=plain \
+  --provenance=mode=max \
+  --build-arg "RUNNER_VERSION=${VERSION}" \
+  --build-arg "SOURCE_REVISION=${source_revision}" \
+  --target local \
+  --output "type=oci,dest=${OUTPUT_DIR}/runner.oci.tar" \
+  -f release/runner/Dockerfile \
+  .
+
+bash "${REPO_ROOT}/release/fleet-manager/verify-oci-archive.sh" \
+  "${OUTPUT_DIR}/runner.oci.tar" \
+  "${VERSION}" \
+  "${source_revision}"
+
 echo ""
 echo "Runner release ${VERSION} is ready in ${OUTPUT_DIR}:"
 echo "  runner-linux-amd64.tar.gz"
@@ -163,4 +181,5 @@ echo "  runner-linux-arm64.tar.gz"
 if [ "${is_git_sha_release}" = "false" ]; then
   echo "  runner.spdx.json"
 fi
+echo "  runner.oci.tar"
 echo "  checksums.txt"

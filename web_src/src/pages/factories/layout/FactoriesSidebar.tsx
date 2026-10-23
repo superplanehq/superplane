@@ -5,8 +5,6 @@ import { useOrganization } from "@/hooks/useOrganizationData";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_WORKSPACE_AGENT } from "@/lib/experimentalFeatures";
 import { useNavigate, useParams } from "react-router";
 import { firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
 import { organizationPlanLabel } from "../lib/hostedCreditEmpty";
@@ -33,7 +31,6 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { has } = useExperimentalFeature(organizationId);
   const { data: organization } = useOrganization(organizationId);
   const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -44,6 +41,8 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         purchasedCreditCents: spend.data?.purchasedCreditCents,
         welcomeCreditExpiresAt: spend.data?.welcomeCreditExpiresAt,
         plan: billing.data?.plan,
+        planName: billing.data?.planName,
+        planCategory: billing.data?.planCategory,
         trialEndsAt: billing.data?.trialEndsAt,
       })
     : undefined;
@@ -66,7 +65,6 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         showAgent={isWorkspaceAgentNavVisible({
           permissionsLoading,
           canUpdateFactories: canAct("factories", "update"),
-          workspaceAgentEnabled: has(FEATURE_WORKSPACE_AGENT),
         })}
       />
       <div className="flex-1" />

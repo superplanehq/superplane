@@ -114,23 +114,16 @@ func loadResetSummary(db *gorm.DB) (resetSummary, error) {
 
 func encryptorFromEnv() (crypto.Encryptor, error) {
 	ctx := context.Background()
-	legacy, err := crypto.LegacyDecryptorFromEnv()
-	if err != nil {
-		return nil, err
-	}
 	masters, primary, err := crypto.MasterKeysFromEnv(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if masters == nil {
-		if legacy == nil || os.Getenv("ENCRYPTION_LEGACY_FORMAT") == "plaintext" {
-			return nil, fmt.Errorf("ENCRYPTION_MASTER_KEYS is required")
-		}
-		return legacy, nil
+		return nil, fmt.Errorf("ENCRYPTION_MASTER_KEYS is required")
 	}
 	store := encryption.NewStore(masters, primary)
 	if err := store.Initialize(ctx); err != nil {
 		return nil, err
 	}
-	return crypto.NewVersionedEncryptor(store, legacy), nil
+	return crypto.NewVersionedEncryptor(store), nil
 }

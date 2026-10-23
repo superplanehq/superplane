@@ -7,7 +7,6 @@ import {
   factoryShowsConfidence,
   isPlanningSettingsTab,
   planningSettingsFromFactory,
-  planningSettingsTabs,
   planningSettingsToApi,
 } from "./planningSettingsModel";
 
@@ -66,13 +65,6 @@ describe("factory score visibility", () => {
     expect(factoryPlanningEnabled(factory)).toBe(true);
     expect(factoryShowsClarity(factory)).toBe(false);
     expect(factoryShowsConfidence(factory)).toBe(true);
-  });
-});
-
-describe("planningSettingsTabs", () => {
-  it("includes the agent tab when an agent node exists", () => {
-    expect(planningSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
-    expect(planningSettingsTabs(false)).toEqual(["general", "automation"]);
   });
 });
 

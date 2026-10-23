@@ -1,14 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
+import { hasHostedDefaultModel } from "@/lib/hostedLLMModels";
 import type { IntegrationId } from "./onboardingFixtures";
 import {
   agentFinishReady,
   firstWorkOrderAgentError,
   hostedCreditGrantCopy,
-  hasHostedDefaultModel,
   isAgentStepReady,
   isHostedAgentReady,
-  onboardingAgentGate,
   resolveOnboardingAgent,
   shouldShowHostedCreditGrant,
 } from "./onboardingAgentReadiness";
@@ -265,43 +264,6 @@ describe("hasHostedDefaultModel", () => {
   });
 });
 
-describe("onboardingAgentGate", () => {
-  const gate = (
-    overrides: Partial<Parameters<typeof onboardingAgentGate>[0]> = {},
-  ): ReturnType<typeof onboardingAgentGate> =>
-    onboardingAgentGate({
-      hostedModelsAvailable: false,
-      hostedModelsAvailableLoading: false,
-      bringYourOwnKey: false,
-      bringYourOwnKeyLoading: false,
-      ...overrides,
-    });
-
-  it("skips the agent screen when hosted models cover the agent", () => {
-    expect(gate({ hostedModelsAvailable: true })).toBe("skip");
-  });
-
-  it("puts the agent screen before the tickets when the organization can bring its own key", () => {
-    expect(gate({ hostedModelsAvailable: true, bringYourOwnKey: true })).toBe("first");
-  });
-
-  it("shows the agent screen after the tickets when only a provider key can run the agent", () => {
-    expect(gate({ bringYourOwnKey: true })).toBe("show");
-  });
-
-  it("waits while the bring-your-own-key flag is still loading", () => {
-    expect(gate({ hostedModelsAvailable: true, bringYourOwnKeyLoading: true })).toBe("pending");
-  });
-
-  it("waits while hosted model availability is still loading", () => {
-    expect(gate({ hostedModelsAvailableLoading: true, bringYourOwnKey: true })).toBe("pending");
-  });
-
-  it("shows the agent screen when no hosted model is available", () => {
-    expect(gate()).toBe("show");
-  });
-});
-
 describe("agentFinishReady", () => {
   const ready = {
     modelSourceChoice: true,
@@ -409,13 +371,13 @@ describe("hosted credit grant copy", () => {
 
   it("explains that remaining credit lets the user continue without keys", () => {
     expect(hostedCreditGrantCopy(5000)).toBe(
-      "This organization has $50.00 of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.",
+      "This organization has $50.00 of trial usage for machines and managed models. Contact an installation admin to keep hosted runs after the trial.",
     );
   });
 
   it("asks the user to connect a provider when remaining credit is empty", () => {
     expect(hostedCreditGrantCopy(0)).toBe(
-      "Trial credit is used up. Subscribe to Business or connect a provider to continue.",
+      "Trial credit is used up. Contact an installation admin or connect a provider to continue.",
     );
   });
 });

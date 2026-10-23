@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/encryption"
 )
 
 const licensePath = "/admin/api/installation/license"
@@ -41,7 +41,7 @@ func TestAdminInstallationLicense(t *testing.T) {
 	issuer := licensingtest.NewIssuer("test-key")
 	server.SetLicenseService(licensing.NewService(
 		licensing.NewVerifier(licensingtest.KeySet(issuer)),
-		licensing.NewDatabaseSource(crypto.NewAESGCMEncryptor([]byte("0123456789abcdef0123456789abcdef"))),
+		licensing.NewDatabaseSource(encryption.NewEncryptor()),
 	))
 
 	t.Run("non-admin cannot read or change the license", func(t *testing.T) {
@@ -260,7 +260,7 @@ func TestAdminLicenseKeyList(t *testing.T) {
 	keySync := licensing.NewKeySync(store, licensing.DatabaseKeyListCache{}, "")
 	server.SetLicenseService(licensing.NewService(
 		licensing.NewVerifier(store),
-		licensing.NewDatabaseSource(crypto.NewAESGCMEncryptor([]byte("0123456789abcdef0123456789abcdef"))),
+		licensing.NewDatabaseSource(encryption.NewEncryptor()),
 		licensing.WithKeySync(keySync),
 	))
 

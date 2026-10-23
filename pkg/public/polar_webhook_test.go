@@ -56,12 +56,67 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
 	})
 
+	t.Run("subscription cycled advances the billing period", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+		firstEnd := time.Now().UTC().Truncate(time.Second).AddDate(0, 1, 0)
+		renewedEnd := firstEnd.AddDate(0, 1, 0)
+		subscriptionBody := func(eventType string, start, end time.Time) []byte {
+			return []byte(fmt.Sprintf(`{
+				"type": %q,
+				"data": {
+					"id": "sub_cycle",
+					"status": "active",
+					"product_id": "prod_business",
+					"modified_at": %q,
+					"current_period_start": %q,
+					"current_period_end": %q,
+					"customer": {"id": "cust_1", "external_id": %q}
+				}
+			}`, eventType, start.Format(time.RFC3339), start.Format(time.RFC3339), end.Format(time.RFC3339), r.Organization.ID.String()))
+		}
+
+		for _, body := range [][]byte{
+			subscriptionBody("subscription.created", firstEnd.AddDate(0, -1, 0), firstEnd),
+			subscriptionBody("subscription.cycled", firstEnd, renewedEnd),
+		} {
+			rec := signedPolarWebhook(t, secret, body)
+			server.handlePolarWebhook(rec.recorder, rec.request)
+			require.Equal(t, http.StatusAccepted, rec.recorder.Code)
+		}
+
+		plan, err := models.FindOrganizationBillingPlan(database.Conn(), r.Organization.ID)
+		require.NoError(t, err)
+		require.NotNil(t, plan.CurrentPeriodStart)
+		require.NotNil(t, plan.CurrentPeriodEnd)
+		assert.True(t, firstEnd.Equal(*plan.CurrentPeriodStart))
+		assert.True(t, renewedEnd.Equal(*plan.CurrentPeriodEnd))
+	})
+
 	t.Run("unusable payload", func(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
 		body := []byte(`{"type":"order.paid","data":{"id":""}}`)
 		rec := signedPolarWebhook(t, secret, body)
 		server.handlePolarWebhook(rec.recorder, rec.request)
 		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
+	})
+
+	t.Run("subscription updated stores purchased seats", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		db := database.Conn()
+		product := "product_" + uuid.NewString()
+		catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: new(50), PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+		require.NoError(t, models.SaveBillingPlan(db, &catalog))
+		body := []byte(fmt.Sprintf(`{"type":"subscription.updated","data":{"id":"sub_seats","status":"active","product_id":%q,"seats":3,"customer":{"external_id":%q}}}`, product, r.Organization.ID.String()))
+		for range 2 {
+			rec := signedPolarWebhook(t, secret, body)
+			server.handlePolarWebhook(rec.recorder, rec.request)
+			require.Equal(t, http.StatusAccepted, rec.recorder.Code)
+		}
+		stored, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.NotNil(t, stored.PurchasedSeats)
+		require.Equal(t, 3, *stored.PurchasedSeats)
 	})
 
 	t.Run("grants credit for paid order", func(t *testing.T) {
@@ -119,6 +174,36 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		grant, err := models.FindLLMCreditGrantByPolarOrderID(database.Conn(), orderID)
 		require.NoError(t, err)
 		assert.Equal(t, models.CentsToMicros(2500), grant.AmountMicros)
+	})
+
+	t.Run("grants quoted credit from signed order metadata excluding fees and tax", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		orderID := uuid.NewString()
+		body := []byte(fmt.Sprintf(`{
+			"type": "order.paid",
+			"data": {
+				"id": %q,
+				"billing_reason": "purchase",
+				"currency": "usd",
+				"net_amount": 10579,
+				"tax_amount": 2116,
+				"total_amount": 12695,
+				"metadata": {
+					"superplane_credit_purchase_version": "1",
+					"superplane_credit_amount_cents": "10000",
+					"superplane_credit_subtotal_cents": "10579"
+				},
+				"customer": {"id": "cust_1", "external_id": %q},
+				"product": {"id": "prod_1", "metadata": {"superplane_credit_pack": true}},
+				"items": [{"amount": 10579, "product_price_id": "price_adhoc"}]
+			}
+		}`, orderID, r.Organization.ID.String()))
+		rec := signedPolarWebhook(t, secret, body)
+		server.handlePolarWebhook(rec.recorder, rec.request)
+		require.Equal(t, http.StatusAccepted, rec.recorder.Code)
+		grant, err := models.FindLLMCreditGrantByPolarOrderID(database.Conn(), orderID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CentsToMicros(10000), grant.AmountMicros)
 	})
 
 	t.Run("apply failure", func(t *testing.T) {

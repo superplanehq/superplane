@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useAccount } from "@/contexts/useAccount";
 import { useGooglePurchaseTracking } from "@/hooks/useGooglePurchaseTracking";
@@ -9,6 +10,7 @@ import type {
   OrganizationsHostedCreditInvoice,
   OrganizationsHostedCreditProduct,
   OrganizationsOrganizationCreditGrant,
+  OrganizationsCreateHostedCreditCheckoutBody,
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useHostedCreditActions, useHostedCreditOwnerContactMessage } from "@/hooks/useHostedCreditActions";
@@ -31,18 +33,34 @@ type HostedCreditBillingActions = {
   checkoutPending: boolean;
   businessCheckoutPending: boolean;
   portalPending: boolean;
-  startCheckout: (productId: string) => Promise<void>;
+  startCheckout: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
   startBusinessCheckout: () => Promise<void>;
   openInvoices: () => Promise<void>;
 };
 
+export type BillingSeatSummary = {
+  purchased?: number;
+  occupied?: number;
+  available?: number;
+  planMaximum?: number;
+  purchasable?: number;
+  expectedRenewalSeats?: number;
+  currentMonthlyTotalCents?: string;
+  expectedRenewalCents?: string;
+};
+
 export type OrganizationBillingPageModel = {
+  seats?: BillingSeatSummary;
   organizationName: string;
   canManageBilling: boolean;
   billingEnabled: boolean;
   subscriptionCheckoutEnabled: boolean;
   creditPurchaseAllowed: boolean;
   plan?: string;
+  planCategory?: string;
+  planName?: string;
+  planPriceCents?: string;
+  planPerSeat?: boolean;
   trialEndsAt?: string;
   billing: HostedCreditBillingActions;
   creditRefreshStatus: HostedCreditRefreshStatus;
@@ -87,20 +105,37 @@ function creditMetricsFromSpend(spend: OrganizationsDescribeOrganizationWorkspac
   };
 }
 
-function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse | undefined) {
+function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse = {}) {
   return {
-    plan: billing?.plan,
-    trialEndsAt: billing?.trialEndsAt,
-    currentPeriodEnd: billing?.currentPeriodEnd,
-    includedRemaining: parseWorkOrderMetric(billing?.includedRemainingCents),
-    purchasedRemaining: parseWorkOrderMetric(billing?.purchasedRemainingCents),
-    welcomeRemaining: parseWorkOrderMetric(billing?.welcomeRemainingCents),
-    adminRemaining: parseWorkOrderMetric(billing?.adminRemainingCents),
-    subscriptionCheckoutEnabled: billing?.subscriptionCheckoutEnabled === true,
-    creditPurchaseAllowed: billing?.creditPurchaseAllowed === true,
-    describeBillingEnabled: billing?.billingEnabled === true,
-    planSource: billing?.planSource,
-    cancelAtPeriodEnd: billing?.cancelAtPeriodEnd === true,
+    plan: billing.plan,
+    planCategory: billing.planCategory,
+    planName: billing.planName,
+    planPriceCents: billing.planPriceCents,
+    planPerSeat: billing.planPerSeat,
+    seats:
+      billing.billingEnabled && billing.planPerSeat
+        ? {
+            purchased: billing.purchasedSeats,
+            occupied: billing.occupiedSeats,
+            available: billing.availableSeats,
+            planMaximum: billing.planMaximumSeats,
+            purchasable: billing.purchasableSeats,
+            expectedRenewalSeats: billing.expectedRenewalSeats,
+            currentMonthlyTotalCents: billing.currentMonthlyTotalCents,
+            expectedRenewalCents: billing.expectedRenewalCents,
+          }
+        : undefined,
+    trialEndsAt: billing.trialEndsAt,
+    currentPeriodEnd: billing.currentPeriodEnd,
+    includedRemaining: parseWorkOrderMetric(billing.includedRemainingCents),
+    purchasedRemaining: parseWorkOrderMetric(billing.purchasedRemainingCents),
+    welcomeRemaining: parseWorkOrderMetric(billing.welcomeRemainingCents),
+    adminRemaining: parseWorkOrderMetric(billing.adminRemainingCents),
+    subscriptionCheckoutEnabled: billing.subscriptionCheckoutEnabled === true,
+    creditPurchaseAllowed: billing.creditPurchaseAllowed === true,
+    describeBillingEnabled: billing.billingEnabled === true,
+    planSource: billing.planSource,
+    cancelAtPeriodEnd: billing.cancelAtPeriodEnd === true,
   };
 }
 
@@ -145,9 +180,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     await Promise.all([refetchSpend(), refetchGrants(), refetchBilling()]);
   }, [refetchSpend, refetchGrants, refetchBilling]);
 
-  const syncFromPolar = useCallback(async () => {
-    await syncOrganizationBilling(organizationId);
-  }, [organizationId]);
+  const syncFromPolar = useBillingSyncCallback(organizationId);
 
   const subscription = useOrganizationSubscriptionActions(organizationId);
 
@@ -167,6 +200,11 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     subscriptionCheckoutEnabled: flags.subscriptionCheckoutEnabled,
     creditPurchaseAllowed: flags.creditPurchaseAllowed,
     plan: flags.plan,
+    planCategory: flags.planCategory,
+    planName: flags.planName,
+    planPriceCents: flags.planPriceCents,
+    planPerSeat: flags.planPerSeat,
+    seats: flags.seats,
     trialEndsAt: flags.trialEndsAt,
     billing,
     creditRefreshStatus,
@@ -195,4 +233,9 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     invoices: metrics.invoices,
     grants: grantsQuery.data?.grants ?? [],
   };
+}
+
+function useBillingSyncCallback(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useCallback(() => syncOrganizationBilling(organizationId, queryClient), [organizationId, queryClient]);
 }

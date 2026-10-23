@@ -244,6 +244,8 @@ describe("ColumnAutomationViewPopup", () => {
     expect(screen.getByText("Model")).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-step-kind-0")).toHaveTextContent("Bash");
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
+    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Include visual evidence")).not.toBeInTheDocument();
     expect(screen.queryByTestId("planning-review-automation-note")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("column-automation-view-edit")).not.toBeInTheDocument();
@@ -253,22 +255,6 @@ describe("ColumnAutomationViewPopup", () => {
     expect(
       within(screen.getByTestId("column-automation-view-canvas")).getByRole("link", { name: "Edit automation" }),
     ).toHaveAttribute("href", EDIT_HREF);
-  });
-
-  it("shows visual evidence only when the agent slot enables it", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      agent: {
-        draft: PLANNING_REVIEW_DRAFT,
-        organizationId: "org-1",
-        onSave: vi.fn(),
-        showVisualEvidenceSetting: true,
-      },
-    });
-
-    expect(screen.getByRole("switch", { name: "Include visual evidence" })).toBeInTheDocument();
-    await user.click(screen.getByTestId("column-automation-view-tab-automation"));
-    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
   });
 
   it("puts General first when a form and an agent exist", () => {
@@ -307,7 +293,7 @@ function renderHost() {
 }
 
 describe("ColumnAutomationViewHost", () => {
-  it("opens the Implement agent on the split screen with that step selected", () => {
+  it("opens supported Implement settings without a canvas", () => {
     useCanvas.mockReturnValue({
       data: {
         metadata: { id: "app-refund-implementer", name: "Implement", liveVersionId: "version-live" },
@@ -333,8 +319,8 @@ describe("ColumnAutomationViewHost", () => {
 
     expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
     const dialog = screen.getByTestId("merge-confidence-config");
-    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
-    expect(within(dialog).getByRole("heading", { name: "Implement From Task Description" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("implement-settings-save")).toBeInTheDocument();
+    expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Start Implementation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();

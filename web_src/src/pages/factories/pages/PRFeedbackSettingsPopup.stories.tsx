@@ -3,7 +3,6 @@ import { MemoryRouter } from "react-router";
 
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
-import { draftWithBashCommand, LONG_BASH_COMMAND } from "./planningReviewFindBox.storyHelpers";
 import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 
 const settings: PRFeedbackDraftSettings = {
@@ -12,6 +11,7 @@ const settings: PRFeedbackDraftSettings = {
   repository: "acme/payments",
   mention: "@superplaneagent",
   ignoreBots: true,
+  addressAllBots: false,
   allowedBots: [],
   checkNames: [],
   maximumAttempts: 3,
@@ -28,19 +28,18 @@ export default meta;
 
 type Story = StoryObj<typeof PRFeedbackSettingsPopup>;
 
-function popup(command?: string) {
+function popup() {
   return (
-    <MemoryRouter>
+    <MemoryRouter initialEntries={["/?prFeedbackSettings=agent"]}>
       <div className="relative min-h-svh bg-background">
         <PRFeedbackSettingsPopup
           settings={settings}
-          healthy
           onSave={(next) => console.log("save PR feedback settings", next)}
           onClose={() => console.log("close PR feedback settings")}
           fixed={false}
           initialTab="agent"
           agent={{
-            draft: command ? draftWithBashCommand(command) : PLANNING_REVIEW_DRAFT,
+            draft: PLANNING_REVIEW_DRAFT,
             organizationId: "org-1",
             onSave: (draft) => console.log("save PR feedback agent", draft),
           }}
@@ -50,12 +49,7 @@ function popup(command?: string) {
   );
 }
 
-export const AgentTab: Story = {
-  name: "Agent tab",
+export const AddressPRFeedback: Story = {
+  name: "Address PR feedback",
   render: () => popup(),
-};
-
-export const AgentLongScript: Story = {
-  name: "Agent long script",
-  render: () => popup(LONG_BASH_COMMAND),
 };

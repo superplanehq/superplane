@@ -3,6 +3,9 @@ package polar
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -19,6 +22,19 @@ var (
 	ErrSubscriptionAlreadyCanceling = errors.New("business is already set to end at the period end")
 	ErrSubscriptionNotCanceling     = errors.New("business is not set to end at the period end")
 )
+
+func BusinessCheckoutProductID(tx *gorm.DB) (string, error) {
+	plan, err := models.FindBillingPlan(tx, models.BillingPlanBusiness)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", err
+	}
+	if err == nil && plan.PolarProductID != nil {
+		if id := strings.TrimSpace(*plan.PolarProductID); id != "" {
+			return id, nil
+		}
+	}
+	return BusinessProductID(), nil
+}
 
 func ApplySubscriptionEvent(ctx context.Context, tx *gorm.DB, event *SubscriptionWebhookEvent) error {
 	if event == nil {
@@ -40,6 +56,9 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 		return err
 	}
 	tx = tx.WithContext(ctx)
+	if err := models.BindLegacyBillingProduct(tx, BusinessProductID()); err != nil {
+		return err
+	}
 	if _, err := models.FindOrganizationByIDInTransaction(tx, orgID.String()); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return permanentApplyError("organization not found")
@@ -64,14 +83,19 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 			orgID,
 			models.PolarSubscriptionApply{
 				ID:                data.ID,
+				ProductID:         data.ProductID,
 				Status:            status,
 				PeriodStart:       periodStart,
 				PeriodEnd:         periodEnd,
 				CancelAtPeriodEnd: data.CancelAtPeriodEnd,
 				ModifiedAt:        data.ModifiedAt.TimePtr(),
+				PurchasedSeats:    data.Seats,
 			},
 		)
 		if err != nil {
+			if errors.Is(err, models.ErrInvalidPurchasedSeats) {
+				return permanentApplyError(err.Error())
+			}
 			return err
 		}
 		if customerID := firstNonEmpty(data.Customer.ID, data.CustomerID); customerID != "" {
@@ -90,17 +114,31 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 }
 
 func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) error {
-	if !SubscriptionCheckoutEnabled() {
+	if !Configured() {
 		return nil
 	}
 
-	items, err := NewClientFromEnv().ListSubscriptions(ctx, orgID.String(), BusinessProductID())
+	if err := models.BindLegacyBillingProduct(tx, BusinessProductID()); err != nil {
+		return err
+	}
+	items, err := NewClientFromEnv().ListSubscriptions(ctx, orgID.String(), "")
 	if err != nil {
 		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to list Polar subscriptions")
 		return nil
 	}
 
-	selected := selectBusinessSubscription(items)
+	known := make([]SubscriptionData, 0, len(items))
+	for _, item := range items {
+		_, err := models.FindBillingPlanByProduct(tx, item.ProductID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		known = append(known, item)
+	}
+	selected := selectBusinessSubscription(known)
 	if selected == nil {
 		return nil
 	}
@@ -148,7 +186,7 @@ func ResumeOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid
 }
 
 func setOrganizationSubscriptionCancelAtPeriodEnd(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, cancelAtPeriodEnd bool) error {
-	if !SubscriptionCheckoutEnabled() {
+	if !Configured() {
 		return ErrSubscriptionCheckoutDisabled
 	}
 
@@ -198,4 +236,58 @@ func polarSubscriptionID(plan *models.OrganizationBillingPlan) string {
 		return ""
 	}
 	return strings.TrimSpace(*plan.PolarSubscriptionID)
+}
+
+// VerifyOrganizationSubscription checks every product without changing local billing.
+func VerifyOrganizationSubscription(ctx context.Context, orgID uuid.UUID) (string, error) {
+	if !Configured() {
+		return "not_configured", nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+	items, err := NewClientFromEnv().ListSubscriptions(ctx, orgID.String(), "")
+	if err != nil {
+		return "failed", err
+	}
+	active := false
+	now := time.Now()
+	for _, item := range items {
+		if externalID := item.organizationExternalID(); externalID != "" && externalID != orgID.String() {
+			return "failed", fmt.Errorf("polar subscription customer does not match organization")
+		}
+		status := strings.ToLower(strings.TrimSpace(item.Status))
+		switch status {
+		case "active", "trialing", "canceled", "unpaid", "revoked", "past_due", "incomplete", "incomplete_expired":
+		default:
+			return "failed", fmt.Errorf("unexpected Polar subscription status %q", item.Status)
+		}
+		if !item.EndedAt.Time.IsZero() && !item.EndedAt.Time.After(now) {
+			continue
+		}
+		if models.PolarSubscriptionIsPaid(status) || (item.CancelAtPeriodEnd && item.CurrentPeriodEnd.Time.After(now)) {
+			active = true
+		}
+	}
+	if active {
+		return "active", nil
+	}
+	return "none", nil
+}
+
+func SubscriptionDashboardURL(subscriptionID string) string {
+	if strings.TrimSpace(subscriptionID) == "" {
+		return ""
+	}
+	slug := strings.TrimSpace(os.Getenv("POLAR_DASHBOARD_ORGANIZATION_SLUG"))
+	if slug == "" {
+		slug = "superplane"
+		if strings.EqualFold(strings.TrimSpace(os.Getenv("POLAR_ENVIRONMENT")), "production") {
+			slug = "superplane-inc"
+		}
+	}
+	host := "https://sandbox.polar.sh"
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("POLAR_ENVIRONMENT")), "production") {
+		host = "https://polar.sh"
+	}
+	return host + "/dashboard/" + url.PathEscape(slug) + "/sales/subscriptions/" + url.PathEscape(subscriptionID)
 }

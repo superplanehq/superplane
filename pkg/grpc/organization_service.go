@@ -153,6 +153,14 @@ func (s *OrganizationService) ListHostedCreditProducts(
 	return organizations.ListHostedCreditProducts(ctx, orgID, req)
 }
 
+func (s *OrganizationService) QuoteHostedCreditCheckout(
+	ctx context.Context,
+	req *pb.QuoteHostedCreditCheckoutRequest,
+) (*pb.QuoteHostedCreditCheckoutResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.QuoteHostedCreditCheckout(ctx, orgID, req)
+}
+
 func (s *OrganizationService) CreateHostedCreditCheckout(
 	ctx context.Context,
 	req *pb.CreateHostedCreditCheckoutRequest,
@@ -193,6 +201,18 @@ func (s *OrganizationService) CreateBusinessCheckout(
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	accountID, _ := accountIDFromContext(ctx)
 	return organizations.CreateBusinessCheckout(ctx, orgID, req, accountID, s.baseURL)
+}
+
+func (s *OrganizationService) SelectBillingPlan(ctx context.Context, req *pb.SelectBillingPlanRequest) (*pb.CreateBusinessCheckoutResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	accountID, _ := accountIDFromContext(ctx)
+	return organizations.SelectBillingPlan(ctx, orgID, req, accountID, s.baseURL)
+}
+
+func (s *OrganizationService) CreatePaymentMethodSession(ctx context.Context, req *pb.CreatePaymentMethodSessionRequest) (*pb.CreateBillingPortalSessionResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	accountID, _ := accountIDFromContext(ctx)
+	return organizations.CreatePaymentMethodSession(ctx, orgID, req, accountID)
 }
 
 func (s *OrganizationService) SyncOrganizationBilling(

@@ -83,7 +83,9 @@ describe("AutomationRunHistory", () => {
       );
       try {
         const { rerender } = render(view());
-        fireEvent.change(screen.getByRole("textbox", { name: "Search task or run ID" }), { target: { value: query } });
+        fireEvent.change(screen.getByRole("textbox", { name: "Search task, source, or run ID" }), {
+          target: { value: query },
+        });
         notifyBottom();
         expect(onLoadMore).not.toHaveBeenCalled();
         const loadMore = screen.getByRole("button", { name: "Load more runs" });
@@ -93,7 +95,9 @@ describe("AutomationRunHistory", () => {
         rerender(view([...implementationRuns, { ...implementationRuns[1], id: "older-run" }]));
         notifyBottom();
         expect(onLoadMore).toHaveBeenCalledTimes(1);
-        fireEvent.change(screen.getByRole("textbox", { name: "Search task or run ID" }), { target: { value: "" } });
+        fireEvent.change(screen.getByRole("textbox", { name: "Search task, source, or run ID" }), {
+          target: { value: "" },
+        });
         notifyBottom();
         expect(onLoadMore).toHaveBeenCalledTimes(2);
       } finally {
@@ -124,12 +128,12 @@ describe("AutomationRunHistory", () => {
 
   it("finds a run by its full ID and recovers from an empty search", () => {
     render(<AutomationRunHistory runs={implementationRuns} onSelectRun={() => {}} />);
-    fireEvent.change(screen.getByRole("textbox", { name: "Search task or run ID" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Search task, source, or run ID" }), {
       target: { value: implementationRuns[1].id },
     });
     expect(screen.getAllByRole("button", { name: /^Open run/ })).toHaveLength(1);
     expect(screen.getByRole("button", { name: `Open run ${implementationRuns[1].id}` })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("textbox", { name: "Search task or run ID" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Search task, source, or run ID" }), {
       target: { value: "missing-task" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));

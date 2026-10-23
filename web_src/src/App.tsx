@@ -96,12 +96,15 @@ import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
+import { Credits as CreditsAdmin } from "./pages/admin/Credits";
 import { InstallationEncryption as InstallationEncryptionAdmin } from "./pages/admin/InstallationEncryption";
 import InstallationLicenseAdmin from "./pages/admin/InstallationLicense";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import { FleetManagerSetup as FleetManagerSetupAdmin } from "./pages/admin/FleetManagerSetup";
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
+import { BillingPlans } from "./pages/admin/BillingPlans";
+import { Features } from "./pages/admin/Features";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import LicenseExpiryBanner from "./components/LicenseExpiryBanner";
@@ -275,8 +278,11 @@ function AppRouter() {
                 <Route index element={<OrganizationsListAdmin />} />
                 <Route path="accounts" element={<AccountsListAdmin />} />
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
+                <Route path="credits" element={<CreditsAdmin />} />
                 <Route path="encryption" element={<InstallationEncryptionAdmin />} />
                 <Route path="license" element={<InstallationLicenseAdmin />} />
+                <Route path="billing-plans" element={<BillingPlans />} />
+                <Route path="features" element={<Features />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="fleet-manager-setup" element={<FleetManagerSetupAdmin />} />
