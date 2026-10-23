@@ -43,6 +43,9 @@ func ListHostedCreditProducts(
 
 	products := make([]*pb.HostedCreditProduct, 0, len(packs))
 	for _, pack := range packs {
+		if !strings.EqualFold(pack.Currency, "usd") {
+			continue
+		}
 		products = append(products, &pb.HostedCreditProduct{
 			Id:          pack.ID,
 			Name:        pack.Name,

@@ -46,11 +46,18 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 		assert.Empty(t, resp.Products)
 	})
 
-	t.Run("lists credit packs", func(t *testing.T) {
+	t.Run("lists only USD credit packs", func(t *testing.T) {
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 			assert.Equal(t, "/products/", req.URL.Path)
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"items": []map[string]any{
+					{
+						"id": "prod_eur", "name": "Euro credit",
+						"metadata": map[string]any{"superplane_credit_pack": true},
+						"prices": []map[string]any{
+							{"amount_type": "fixed", "price_amount": 5000, "price_currency": "eur"},
+						},
+					},
 					{
 						"id":   "prod_25",
 						"name": "Hosted credit 25",

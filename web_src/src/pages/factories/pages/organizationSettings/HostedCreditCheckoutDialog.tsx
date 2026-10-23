@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import type {
   OrganizationsCreateHostedCreditCheckoutBody,
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useHostedCreditCheckoutQuote } from "@/hooks/useLLMModelAllowlists";
+import { hostedCreditProductsQueryKey, useHostedCreditCheckoutQuote } from "@/hooks/useLLMModelAllowlists";
 import { getApiErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ export function HostedCreditCheckoutDialog({
   onClose: () => void;
   onCloseAutoFocus?: (event: Event) => void;
 }) {
+  const queryClient = useQueryClient();
   const [selection, setSelection] = useState<number | "custom" | null>(null);
   const [dollars, setDollars] = useState("");
   const [checkoutError, setCheckoutError] = useState("");
@@ -51,6 +53,11 @@ export function HostedCreditCheckoutDialog({
   );
   const pending = checkoutPending || submitting;
   const quoteError = quoteErrorMessage(quote, Boolean(quoteInput), quoteValid);
+  const refreshQuote = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: hostedCreditProductsQueryKey(organizationId) }),
+      quote.refetch(),
+    ]);
 
   const chooseAmount = (next: number | "custom") => {
     setSelection(next);
@@ -64,7 +71,7 @@ export function HostedCreditCheckoutDialog({
       await onAddCredit({ ...quoteInput, expectedSubtotalCents: String(subtotal) });
     } catch (error) {
       setCheckoutError(getApiErrorMessage(error, "Unable to start checkout. Try again."));
-      await quote.refetch();
+      await refreshQuote();
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +111,7 @@ export function HostedCreditCheckoutDialog({
           </p>
         ) : null}
         {quoteError ? (
-          <Button type="button" variant="outline" onClick={() => void quote.refetch()}>
+          <Button type="button" variant="outline" onClick={() => void refreshQuote()}>
             Try again
           </Button>
         ) : null}
