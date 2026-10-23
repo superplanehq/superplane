@@ -34,6 +34,7 @@ var reservedOrganizationSlugs = []string{
 	"create",
 	"setup",
 	"invite",
+	"invitations",
 	"install",
 	"github",
 	// Infrastructure roots served outside the SPA.
