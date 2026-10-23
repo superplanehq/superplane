@@ -10,11 +10,11 @@ import (
 )
 
 func TestMembersInvitations(t *testing.T) {
-	t.Run("viewing the invite link", func(t *testing.T) {
+	t.Run("owner can invite a member by email", func(t *testing.T) {
 		steps := &membersSteps{t: t}
 		steps.start()
 		steps.visitMembersPage()
-		steps.assertInviteLinkVisible()
+		steps.assertInviteMemberVisible()
 		steps.assertInviteLinkPersistedInDB()
 	})
 
@@ -22,8 +22,7 @@ func TestMembersInvitations(t *testing.T) {
 		steps := &membersSteps{t: t}
 		steps.start()
 		steps.visitMembersPage()
-		steps.assertMembersHeaderVisible()
-		steps.assertMembersCount("Members (1)")
+		steps.assertMembersCount("1 member")
 		steps.assertMemberVisible("e2e@superplane.local")
 	})
 }
@@ -43,8 +42,8 @@ func (s *membersSteps) visitMembersPage() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/members")
 }
 
-func (s *membersSteps) assertInviteLinkVisible() {
-	s.session.AssertText("Invite link to add members")
+func (s *membersSteps) assertInviteMemberVisible() {
+	s.session.AssertText("Invite member")
 }
 
 func (s *membersSteps) assertInviteLinkPersistedInDB() {
@@ -53,10 +52,6 @@ func (s *membersSteps) assertInviteLinkPersistedInDB() {
 	require.NoError(s.t, err)
 	require.Equal(s.t, s.session.OrgID.String(), inviteLink.OrganizationID.String())
 	require.True(s.t, inviteLink.Enabled)
-}
-
-func (s *membersSteps) assertMembersHeaderVisible() {
-	s.session.AssertText("Members")
 }
 
 func (s *membersSteps) assertMembersCount(label string) {
