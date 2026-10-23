@@ -1,22 +1,31 @@
 import type {
   FactoriesDescribeFactoryUsageResponse,
+  FactoriesFactoryLlmModel,
   OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
+import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
 import { useFactoryUsage } from "@/hooks/useFactoryUsage";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 
 import { workOrderCreditFailureCopy, type WorkOrderCreditFailureReason } from "../../lib/workOrderFailureReason";
-import { parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import type { SplitRunFooter, SplitRunFooterNote } from "./splitRunFooter";
 
+const HOSTED_MODEL_KEY_PREFIX = "hosted::";
+
 /** Keep Start and its explanation in sync with the current billing state. */
-export function useWorkOrderStartFooter(footer: SplitRunFooter, organizationId?: string, factoryId?: string) {
+export function useWorkOrderStartFooter(
+  footer: SplitRunFooter,
+  organizationId?: string,
+  factoryId?: string,
+  lineName?: string,
+) {
   const billingEnabled = useBillingProductEnabled();
   const checkStart = billingEnabled && footer.actions.some((action) => action.kind === "start");
   const billing = useOrganizationBilling(checkStart ? organizationId : undefined);
   const usage = useFactoryUsage(checkStart ? (organizationId ?? "") : "", checkStart ? (factoryId ?? "") : "");
-  const block = checkStart ? runStartBlock(billing.data, usage.data) : undefined;
+  const runnerModels = useFactoryLineRunnerModels(organizationId, factoryId, lineName, checkStart);
+  const block = checkStart ? runStartBlock(billing.data, usage.data, runnerModels.data) : undefined;
   if (!block) {
     return footer;
   }
@@ -32,6 +41,7 @@ export function useWorkOrderStartFooter(footer: SplitRunFooter, organizationId?:
 function runStartBlock(
   billing: OrganizationsDescribeOrganizationBillingResponse | undefined,
   usage: FactoriesDescribeFactoryUsageResponse | undefined,
+  lineModels: FactoriesFactoryLlmModel[] | undefined,
 ): SplitRunFooterNote | undefined {
   if (billing?.hostedExecutionAllowed === false) {
     if (billing.requirePaymentMethod && !billing.hasPaymentMethod) {
@@ -44,15 +54,20 @@ function runStartBlock(
     return creditStartBlock("hosted_subscription_required");
   }
 
-  const remainingCredit = billing?.remainingCreditCents ?? usage?.remainingCreditCents;
-  if (remainingCredit != null && parseWorkOrderMetric(remainingCredit) <= 0) {
+  // A line that runs on the organization's own provider keys never spends
+  // hosted credit, so the hosted credit and workspace budget limits do not
+  // block its Start. An unloaded model list keeps the hosted checks.
+  if (lineModels && !lineModels.some((model) => model.id?.startsWith(HOSTED_MODEL_KEY_PREFIX))) {
+    return undefined;
+  }
+
+  // The server gates runs on exact micros, so use its availability flags
+  // instead of the rounded whole-cent balances.
+  const creditAvailable = billing?.hostedCreditAvailable ?? usage?.hostedCreditAvailable;
+  if (creditAvailable === false) {
     return creditStartBlock("no_hosted_credit");
   }
-  if (
-    usage?.hostedSpendBudgetCents != null &&
-    usage.factoryRemainingCreditCents != null &&
-    parseWorkOrderMetric(usage.factoryRemainingCreditCents) <= 0
-  ) {
+  if (usage?.hostedSpendBudgetCents != null && usage.factoryHostedBudgetAvailable === false) {
     return creditStartBlock("workspace_budget_empty");
   }
   return undefined;

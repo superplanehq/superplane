@@ -131,7 +131,7 @@ function AnalysisWorkOrderPopup({
   const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
   const { sourceOnly, viewFixture: originalViewFixture } = analysisPopupView(fixture, factory);
-  const footer = useWorkOrderStartFooter(originalViewFixture.footer, organizationId, factoryId);
+  const footer = useWorkOrderStartFooter(originalViewFixture.footer, organizationId, factoryId, fixture.lineName);
   const viewFixture = { ...originalViewFixture, footer };
   const startAllowed = canDispatch && !footer.actions.some((action) => action.kind === "start" && action.disabled);
   const draftStart = draftStartAction(

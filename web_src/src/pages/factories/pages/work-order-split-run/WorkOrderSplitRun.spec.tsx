@@ -11,6 +11,7 @@ import { factoryQueryKeys } from "@/hooks/useFactoryData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 import { organizationBillingQueryKey } from "@/hooks/useOrganizationBilling";
+import { factoryLineRunnerModelsQueryKey } from "@/hooks/useFactoryLineRunnerModels";
 
 import type { PlanningSessionPayload } from "../planningSessionView";
 
@@ -194,6 +195,14 @@ function renderPopup(
 
 function renderSplitRun() {
   return renderPopup({ fixture: SPLIT_RUN_RUNNING });
+}
+
+/** The draft fixture starts on "plan-and-implement"; give it a hosted runner model list. */
+function seedHostedLineModels(client: QueryClient) {
+  client.setQueryData(
+    factoryLineRunnerModelsQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, "plan-and-implement"),
+    [{ id: "hosted::anthropic::claude-sonnet-4-6", name: "claude-sonnet-4-6" }],
+  );
 }
 
 function liveUsageTelemetry(inputTokens: number, totalCostUsd: number) {
@@ -1770,20 +1779,20 @@ describe("WorkOrderSplitRunPopup", () => {
   it.each([
     {
       name: "no plan despite remaining credit",
-      billing: { hostedExecutionAllowed: false, remainingCreditCents: "5000" },
+      billing: { hostedExecutionAllowed: false, remainingCreditCents: "5000", hostedCreditAvailable: true },
       usage: {},
       message: "Agent runs need an active plan.",
     },
     {
       name: "no organization credit",
-      billing: { hostedExecutionAllowed: true, remainingCreditCents: "0" },
+      billing: { hostedExecutionAllowed: true, remainingCreditCents: "0", hostedCreditAvailable: false },
       usage: {},
       message: "The organization has no SuperPlane hosted credit.",
     },
     {
       name: "an exhausted workspace budget",
-      billing: { hostedExecutionAllowed: true, remainingCreditCents: "5000" },
-      usage: { hostedSpendBudgetCents: "1000", factoryRemainingCreditCents: "0" },
+      billing: { hostedExecutionAllowed: true, remainingCreditCents: "5000", hostedCreditAvailable: true },
+      usage: { hostedSpendBudgetCents: "1000", factoryRemainingCreditCents: "0", factoryHostedBudgetAvailable: false },
       message: "This workspace has no hosted credit budget left.",
     },
     {
@@ -1800,6 +1809,7 @@ describe("WorkOrderSplitRunPopup", () => {
       [...factoryQueryKeys.detail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID), "usage", 30],
       usage,
     );
+    seedHostedLineModels(client);
     const onDispatch = vi.fn();
     renderPopup(
       {
@@ -1826,21 +1836,125 @@ describe("WorkOrderSplitRunPopup", () => {
     );
   });
 
+  it("keeps Start available when a sub-cent balance rounds down to zero cents", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID), {
+      hostedExecutionAllowed: true,
+      remainingCreditCents: "0",
+      hostedCreditAvailable: true,
+    });
+    client.setQueryData([...factoryQueryKeys.detail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID), "usage", 30], {
+      hostedSpendBudgetCents: "1000",
+      factoryRemainingCreditCents: "0",
+      factoryHostedBudgetAvailable: true,
+    });
+    seedHostedLineModels(client);
+    const onDispatch = vi.fn();
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        canDispatch: true,
+        onDispatch,
+      },
+      client,
+    );
+
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).toBeEnabled();
+    await userEvent.setup().click(start);
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps Start available on a line that runs on the organization's own keys", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID), {
+      hostedExecutionAllowed: true,
+      remainingCreditCents: "0",
+      hostedCreditAvailable: false,
+    });
+    client.setQueryData([...factoryQueryKeys.detail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID), "usage", 30], {
+      hostedSpendBudgetCents: "1000",
+      factoryRemainingCreditCents: "0",
+      factoryHostedBudgetAvailable: false,
+    });
+    client.setQueryData(
+      factoryLineRunnerModelsQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, "plan-and-implement"),
+      [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }],
+    );
+    const onDispatch = vi.fn();
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        canDispatch: true,
+        onDispatch,
+      },
+      client,
+    );
+
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).toBeEnabled();
+    await userEvent.setup().click(start);
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks Start on a line that runs on the organization's own keys when no plan is active", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID), {
+      hostedExecutionAllowed: false,
+      remainingCreditCents: "0",
+      hostedCreditAvailable: false,
+    });
+    client.setQueryData(
+      factoryLineRunnerModelsQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, "plan-and-implement"),
+      [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }],
+    );
+    const onDispatch = vi.fn();
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        canDispatch: true,
+        onDispatch,
+      },
+      client,
+    );
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).toHaveTextContent("Agent runs need an active plan.");
+    expect(within(note).getByRole("button", { name: "Start" })).toBeDisabled();
+    await userEvent.setup().click(within(note).getByRole("button", { name: "Start" }));
+    expect(onDispatch).not.toHaveBeenCalled();
+  });
+
   it.each([
-    { name: "credit is low but positive", enabled: true, credit: "1", allowed: true },
-    { name: "product billing is off", enabled: false, credit: "0", allowed: false },
-  ])("keeps Start available when $name", async ({ enabled, credit, allowed }) => {
+    { name: "credit is low but positive", enabled: true, credit: "1", allowed: true, creditAvailable: true },
+    { name: "product billing is off", enabled: false, credit: "0", allowed: false, creditAvailable: false },
+  ])("keeps Start available when $name", async ({ enabled, credit, allowed, creditAvailable }) => {
     billingProductEnabled.current = enabled;
     factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
     const client = new QueryClient();
     client.setQueryData(organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID), {
       hostedExecutionAllowed: allowed,
       remainingCreditCents: credit,
+      hostedCreditAvailable: creditAvailable,
     });
     // Without a workspace cap, a zero workspace remainder does not block runs.
     client.setQueryData([...factoryQueryKeys.detail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID), "usage", 30], {
       factoryRemainingCreditCents: "0",
+      factoryHostedBudgetAvailable: true,
     });
+    seedHostedLineModels(client);
     const onDispatch = vi.fn();
     renderPopup(
       {
@@ -1862,7 +1976,12 @@ describe("WorkOrderSplitRunPopup", () => {
     factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
     const client = new QueryClient();
     const billingKey = organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID);
-    client.setQueryData(billingKey, { hostedExecutionAllowed: true, remainingCreditCents: "0" });
+    client.setQueryData(billingKey, {
+      hostedExecutionAllowed: true,
+      remainingCreditCents: "0",
+      hostedCreditAvailable: false,
+    });
+    seedHostedLineModels(client);
     const onDispatch = vi.fn();
     renderPopup(
       {
@@ -1876,7 +1995,13 @@ describe("WorkOrderSplitRunPopup", () => {
     );
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
 
-    act(() => client.setQueryData(billingKey, { hostedExecutionAllowed: true, remainingCreditCents: "5000" }));
+    act(() =>
+      client.setQueryData(billingKey, {
+        hostedExecutionAllowed: true,
+        remainingCreditCents: "5000",
+        hostedCreditAvailable: true,
+      }),
+    );
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Start" })).toBeEnabled());
     expect(screen.getByTestId("split-run-attention-note")).toHaveTextContent("This task is ready to start");

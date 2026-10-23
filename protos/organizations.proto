@@ -877,6 +877,9 @@ message DescribeOrganizationBillingResponse {
   bool has_payment_method = 24;
   repeated BillingPlanOption available_plans = 25;
   map<string, bool> product_features = 26;
+  // Exact hosted credit gate for new runs. Whole-cent balances round down,
+  // so clients must use this flag instead of remaining_credit_cents.
+  bool hosted_credit_available = 27;
 }
 
 message BillingPlanOption {

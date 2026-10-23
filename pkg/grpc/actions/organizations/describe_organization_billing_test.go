@@ -21,6 +21,46 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+func Test__DescribeOrganizationBillingHostedCreditAvailableUsesExactBalance(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	// A sub-cent remainder rounds down to zero cents, but the run gate stays open.
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+		OrganizationID: r.Organization.ID,
+		Bucket:         models.CreditBalanceBucketTrial,
+		TargetMicros:   5000,
+		ExpectedMicros: before.WelcomeRemainingMicros,
+		Note:           "support",
+		ActorAccountID: &r.Account.ID,
+	})
+	require.NoError(t, err)
+
+	resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.Zero(t, resp.RemainingCreditCents)
+	assert.True(t, resp.HostedCreditAvailable)
+	require.NoError(t, models.AssertHostedCreditAvailable(db, r.Organization.ID))
+
+	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+		OrganizationID: r.Organization.ID,
+		Bucket:         models.CreditBalanceBucketTrial,
+		TargetMicros:   0,
+		ExpectedMicros: 5000,
+		Note:           "support",
+		ActorAccountID: &r.Account.ID,
+	})
+	require.NoError(t, err)
+
+	resp, err = DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.Zero(t, resp.RemainingCreditCents)
+	assert.False(t, resp.HostedCreditAvailable)
+	assert.ErrorIs(t, models.AssertHostedCreditAvailable(db, r.Organization.ID), models.ErrHostedCreditEmpty)
+}
+
 func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	r := support.Setup(t)
 	catalog := models.BillingPlan{
@@ -69,6 +109,8 @@ func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, resp.BillingEnabled)
 	assert.False(t, resp.SubscriptionCheckoutEnabled)
+	assert.True(t, resp.HostedExecutionAllowed)
+	assert.True(t, resp.HostedCreditAvailable)
 
 	_, err = SyncOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
 	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
