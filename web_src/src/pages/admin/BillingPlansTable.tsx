@@ -2,17 +2,18 @@ import { Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/Table/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { BillingHelp } from "./BillingHelp";
-import type { BillingPlan } from "./billingPlansApi";
+import type { BillingPlanListItem } from "./billingPlansApi";
 
 export function BillingPlansTable({
   plans,
   onEdit,
   onDelete,
 }: {
-  plans: BillingPlan[];
-  onEdit: (plan: BillingPlan) => void;
-  onDelete: (plan: BillingPlan) => void;
+  plans: BillingPlanListItem[];
+  onEdit: (plan: BillingPlanListItem) => void;
+  onDelete: (plan: BillingPlanListItem) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-lg border px-6">
@@ -75,17 +76,7 @@ export function BillingPlansTable({
                   <Button size="icon-sm" variant="ghost" aria-label={`Edit ${plan.name}`} onClick={() => onEdit(plan)}>
                     <Pencil aria-hidden="true" />
                   </Button>
-                  {!plan.polar_product_id &&
-                    !["none", "trial", "business_legacy", "business_manual"].includes(plan.key) && (
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={`Delete ${plan.name}`}
-                        onClick={() => onDelete(plan)}
-                      >
-                        <Trash2 aria-hidden="true" />
-                      </Button>
-                    )}
+                  <DeletePlanButton plan={plan} onDelete={onDelete} />
                 </div>
               </TableCell>
             </TableRow>
@@ -93,5 +84,44 @@ export function BillingPlansTable({
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+function DeletePlanButton({
+  plan,
+  onDelete,
+}: {
+  plan: BillingPlanListItem;
+  onDelete: (plan: BillingPlanListItem) => void;
+}) {
+  const reason = plan.delete_disabled_reason;
+  const button = (
+    <Button
+      size="icon-sm"
+      variant="ghost"
+      aria-label={`Delete ${plan.name}`}
+      disabled={!!reason}
+      onClick={() => onDelete(plan)}
+    >
+      <Trash2 aria-hidden="true" />
+    </Button>
+  );
+  if (!reason) return button;
+  // Disabled buttons do not receive focus. The wrapper receives hover and
+  // keyboard focus so that the reason is available to every user.
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="group"
+          tabIndex={0}
+          aria-label={`Delete ${plan.name} is unavailable`}
+          className="inline-flex rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          {button}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{reason}</TooltipContent>
+    </Tooltip>
   );
 }

@@ -40,6 +40,7 @@ required_keys=(
   START_RUNNER_CLEANUP_WORKER
   RUNNER_ACTIVE_LOG_FS_PATH
   RUNNER_STABLE_VERSION
+  SUPERPLANE_BILLING_ENABLED
   START_ORGANIZATION_CLEANUP_WORKER
   START_FILE_CLEANUP_WORKER
   START_EVENT_RETENTION_WORKER
@@ -58,6 +59,10 @@ if grep -Eq '^SESSION_SECRET=' superplane.env; then
 fi
 if grep -Eq '^RABBITMQ_URL=amqp://guest:guest@' superplane.env; then
   echo "Error: RabbitMQ still uses guest:guest" >&2
+  exit 1
+fi
+if ! grep -Eq '^SUPERPLANE_BILLING_ENABLED=no$' superplane.env; then
+  echo "Error: single-host billing must be off" >&2
   exit 1
 fi
 
@@ -94,6 +99,11 @@ mv superplane.env.tmp superplane.env
 chmod 600 superplane.env
 SUPERPLANE_CONFIG_ONLY=yes ./install.sh >/dev/null
 grep -Eq '^BLOB_STORAGE_PROVIDER=filesystem$' superplane.env
+grep -v '^SUPERPLANE_BILLING_ENABLED=' superplane.env >superplane.env.tmp
+mv superplane.env.tmp superplane.env
+chmod 600 superplane.env
+SUPERPLANE_CONFIG_ONLY=yes ./install.sh >/dev/null
+grep -Eq '^SUPERPLANE_BILLING_ENABLED=no$' superplane.env
 upgraded="$(secret_snapshot)"
 if [[ "${before}" != "${upgraded}" ]]; then
   echo "Error: upgrade changed existing secrets" >&2
