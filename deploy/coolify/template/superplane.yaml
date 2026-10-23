@@ -75,9 +75,6 @@ services:
       - oidc-keys:/app/oidc-keys:ro
       - blobs:/var/lib/superplane/blobs
       - runner-logs:/var/lib/superplane/runner-logs
-    networks:
-      - default
-      - runners
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
       interval: 10s
@@ -276,7 +273,7 @@ services:
       - 'RUNNER_FLEET_ID=${RUNNER_FLEET_ID:-e1-large-amd64}'
       - 'RUNNER_VERSION=${RUNNER_VERSION:-v0.2.1}'
       - 'RUNNER_ARCH=${RUNNER_ARCH:-amd64}'
-      - 'RUNNER_NETWORK=${RUNNER_NETWORK:-${COMPOSE_PROJECT_NAME}_runners}'
+      - 'RUNNER_NETWORK=${RUNNER_NETWORK:-${COMPOSE_PROJECT_NAME}}'
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
