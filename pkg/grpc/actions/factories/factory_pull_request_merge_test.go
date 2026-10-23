@@ -297,6 +297,59 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 		assert.Equal(t, models.FactoryWorkOrderStateClosed, closed.State)
 	})
 
+	t.Run("starts another task while a merge waits", func(t *testing.T) {
+		factory := newFactory(t)
+		merging := createOrder(t, factory)
+		_, err := merging.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+			ToState: models.FactoryWorkOrderStateOpen,
+			Actor:   &r.User,
+		})
+		require.NoError(t, err)
+		other := createOrder(t, factory)
+		pr := createMergeTestPullRequest(t, db, merging)
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+		mergingLine, err := factory.CreateLine(db, "ship-merging", []models.FactoryLineStep{
+			{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+		})
+		require.NoError(t, err)
+		otherLine, err := factory.CreateLine(db, "ship-other", []models.FactoryLineStep{
+			{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+		})
+		require.NoError(t, err)
+		api := readyAPI()
+		api.onMerge = func() {
+			_, err := DispatchWorkOrder(ctx, orgID, &pb.DispatchWorkOrderRequest{
+				FactoryId: factory.ID.String(),
+				OrderId:   merging.ID.String(),
+				LineName:  mergingLine.Name,
+			})
+			require.NoError(t, err)
+			_, err = DispatchWorkOrder(ctx, orgID, &pb.DispatchWorkOrderRequest{
+				FactoryId: factory.ID.String(),
+				OrderId:   other.ID.String(),
+				LineName:  otherLine.Name,
+			})
+			require.NoError(t, err)
+			var mergingExecutions int64
+			require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", merging.ID).Count(&mergingExecutions).Error)
+			assert.Zero(t, mergingExecutions)
+			var otherExecutions int64
+			require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", other.ID).Count(&otherExecutions).Error)
+			assert.Equal(t, int64(1), otherExecutions)
+		}
+		useGitHub(t, api)
+
+		resp, err := merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
+		require.NoError(t, err)
+		assert.Equal(t, pb.FactoryPullRequest_STATE_MERGED, resp.GetPullRequest().GetState())
+		stored, err := factory.FindWorkOrder(db, other.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateOpen, stored.State)
+		var otherExecutions int64
+		require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", other.ID).Count(&otherExecutions).Error)
+		assert.Equal(t, int64(1), otherExecutions)
+	})
+
 	t.Run("starts line work after the provider rejects the merge", func(t *testing.T) {
 		factory := newFactory(t)
 		order := createOrder(t, factory)

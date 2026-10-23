@@ -2,11 +2,13 @@ package factories
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"time"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
@@ -106,7 +108,7 @@ func MergeFactoryPullRequest(
 	// must not block dispatch or cancellation for every other task. This task
 	// keeps a separate lock until the host accepts or rejects the merge, so
 	// its line and root events cannot start in that gap.
-	release, err := lockWorkOrderForMerge(ctx, db, models.WorkOrderMergeAdvisoryKey(pullRequest.WorkOrderID))
+	release, err := lockWorkOrderForMerge(ctx, pullRequest.WorkOrderID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
@@ -181,23 +183,34 @@ func rejectMergeWhileAutomationActive(db *gorm.DB, factory *models.Factory, pull
 	})
 }
 
-func lockWorkOrderForMerge(ctx context.Context, db *gorm.DB, key int64) (func(), error) {
-	sqlDB, err := db.DB()
+func lockWorkOrderForMerge(ctx context.Context, workOrderID uuid.UUID) (func(), error) {
+	// A shared pool connection held for the provider call can exhaust that
+	// pool. The merge then cannot record its result or release the lock.
+	lockDB, err := database.OpenDedicatedSQLDB("work-order-merge-lock", 1)
 	if err != nil {
 		return nil, err
 	}
-	conn, err := sqlDB.Conn(ctx)
+	conn, err := lockDB.Conn(ctx)
 	if err != nil {
+		_ = lockDB.Close()
 		return nil, err
 	}
-	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", key); err != nil {
+	if err := models.AcquireWorkOrderMergeLock(ctx, conn, workOrderID); err != nil {
 		_ = conn.Close()
+		_ = lockDB.Close()
 		return nil, err
 	}
 	return func() {
-		_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", key)
-		_ = conn.Close()
+		releaseWorkOrderMergeLock(conn, lockDB, workOrderID)
 	}, nil
+}
+
+func releaseWorkOrderMergeLock(conn *sql.Conn, lockDB *sql.DB, workOrderID uuid.UUID) {
+	defer lockDB.Close()
+	defer conn.Close()
+	if err := models.ReleaseWorkOrderMergeLock(context.Background(), conn, workOrderID); err != nil {
+		log.WithError(err).Warn("failed to release work order merge lock")
+	}
 }
 
 func recordMergedFactoryPullRequest(

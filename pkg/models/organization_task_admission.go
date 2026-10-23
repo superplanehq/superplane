@@ -1,7 +1,9 @@
 package models
 
 import (
+	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -49,6 +51,20 @@ func TryLockOrganizationTaskAdmission(tx *gorm.DB, orgID uuid.UUID) (bool, error
 func WorkOrderMergeAdvisoryKey(workOrderID uuid.UUID) int64 {
 	sum := sha256.Sum256(append([]byte("work-order-merge:"), workOrderID[:]...))
 	return int64(binary.BigEndian.Uint64(sum[:8]))
+}
+
+// AcquireWorkOrderMergeLock blocks until this task's merge lock is free.
+// conn must be a dedicated connection, not one from the application pool.
+// The lock survives until ReleaseWorkOrderMergeLock or the connection closes.
+func AcquireWorkOrderMergeLock(ctx context.Context, conn *sql.Conn, workOrderID uuid.UUID) error {
+	_, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", WorkOrderMergeAdvisoryKey(workOrderID))
+	return err
+}
+
+// ReleaseWorkOrderMergeLock drops the session lock acquired by AcquireWorkOrderMergeLock.
+func ReleaseWorkOrderMergeLock(ctx context.Context, conn *sql.Conn, workOrderID uuid.UUID) error {
+	_, err := conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", WorkOrderMergeAdvisoryKey(workOrderID))
+	return err
 }
 
 // LockRunOrganizationTaskAdmission also covers automation callbacks that close
@@ -151,7 +167,11 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 		return admitted, nil
 	}
 	var items []FactoryWorkOrderQueueItem
-	if err := eligibleQueuedTasks(tx, orgID).Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
+	eligible, err := eligibleQueuedTasks(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if err := eligible.Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
 		return nil, err
 	}
 	head, err := nextQueuedOrganizationTask(tx, orgID)
@@ -206,7 +226,11 @@ func AdmitQueuedForOrganization(tx *gorm.DB, orgID uuid.UUID) ([]*FactoryLineSte
 
 func admitSharingQueuedTasks(tx *gorm.DB, orgID uuid.UUID, active []uuid.UUID) ([]*FactoryLineStepResult, error) {
 	var items []FactoryWorkOrderQueueItem
-	if err := sharingEligibleQueuedTasks(tx, orgID, active).Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
+	eligible, err := sharingEligibleQueuedTasks(tx, orgID, active)
+	if err != nil {
+		return nil, err
+	}
+	if err := eligible.Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
 		return nil, err
 	}
 	var admitted []*FactoryLineStepResult
@@ -402,10 +426,18 @@ func admitQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*FactoryLine
 
 // Filter locally full steps before the bounded candidate batch, so a long
 // blocked queue cannot hide eligible work in another workspace.
-func eligibleQueuedTasks(tx *gorm.DB, orgID uuid.UUID) *gorm.DB {
-	return tx.Model(&FactoryWorkOrderQueueItem{}).
+func eligibleQueuedTasks(tx *gorm.DB, orgID uuid.UUID) (*gorm.DB, error) {
+	reserved, err := mergeReservedWorkOrderIDs(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	query := tx.Model(&FactoryWorkOrderQueueItem{}).
 		Where("organization_id = ?", orgID).
-		Where("work_order_id NOT IN (?)", stoppingOrganizationTasks(tx, orgID)).
+		Where("work_order_id NOT IN (?)", stoppingOrganizationTasks(tx, orgID))
+	if len(reserved) > 0 {
+		query = query.Where("work_order_id NOT IN ?", reserved)
+	}
+	return query.
 		Where(`NOT EXISTS (
 			SELECT 1 FROM factory_lines l
 			JOIN factory_work_order_line_dispatches d ON d.id = factory_work_order_queue_items.line_dispatch_id
@@ -416,14 +448,17 @@ func eligibleQueuedTasks(tx *gorm.DB, orgID uuid.UUID) *gorm.DB {
 			>= COALESCE(NULLIF(GREATEST((COALESCE(l.steps->factory_work_order_queue_items.step_index,
 				d.steps->factory_work_order_queue_items.step_index)->>'max_parallelism')::int, 0), 0), ?)
 		)`, []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning}, CanvasRunStateFinished, DefaultFactoryLineStepMaxParallelism).
-		Order("created_at, id")
+		Order("created_at, id"), nil
 }
 
 // A cancelling line run keeps the slot but must not start another line.
 // Select sharing tasks directly so older inactive rows cannot hide them.
-func sharingEligibleQueuedTasks(tx *gorm.DB, orgID uuid.UUID, active []uuid.UUID) *gorm.DB {
-	return eligibleQueuedTasks(tx, orgID).
-		Where("factory_work_order_queue_items.work_order_id IN ?", active)
+func sharingEligibleQueuedTasks(tx *gorm.DB, orgID uuid.UUID, active []uuid.UUID) (*gorm.DB, error) {
+	query, err := eligibleQueuedTasks(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return query.Where("factory_work_order_queue_items.work_order_id IN ?", active), nil
 }
 
 func failQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem, dispatch *FactoryWorkOrderLineDispatch, cause error) (*FactoryLineStepResult, error) {
@@ -466,6 +501,52 @@ func workOrderMergeInProgress(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) 
 	var locked bool
 	err := tx.Raw("SELECT pg_try_advisory_xact_lock(?)", WorkOrderMergeAdvisoryKey(workOrderID)).Scan(&locked).Error
 	return !locked, err
+}
+
+// mergeReservedWorkOrderIDs lists queued tasks whose merge lock is held by
+// another session. This read does not take the lock, so a waiting merge
+// cannot become the head of the queue.
+func mergeReservedWorkOrderIDs(tx *gorm.DB, orgID uuid.UUID) ([]uuid.UUID, error) {
+	var locks []struct {
+		ClassID int64
+		ObjID   int64
+	}
+	err := tx.Raw(`
+		SELECT classid::bigint AS class_id, objid::bigint AS obj_id
+		FROM pg_locks
+		WHERE locktype = 'advisory' AND objsubid = 1 AND granted AND pid <> pg_backend_pid()
+	`).Scan(&locks).Error
+	if err != nil || len(locks) == 0 {
+		return nil, err
+	}
+	held := make(map[[2]int64]struct{}, len(locks))
+	for _, lock := range locks {
+		held[[2]int64{lock.ClassID, lock.ObjID}] = struct{}{}
+	}
+	var ids []uuid.UUID
+	if err := tx.Model(&FactoryWorkOrderQueueItem{}).
+		Where("organization_id = ?", orgID).
+		Distinct("work_order_id").
+		Pluck("work_order_id", &ids).Error; err != nil {
+		return nil, err
+	}
+	roots, err := listQueuedRootTasks(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	for _, root := range roots {
+		ids = append(ids, root.WorkOrderID)
+	}
+	var reserved []uuid.UUID
+	for _, id := range ids {
+		key := WorkOrderMergeAdvisoryKey(id)
+		classID := int64(uint32(key >> 32))
+		objID := int64(uint32(key))
+		if _, ok := held[[2]int64{classID, objID}]; ok {
+			reserved = append(reserved, id)
+		}
+	}
+	return reserved, nil
 }
 
 func organizationAdmissionKey(orgID uuid.UUID) int64 {
