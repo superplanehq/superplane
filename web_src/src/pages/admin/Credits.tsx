@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { bpsToPercentInput, centsToDollarInput, parseDollarInputToCents } from "@/lib/hostedCredit";
 import { showSuccessToast } from "@/lib/toast";
+import { CreditPacks } from "./CreditPacks";
 import {
   fetchInstallationLLMSettings,
   patchInstallationLLMPolicy,
@@ -115,8 +116,9 @@ export function Credits() {
     <div>
       <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Credits</h1>
       <Text className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-        Configure processing fees for hosted credit purchases across all organizations.
+        Manage credit packs and processing fees for hosted credit purchases across all organizations.
       </Text>
+      <CreditPacks />
       {error ? (
         <p role="alert" className="mt-5 text-sm text-red-700 dark:text-red-400">
           {error}

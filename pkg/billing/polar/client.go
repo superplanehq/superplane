@@ -48,6 +48,13 @@ type Client struct {
 	httpClient  *http.Client
 }
 
+type ProductKind string
+
+const (
+	ProductKindOneTime      ProductKind = "one_time"
+	ProductKindSubscription ProductKind = "subscription"
+)
+
 type Product struct {
 	ID                 string
 	Name               string
@@ -147,12 +154,13 @@ func APIBaseURL() string {
 	return sandboxAPIBaseURL
 }
 
-func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
+func (c *Client) listProducts(ctx context.Context, kind ProductKind) ([]productJSON, error) {
 	var items []productJSON
 	page := 1
 	for {
 		query := url.Values{}
 		query.Set("is_archived", "false")
+		query.Set("is_recurring", strconv.FormatBool(kind == ProductKindSubscription))
 		query.Set("limit", "100")
 		query.Set("page", strconv.Itoa(page))
 		var payload listProductsJSON
@@ -167,6 +175,37 @@ func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
 			break
 		}
 		page++
+	}
+
+	return items, nil
+}
+
+func (c *Client) ListProducts(ctx context.Context, kind ProductKind) ([]Product, error) {
+	items, err := c.listProducts(ctx, kind)
+	if err != nil {
+		return nil, err
+	}
+	products := make([]Product, 0, len(items))
+	for _, item := range items {
+		product, ok := catalogProduct(item, kind)
+		if !ok {
+			continue
+		}
+		products = append(products, product)
+	}
+	slices.SortFunc(products, func(left, right Product) int {
+		if order := strings.Compare(left.Name, right.Name); order != 0 {
+			return order
+		}
+		return strings.Compare(left.ID, right.ID)
+	})
+	return products, nil
+}
+
+func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
+	items, err := c.listProducts(ctx, ProductKindOneTime)
+	if err != nil {
+		return nil, err
 	}
 
 	packs := make([]Product, 0, len(items))
@@ -192,7 +231,45 @@ func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
 	return packs, nil
 }
 
+func catalogProduct(item productJSON, kind ProductKind) (Product, bool) {
+	if kind == ProductKindOneTime {
+		product, ok := creditPackFromProduct(item)
+		return product, ok && strings.EqualFold(product.Currency, "usd")
+	}
+	if kind != ProductKindSubscription || !item.IsRecurring || item.IsArchived {
+		return Product{}, false
+	}
+	// Subscription plans can use fixed, per-seat, or other recurring prices.
+	if !slices.ContainsFunc(item.Prices, func(price priceJSON) bool {
+		return !price.IsArchived && strings.EqualFold(price.currency(), "usd")
+	}) {
+		return Product{}, false
+	}
+	return Product{ID: item.ID, Name: item.Name, Currency: "usd"}, true
+}
+
 func (c *Client) GetCreditPack(ctx context.Context, productID string) (*Product, error) {
+	payload, err := c.getProduct(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+	if !isCreditPack(payload.Metadata) {
+		return nil, ErrNotCreditPack
+	}
+	return checkoutProduct(*payload)
+}
+
+// GetCheckoutProduct validates a product linked by an installation admin.
+// The local catalog identifies credit packs, so Polar metadata is not required.
+func (c *Client) GetCheckoutProduct(ctx context.Context, productID string) (*Product, error) {
+	payload, err := c.getProduct(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+	return checkoutProduct(*payload)
+}
+
+func (c *Client) getProduct(ctx context.Context, productID string) (*productJSON, error) {
 	id := strings.TrimSpace(productID)
 	if id == "" {
 		return nil, fmt.Errorf("product id is required")
@@ -202,12 +279,13 @@ func (c *Client) GetCreditPack(ctx context.Context, productID string) (*Product,
 	if err := c.get(ctx, "/products/"+url.PathEscape(id), &payload); err != nil {
 		return nil, err
 	}
-	if !isCreditPack(payload.Metadata) {
-		return nil, ErrNotCreditPack
-	}
+	return &payload, nil
+}
+
+func checkoutProduct(payload productJSON) (*Product, error) {
 	pack, ok := creditPackFromProduct(payload)
 	if !ok {
-		return nil, fmt.Errorf("credit pack face value is missing")
+		return nil, fmt.Errorf("%w: an active one-time product with USD pricing is required", ErrNotCreditPack)
 	}
 	return &pack, nil
 }
@@ -614,12 +692,13 @@ type productJSON struct {
 	ID          string         `json:"id"`
 	Name        string         `json:"name"`
 	IsRecurring bool           `json:"is_recurring"`
+	IsArchived  bool           `json:"is_archived"`
 	Metadata    map[string]any `json:"metadata"`
 	Prices      []priceJSON    `json:"prices"`
 }
 
 func creditPackFromProduct(item productJSON) (Product, bool) {
-	if item.IsRecurring {
+	if item.IsRecurring || item.IsArchived {
 		return Product{}, false
 	}
 	for _, price := range item.Prices {

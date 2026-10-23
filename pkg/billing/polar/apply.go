@@ -171,6 +171,15 @@ func parseOrganizationID(data OrderData) (uuid.UUID, error) {
 }
 
 func orderIsCreditPack(ctx context.Context, data OrderData, lookup CreditPackLookup) (bool, error) {
+	// Checkout metadata is a snapshot. It remains valid after the admin edits
+	// or deletes the pack, and does not require metadata on the Polar product.
+	quote, err := creditPurchaseFromOrder(data)
+	if err != nil {
+		return false, err
+	}
+	if quote != nil {
+		return true, nil
+	}
 	if data.Product.IsCreditPack() {
 		return true, nil
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/metadata"
+	"gorm.io/gorm"
 )
 
 func ListHostedCreditProducts(
@@ -36,7 +37,7 @@ func ListHostedCreditProducts(
 		return &pb.ListHostedCreditProductsResponse{BillingEnabled: true}, nil
 	}
 
-	packs, err := polar.NewClientFromEnv().ListCreditPacks(ctx)
+	packs, err := availableHostedCreditPacks(ctx)
 	if err != nil {
 		return nil, polarBillingError(err, "failed to list hosted credit products")
 	}
@@ -56,6 +57,69 @@ func ListHostedCreditProducts(
 		BillingEnabled: true,
 		Products:       products,
 	}, nil
+}
+
+func availableHostedCreditPacks(ctx context.Context) ([]polar.Product, error) {
+	tx := database.DB(ctx)
+	configured, err := models.CreditPackCatalogConfigured(tx)
+	if err != nil {
+		return nil, err
+	}
+	if !configured {
+		return polar.NewClientFromEnv().ListCreditPacks(ctx)
+	}
+	packs, err := models.ListCreditPacks(tx)
+	if err != nil {
+		return nil, err
+	}
+	products := make([]polar.Product, 0, len(packs))
+	for _, pack := range packs {
+		if !pack.Enabled || pack.PolarProductID == nil {
+			continue
+		}
+		products = append(products, polar.Product{
+			ID: *pack.PolarProductID, Name: pack.Name, AmountCents: pack.AmountCents, Currency: "usd",
+		})
+	}
+	return products, nil
+}
+
+func hostedCreditPack(ctx context.Context, productID string) (*polar.Product, error) {
+	tx := database.DB(ctx)
+	configured, err := models.CreditPackCatalogConfigured(tx)
+	if err != nil {
+		return nil, err
+	}
+	if !configured {
+		return polar.NewClientFromEnv().GetCreditPack(ctx, productID)
+	}
+	pack, err := models.FindCreditPackByProduct(tx, productID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, polar.ErrNotCreditPack
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !pack.Enabled {
+		return nil, polar.ErrNotCreditPack
+	}
+	product, err := polar.NewClientFromEnv().GetCheckoutProduct(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+	product.Name = pack.Name
+	if pack.AmountCents > 0 {
+		// Checkout uses an ad-hoc fixed price. Polar catalog prices and custom
+		// amount limits do not change the credit amount set by the admin.
+		product.AmountCents = pack.AmountCents
+		product.CustomPrice = false
+		product.MinimumAmountCents = 0
+		product.MaximumAmountCents = 0
+		return product, nil
+	}
+	product.AmountCents = 0
+	product.CustomPrice = true
+	return product, nil
 }
 
 func QuoteHostedCreditCheckout(
@@ -105,7 +169,7 @@ func hostedCreditPurchaseQuote(ctx context.Context, productID string, creditCent
 	if productID == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "product id is required")
 	}
-	pack, err := polar.NewClientFromEnv().GetCreditPack(ctx, productID)
+	pack, err := hostedCreditPack(ctx, productID)
 	if err != nil {
 		if polar.IsNotFound(err) || errors.Is(err, polar.ErrNotCreditPack) {
 			return nil, grpcerrors.InvalidArgument(err, "product is not a hosted credit pack")
