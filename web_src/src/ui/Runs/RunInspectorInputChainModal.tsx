@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { RunInspectorUpstreamSection } from "./types";
-import { JsonPayload } from "./RunInspectorTimelineCard";
+import { JsonPayload } from "@/ui/JsonPayload";
 import { HeaderIconButton } from "@/ui/HeaderIconButton";
 import { NodeMarker } from "./RunInspectorTimelineMarkers";
 

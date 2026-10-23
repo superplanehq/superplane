@@ -1,13 +1,11 @@
-import JsonView from "@uiw/react-json-view";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Check, ChevronDown, Copy, Maximize2 } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { jsonViewClassName } from "@/lib/jsonViewTheme";
+import { JsonPayload } from "@/ui/JsonPayload";
 import { AccordionContent, AccordionItem } from "@/ui/accordion";
 import { FullscreenContentDialog } from "@/ui/FullscreenContentDialog";
 import { HeaderIconButton } from "@/ui/HeaderIconButton";
-import { escapeJsonStringValue } from "./runInspectorJson";
 import type { InternalAccordionKey, StatusPill } from "./RunInspectorTimelineTypes";
 
 export function TimelineAccordionCard({
@@ -112,49 +110,6 @@ export function TimelineAccordionCard({
         <JsonPayload value={actionPayload} jsonViewStyle={jsonViewStyle} collapsed={false} />
       </FullscreenContentDialog>
     </>
-  );
-}
-
-export function JsonPayload({
-  value,
-  jsonViewStyle,
-  collapsed = 2,
-}: {
-  value: unknown;
-  jsonViewStyle: CSSProperties;
-  collapsed?: boolean | number;
-}) {
-  return (
-    <JsonView
-      value={(value ?? {}) as object}
-      collapsed={collapsed}
-      style={jsonViewStyle}
-      className={jsonViewClassName}
-      displayObjectSize={false}
-      enableClipboard={false}
-    >
-      <JsonView.String
-        render={({ children, ...props }, { type, value: stringValue }) => {
-          if (type !== "value") return undefined;
-
-          const displayValue = typeof children === "string" ? children : String(stringValue ?? "");
-
-          return (
-            <>
-              <span aria-hidden className={props.className}>
-                &quot;
-              </span>
-              <span {...props} className={cn(props.className, "wrap-anywhere whitespace-pre-wrap")}>
-                {escapeJsonStringValue(displayValue)}
-              </span>
-              <span aria-hidden className={props.className}>
-                &quot;
-              </span>
-            </>
-          );
-        }}
-      />
-    </JsonView>
   );
 }
 
