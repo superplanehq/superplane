@@ -183,7 +183,10 @@ func Test__ListLineRunnerModels__StoredBYOKModelsRespectAllowlists(t *testing.T)
 func Test__ListLineRunnerModels__DropsStoredBYOKModelWithoutAccess(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"opus"})
 	require.NoError(t, err)
 
 	planning := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "opus")

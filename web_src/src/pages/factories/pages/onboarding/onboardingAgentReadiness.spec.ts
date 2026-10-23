@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
+import { hasHostedDefaultModel } from "@/lib/hostedLLMModels";
 import type { IntegrationId } from "./onboardingFixtures";
 import {
   agentFinishReady,
   firstWorkOrderAgentError,
   hostedCreditGrantCopy,
-  hasHostedDefaultModel,
   isAgentStepReady,
   isHostedAgentReady,
   resolveOnboardingAgent,
