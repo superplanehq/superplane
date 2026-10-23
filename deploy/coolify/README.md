@@ -120,6 +120,6 @@ the same host.
 
 ## Coolify one-click catalog
 
-See [SUBMISSION.md](SUBMISSION.md). Coolify accepts one-click services from
-repositories with at least 1,000 GitHub stars. External contributions are
-paused until Coolify reopens them.
+[template/](template/) holds the files for the Coolify repository. Copy
+`template/superplane.yaml` to `templates/compose/superplane.yaml` and
+`template/svgs/superplane.svg` to `svgs/superplane.svg`.
