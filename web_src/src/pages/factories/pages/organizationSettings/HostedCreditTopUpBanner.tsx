@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { OrganizationsCreateHostedCreditCheckoutBody, OrganizationsHostedCreditProduct } from "@/api-client";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ export function HostedCreditTopUpBanner({
   onAddCredit: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const topUpButton = useRef<HTMLButtonElement>(null);
   const hasPurchasablePack = packs.some(
     (pack) =>
       pack.id &&
@@ -28,6 +29,7 @@ export function HostedCreditTopUpBanner({
     <>
       <div className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-violet-100 py-1 pr-1.5 pl-2.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900">
         <Button
+          ref={topUpButton}
           type="button"
           variant="ghost"
           size="xs"
@@ -49,6 +51,10 @@ export function HostedCreditTopUpBanner({
           checkoutPending={checkoutPending}
           onAddCredit={onAddCredit}
           onClose={() => setOpen(false)}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            topUpButton.current?.focus();
+          }}
         />
       ) : null}
     </>

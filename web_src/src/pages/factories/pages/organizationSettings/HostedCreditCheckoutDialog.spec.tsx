@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -38,16 +38,14 @@ describe("HostedCreditCheckoutDialog", () => {
   it("requires an amount and confirmation before starting checkout", async () => {
     client.setConfig({
       baseUrl: "http://localhost",
-      fetch: vi
-        .fn()
-        .mockResolvedValue(
-          Response.json({
-            creditAmountCents: "10000",
-            processingFeeCents: "579",
-            subtotalCents: "10579",
-            currency: "usd",
-          }),
-        ),
+      fetch: vi.fn().mockResolvedValue(
+        Response.json({
+          creditAmountCents: "10000",
+          processingFeeCents: "579",
+          subtotalCents: "10579",
+          currency: "usd",
+        }),
+      ),
     });
     const { user, onAddCredit, onClose } = renderDialog();
     const dialog = screen.getByRole("dialog", { name: "Add hosted credit" });
@@ -117,9 +115,11 @@ describe("HostedCreditCheckoutDialog", () => {
     expect(confirm).toBeDisabled();
     expect(screen.queryByText("$13.52")).not.toBeInTheDocument();
     await waitFor(() => expect(resolveQuote).toBeDefined());
-    resolveQuote?.(
-      Response.json({ creditAmountCents: "2500", processingFeeCents: "185", subtotalCents: "2685", currency: "usd" }),
-    );
+    await act(async () => {
+      resolveQuote?.(
+        Response.json({ creditAmountCents: "2500", processingFeeCents: "185", subtotalCents: "2685", currency: "usd" }),
+      );
+    });
     await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);
     expect(onAddCredit).toHaveBeenCalledWith({

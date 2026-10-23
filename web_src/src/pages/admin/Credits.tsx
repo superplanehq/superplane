@@ -18,7 +18,7 @@ function parseFeeInput(value: string): number | null {
   return amount !== null && Number.isSafeInteger(amount) ? amount : null;
 }
 
-export function Credits() {
+function useCreditPurchaseFees() {
   const [settings, setSettings] = useState<InstallationLLMSettings | null>(null);
   const [percent, setPercent] = useState("");
   const [fixedUSD, setFixedUSD] = useState("");
@@ -77,6 +77,40 @@ export function Credits() {
     }
   };
 
+  return {
+    settings,
+    percent,
+    setPercent,
+    fixedUSD,
+    setFixedUSD,
+    loading,
+    saving,
+    error,
+    load,
+    percentValid,
+    fixedValid: fixedCents !== null,
+    canSave: valid && changed && !saving,
+    save,
+  };
+}
+
+export function Credits() {
+  const {
+    settings,
+    percent,
+    setPercent,
+    fixedUSD,
+    setFixedUSD,
+    loading,
+    saving,
+    error,
+    load,
+    percentValid,
+    fixedValid,
+    canSave,
+    save,
+  } = useCreditPurchaseFees();
+
   return (
     <div>
       <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Credits</h1>
@@ -133,17 +167,17 @@ export function Credits() {
                 value={fixedUSD}
                 disabled={saving}
                 onChange={(event) => setFixedUSD(event.target.value)}
-                aria-invalid={fixedCents === null}
-                aria-describedby={fixedCents === null ? "credit-purchase-fixed-fee-error" : undefined}
+                aria-invalid={!fixedValid}
+                aria-describedby={!fixedValid ? "credit-purchase-fixed-fee-error" : undefined}
               />
-              {fixedCents === null ? (
+              {!fixedValid ? (
                 <p id="credit-purchase-fixed-fee-error" className="mt-1 text-xs text-red-700 dark:text-red-400">
                   Enter a valid USD amount of zero or more, with up to 2 decimal places.
                 </p>
               ) : null}
             </div>
           </div>
-          <Button type="submit" disabled={saving || !valid || !changed}>
+          <Button type="submit" disabled={!canSave}>
             {saving ? "Saving..." : "Save fee settings"}
           </Button>
         </form>

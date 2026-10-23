@@ -30,12 +30,14 @@ export function HostedCreditCheckoutDialog({
   checkoutPending,
   onAddCredit,
   onClose,
+  onCloseAutoFocus,
 }: {
   organizationId: string;
   packs: OrganizationsHostedCreditProduct[];
   checkoutPending: boolean;
   onAddCredit: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
   onClose: () => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const [selection, setSelection] = useState<number | "custom" | null>(null);
   const [dollars, setDollars] = useState("");
@@ -75,7 +77,11 @@ export function HostedCreditCheckoutDialog({
         if (!open && !pending) onClose();
       }}
     >
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto" showCloseButton={!pending}>
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        showCloseButton={!pending}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>Add hosted credit</DialogTitle>
           <DialogDescription>Choose the amount of hosted credit to add to this organization.</DialogDescription>

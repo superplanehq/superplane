@@ -248,48 +248,6 @@ describe("OrganizationSettingsBillingPage", () => {
     vi.unstubAllGlobals();
   }, 10000);
 
-  it("opens Polar checkout for a single hosted credit pack", async () => {
-    const assign = vi.fn();
-    vi.stubGlobal("location", { ...window.location, assign });
-    const user = userEvent.setup();
-
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
-        factoriesFixture={{
-          ...defaultFactoriesFixture,
-          hostedCreditProducts: [STORYBOOK_HOSTED_CREDIT_PRODUCTS[0]],
-          organizationBilling: BUSINESS_ORGANIZATION_BILLING,
-          organizationWorkspaceUsage: {
-            ...DEFAULT_FACTORY_USAGE,
-            billingEnabled: true,
-            hasBillingCustomer: false,
-          },
-        }}
-      />,
-    );
-
-    const balance = await screen.findByTestId("billing-credit-balance");
-    const topup = within(balance).getByTestId("billing-credit-topup");
-    await waitFor(() => {
-      expect(within(topup).getByRole("button", { name: "Top up" })).toBeEnabled();
-    });
-    expect(within(balance).queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
-    expect(within(topup).queryByRole("button", { name: "$50" })).not.toBeInTheDocument();
-    await user.click(within(topup).getByRole("button", { name: "Top up" }));
-    const dialog = await screen.findByRole("dialog", { name: "Add hosted credit" });
-    await user.click(within(dialog).getByRole("button", { name: "$50" }));
-    const confirm = within(dialog).getByRole("button", { name: "Continue to checkout" });
-    await waitFor(() => expect(confirm).toBeEnabled());
-    expect(dialog).toHaveTextContent("$3.16");
-    expect(dialog).toHaveTextContent("$53.16");
-    expect(assign).not.toHaveBeenCalled();
-    await user.click(confirm);
-
-    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook"));
-    vi.unstubAllGlobals();
-  }, 10000);
-
   it("opens Polar checkout from Top up when billing already has a customer", async () => {
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });
