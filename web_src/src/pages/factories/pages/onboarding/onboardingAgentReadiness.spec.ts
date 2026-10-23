@@ -358,11 +358,15 @@ describe("firstWorkOrderAgentError", () => {
 
 describe("hosted credit grant copy", () => {
   it("hides the grant block when the organization has no grant", () => {
-    expect(shouldShowHostedCreditGrant(0)).toBe(false);
+    expect(shouldShowHostedCreditGrant(0, true)).toBe(false);
+  });
+
+  it("hides the grant block when product billing is off", () => {
+    expect(shouldShowHostedCreditGrant(5000, false)).toBe(false);
   });
 
   it("shows the grant block when a grant exists, even if remaining credit is empty", () => {
-    expect(shouldShowHostedCreditGrant(5000)).toBe(true);
+    expect(shouldShowHostedCreditGrant(5000, true)).toBe(true);
   });
 
   it("explains that remaining credit lets the user continue without keys", () => {
