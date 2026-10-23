@@ -911,6 +911,7 @@ message DescribeOrganizationBillingResponse {
   bool has_payment_method = 24;
   repeated BillingPlanOption available_plans = 25;
   map<string, bool> product_features = 26;
+  optional int32 occupied_seats = 27;
 }
 
 message BillingPlanOption {
@@ -920,12 +921,14 @@ message BillingPlanOption {
   bool per_seat = 4;
   bool require_payment_method = 5;
   bool subscription_required = 6;
+  optional int32 seat_maximum = 7;
 }
 
 message SelectBillingPlanRequest {
   string id = 1;
   string plan_key = 2;
   string return_path = 3;
+  optional int32 seats = 4;
 }
 
 message CreatePaymentMethodSessionRequest {

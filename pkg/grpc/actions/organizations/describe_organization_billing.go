@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -49,6 +50,10 @@ func DescribeOrganizationBilling(
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
 	}
+	seats, err := entitlements.ResolveSeats(db, organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load seat usage.")
+	}
 	hasCard := false
 	if billingEnabled && newBilling && hasCustomer {
 		hasCard, err = polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())
@@ -76,11 +81,25 @@ func DescribeOrganizationBilling(
 				continue
 			}
 			checkoutEnabled = checkoutEnabled || item.PolarProductID != nil
-			available = append(available, &pb.BillingPlanOption{Key: item.Key, Name: item.Name, PriceCents: item.PriceCents, PerSeat: item.PerSeat, RequirePaymentMethod: item.RequirePaymentMethod, SubscriptionRequired: item.PolarProductID != nil || item.PriceCents != 0})
+			maximum, err := entitlements.SeatMaximumForPlan(db, organizationID, &item)
+			if err != nil {
+				return nil, grpcerrors.Internal(err, "Could not load seat limits.")
+			}
+			var seatMaximum *int32
+			if maximum != nil {
+				seatMaximum = new(int32(*maximum))
+			}
+			available = append(available, &pb.BillingPlanOption{
+				Key: item.Key, Name: item.Name, PriceCents: item.PriceCents,
+				PerSeat: item.PerSeat, SeatMaximum: seatMaximum,
+				RequirePaymentMethod: item.RequirePaymentMethod,
+				SubscriptionRequired: item.PerSeat || item.PolarProductID != nil || item.PriceCents != 0,
+			})
 		}
 	}
 	return &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
+		OccupiedSeats:               new(int32(seats.Occupied)),
 		ProductFeatures:             productFeatures,
 		RequirePaymentMethod:        models.BillingEnabled() && newBilling && plan.Catalog.RequirePaymentMethod,
 		HasPaymentMethod:            hasCard,
@@ -180,10 +199,7 @@ func CreateBusinessCheckout(
 
 	session, err := client.CreateCheckout(
 		ctx,
-		productID,
-		organizationID.String(),
-		businessCheckoutSuccessURL(baseURL, organizationID),
-		clientIPFromContext(ctx),
+		polar.CheckoutInput{ProductID: productID, ExternalCustomerID: organizationID.String(), SuccessURL: businessCheckoutSuccessURL(baseURL, organizationID), CustomerIP: clientIPFromContext(ctx)},
 	)
 	if err != nil {
 		return nil, polarBillingError(err, "failed to create Business checkout")
