@@ -818,6 +818,11 @@ message QuoteHostedCreditCheckoutResponse {
   int64 processing_fee_cents = 2;
   int64 subtotal_cents = 3;
   string currency = 4;
+  int64 fixed_fee_cents = 5;
+  // Percentage of the pre-tax subtotal, in basis points (100 = 1%).
+  int32 percentage_fee_bps = 6;
+  // Rounded up to the nearest cent. Together with the fixed fee, equals the processing fee.
+  int64 percentage_fee_cents = 7;
 }
 
 message CreateHostedCreditCheckoutResponse {

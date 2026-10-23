@@ -1553,6 +1553,9 @@ function hostedCreditCheckoutQuoteRoute(fixture: FactoriesFixture): FactoriesRou
         json: {
           creditAmountCents: String(creditAmountCents),
           processingFeeCents: String(subtotalCents - creditAmountCents),
+          fixedFeeCents: "50",
+          percentageFeeBps: 500,
+          percentageFeeCents: String(subtotalCents - creditAmountCents - 50),
           subtotalCents: String(subtotalCents),
           currency: "usd",
         },

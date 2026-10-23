@@ -21,6 +21,9 @@ type CreditPurchaseQuote struct {
 	ProcessingFeeCents int64
 	SubtotalCents      int64
 	Currency           string
+	FixedFeeCents      int64
+	PercentageFeeBPS   int
+	PercentageFeeCents int64
 }
 
 func CalculateCreditPurchase(creditCents int64, feeBPS int, fixedFeeCents int64) (*CreditPurchaseQuote, error) {
@@ -49,6 +52,9 @@ func CalculateCreditPurchase(creditCents int64, feeBPS int, fixedFeeCents int64)
 		ProcessingFeeCents: subtotal - creditCents,
 		SubtotalCents:      subtotal,
 		Currency:           "usd",
+		FixedFeeCents:      fixedFeeCents,
+		PercentageFeeBPS:   feeBPS,
+		PercentageFeeCents: subtotal - creditCents - fixedFeeCents,
 	}, nil
 }
 

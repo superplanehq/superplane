@@ -19,6 +19,8 @@ func TestCalculateCreditPurchase(t *testing.T) {
 	}{
 		{name: "fees disabled", credits: 10000, subtotal: 10000},
 		{name: "rounds Starter fee up", credits: 10000, feeBPS: 500, fixedFee: 50, subtotal: 10579},
+		{name: "fifty dollar purchase", credits: 5000, feeBPS: 500, fixedFee: 50, subtotal: 5316},
+		{name: "fractional percentage", credits: 5000, feeBPS: 525, fixedFee: 50, subtotal: 5330},
 		{name: "rounds Early Member fee up", credits: 10000, feeBPS: 400, fixedFee: 40, subtotal: 10459},
 		{name: "exact division", credits: 95, feeBPS: 500, subtotal: 100},
 		{name: "minimum charge", credits: 1, fixedFee: 49, subtotal: 50},
@@ -44,6 +46,9 @@ func TestCalculateCreditPurchase(t *testing.T) {
 			assert.Equal(t, test.credits, quote.CreditAmountCents)
 			assert.Equal(t, test.subtotal, quote.SubtotalCents)
 			assert.Equal(t, test.subtotal-test.credits, quote.ProcessingFeeCents)
+			assert.Equal(t, test.fixedFee, quote.FixedFeeCents)
+			assert.Equal(t, test.feeBPS, quote.PercentageFeeBPS)
+			assert.Equal(t, test.subtotal-test.credits-test.fixedFee, quote.PercentageFeeCents)
 			assert.Equal(t, "usd", quote.Currency)
 			assert.GreaterOrEqual(t, test.subtotal*int64(10000-test.feeBPS), (test.credits+test.fixedFee)*10000)
 		})

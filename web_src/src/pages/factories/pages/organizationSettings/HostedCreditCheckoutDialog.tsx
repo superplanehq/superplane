@@ -212,6 +212,14 @@ function CreditQuoteSummary({
             <dt>Processing fee</dt>
             <dd className="tabular-nums">{formatUsdCents(Number(quote.processingFeeCents))}</dd>
           </div>
+          <div className="flex justify-between gap-4 pl-3 text-xs text-muted-foreground">
+            <dt>Fixed fee per transaction</dt>
+            <dd className="shrink-0 tabular-nums">{formatUsdCents(Number(quote.fixedFeeCents))}</dd>
+          </div>
+          <div className="flex justify-between gap-4 pl-3 text-xs text-muted-foreground">
+            <dt>Percentage fee ({Number(quote.percentageFeeBps) / 100}% of subtotal)</dt>
+            <dd className="shrink-0 tabular-nums">{formatUsdCents(Number(quote.percentageFeeCents))}</dd>
+          </div>
           <div className="flex justify-between gap-4 border-t border-border pt-3 font-semibold">
             <dt>Subtotal</dt>
             <dd className="tabular-nums">{formatUsdCents(Number(quote.subtotalCents))}</dd>
@@ -222,6 +230,9 @@ function CreditQuoteSummary({
           {loading ? "Calculating subtotal..." : "Choose an amount to see the subtotal."}
         </p>
       )}
+      {quote && Number(quote.percentageFeeBps) > 0 ? (
+        <p className="mt-3 text-xs text-muted-foreground">The percentage fee is rounded up to the nearest cent.</p>
+      ) : null}
       <p className="mt-3 text-xs text-muted-foreground">Tax is calculated at checkout.</p>
     </div>
   );
@@ -250,11 +261,22 @@ function quoteErrorMessage(quote: ReturnType<typeof useHostedCreditCheckoutQuote
 
 function validQuote(quote: OrganizationsQuoteHostedCreditCheckoutResponse, creditAmountCents: string) {
   const fee = Number(quote.processingFeeCents);
+  const fixedFee = Number(quote.fixedFeeCents);
+  const percentageFee = Number(quote.percentageFeeCents);
+  const percentageBps = Number(quote.percentageFeeBps);
   const subtotal = Number(quote.subtotalCents);
   return (
     quote.creditAmountCents === creditAmountCents &&
     Number.isSafeInteger(fee) &&
     fee >= 0 &&
+    Number.isSafeInteger(fixedFee) &&
+    fixedFee >= 0 &&
+    Number.isSafeInteger(percentageFee) &&
+    percentageFee >= 0 &&
+    fixedFee + percentageFee === fee &&
+    Number.isSafeInteger(percentageBps) &&
+    percentageBps >= 0 &&
+    percentageBps < 10000 &&
     Number.isSafeInteger(subtotal) &&
     subtotal === Number(creditAmountCents) + fee &&
     quote.currency?.toLowerCase() === "usd"

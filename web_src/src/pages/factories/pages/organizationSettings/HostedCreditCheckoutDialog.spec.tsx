@@ -42,6 +42,9 @@ describe("HostedCreditCheckoutDialog", () => {
         Response.json({
           creditAmountCents: "10000",
           processingFeeCents: "579",
+          fixedFeeCents: "50",
+          percentageFeeBps: 500,
+          percentageFeeCents: "529",
           subtotalCents: "10579",
           currency: "usd",
         }),
@@ -56,6 +59,8 @@ describe("HostedCreditCheckoutDialog", () => {
     await waitFor(() => expect(confirm).toBeEnabled());
     expect(dialog).toHaveTextContent("$100.00");
     expect(dialog).toHaveTextContent("$5.79");
+    expect(within(dialog).getByText("Fixed fee per transaction").parentElement).toHaveTextContent("$0.50");
+    expect(within(dialog).getByText("Percentage fee (5% of subtotal)").parentElement).toHaveTextContent("$5.29");
     expect(dialog).toHaveTextContent("$105.79");
     expect(dialog).toHaveTextContent("Tax is calculated at checkout.");
     expect(onAddCredit).not.toHaveBeenCalled();
@@ -79,6 +84,9 @@ describe("HostedCreditCheckoutDialog", () => {
         return Response.json({
           creditAmountCents: "1234",
           processingFeeCents: "118",
+          fixedFeeCents: "50",
+          percentageFeeBps: 500,
+          percentageFeeCents: "68",
           subtotalCents: "1352",
           currency: "usd",
         });
@@ -90,6 +98,9 @@ describe("HostedCreditCheckoutDialog", () => {
       return Response.json({
         creditAmountCents: amount,
         processingFeeCents: "50",
+        fixedFeeCents: "50",
+        percentageFeeBps: 0,
+        percentageFeeCents: "0",
         subtotalCents: String(Number(amount) + 50),
         currency: "usd",
       });
@@ -117,7 +128,15 @@ describe("HostedCreditCheckoutDialog", () => {
     await waitFor(() => expect(resolveQuote).toBeDefined());
     await act(async () => {
       resolveQuote?.(
-        Response.json({ creditAmountCents: "2500", processingFeeCents: "185", subtotalCents: "2685", currency: "usd" }),
+        Response.json({
+          creditAmountCents: "2500",
+          processingFeeCents: "185",
+          fixedFeeCents: "50",
+          percentageFeeBps: 500,
+          percentageFeeCents: "135",
+          subtotalCents: "2685",
+          currency: "usd",
+        }),
       );
     });
     await waitFor(() => expect(confirm).toBeEnabled());
@@ -136,6 +155,9 @@ describe("HostedCreditCheckoutDialog", () => {
         Response.json({
           creditAmountCents: "10000",
           processingFeeCents: "579",
+          fixedFeeCents: "50",
+          percentageFeeBps: 500,
+          percentageFeeCents: "529",
           subtotalCents: "10579",
           currency: "usd",
         }),
@@ -144,6 +166,9 @@ describe("HostedCreditCheckoutDialog", () => {
         Response.json({
           creditAmountCents: "10000",
           processingFeeCents: "600",
+          fixedFeeCents: "70",
+          percentageFeeBps: 500,
+          percentageFeeCents: "530",
           subtotalCents: "10600",
           currency: "usd",
         }),
@@ -161,6 +186,8 @@ describe("HostedCreditCheckoutDialog", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The checkout price changed.");
     expect(await screen.findByText("$106.00")).toBeInTheDocument();
+    expect(screen.getByText("Fixed fee per transaction").parentElement).toHaveTextContent("$0.70");
+    expect(screen.getByText("Percentage fee (5% of subtotal)").parentElement).toHaveTextContent("$5.30");
     expect(onAddCredit).toHaveBeenCalledOnce();
     await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);

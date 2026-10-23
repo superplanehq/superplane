@@ -30,6 +30,9 @@ describe("HostedCreditTopUpBanner", () => {
           creditAmountCents,
           subtotalCents: creditAmountCents,
           processingFeeCents: "0",
+          fixedFeeCents: "0",
+          percentageFeeBps: 0,
+          percentageFeeCents: "0",
           currency: "usd",
         });
       },

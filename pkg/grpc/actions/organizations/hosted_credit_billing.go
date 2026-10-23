@@ -76,6 +76,9 @@ func QuoteHostedCreditCheckout(
 		ProcessingFeeCents: quote.ProcessingFeeCents,
 		SubtotalCents:      quote.SubtotalCents,
 		Currency:           quote.Currency,
+		FixedFeeCents:      quote.FixedFeeCents,
+		PercentageFeeBps:   int32(quote.PercentageFeeBPS),
+		PercentageFeeCents: quote.PercentageFeeCents,
 	}, nil
 }
 
