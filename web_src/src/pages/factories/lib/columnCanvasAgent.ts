@@ -14,20 +14,6 @@ export const PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS = [
   "address-pr-review-reply-feedback",
 ] as const;
 
-function exposesVisualEvidenceSetting(node: CanvasSpecNode): boolean {
-  return node.configuration !== undefined && "includeVisualEvidence" in node.configuration;
-}
-
-/** Whether every PR discussion agent supports visual evidence. */
-export function supportsPRFeedbackVisualEvidence(spec: CanvasesCanvas["spec"] | null | undefined): boolean {
-  const nodes = spec?.nodes ?? [];
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
-  return PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.every((nodeId) => {
-    const node = nodesById.get(nodeId);
-    return Boolean(node && isAgentHarnessComponent(node.component) && exposesVisualEvidenceSetting(node));
-  });
-}
-
 /** Agent harness nodes on a column automation canvas. */
 export function findAgentNodes(spec: CanvasesCanvas["spec"] | null | undefined): CanvasSpecNode[] {
   return (spec?.nodes ?? []).filter((node) => {

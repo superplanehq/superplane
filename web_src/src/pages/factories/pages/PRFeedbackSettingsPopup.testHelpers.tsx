@@ -157,12 +157,7 @@ export function renderAutomationPopup(props: { canvasId?: string } = {}) {
   );
 }
 
-export function renderAgentSettingsPopup(
-  settings: PRFeedbackDraftSettings,
-  showVisualEvidenceSetting: boolean,
-  initialPath = "/",
-  probe?: ReactNode,
-) {
+export function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, initialPath = "/", probe?: ReactNode) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter initialEntries={[initialPath]}>
@@ -173,7 +168,6 @@ export function renderAgentSettingsPopup(
             draft: PLANNING_REVIEW_DRAFT,
             organizationId: "org-1",
             onSave: vi.fn(),
-            showVisualEvidenceSetting,
           }}
           onSave={vi.fn()}
           onClose={vi.fn()}
