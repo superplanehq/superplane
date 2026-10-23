@@ -11,6 +11,21 @@ import { HostedCreditTopUpBanner } from "./HostedCreditTopUpBanner";
 afterEach(() => client.setConfig({ fetch: undefined }));
 
 describe("HostedCreditTopUpBanner", () => {
+  it("enables Top up when the only pack is a configured fixed amount", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <HostedCreditTopUpBanner
+          organizationId="org-1"
+          packs={[{ id: "prod-2550", amountCents: "2550" }]}
+          checkoutPending={false}
+          onAddCredit={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Top up" })).toBeEnabled();
+  });
+
   it("refreshes changed products before the buyer confirms another purchase", async () => {
     const user = userEvent.setup();
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -62,7 +77,7 @@ describe("HostedCreditTopUpBanner", () => {
     const confirm = screen.getByRole("button", { name: "Continue to checkout" });
     await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);
-    await waitFor(() => expect(screen.getByRole("button", { name: "$100" })).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "$100" })).not.toBeInTheDocument());
     expect(confirm).toBeDisabled();
     expect(onAddCredit).toHaveBeenCalledOnce();
     await user.click(screen.getByRole("button", { name: "$500" }));

@@ -14,13 +14,13 @@ const packs = [
   { id: "prod-custom" },
 ];
 
-function renderDialog(onAddCredit = vi.fn().mockResolvedValue(undefined)) {
+function renderDialog(onAddCredit = vi.fn().mockResolvedValue(undefined), nextPacks: typeof packs = packs) {
   const onClose = vi.fn();
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <HostedCreditCheckoutDialog
         organizationId="org-1"
-        packs={packs}
+        packs={nextPacks}
         checkoutPending={false}
         onAddCredit={onAddCredit}
         onClose={onClose}
@@ -195,6 +195,45 @@ describe("HostedCreditCheckoutDialog", () => {
       productId: "prod-100",
       creditAmountCents: "10000",
       expectedSubtotalCents: "10600",
+    });
+  });
+
+  it("offers a configured fixed pack that is not a default amount", async () => {
+    client.setConfig({
+      baseUrl: "http://localhost",
+      fetch: vi.fn().mockResolvedValue(
+        Response.json({
+          creditAmountCents: "2550",
+          processingFeeCents: "0",
+          fixedFeeCents: "0",
+          percentageFeeBps: 0,
+          percentageFeeCents: "0",
+          subtotalCents: "2550",
+          currency: "usd",
+        }),
+      ),
+    });
+    const { user, onAddCredit } = renderDialog(vi.fn().mockResolvedValue(undefined), [
+      { id: "prod-100", amountCents: "10000" },
+      { id: "prod-2550", amountCents: "2550" },
+    ]);
+    const amounts = screen.getByRole("group", { name: "Hosted credit amount" });
+
+    expect(
+      within(amounts)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["$25.50", "$100", "Custom"]);
+    expect(within(amounts).getByRole("button", { name: "Custom" })).toBeDisabled();
+
+    await user.click(within(amounts).getByRole("button", { name: "$25.50" }));
+    const confirm = screen.getByRole("button", { name: "Continue to checkout" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.click(confirm);
+    expect(onAddCredit).toHaveBeenCalledWith({
+      productId: "prod-2550",
+      creditAmountCents: "2550",
+      expectedSubtotalCents: "2550",
     });
   });
 });

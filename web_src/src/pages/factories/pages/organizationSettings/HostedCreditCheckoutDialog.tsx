@@ -22,8 +22,12 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 
 import { formatUsdCents } from "../../lib/workOrderUsage";
-
-const CREDIT_PACK_CENTS = [5_000, 10_000, 50_000] as const;
+import {
+  fixedHostedCreditPackCents,
+  hasCustomHostedCreditPack,
+  hostedCreditPackButtonLabel,
+  hostedCreditPackCents,
+} from "./hostedCreditPacks";
 
 export function HostedCreditCheckoutDialog({
   organizationId,
@@ -152,17 +156,19 @@ function CreditAmountSelection({
   return (
     <>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Hosted credit amount">
-        {CREDIT_PACK_CENTS.map((cents) => (
+        {fixedHostedCreditPackCents(packs).map((cents) => (
           <CreditAmountButton
             key={cents}
             selected={selection === cents}
-            disabled={pending || !packs.some((pack) => pack.id && Number(pack.amountCents ?? 0) === cents)}
+            disabled={pending}
             onClick={() => onChoose(cents)}
-          >{`$${cents / 100}`}</CreditAmountButton>
+          >
+            {hostedCreditPackButtonLabel(cents)}
+          </CreditAmountButton>
         ))}
         <CreditAmountButton
           selected={selection === "custom"}
-          disabled={pending || !packs.some((pack) => pack.id && Number(pack.amountCents ?? 0) <= 0)}
+          disabled={pending || !hasCustomHostedCreditPack(packs)}
           onClick={() => onChoose("custom")}
         >
           Custom
@@ -244,9 +250,10 @@ function creditQuoteInput(
   dollars: string,
 ) {
   const custom = selection === "custom";
-  const product = packs.find(
-    (pack) => pack.id && (custom ? Number(pack.amountCents ?? 0) <= 0 : Number(pack.amountCents ?? 0) === selection),
-  );
+  const product = packs.find((pack) => {
+    const cents = hostedCreditPackCents(pack);
+    return cents !== null && (custom ? cents === 0 : cents === selection);
+  });
   const creditCents = custom ? parseCreditAmount(dollars) : selection;
   if (!product?.id || creditCents === null || creditCents <= 0) return undefined;
   return { productId: product.id, creditAmountCents: String(creditCents) };

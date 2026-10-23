@@ -5,6 +5,7 @@ import type { OrganizationsCreateHostedCreditCheckoutBody, OrganizationsHostedCr
 import { Button } from "@/components/ui/button";
 
 import { HostedCreditCheckoutDialog } from "./HostedCreditCheckoutDialog";
+import { hasPurchasableHostedCreditPack } from "./hostedCreditPacks";
 
 export function HostedCreditTopUpBanner({
   organizationId,
@@ -19,11 +20,7 @@ export function HostedCreditTopUpBanner({
 }) {
   const [open, setOpen] = useState(false);
   const topUpButton = useRef<HTMLButtonElement>(null);
-  const hasPurchasablePack = packs.some(
-    (pack) =>
-      pack.id &&
-      (Number(pack.amountCents ?? 0) <= 0 || [5_000, 10_000, 50_000].includes(Number(pack.amountCents ?? 0))),
-  );
+  const hasPurchasablePack = hasPurchasableHostedCreditPack(packs);
 
   return (
     <>
