@@ -269,6 +269,43 @@ func Test__SendPlanningSessionMessage__RecoversMissingSession(t *testing.T) {
 	}
 }
 
+func Test__SendPlanningSessionMessage__StartsAnalysisWithoutPriorRun(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, factoryModel.UpdatePlanning(db, models.FactoryPlanning{Enabled: false}))
+	order, err := factoryModel.CreateWorkOrder(db, "Older draft", "Created before Planning.", &r.User, nil, nil)
+	require.NoError(t, err)
+	canvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+	version, err := models.FindCanvasVersionInTransaction(db, canvas.ID, *canvas.LiveVersionID)
+	require.NoError(t, err)
+	nodes := version.Nodes
+	nodes[0].ID = models.FactoryAppBacklogTriggerID
+	nodes[0].Metadata = models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 1)
+	require.NoError(t, db.Model(version).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+	require.NoError(t, db.Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "start").
+		Update("node_id", models.FactoryAppBacklogTriggerID).Error)
+	require.NoError(t, factoryModel.UpdatePlanning(db, models.FactoryPlanning{Enabled: true}))
+
+	sent, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId:   factoryModel.ID.String(),
+		WorkOrderId: order.ID.String(),
+		Text:        "Analyze this older draft.",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, sent.Session)
+	assert.Equal(t, order.ID.String(), sent.Session.Draft.WorkOrderId)
+	require.Len(t, sent.Session.Messages, 1)
+	assert.Equal(t, "Analyze this older draft.", sent.Session.Messages[0].Text)
+	events, err := models.ListCanvasEvents(db, canvas.ID, models.FactoryAppBacklogTriggerID, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, models.CanvasEventStatePending, events[0].State)
+}
+
 func Test__SendPlanningSessionMessage__RestartsCancelledAnalysisRun(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
