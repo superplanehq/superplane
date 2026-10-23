@@ -59,6 +59,14 @@ func TestAdminLLMSettings(t *testing.T) {
 			authCookie: regularToken,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
+		response = execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-settings",
+			authCookie:  regularToken,
+			body:        []byte(`{"credit_purchase_fee_bps":500}`),
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
 
 	t.Run("admin can load defaults and update markup", func(t *testing.T) {
@@ -73,6 +81,8 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
 		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
 		assert.Equal(t, models.DefaultMarkupBPS, settings.MarkupBPS)
+		assert.Zero(t, settings.CreditPurchaseFeeBPS)
+		assert.Zero(t, settings.CreditPurchaseFixedFeeCents)
 		assert.Empty(t, settings.DefaultHostedProvider)
 		assert.Empty(t, settings.DefaultHostedModel)
 		require.Len(t, settings.Providers, 3)
@@ -92,6 +102,53 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
 		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
 		assert.Equal(t, 1000, settings.MarkupBPS)
+	})
+
+	t.Run("credit fees persist through unrelated updates and allow explicit zero", func(t *testing.T) {
+		for _, tc := range []struct {
+			body  string
+			bps   int
+			fixed int64
+		}{
+			{`{"credit_purchase_fee_bps":500,"credit_purchase_fixed_fee_cents":50}`, 500, 50},
+			{`{"warning_threshold_bps":2500}`, 500, 50},
+			{`{"credit_purchase_fee_bps":0,"credit_purchase_fixed_fee_cents":0}`, 0, 0},
+		} {
+			response := execRequest(server, requestParams{
+				method:      "PATCH",
+				path:        "/admin/api/installation/llm-settings",
+				authCookie:  token,
+				body:        []byte(tc.body),
+				contentType: "application/json",
+			})
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+			var settings installationLLMSettingsResponse
+			require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+			assert.Equal(t, tc.bps, settings.CreditPurchaseFeeBPS)
+			assert.Equal(t, tc.fixed, settings.CreditPurchaseFixedFeeCents)
+			saved, err := models.GetInstallationLLMSettings(database.Conn())
+			require.NoError(t, err)
+			assert.Equal(t, tc.bps, saved.CreditPurchaseFeeBPS)
+			assert.Equal(t, tc.fixed, saved.CreditPurchaseFixedFeeCents)
+		}
+	})
+
+	t.Run("invalid credit fees return a client error", func(t *testing.T) {
+		for _, body := range []string{
+			`{"credit_purchase_fee_bps":-1}`,
+			`{"credit_purchase_fee_bps":10000}`,
+			`{"credit_purchase_fixed_fee_cents":-1}`,
+			`{"credit_purchase_fee_bps":500.5}`,
+		} {
+			response := execRequest(server, requestParams{
+				method:      "PATCH",
+				path:        "/admin/api/installation/llm-settings",
+				authCookie:  token,
+				body:        []byte(body),
+				contentType: "application/json",
+			})
+			assert.Equal(t, http.StatusBadRequest, response.Code, body)
+		}
 	})
 
 	t.Run("admin can save a hosted provider", func(t *testing.T) {

@@ -76,6 +76,13 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 	}
 
 	amountCents := purchasedFaceValueCents(event.Data)
+	quote, err := creditPurchaseFromOrder(event.Data)
+	if err != nil {
+		return err
+	}
+	if quote != nil {
+		amountCents = quote.CreditAmountCents
+	}
 	if amountCents <= 0 {
 		return permanentApplyError("credit pack face value is missing")
 	}
@@ -125,9 +132,34 @@ func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEve
 		return err
 	}
 
-	reverseMicros := refundReverseMicros(grant.AmountMicros, event.Data)
+	reverseMicros, err := creditPurchaseRefundMicros(grant.AmountMicros, event.Data)
+	if err != nil {
+		return err
+	}
 	refundID := polarRefundID(event.Data, reverseMicros)
 	return models.ReversePolarOrderCredit(tx, orgID, event.Data.ID, reverseMicros, refundID)
+}
+
+func creditPurchaseRefundMicros(grantMicros int64, order OrderData) (int64, error) {
+	quote, err := creditPurchaseFromOrder(order)
+	if err != nil {
+		return 0, err
+	}
+	if quote == nil {
+		return refundReverseMicros(grantMicros, order), nil
+	}
+	if models.CentsToMicros(quote.CreditAmountCents) != grantMicros {
+		return 0, permanentApplyError("credit purchase metadata does not match the recorded grant")
+	}
+	if strings.EqualFold(strings.TrimSpace(order.Status), "refunded") {
+		return grantMicros, nil
+	}
+	if order.RefundedAmount <= 0 {
+		return 0, nil
+	}
+	refunded := min(order.RefundedAmount, quote.SubtotalCents)
+	// Split division before multiplication to avoid overflowing large purchases.
+	return grantMicros/quote.SubtotalCents*refunded + grantMicros%quote.SubtotalCents*refunded/quote.SubtotalCents, nil
 }
 
 func parseOrganizationID(data OrderData) (uuid.UUID, error) {

@@ -109,26 +109,97 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 	})
 }
 
+func Test__QuoteHostedCreditCheckout(t *testing.T) {
+	r := support.Setup(t)
+	ctx := context.Background()
+	tx := database.DB(ctx)
+	_, err := models.SetAdminOrganizationPlan(tx, r.Organization.ID, models.BillingPlanBusiness, nil)
+	require.NoError(t, err)
+	settings, err := models.GetInstallationLLMSettings(tx)
+	require.NoError(t, err)
+	original := *settings
+	t.Cleanup(func() {
+		_, restoreErr := models.UpdateInstallationLLMSettings(tx, original)
+		require.NoError(t, restoreErr)
+	})
+	settings.CreditPurchaseFeeBPS = 500
+	settings.CreditPurchaseFixedFeeCents = 50
+	_, err = models.UpdateInstallationLLMSettings(tx, *settings)
+	require.NoError(t, err)
+	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, http.MethodGet, req.Method)
+		price := map[string]any{"amount_type": "fixed", "price_amount": 10000, "price_currency": "usd"}
+		if strings.HasSuffix(req.URL.Path, "/prod_custom") {
+			price = map[string]any{"amount_type": "custom", "minimum_amount": 500, "maximum_amount": 50000, "price_currency": "usd"}
+		}
+		if strings.HasSuffix(req.URL.Path, "/prod_eur") {
+			price["price_currency"] = "eur"
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id": "pack", "metadata": map[string]any{"superplane_credit_pack": true},
+			"prices": []map[string]any{price},
+		}))
+	})
+	usePolarTestServer(t, server)
+
+	for _, test := range []struct {
+		name      string
+		productID string
+		credits   int64
+		code      codes.Code
+	}{
+		{name: "fixed pack uses catalog credits", productID: "prod_fixed"},
+		{name: "custom credits exclude the fee", productID: "prod_custom", credits: 10000},
+		{name: "fixed pack cannot change credit value", productID: "prod_fixed", credits: 9000, code: codes.FailedPrecondition},
+		{name: "custom amount is required", productID: "prod_custom", code: codes.InvalidArgument},
+		{name: "custom minimum is enforced", productID: "prod_custom", credits: 499, code: codes.InvalidArgument},
+		{name: "custom maximum is enforced", productID: "prod_custom", credits: 50001, code: codes.InvalidArgument},
+		{name: "non USD catalog is rejected", productID: "prod_eur", code: codes.InvalidArgument},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			quote, err := QuoteHostedCreditCheckout(ctx, r.Organization.ID.String(), &pb.QuoteHostedCreditCheckoutRequest{
+				ProductId: test.productID, CreditAmountCents: test.credits,
+			})
+			if test.code != codes.OK {
+				assert.Equal(t, test.code, grpcerrors.Code(err))
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, int64(10000), quote.CreditAmountCents)
+			assert.Equal(t, int64(579), quote.ProcessingFeeCents)
+			assert.Equal(t, int64(10579), quote.SubtotalCents)
+			assert.Equal(t, "usd", quote.Currency)
+		})
+	}
+
+	t.Run("requires an eligible billing plan", func(t *testing.T) {
+		_, err := models.SetAdminOrganizationPlan(tx, r.Organization.ID, models.BillingPlanTrial, nil)
+		require.NoError(t, err)
+		_, err = QuoteHostedCreditCheckout(ctx, r.Organization.ID.String(), &pb.QuoteHostedCreditCheckoutRequest{ProductId: "prod_fixed"})
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	})
+}
+
 func Test__CreateHostedCreditCheckout(t *testing.T) {
 	r := support.Setup(t)
 	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 
 	t.Run("invalid organization id", func(t *testing.T) {
-		_, err := CreateHostedCreditCheckout(context.Background(), "bad", &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"}, "", "")
+		_, err := CreateHostedCreditCheckout(context.Background(), "bad", &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CreditAmountCents: 2500, ExpectedSubtotalCents: 2500}, "", "")
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
 	t.Run("billing not configured", func(t *testing.T) {
 		t.Setenv("POLAR_ACCESS_TOKEN", "")
-		_, err := CreateHostedCreditCheckout(context.Background(), r.Organization.ID.String(), &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"}, "", "")
+		_, err := CreateHostedCreditCheckout(context.Background(), r.Organization.ID.String(), &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CreditAmountCents: 2500, ExpectedSubtotalCents: 2500}, "", "")
 		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	})
 
 	t.Run("rejects checkout when product billing is off", func(t *testing.T) {
 		t.Setenv(models.BillingEnabledEnv, "no")
 		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
-		_, err := CreateHostedCreditCheckout(context.Background(), r.Organization.ID.String(), &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"}, "", "")
+		_, err := CreateHostedCreditCheckout(context.Background(), r.Organization.ID.String(), &pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CreditAmountCents: 2500, ExpectedSubtotalCents: 2500}, "", "")
 		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	})
 
@@ -136,6 +207,41 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 		_, err := CreateHostedCreditCheckout(context.Background(), r.Organization.ID.String(), &pb.CreateHostedCreditCheckoutRequest{}, "", "")
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
+	t.Run("requires a confirmed credit amount and subtotal", func(t *testing.T) {
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		_, err := CreateHostedCreditCheckout(context.Background(), r.Organization.ID.String(),
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"}, r.Account.ID.String(), "http://localhost:8000")
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
+	t.Run("rejects a changed subtotal before creating a customer or checkout", func(t *testing.T) {
+		tx := database.DB(context.Background())
+		settings, err := models.GetInstallationLLMSettings(tx)
+		require.NoError(t, err)
+		original := *settings
+		t.Cleanup(func() {
+			_, restoreErr := models.UpdateInstallationLLMSettings(tx, original)
+			require.NoError(t, restoreErr)
+		})
+		settings.CreditPurchaseFeeBPS = 500
+		settings.CreditPurchaseFixedFeeCents = 50
+		_, err = models.UpdateInstallationLLMSettings(tx, *settings)
+		require.NoError(t, err)
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			require.Equal(t, http.MethodGet, req.Method)
+			require.Equal(t, "/products/prod_100", req.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"id": "prod_100", "metadata": map[string]any{"superplane_credit_pack": true},
+				"prices": []map[string]any{{"amount_type": "fixed", "price_amount": 10000, "price_currency": "usd"}},
+			}))
+		})
+		usePolarTestServer(t, server)
+		_, err = CreateHostedCreditCheckout(context.Background(), r.Organization.ID.String(), &pb.CreateHostedCreditCheckoutRequest{
+			ProductId: "prod_100", CreditAmountCents: 10000, ExpectedSubtotalCents: 10000,
+		}, r.Account.ID.String(), "http://localhost:8000")
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	})
 
 	t.Run("rejects non credit packs", func(t *testing.T) {
@@ -156,7 +262,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		_, err := CreateHostedCreditCheckout(
 			context.Background(),
 			r.Organization.ID.String(),
-			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_other"},
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_other", CreditAmountCents: 1000, ExpectedSubtotalCents: 1000},
 			r.Account.ID.String(),
 			"http://localhost:8000",
 		)
@@ -202,7 +308,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		resp, err := CreateHostedCreditCheckout(
 			context.Background(),
 			r.Organization.ID.String(),
-			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_custom"},
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_custom", CreditAmountCents: 5000, ExpectedSubtotalCents: 5000},
 			r.Account.ID.String(),
 			"http://localhost:8000",
 		)
@@ -263,7 +369,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		resp, err := CreateHostedCreditCheckout(
 			ctx,
 			r.Organization.ID.String(),
-			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CustomerIpAddress: spoofedIP},
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CreditAmountCents: 2500, ExpectedSubtotalCents: 2500, CustomerIpAddress: spoofedIP},
 			r.Account.ID.String(),
 			"http://localhost:8000",
 		)
@@ -290,7 +396,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		_, err := CreateHostedCreditCheckout(
 			context.Background(),
 			r.Organization.ID.String(),
-			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"},
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CreditAmountCents: 2500, ExpectedSubtotalCents: 2500},
 			"",
 			"http://localhost:8000",
 		)
@@ -335,7 +441,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		resp, err := CreateHostedCreditCheckout(
 			ctx,
 			r.Organization.ID.String(),
-			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"},
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CreditAmountCents: 2500, ExpectedSubtotalCents: 2500},
 			"",
 			"http://localhost:8000",
 		)
@@ -353,7 +459,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		_, err := CreateHostedCreditCheckout(
 			context.Background(),
 			r.Organization.ID.String(),
-			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"},
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CreditAmountCents: 2500, ExpectedSubtotalCents: 2500},
 			r.Account.ID.String(),
 			"http://localhost:8000",
 		)
@@ -407,7 +513,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		_, err = CreateHostedCreditCheckout(
 			context.Background(),
 			r.Organization.ID.String(),
-			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"},
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CreditAmountCents: 2500, ExpectedSubtotalCents: 2500},
 			r.Account.ID.String(),
 			"http://localhost:8000",
 		)
@@ -415,7 +521,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		_, err = CreateHostedCreditCheckout(
 			context.Background(),
 			other.ID.String(),
-			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"},
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CreditAmountCents: 2500, ExpectedSubtotalCents: 2500},
 			r.Account.ID.String(),
 			"http://localhost:8000",
 		)

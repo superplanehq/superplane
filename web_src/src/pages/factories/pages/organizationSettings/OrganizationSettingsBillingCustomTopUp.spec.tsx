@@ -46,16 +46,36 @@ describe("OrganizationSettingsBillingPage custom top-up", () => {
       />,
     );
 
+    const checkoutBodies: unknown[] = [];
+    const captureCheckout = async (request: Request) => {
+      if (new URL(request.url).pathname.endsWith("/hosted-credit-checkout")) {
+        checkoutBodies.push(await request.clone().json());
+      }
+      return request;
+    };
+    client.interceptors.request.use(captureCheckout);
     const balance = await screen.findByTestId("billing-credit-balance");
     const topup = within(balance).getByTestId("billing-credit-topup");
     await waitFor(() => {
       expect(within(topup).getByRole("button", { name: "Top up" })).toBeEnabled();
     });
     await user.click(within(topup).getByRole("button", { name: "Top up" }));
-    expect(await within(topup).findByRole("button", { name: "Custom" })).toBeEnabled();
-    await user.click(within(topup).getByRole("button", { name: "Custom" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add hosted credit" });
+    await user.click(within(dialog).getByRole("button", { name: "Custom" }));
+    await user.type(within(dialog).getByRole("textbox", { name: "Credit amount in USD" }), "100");
+    const confirm = within(dialog).getByRole("button", { name: "Continue to checkout" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    expect(dialog).toHaveTextContent("$100.00");
+    expect(dialog).toHaveTextContent("$5.79");
+    expect(dialog).toHaveTextContent("$105.79");
+    expect(assign).not.toHaveBeenCalled();
+    await user.click(confirm);
 
-    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook");
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook"));
+    expect(checkoutBodies).toEqual([
+      { productId: "prod-custom", creditAmountCents: "10000", expectedSubtotalCents: "10579" },
+    ]);
+    client.interceptors.request.eject(captureCheckout);
     vi.unstubAllGlobals();
   }, 10000);
 });

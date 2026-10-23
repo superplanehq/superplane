@@ -176,6 +176,36 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		assert.Equal(t, models.CentsToMicros(2500), grant.AmountMicros)
 	})
 
+	t.Run("grants quoted credit from signed order metadata excluding fees and tax", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		orderID := uuid.NewString()
+		body := []byte(fmt.Sprintf(`{
+			"type": "order.paid",
+			"data": {
+				"id": %q,
+				"billing_reason": "purchase",
+				"currency": "usd",
+				"net_amount": 10579,
+				"tax_amount": 2116,
+				"total_amount": 12695,
+				"metadata": {
+					"superplane_credit_purchase_version": "1",
+					"superplane_credit_amount_cents": "10000",
+					"superplane_credit_subtotal_cents": "10579"
+				},
+				"customer": {"id": "cust_1", "external_id": %q},
+				"product": {"id": "prod_1", "metadata": {"superplane_credit_pack": true}},
+				"items": [{"amount": 10579, "product_price_id": "price_adhoc"}]
+			}
+		}`, orderID, r.Organization.ID.String()))
+		rec := signedPolarWebhook(t, secret, body)
+		server.handlePolarWebhook(rec.recorder, rec.request)
+		require.Equal(t, http.StatusAccepted, rec.recorder.Code)
+		grant, err := models.FindLLMCreditGrantByPolarOrderID(database.Conn(), orderID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CentsToMicros(10000), grant.AmountMicros)
+	})
+
 	t.Run("apply failure", func(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
 		body := []byte(`{

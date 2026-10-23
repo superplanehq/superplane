@@ -277,9 +277,16 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(balance).queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
     expect(within(topup).queryByRole("button", { name: "$50" })).not.toBeInTheDocument();
     await user.click(within(topup).getByRole("button", { name: "Top up" }));
-    await user.click(await within(topup).findByRole("button", { name: "$50" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add hosted credit" });
+    await user.click(within(dialog).getByRole("button", { name: "$50" }));
+    const confirm = within(dialog).getByRole("button", { name: "Continue to checkout" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    expect(dialog).toHaveTextContent("$3.16");
+    expect(dialog).toHaveTextContent("$53.16");
+    expect(assign).not.toHaveBeenCalled();
+    await user.click(confirm);
 
-    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook");
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook"));
     vi.unstubAllGlobals();
   }, 10000);
 
@@ -337,14 +344,19 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(balance).not.toHaveTextContent("welcome credit");
 
     await user.click(within(topup).getByRole("button", { name: "Top up" }));
-    expect(await within(topup).findByRole("button", { name: "$50" })).toBeEnabled();
-    expect(within(topup).getByRole("button", { name: "$100" })).toBeEnabled();
-    expect(within(topup).getByRole("button", { name: "$500" })).toBeEnabled();
-    expect(within(topup).getByRole("button", { name: "Custom" })).toBeDisabled();
+    const dialog = await screen.findByRole("dialog", { name: "Add hosted credit" });
+    expect(within(dialog).getByRole("button", { name: "$50" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "$100" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "$500" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "Custom" })).toBeDisabled();
 
-    await user.click(within(topup).getByRole("button", { name: "$50" }));
-    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook");
+    await user.click(within(dialog).getByRole("button", { name: "$50" }));
+    const confirm = within(dialog).getByRole("button", { name: "Continue to checkout" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.click(confirm);
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook"));
     vi.unstubAllGlobals();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
     const invoices = await screen.findByTestId("billing-polar-invoices");
     expect(within(invoices).getByText("Recent paid invoices for this organization.")).toBeInTheDocument();
