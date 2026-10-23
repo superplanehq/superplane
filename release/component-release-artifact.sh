@@ -466,7 +466,12 @@ push_bundle() {
     part_names=()
     IFS=',' read -r -a part_names <<< "${parts_csv}"
     for part_name in "${part_names[@]}"; do
-      artifact push workflow "${work_dir}/${part_name}"
+      # The path argument is the artifact name. Publish pulls the same
+      # name from a different machine, so it cannot be this temp path.
+      (
+        cd "${work_dir}"
+        artifact push workflow "${part_name}"
+      )
       rm -f "${work_dir}/${part_name}"
     done
   done <"${work_dir}/files.tsv"
@@ -558,7 +563,10 @@ restore_split_files() {
     part_paths=()
     IFS=',' read -r -a part_names <<< "${parts_csv}"
     for part_name in "${part_names[@]}"; do
-      if ! artifact pull workflow "${listing_dir}/${part_name}"; then
+      if ! (
+        cd "${listing_dir}"
+        artifact pull workflow "${part_name}"
+      ); then
         echo "Error: cannot pull artifact part ${part_name}" >&2
         discard_release_dir
         exit 1

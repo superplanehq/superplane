@@ -435,6 +435,7 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationSpendingReport: DEFAULT_ORG_SPENDING_REPORT,
   organizationCreditGrants: DEFAULT_CREDIT_GRANTS,
   organizationBilling: {
+    productFeatures: { byo_key: true },
     plan: "trial",
     catalogKey: "trial",
     hasPaymentMethod: false,

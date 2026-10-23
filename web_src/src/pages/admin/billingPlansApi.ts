@@ -20,6 +20,14 @@ export type BillingPlan = {
   features: string[];
 };
 
+// The admin list adds delete_disabled_reason. It is display metadata only and
+// never belongs in the editable plan or in POST and PUT payloads.
+export type BillingPlanListItem = BillingPlan & { delete_disabled_reason: string | null };
+
+export function toEditableBillingPlan({ delete_disabled_reason: _reason, ...plan }: BillingPlanListItem): BillingPlan {
+  return plan;
+}
+
 export type FeatureDefinition = { key: string; label: string; gated: boolean };
 export type OrganizationFeatures = {
   grants: { feature_key: string; enabled: boolean }[];

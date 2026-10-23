@@ -30,14 +30,14 @@ func ListUsers(
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
 	}
-	effective, err := entitlements.Resolve(database.DB(ctx), orgID)
+	seats, err := entitlements.ResolveSeats(database.DB(ctx), orgID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to resolve seat limit")
 	}
 	var seatLimit *int32
-	if effective.SeatLimit != nil {
-		limit := int32(*effective.SeatLimit)
-		seatLimit = &limit
+	if limit := seats.JoinLimit(); limit != nil {
+		quantity := int32(*limit)
+		seatLimit = &quantity
 	}
 	users, err := models.ListAllActiveUsersInOrganization(domainID)
 	if err != nil {

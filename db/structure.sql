@@ -718,6 +718,7 @@ CREATE TABLE public.factory_pull_request_runs (
     access_granted_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     title text DEFAULT ''::text NOT NULL,
+    fixes_continued_at timestamp with time zone,
     CONSTRAINT factory_pull_request_runs_access_valid CHECK (((access)::text = ANY ((ARRAY['concurrent'::character varying, 'waiting'::character varying, 'exclusive'::character varying, 'released'::character varying])::text[]))),
     CONSTRAINT factory_pull_request_runs_attempt_limit_positive CHECK (((attempt_limit IS NULL) OR (attempt_limit > 0))),
     CONSTRAINT factory_pull_request_runs_attempt_positive CHECK (((attempt IS NULL) OR (attempt > 0))),
@@ -1258,6 +1259,8 @@ CREATE TABLE public.organization_billing_plans (
     cancel_at_period_end boolean DEFAULT false NOT NULL,
     polar_modified_at timestamp with time zone,
     plan_id uuid NOT NULL,
+    purchased_seats integer,
+    CONSTRAINT organization_billing_plans_purchased_seats_check CHECK ((purchased_seats >= 0)),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
 
@@ -6013,7 +6016,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261022133415	f
+20261023123107	f
 \.
 
 

@@ -169,33 +169,6 @@ export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boole
 export type OnboardingAgentCredentialChoice = "own-key" | "hosted";
 
 /**
- * Where the agent screen goes in the wizard:
- * - `show`: after the ticket screen, to connect a provider key.
- * - `first`: before the ticket screen, to choose a model source.
- * - `skip`: nowhere. Hosted models run the agent.
- * - `pending`: not known until the bring-your-own-key flag loads.
- */
-export type OnboardingAgentGate = "show" | "first" | "skip" | "pending";
-
-/**
- * Hosted models skip the agent screen. Only an organization with the
- * bring-your-own-key flag chooses its own provider key or SuperPlane-hosted
- * models, before it chooses the backlog. The gate waits until the flag has
- * loaded, so setup does not finish on the hosted path first.
- */
-export function onboardingAgentGate(args: {
-  hostedModelsAvailable: boolean;
-  hostedModelsAvailableLoading: boolean;
-  bringYourOwnKey: boolean;
-  bringYourOwnKeyLoading: boolean;
-}): OnboardingAgentGate {
-  if (args.hostedModelsAvailableLoading || args.bringYourOwnKeyLoading) return "pending";
-  if (!args.hostedModelsAvailable) return "show";
-  if (args.bringYourOwnKey) return "first";
-  return "skip";
-}
-
-/**
  * A model source choice must be made before setup finishes. Own-key setup
  * finishes only after a provider key is connected.
  */

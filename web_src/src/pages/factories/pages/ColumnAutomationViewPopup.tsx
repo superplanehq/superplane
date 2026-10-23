@@ -261,7 +261,6 @@ function ColumnAutomationViewBody({
         isLoading={agent.isLoading}
         showAutomationNote={false}
         showCancel={false}
-        showVisualEvidenceSetting={agent.showVisualEvidenceSetting}
       />
     );
   }
@@ -357,7 +356,6 @@ export function ColumnAutomationViewHost({
               factoryKey,
               automationId: canvasId,
               onSave: agent.save,
-              showVisualEvidenceSetting: agent.showVisualEvidenceSetting,
             }
           : undefined
       }

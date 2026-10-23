@@ -101,6 +101,24 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
 	})
 
+	t.Run("subscription updated stores purchased seats", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		db := database.Conn()
+		product := "product_" + uuid.NewString()
+		catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+		require.NoError(t, models.SaveBillingPlan(db, &catalog))
+		body := []byte(fmt.Sprintf(`{"type":"subscription.updated","data":{"id":"sub_seats","status":"active","product_id":%q,"seats":3,"customer":{"external_id":%q}}}`, product, r.Organization.ID.String()))
+		for range 2 {
+			rec := signedPolarWebhook(t, secret, body)
+			server.handlePolarWebhook(rec.recorder, rec.request)
+			require.Equal(t, http.StatusAccepted, rec.recorder.Code)
+		}
+		stored, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.NotNil(t, stored.PurchasedSeats)
+		require.Equal(t, 3, *stored.PurchasedSeats)
+	})
+
 	t.Run("grants credit for paid order", func(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
 		orderID := uuid.NewString()

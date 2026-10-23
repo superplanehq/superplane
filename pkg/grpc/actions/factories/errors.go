@@ -33,6 +33,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	}
 
 	switch {
+	case errors.Is(err, models.ErrBYOKAccessDenied):
+		return grpcerrors.PermissionDenied(err, err.Error())
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory with the same name already exists")
 	case errors.Is(err, models.ErrFactoryNameRequired):
@@ -125,6 +127,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "factory pull request not found")
 	case errors.Is(err, models.ErrFactoryPullRequestInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPullRequestActivityNotFound):
+		return grpcerrors.NotFound(err, "pull request activity not found")
+	case errors.Is(err, models.ErrFactoryPullRequestFixesNotPaused):
+		return grpcerrors.FailedPrecondition(err, "Automatic fixes are not paused for this pull request.")
 	case errors.Is(err, models.ErrFactoryPullRequestAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory pull request already exists")
 	case errors.Is(err, models.ErrFactoryPullRequestRunAlreadyLinked):

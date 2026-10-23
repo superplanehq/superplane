@@ -247,7 +247,11 @@ services:
       test: rabbitmq-diagnostics -q ping
       interval: 3s
       timeout: 3s
-      retries: 5
+      # Allow time for RabbitMQ to boot on loaded CI runners. Without a
+      # start period, a slow boot marks the container unhealthy and fails
+      # every dependent service.
+      start_period: 30s
+      retries: 10
 
   # Build-only service. Fleet Manager starts ephemeral containers from this
   # image when a task is queued.

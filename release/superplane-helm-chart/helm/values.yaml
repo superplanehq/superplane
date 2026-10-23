@@ -111,12 +111,14 @@ fleetManagerSetup:
   serviceAccountName: superplane-fleet-manager
   infrastructure: {}
 
-# Saved versions are the fallback when release lookup fails.
+# A running installation uses the newest stable Runner and Fleet Manager
+# release. Release candidates are excluded. These versions apply when
+# release lookup fails.
 componentReleases:
-  runnerVersion: v0.2.0
+  runnerVersion: v0.2.1
   runnerVersions:
-    - v0.2.0
-  fleetManagerVersion: v0.1.4
+    - v0.2.1
+  fleetManagerVersion: v0.1.5
 
 sentry:
   secretName: ""
