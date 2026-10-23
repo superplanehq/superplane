@@ -68,6 +68,12 @@ export function useOnboardingPlanTransition(
     navigation.screen === "agent" && (!access.allowed || (hasBillingStep && !isOrganizationPlanActive(billing.data)))
       ? ("billing" as const)
       : navigation.screen;
+  // Restored and redirected visits open the plan screen without the tickets
+  // transition. Record that the screen was shown, so a saved card does not
+  // remove the step while the user is on it.
+  useEffect(() => {
+    if (screen === "billing" && hasBillingStep) setBillingStepShown(true);
+  }, [screen, hasBillingStep]);
   useEffect(() => {
     if (access.ready && screen !== navigation.screen) navigation.goToScreen(screen);
   }, [access.ready, screen, navigation]);

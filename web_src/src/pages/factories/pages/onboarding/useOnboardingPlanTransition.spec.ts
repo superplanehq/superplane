@@ -136,6 +136,18 @@ it("keeps the plan step after the user activates a plan on it", async () => {
   rerender();
   expect(result.current.hasBillingStep).toBe(true);
 });
+it("keeps the plan step after a card save on a restored visit", () => {
+  Object.assign(billing, inactivePlans["card required without card"]);
+  const finish = vi.fn(async () => {});
+  const goToScreen = vi.fn();
+  const { result, rerender } = renderHook(() =>
+    useOnboardingPlanTransition({ saving: false, finish }, { screen: "billing", goToScreen }, "org"),
+  );
+  expect(result.current.hasBillingStep).toBe(true);
+  Object.assign(billing, activePlans["plan with card on file"]);
+  rerender();
+  expect(result.current.hasBillingStep).toBe(true);
+});
 it("sends the agent screen back to the plan step for an inactive plan", async () => {
   const finish = vi.fn(async () => {});
   const goToScreen = vi.fn();
