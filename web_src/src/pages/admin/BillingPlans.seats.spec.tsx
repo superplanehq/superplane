@@ -10,7 +10,10 @@ it("keeps entered values and shows failed saves inside the editor", async () => 
   const saves: unknown[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/admin/api/polar/products?kind=subscription") {
+        return new Response(JSON.stringify([{ id: "prod_team", name: "Team subscription" }]));
+      }
       if (init?.method === "POST") {
         saves.push(JSON.parse(String(init.body)));
         return new Response("Polar seat price must match the catalog price.", { status: 400 });
@@ -28,7 +31,8 @@ it("keeps entered values and shows failed saves inside the editor", async () => 
   await user.click(screen.getByRole("button", { name: "Create plan" }));
   await user.type(screen.getByLabelText("Name", { exact: true }), "Team");
   await user.type(screen.getByLabelText("Key", { exact: true }), "team");
-  await user.type(screen.getByLabelText("Polar product ID", { exact: true }), "prod_team");
+  await user.click(screen.getByRole("combobox", { name: "Polar product" }));
+  await user.click(await screen.findByRole("option", { name: /Team subscription/ }));
   const seatLimit = screen.getByLabelText("Seat limit", { exact: true });
   await user.type(seatLimit, "25");
   await user.click(screen.getByRole("switch", { name: "Per seat" }));
@@ -48,7 +52,7 @@ it("keeps entered values and shows failed saves inside the editor", async () => 
   expect(await dialog.findByRole("alert")).toHaveTextContent("Polar seat price must match the catalog price.");
   expect(dialog.getByLabelText("Name", { exact: true })).toHaveValue("Team");
   expect(dialog.getByLabelText("Key", { exact: true })).toHaveValue("team");
-  expect(dialog.getByLabelText("Polar product ID", { exact: true })).toHaveValue("prod_team");
+  expect(dialog.getByRole("combobox", { name: "Polar product" })).toHaveTextContent("Team subscription");
   expect(dialog.getByLabelText("Maximum seats", { exact: true })).toHaveValue(80);
   expect(saves).toEqual([expect.objectContaining({ seat_limit: 80, per_seat: true })]);
   await user.click(dialog.getByRole("button", { name: "Cancel" }));

@@ -1537,6 +1537,33 @@ function hostedCreditCheckoutRoute(): FactoriesRoute {
   };
 }
 
+function hostedCreditCheckoutQuoteRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-checkout-quote"),
+    resolve: (_match, method, _body, url) => {
+      if (method !== "GET") return null;
+      const product = fixture.hostedCreditProducts?.find((pack) => pack.id === url.searchParams.get("productId"));
+      if (!product) return { status: 400, json: { message: "Select an available credit amount." } };
+      const creditAmountCents = Number(url.searchParams.get("creditAmountCents"));
+      if (!Number.isSafeInteger(creditAmountCents) || creditAmountCents <= 0) {
+        return { status: 400, json: { message: "Enter a valid credit amount." } };
+      }
+      const subtotalCents = Math.ceil((creditAmountCents + 50) / 0.95);
+      return {
+        json: {
+          creditAmountCents: String(creditAmountCents),
+          processingFeeCents: String(subtotalCents - creditAmountCents),
+          fixedFeeCents: "50",
+          percentageFeeBps: 500,
+          percentageFeeCents: String(subtotalCents - creditAmountCents - 50),
+          subtotalCents: String(subtotalCents),
+          currency: "usd",
+        },
+      };
+    },
+  };
+}
+
 function billingPlanSelectionRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/billing/select-plan"),
@@ -1674,6 +1701,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),
+    hostedCreditCheckoutQuoteRoute(fixture),
     organizationBillingSyncRoute(fixture),
     organizationBillingCancelRoute(fixture),
     organizationBillingResumeRoute(fixture),

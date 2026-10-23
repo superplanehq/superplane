@@ -24,6 +24,10 @@ func TestAdminCatalogAuthorizationAndAssignment(t *testing.T) {
 	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 	for _, route := range []struct{ method, path, body string }{
+		{"GET", "/admin/api/polar/products", ""},
+		{"GET", "/admin/api/credit-packs", ""}, {"POST", "/admin/api/credit-packs", "{}"},
+		{"PUT", "/admin/api/credit-packs/00000000-0000-0000-0000-000000000000", "{}"},
+		{"DELETE", "/admin/api/credit-packs/00000000-0000-0000-0000-000000000000", ""},
 		{"GET", "/admin/api/billing-plans", ""}, {"POST", "/admin/api/billing-plans", "{}"},
 		{"PUT", "/admin/api/billing-plans/00000000-0000-0000-0000-000000000000", "{}"},
 		{"DELETE", "/admin/api/billing-plans/00000000-0000-0000-0000-000000000000", ""},
