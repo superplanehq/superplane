@@ -47,7 +47,45 @@ func TestCodexExecArgsUsesDangerousBypassOutsidePlanning(t *testing.T) {
 	assert.Contains(t, args, "gpt-5")
 	assert.NotContains(t, args, "--sandbox")
 	assert.NotContains(t, args, "read-only")
-	assert.NotContains(t, strings.Join(args, " "), "mcp_servers")
+	joined := strings.Join(args, " ")
+	assert.NotContains(t, joined, "mcp_servers")
+	assert.NotContains(t, joined, "openai_base_url")
+}
+
+func TestCodexExecArgsAddsOpenAIBaseURLOverride(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{
+		"OPENAI_BASE_URL": "https://proxy.example/v1",
+	}, "gpt-5", "/task/planning_session_mcp.js")
+
+	assert.Contains(t, strings.Join(args, " "), `openai_base_url="https://proxy.example/v1"`)
+}
+
+func TestCodexExecEnvCopiesOpenAIAPIKey(t *testing.T) {
+	env := codexExecEnvFromScript(t, map[string]string{
+		"OPENAI_API_KEY": "sk-from-openai",
+		"OTHER":          "keep-me",
+	})
+	assert.Equal(t, "sk-from-openai", env["CODEX_API_KEY"])
+	assert.Equal(t, "sk-from-openai", env["OPENAI_API_KEY"])
+	assert.Equal(t, "keep-me", env["OTHER"])
+}
+
+func TestCodexExecEnvKeepsExplicitCodexAPIKey(t *testing.T) {
+	env := codexExecEnvFromScript(t, map[string]string{
+		"CODEX_API_KEY":  "sk-codex",
+		"OPENAI_API_KEY": "sk-openai",
+	})
+	assert.Equal(t, "sk-codex", env["CODEX_API_KEY"])
+	assert.Equal(t, "sk-openai", env["OPENAI_API_KEY"])
+}
+
+func TestCodexExecEnvRejectsMissingAPIKey(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `require(process.argv[1]).codexExecEnv({OPENAI_API_KEY:"  "})`, script)
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(out), "Codex API key is missing")
 }
 
 func TestCodexExecArgsAddsMergeConfidenceMCP(t *testing.T) {
@@ -213,6 +251,7 @@ func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
 		"RECORDED_AGENT_MESSAGE="+recorded,
+		"OPENAI_API_KEY=sk-test-openai-key",
 	)
 	output, err := cmd.CombinedOutput()
 	require.Error(t, err, string(output))
@@ -222,6 +261,65 @@ func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
 	assert.Equal(t, "I found useful context before the tool failed.", string(message))
 	_, err = os.Stat(result)
 	require.NoError(t, err)
+}
+
+func TestCodexRunPassesOpenAIAPIKeyToCodexChild(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	result := filepath.Join(taskDir, "result.json")
+	received := filepath.Join(taskDir, "received-key")
+	require.NoError(t, os.WriteFile(prompt, []byte("hello"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(taskDir, "codex"),
+		[]byte("#!/bin/sh\nprintf '%s' \"$CODEX_API_KEY\" > \"$RECEIVED_KEY\"\nprintf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"thread-1\"}' '{\"type\":\"item.completed\",\"item\":{\"id\":\"reply-1\",\"type\":\"agent_message\",\"text\":\"ok\"}}'\n"),
+		0o700,
+	))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+result,
+		"RECEIVED_KEY="+received,
+		"OPENAI_API_KEY=sk-from-openai",
+	)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+	got, err := os.ReadFile(received)
+	require.NoError(t, err)
+	assert.Equal(t, "sk-from-openai", string(got))
+}
+
+func TestCodexRunRejectsMissingAPIKeyBeforeSpawn(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	result := filepath.Join(taskDir, "result.json")
+	spawned := filepath.Join(taskDir, "spawned")
+	require.NoError(t, os.WriteFile(prompt, []byte("hello"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(taskDir, "codex"),
+		[]byte("#!/bin/sh\ntouch \"$SPAWNED\"\n"),
+		0o700,
+	))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+result,
+		"SPAWNED="+spawned,
+	)
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err, string(output))
+	assert.Contains(t, string(output), "Codex API key is missing")
+	_, statErr := os.Stat(spawned)
+	assert.Error(t, statErr)
 }
 
 func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
@@ -421,6 +519,37 @@ func codexExecArgsFromScriptWithPrompt(
 	var args []string
 	require.NoError(t, json.Unmarshal(out, &args))
 	return args
+}
+
+func codexExecEnvFromScript(t *testing.T, env map[string]string) map[string]string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { codexExecEnv } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexExecEnv(JSON.parse(process.argv[2]))));`,
+		script,
+		string(payload),
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var childEnv map[string]string
+	require.NoError(t, json.Unmarshal(out, &childEnv))
+	return childEnv
+}
+
+func withoutCodexAPIKeys(env []string) []string {
+	filtered := make([]string, 0, len(env))
+	for _, entry := range env {
+		if strings.HasPrefix(entry, "OPENAI_API_KEY=") || strings.HasPrefix(entry, "CODEX_API_KEY=") {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
 }
 
 func planningEnabledFromScript(t *testing.T, env map[string]string) bool {
