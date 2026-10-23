@@ -204,23 +204,31 @@ test("proposeUpdate publishes scores and spec with or without survey questions",
       ] },
     });
 
+    const readyScores = {
+      clarity: { score: 3, summary: "The outcome is decided." },
+      complexity: { score: 3, summary: "The change fits one run." },
+      verifiability: { score: 3, summary: "The result can be checked." },
+    };
     await proposeUpdate({
-      scores: {
-        clarity: { score: 3, summary: "The outcome is decided." },
-        complexity: { score: 3, summary: "The change fits one run." },
-        verifiability: { score: 3, summary: "The result can be checked." },
-      },
+      scores: readyScores,
       spec: "# Add CI badge",
       survey: { questions: [] },
     });
     assert.equal(calls.length, 2);
     assert.deepEqual(JSON.parse(calls[1].options.body), {
-      scores: {
-        clarity: { score: 3, summary: "The outcome is decided." },
-        complexity: { score: 3, summary: "The change fits one run." },
-        verifiability: { score: 3, summary: "The result can be checked." },
-      },
+      scores: readyScores,
       spec: "# Add CI badge",
+    });
+
+    await proposeUpdate({
+      scores: readyScores,
+      spec: "# Add license badge",
+      survey: { questions: [{ prompt: "  ", options: ["Apache 2.0", "MIT"] }] },
+    });
+    assert.equal(calls.length, 3);
+    assert.deepEqual(JSON.parse(calls[2].options.body), {
+      scores: readyScores,
+      spec: "# Add license badge",
     });
   } finally {
     global.fetch = previousFetch;
