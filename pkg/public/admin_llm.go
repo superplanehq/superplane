@@ -24,12 +24,14 @@ import (
 )
 
 type installationLLMSettingsResponse struct {
-	WelcomeGrantCents     int64                       `json:"welcome_grant_cents"`
-	MarkupBPS             int                         `json:"markup_bps"`
-	WarningThresholdBPS   int                         `json:"warning_threshold_bps"`
-	DefaultHostedProvider string                      `json:"default_hosted_provider"`
-	DefaultHostedModel    string                      `json:"default_hosted_model"`
-	Providers             []hostedLLMProviderResponse `json:"providers"`
+	WelcomeGrantCents           int64                       `json:"welcome_grant_cents"`
+	MarkupBPS                   int                         `json:"markup_bps"`
+	WarningThresholdBPS         int                         `json:"warning_threshold_bps"`
+	CreditPurchaseFeeBPS        int                         `json:"credit_purchase_fee_bps"`
+	CreditPurchaseFixedFeeCents int64                       `json:"credit_purchase_fixed_fee_cents"`
+	DefaultHostedProvider       string                      `json:"default_hosted_provider"`
+	DefaultHostedModel          string                      `json:"default_hosted_model"`
+	Providers                   []hostedLLMProviderResponse `json:"providers"`
 }
 
 type hostedLLMProviderResponse struct {
@@ -42,11 +44,13 @@ type hostedLLMProviderResponse struct {
 }
 
 type installationLLMSettingsRequest struct {
-	WelcomeGrantCents     *int64  `json:"welcome_grant_cents"`
-	MarkupBPS             *int    `json:"markup_bps"`
-	WarningThresholdBPS   *int    `json:"warning_threshold_bps"`
-	DefaultHostedProvider *string `json:"default_hosted_provider"`
-	DefaultHostedModel    *string `json:"default_hosted_model"`
+	WelcomeGrantCents           *int64  `json:"welcome_grant_cents"`
+	MarkupBPS                   *int    `json:"markup_bps"`
+	WarningThresholdBPS         *int    `json:"warning_threshold_bps"`
+	CreditPurchaseFeeBPS        *int    `json:"credit_purchase_fee_bps"`
+	CreditPurchaseFixedFeeCents *int64  `json:"credit_purchase_fixed_fee_cents"`
+	DefaultHostedProvider       *string `json:"default_hosted_provider"`
+	DefaultHostedModel          *string `json:"default_hosted_model"`
 }
 
 type hostedLLMProviderRequest struct {
@@ -178,6 +182,12 @@ func (s *Server) adminUpdateInstallationLLMSettings(w http.ResponseWriter, r *ht
 		}
 		if req.WarningThresholdBPS != nil {
 			next.WarningThresholdBPS = *req.WarningThresholdBPS
+		}
+		if req.CreditPurchaseFeeBPS != nil {
+			next.CreditPurchaseFeeBPS = *req.CreditPurchaseFeeBPS
+		}
+		if req.CreditPurchaseFixedFeeCents != nil {
+			next.CreditPurchaseFixedFeeCents = *req.CreditPurchaseFixedFeeCents
 		}
 		if req.DefaultHostedProvider != nil {
 			next.DefaultHostedProvider = optionalTrimmedStringPointer(*req.DefaultHostedProvider)
@@ -777,12 +787,14 @@ func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettings
 	}
 	defaultModel := models.InstallationDefaultHostedLLMModel(settings)
 	return installationLLMSettingsResponse{
-		WelcomeGrantCents:     catalog.TrialCreditCents,
-		MarkupBPS:             settings.MarkupBPS,
-		WarningThresholdBPS:   settings.WarningThresholdBPS,
-		DefaultHostedProvider: defaultModel.Provider,
-		DefaultHostedModel:    defaultModel.Model,
-		Providers:             providers,
+		WelcomeGrantCents:           catalog.TrialCreditCents,
+		MarkupBPS:                   settings.MarkupBPS,
+		WarningThresholdBPS:         settings.WarningThresholdBPS,
+		CreditPurchaseFeeBPS:        settings.CreditPurchaseFeeBPS,
+		CreditPurchaseFixedFeeCents: settings.CreditPurchaseFixedFeeCents,
+		DefaultHostedProvider:       defaultModel.Provider,
+		DefaultHostedModel:          defaultModel.Model,
+		Providers:                   providers,
 	}, nil
 }
 
@@ -864,6 +876,8 @@ func isClientLLMSettingsError(err error) bool {
 		strings.Contains(msg, "markup cannot") ||
 		strings.Contains(msg, "welcome grant") ||
 		strings.Contains(msg, "warning threshold") ||
+		strings.Contains(msg, "credit purchase fee") ||
+		strings.Contains(msg, "credit purchase fixed fee") ||
 		strings.Contains(msg, "provisioning api key") ||
 		strings.Contains(msg, "llm base url") ||
 		strings.Contains(msg, "superplane agent model")

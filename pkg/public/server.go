@@ -569,13 +569,17 @@ func apiKeyCanvasScopes(canvasIDs []string) []string {
 
 func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := middleware.CloneGatewayRequest(r)
+		if middleware.IsFleetManagerRequest(r.Context()) {
+			middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
+			return
+		}
 		account, ok := middleware.GetAccountFromContext(r.Context())
 		if !ok {
 			http.Error(w, "Account not found in context", http.StatusUnauthorized)
 			return
 		}
 
-		r2 := middleware.CloneGatewayRequest(r)
 		r2.Header.Set("x-account-id", account.ID.String())
 		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
@@ -815,9 +819,14 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
-	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt))
+	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt, singleHostFleetManagerToken()))
 	adminRoute.Use(middleware.RequireInstallationAdmin())
 	adminRoute.HandleFunc("/billing-plans", s.adminListBillingPlans).Methods("GET")
+	adminRoute.HandleFunc("/credit-packs", s.adminListCreditPacks).Methods("GET")
+	adminRoute.HandleFunc("/credit-packs", s.adminSaveCreditPack).Methods("POST")
+	adminRoute.HandleFunc("/credit-packs/{packId}", s.adminSaveCreditPack).Methods("PUT")
+	adminRoute.HandleFunc("/credit-packs/{packId}", s.adminDeleteCreditPack).Methods("DELETE")
+	adminRoute.HandleFunc("/polar/products", s.adminListPolarProducts).Methods("GET")
 	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}", s.adminGetOrganization).Methods("GET")
@@ -890,6 +899,13 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	}
 
 	s.Router = r
+}
+
+func singleHostFleetManagerToken() string {
+	if os.Getenv("SUPERPLANE_INSTALLATION_TYPE") != "single-host" {
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv("FLEET_MANAGER_API_TOKEN"))
 }
 
 type oidcDiscoveryResponse struct {

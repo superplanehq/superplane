@@ -230,6 +230,17 @@ service Organizations {
     };
   }
 
+  rpc QuoteHostedCreditCheckout(QuoteHostedCreditCheckoutRequest) returns (QuoteHostedCreditCheckoutResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/hosted-credit-checkout-quote"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Quote hosted credit checkout";
+      description: "Returns hosted credit, processing fee, and subtotal before tax";
+      tags: "Organization";
+    };
+  }
+
   rpc CreateHostedCreditCheckout(CreateHostedCreditCheckoutRequest) returns (CreateHostedCreditCheckoutResponse) {
     option (google.api.http) = {
       post: "/api/v1/organizations/{id}/hosted-credit-checkout"
@@ -789,6 +800,29 @@ message CreateHostedCreditCheckoutRequest {
   string product_id = 2;
   // Ignored. SuperPlane sends Polar the client IP from proxy headers only.
   string customer_ip_address = 3;
+  // The credit amount the buyer reviewed. Must match the catalog for a fixed pack.
+  int64 credit_amount_cents = 4;
+  // The pre-tax subtotal the buyer confirmed. Checkout rejects a changed quote.
+  int64 expected_subtotal_cents = 5;
+}
+
+message QuoteHostedCreditCheckoutRequest {
+  string id = 1;
+  string product_id = 2;
+  // Required for custom packs. Zero uses the catalog amount for a fixed pack.
+  int64 credit_amount_cents = 3;
+}
+
+message QuoteHostedCreditCheckoutResponse {
+  int64 credit_amount_cents = 1;
+  int64 processing_fee_cents = 2;
+  int64 subtotal_cents = 3;
+  string currency = 4;
+  int64 fixed_fee_cents = 5;
+  // Percentage of the pre-tax subtotal, in basis points (100 = 1%).
+  int32 percentage_fee_bps = 6;
+  // Rounded up to the nearest cent. Together with the fixed fee, equals the processing fee.
+  int64 percentage_fee_cents = 7;
 }
 
 message CreateHostedCreditCheckoutResponse {
@@ -877,6 +911,14 @@ message DescribeOrganizationBillingResponse {
   bool has_payment_method = 24;
   repeated BillingPlanOption available_plans = 25;
   map<string, bool> product_features = 26;
+  optional int32 purchased_seats = 27;
+  optional int32 occupied_seats = 28;
+  optional int32 available_seats = 29;
+  optional int32 plan_maximum_seats = 30;
+  optional int32 purchasable_seats = 31;
+  optional int32 expected_renewal_seats = 32;
+  optional int64 current_monthly_total_cents = 33;
+  optional int64 expected_renewal_cents = 34;
 }
 
 message BillingPlanOption {
@@ -886,12 +928,14 @@ message BillingPlanOption {
   bool per_seat = 4;
   bool require_payment_method = 5;
   bool subscription_required = 6;
+  optional int32 seat_maximum = 7;
 }
 
 message SelectBillingPlanRequest {
   string id = 1;
   string plan_key = 2;
   string return_path = 3;
+  optional int32 seats = 4;
 }
 
 message CreatePaymentMethodSessionRequest {

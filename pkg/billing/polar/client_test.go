@@ -157,6 +157,7 @@ func Test__GetCreditPackReturnsPack(t *testing.T) {
 	assert.Equal(t, "prod_25", pack.ID)
 	assert.Equal(t, int64(2500), pack.AmountCents)
 	assert.False(t, pack.CustomPrice)
+	assert.Equal(t, "usd", pack.Currency)
 }
 
 func Test__GetCreditPackReturnsCustomPack(t *testing.T) {
@@ -215,6 +216,8 @@ func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
 		assert.Equal(t, "org-1", body["external_customer_id"])
+		assert.NotContains(t, body, "prices")
+		assert.NotContains(t, body, "metadata")
 		_, hasCustomerEmail := body["customer_email"]
 		assert.False(t, hasCustomerEmail)
 		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
@@ -225,10 +228,82 @@ func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := NewClient(server.URL, "oat_test", server.Client())
-	session, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "http://localhost:8000/return", "203.0.113.10")
+	session, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost:8000/return", CustomerIP: "203.0.113.10"})
 	require.NoError(t, err)
 	assert.Equal(t, "https://buy.polar.sh/polar_c_test", session.URL)
 	assert.Equal(t, "cust_1", session.CustomerID)
+}
+
+func TestCreateCreditCheckoutLocksChargeAndCreditMetadata(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/checkouts/", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, []any{"prod_credits"}, body["products"])
+		assert.Equal(t, "org-1", body["external_customer_id"])
+		assert.Equal(t, "https://app.example/return", body["success_url"])
+		assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
+		assert.Equal(t, false, body["allow_discount_codes"])
+		assert.Equal(t, map[string]any{
+			"prod_credits": []any{map[string]any{
+				"amount_type": "fixed", "price_amount": float64(10579),
+				"price_currency": "usd", "tax_behavior": "exclusive",
+			}},
+		}, body["prices"])
+		assert.Equal(t, map[string]any{
+			"superplane_credit_purchase_version": "1",
+			"superplane_credit_amount_cents":     "10000",
+			"superplane_credit_subtotal_cents":   "10579",
+		}, body["metadata"])
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"url": "https://buy.example/credits", "customer_id": "cust_1",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	quote, err := CalculateCreditPurchase(10000, 500, 50)
+	require.NoError(t, err)
+	client := NewClient(server.URL, "oat_test", server.Client())
+	session, err := client.CreateCreditCheckout(context.Background(), "prod_credits", "org-1", "https://app.example/return", "203.0.113.10", quote)
+	require.NoError(t, err)
+	assert.Equal(t, "https://buy.example/credits", session.URL)
+	assert.Equal(t, "cust_1", session.CustomerID)
+}
+
+func TestGetCreditPackReturnsSelectedCurrencyAndCustomLimits(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id": "prod_custom", "name": "Custom credit",
+			"metadata": map[string]any{"superplane_credit_pack": true},
+			"prices": []map[string]any{
+				{"amount_type": "fixed", "price_amount": 2500, "is_archived": true},
+				{"amount_type": "custom", "price_currency": "eur", "minimum_amount": 100, "maximum_amount": 50000},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	pack, err := client.GetCreditPack(context.Background(), "prod_custom")
+	require.NoError(t, err)
+	assert.True(t, pack.CustomPrice)
+	assert.Equal(t, "eur", pack.Currency)
+	assert.Equal(t, int64(100), pack.MinimumAmountCents)
+	assert.Equal(t, int64(50000), pack.MaximumAmountCents)
+}
+
+func TestGetCreditPackRejectsRecurringProducts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id": "prod_recurring", "is_recurring": true,
+			"metadata": map[string]any{"superplane_credit_pack": true},
+			"prices":   []map[string]any{{"amount_type": "fixed", "price_amount": 2500}},
+		}))
+	}))
+	t.Cleanup(server.Close)
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.GetCreditPack(t.Context(), "prod_recurring")
+	require.Error(t, err)
 }
 
 func Test__CreateCustomerPostsTeamOwnerWithoutEmail(t *testing.T) {
@@ -357,7 +432,7 @@ func Test__CreateCheckoutReportsRateLimit(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := NewClient(server.URL, "oat_test", server.Client())
-	_, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "http://localhost/return", "")
+	_, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost/return"})
 	require.ErrorIs(t, err, ErrRateLimited)
 }
 

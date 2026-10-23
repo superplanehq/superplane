@@ -6,6 +6,7 @@ import { Navigate, useParams } from "react-router";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 
 import type {
+  OrganizationsCreateHostedCreditCheckoutBody,
   OrganizationsHostedCreditInvoice,
   OrganizationsHostedCreditProduct,
   OrganizationsOrganizationCreditGrant,
@@ -32,10 +33,11 @@ import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { BillingCreditHistoryCard } from "./BillingCreditHistoryCard";
 import { BillingInvoicesCard } from "./BillingInvoicesCard";
+import { BillingSeatsCard } from "./BillingSeatsCard";
 import { BillingPaymentSettings } from "./BillingPaymentSettings";
 import { BillingPlansSection } from "./BillingPlansSection";
 import { HostedCreditTopUpBanner } from "./HostedCreditTopUpBanner";
-import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
+import { type BillingSeatSummary, useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
 
 const HOSTED_CREDIT_EXPLANATION =
   "Hosted credit pays SuperPlane-hosted machines and managed models for this organization.";
@@ -61,6 +63,7 @@ export function OrganizationSettingsBillingPage() {
         <BillingPaymentSettings organizationId={organizationId} canManageBilling={model.canManageBilling} />
       )}
       <BillingPageBody
+        organizationId={organizationId}
         newBilling={newBilling}
         billingContactMessage={model.billingContactMessage}
         billingEnabled={model.billingEnabled}
@@ -80,6 +83,7 @@ export function OrganizationSettingsBillingPage() {
         planName={model.planName}
         planPriceCents={model.planPriceCents}
         planPerSeat={model.planPerSeat}
+        seats={model.seats}
         planSource={model.planSource}
         cancelAtPeriodEnd={model.cancelAtPeriodEnd}
         subscriptionPending={model.cancelPending || model.keepPending}
@@ -104,6 +108,7 @@ export function OrganizationSettingsBillingPage() {
 }
 
 type BillingPageBodyProps = {
+  organizationId: string;
   newBilling: boolean;
   billingContactMessage?: string;
   billingEnabled: boolean;
@@ -123,6 +128,7 @@ type BillingPageBodyProps = {
   planName?: string;
   planPriceCents?: string;
   planPerSeat?: boolean;
+  seats?: BillingSeatSummary;
   planSource?: string;
   cancelAtPeriodEnd: boolean;
   subscriptionPending: boolean;
@@ -136,7 +142,7 @@ type BillingPageBodyProps = {
   currentPeriodEnd?: string;
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
-  onAddCredit: (productId: string) => void | Promise<void>;
+  onAddCredit: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
   onSubscribe: () => void | Promise<void>;
   onCancelSubscription: () => void | Promise<void>;
   onKeepSubscription: () => void | Promise<void>;
@@ -144,6 +150,7 @@ type BillingPageBodyProps = {
 };
 
 function BillingPageBody({
+  organizationId,
   newBilling,
   billingContactMessage,
   billingEnabled,
@@ -163,6 +170,7 @@ function BillingPageBody({
   planName,
   planPriceCents,
   planPerSeat,
+  seats,
   planSource,
   cancelAtPeriodEnd,
   subscriptionPending,
@@ -217,7 +225,11 @@ function BillingPageBody({
         onCancel={onCancelSubscription}
         onKeep={onKeepSubscription}
       />
+      {seats ? (
+        <BillingSeatsCard seats={seats} currentPeriodEnd={currentPeriodEnd} cancelAtPeriodEnd={cancelAtPeriodEnd} />
+      ) : null}
       <HostedCreditRemainingCard
+        organizationId={organizationId}
         billingContactMessage={billingContactMessage}
         billingEnabled={billingEnabled}
         canManageBilling={canManageBilling}
@@ -250,6 +262,7 @@ function BillingPageBody({
 }
 
 type HostedCreditRemainingCardProps = {
+  organizationId: string;
   billingContactMessage?: string;
   billingEnabled: boolean;
   canManageBilling: boolean;
@@ -271,10 +284,11 @@ type HostedCreditRemainingCardProps = {
   welcomeRemaining: number;
   adminRemaining: number;
   grants: OrganizationsOrganizationCreditGrant[];
-  onAddCredit: (productId: string) => void | Promise<void>;
+  onAddCredit: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
 };
 
 function HostedCreditRemainingCard({
+  organizationId,
   billingContactMessage,
   billingEnabled,
   canManageBilling,
@@ -358,7 +372,12 @@ function HostedCreditRemainingCard({
             bucket={bucket}
             action={
               bucket.key === "topup" && showBuyMore ? (
-                <HostedCreditTopUpBanner checkoutPending={checkoutPending} packs={packs} onAddCredit={onAddCredit} />
+                <HostedCreditTopUpBanner
+                  organizationId={organizationId}
+                  checkoutPending={checkoutPending}
+                  packs={packs}
+                  onAddCredit={onAddCredit}
+                />
               ) : undefined
             }
           />
