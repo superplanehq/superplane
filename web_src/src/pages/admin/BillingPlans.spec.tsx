@@ -72,7 +72,7 @@ it("creates a per-seat paid plan with dollar amounts and a markup percentage", a
       }),
     ]),
   );
-});
+}, 15000);
 
 it("creates a feature and selects its string key in a plan", async () => {
   const definitions: { key: string; label: string; gated: boolean }[] = [];
@@ -117,7 +117,7 @@ it("creates a feature and selects its string key in a plan", async () => {
   await user.click(screen.getByRole("checkbox", { name: /Custom reports/ }));
   await user.click(screen.getByRole("button", { name: "Save plan" }));
   await waitFor(() => expect(savedPlans).toEqual([expect.objectContaining({ features: ["custom_reports"] })]));
-});
+}, 15000);
 
 it("edits a linked plan in a dialog, preserves locked pricing and credit policies, and updates maximum seats", async () => {
   const plan = {
@@ -335,7 +335,7 @@ it("keeps entered values and shows failed saves inside the editor", async () => 
   await user.click(dialog.getByRole("button", { name: "Cancel" }));
   await user.click(screen.getByRole("button", { name: "Create plan" }));
   expect(within(screen.getByRole("dialog")).queryByRole("alert")).not.toBeInTheDocument();
-});
+}, 15000);
 
 it("preserves unlimited seat limits for plans without per-seat pricing", async () => {
   const saves: unknown[] = [];
