@@ -426,6 +426,20 @@ service Factories {
     };
   }
 
+  rpc ContinueFactoryPullRequestFixes(
+    ContinueFactoryPullRequestFixesRequest
+  ) returns (ContinueFactoryPullRequestFixesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/continue-fixes"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Continue factory pull request fixes";
+      description: "Resumes paused automatic fixes for a tracked pull request with a fresh attempt budget";
+      tags: "Factory";
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -1745,6 +1759,18 @@ message MergeFactoryPullRequestRequest {
 
 message MergeFactoryPullRequestResponse {
   FactoryPullRequest pull_request = 1;
+}
+
+message ContinueFactoryPullRequestFixesRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  // Run of the paused activity that reached the attempt limit.
+  string run_id = 3;
+}
+
+message ContinueFactoryPullRequestFixesResponse {
+  // Root event that restarts the checks automation.
+  string event_id = 1;
 }
 
 message FactoryIntakeItem {

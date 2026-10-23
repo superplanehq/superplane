@@ -26,6 +26,7 @@ export function PhoneTaskReview({
     lineName?: string;
     onArchive?: () => void | Promise<void>;
     onReject?: () => void | Promise<void>;
+    onContinueFixes?: () => void | Promise<void>;
     onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
     startBusy: boolean;
     actionBusy: boolean;
@@ -60,6 +61,7 @@ export function PhoneTaskReview({
       modelSelect={withModelSelect ? draftStart.modelSelect : undefined}
       onArchive={model.onArchive}
       onReject={model.onReject}
+      onContinueFixes={model.onContinueFixes}
       onStop={model.onStop}
       startBusy={model.startBusy}
       actionBusy={model.actionBusy}
