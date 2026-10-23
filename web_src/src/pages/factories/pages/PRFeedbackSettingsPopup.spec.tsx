@@ -377,25 +377,64 @@ describe("PRFeedbackSettingsPopup automation", () => {
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
     expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
   });
+});
 
-  it("opens an Address PR feedback Agent link on General and hides the Agent tab", () => {
-    renderAgentSettingsPopup(discussionDraft(), "/?prFeedbackSettings=agent", <SearchProbe />);
+describe("PRFeedbackSettingsPopup agent tab", () => {
+  const sources = [
+    ["discussion", discussionDraft()],
+    ["checks", checksDraft()],
+  ] as const;
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
-    expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
-    expect(screen.getByTestId("pr-feedback-settings-tab-general")).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByTestId("planning-review-editor")).not.toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).toBeChecked();
+  it.each(sources)("shows an Agent tab for %s handlers with an agent", (_source, settings) => {
+    renderAgentSettingsPopup(settings);
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Runs"]);
+    expect(screen.getByRole("tab", { name: "Agent" })).toBeInTheDocument();
+  });
+
+  it.each(sources)("opens the model editor when the Agent tab is selected for %s", async (_source, settings) => {
+    const user = userEvent.setup();
+    renderAgentSettingsPopup(settings);
+
+    await user.click(screen.getByTestId("pr-feedback-settings-tab-agent"));
+
+    expect(screen.getByTestId("pr-feedback-settings-tab-agent")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
+  });
+
+  it.each(sources)("opens the model editor from the agent deep link for %s", (_source, settings) => {
+    renderAgentSettingsPopup(settings, { initialPath: "/?prFeedbackSettings=agent", probe: <SearchProbe /> });
+
+    expect(screen.getByTestId("pr-feedback-settings-tab-agent")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent("prFeedbackSettings=agent");
   });
 
-  it("opens a checks Agent link on General and hides the Agent tab", () => {
-    renderAgentSettingsPopup(checksDraft(), "/?prFeedbackSettings=agent", <SearchProbe />);
+  it.each(sources)("opens the model editor from initialTab for %s", (_source, settings) => {
+    renderAgentSettingsPopup(settings, { initialTab: "agent" });
+
+    expect(screen.getByTestId("pr-feedback-settings-tab-agent")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
+  });
+
+  it.each(sources)("sends the agent draft to the agent save for %s", async (_source, settings) => {
+    const user = userEvent.setup();
+    const { onAgentSave } = renderAgentSettingsPopup(settings, { initialTab: "agent" });
+
+    await user.click(screen.getByTestId("planning-review-save"));
+
+    expect(onAgentSave).toHaveBeenCalledWith(expect.objectContaining({ components: expect.any(Array) }));
+  });
+
+  it("falls back to General for an agent deep link when the canvas has no agent", () => {
+    renderAgentSettingsPopup(discussionDraft(), {
+      initialPath: "/?prFeedbackSettings=agent",
+      withAgent: false,
+      probe: <SearchProbe />,
+    });
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
-    expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
     expect(screen.getByTestId("pr-feedback-settings-tab-general")).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByTestId("planning-review-editor")).not.toBeInTheDocument();
-    expect(screen.getByTestId("location")).toHaveTextContent("prFeedbackSettings=agent");
   });
 });
