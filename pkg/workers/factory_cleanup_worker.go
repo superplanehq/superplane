@@ -95,6 +95,9 @@ func (w *FactoryCleanupWorker) commitFactoryFileCleanup(factory models.Factory) 
 func (w *FactoryCleanupWorker) prepareFactoryFileCleanup(factory models.Factory) (bool, error) {
 	var canDeleteFiles bool
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, factory.OrganizationID); err != nil {
+			return err
+		}
 		locked, err := models.LockDeletedFactory(tx, factory.ID)
 		if err != nil {
 			w.logger.Infof("Factory %s already being processed - skipping", factory.ID)
@@ -123,6 +126,9 @@ func (w *FactoryCleanupWorker) prepareFactoryFileCleanup(factory models.Factory)
 func (w *FactoryCleanupWorker) factoryHasNoFiles(factory models.Factory) (bool, error) {
 	var readyForDomain bool
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, factory.OrganizationID); err != nil {
+			return err
+		}
 		locked, err := models.LockDeletedFactory(tx, factory.ID)
 		if err != nil {
 			w.logger.Infof("Factory %s already being processed - skipping", factory.ID)
@@ -146,6 +152,9 @@ func (w *FactoryCleanupWorker) factoryHasNoFiles(factory models.Factory) (bool, 
 
 func (w *FactoryCleanupWorker) commitFactoryDomainCleanup(factory models.Factory) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, factory.OrganizationID); err != nil {
+			return err
+		}
 		locked, err := models.LockDeletedFactory(tx, factory.ID)
 		if err != nil {
 			w.logger.Infof("Factory %s already being processed - skipping", factory.ID)

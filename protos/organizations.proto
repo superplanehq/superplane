@@ -602,6 +602,9 @@ message DescribeOrganizationWorkspaceUsageResponse {
   string default_hosted_provider = 16;
   string default_hosted_model = 17;
   google.protobuf.Timestamp welcome_credit_expires_at = 18;
+  int32 active_task_count = 19;
+  // Absent when the organization has unlimited concurrent tasks.
+  optional int32 parallel_task_limit = 20;
 }
 
 message DescribeOrganizationSpendingReportRequest {

@@ -434,3 +434,55 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 	assert.Equal(t, secondDispatch.ID, admitted.LineDispatchID)
 	assertExecutionRunID(t, thirdPending[0].runID, admitted)
 }
+
+// Pending runs must reserve organization capacity before initialization. A
+// completion must refill that capacity in another workspace and report its owner.
+func Test__OrganizationQueue_TerminalRunReleasesSharedCapacity(t *testing.T) {
+	for _, terminal := range []string{models.CanvasRunResultPassed, models.CanvasRunResultFailed, models.CanvasRunResultCancelled, "deleted_workspace"} {
+		t.Run(terminal, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			setTaskPlanLimit(t, r, 1)
+			firstWorkspace := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10), stepMaxParallelism(10)})
+			secondWorkspace := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+			first := firstWorkspace.createOpenWorkOrder(t, r, "Running")
+			second := secondWorkspace.createOpenWorkOrder(t, r, "Waiting")
+			_, running := firstWorkspace.dispatchLine(t, first)
+			waiting, queued := secondWorkspace.dispatchLine(t, second)
+			require.NotNil(t, queued.QueueItem, "pending work in another workspace reserves the only organization slot")
+			require.Nil(t, queued.Run)
+			require.Empty(t, executionsForOrder(t, second.ID))
+			result := terminal
+			if terminal == "deleted_workspace" {
+				require.NoError(t, firstWorkspace.factory.SoftDelete(database.DB(t.Context())))
+				result = models.CanvasRunResultPassed
+			}
+			finishRun(t, running.Run, result)
+			pending, updates := advanceFactoryLineWithUpdates(t, r, running.Run.ID)
+			require.Len(t, pending, 1)
+			require.Nil(t, queueItemForDispatch(t, waiting.ID))
+			admitted := executionsForOrder(t, second.ID)
+			require.Len(t, admitted, 1)
+			assertExecutionRunID(t, pending[0].runID, admitted[0])
+			require.Contains(t, updates, factoryWorkOrderUpdate{factoryID: secondWorkspace.factory.ID, orderID: second.ID})
+			if terminal == models.CanvasRunResultPassed {
+				active, err := first.FindActiveLineDispatch(database.Conn())
+				require.NoError(t, err)
+				require.NotNil(t, queueItemForDispatch(t, active.ID), "continuations cannot overtake older eligible work")
+			}
+		})
+	}
+}
+
+func setTaskPlanLimit(t *testing.T, r *support.ResourceRegistry, limit int) *models.BillingPlan {
+	t.Helper()
+	db := database.DB(t.Context())
+	plan := &models.BillingPlan{
+		Key: "task_" + uuid.NewString()[:8], Name: "Task capacity", Category: "paid", Visibility: "private",
+		ParallelTaskLimit: &limit, CreditFrequency: "none", CreditExpiration: "never",
+	}
+	require.NoError(t, models.SaveBillingPlan(db, plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	return plan
+}

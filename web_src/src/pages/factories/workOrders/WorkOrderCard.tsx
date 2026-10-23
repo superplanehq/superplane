@@ -1,7 +1,7 @@
 import type { FactoriesFactoryLine, FactoriesFactoryPullRequest } from "@/api-client";
 import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
-import { Bot } from "lucide-react";
+import { Bot, Clock3 } from "lucide-react";
 import { Link } from "react-router";
 import {
   getWorkOrderAttentionReasons,
@@ -18,12 +18,12 @@ import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import type { MergeConfidenceCardCheck } from "../lib/mergeConfidenceScore";
-import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
-import { CardScoreBadges, MergeConfidenceChip } from "./ReadinessMark";
+import { WorkOrderCardFooterStatus } from "./WorkOrderCardFooterStatus";
 import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip, WorkOrderMergeableChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
+import { WorkOrderQueueStatus } from "./WorkOrderQueueStatus";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
 import { WORK_ORDER_CARD_HOVER_SURFACE_CLASS } from "./workOrderCardSurface";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -49,6 +49,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   /** Tasks with a dispatch in flight. Only their controls show a busy state. */
   dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
+  onCancelQueuedTask?: (orderId: string, queueId: string) => Promise<void>;
+  cancellingQueueOrderIds?: ReadonlySet<string>;
   /** Tasks with a queued or running discussion or exclusive-repair run. */
   addressingFeedbackOrderIds?: ReadonlySet<string>;
   /** Activity text for an addressing run, keyed by task id. */
@@ -67,6 +69,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
 
 export interface WorkOrderCardProps extends WorkOrderCardContext {
   entry: WorkOrderListEntry;
+  /** Queue status of the line step represented by this card. */
+  queuedLabel?: string;
   /**
    * Overlay destination. Defaults to the task. The Lines board
    * passes onOpen to show the card dialog instead of navigating.
@@ -126,59 +130,55 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * After Verify writes a merge confidence check, three bars sit with
  * those scores.
  */
-export function WorkOrderCard({
-  entry,
-  organizationId,
-  factoryKey,
-  factoryLines,
-  addressingFeedbackOrderIds = EMPTY_ADDRESSING_FEEDBACK_IDS,
-  addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
-  waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
-  checksPassedOrderIds = EMPTY_CHECKS_PASSED_IDS,
-  checksPassedLabels = EMPTY_CHECKS_PASSED_LABELS,
-  fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
-  pullRequests = EMPTY_PULL_REQUESTS,
-  href,
-  onOpen,
-  clarityScore,
-  confidenceScore,
-  showClarity,
-  showConfidenceScore,
-  mergeConfidence,
-  reviewMetrics,
-  isAnalyzing = false,
-  className,
-  selected = false,
-  hasAgentQuestion = false,
-  creditLabel,
-  interactive = true,
-  canAssign,
-  isAssigneesSaving,
-  onAssigneesSave,
-}: WorkOrderCardProps) {
+export function WorkOrderCard(props: WorkOrderCardProps) {
+  const {
+    entry,
+    queuedLabel,
+    organizationId,
+    factoryKey,
+    factoryLines,
+    href,
+    onOpen,
+    clarityScore,
+    confidenceScore,
+    showClarity,
+    showConfidenceScore,
+    mergeConfidence,
+    reviewMetrics,
+    isAnalyzing = false,
+    className,
+    selected = false,
+    hasAgentQuestion = false,
+    creditLabel,
+    interactive = true,
+    canAssign,
+    isAssigneesSaving,
+    onAssigneesSave,
+    canDispatch,
+    onCancelQueuedTask,
+    cancellingQueueOrderIds,
+  } = props;
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const destination = interactive
-    ? (href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id))
-    : "";
+  const queuedTasks = entry.order.queuedTasks ?? [];
+  const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const updatedAt = entry.updatedAtMs > 0 ? new Date(entry.updatedAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
-  const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
-  const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
+  const { showAgentQuestion, agentWorking } = draftCardActionFlags(
+    isDraft,
+    isAnalyzing,
+    hasAgentQuestion,
+    queuedTasks.length > 0,
+  );
   const source = workOrderCardSource(entry.order);
-  const mergeConfidenceChecks = mergeConfidence ? mergeConfidence.checks : entry.order.checkScores;
-  const pullRequestMerge = useExperimentalFeature(organizationId ? organizationId : null);
-  const showPullRequestMerge = pullRequestMerge.has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
-  const attentionReasons = visibleWorkOrderCardAttentionReasons(
-    getWorkOrderAttentionReasons(entry.order, {
-      addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
-      waitingOnChecks: waitingOnChecksOrderIds.has(entry.id),
-      checksPassed: checksPassedOrderIds.has(entry.id),
-      fixesPaused: fixesPausedOrderIds.has(entry.id),
-    }),
+  const {
     cardPullRequest,
+    attentionReasons,
     showPullRequestMerge,
     mergeConfidenceChecks,
-  );
+    feedbackLabel,
+    checksPassedLabel,
+  } = useWorkOrderCardAttention(props);
+
   return (
     <article
       className={cn(
@@ -197,6 +197,7 @@ export function WorkOrderCard({
           entryId={entry.id}
           displayStatus={entry.displayStatus}
           statusLabel={meta.label}
+          queuedLabel={queuedLabel}
           title={entry.title}
           showOwnerCorner
           organizationId={organizationId}
@@ -209,8 +210,8 @@ export function WorkOrderCard({
         <WorkOrderCardStatusRow
           entryId={entry.id}
           reasons={attentionReasons}
-          feedbackLabel={addressingFeedbackLabels.get(entry.id)}
-          checksPassedLabel={checksPassedLabels.get(entry.id)}
+          feedbackLabel={feedbackLabel}
+          checksPassedLabel={checksPassedLabel}
           failedLabel={getWorkOrderFailedAttentionLabel(entry.order)}
           creditLabel={isDraft ? creditLabel : undefined}
           cardPullRequest={cardPullRequest}
@@ -229,6 +230,24 @@ export function WorkOrderCard({
           mergeConfidence={mergeConfidence}
           reviewMetrics={reviewMetrics}
           isAnalyzing={agentWorking}
+          queueStatus={
+            queuedTasks.length ? (
+              <span className="flex flex-wrap items-center justify-end gap-1.5">
+                {queuedTasks.map((queue) => (
+                  <WorkOrderQueueStatus
+                    key={queue.id}
+                    queue={queue}
+                    orderId={entry.id}
+                    title={entry.title}
+                    canCancel={interactive}
+                    canDispatch={canDispatch}
+                    cancellingOrderIds={cancellingQueueOrderIds}
+                    onCancel={onCancelQueuedTask}
+                  />
+                ))}
+              </span>
+            ) : undefined
+          }
         />
       </div>
     </article>
@@ -239,6 +258,7 @@ function WorkOrderCardTitleRow({
   entryId,
   displayStatus,
   statusLabel,
+  queuedLabel,
   title,
   showOwnerCorner,
   organizationId,
@@ -250,6 +270,7 @@ function WorkOrderCardTitleRow({
   entryId: string;
   displayStatus: WorkOrderListEntry["displayStatus"];
   statusLabel: string;
+  queuedLabel?: string;
   title: string;
   showOwnerCorner: boolean;
   organizationId: string;
@@ -258,9 +279,24 @@ function WorkOrderCardTitleRow({
   isAssigneesSaving: boolean;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
 }) {
+  const firstQueued = entry.order.queuedTasks?.[0];
+  const hasRunningWork = entry.order.queuedTasks?.some((queue) => queue.taskActive);
+  const queueLabel = hasRunningWork
+    ? undefined
+    : (queuedLabel ?? (firstQueued ? `Queued #${firstQueued.position}` : undefined));
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <WorkOrderStatusIcon status={displayStatus} title={statusLabel} aria-label={statusLabel} />
+      {queueLabel ? (
+        <span title={queueLabel}>
+          <Clock3 className="size-3.5 shrink-0 text-muted-foreground" role="img" aria-label={queueLabel} />
+        </span>
+      ) : (
+        <WorkOrderStatusIcon
+          status={hasRunningWork ? "running" : displayStatus}
+          title={hasRunningWork ? "Running" : statusLabel}
+          aria-label={hasRunningWork ? "Running" : statusLabel}
+        />
+      )}
       <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5 text-foreground">{title}</h3>
       {showOwnerCorner ? (
         <div className="flex shrink-0 items-center gap-0.5" data-testid={`work-order-card-title-trailing-${entryId}`}>
@@ -386,6 +422,7 @@ function WorkOrderCardMetaRow({
   mergeConfidence,
   reviewMetrics,
   isAnalyzing,
+  queueStatus,
 }: {
   entryId: string;
   source: ReturnType<typeof workOrderCardSource>;
@@ -397,11 +434,9 @@ function WorkOrderCardMetaRow({
   mergeConfidence?: { score: number; maxScore: number; checks?: MergeConfidenceCardCheck[] };
   reviewMetrics?: { key: string; name: string; score: number }[];
   isAnalyzing: boolean;
+  queueStatus?: React.ReactNode;
 }) {
   const updatedLabel = updatedAt ? formatRelative(updatedAt) : "—";
-  const hasScore = (showClarity && clarityScore != null) || (showConfidenceScore && confidenceScore != null);
-  const showActions = hasScore || isAnalyzing;
-  const showTrailing = showActions || mergeConfidence != null;
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">
@@ -414,83 +449,60 @@ function WorkOrderCardMetaRow({
           {updatedLabel}
         </span>
       </div>
-      {showTrailing ? (
-        <div className="flex shrink-0 items-center gap-1.5">
-          {mergeConfidence ? (
-            <MergeConfidenceChip
-              score={mergeConfidence.score}
-              maxScore={mergeConfidence.maxScore}
-              checks={mergeConfidence.checks}
-              testId={`work-order-card-merge-${entryId}`}
-            />
-          ) : null}
-          {showActions ? (
-            <CardScores
-              entryId={entryId}
-              clarity={clarityScore}
-              confidence={confidenceScore}
-              showClarity={showClarity}
-              showConfidence={showConfidenceScore}
-              reviewMetrics={reviewMetrics}
-              isAnalyzing={isAnalyzing}
-            />
-          ) : null}
-        </div>
-      ) : null}
+      <WorkOrderCardFooterStatus
+        entryId={entryId}
+        clarityScore={clarityScore}
+        confidenceScore={confidenceScore}
+        showClarity={showClarity}
+        showConfidenceScore={showConfidenceScore}
+        mergeConfidence={mergeConfidence}
+        reviewMetrics={reviewMetrics}
+        isAnalyzing={isAnalyzing}
+        queueStatus={queueStatus}
+      />
     </div>
   );
 }
 
-function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQuestion: boolean) {
+function draftCardActionFlags(isDraft: boolean, isAnalyzing: boolean, hasAgentQuestion: boolean, isQueued: boolean) {
   const showAgentQuestion = hasAgentQuestion && isDraft;
-  const agentWorking = isAnalyzing && !showAgentQuestion;
+  const agentWorking = isAnalyzing && !showAgentQuestion && !isQueued;
   return { showAgentQuestion, agentWorking };
 }
 
-/**
- * Thinking states while the agent still works, even after a score exists.
- * When the agent waits for the user the card shows one verdict word with a
- * tone dot. The two scores stay in the tooltip. Intake-only drafts have
- * Confidence alone; the verdict uses the scores that exist.
- */
-function CardScores({
-  entryId,
-  clarity,
-  confidence,
-  showClarity = true,
-  showConfidence = true,
-  reviewMetrics,
-  isAnalyzing,
-}: {
-  entryId: string;
-  clarity?: number;
-  confidence?: number;
-  showClarity?: boolean;
-  showConfidence?: boolean;
-  reviewMetrics?: { key: string; name: string; score: number }[];
-  isAnalyzing: boolean;
-}) {
-  if (isAnalyzing) {
-    return (
-      <ConfidenceAnalyzingIndicator
-        className="shrink-0"
-        testId={`work-order-card-analyzing-${entryId}`}
-        showThinkingStates
-        showTooltip={false}
-      />
-    );
-  }
-  if (clarity == null && confidence == null) {
-    return null;
-  }
-  return (
-    <CardScoreBadges
-      clarity={clarity}
-      confidence={confidence}
-      showClarity={showClarity}
-      showConfidence={showConfidence}
-      reviewMetrics={reviewMetrics}
-      testId={`work-order-card-score-${entryId}`}
-    />
+function useWorkOrderCardAttention({
+  entry,
+  organizationId,
+  mergeConfidence,
+  addressingFeedbackOrderIds = EMPTY_ADDRESSING_FEEDBACK_IDS,
+  addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
+  waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
+  checksPassedOrderIds = EMPTY_CHECKS_PASSED_IDS,
+  checksPassedLabels = EMPTY_CHECKS_PASSED_LABELS,
+  fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
+  pullRequests = EMPTY_PULL_REQUESTS,
+}: WorkOrderCardProps) {
+  const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
+  const mergeConfidenceChecks = mergeConfidence ? mergeConfidence.checks : entry.order.checkScores;
+  const pullRequestMerge = useExperimentalFeature(organizationId ? organizationId : null);
+  const showPullRequestMerge = pullRequestMerge.has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
+  const attentionReasons = visibleWorkOrderCardAttentionReasons(
+    getWorkOrderAttentionReasons(entry.order, {
+      addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
+      waitingOnChecks: waitingOnChecksOrderIds.has(entry.id),
+      checksPassed: checksPassedOrderIds.has(entry.id),
+      fixesPaused: fixesPausedOrderIds.has(entry.id),
+    }),
+    cardPullRequest,
+    showPullRequestMerge,
+    mergeConfidenceChecks,
   );
+  return {
+    cardPullRequest,
+    attentionReasons,
+    showPullRequestMerge,
+    mergeConfidenceChecks,
+    feedbackLabel: addressingFeedbackLabels.get(entry.id),
+    checksPassedLabel: checksPassedLabels.get(entry.id),
+  };
 }
