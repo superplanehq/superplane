@@ -84,27 +84,21 @@ const billingState = {
   enabled: false,
   newBilling: false,
   byok: false,
+  planActive: false,
   availablePlans: undefined as OrganizationsBillingPlanOption[] | undefined,
 };
-const refetchBilling = vi.fn(async () => ({
-  data: {
-    billingEnabled: billingState.enabled,
-    availablePlans: billingState.availablePlans,
-    productFeatures: { byo_key: true },
-    planCategory: "paid",
-    creditPurchaseAllowed: true,
-  },
-}));
+const billingData = () => ({
+  billingEnabled: billingState.enabled,
+  availablePlans: billingState.availablePlans,
+  productFeatures: { byo_key: true },
+  planCategory: billingState.planActive ? "paid" : "none",
+  creditPurchaseAllowed: billingState.planActive,
+});
+const refetchBilling = vi.fn(async () => ({ data: billingData() }));
 vi.mock("@/hooks/useOrganizationBilling", () => ({
   organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
   useOrganizationBilling: () => ({
-    data: {
-      billingEnabled: billingState.enabled,
-      availablePlans: billingState.availablePlans,
-      productFeatures: { byo_key: true },
-      planCategory: "paid",
-      creditPurchaseAllowed: true,
-    },
+    data: billingData(),
     isPending: false,
     isSuccess: true,
     refetch: refetchBilling,
@@ -239,9 +233,7 @@ describe("FirstRunSetup chrome", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
     navigateSpy.mockClear();
-    billingState.byok = false;
-    billingState.enabled = false;
-    billingState.newBilling = false;
+    Object.assign(billingState, { byok: false, enabled: false, newBilling: false, planActive: false });
     billingState.availablePlans = [{ key: "free", name: "Free" }];
     refetchBilling.mockClear();
     localStorage.clear();
@@ -348,10 +340,13 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-host-bitbucket")).toBeInTheDocument();
   });
 
-  it.each([false, true])("keeps repository and intake before the final model choice (billing: %s)", async (billing) => {
-    billingState.enabled = billing;
-    billingState.newBilling = billing;
-    billingState.byok = true;
+  it.each([
+    { newBilling: false, planActive: false },
+    { newBilling: true, planActive: false },
+    { newBilling: true, planActive: true },
+  ])("keeps repository and intake before the final model choice (%j)", async ({ newBilling, planActive }) => {
+    const billing = newBilling && !planActive;
+    Object.assign(billingState, { enabled: newBilling, newBilling, planActive, byok: true });
     const user = userEvent.setup();
     const model = pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true, openSection: "vcs" });
     render(
@@ -373,9 +368,12 @@ describe("FirstRunSetup chrome", () => {
     await waitFor(() => expect(model.saveIssues).toHaveBeenCalledWith("vcs"));
     if (billing) {
       expect(await screen.findByTestId("first-run-billing")).toBeInTheDocument();
+      billingState.planActive = true; // Choosing a plan makes it the active plan.
       await user.click(screen.getByRole("button", { name: "Finish with selected plan" }));
     }
     expect(await screen.findByTestId("first-run-model-source")).toBeInTheDocument();
+    const steps = billing ? 6 : 5;
+    expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", `Step ${steps} of ${steps}`);
     expect(model.finish).not.toHaveBeenCalled();
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
 
