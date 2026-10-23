@@ -650,6 +650,18 @@ func TestNodeExecutorRetriesWhenPaymentMethodVerificationFails(t *testing.T) {
 func TestNodeExecutorBYOKRevocation(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
+	settings, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+			"default_hosted_provider": settings.DefaultHostedProvider,
+			"default_hosted_model":    settings.DefaultHostedModel,
+		}).Error)
+	})
+	require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+		"default_hosted_provider": models.UsageProviderAnthropic,
+		"default_hosted_model":    "hosted-model",
+	}).Error)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	calls := 0
 	r.Registry.Actions["runnerCodex"] = impl.NewDummyAction(impl.DummyActionOptions{
