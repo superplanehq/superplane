@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -163,6 +164,9 @@ func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
 			require.Equal(t, "http://localhost/org/setup?step=billing&subscribed=1&checkout_id={CHECKOUT_ID}", body["success_url"])
 			require.Equal(t, []any{product}, body["products"])
+			for _, field := range []string{"seats", "min_seats", "max_seats"} {
+				require.NotContains(t, body, field)
+			}
 			require.Equal(t, r.Organization.ID.String(), body["external_customer_id"])
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"url": "https://polar.sh/checkout/selected"}))
 		default:
@@ -224,4 +228,185 @@ func TestPaymentMethodSetupCreatesCustomerWithoutCheckout(t *testing.T) {
 	sessionToken = ""
 	_, err = CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{}, r.Account.ID.String())
 	require.Equal(t, codes.Internal, grpcerrors.Code(err))
+}
+
+func TestSelectPerSeatPlanValidatesBeforePolar(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	member := support.CreateUser(t, r, r.Organization.ID)
+	product := "prod_team_" + uuid.NewString()
+	team := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: new(5), PriceCents: 2000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &team))
+	unlinked := models.BillingPlan{Key: "unlinked_" + uuid.NewString()[:8], Name: "Unlinked", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: new(5), CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &unlinked))
+	flat := models.BillingPlan{Key: "flat_" + uuid.NewString()[:8], Name: "Flat", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &flat))
+	before, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	calls := 0
+	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		calls++
+		t.Errorf("invalid checkout contacted Polar: %s", req.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	usePolarTestServer(t, server)
+	for _, tc := range []struct {
+		name, key string
+		seats     *int32
+		code      codes.Code
+		message   string
+	}{
+		{"missing", team.Key, nil, codes.InvalidArgument, "Select a seat count for this plan."},
+		{"zero", team.Key, new(int32(0)), codes.InvalidArgument, "Select at least 2 seats to cover current members."},
+		{"negative", team.Key, new(int32(-1)), codes.InvalidArgument, "Select at least 2 seats to cover current members."},
+		{"insufficient", team.Key, new(int32(1)), codes.InvalidArgument, "Select at least 2 seats to cover current members."},
+		{"excessive", team.Key, new(int32(6)), codes.InvalidArgument, "The Team plan allows up to 5 seats."},
+		{"flat zero", flat.Key, new(int32(0)), codes.InvalidArgument, "Seats are only available for per-seat plans."},
+		{"flat positive", flat.Key, new(int32(3)), codes.InvalidArgument, "Seats are only available for per-seat plans."},
+		{"none zero", models.BillingPlanNone, new(int32(0)), codes.InvalidArgument, "Seats are only available for per-seat plans."},
+		{"unlinked zero price", unlinked.Key, new(int32(3)), codes.FailedPrecondition, "Checkout is not available for this plan."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: tc.key, Seats: tc.seats}, r.Account.ID.String(), "http://localhost")
+			require.Equal(t, tc.code, grpcerrors.Code(err))
+			require.Contains(t, err.Error(), tc.message)
+			require.Zero(t, calls)
+			after, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.Equal(t, before.PlanID, after.PlanID)
+			require.Equal(t, before.PurchasedSeats, after.PurchasedSeats)
+		})
+	}
+	// A lower override replaces the target catalog maximum, even below occupancy.
+	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, new(1)))
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: team.Key, Seats: new(int32(2))}, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	require.Contains(t, err.Error(), "The Team plan allows up to 1 seats.")
+	require.Zero(t, calls)
+	require.NoError(t, db.Delete(member).Error)
+	require.NoError(t, models.DeleteOrganizationSeatLimitOverride(db, r.Organization.ID))
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: team.Key, Seats: new(int32(0))}, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	require.Contains(t, err.Error(), "Select at least 1 seats to cover current members.")
+	require.Zero(t, calls)
+	empty, err := models.CreateOrganization("empty-checkout-"+uuid.NewString()[:8], "")
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, empty.ID, features.FeatureNewBilling))
+	_, err = SelectBillingPlan(t.Context(), empty.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: team.Key, Seats: new(int32(0))}, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	require.Contains(t, err.Error(), "Select at least 1 seats to cover current members.")
+	require.Zero(t, calls)
+}
+
+func TestTeamCheckoutCapacityLifecycle(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	support.CreateUser(t, r, r.Organization.ID)
+	product := "prod_team_" + uuid.NewString()
+	team := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: new(3), PriceCents: 2000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &team))
+	before, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.BillingPlanTrial, before.Catalog.Key)
+	selected := 3
+	failCheckout := false
+	calls := 0
+	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
+		case "/customers/external/" + r.Organization.ID.String():
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_team", "external_id": r.Organization.ID.String()}))
+		case "/customers/external/" + r.Organization.ID.String() + "/payment-methods":
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
+		case "/checkouts/":
+			calls++
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			for _, field := range []string{"seats", "min_seats", "max_seats"} {
+				require.Equal(t, float64(selected), body[field], field)
+			}
+			require.Equal(t, []any{product}, body["products"])
+			if failCheckout {
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"url": "https://polar.sh/checkout/team"}))
+		default:
+			t.Errorf("unexpected Polar request %s", req.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+	usePolarTestServer(t, server)
+	for _, tc := range []struct {
+		name     string
+		override bool
+		maximum  *int
+		selected int
+	}{
+		{"target catalog instead of Trial limit", false, new(3), 3},
+		{"higher override", true, new(8), 8},
+		{"lower override", true, new(2), 2},
+		{"unlimited override", true, nil, 9},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.override {
+				require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, tc.maximum))
+			}
+			billing, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+			require.NoError(t, err)
+			require.NotNil(t, billing.OccupiedSeats)
+			require.EqualValues(t, 2, *billing.OccupiedSeats)
+			found := false
+			for _, option := range billing.AvailablePlans {
+				if option.Key != team.Key {
+					continue
+				}
+				found = true
+				if tc.maximum == nil {
+					require.Nil(t, option.SeatMaximum)
+				} else {
+					require.EqualValues(t, *tc.maximum, *option.SeatMaximum)
+				}
+			}
+			require.True(t, found, "the target Team plan must be available")
+			selected = tc.selected
+			response, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: team.Key, Seats: new(int32(selected))}, r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
+			require.Equal(t, "https://polar.sh/checkout/team", response.CheckoutUrl)
+			after, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.Equal(t, before.PlanID, after.PlanID, "abandoned checkout must preserve Trial")
+			require.Equal(t, before.PurchasedSeats, after.PurchasedSeats)
+		})
+	}
+	require.Equal(t, 4, calls)
+	failCheckout = true
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: team.Key, Seats: new(int32(selected))}, r.Account.ID.String(), "http://localhost")
+	require.Error(t, err)
+	unchanged, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, before.PlanID, unchanged.PlanID)
+	require.Equal(t, before.PurchasedSeats, unchanged.PurchasedSeats)
+	start := time.Now().UTC().Truncate(time.Second)
+	end := start.AddDate(0, 1, 0)
+	payload, err := json.Marshal(map[string]any{"id": "sub_" + uuid.NewString(), "product_id": product, "status": "active", "seats": 3, "external_customer_id": r.Organization.ID.String(), "current_period_start": start, "current_period_end": end, "modified_at": start})
+	require.NoError(t, err)
+	var snapshot polar.SubscriptionData
+	require.NoError(t, json.Unmarshal(payload, &snapshot))
+	require.NoError(t, polar.ApplySubscription(t.Context(), db, snapshot))
+	// A webhook replay must preserve the same purchased capacity.
+	require.NoError(t, polar.ApplySubscription(t.Context(), db, snapshot))
+	active, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, team.ID, active.PlanID)
+	require.True(t, active.CurrentPeriodStart.Equal(start))
+	require.True(t, active.CurrentPeriodEnd.Equal(end))
+	seats, err := entitlements.ResolveSeats(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, new(3), seats.Purchased)
+	require.Equal(t, 2, seats.Occupied)
+	require.Equal(t, new(1), seats.Available)
 }

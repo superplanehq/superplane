@@ -1,4 +1,4 @@
-import { useOnboardingPlanTransition } from "./useOnboardingPlanTransition";
+import { useOnboardingModelTransition } from "./useOnboardingModelTransition";
 import type { MeVcsProviderRepository } from "@/api-client";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { startPublicGitHubAppCreate } from "@/lib/githubAppManifest";
@@ -34,7 +34,7 @@ import {
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
-export type FirstRunScreen = "welcome" | "host" | "connect" | "choose" | "tickets" | "agent" | "billing";
+export type FirstRunScreen = "welcome" | "host" | "connect" | "choose" | "tickets" | "agent" | "complete";
 const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   vcs: "connect",
   repo: "choose",
@@ -53,7 +53,8 @@ const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
 /** Null means no step was requested, so the flow resumes from saved progress. */
 function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen | null {
   const requestedStep = searchParams.get("step");
-  if (requestedStep === "billing" || requestedStep === "welcome" || requestedStep === "host") return requestedStep;
+  if (requestedStep === "billing") return "complete";
+  if (requestedStep === "complete" || requestedStep === "welcome" || requestedStep === "host") return requestedStep;
   if (isWizardStepId(requestedStep)) return SCREEN_FOR_STEP[requestedStep];
   return null;
 }
@@ -140,7 +141,7 @@ function useFirstRunNavigation(
     const updated = new URLSearchParams(searchParams);
     updated.set(
       "step",
-      next === "billing" || next === "welcome" || next === "host" ? next : (STEP_FOR_SCREEN[next] ?? "vcs"),
+      next === "complete" || next === "welcome" || next === "host" ? next : (STEP_FOR_SCREEN[next] ?? "vcs"),
     );
     setSearchParams(updated);
     const step = STEP_FOR_SCREEN[next];
@@ -158,14 +159,19 @@ function useFirstRunNavigation(
   let screen = availableScreen;
   const intakePending = intakeLookupPending(model);
   const githubPending = connection.onboarding.isPending;
-  if ((screen === "billing" || screen === "agent") && !model.setup.selectedRepo) screen = "host";
-  if ((screen === "billing" || screen === "agent") && !intakePrerequisitesSatisfied(model)) screen = "tickets";
+  if ((screen === "complete" || screen === "agent") && !model.setup.selectedRepo) screen = "host";
+  if ((screen === "complete" || screen === "agent") && !intakePrerequisitesSatisfied(model)) screen = "tickets";
   useEffect(() => {
     if (githubPending && !initialFirstRunScreen(searchParams)) return;
-    const step = screen === "billing" || screen === "welcome" || screen === "host" ? screen : STEP_FOR_SCREEN[screen];
+    const step = screen === "complete" || screen === "welcome" || screen === "host" ? screen : STEP_FOR_SCREEN[screen];
     if (!step || searchParams.get("step") === step || (screen === "tickets" && intakePending)) return;
     const updated = new URLSearchParams(searchParams);
     updated.set("step", step);
+    if (searchParams.get("step") === "billing") {
+      updated.delete("subscribed");
+      updated.delete("checkout_id");
+      updated.delete("plan");
+    }
     setSearchParams(updated, { replace: true });
   }, [screen, intakePending, githubPending, searchParams, setSearchParams]);
   return { screen, goToScreen };
@@ -356,10 +362,10 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ready: githubReady,
     returned: githubReturned,
   });
-  const planTransition = useOnboardingPlanTransition(model, navigation, organizationId);
+  const modelTransition = useOnboardingModelTransition(model, navigation, organizationId);
   const commands = useFirstRunCommands({
     model,
-    afterTickets: planTransition.afterTickets,
+    afterTickets: modelTransition.afterTickets,
     connection,
     navigation,
     blocking,
@@ -380,8 +386,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   return {
     ...navigation,
     ...commands,
-    ...planTransition,
-    finishSetup: () => blocking.run("finishing-setup", planTransition.continueAfterPlan),
+    ...modelTransition,
+    finishSetup: () => blocking.run("finishing-setup", modelTransition.continueAfterModelAccess),
     selectBitbucketIdentity,
     vcsHost: model.setup.vcsHost,
     bitbucketForgeConfigured: bitbucketConnect.configured,
@@ -403,13 +409,13 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bitbucketInstallUrl: bitbucketConnect.installUrl,
     copyBitbucketInstallLink: bitbucketConnect.copyInstallLink,
     grantBitbucketAccess: bitbucketConnect.grantAccess,
-    skipAgentScreen: planTransition.skipAgentScreen,
+    skipAgentScreen: modelTransition.skipAgentScreen,
     credentialChoice: model.agentCredentialChoice,
     selectCredentialChoice: model.setAgentCredentialChoice,
     ticketSource: ticketSelection(model).ticketSource,
     ...firstRunGitHubProperties(connection, checkingGitHub),
     blockingAction: blocking.action,
-    busy: blocking.busy || model.saving || planTransition.pending,
+    busy: blocking.busy || model.saving || modelTransition.pending,
   };
 }
 
