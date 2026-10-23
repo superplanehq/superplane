@@ -1,3 +1,5 @@
+import { MoreVertical } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../../components/Icon";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
@@ -52,13 +54,19 @@ export function MemberRoleSelect({
     <PermissionTooltip allowed={tooltipAllowed} message={tooltipMessage}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            className={cn("flex items-center gap-2 text-sm", settingsRowMenuClassName)}
+          <Button
+            type="button"
+            variant="ghost"
+            className={cn(
+              "h-11 gap-1.5 px-0 !text-xs @min-[44rem]/members:h-8 @min-[44rem]/members:!text-sm",
+              settingsRowMenuClassName,
+            )}
+            aria-label={`Role for ${member.name}`}
             disabled={!roleChangeAllowed}
           >
             {member.role}
             <Icon name="chevron-down" />
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           {assignableRoles.map((role) => (
@@ -66,7 +74,7 @@ export function MemberRoleSelect({
               key={role.metadata?.name}
               onClick={() => onRoleChange(member.id, role.metadata?.name || "")}
               disabled={loadingRoles || !roleChangeAllowed}
-              className="flex flex-col items-start gap-1"
+              className="min-h-11 flex-col items-start gap-1 sm:min-h-8"
             >
               <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
                 {role.spec?.displayName || role.metadata?.name}
@@ -117,17 +125,23 @@ export function MemberOverflowMenu({
     >
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            className={cn("flex items-center gap-2 text-sm disabled:opacity-50", settingsRowMenuClassName)}
+          <Button
+            type="button"
+            variant="ghost"
+            className={cn(
+              "size-11 shrink-0 p-0 text-sm disabled:opacity-50 @min-[44rem]/members:size-8",
+              settingsRowMenuClassName,
+            )}
+            aria-label={`Member actions for ${member.name}`}
             disabled={!canDeleteMembers && !canUpdateMembers}
           >
-            <Icon name="ellipsis-vertical" size="sm" />
-          </button>
+            <MoreVertical className="size-4" aria-hidden="true" />
+          </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent align="end">
           {canSetOwner && (
             <DropdownMenuItem
-              className="flex items-center gap-1"
+              className="min-h-11 gap-1 sm:min-h-8"
               onClick={() => onOwnerChange(member, true)}
               disabled={!ownerActionAllowed || ownerChangePending}
             >
@@ -137,7 +151,7 @@ export function MemberOverflowMenu({
           )}
           {canClearOwner && (
             <DropdownMenuItem
-              className="flex items-center gap-1"
+              className="min-h-11 gap-1 sm:min-h-8"
               onClick={() => onOwnerChange(member, false)}
               disabled={ownerChangePending}
             >
@@ -152,7 +166,7 @@ export function MemberOverflowMenu({
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem
-              className="flex items-center gap-1"
+              className="min-h-11 gap-1 sm:min-h-8"
               onClick={() => onRemove(member)}
               disabled={!canDeleteMembers}
             >

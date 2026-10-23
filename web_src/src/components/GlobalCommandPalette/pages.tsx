@@ -1,7 +1,7 @@
 import { CommandGroup, CommandItem, CommandSeparator } from "@/components/ui/command";
 import { appPath } from "@/lib/appPaths";
 import { ActionItem, CanvasListItems } from "./items";
-import { BookOpen, ChevronLeft, ChevronRight, Key, Link2, LogOut, Palette, Plug, Plus, UserPlus } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Key, LogOut, Palette, Plug, Plus, UserPlus } from "lucide-react";
 import type { CanvasCommandListProps, PaletteAction } from "./types";
 
 export type IntegrationStatus = "ready" | "pending" | "error";
@@ -17,9 +17,8 @@ export type CommandPalettePageProps = {
   canvasListProps: CanvasCommandListProps;
   integrations: IntegrationItem[];
   onCreateApp: () => void;
-  onCopyInviteLink: () => void;
-  showCopyInviteLink: boolean;
-  copyInviteLinkDisabled: boolean;
+  onInviteMember: () => void;
+  showInviteMember: boolean;
   onExpandApps: () => void;
   onExpandIntegrations: () => void;
   onCollapse: () => void;
@@ -71,15 +70,10 @@ function DefaultView(props: CommandPalettePageProps) {
           <Plus className="mr-2 size-4 shrink-0" />
           <span>{props.createAppLabel}</span>
         </CommandItem>
-        {props.showCopyInviteLink ? (
-          <CommandItem
-            value="copy-invite-link"
-            onSelect={props.onCopyInviteLink}
-            disabled={props.copyInviteLinkDisabled}
-            className="cursor-pointer"
-          >
-            <Link2 className="mr-2 size-4 shrink-0" />
-            <span>Copy Invite Link</span>
+        {props.showInviteMember ? (
+          <CommandItem value="invite-member" onSelect={props.onInviteMember} className="cursor-pointer">
+            <UserPlus className="mr-2 size-4 shrink-0" />
+            <span>Invite by email</span>
           </CommandItem>
         ) : null}
       </CommandGroup>
