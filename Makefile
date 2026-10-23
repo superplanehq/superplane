@@ -146,6 +146,9 @@ dev.setup:
 	$(MAKE) dev.setup.go
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
+ifeq ($(strip $(CI)),)
+	@$(MAKE) dev.setup.billing.catalog
+endif
 	@$(MAKE) dev.setup.runner.fleet
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
@@ -161,6 +164,11 @@ dev.setup.go:
 dev.setup.runner.fleet:
 	@$(MAKE) dev.test.is.running
 	@$(COMPOSE) exec -T app ./scripts/db_seed_local_runner_fleet.sh superplane_dev
+
+.PHONY: dev.setup.billing.catalog
+dev.setup.billing.catalog:
+	@$(MAKE) dev.test.is.running
+	@$(COMPOSE) exec -T app bash ./scripts/db_seed_local_billing_catalog.sh superplane_dev
 
 dev.clean.go.cache:
 	@$(MAKE) dev.test.is.running
