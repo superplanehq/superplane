@@ -378,6 +378,7 @@ describe("MobileTaskDetailPage model select", () => {
       `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
     );
 
+    await screen.findByTestId("split-run-intent-composer");
     const queue = await screen.findByRole("button", { name: "Queue" });
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     await userEvent.setup().click(queue);

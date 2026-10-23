@@ -215,12 +215,11 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     uploadFiles,
   } = args;
   const queryClient = useQueryClient();
-  const [composer, setComposer] = useState("");
-  const [composerError, setComposerError] = useState("");
-  useEffect(() => {
-    setComposer("");
-    setComposerError("");
-  }, [organizationId, factoryId, workOrderId]);
+  const { composer, composerError, setComposer, setComposerError } = useAnalysisComposer(
+    organizationId,
+    factoryId,
+    workOrderId,
+  );
   const queryKey = workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId);
   const query = usePlanningSessionLookup({
     organizationId,
@@ -323,6 +322,16 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
       submit(text, answerSurvey.mutate);
     },
   };
+}
+
+function useAnalysisComposer(organizationId: string, factoryId: string, workOrderId: string) {
+  const [composer, setComposer] = useState("");
+  const [composerError, setComposerError] = useState("");
+  useEffect(() => {
+    setComposer("");
+    setComposerError("");
+  }, [organizationId, factoryId, workOrderId]);
+  return { composer, composerError, setComposer, setComposerError };
 }
 
 type AnalysisMessageInput = {
