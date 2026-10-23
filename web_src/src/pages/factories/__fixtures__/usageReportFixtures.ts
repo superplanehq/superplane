@@ -9,6 +9,8 @@ export interface StorybookUsageReport {
   totalTokens: string;
   totalCostCents: string;
   totalDurationSeconds?: string;
+  defaultHostedProvider?: string;
+  defaultHostedModel?: string;
   periodDays: number;
   byModel: Array<{ provider: string; model: string; totalTokens: string; costCents: string }>;
   byMachineType?: Array<{ machineType: string; durationSeconds: string; costCents: string }>;
@@ -86,6 +88,12 @@ export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   hostedBilledCents: "876",
   remainingCreditWarning: false,
   welcomeCreditExpiresAt: ACTIVE_TRIAL_ENDS_AT,
+};
+
+export const HOSTED_DEFAULT_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  defaultHostedProvider: "openrouter",
+  defaultHostedModel: "openai/gpt-5",
 };
 
 /** Welcome grant spent. Remaining hosted credit is empty. Polar recovery is available. */

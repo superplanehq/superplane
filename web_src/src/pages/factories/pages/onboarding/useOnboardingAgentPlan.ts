@@ -1,17 +1,12 @@
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
-import { hostedModelIds } from "@/lib/hostedLLMModels";
+import { hasHostedDefaultModel, hostedModelIds } from "@/lib/hostedLLMModels";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 
-import {
-  AGENT_PROVIDER_IDS,
-  hasHostedDefaultModel,
-  resolveOnboardingAgent,
-  type OnboardingAgentPlan,
-} from "./onboardingAgentReadiness";
+import { AGENT_PROVIDER_IDS, resolveOnboardingAgent, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import type { IntegrationId } from "./onboardingFixtures";
 
 type HostedAgentDefaults = {

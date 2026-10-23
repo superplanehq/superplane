@@ -1,6 +1,13 @@
 export const HOSTED_MODEL_ALL_PROVIDERS = "all";
 export const HOSTED_LLM_PROVIDERS = ["anthropic", "openai", "openrouter"] as const;
 
+/** True when the installation sets a default SuperPlane-hosted model. */
+export function hasHostedDefaultModel(args: { defaultHostedProvider?: string; defaultHostedModel?: string }): boolean {
+  const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
+  const defaultModel = args.defaultHostedModel?.trim() ?? "";
+  return Boolean(defaultProvider && defaultModel);
+}
+
 export function hostedLLMModelKey(provider: string, model: string): string {
   const trimmedProvider = provider.trim();
   const trimmedModel = model.trim();

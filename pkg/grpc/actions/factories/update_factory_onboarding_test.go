@@ -578,7 +578,15 @@ func createReadyOnboardingIntegration(t *testing.T, organizationID uuid.UUID, ap
 
 func upsertHostedOnboardingProvider(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+	settings, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.Background()).Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+			"default_hosted_provider": settings.DefaultHostedProvider,
+			"default_hosted_model":    settings.DefaultHostedModel,
+		}).Error)
+	})
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider:      models.UsageProviderAnthropic,
 		Enabled:       true,
 		APIKey:        []byte("test-hosted-key"),
@@ -587,13 +595,10 @@ func upsertHostedOnboardingProvider(t *testing.T, db *gorm.DB) {
 	require.NoError(t, err)
 	provider := models.UsageProviderAnthropic
 	model := "sonnet"
-	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
-		DefaultHostedProvider: &provider,
-		DefaultHostedModel:    &model,
-	})
+	hostedSettings := *settings
+	hostedSettings.DefaultHostedProvider = &provider
+	hostedSettings.DefaultHostedModel = &model
+	_, err = models.UpdateInstallationLLMSettings(db, hostedSettings)
 	require.NoError(t, err)
 }
 
@@ -613,6 +618,7 @@ func clearHostedLLMProviders(t *testing.T, db *gorm.DB) {
 func TestFactoryOnboardingRejectsBYOKAfterRevocation(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
