@@ -104,6 +104,26 @@ vi.mock("@/hooks/useOrganizationBilling", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({
+    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+  }),
+}));
+vi.mock("./first-run/FirstRunBillingScreen", () => ({
+  FirstRunBillingScreen: ({ onContinue, chrome }: { onContinue: () => void; chrome?: FirstRunChrome }) => (
+    <section data-testid="first-run-billing">
+      <button data-testid="first-run-back" onClick={chrome?.onBack}>
+        Back
+      </button>
+      <button onClick={onContinue}>Finish with selected plan</button>
+    </section>
+  ),
+}));
+
 const navigateSpy = vi.fn();
 
 let accountOrganizations: Array<{ id: string; name: string; slug?: string }>;
@@ -497,6 +517,31 @@ describe("FirstRunSetup chrome", () => {
       await waitFor(() => expect(model.finish).toHaveBeenCalled());
     },
   );
+
+  it.each(
+    ["issues", "billing"].flatMap((step) => [
+      { step, newBilling: false, availablePlans: [{ key: "free", name: "Free" }] },
+      { step, newBilling: true, availablePlans: [] },
+      { step, newBilling: true, availablePlans: undefined },
+    ]),
+  )("finishes without plan selection (%j)", async ({ step, newBilling, availablePlans }) => {
+    Object.assign(billingState, { enabled: true, newBilling, availablePlans });
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      setup: { ...setupState(), issuesChoice: "vcs" },
+    });
+    renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
+    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
+    await user.click(
+      step === "issues"
+        ? screen.getByTestId("first-run-analyze-tickets")
+        : screen.getByRole("button", { name: "Continue" }),
+    );
+    await waitFor(() => expect(model.finish).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
+  });
 
   it.each([false, true])("routes a restored billing URL through model access (own key: %s)", async (byok) => {
     billingState.enabled = true;
