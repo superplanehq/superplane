@@ -16,7 +16,7 @@
 # Complete owner setup in the SuperPlane UI. fleet-token waits, then mints
 # an admin token. fleet-manager starts after that file exists.
 # FLEET_MANAGER_VERSION defaults to v0.1.5 (the first tag with -docker).
-# RUNNER_VERSION defaults to v0.2.0.
+# RUNNER_VERSION defaults to v0.2.1.
 # On ARM, set RUNNER_FLEET_ID=e1-large-arm64 and RUNNER_ARCH=arm64.
 # Fleet Manager id defaults to COMPOSE_PROJECT_NAME so two stacks stay isolated.
 
@@ -321,7 +321,7 @@ services:
           requestTimeout: 60s
         fleets:
           - id: ${RUNNER_FLEET_ID:-e1-large-amd64}
-            runnerVersion: ${RUNNER_VERSION:-v0.2.0}
+            runnerVersion: ${RUNNER_VERSION:-v0.2.1}
             provider: docker
             maxCapacity: 1
             warmCapacity: 1
@@ -333,7 +333,7 @@ services:
               diskGb: 30
               # Omit capabilities docker: the runner image has no Docker client.
             docker:
-              image: ghcr.io/superplanehq/runner:${RUNNER_VERSION:-v0.2.0}
+              image: ghcr.io/superplanehq/runner:${RUNNER_VERSION:-v0.2.1}
               architecture: ${RUNNER_ARCH:-amd64}
               runnerApiUrl: http://app:8000
               network: ${RUNNER_NETWORK:-${COMPOSE_PROJECT_NAME}_runners}

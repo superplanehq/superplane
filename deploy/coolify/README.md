@@ -103,7 +103,7 @@ Git checkout.
 6. Deploy. Complete owner setup. Wait for Fleet Manager.
 
 `FLEET_MANAGER_VERSION` defaults to `v0.1.5` (the first tag with `-docker`).
-`RUNNER_VERSION` defaults to `v0.2.0`.
+`RUNNER_VERSION` defaults to `v0.2.1`.
 
 ## Runner network and architecture
 
