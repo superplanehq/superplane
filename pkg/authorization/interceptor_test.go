@@ -540,6 +540,8 @@ func TestBillingMutationsUseOrgUpdate(t *testing.T) {
 		"/api/v1/organizations/{id}/business-checkout",
 		"/api/v1/organizations/{id}/billing/select-plan",
 		"/api/v1/organizations/{id}/billing/payment-method-session",
+		"/api/v1/organizations/{id}/billing/seats/preview",
+		"/api/v1/organizations/{id}/billing/seats/purchase",
 	} {
 		t.Run(path, func(t *testing.T) {
 			rule, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: path}]
@@ -547,7 +549,7 @@ func TestBillingMutationsUseOrgUpdate(t *testing.T) {
 			assert.Equal(t, "org", rule.Resource)
 			assert.Equal(t, "update", rule.Action)
 			assert.Equal(t, models.DomainTypeOrganization, rule.DomainType)
-			if strings.HasSuffix(path, "/billing/select-plan") || strings.HasSuffix(path, "/billing/payment-method-session") {
+			if strings.Contains(path, "/billing/") {
 				assert.Equal(t, []string{features.FeatureNewBilling}, rule.RequiredExperimentalFeatures)
 			}
 		})
