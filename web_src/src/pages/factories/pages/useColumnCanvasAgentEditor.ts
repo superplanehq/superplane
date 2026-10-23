@@ -65,7 +65,6 @@ type AgentCanvasEdit = {
 };
 
 interface ColumnCanvasAgentEditorOptions {
-  showVisualEvidenceSetting?: boolean;
   synchronizedAgentNodeIds?: readonly string[];
   preferredAgentNodeId?: string;
 }
@@ -103,7 +102,6 @@ export function useColumnCanvasAgentEditor(
   const agentNode = primaryAgentNode(canvas?.spec, preferredAgentNodeId);
   const agentNodeIds = editableAgentNodeIds(canvas, agentNode?.id, options.synchronizedAgentNodeIds);
   const draft = canvas && agentNode?.id ? planningReviewDraftFromCanvas(canvas, agentNode.id) : null;
-  const showVisualEvidenceSetting = options.showVisualEvidenceSetting ?? false;
 
   const canvasEditDeps = {
     appId: canvasId,
@@ -149,7 +147,6 @@ export function useColumnCanvasAgentEditor(
     agentNodeIds,
     isLoading: enabled && canvasQuery.isPending,
     draft,
-    showVisualEvidenceSetting,
     editorOpen,
     openEditor: agentNode ? () => setEditorOpen(true) : undefined,
     closeEditor: () => setEditorOpen(false),

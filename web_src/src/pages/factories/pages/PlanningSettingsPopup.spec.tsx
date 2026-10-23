@@ -38,7 +38,6 @@ function defaultAgentSlot(overrides: Partial<PlanningReviewAgentSlot> = {}): Pla
     draft: PLANNING_REVIEW_DRAFT,
     organizationId: "org-1",
     onSave: vi.fn(),
-    showVisualEvidenceSetting: false,
     ...overrides,
   };
 }
