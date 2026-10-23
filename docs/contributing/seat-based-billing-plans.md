@@ -41,8 +41,8 @@ and Polar tier `price_per_seat = 2000`. Polar exposes this price through
 [`seat_tiers`](https://github.com/polarsource/polar-js/blob/main/src/models/components/productpriceseatbased.ts),
 not the flat-price `price_amount` field.
 
-Public visibility makes the plan available in the customer catalog. This
-catalog change does not add Team checkout or purchased-seat tracking.
+Public visibility makes the plan available under **Settings → Billing → Payment method**.
+Billing managers select a seat count there and start checkout with **Subscribe to Team**.
 No migration seeds Team because each environment has its own product ID.
 
 Each linked per-seat save fetches the product, including saves that change
@@ -70,7 +70,7 @@ adjustments require their own specification.
 
 Changing the catalog maximum performs no subscription or ledger writes.
 Purchased-capacity behavior belongs to [#8818](https://github.com/superplanehq/superplane/issues/8818).
-Checkout, purchases, invitations, and credit delivery remain separate work.
+Additional purchases, invitations, renewal estimates, and credit delivery remain separate work.
 
 ## Verify in the sandbox
 
@@ -81,3 +81,38 @@ Checkout, purchases, invitations, and credit delivery remain separate work.
 5. Try a mismatched price on a new plan. Confirm that the editor shows an error and retains entered values.
 6. Try an archived or missing product. Confirm that SuperPlane rejects the save.
 7. Confirm that rejected updates leave the stored maximum unchanged.
+
+## Verify the initial Team purchase in the sandbox
+
+Use separate organizations for successful payment and abandonment. Do not use
+production cards or production tokens. The $20 monthly seat price below is
+an example. Use your catalog price for the actual estimates.
+
+1. Configure the sandbox product and public Team plan as described above.
+2. Enable **New Billing** for a new Trial organization with an owner and one active teammate.
+3. Complete workspace onboarding without selecting a plan or entering payment details.
+4. Confirm that the organization remains on Trial with the original trial expiration.
+5. Open **Settings → Billing → Payment method** as a billing manager.
+6. Confirm that Team starts at two seats and shows the effective plan maximum.
+7. Select three seats. At $20 per seat, confirm a $60 initial estimate and $60 monthly total.
+8. Confirm that the price says **per seat per month** and the note says **Estimates exclude tax.**
+9. Select **Subscribe to Team**. Inspect the Polar request with a local HTTP proxy or debugger.
+10. Confirm that `seats`, `min_seats`, and `max_seats` all equal 3 in the Polar request.
+11. Confirm that hosted checkout fixes the quantity at three seats.
+12. Complete payment with a Polar sandbox payment method.
+13. Confirm delivery of `subscription.created` or `subscription.active` to the configured webhook.
+14. Confirm that the stored organization plan is Team and `purchased_seats` equals 3.
+15. Resolve seat usage. Confirm purchased 3, occupied 2, and available 1.
+16. Confirm that stored period dates match the webhook's supplied monthly start and end dates.
+17. Repeat the flow with a separate two-member Trial organization, then abandon checkout before payment.
+18. Confirm that this organization remains on Trial and its purchased capacity and expiration stay unchanged.
+
+Checkout creation does not activate a plan or grant capacity. Only subscription
+activation stores the purchased quantity. The monthly total describes purchased
+capacity. Membership-based renewal estimates belong to
+[#8830](https://github.com/superplanehq/superplane/issues/8830).
+
+`occupied_seats` uses billing response field 27. Issue #8830 must reuse that
+field and allocate additional fields after it. An absent `seat_maximum` means
+unlimited. An organization override replaces the target catalog maximum,
+including an unlimited override.
