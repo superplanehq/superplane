@@ -184,6 +184,7 @@ test("proposeUpdate publishes scores and spec with or without survey questions",
       },
       spec: "# Retry refunds\n",
       survey: { questions: [
+        { prompt: "  ", options: ["Unused"] },
         { prompt: "Which service?", options: ["Payments", "Billing"], recommended_option: "Billing" },
         { prompt: "Which scope?", options: ["One page", "All pages"] },
       ] },
