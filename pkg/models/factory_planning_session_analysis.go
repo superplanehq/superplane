@@ -353,7 +353,7 @@ func planningScoreCallSentence() string {
 	const updateCue = "End an answer, and the first plan, with how to update the plan or the scores. "
 	const reviewStartCue = "When every required score is 3, publish each required score on that plan turn. "
 	const missingCue = "If no score is published yet, this turn is a plan turn. Publish the required scores before you ask or stop. "
-	return missingCue + "Call propose_update with scores, spec, and survey in one call. Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + reviewStartCue + updateCue
+	return missingCue + "Call propose_update with scores and any updated spec in one call. Include survey only when you ask a necessary question. Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + reviewStartCue + updateCue
 }
 
 func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (string, error) {
@@ -380,7 +380,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	var b strings.Builder
 	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity and Confidence rules, and specification shape. ")
 	b.WriteString(planningScoreCallSentence())
-	b.WriteString("If you write or update a specification this turn, include spec on propose_update before you stop. Do not leave a written plan unpublished. Include survey on propose_update only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
+	b.WriteString("If you write or update a specification this turn, include spec on propose_update before you stop. Do not leave a written plan unpublished. Omit survey when you do not ask a necessary question. You may update a score without rewriting the specification. Apply the latest user message.\n")
 	if artifacts.spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(artifacts.spec)
