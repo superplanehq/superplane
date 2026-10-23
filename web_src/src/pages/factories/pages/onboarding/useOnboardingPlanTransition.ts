@@ -4,6 +4,7 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
+import { isOrganizationPlanActive } from "./onboardingPlanActive";
 import type { FirstRunScreen, OnboardingPageModel } from "./useFirstRunSetupFlow";
 
 export function useOnboardingPlanTransition(
@@ -16,10 +17,14 @@ export function useOnboardingPlanTransition(
   const billing = useOrganizationBilling(organizationId);
   const [ticketsSaved, setTicketsSaved] = useState(false);
   const [pending, setPending] = useState(false);
+  // Choosing a plan activates it. Keep the step once it is shown, so it does
+  // not disappear while the user is on it.
+  const [billingStepShown, setBillingStepShown] = useState(false);
   const hasBillingStep =
     rollout.has(FEATURE_NEW_BILLING) &&
     billing.data?.billingEnabled === true &&
-    Boolean(billing.data.availablePlans?.length);
+    Boolean(billing.data.availablePlans?.length) &&
+    (billingStepShown || !isOrganizationPlanActive(billing.data));
   const continueAfterPlan = useCallback(async () => {
     try {
       if (await access.verify()) {
@@ -44,7 +49,13 @@ export function useOnboardingPlanTransition(
         showErrorToast("Could not load billing plans. Try again.");
         return;
       }
-      if (rollout.has(FEATURE_NEW_BILLING) && result.data.billingEnabled && result.data.availablePlans?.length) {
+      if (
+        rollout.has(FEATURE_NEW_BILLING) &&
+        result.data.billingEnabled &&
+        result.data.availablePlans?.length &&
+        !isOrganizationPlanActive(result.data)
+      ) {
+        setBillingStepShown(true);
         navigation.goToScreen("billing");
         return;
       }
@@ -53,12 +64,8 @@ export function useOnboardingPlanTransition(
     setPending(true);
     void continueFromTickets().finally(() => setPending(false));
   }, [ticketsSaved, model.saving, rollout, billing, navigation, continueAfterPlan]);
-  const planActive =
-    billing.data?.planCategory === "paid" &&
-    billing.data.creditPurchaseAllowed &&
-    (!billing.data.requirePaymentMethod || billing.data.hasPaymentMethod);
   const screen =
-    navigation.screen === "agent" && (!access.allowed || (hasBillingStep && !planActive))
+    navigation.screen === "agent" && (!access.allowed || (hasBillingStep && !isOrganizationPlanActive(billing.data)))
       ? ("billing" as const)
       : navigation.screen;
   useEffect(() => {

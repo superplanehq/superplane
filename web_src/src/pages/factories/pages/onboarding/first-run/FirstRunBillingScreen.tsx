@@ -13,6 +13,7 @@ import {
 } from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { hasPlanWithCreditAccess } from "../onboardingPlanActive";
 import { formatUsdCents } from "../../../lib/workOrderUsage";
 import { BillingCardSetup } from "../../organizationSettings/BillingCardSetup";
 import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
@@ -33,9 +34,7 @@ function isCurrentBillingPlan(
 function currentPlanOption(
   billing: OrganizationsDescribeOrganizationBillingResponse | undefined,
 ): OrganizationsBillingPlanOption | undefined {
-  if (!billing?.catalogKey || billing.planCategory !== "paid" || billing.creditPurchaseAllowed !== true) {
-    return undefined;
-  }
+  if (!billing?.catalogKey || !hasPlanWithCreditAccess(billing)) return undefined;
   return {
     key: billing.catalogKey,
     name: billing.planName || billing.catalogKey,
