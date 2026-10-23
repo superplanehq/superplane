@@ -26,6 +26,7 @@ const pageLinks = [
   { label: "Encryption", href: "/admin/encryption", icon: "lucide-key-round" },
   { label: "License", href: "/admin/license", icon: "lucide-key-round" },
   { label: "Billing plans", href: "/admin/billing-plans", icon: "lucide-book-open" },
+  { label: "Credits", href: "/admin/credits", icon: "lucide-credit-card" },
   { label: "Features", href: "/admin/features", icon: "lucide-book-open" },
   { label: "Price Books", href: "/admin/price-books", icon: "lucide-book-open" },
   { label: "Fleets", href: "/admin/runner-tasks", icon: "lucide-terminal" },

@@ -10,6 +10,7 @@ import type {
   OrganizationsHostedCreditInvoice,
   OrganizationsHostedCreditProduct,
   OrganizationsOrganizationCreditGrant,
+  OrganizationsCreateHostedCreditCheckoutBody,
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useHostedCreditActions, useHostedCreditOwnerContactMessage } from "@/hooks/useHostedCreditActions";
@@ -32,7 +33,7 @@ type HostedCreditBillingActions = {
   checkoutPending: boolean;
   businessCheckoutPending: boolean;
   portalPending: boolean;
-  startCheckout: (productId: string) => Promise<void>;
+  startCheckout: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
   startBusinessCheckout: () => Promise<void>;
   openInvoices: () => Promise<void>;
 };
