@@ -3,7 +3,13 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showErrorToast } from "@/lib/toast";
-import { billingCatalogRequest, type BillingPlan, type FeatureDefinition } from "./billingPlansApi";
+import {
+  billingCatalogRequest,
+  toEditableBillingPlan,
+  type BillingPlan,
+  type BillingPlanListItem,
+  type FeatureDefinition,
+} from "./billingPlansApi";
 import { BillingPlanEditor } from "./BillingPlanEditor";
 import { BillingPlansTable } from "./BillingPlansTable";
 
@@ -29,7 +35,7 @@ const emptyPlan: BillingPlan = {
 };
 
 export function BillingPlans() {
-  const [plans, setPlans] = useState<BillingPlan[]>([]);
+  const [plans, setPlans] = useState<BillingPlanListItem[]>([]);
   const [features, setFeatures] = useState<FeatureDefinition[]>([]);
   const [editing, setEditing] = useState<BillingPlan | null>(null);
   const [error, setError] = useState("");
@@ -40,7 +46,7 @@ export function BillingPlans() {
     setLoading(true);
     try {
       const [catalog, definitions] = await Promise.all([
-        billingCatalogRequest<BillingPlan[]>("billing-plans"),
+        billingCatalogRequest<BillingPlanListItem[]>("billing-plans"),
         billingCatalogRequest<FeatureDefinition[]>("feature-definitions"),
       ]);
       setPlans(catalog);
@@ -72,13 +78,14 @@ export function BillingPlans() {
       setSaving(false);
     }
   };
-  const remove = async (plan: BillingPlan) => {
+  const remove = async (plan: BillingPlanListItem) => {
     try {
       await billingCatalogRequest(`billing-plans/${plan.id}`, "DELETE");
-      await load();
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to delete billing plan");
     }
+    // The server is authoritative. Reload so each row shows its current protection status.
+    await load();
   };
   return (
     <div className="space-y-6 p-6">
@@ -111,7 +118,7 @@ export function BillingPlans() {
           !error && (
             <BillingPlansTable
               plans={plans}
-              onEdit={(plan) => setEditing({ ...plan })}
+              onEdit={(plan) => setEditing(toEditableBillingPlan(plan))}
               onDelete={(plan) => void remove(plan)}
             />
           )
