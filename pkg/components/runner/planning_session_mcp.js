@@ -58,17 +58,19 @@ async function requestJSON(method, path, body) {
 
 function surveyQuestions(input) {
   const raw = input && Array.isArray(input.questions) ? input.questions : [];
-  return raw.map((question) => ({
-    prompt: String((question && question.prompt) || "").trim(),
-    options: Array.isArray(question && question.options)
-      ? question.options
-          .map((option) => String(option || "").trim())
-          .filter(Boolean)
-      : [],
-    ...(question && question.recommended_option
-      ? { recommended_option: String(question.recommended_option) }
-      : {}),
-  }));
+  return raw
+    .map((question) => ({
+      prompt: String((question && question.prompt) || "").trim(),
+      options: Array.isArray(question && question.options)
+        ? question.options
+            .map((option) => String(option || "").trim())
+            .filter(Boolean)
+        : [],
+      ...(question && question.recommended_option
+        ? { recommended_option: String(question.recommended_option) }
+        : {}),
+    }))
+    .filter((question) => question.prompt);
 }
 
 async function proposeSurvey(input) {
