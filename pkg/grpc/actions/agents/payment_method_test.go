@@ -74,3 +74,40 @@ func requirePaymentMethod(t *testing.T, err error) {
 	require.True(t, ok)
 	assert.Equal(t, models.ErrPaymentMethodRequired.Error(), message)
 }
+
+func TestAgentActionsRequireActivePlan(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	chatID := uuid.NewString()
+
+	t.Run("send message", func(t *testing.T) {
+		svc := &stubService{
+			sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
+				return nil, models.ErrHostedSubscriptionRequired
+			},
+		}
+		_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
+			ChatId:  chatID,
+			Content: "hello",
+		})
+		requireActivePlan(t, err)
+	})
+
+	t.Run("define outcome", func(t *testing.T) {
+		svc := &stubService{defineErr: models.ErrHostedSubscriptionRequired}
+		_, err := actionsagents.DefineAgentOutcome(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.DefineAgentOutcomeRequest{
+			ChatId: chatID,
+			Rubric: "The change is complete",
+		})
+		requireActivePlan(t, err)
+	})
+}
+
+func requireActivePlan(t *testing.T, err error) {
+	t.Helper()
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	message, ok := grpcerrors.HandlerMessage(err)
+	require.True(t, ok)
+	assert.Equal(t, models.ErrHostedSubscriptionRequired.Error(), message)
+}
