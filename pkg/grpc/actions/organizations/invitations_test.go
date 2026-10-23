@@ -110,6 +110,10 @@ func TestInvitationExpiryAndValidation(t *testing.T) {
 	t.Setenv(models.BillingEnabledEnv, "no")
 	db := database.Conn()
 	ctx := context.Background()
+	settings, err := models.GetInstallationMetadata(db)
+	require.NoError(t, err)
+	settings.InvitationDurationDays = 14
+	require.NoError(t, models.UpdateInstallationMetadata(db, settings))
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 	create := func(email, role string) (*pb.CreateInvitationResponse, error) {
 		return s.Create(ctx, r.Organization.ID.String(), r.User.String(), &pb.CreateInvitationRequest{Email: email, Role: role})
@@ -118,7 +122,7 @@ func TestInvitationExpiryAndValidation(t *testing.T) {
 		_, err := create(email, "")
 		require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	}
-	_, err := create("unknown@example.com", "missing")
+	_, err = create("unknown@example.com", "missing")
 	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	account, err := models.CreateAccount("Removed member", "removed@example.com")
 	require.NoError(t, err)
@@ -131,11 +135,18 @@ func TestInvitationExpiryAndValidation(t *testing.T) {
 	require.NoError(t, err)
 	first, err := create("person@example.com", models.RoleOrgMaintainer)
 	require.NoError(t, err)
+	require.Equal(t, 14*24*time.Hour, first.Invitation.ExpiresAt.AsTime().Sub(first.Invitation.SentAt.AsTime()))
+	settings.InvitationDurationDays = 3
+	require.NoError(t, models.UpdateInstallationMetadata(db, settings))
+	stored, err := models.FindOrganizationInvitation(db, r.Organization.ID, uuid.MustParse(first.Invitation.Id))
+	require.NoError(t, err)
+	require.Equal(t, 14*24*time.Hour, stored.ExpiresAt.Sub(stored.SentAt))
 	_, err = create("PERSON@example.com", "")
 	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 	require.NoError(t, db.Model(&models.OrganizationInvitation{}).Where("id = ?", first.Invitation.Id).Update("expires_at", time.Now().Add(-time.Hour)).Error)
 	listed, err := s.List(ctx, r.Organization.ID.String())
 	require.NoError(t, err)
+	require.Equal(t, int32(3), listed.InvitationDurationDays)
 	require.Equal(t, "expired", listed.Invitations[0].State)
 	require.Zero(t, listed.Seats.PendingInvitations)
 	require.Nil(t, listed.Seats.Invitable)
@@ -148,6 +159,7 @@ func TestInvitationExpiryAndValidation(t *testing.T) {
 	revived, err := s.Resend(ctx, r.Organization.ID.String(), first.Invitation.Id)
 	require.NoError(t, err)
 	require.NotEqual(t, first.AcceptanceUrl, revived.AcceptanceUrl)
+	require.Equal(t, 3*24*time.Hour, revived.Invitation.ExpiresAt.AsTime().Sub(revived.Invitation.SentAt.AsTime()))
 	require.NoError(t, db.Model(&models.OrganizationInvitation{}).Where("id = ?", first.Invitation.Id).Update("state", "accepted").Error)
 	_, err = s.Cancel(ctx, r.Organization.ID.String(), first.Invitation.Id)
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))

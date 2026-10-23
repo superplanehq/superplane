@@ -28,6 +28,7 @@ type InstallationMetadata struct {
 	InstallationID            string `gorm:"type:varchar(64)"`
 	AllowPrivateNetworkAccess bool
 	SignupsEnabled            bool
+	InvitationDurationDays    int     `gorm:"default:7"`
 	OwnerSetupStep            *string `gorm:"type:text"`
 	ShareOwnerIdentity        bool
 	CreatedAt                 time.Time
@@ -162,6 +163,7 @@ func UpdateInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) err
 		Updates(map[string]any{
 			"allow_private_network_access": metadata.AllowPrivateNetworkAccess,
 			"signups_enabled":              metadata.SignupsEnabled,
+			"invitation_duration_days":     metadata.InvitationDurationDays,
 			"updated_at":                   metadata.UpdatedAt,
 		}).
 		Error
@@ -178,9 +180,10 @@ func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error
 	}
 
 	metadata = InstallationMetadata{
-		ID:             installationMetadataID,
-		InstallationID: uuid.NewString(),
-		SignupsEnabled: true,
+		ID:                     installationMetadataID,
+		InstallationID:         uuid.NewString(),
+		SignupsEnabled:         true,
+		InvitationDurationDays: 7,
 	}
 
 	if err := tx.Clauses(clause.OnConflict{

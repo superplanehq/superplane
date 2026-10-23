@@ -1298,6 +1298,7 @@ message ListInvitationsRequest { string id = 1; }
 message ListInvitationsResponse {
   repeated OrganizationInvitation invitations = 1;
   InvitationSeatSummary seats = 2;
+  int32 invitation_duration_days = 3;
 }
 message ResendInvitationRequest {
   string id = 1;

@@ -27,8 +27,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const invitationLifetime = 7 * 24 * time.Hour
-
 type InvitationService struct {
 	AuthService  authorization.Authorization
 	EmailService services.EmailService
@@ -90,7 +88,7 @@ func (s *InvitationService) Create(ctx context.Context, orgID, inviterID string,
 		if err := requireInvitationCapacity(tx, organization, false); err != nil {
 			return err
 		}
-		token, err = prepareInvitation(invitation, now)
+		token, err = prepareInvitation(tx, invitation, now)
 		if err != nil {
 			return err
 		}
@@ -132,6 +130,11 @@ func (s *InvitationService) List(ctx context.Context, orgID string) (*pb.ListInv
 		if err != nil {
 			return err
 		}
+		settings, err := models.GetInstallationMetadata(tx)
+		if err != nil {
+			return err
+		}
+		response.InvitationDurationDays = int32(settings.InvitationDurationDays)
 		response.Invitations = make([]*pb.OrganizationInvitation, 0, len(invitations))
 		for i := range invitations {
 			response.Invitations = append(response.Invitations, invitationToProto(&invitations[i]))
@@ -184,7 +187,7 @@ func (s *InvitationService) Resend(ctx context.Context, orgID, invitationID stri
 		if err := requireInvitationCapacity(tx, organization, invitation.State == models.InvitationStatePending); err != nil {
 			return err
 		}
-		token, err = prepareInvitation(invitation, now)
+		token, err = prepareInvitation(tx, invitation, now)
 		if err != nil {
 			return err
 		}
@@ -289,7 +292,11 @@ func requireInvitationCapacity(tx *gorm.DB, orgID uuid.UUID, alreadyPending bool
 	return nil
 }
 
-func prepareInvitation(invitation *models.OrganizationInvitation, now time.Time) (string, error) {
+func prepareInvitation(tx *gorm.DB, invitation *models.OrganizationInvitation, now time.Time) (string, error) {
+	settings, err := models.GetInstallationMetadata(tx)
+	if err != nil {
+		return "", err
+	}
 	random := make([]byte, 32)
 	if _, err := rand.Read(random); err != nil {
 		return "", err
@@ -299,7 +306,7 @@ func prepareInvitation(invitation *models.OrganizationInvitation, now time.Time)
 	invitation.TokenHash = &hash
 	invitation.State = models.InvitationStatePending
 	invitation.SentAt = now
-	invitation.ExpiresAt = now.Add(invitationLifetime)
+	invitation.ExpiresAt = now.Add(time.Duration(settings.InvitationDurationDays) * 24 * time.Hour)
 	return token, nil
 }
 

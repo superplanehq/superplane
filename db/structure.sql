@@ -1183,6 +1183,8 @@ CREATE TABLE public.installation_metadata (
     signups_enabled boolean DEFAULT true NOT NULL,
     owner_setup_step text,
     share_owner_identity boolean DEFAULT false NOT NULL,
+    invitation_duration_days integer DEFAULT 7 NOT NULL,
+    CONSTRAINT installation_metadata_invitation_duration_days_check CHECK (((invitation_duration_days >= 1) AND (invitation_duration_days <= 365))),
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -6082,7 +6084,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261023170420	f
+20261023192046	f
 \.
 
 

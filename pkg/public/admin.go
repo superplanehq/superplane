@@ -37,6 +37,7 @@ type paginatedResponse struct {
 type installationSettingsResponse struct {
 	AllowPrivateNetworkAccess  bool     `json:"allow_private_network_access"`
 	SignupsEnabled             bool     `json:"signups_enabled"`
+	InvitationDurationDays     int      `json:"invitation_duration_days"`
 	SignupsBlockedByEnv        bool     `json:"signups_blocked_by_environment"`
 	EffectiveBlockedHTTPHosts  []string `json:"effective_blocked_http_hosts"`
 	EffectivePrivateIPRanges   []string `json:"effective_private_ip_ranges"`
@@ -55,6 +56,7 @@ type installationSettingsResponse struct {
 type installationSettingsRequest struct {
 	AllowPrivateNetworkAccess *bool   `json:"allow_private_network_access"`
 	SignupsEnabled            *bool   `json:"signups_enabled"`
+	InvitationDurationDays    *int    `json:"invitation_duration_days"`
 	SMTPEnabled               *bool   `json:"smtp_enabled"`
 	SMTPHost                  *string `json:"smtp_host"`
 	SMTPPort                  *int    `json:"smtp_port"`
@@ -135,8 +137,11 @@ func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r
 var errInvalidInstallationSettingsRequest = errors.New("invalid installation settings request")
 
 func (s *Server) updateInstallationSettings(ctx context.Context, req installationSettingsRequest) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil {
+	if req.InvitationDurationDays != nil && (*req.InvitationDurationDays < 1 || *req.InvitationDurationDays > 365) {
+		return errors.Join(errInvalidInstallationSettingsRequest, errors.New("invitation duration must be between 1 and 365 days"))
+	}
+	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil || req.InvitationDurationDays != nil {
 			metadata, err := models.GetInstallationMetadata(tx)
 			if err != nil {
 				return err
@@ -148,6 +153,10 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 
 			if req.SignupsEnabled != nil {
 				metadata.SignupsEnabled = *req.SignupsEnabled
+			}
+
+			if req.InvitationDurationDays != nil {
+				metadata.InvitationDurationDays = *req.InvitationDurationDays
 			}
 
 			metadata.UpdatedAt = time.Now()
@@ -179,6 +188,7 @@ func (s *Server) buildInstallationSettingsResponse() (installationSettingsRespon
 	response := installationSettingsResponse{
 		AllowPrivateNetworkAccess:  policy.AllowPrivateNetworkAccess,
 		SignupsEnabled:             metadata.SignupsEnabled,
+		InvitationDurationDays:     metadata.InvitationDurationDays,
 		SignupsBlockedByEnv:        s.authHandler.SignupsBlockedByEnvironment(),
 		EffectiveBlockedHTTPHosts:  policy.BlockedHosts,
 		EffectivePrivateIPRanges:   policy.PrivateIPRanges,
