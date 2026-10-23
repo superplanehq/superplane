@@ -19,7 +19,7 @@ describe("workOrderCreditFailureCopy", () => {
   it("maps a missing Business plan to No plan and Subscribe", () => {
     expect(workOrderCreditFailureCopy("hosted_subscription_required")).toEqual({
       label: "No plan",
-      message: "This agent run is blocked. SuperPlane hosted runs need an active plan.",
+      message: "This agent run is blocked. Agent runs need an active plan.",
       actionLabel: "View billing",
     });
   });
@@ -34,6 +34,10 @@ describe("workOrderCreditFailureCopy", () => {
 
   it("maps a runner credit message to the same copy", () => {
     expect(workOrderCreditFailureFromMessage("This organization has no hosted credit.")?.label).toBe("No credit");
+    expect(workOrderCreditFailureFromMessage("  Subscribe to a plan to run agents.  ")?.label).toBe("No plan");
+    expect(
+      workOrderCreditFailureFromMessage("Contact an installation admin to keep SuperPlane-hosted runs.")?.label,
+    ).toBe("No plan");
     expect(workOrderCreditFailureFromMessage("  Subscribe to Business to keep SuperPlane-hosted runs.  ")?.label).toBe(
       "No plan",
     );

@@ -2648,6 +2648,12 @@ message DescribeFactoryUsageResponse {
   bool factory_remaining_credit_warning = 12;
   int64 total_duration_seconds = 13;
   repeated UsageByMachineType by_machine_type = 14;
+  // Exact hosted credit gate for new runs. Whole-cent balances round down,
+  // so clients must use this flag instead of remaining_credit_cents.
+  bool hosted_credit_available = 15;
+  // Exact workspace hosted budget gate for new runs. True when the workspace
+  // has no cap or its capped remainder is still positive.
+  bool factory_hosted_budget_available = 16;
 }
 
 message ListFactoryWorkOrderRunUsageRequest {
@@ -2704,6 +2710,7 @@ message ListFactoryLineRunnerModelsRequest {
 
 message ListFactoryLineRunnerModelsResponse {
   repeated FactoryLLMModel models = 1;
+  bool uses_hosted_funding = 2;
 }
 
 message ListFactoryLLMModelsRequest {

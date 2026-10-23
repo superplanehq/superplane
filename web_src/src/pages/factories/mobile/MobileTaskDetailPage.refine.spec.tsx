@@ -104,10 +104,12 @@ vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   useFactoryLineRunnerModels: (...args: unknown[]) => {
     runnerModelCalls.push(args);
     return {
-      data: [
-        { id: "claude-opus-4-6", name: "claude-opus-4-6" },
-        { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
-      ],
+      data: {
+        models: [
+          { id: "claude-opus-4-6", name: "claude-opus-4-6" },
+          { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
+        ],
+      },
       isLoading: false,
     };
   },

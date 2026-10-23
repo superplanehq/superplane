@@ -812,6 +812,70 @@ func Test__AssertHostedRunAllowedRequiresSubscriptionWhenPolarConfigured(t *test
 	require.ErrorIs(t, err, models.ErrHostedSubscriptionRequired)
 }
 
+func Test__AssertOrganizationPlanAllowsRuns(t *testing.T) {
+	for _, polarToken := range []string{"", "oat_test"} {
+		t.Run("None plan with leftover credit is blocked, polar token "+polarToken, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.Conn()
+			t.Setenv("POLAR_ACCESS_TOKEN", polarToken)
+			_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, nil)
+			require.NoError(t, err)
+			credit, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.Greater(t, credit.RemainingMicros, int64(0))
+
+			require.ErrorIs(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID), models.ErrHostedSubscriptionRequired)
+			require.ErrorIs(t, models.AssertHostedRunAllowed(db, r.Organization.ID, nil), models.ErrHostedSubscriptionRequired)
+		})
+	}
+
+	t.Run("open trial is allowed", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		t.Setenv("POLAR_ACCESS_TOKEN", "")
+
+		require.NoError(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID))
+		require.NoError(t, models.AssertHostedRunAllowed(db, r.Organization.ID, nil))
+	})
+
+	t.Run("active paid plan is allowed", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		t.Setenv("POLAR_ACCESS_TOKEN", "")
+		_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
+		require.NoError(t, err)
+
+		require.NoError(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID))
+	})
+
+	t.Run("expired trial is blocked", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		t.Setenv("POLAR_ACCESS_TOKEN", "")
+		expireOrganizationTrial(t, db, r.Organization.ID)
+
+		require.ErrorIs(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID), models.ErrHostedSubscriptionRequired)
+	})
+
+	t.Run("billing disabled allows a None plan", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		t.Setenv(models.BillingEnabledEnv, "no")
+		_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, nil)
+		require.NoError(t, err)
+
+		require.NoError(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID))
+	})
+
+	t.Run("nil organization is rejected", func(t *testing.T) {
+		support.Setup(t)
+
+		err := models.AssertOrganizationPlanAllowsRuns(database.Conn(), uuid.Nil)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, models.ErrHostedSubscriptionRequired)
+	})
+}
+
 func Test__ResolveOrganizationBillingPlanLeavesOpenTrial(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))

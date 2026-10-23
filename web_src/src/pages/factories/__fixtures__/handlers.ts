@@ -437,6 +437,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
             { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
             { id: "claude-opus-4-6", name: "claude-opus-4-6" },
           ],
+          usesHostedFunding: true,
         },
       }),
     },
