@@ -378,19 +378,15 @@ describe("PRFeedbackSettingsPopup automation", () => {
     expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
   });
 
-  it("puts Agent between General and Runs when the canvas has an agent", () => {
-    renderAgentSettingsPopup(discussionDraft());
+  it("opens an Address PR feedback Agent link on General and hides the Agent tab", () => {
+    renderAgentSettingsPopup(discussionDraft(), "/?prFeedbackSettings=agent", <SearchProbe />);
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Runs"]);
-
-    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
-    expect(screen.getByText("Concurrency")).toBeInTheDocument();
-    expect(screen.getByText("Model")).toBeInTheDocument();
-    expect(screen.getByText("Steps")).toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
-    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Include visual evidence")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
+    expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pr-feedback-settings-tab-general")).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("planning-review-editor")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Require @superplaneagent/ })).toBeChecked();
+    expect(screen.getByTestId("location")).toHaveTextContent("prFeedbackSettings=agent");
   });
 
   it("opens a checks Agent link on General and hides the Agent tab", () => {
