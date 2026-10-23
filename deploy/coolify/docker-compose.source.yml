@@ -172,6 +172,7 @@ services:
       BLOCK_SIGNUP: "yes"
       REDIRECT_HTTP_REQUESTS: "yes"
       SUPERPLANE_INSTALLATION_TYPE: single-host
+      SUPERPLANE_BILLING_ENABLED: "no"
       OTEL_ENABLED: "no"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-}
@@ -184,7 +185,7 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
 
   runner-image:
-    image: superplane-runner:coolify
+    image: superplane-runner:${COMPOSE_PROJECT_NAME:-coolify}
     build:
       context: ../..
       dockerfile: release/runner/Dockerfile
@@ -241,7 +242,7 @@ services:
               diskGb: 30
               # Omit capabilities docker: the runner image has no Docker client.
             docker:
-              image: superplane-runner:coolify
+              image: superplane-runner:${COMPOSE_PROJECT_NAME:-coolify}
               architecture: ${RUNNER_ARCH:-amd64}
               runnerApiUrl: http://app:8000
               network: ${RUNNER_NETWORK:-${COMPOSE_PROJECT_NAME}_runners}
