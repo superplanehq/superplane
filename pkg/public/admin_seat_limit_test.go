@@ -18,10 +18,11 @@ func TestAdminSeatLimit(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	planLimit := 10
-	plan := models.BillingPlan{Key: "seat_" + uuid.NewString()[:8], Name: "Seats", Category: "paid", Visibility: "private", SeatLimit: &planLimit, CreditFrequency: "none", CreditExpiration: "never"}
+	plan := models.BillingPlan{Key: "seat_" + uuid.NewString()[:8], Name: "Seats", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &planLimit, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(database.Conn(), &plan))
 	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
 	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/seat-limit"
 	regular, err := models.CreateAccount("Member", "seats@example.com")
 	require.NoError(t, err)

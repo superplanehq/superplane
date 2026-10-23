@@ -41,6 +41,7 @@ var (
 	ErrPaymentMethodRequired      = errors.New("add a payment method in organization billing before usage")
 	ErrHostedSubscriptionRequired = errors.New("an active paid plan is required for SuperPlane-hosted runs")
 	ErrInvalidBillingPlan         = errors.New("billing plan is invalid")
+	ErrInvalidPurchasedSeats      = errors.New("purchased seats must be a nonnegative integer")
 	ErrBillingPlanChanged         = errors.New("the billing record changed. Refresh and try again")
 	ErrPolarManagedBillingPlan    = errors.New("this organization uses Polar for billing. Cancel or change the subscription in Polar")
 )
@@ -56,6 +57,7 @@ type OrganizationBillingPlan struct {
 	PolarSubscriptionStatus string
 	CancelAtPeriodEnd       bool
 	PolarModifiedAt         *time.Time
+	PurchasedSeats          *int
 	CurrentPeriodStart      *time.Time
 	CurrentPeriodEnd        *time.Time
 	TrialStartedAt          *time.Time
@@ -72,6 +74,7 @@ type PolarSubscriptionApply struct {
 	PeriodEnd         *time.Time
 	CancelAtPeriodEnd bool
 	ModifiedAt        *time.Time
+	PurchasedSeats    *int
 }
 
 func (OrganizationBillingPlan) TableName() string {
@@ -308,6 +311,9 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 	var saved *OrganizationBillingPlan
 	var grantIncluded bool
 	err := tx.Transaction(func(inner *gorm.DB) error {
+		if _, err := LockOrganization(inner, orgID); err != nil {
+			return err
+		}
 		existing, err := EnsureOrganizationBillingPlan(inner, orgID)
 		if err != nil {
 			return err
@@ -328,12 +334,20 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 			saved = existing
 			return nil
 		}
+		catalog, catalogErr := FindBillingPlanByProduct(inner, sub.ProductID)
+		if catalogErr != nil && !errors.Is(catalogErr, gorm.ErrRecordNotFound) {
+			return catalogErr
+		}
+		if sub.PurchasedSeats != nil && *sub.PurchasedSeats < 0 || catalog.PerSeat && sub.PurchasedSeats == nil {
+			return ErrInvalidPurchasedSeats
+		}
 
 		now := time.Now()
 		next := *existing
 		next.PlanSource = BillingPlanSourcePolar
 		next.UpdatedAt = now
 		next.PolarModifiedAt = polarSnapshotModifiedAt(existing.PolarModifiedAt, sub.ModifiedAt)
+		next.PurchasedSeats = sub.PurchasedSeats
 		if strings.TrimSpace(sub.ID) != "" {
 			id := strings.TrimSpace(sub.ID)
 			next.PolarSubscriptionID = &id
@@ -350,9 +364,8 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 		}
 
 		if polarPaidAccessContinues(&next, now) {
-			catalog, err := FindBillingPlanByProduct(inner, sub.ProductID)
-			if err != nil {
-				return fmt.Errorf("unknown subscription product: %w", err)
+			if catalogErr != nil {
+				return fmt.Errorf("unknown subscription product: %w", catalogErr)
 			}
 			if catalog.Category != "paid" {
 				return ErrInvalidBillingPlan
@@ -380,6 +393,7 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 				"polar_subscription_status",
 				"cancel_at_period_end",
 				"polar_modified_at",
+				"purchased_seats",
 				"current_period_start",
 				"current_period_end",
 				"trial_started_at",

@@ -42,30 +42,22 @@ func AcceptInviteLink(ctx context.Context, authService authorization.Authorizati
 		if _, err := models.LockOrganization(tx, org.ID); err != nil {
 			return err
 		}
-		user, err := models.FindMaybeDeletedUserByEmailInTransaction(tx, org.ID.String(), account.Email)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
+		user, findErr := models.FindMaybeDeletedUserByEmailInTransaction(tx, org.ID.String(), account.Email)
+		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+			return findErr
 		}
-		if err == nil && !user.DeletedAt.Valid {
+		if findErr == nil && !user.DeletedAt.Valid {
 			statusValue = "already_member"
 			return nil
 		}
-		if models.BillingEnabled() {
-			effective, err := entitlements.Resolve(tx, org.ID)
-			if err != nil {
-				return err
-			}
-			if effective.SeatLimit != nil {
-				used, err := models.CountActiveHumanUsersByOrganizationInTransaction(tx, org.ID.String())
-				if err != nil {
-					return err
-				}
-				if used >= int64(*effective.SeatLimit) {
-					return grpcerrors.FailedPrecondition(nil, "This organization has reached its seat limit. Contact an organization admin.")
-				}
-			}
+		seats, err := entitlements.ResolveSeats(tx, org.ID)
+		if err != nil {
+			return err
 		}
-		if user == nil || errors.Is(err, gorm.ErrRecordNotFound) {
+		if limit := seats.JoinLimit(); limit != nil && seats.Occupied >= *limit {
+			return grpcerrors.FailedPrecondition(nil, "This organization has reached its seat limit. Contact an organization admin.")
+		}
+		if user == nil || errors.Is(findErr, gorm.ErrRecordNotFound) {
 			user, err = models.CreateUserInTransaction(tx, org.ID, account.ID, account.Email, account.Name)
 		} else {
 			err = user.RestoreInTransaction(tx)

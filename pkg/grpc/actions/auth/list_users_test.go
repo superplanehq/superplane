@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -59,4 +60,32 @@ func TestListUsersSeatMetadata(t *testing.T) {
 	resp, err := ListUsers(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), false, r.AuthService)
 	require.NoError(t, err)
 	require.Nil(t, resp.SeatLimit)
+
+	maximum := 50
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, CreditFrequency: "none", CreditExpiration: "never"}
+	db := database.Conn()
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{"plan_id": plan.ID, "plan": plan.Key, "plan_source": "admin", "purchased_seats": 3}).Error)
+	for _, quantity := range []*int{&limit, nil} {
+		require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", quantity).Error)
+		for _, disabled := range []bool{false, true} {
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			if disabled {
+				t.Setenv(models.BillingEnabledEnv, "no")
+			}
+			for _, roles := range []bool{false, true} {
+				resp, err := ListUsers(t.Context(), models.DomainTypeOrganization, r.Organization.ID.String(), roles, r.AuthService)
+				require.NoError(t, err)
+				if disabled {
+					require.Nil(t, resp.SeatLimit)
+					continue
+				}
+				expected := int32(0)
+				if quantity != nil {
+					expected = int32(*quantity)
+				}
+				require.Equal(t, &expected, resp.SeatLimit)
+			}
+		}
+	}
 }
