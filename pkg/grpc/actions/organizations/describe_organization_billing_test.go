@@ -131,6 +131,20 @@ func Test__DescribeOrganizationBillingOccupiedOnNonPerSeatPlans(t *testing.T) {
 	}
 }
 
+func Test__DescribeOrganizationBillingNonePlanWithCreditDoesNotAllowRuns(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("POLAR_ACCESS_TOKEN", "")
+	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanNone, nil)
+	require.NoError(t, err)
+
+	resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, "none", resp.PlanCategory)
+	assert.Greater(t, resp.WelcomeRemainingCents, int64(0))
+	assert.False(t, resp.HostedExecutionAllowed)
+	assert.ErrorIs(t, models.AssertHostedRunAllowed(database.Conn(), r.Organization.ID, nil), models.ErrHostedSubscriptionRequired)
+}
+
 func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))

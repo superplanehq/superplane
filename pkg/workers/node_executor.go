@@ -551,6 +551,17 @@ func (w *NodeExecutor) executeActionNode(
 		}
 		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 	}
+	// Every agent run needs an active paid plan or an open trial. Credit and
+	// BYOK keys do not replace the plan. Database failures leave the execution
+	// pending for the worker retry.
+	if models.IsAgentRunnerComponent(componentName) {
+		if err := models.AssertOrganizationPlanAllowsRuns(tx, workflow.OrganizationID); err != nil {
+			if !errors.Is(err, models.ErrHostedSubscriptionRequired) {
+				return err
+			}
+			return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+		}
+	}
 	// Recheck saved BYOK configurations immediately before a new runner action.
 	// Database failures leave the execution pending for the worker retry.
 	if slices.Contains([]string{"runnerClaudeCode", "runnerCodex", "runnerOpenRouter"}, componentName) {
