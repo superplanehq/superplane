@@ -273,7 +273,6 @@ services:
       - 'RUNNER_FLEET_ID=${RUNNER_FLEET_ID:-e1-large-amd64}'
       - 'RUNNER_VERSION=${RUNNER_VERSION:-v0.2.1}'
       - 'RUNNER_ARCH=${RUNNER_ARCH:-amd64}'
-      - 'RUNNER_NETWORK=${RUNNER_NETWORK:-${COMPOSE_PROJECT_NAME}}'
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -286,6 +285,13 @@ services:
           INSTALLATION_ADMIN_TOKEN="$$(cat /token/installation-admin-token)"
           export INSTALLATION_ADMIN_TOKEN
         fi
+        # Runners join the resource network that Coolify gave this container, so they reach app.
+        RUNNER_NETWORK="$$(docker inspect -f '{{range $$name, $$_ := .NetworkSettings.Networks}}{{println $$name}}{{end}}' "$$HOSTNAME" | head -n 1)"
+        if [ -z "$$RUNNER_NETWORK" ]; then
+          echo "Could not find the Fleet Manager container network." >&2
+          exit 1
+        fi
+        echo "Runners join network $$RUNNER_NETWORK."
         # The runner image has no Docker client, so the fleet omits the docker capability.
         FLEET_MANAGER_CONFIG="$$(cat <<EOF
         id: $${FLEET_MANAGER_ID}
