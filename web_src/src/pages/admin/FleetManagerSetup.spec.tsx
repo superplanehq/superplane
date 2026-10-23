@@ -160,17 +160,17 @@ describe("FleetManagerSetup", () => {
     expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
   });
 
-  it("shows the single-VM runner command instead of the chart", async () => {
-    const user = userEvent.setup();
+  it("explains that single-host Fleet Manager is automatic", async () => {
     stubSetup({ ...metadata, installationType: "single-host" });
     render(<FleetManagerSetup />);
 
-    await user.click(await screen.findByRole("button", { name: "This VM" }));
+    expect(await screen.findByRole("heading", { name: "Local runners" })).toBeInTheDocument();
+    expect(screen.getByText(/manages Fleet Manager automatically/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Configure the default fleet" })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Generate install command" }));
-    expect(await screen.findByText("./enable-runners.sh 'one-time-personal-token'")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "This VM" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/enable-runners.sh/)).not.toBeInTheDocument();
     expect(screen.queryByText(/helm upgrade --install fleet-manager/)).not.toBeInTheDocument();
+    expect(createToken).not.toHaveBeenCalled();
   });
 
   it("switches the machine type list when the cloud changes", async () => {
