@@ -1,5 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/Table/table";
+import { Button } from "@/components/ui/button";
 import { MemberIdentity, MemberStatus, MemberTableRow } from "./MemberTableRow";
 import { MemberInvitationRow } from "./MemberInvitationRow";
 import { MemberOverflowMenu, MemberRoleSelect, type OrganizationMember } from "./MemberRowControls";
@@ -82,10 +83,10 @@ function MemberSortHeader({
 }) {
   return (
     <TableHeader className={`${className} !px-4`}>
-      <button type="button" className="flex items-center gap-2" onClick={() => sort.onSort(field)}>
+      <Button type="button" variant="ghost" className="h-auto px-0 font-normal" onClick={() => sort.onSort(field)}>
         {label}
         <Icon name={sort.icon(field)} size="sm" />
-      </button>
+      </Button>
     </TableHeader>
   );
 }
