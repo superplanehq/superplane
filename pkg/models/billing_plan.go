@@ -17,6 +17,14 @@ import (
 var ErrCatalogPlan = errors.New("invalid billing catalog plan")
 var catalogKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
+const (
+	BillingPlanDeleteReasonSystem   = "System plans cannot be deleted."
+	BillingPlanDeleteReasonPolar    = "This plan is linked to a Polar product and cannot be deleted."
+	BillingPlanDeleteReasonAssigned = "One or more organizations use this plan. Assign them another plan before deleting it."
+)
+
+var systemBillingPlanKeys = []string{"none", "trial", "business_legacy", BillingPlanBusinessManual}
+
 type BillingPlan struct {
 	ID                   uuid.UUID `json:"id" gorm:"primaryKey"`
 	Key                  string    `json:"key"`
@@ -97,7 +105,7 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 		if current.PolarProductID != nil && (plan.PolarProductID == nil || *current.PolarProductID != *plan.PolarProductID || current.PriceCents != plan.PriceCents || current.PerSeat != plan.PerSeat) {
 			return fmt.Errorf("%w: create a new plan and Polar product to change linked prices", ErrCatalogPlan)
 		}
-		if slices.Contains([]string{"none", "trial", "business_legacy", BillingPlanBusinessManual}, current.Key) && current.Category != plan.Category {
+		if current.IsSystem() && current.Category != plan.Category {
 			return fmt.Errorf("%w: system plan categories cannot change", ErrCatalogPlan)
 		}
 		plan.CreatedAt = current.CreatedAt
@@ -105,24 +113,74 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 	})
 }
 
+// DeleteBillingPlan removes a plan when no deletion rule blocks it. The row
+// lock keeps assignment checks and deletion in one transaction.
 func DeleteBillingPlan(tx *gorm.DB, id uuid.UUID) error {
 	return tx.Transaction(func(inner *gorm.DB) error {
 		var plan BillingPlan
 		if err := inner.Clauses(clause.Locking{Strength: "UPDATE"}).First(&plan, "id = ?", id).Error; err != nil {
 			return err
 		}
-		if slices.Contains([]string{"none", "trial", "business_legacy", BillingPlanBusinessManual}, plan.Key) || plan.PolarProductID != nil {
-			return fmt.Errorf("%w: system and Polar-linked plans cannot be deleted", ErrCatalogPlan)
-		}
-		var count int64
-		if err := inner.Model(&OrganizationBillingPlan{}).Where("plan_id = ?", id).Count(&count).Error; err != nil {
+		assigned, err := ListAssignedBillingPlanIDs(inner, []uuid.UUID{plan.ID})
+		if err != nil {
 			return err
 		}
-		if count > 0 {
-			return fmt.Errorf("%w: assigned plans cannot be deleted", ErrCatalogPlan)
+		if reason := plan.DeleteBlockReason(assigned.Contains(plan.ID)); reason != "" {
+			return fmt.Errorf("%w: %s", ErrCatalogPlan, reason)
 		}
 		return inner.Delete(&plan).Error
 	})
+}
+
+// DeleteBlockReason returns the first rule that blocks deletion, or an empty
+// string when the plan can be deleted. Callers pass whether any organization
+// references the plan. Subscription status does not affect the result.
+func (p BillingPlan) DeleteBlockReason(assigned bool) string {
+	switch {
+	case p.IsSystem():
+		return BillingPlanDeleteReasonSystem
+	case p.PolarProductID != nil:
+		return BillingPlanDeleteReasonPolar
+	case assigned:
+		return BillingPlanDeleteReasonAssigned
+	}
+	return ""
+}
+
+// IsSystem reports whether the plan key is reserved for a built-in plan.
+func (p BillingPlan) IsSystem() bool {
+	return slices.Contains(systemBillingPlanKeys, p.Key)
+}
+
+// BillingPlanAssignments is a set of billing plan IDs referenced by organizations.
+type BillingPlanAssignments map[uuid.UUID]struct{}
+
+// Contains reports whether the set references the plan.
+func (a BillingPlanAssignments) Contains(planID uuid.UUID) bool {
+	_, ok := a[planID]
+	return ok
+}
+
+// ListAssignedBillingPlanIDs returns the plan IDs that any organization
+// references, regardless of subscription status. It runs one query for all IDs.
+func ListAssignedBillingPlanIDs(tx *gorm.DB, planIDs []uuid.UUID) (BillingPlanAssignments, error) {
+	assigned := BillingPlanAssignments{}
+	if len(planIDs) == 0 {
+		return assigned, nil
+	}
+	var ids []uuid.UUID
+	err := tx.Model(&OrganizationBillingPlan{}).
+		Where("plan_id IN ?", planIDs).
+		Distinct("plan_id").
+		Pluck("plan_id", &ids).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		assigned[id] = struct{}{}
+	}
+	return assigned, nil
 }
 
 // BindLegacyBillingProduct is idempotent and never replaces an existing binding.

@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -323,4 +324,149 @@ func TestAdminDeleteFeatureDefinitionRollsBackWhenDefinitionDeleteFails(t *testi
 	assignment, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
 	require.Equal(t, plan.ID, assignment.PlanID)
+}
+
+type billingPlanDeleteReasonRow struct {
+	Key                  string
+	DeleteDisabledReason *string `json:"delete_disabled_reason"`
+}
+
+// listBillingPlanDeleteReasons returns the list response keyed by plan key. It
+// also checks that every item keeps the editable fields and that the reason
+// is present as either a string or an explicit JSON null.
+func listBillingPlanDeleteReasons(t *testing.T, request adminCatalogRequest) map[string]*string {
+	response := request("GET", "billing-plans", "")
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	var raw []map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &raw))
+	reasons := map[string]*string{}
+	for _, item := range raw {
+		for _, field := range []string{"id", "key", "name", "features", "polar_product_id", "credit_expiration"} {
+			require.Contains(t, item, field)
+		}
+		require.Contains(t, item, "delete_disabled_reason")
+	}
+	var items []billingPlanDeleteReasonRow
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &items))
+	for _, item := range items {
+		reasons[item.Key] = item.DeleteDisabledReason
+	}
+	return reasons
+}
+
+func requireDeleteReason(t *testing.T, reasons map[string]*string, key string, expected string) {
+	t.Helper()
+	require.NotNil(t, reasons[key], "plan %s should be blocked", key)
+	require.Equal(t, expected, *reasons[key], "plan %s", key)
+}
+
+func TestAdminBillingPlanListDeleteDisabledReasonPriority(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	request := newAdminCatalogRequest(server, token)
+	orgPath := "organizations/" + r.Organization.ID.String()
+	polar := createAdminTestPlan(t, request, `{"key":"reason_polar","name":"Polar","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never","polar_product_id":"polar_reason"}`)
+	assigned := createAdminTestPlan(t, request, `{"key":"reason_assigned","name":"Assigned","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never"}`)
+	free := createAdminTestPlan(t, request, `{"key":"reason_free","name":"Free","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never"}`)
+	cleanupFeatureReferences(t, r.Organization.ID, []uuid.UUID{polar.ID, assigned.ID, free.ID}, nil)
+
+	assignPlan := func(key string) {
+		response := request("PUT", orgPath+"/billing-plan", `{"plan":"`+key+`"}`)
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	}
+	systemReason := models.BillingPlanDeleteReasonSystem
+	polarReason := models.BillingPlanDeleteReasonPolar
+	assignedReason := models.BillingPlanDeleteReasonAssigned
+
+	reasons := listBillingPlanDeleteReasons(t, request)
+	for _, key := range []string{"none", "trial", "business_legacy", "business_manual"} {
+		requireDeleteReason(t, reasons, key, systemReason)
+	}
+	requireDeleteReason(t, reasons, polar.Key, polarReason)
+	require.Nil(t, reasons[assigned.Key])
+	require.Nil(t, reasons[free.Key])
+
+	assignPlan(assigned.Key)
+	reasons = listBillingPlanDeleteReasons(t, request)
+	requireDeleteReason(t, reasons, assigned.Key, assignedReason)
+	require.Nil(t, reasons[free.Key])
+
+	assignPlan(polar.Key)
+	reasons = listBillingPlanDeleteReasons(t, request)
+	requireDeleteReason(t, reasons, polar.Key, polarReason)
+	require.Nil(t, reasons[assigned.Key])
+
+	assignPlan("business_manual")
+	reasons = listBillingPlanDeleteReasons(t, request)
+	requireDeleteReason(t, reasons, "business_manual", systemReason)
+	requireDeleteReason(t, reasons, polar.Key, polarReason)
+	require.Nil(t, reasons[free.Key])
+}
+
+func TestAdminBillingPlanListLooksUpAssignmentsOnce(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	request := newAdminCatalogRequest(server, token)
+	first := createAdminTestPlan(t, request, `{"key":"lookup_first","name":"First","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never"}`)
+	second := createAdminTestPlan(t, request, `{"key":"lookup_second","name":"Second","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never"}`)
+	cleanupFeatureReferences(t, r.Organization.ID, []uuid.UUID{first.ID, second.ID}, nil)
+
+	db := database.Conn()
+	lookups := 0
+	const callbackName = "test:count_organization_billing_plan_lookups"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if tx.Statement.Table == "organization_billing_plans" {
+			lookups++
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callbackName)) })
+
+	listBillingPlanDeleteReasons(t, request)
+	require.Equal(t, 1, lookups)
+}
+
+func TestAdminBillingPlanDeletionFollowsAssignmentLifecycle(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	request := newAdminCatalogRequest(server, token)
+	orgPath := "organizations/" + r.Organization.ID.String()
+	plan := createAdminTestPlan(t, request, `{"key":"lifecycle_plan","name":"Lifecycle","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never"}`)
+	replacement := createAdminTestPlan(t, request, `{"key":"lifecycle_replacement","name":"Replacement","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never"}`)
+	cleanupFeatureReferences(t, r.Organization.ID, []uuid.UUID{plan.ID, replacement.ID}, nil)
+
+	require.Nil(t, listBillingPlanDeleteReasons(t, request)[plan.Key])
+
+	response := request("PUT", orgPath+"/billing-plan", `{"plan":"lifecycle_plan"}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	// The client may still hold the null reason from before the assignment.
+	response = request("DELETE", "billing-plans/"+plan.ID.String(), "")
+	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), models.BillingPlanDeleteReasonAssigned)
+	requireDeleteReason(t, listBillingPlanDeleteReasons(t, request), plan.Key, models.BillingPlanDeleteReasonAssigned)
+
+	response = request("PUT", orgPath+"/billing-plan", `{"plan":"lifecycle_replacement"}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.Nil(t, listBillingPlanDeleteReasons(t, request)[plan.Key])
+
+	response = request("DELETE", "billing-plans/"+plan.ID.String(), "")
+	require.Equal(t, http.StatusNoContent, response.Code, response.Body.String())
+	require.NotContains(t, listBillingPlanDeleteReasons(t, request), plan.Key)
+}
+
+func TestAdminBillingPlanInactiveSubscriptionAssignmentBlocksDeletion(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	db := database.Conn()
+	request := newAdminCatalogRequest(server, token)
+	orgPath := "organizations/" + r.Organization.ID.String()
+	plan := createAdminTestPlan(t, request, `{"key":"inactive_plan","name":"Inactive","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never"}`)
+	cleanupFeatureReferences(t, r.Organization.ID, []uuid.UUID{plan.ID}, nil)
+	response := request("PUT", orgPath+"/billing-plan", `{"plan":"inactive_plan"}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	ended := time.Now().Add(-24 * time.Hour)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Updates(map[string]any{"polar_subscription_status": "canceled", "current_period_end": ended}).Error)
+
+	requireDeleteReason(t, listBillingPlanDeleteReasons(t, request), plan.Key, models.BillingPlanDeleteReasonAssigned)
+	response = request("DELETE", "billing-plans/"+plan.ID.String(), "")
+	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), models.BillingPlanDeleteReasonAssigned)
 }
