@@ -40,3 +40,10 @@ Coolify generates `ENCRYPTION_MASTER_KEYS`. Keep that value.
 Do not replace it with a password.
 
 On an ARM VM, set `RUNNER_FLEET_ID=e1-large-arm64` and `RUNNER_ARCH=arm64`.
+
+## Limits
+
+- Run one SuperPlane stack per Docker host. Fleet Manager `v0.1.5` does not
+  isolate runner containers between stacks.
+- Fleet Manager mounts the Docker socket and starts one runner container on
+  the same host. Coolify does not manage that container.
