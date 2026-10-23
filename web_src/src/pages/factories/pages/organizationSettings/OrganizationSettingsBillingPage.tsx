@@ -33,10 +33,11 @@ import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { BillingCreditHistoryCard } from "./BillingCreditHistoryCard";
 import { BillingInvoicesCard } from "./BillingInvoicesCard";
+import { BillingSeatsCard } from "./BillingSeatsCard";
 import { BillingPaymentSettings } from "./BillingPaymentSettings";
 import { BillingPlansSection } from "./BillingPlansSection";
 import { HostedCreditTopUpBanner } from "./HostedCreditTopUpBanner";
-import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
+import { type BillingSeatSummary, useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
 
 const HOSTED_CREDIT_EXPLANATION =
   "Hosted credit pays SuperPlane-hosted machines and managed models for this organization.";
@@ -82,6 +83,7 @@ export function OrganizationSettingsBillingPage() {
         planName={model.planName}
         planPriceCents={model.planPriceCents}
         planPerSeat={model.planPerSeat}
+        seats={model.seats}
         planSource={model.planSource}
         cancelAtPeriodEnd={model.cancelAtPeriodEnd}
         subscriptionPending={model.cancelPending || model.keepPending}
@@ -126,6 +128,7 @@ type BillingPageBodyProps = {
   planName?: string;
   planPriceCents?: string;
   planPerSeat?: boolean;
+  seats?: BillingSeatSummary;
   planSource?: string;
   cancelAtPeriodEnd: boolean;
   subscriptionPending: boolean;
@@ -167,6 +170,7 @@ function BillingPageBody({
   planName,
   planPriceCents,
   planPerSeat,
+  seats,
   planSource,
   cancelAtPeriodEnd,
   subscriptionPending,
@@ -221,6 +225,9 @@ function BillingPageBody({
         onCancel={onCancelSubscription}
         onKeep={onKeepSubscription}
       />
+      {seats ? (
+        <BillingSeatsCard seats={seats} currentPeriodEnd={currentPeriodEnd} cancelAtPeriodEnd={cancelAtPeriodEnd} />
+      ) : null}
       <HostedCreditRemainingCard
         organizationId={organizationId}
         billingContactMessage={billingContactMessage}

@@ -1479,7 +1479,7 @@ function organizationBillingCancelRoute(fixture: FactoriesFixture): FactoriesRou
     resolve: () => {
       fixture.organizationBilling = {
         ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
-        plan: "business",
+        plan: fixture.organizationBilling?.plan ?? "business",
         planSource: "polar",
         creditPurchaseAllowed: true,
         cancelAtPeriodEnd: true,
@@ -1495,7 +1495,7 @@ function organizationBillingResumeRoute(fixture: FactoriesFixture): FactoriesRou
     resolve: () => {
       fixture.organizationBilling = {
         ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
-        plan: "business",
+        plan: fixture.organizationBilling?.plan ?? "business",
         planSource: "polar",
         creditPurchaseAllowed: true,
         cancelAtPeriodEnd: false,
