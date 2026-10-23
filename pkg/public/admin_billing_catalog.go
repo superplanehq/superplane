@@ -28,6 +28,10 @@ func (s *Server) adminSaveBillingPlan(w http.ResponseWriter, r *http.Request) {
 		}
 		plan.ID = parsed
 	}
+	if status, err := validateSeatPlanProduct(r.Context(), &plan); err != nil {
+		http.Error(w, err.Error(), status)
+		return
+	}
 	if err := models.SaveBillingPlan(database.DB(r.Context()), &plan); err != nil {
 		writeCatalogError(w, err)
 		return
