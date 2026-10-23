@@ -147,7 +147,10 @@ it("creates an email invitation and copies its recipient-specific link", async (
   fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(acceptanceUrl));
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
-  fireEvent.click(screen.getByRole("button", { name: "Copy link for invitee@example.com" }));
+  fireEvent.keyDown(screen.getByRole("button", { name: "Invitation actions for invitee@example.com" }), {
+    key: "ArrowDown",
+  });
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Copy link" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
   expect(requests).toHaveLength(1);
 });
@@ -158,7 +161,9 @@ it("resends and copies a saved invitation, then releases its seat on cancel", as
     seats: { perSeat: true, invitable: "0", pendingInvitations: "1" },
   };
   renderMembers();
-  fireEvent.click(await screen.findByRole("button", { name: "Invitation actions for invitee@example.com" }));
+  fireEvent.keyDown(await screen.findByRole("button", { name: "Invitation actions for invitee@example.com" }), {
+    key: "ArrowDown",
+  });
   fireEvent.click(await screen.findByRole("menuitem", { name: "Resend and copy link" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(acceptanceUrl + "-renewed"));
   fireEvent.keyDown(screen.getByRole("button", { name: "Invitation actions for invitee@example.com" }), {
@@ -315,7 +320,9 @@ it("offers manual copying when resending a saved invitation cannot use the clipb
   ];
   writeText.mockRejectedValueOnce(new Error("Clipboard unavailable"));
   renderMembers();
-  fireEvent.click(await screen.findByRole("button", { name: "Invitation actions for invitee@example.com" }));
+  fireEvent.keyDown(await screen.findByRole("button", { name: "Invitation actions for invitee@example.com" }), {
+    key: "ArrowDown",
+  });
   fireEvent.click(await screen.findByRole("menuitem", { name: "Resend and copy link" }));
   expect(await screen.findByLabelText("Invitation link for invitee@example.com")).toHaveValue(
     acceptanceUrl + "-renewed",
@@ -329,7 +336,9 @@ it("shows a resend failure without offering an invalid invitation link", async (
     { id: "invitation-1", email: "invitee@example.com", role: "org_operator", state: "pending" },
   ];
   renderMembers();
-  fireEvent.click(await screen.findByRole("button", { name: "Invitation actions for invitee@example.com" }));
+  fireEvent.keyDown(await screen.findByRole("button", { name: "Invitation actions for invitee@example.com" }), {
+    key: "ArrowDown",
+  });
   fireEvent.click(await screen.findByRole("menuitem", { name: "Resend and copy link" }));
   expect(await screen.findByText("Could not resend invitation.")).toBeInTheDocument();
   expect(screen.queryByLabelText("Invitation link for invitee@example.com")).not.toBeInTheDocument();

@@ -1,10 +1,9 @@
-import { MoreHorizontal } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import type { OrganizationsOrganizationInvitation } from "@/api-client";
-import { Badge } from "@/components/Badge/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import type { AssignableRoleOption } from "./MemberRowControls";
-import { MemberIdentity, MemberTableRow } from "./MemberTableRow";
+import { MemberIdentity, MemberStatus, MemberTableRow } from "./MemberTableRow";
 import type { InvitationManager } from "./useOrganizationInvitationManager";
 
 export function MemberInvitationRow({
@@ -28,8 +27,12 @@ export function MemberInvitationRow({
           initials={invitation.email?.slice(0, 2).toUpperCase() || "?"}
         />
       }
-      role={<span className="text-xs text-muted-foreground sm:text-sm">{role}</span>}
-      status={<Badge color={expired ? "zinc" : "yellow"}>{expired ? "Expired" : "Pending"}</Badge>}
+      role={
+        <span className="inline-flex min-h-6 items-center text-xs text-muted-foreground @min-[44rem]/members:min-h-8 @min-[44rem]/members:text-sm">
+          {role}
+        </span>
+      }
+      status={<MemberStatus status={expired ? "expired" : "pending"} />}
       actions={
         manager.canInvite && <InvitationRowActions invitation={invitation} manager={manager} onShowLink={onShowLink} />
       }
@@ -64,7 +67,7 @@ function InvitationRowActions({
           aria-label={`Invitation actions for ${invitation.email}`}
           disabled={manager.busy}
         >
-          <MoreHorizontal className="size-4" aria-hidden="true" />
+          <MoreVertical className="size-4" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

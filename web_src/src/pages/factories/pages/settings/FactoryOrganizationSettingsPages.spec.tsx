@@ -17,7 +17,7 @@ function settingsColumnClassName(content: HTMLElement) {
 }
 
 describe("FactoryOrganizationMembersPage", () => {
-  it("uses the wide settings column so the member table stays in view", () => {
+  it("keeps the members header and list in the compact settings column", () => {
     render(
       <MemoryRouter initialEntries={["/org-1/settings/organization/members"]}>
         <Routes>
@@ -26,9 +26,9 @@ describe("FactoryOrganizationMembersPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("workspace-page-header").className).toContain("max-w-6xl");
+    expect(screen.getByTestId("workspace-page-header").className).toContain("max-w-3xl");
     const bodyClassName = settingsColumnClassName(screen.getByTestId("members-body"));
-    expect(bodyClassName).toContain("max-w-6xl");
-    expect(bodyClassName).not.toContain("max-w-3xl");
+    expect(bodyClassName).toContain("max-w-3xl");
+    expect(bodyClassName).not.toContain("max-w-6xl");
   });
 });

@@ -225,7 +225,7 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   return (
-    <div className="min-w-0 space-y-4 pt-6">
+    <div className="min-w-0 space-y-3">
       {error && (
         <p role="alert" className={settingsErrorClassName}>
           {getApiErrorMessage(error, "Could not load members. Refresh the page to try again.")}
@@ -237,23 +237,23 @@ export function Members({ organizationId }: MembersProps) {
         </p>
       )}
       {!inviteOpen && !showingLink && <InvitationErrors manager={invitationManager} />}
-      <section className={`${settingsTableCardClassName} @container/members`} aria-label="Members and invitations">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4 sm:px-6">
-          <div className="min-w-0 text-sm text-muted-foreground" aria-live="polite">
-            {capacityLoading
-              ? "Loading seat usage..."
-              : membersLoaded &&
-                (seatLimit == null
-                  ? `${users.length} ${users.length === 1 ? "member" : "members"}`
-                  : `${users.length} of ${seatLimit} seats used`)}
-          </div>
-          {invitationManager.canInvite && (
-            <Button type="button" onClick={() => setInviteOpen(true)} className="h-11 sm:h-8">
-              <Plus className="size-4" aria-hidden="true" />
-              Invite member
-            </Button>
-          )}
+      <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 text-sm text-muted-foreground" aria-live="polite">
+          {capacityLoading
+            ? "Loading seat usage..."
+            : membersLoaded &&
+              (seatLimit == null
+                ? `${users.length} ${users.length === 1 ? "member" : "members"}`
+                : `${users.length} of ${seatLimit} seats used`)}
         </div>
+        {invitationManager.canInvite && (
+          <Button type="button" onClick={() => setInviteOpen(true)} className="h-11 w-full sm:h-9 sm:w-auto">
+            <Plus className="size-4" aria-hidden="true" />
+            Invite member
+          </Button>
+        )}
+      </div>
+      <section className={`${settingsTableCardClassName} @container/members`} aria-label="Members and invitations">
         {loadingMembers ? (
           <p className="p-6 text-sm text-muted-foreground" role="status">
             Loading members...

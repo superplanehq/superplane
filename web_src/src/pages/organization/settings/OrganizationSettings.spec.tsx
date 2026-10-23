@@ -67,12 +67,12 @@ function renderSettings(path: string) {
 }
 
 describe("OrganizationSettings members column", () => {
-  it("uses the wide settings column around the member table", () => {
+  it("keeps the member table in the compact settings column", () => {
     renderSettings("/org-1/settings/members");
 
     const bodyClassName = settingsColumnClassName(screen.getByTestId("members-body"));
-    expect(bodyClassName).toContain("max-w-6xl");
-    expect(bodyClassName).not.toContain("max-w-3xl");
+    expect(bodyClassName).toContain("max-w-3xl");
+    expect(bodyClassName).not.toContain("max-w-6xl");
   });
 
   it("keeps other settings sections on the short column", () => {

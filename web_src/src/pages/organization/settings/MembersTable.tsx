@@ -1,7 +1,6 @@
-import { Badge } from "@/components/Badge/badge";
 import { Icon } from "@/components/Icon";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/Table/table";
-import { MemberIdentity, MemberTableRow } from "./MemberTableRow";
+import { MemberIdentity, MemberStatus, MemberTableRow } from "./MemberTableRow";
 import { MemberInvitationRow } from "./MemberInvitationRow";
 import { MemberOverflowMenu, MemberRoleSelect, type OrganizationMember } from "./MemberRowControls";
 import type { InvitationManager } from "./useOrganizationInvitationManager";
@@ -33,7 +32,7 @@ export function MembersTable({ members, manager, controls, onShowLink, sort }: M
           <MemberSortHeader label="Member" field="name" sort={sort} />
           <MemberSortHeader label="Role" field="role" sort={sort} className="w-36" />
           <MemberSortHeader label="Status" field="status" sort={sort} className="w-28" />
-          <TableHeader className="w-52 !pr-4 text-right">
+          <TableHeader className="w-16 !pr-4 text-right">
             <span className="sr-only">Actions</span>
           </TableHeader>
         </TableRow>
@@ -52,7 +51,7 @@ export function MembersTable({ members, manager, controls, onShowLink, sort }: M
               />
             }
             role={<MemberRoleSelect member={member} {...controls} />}
-            status={<Badge color="green">Active</Badge>}
+            status={<MemberStatus status="active" />}
             actions={<MemberOverflowMenu member={member} {...controls} />}
           />
         ))}

@@ -1,3 +1,4 @@
+import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "../../../components/Icon";
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -56,7 +57,10 @@ export function MemberRoleSelect({
           <Button
             type="button"
             variant="ghost"
-            className={cn("h-11 gap-2 px-0 text-sm @min-[44rem]/members:h-8", settingsRowMenuClassName)}
+            className={cn(
+              "h-11 gap-1.5 px-0 !text-xs @min-[44rem]/members:h-8 @min-[44rem]/members:!text-sm",
+              settingsRowMenuClassName,
+            )}
             aria-label={`Role for ${member.name}`}
             disabled={!roleChangeAllowed}
           >
@@ -125,16 +129,16 @@ export function MemberOverflowMenu({
             type="button"
             variant="ghost"
             className={cn(
-              "size-11 p-0 text-sm disabled:opacity-50 @min-[44rem]/members:size-8",
+              "size-11 shrink-0 p-0 text-sm disabled:opacity-50 @min-[44rem]/members:size-8",
               settingsRowMenuClassName,
             )}
             aria-label={`Member actions for ${member.name}`}
             disabled={!canDeleteMembers && !canUpdateMembers}
           >
-            <Icon name="ellipsis-vertical" size="sm" />
+            <MoreVertical className="size-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent align="end">
           {canSetOwner && (
             <DropdownMenuItem
               className="min-h-11 gap-1 sm:min-h-8"
