@@ -3,6 +3,7 @@ package polar
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -674,6 +675,80 @@ func TestCatalogSubscriptionDoesNotDeliverNewPolicies(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, summary.IncludedRemainingMicros)
 }
+
+func TestSubscriptionSeatSnapshots(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	product := "product_" + uuid.NewString()
+	catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: new(50), PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &catalog))
+	now := time.Now().UTC().Truncate(time.Second)
+	end := now.AddDate(0, 1, 0)
+	initial := polarSubscriptionJSON("sub_seats", "active", org.ID.String(), now, end)
+	initial["product_id"], initial["seats"], initial["modified_at"] = product, 3, now.Format(time.RFC3339)
+	usePolarSubscriptionServer(t, org.ID.String(), []map[string]any{initial})
+	require.NoError(t, SyncOrganizationSubscription(t.Context(), db, org.ID))
+	saved, err := models.FindOrganizationBillingPlan(db, org.ID)
+	require.NoError(t, err)
+	require.Equal(t, intPointer(3), saved.PurchasedSeats)
+
+	for _, tc := range []struct {
+		name           string
+		modified       time.Time
+		quantity, want int
+	}{
+		{"older", now.Add(-time.Minute), 1, 3},
+		{"equal", now, 4, 4},
+		{"absent", time.Time{}, 5, 5},
+		{"newer zero", now.Add(time.Minute), 0, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			event := subscriptionEvent(org.ID, "sub_seats", "active", now, end)
+			event.Data.ProductID, event.Data.Seats = product, &tc.quantity
+			event.Data.ModifiedAt = polarTime{Time: tc.modified}
+			require.NoError(t, ApplySubscriptionEvent(t.Context(), db, event))
+			saved, err := models.FindOrganizationBillingPlan(db, org.ID)
+			require.NoError(t, err)
+			require.Equal(t, &tc.want, saved.PurchasedSeats)
+			wantModified := tc.modified
+			if wantModified.IsZero() || wantModified.Before(now) {
+				wantModified = now
+			}
+			require.NotNil(t, saved.PolarModifiedAt)
+			require.True(t, saved.PolarModifiedAt.Equal(wantModified))
+		})
+	}
+
+	before, err := models.FindOrganizationBillingPlan(db, org.ID)
+	require.NoError(t, err)
+	settingsBefore, err := models.FindOrganizationLLMSettings(db, org.ID)
+	require.NoError(t, err)
+	_, err = models.AddIncludedLLMCreditGrant(db, org.ID, models.CentsToMicros(500), "previous_subscription", end)
+	require.NoError(t, err)
+	grantsBefore, err := models.ListOrganizationLLMCreditGrants(db, org.ID)
+	require.NoError(t, err)
+	for _, status := range []string{"active", "canceled", "incomplete"} {
+		for _, seats := range []string{"", `,"seats":null`, `,"seats":-1`} {
+			t.Run(status+seats, func(t *testing.T) {
+				var snapshot SubscriptionData
+				payload := fmt.Sprintf(`{"id":"sub_invalid","status":%q,"product_id":%q,"modified_at":%q,"current_period_end":%q,"customer":{"id":"changed_customer","external_id":%q}%s}`, status, product, now.Add(time.Hour).Format(time.RFC3339), now.Add(-time.Hour).Format(time.RFC3339), org.ID.String(), seats)
+				require.NoError(t, json.Unmarshal([]byte(payload), &snapshot))
+				require.ErrorIs(t, ApplySubscription(t.Context(), db, snapshot), ErrPermanentApply)
+				after, err := models.FindOrganizationBillingPlan(db, org.ID)
+				require.NoError(t, err)
+				require.Equal(t, before, after)
+				grantsAfter, err := models.ListOrganizationLLMCreditGrants(db, org.ID)
+				require.NoError(t, err)
+				require.Equal(t, grantsBefore, grantsAfter)
+				state, err := models.FindOrganizationLLMSettings(db, org.ID)
+				require.NoError(t, err)
+				require.Equal(t, settingsBefore, state)
+			})
+		}
+	}
+}
+
+func intPointer(quantity int) *int { return &quantity }
 
 func Test__ApplySubscriptionRenewalAdvancesPeriodAndGrantsIncluded(t *testing.T) {
 	for _, eventType := range []string{subscriptionCycledType, subscriptionUpdatedType} {
