@@ -31,7 +31,9 @@ func TestCatalogPlanAssignmentAndProtection(t *testing.T) {
 	markup, err := models.ResolveOrganizationMarkupBPS(db, r.Organization.ID)
 	require.NoError(t, err)
 	require.Zero(t, markup)
-	require.Error(t, models.DeleteBillingPlan(db, plan.ID))
+	err = models.DeleteBillingPlan(db, plan.ID)
+	require.ErrorIs(t, err, models.ErrCatalogPlan)
+	require.ErrorContains(t, err, models.BillingPlanDeleteReasonAssigned)
 	grants, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 	require.NoError(t, err)
 	for _, grant := range grants {
@@ -46,6 +48,7 @@ func TestCatalogPlanAssignmentAndProtection(t *testing.T) {
 	plan.PriceCents = 3000
 	plan.PerSeat = true
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	require.ErrorContains(t, models.DeleteBillingPlan(db, plan.ID), models.BillingPlanDeleteReasonPolar)
 	stored, err := models.FindBillingPlan(db, plan.Key)
 	require.NoError(t, err)
 	require.Equal(t, int64(3000), stored.PriceCents)
@@ -58,6 +61,7 @@ func TestCatalogPlanAssignmentAndProtection(t *testing.T) {
 	manual, err := models.FindBillingPlan(db, "business_manual")
 	require.NoError(t, err)
 	require.ErrorIs(t, models.DeleteBillingPlan(db, manual.ID), models.ErrCatalogPlan)
+	require.ErrorContains(t, models.DeleteBillingPlan(db, manual.ID), models.BillingPlanDeleteReasonSystem)
 	manual.Category = "trial"
 	require.ErrorIs(t, models.SaveBillingPlan(db, manual), models.ErrCatalogPlan)
 	manual.Category = "paid"
