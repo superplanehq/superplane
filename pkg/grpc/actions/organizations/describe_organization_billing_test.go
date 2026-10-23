@@ -25,7 +25,7 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	r := support.Setup(t)
 	catalog := models.BillingPlan{
 		Key: "billing_response_custom", Name: "Team", Category: "paid", Visibility: "private",
-		PriceCents: 2900, PerSeat: true, CreditFrequency: "none", CreditExpiration: "never",
+		PriceCents: 2900, PerSeat: true, SeatLimit: new(50), CreditFrequency: "none", CreditExpiration: "never",
 	}
 	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
 	t.Cleanup(func() {
@@ -345,7 +345,7 @@ func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	plans := []models.BillingPlan{
 		{Name: "Flat price", Visibility: "public", PriceCents: 2000},
-		{Name: "Seat price", Visibility: "public", PriceCents: 3000, PerSeat: true},
+		{Name: "Seat price", Visibility: "public", PriceCents: 3000, PerSeat: true, SeatLimit: new(50)},
 		{Name: "Private", Visibility: "private", PriceCents: 1000},
 	}
 	for i := range plans {

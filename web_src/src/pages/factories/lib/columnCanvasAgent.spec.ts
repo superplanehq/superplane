@@ -6,10 +6,8 @@ import {
   canvasNodeToPlanningReviewComponent,
   findAgentNodes,
   planningReviewDraftFromCanvas,
-  PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS,
   primaryAgentNode,
   serializeColumnAgentCanvas,
-  supportsPRFeedbackVisualEvidence,
   type CanvasSpecNode,
 } from "./columnCanvasAgent";
 
@@ -101,29 +99,6 @@ describe("primaryAgentNode", () => {
 
   it("returns undefined when no agent exists", () => {
     expect(primaryAgentNode({ nodes: [triggerNode()] })).toBeUndefined();
-  });
-});
-
-describe("supportsPRFeedbackVisualEvidence", () => {
-  const feedbackAgents = PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.map((id) =>
-    agentNode({
-      id,
-      configuration: { ...implementerConfiguration, includeVisualEvidence: false },
-    }),
-  );
-
-  it("accepts discussion agents that expose the visual evidence setting", () => {
-    expect(supportsPRFeedbackVisualEvidence({ nodes: feedbackAgents })).toBe(true);
-  });
-
-  it("rejects legacy discussion agents without the visual evidence setting", () => {
-    const legacyAgents = PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS.map((id) => agentNode({ id }));
-    expect(supportsPRFeedbackVisualEvidence({ nodes: legacyAgents })).toBe(false);
-  });
-
-  it("requires every discussion agent to expose the visual evidence setting", () => {
-    const incompleteAgents = feedbackAgents.map((node, index) => (index === 2 ? agentNode({ id: node.id }) : node));
-    expect(supportsPRFeedbackVisualEvidence({ nodes: incompleteAgents })).toBe(false);
   });
 });
 

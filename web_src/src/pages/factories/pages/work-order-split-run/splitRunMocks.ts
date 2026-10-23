@@ -70,6 +70,7 @@ import {
   doneFooterForStatus,
   SPLIT_RUN_DRAFT_NOTE,
   SPLIT_RUN_FAILED_NOTE_TEXT,
+  type SplitRunContinueFixesTarget,
   type SplitRunFooter,
   type SplitRunFooterKind,
   type SplitRunFooterTone,
@@ -307,8 +308,11 @@ const FIXES_PAUSED_HEADLINE = "Automatic fixes did not succeed";
 const FIXES_PAUSED_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
   key: "check-fixes-paused",
   headline: FIXES_PAUSED_HEADLINE,
-  text: "SuperPlane paused automatic fixes. Review the pull request and fix the remaining checks.",
+  text: "SuperPlane paused automatic fixes. Continue fixes or review the pull request.",
 };
+
+/** Automatic fixes are paused. The target is set when the paused activity can resume. */
+type PausedFixes = { continueFixes?: SplitRunContinueFixesTarget };
 
 /**
  * The footer note for a draft. A scored review candidate keeps the plan
@@ -535,7 +539,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       apiChecks: options?.checks,
       demoArtifacts,
       hideWaitingDecision: shouldHideWaitingDecision(options?.prFeedbackRuns),
-      fixesPaused: latestPRFeedbackRun(options?.prFeedbackRuns)?.kind === "fixes-paused",
+      pausedFixes: pausedFixesFromRuns(options?.prFeedbackRuns),
       stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
       closer: options?.closer,
       analysisRuns: options?.analysisRuns,
@@ -557,7 +561,7 @@ function reviewSurfaces(
     apiChecks?: FactoriesWorkOrderCheck[];
     demoArtifacts?: boolean;
     hideWaitingDecision?: boolean;
-    fixesPaused?: boolean;
+    pausedFixes?: PausedFixes;
     stoppedBy?: OrgUserDisplay;
     closer?: SplitRunFooterCloser;
     analysisRuns?: BacklogAnalysisRun[];
@@ -583,7 +587,7 @@ function reviewSurfaces(
     return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
-    return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision, input.fixesPaused);
+    return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision, input.pausedFixes);
   }
   if (displayStatus === "running") {
     return surfaces(
@@ -689,19 +693,20 @@ function waitingReviewSurface(
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
   hideWaitingDecision?: boolean,
-  fixesPaused?: boolean,
+  pausedFixes?: PausedFixes,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   if (hideWaitingDecision) {
     return surfaces(buildSplitRunFooter({ kind: "waiting", status: displayStatus, decision: false }), [], checks);
   }
   const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
-  if (fixesPaused) {
+  if (pausedFixes) {
     const note = pauseFooterNote(notes);
     return surfaces(
       buildSplitRunFooter({
         kind: "waiting",
         note,
         status: displayStatus,
+        continueFixes: pausedFixes.continueFixes,
       }),
       [note],
       checks,
@@ -1305,6 +1310,19 @@ function hasActivePRFeedbackRun(runs?: PRFeedbackLogRun[]): boolean {
 
 function shouldHideWaitingDecision(runs?: PRFeedbackLogRun[]): boolean {
   return hasActivePRFeedbackRun(runs);
+}
+
+function pausedFixesFromRuns(runs?: PRFeedbackLogRun[]): PausedFixes | undefined {
+  const latest = latestPRFeedbackRun(runs);
+  if (latest?.kind !== "fixes-paused") {
+    return undefined;
+  }
+  const pullRequestId = latest.pullRequest?.id;
+  const runId = latest.run.id;
+  if (!pullRequestId || !runId) {
+    return {};
+  }
+  return { continueFixes: { pullRequestId, runId } };
 }
 
 function latestPRFeedbackRun(runs?: PRFeedbackLogRun[]): PRFeedbackLogRun | undefined {

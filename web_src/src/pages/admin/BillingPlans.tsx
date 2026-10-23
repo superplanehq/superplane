@@ -3,7 +3,13 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showErrorToast } from "@/lib/toast";
-import { billingCatalogRequest, type BillingPlan, type FeatureDefinition } from "./billingPlansApi";
+import {
+  billingCatalogRequest,
+  toEditableBillingPlan,
+  type BillingPlan,
+  type BillingPlanListItem,
+  type FeatureDefinition,
+} from "./billingPlansApi";
 import { BillingPlanEditor } from "./BillingPlanEditor";
 import { BillingPlansTable } from "./BillingPlansTable";
 
@@ -29,10 +35,11 @@ const emptyPlan: BillingPlan = {
 };
 
 export function BillingPlans() {
-  const [plans, setPlans] = useState<BillingPlan[]>([]);
+  const [plans, setPlans] = useState<BillingPlanListItem[]>([]);
   const [features, setFeatures] = useState<FeatureDefinition[]>([]);
   const [editing, setEditing] = useState<BillingPlan | null>(null);
   const [error, setError] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   useReportPageReady(!loading, { failed: !!error });
@@ -40,7 +47,7 @@ export function BillingPlans() {
     setLoading(true);
     try {
       const [catalog, definitions] = await Promise.all([
-        billingCatalogRequest<BillingPlan[]>("billing-plans"),
+        billingCatalogRequest<BillingPlanListItem[]>("billing-plans"),
         billingCatalogRequest<FeatureDefinition[]>("feature-definitions"),
       ]);
       setPlans(catalog);
@@ -55,8 +62,23 @@ export function BillingPlans() {
   useEffect(() => {
     void load();
   }, []);
+  const editPlan = (plan: BillingPlan) => {
+    setSaveError("");
+    setEditing({ ...plan });
+  };
   const save = async () => {
     if (!editing) return;
+    setSaveError("");
+    if (
+      editing.per_seat &&
+      (editing.seat_limit === null ||
+        !Number.isInteger(editing.seat_limit) ||
+        editing.seat_limit < 1 ||
+        editing.seat_limit > 1000)
+    ) {
+      setSaveError("Maximum seats must be an integer from 1 to 1,000.");
+      return;
+    }
     setSaving(true);
     try {
       await billingCatalogRequest(
@@ -67,18 +89,19 @@ export function BillingPlans() {
       setEditing(null);
       await load();
     } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : "Failed to save billing plan");
+      setSaveError(error instanceof Error ? error.message : "Failed to save billing plan");
     } finally {
       setSaving(false);
     }
   };
-  const remove = async (plan: BillingPlan) => {
+  const remove = async (plan: BillingPlanListItem) => {
     try {
       await billingCatalogRequest(`billing-plans/${plan.id}`, "DELETE");
-      await load();
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to delete billing plan");
     }
+    // The server is authoritative. Reload so each row shows its current protection status.
+    await load();
   };
   return (
     <div className="space-y-6 p-6">
@@ -100,7 +123,7 @@ export function BillingPlans() {
             <h2 className="font-semibold">Plans</h2>
             <p className="text-sm text-muted-foreground">Set the pricing and access available to each organization.</p>
           </div>
-          <Button disabled={loading || !!error} onClick={() => setEditing({ ...emptyPlan })}>
+          <Button disabled={loading || !!error} onClick={() => editPlan(emptyPlan)}>
             <Plus aria-hidden="true" />
             Create plan
           </Button>
@@ -111,7 +134,7 @@ export function BillingPlans() {
           !error && (
             <BillingPlansTable
               plans={plans}
-              onEdit={(plan) => setEditing({ ...plan })}
+              onEdit={(plan) => editPlan(toEditableBillingPlan(plan))}
               onDelete={(plan) => void remove(plan)}
             />
           )
@@ -126,6 +149,7 @@ export function BillingPlans() {
           onSave={() => void save()}
           onCancel={() => setEditing(null)}
           saving={saving}
+          error={saveError}
         />
       )}
     </div>

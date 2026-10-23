@@ -343,6 +343,14 @@ func TestMergeRoutesRequirePullRequestMergeFeature(t *testing.T) {
 	}
 }
 
+func TestContinueFixesRouteRequiresWorkOrderUpdate(t *testing.T) {
+	rule, ok := DefaultAuthorizationRules()[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/prs/{pr_id}/continue-fixes"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", rule.Resource)
+	assert.Equal(t, "update", rule.Action)
+	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
+}
+
 func TestAgentResourceRoutesRequireFactoriesFeature(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	required := []string{features.FeatureFactories}

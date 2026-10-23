@@ -25,6 +25,7 @@ func TestAcceptInviteSeatLimits(t *testing.T) {
 		members                                     int
 		restored, existing, apiKey, billingDisabled bool
 		plan                                        string
+		purchased                                   *int
 		expired                                     bool
 		rejected                                    bool
 	}{
@@ -41,6 +42,12 @@ func TestAcceptInviteSeatLimits(t *testing.T) {
 		{name: "trial plan", plan: "trial"},
 		{name: "expired trial", plan: "trial", expired: true},
 		{name: "billing disabled", limit: 1, billingDisabled: true},
+		{name: "purchased seats available", limit: 50, plan: "per_seat", purchased: seatQuantity(3), members: 1},
+		{name: "purchased seats full", limit: 50, plan: "per_seat", purchased: seatQuantity(3), members: 2, rejected: true},
+		{name: "purchased seats restore full", limit: 50, plan: "per_seat", purchased: seatQuantity(3), members: 2, restored: true, rejected: true},
+		{name: "purchased seats existing member", limit: 50, plan: "per_seat", purchased: seatQuantity(3), members: 2, existing: true},
+		{name: "missing purchased seats", limit: 50, plan: "per_seat", rejected: true},
+		{name: "purchased seats billing disabled", limit: 50, plan: "per_seat", billingDisabled: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := support.Setup(t)
@@ -52,7 +59,9 @@ func TestAcceptInviteSeatLimits(t *testing.T) {
 			db := database.Conn()
 
 			t.Setenv("POLAR_ACCESS_TOKEN", "")
-			if tc.plan == "finite" {
+			if tc.plan == "per_seat" {
+				setPurchasedSeatPlan(t, db, r.Organization.ID, tc.purchased)
+			} else if tc.plan == "finite" {
 				plan := models.BillingPlan{Key: "seat_" + uuid.NewString()[:8], Name: "Seats", Category: "paid", Visibility: "private", SeatLimit: &tc.limit, CreditFrequency: "none", CreditExpiration: "never"}
 				require.NoError(t, models.SaveBillingPlan(db, &plan))
 				_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
@@ -124,7 +133,7 @@ func TestAcceptInviteFinalSeatConcurrent(t *testing.T) {
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	limit := 2
-	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, &limit))
+	setPurchasedSeatPlan(t, db, r.Organization.ID, &limit)
 	link, err := models.FindOrCreateInviteLink(db, r.Organization.ID)
 	require.NoError(t, err)
 	accounts := []*models.Account{}
@@ -157,7 +166,7 @@ func TestAcceptInviteFinalSeatConcurrent(t *testing.T) {
 	}
 	require.Equal(t, 1, joined)
 	require.Equal(t, 1, rejected)
-	used, err := models.CountActiveHumanUsersByOrganization(r.Organization.ID.String())
+	used, err := models.CountActiveHumanUsersByOrganization(db, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.EqualValues(t, 2, used)
 }
@@ -175,6 +184,15 @@ func (a *pausedInviteAuthorization) AssignRole(userID, role, domainID, domainTyp
 }
 
 func TestSeatLimitReductionRacesWithJoin(t *testing.T) {
+	testCapacityReductionRacesWithJoin(t, false)
+}
+
+func TestPurchasedSeatReductionRacesWithJoin(t *testing.T) {
+	testCapacityReductionRacesWithJoin(t, true)
+}
+
+func testCapacityReductionRacesWithJoin(t *testing.T, perSeat bool) {
+	t.Helper()
 	for _, joinFirst := range []bool{false, true} {
 		t.Run(fmt.Sprintf("join first %t", joinFirst), func(t *testing.T) {
 			r := support.Setup(t)
@@ -182,7 +200,19 @@ func TestSeatLimitReductionRacesWithJoin(t *testing.T) {
 			t.Setenv(models.BillingEnabledEnv, "yes")
 			db := database.Conn()
 			limit := 2
-			require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, &limit))
+			var product string
+			if perSeat {
+				product = setPurchasedSeatPlan(t, db, r.Organization.ID, &limit)
+			} else {
+				require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, &limit))
+			}
+			reduce := func(tx *gorm.DB) error {
+				if perSeat {
+					_, _, err := models.ApplyPolarSubscription(tx, r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_capacity", ProductID: product, Status: "active", PurchasedSeats: &limit})
+					return err
+				}
+				return models.SetOrganizationSeatLimitOverride(tx, r.Organization.ID, &limit)
+			}
 			account, err := models.CreateAccount("Invitee", uuid.NewString()+"@example.com")
 			require.NoError(t, err)
 			link, err := models.FindOrCreateInviteLink(db, r.Organization.ID)
@@ -202,16 +232,29 @@ func TestSeatLimitReductionRacesWithJoin(t *testing.T) {
 				require.NoError(t, err)
 				go join(r.AuthService)
 				waitForOrganizationLockWait(t, db)
-				require.NoError(t, models.SetOrganizationSeatLimitOverride(tx, r.Organization.ID, &limit))
+				require.NoError(t, reduce(tx))
 				require.NoError(t, tx.Commit().Error)
 				code, _, ok := grpcerrors.HandlerStatus(<-joined)
 				require.True(t, ok)
 				require.Equal(t, codes.FailedPrecondition, code)
 			} else {
 				auth := &pausedInviteAuthorization{Authorization: r.AuthService, entered: make(chan struct{}), release: make(chan struct{})}
+				defer func() {
+					select {
+					case <-auth.release:
+					default:
+						close(auth.release)
+					}
+				}()
 				go join(auth)
-				<-auth.entered
-				go func() { reduced <- models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, &limit) }()
+				select {
+				case <-auth.entered:
+				case err := <-joined:
+					t.Fatalf("join ended before role assignment: %v", err)
+				case <-time.After(5 * time.Second):
+					t.Fatal("join did not reach role assignment")
+				}
+				go func() { reduced <- reduce(db) }()
 				waitForOrganizationLockWait(t, db)
 				close(auth.release)
 				require.NoError(t, <-joined)
@@ -219,7 +262,7 @@ func TestSeatLimitReductionRacesWithJoin(t *testing.T) {
 				_, err = models.FindActiveUserByEmail(r.Organization.ID.String(), account.Email)
 				require.NoError(t, err)
 			}
-			used, err := models.CountActiveHumanUsersByOrganization(r.Organization.ID.String())
+			used, err := models.CountActiveHumanUsersByOrganization(db, r.Organization.ID.String())
 			require.NoError(t, err)
 			expected := int64(1)
 			if joinFirst {
@@ -228,6 +271,18 @@ func TestSeatLimitReductionRacesWithJoin(t *testing.T) {
 			require.Equal(t, expected, used)
 		})
 	}
+}
+
+func seatQuantity(quantity int) *int { return &quantity }
+
+func setPurchasedSeatPlan(t *testing.T, db *gorm.DB, orgID uuid.UUID, purchased *int) string {
+	t.Helper()
+	maximum := 50
+	product := "product_" + uuid.NewString()
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", orgID).Updates(map[string]any{"plan_id": plan.ID, "plan": plan.Key, "plan_source": "polar", "polar_subscription_status": "active", "purchased_seats": purchased}).Error)
+	return product
 }
 
 func waitForOrganizationLockWait(t *testing.T, db *gorm.DB) {

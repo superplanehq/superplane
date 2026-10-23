@@ -5,20 +5,27 @@ import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { DRAFT_READINESS_NOTES, draftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
 import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import {
+  ARCHIVE,
+  openDecisionActions,
+  REJECT,
+  RERUN,
+  REOPEN,
+  SEND_TO_BACKLOG,
+  START,
+  type SplitRunContinueFixesTarget,
+  type SplitRunFooterAction,
+} from "./splitRunFooterActions";
+
+export type {
+  SplitRunContinueFixesTarget,
+  SplitRunFooterAction,
+  SplitRunFooterActionKind,
+} from "./splitRunFooterActions";
 export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
 
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
-
-export type SplitRunFooterActionKind =
-  | "start"
-  | "archive"
-  | "reject"
-  | "refine"
-  | "approve"
-  | "rerun"
-  | "reopen"
-  | "send-to-backlog";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
@@ -129,15 +136,6 @@ export function defaultSplitRunStopChoice(
   return available[0]?.id;
 }
 
-export interface SplitRunFooterAction {
-  id: string;
-  kind: SplitRunFooterActionKind;
-  label: string;
-  emphasis: "primary" | "quiet";
-  tooltip?: string;
-  disabled?: boolean;
-}
-
 export interface SplitRunFooterNote {
   headline: string;
   text?: string;
@@ -156,6 +154,8 @@ export interface SplitRunFooter {
   /** When true, the decision note renders as a sticky strip. */
   attentionCard?: boolean;
   run?: { appId: string; runId: string };
+  /** Set while automatic fixes are paused and a person can resume them. */
+  continueFixes?: SplitRunContinueFixesTarget;
   status?: WorkOrderDisplayStatus;
   /** Draft Clarity. Missing while analysis has not scored yet. */
   clarityScore?: number;
@@ -168,19 +168,6 @@ export interface SplitRunFooter {
 export function isTaskResultFooter(footer: SplitRunFooter): boolean {
   return footer.status === "completed" || footer.status === "rejected";
 }
-
-const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
-const ARCHIVE: SplitRunFooterAction = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
-const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
-const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
-const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
-const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
-const SEND_TO_BACKLOG: SplitRunFooterAction = {
-  id: "send-to-backlog",
-  kind: "send-to-backlog",
-  label: "Send to backlog",
-  emphasis: "quiet",
-};
 
 export const SPLIT_RUN_FAILED_NOTE_TEXT = "This automation did not finish. Fix the error, then run this step again.";
 
@@ -397,6 +384,8 @@ type FooterInput = {
   /** When false, hide the decision strip. Used while a follow-up run is active. */
   decision?: boolean;
   run?: { appId: string; runId: string };
+  /** The paused automatic-fixes activity. Adds the Continue fixes action. */
+  continueFixes?: SplitRunContinueFixesTarget;
   status?: WorkOrderDisplayStatus;
   actor?: OrgUserDisplay;
   automationName?: string;
@@ -410,7 +399,8 @@ type FooterInput = {
 function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
   const next = input.status ? { ...footer, status: input.status } : footer;
   const withRun = input.run ? { ...next, run: input.run } : next;
-  const withClarity = input.clarityScore == null ? withRun : { ...withRun, clarityScore: input.clarityScore };
+  const withFixes = input.continueFixes ? { ...withRun, continueFixes: input.continueFixes } : withRun;
+  const withClarity = input.clarityScore == null ? withFixes : { ...withFixes, clarityScore: input.clarityScore };
   const withConfidence =
     input.confidenceScore == null ? withClarity : { ...withClarity, confidenceScore: input.confidenceScore };
   return input.scoreMax == null ? withConfidence : { ...withConfidence, scoreMax: input.scoreMax };
@@ -527,7 +517,7 @@ function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spli
     return hiddenDecisionFooter(input);
   }
 
-  const actions = input.kind === "failed" ? [REJECT, RERUN] : [REJECT, APPROVE];
+  const actions = openDecisionActions(input);
   return withFooterMeta(input, {
     kind: input.kind,
     sentence: splitRunKindSentence(input.kind),

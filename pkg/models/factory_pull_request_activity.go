@@ -138,6 +138,31 @@ func (a *FactoryPullRequestRun) Finalize(tx *gorm.DB, run *CanvasRun) error {
 	return nil
 }
 
+// ContinueFixes resumes automatic fixes after the attempt limit paused them.
+// Attempts that exist before this call stop counting toward the limit. It
+// fails when the activity is not paused or a person already continued it.
+func (a *FactoryPullRequestRun) ContinueFixes(tx *gorm.DB) error {
+	now := time.Now()
+	result := tx.Model(&FactoryPullRequestRun{}).
+		Where("pull_request_id = ? AND run_id = ?", a.PullRequestID, a.RunID).
+		Where("state = ?", FactoryPullRequestActivityStateLimitReached).
+		Where("fixes_continued_at IS NULL").
+		Updates(map[string]any{
+			"fixes_continued_at": now,
+			"updated_at":         now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrFactoryPullRequestFixesNotPaused
+	}
+
+	a.FixesContinuedAt = &now
+	a.UpdatedAt = now
+	return nil
+}
+
 func FindPullRequestActivityByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryPullRequestRun, error) {
 	var activity FactoryPullRequestRun
 	err := tx.Where("run_id = ?", runID).First(&activity).Error
@@ -435,13 +460,34 @@ func (p *FactoryPullRequest) reserveAttempt(tx *gorm.DB, activity *FactoryPullRe
 }
 
 func (p *FactoryPullRequest) countAttemptsSinceReset(tx *gorm.DB, handlerID uuid.UUID) (int, error) {
-	type resetBoundary struct {
-		UpdatedAt time.Time
+	passedAt, err := p.latestPassedEvaluationAt(tx, handlerID)
+	if err != nil {
+		return 0, err
+	}
+	continuedAt, err := p.latestFixesContinuedAt(tx, handlerID)
+	if err != nil {
+		return 0, err
 	}
 
-	var reset resetBoundary
+	query := tx.Model(&FactoryPullRequestRun{}).
+		Where("feedback_handler_id = ?", handlerID).
+		Where("pull_request_id = ?", p.ID).
+		Where("attempt IS NOT NULL")
+
+	if boundary := latestTime(passedAt, continuedAt); boundary != nil {
+		query = query.Where("access_granted_at > ?", *boundary)
+	}
+
+	var count int64
+	if err := query.Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return int(count), nil
+}
+
+func (p *FactoryPullRequest) latestPassedEvaluationAt(tx *gorm.DB, handlerID uuid.UUID) (*time.Time, error) {
+	var times []time.Time
 	err := tx.Table("factory_pull_request_runs AS activities").
-		Select("activities.updated_at").
 		Joins("JOIN workflow_runs ON workflow_runs.id = activities.run_id").
 		Where("activities.feedback_handler_id = ?", handlerID).
 		Where("activities.pull_request_id = ?", p.ID).
@@ -451,25 +497,38 @@ func (p *FactoryPullRequest) countAttemptsSinceReset(tx *gorm.DB, handlerID uuid
 		Where("workflow_runs.result = ?", CanvasRunResultPassed).
 		Order("activities.updated_at DESC").
 		Limit(1).
-		Take(&reset).
+		Pluck("activities.updated_at", &times).
 		Error
+	if err != nil || len(times) == 0 {
+		return nil, err
+	}
+	return &times[0], nil
+}
 
-	query := tx.Model(&FactoryPullRequestRun{}).
+func (p *FactoryPullRequest) latestFixesContinuedAt(tx *gorm.DB, handlerID uuid.UUID) (*time.Time, error) {
+	var times []time.Time
+	err := tx.Model(&FactoryPullRequestRun{}).
 		Where("feedback_handler_id = ?", handlerID).
 		Where("pull_request_id = ?", p.ID).
-		Where("attempt IS NOT NULL")
-
-	if err == nil {
-		query = query.Where("access_granted_at > ?", reset.UpdatedAt)
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, err
+		Where("fixes_continued_at IS NOT NULL").
+		Order("fixes_continued_at DESC").
+		Limit(1).
+		Pluck("fixes_continued_at", &times).
+		Error
+	if err != nil || len(times) == 0 {
+		return nil, err
 	}
+	return &times[0], nil
+}
 
-	var count int64
-	if err := query.Count(&count).Error; err != nil {
-		return 0, err
+func latestTime(first, second *time.Time) *time.Time {
+	if first == nil {
+		return second
 	}
-	return int(count), nil
+	if second == nil || first.After(*second) {
+		return first
+	}
+	return second
 }
 
 func findActiveHandlerRevisionActivity(tx *gorm.DB, pullRequestID, revisionID, handlerID uuid.UUID) (*FactoryPullRequestRun, error) {

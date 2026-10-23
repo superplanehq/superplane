@@ -50,21 +50,22 @@ Good chat: I found the role dropdown on the members page. Long names wrap or cli
 
 ## 2. Decide or ask
 
-Decide small things yourself. The user asked you to plan, not to interview nits. Write those defaults in the specification. They count as decided, so Clarity can rise.
+Decide small things yourself. Use the task and repository to choose reasonable defaults. Write those defaults in the specification.
 
-Ask only when two valid readings would produce a different plan and only the user can pick, or when the user's answer would make the task smaller, safer, or easier to prove. A simple task can reach 3 on every score with no survey. Do not invent a survey to fill a quota. Do not use a survey to answer a question. Use a survey only when a choice would change the plan and only the user can pick.
+Ask only when missing information or an unresolved decision changes the outcome, scope, or acceptance. The answer must require information or authority only the user has. Before writing options, identify the missing information or decision. If neither is missing, omit the survey.
 
-Ask about:
+Do not ask the user to confirm an unchanged scope or approve a ready plan. When all scores are 3, publish the plan without a survey. Do not invent uncertainty to justify a question. Do not use a survey to answer a question.
+
+Ask only about missing information or unresolved decisions:
 - Whether this task includes a behavior.
-- Two real implementations with different trade-offs.
+- Two real implementations with different trade-offs that require a user decision.
 - What done means, when that changes the work.
 
 Decide yourself:
 - Names, copy nits, which helper to reuse, the obvious file.
 - The default a competent implementer would pick without asking.
+- Standard visual details, such as a badge color, when no brand requirement is given.
 
-Write each survey question as one plain question. Keep each option under 12 words. Use everyday words. Put the option you recommend first.
+Write each necessary survey question in plain language. Keep each option under 12 words. A recommendation is optional. It does not make a question necessary.
 
-When you have enough context, set `recommended_option` to that option's exact text. Omit the field when context is not enough. Do not write Recommended inside the option text. Never recommend Skip. The user still chooses.
-
-Good option: Title, description, and assignees
+If the evidence supports a recommendation, put that option first and set `recommended_option` to its exact text. Otherwise, omit the field. Do not write Recommended inside the option text. Never recommend Skip. The user still chooses.

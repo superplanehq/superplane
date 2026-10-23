@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"testing"
+	"time"
 )
 
 func TestResolveCatalogAccessAndMarkup(t *testing.T) {
@@ -98,3 +99,128 @@ func TestSeatOverridePrecedenceAndPersistence(t *testing.T) {
 	t.Setenv(models.BillingEnabledEnv, "no")
 	check(nil)
 }
+
+func TestResolvePurchasedSeats(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	maximum := 50
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
+	member := support.CreateUser(t, r, r.Organization.ID)
+	removed := support.CreateUser(t, r, r.Organization.ID)
+	require.NoError(t, db.Delete(removed).Error)
+	_, err = models.CreateAPIKey(db, r.Organization.ID, "service", nil, r.User, nil, nil)
+	require.NoError(t, err)
+
+	expected := SeatUsage{PerSeat: true, Purchased: seatCount(3), Occupied: 2, Available: seatCount(1), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(2)}
+	check := func() {
+		t.Helper()
+		actual, err := ResolveSeats(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.Equal(t, expected, *actual)
+		require.Equal(t, expected.Purchased, actual.JoinLimit())
+	}
+	check()
+	maximum = 60
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	expected.PlanMaximum, expected.Purchasable = seatCount(60), seatCount(57)
+	check()
+	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, seatCount(80)))
+	expected.PlanMaximum, expected.Purchasable = seatCount(80), seatCount(77)
+	check()
+	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, nil))
+	expected.PlanMaximum, expected.Purchasable = nil, nil
+	check()
+	require.NoError(t, models.DeleteOrganizationSeatLimitOverride(db, r.Organization.ID))
+	expected.PlanMaximum, expected.Purchasable = seatCount(60), seatCount(57)
+	check()
+	// Simulate a stored plan that predates the required per-seat maximum.
+	require.NoError(t, db.Model(&plan).Update("seat_limit", nil).Error)
+	expected.PlanMaximum, expected.Purchasable = nil, nil
+	check()
+	plan.SeatLimit = seatCount(1)
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	expected.PlanMaximum, expected.Purchasable = seatCount(1), seatCount(0)
+	check()
+
+	for _, quantity := range []*int{seatCount(1), seatCount(0), nil} {
+		require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", quantity).Error)
+		expected.Purchased, expected.Available = quantity, seatCount(0)
+		if quantity == nil {
+			expected.Purchased = seatCount(0)
+		}
+		expected.Purchasable = seatCount(1 - *expected.Purchased)
+		check()
+	}
+	require.NoError(t, db.Delete(member).Error)
+	require.NoError(t, db.Delete(&models.User{}, "id = ?", r.User).Error)
+	expected.Occupied, expected.RenewalQuantity = 0, seatCount(1)
+	check()
+	t.Setenv(models.BillingEnabledEnv, "no")
+	actual, err := ResolveSeats(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, SeatUsage{}, *actual)
+	require.Nil(t, actual.JoinLimit())
+}
+
+func TestResolveMemberLimits(t *testing.T) {
+	for _, key := range []string{"business_legacy", "business_manual", "trial", "none", "finite"} {
+		t.Run(key, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			db := database.Conn()
+			var catalog *models.BillingPlan
+			if key == "finite" {
+				catalog = &models.BillingPlan{Key: "finite_" + uuid.NewString()[:8], Name: "Finite", Category: "paid", Visibility: "private", SeatLimit: seatCount(7), CreditFrequency: "none", CreditExpiration: "never"}
+				require.NoError(t, models.SaveBillingPlan(db, catalog))
+			} else {
+				var err error
+				catalog, err = models.FindBillingPlan(db, key)
+				require.NoError(t, err)
+			}
+			// Resolve the plan and member count from the caller's uncommitted changes.
+			tx := db.Begin()
+			require.NoError(t, tx.Error)
+			defer tx.Rollback()
+			end := time.Now().Add(time.Hour)
+			require.NoError(t, tx.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{"plan_id": catalog.ID, "plan": catalog.ResponsePlan(), "plan_source": "admin", "trial_ends_at": end, "purchased_seats": 99}).Error)
+			for _, tc := range []struct {
+				name  string
+				limit *int
+			}{
+				{"catalog", catalog.SeatLimit},
+				{"override", seatCount(2)},
+				{"unlimited override", nil},
+				{"deleted override", catalog.SeatLimit},
+			} {
+				if tc.name == "override" || tc.name == "unlimited override" {
+					require.NoError(t, models.SetOrganizationSeatLimitOverride(tx, r.Organization.ID, tc.limit))
+				}
+				if tc.name == "deleted override" {
+					require.NoError(t, models.DeleteOrganizationSeatLimitOverride(tx, r.Organization.ID))
+				}
+				actual, err := ResolveSeats(tx, r.Organization.ID)
+				require.NoError(t, err)
+				require.Equal(t, SeatUsage{Occupied: 1, MemberLimit: tc.limit}, *actual, tc.name)
+				require.Equal(t, tc.limit, actual.JoinLimit())
+			}
+			require.NoError(t, tx.Delete(&models.User{}, "id = ?", r.User).Error)
+			actual, err := ResolveSeats(tx, r.Organization.ID)
+			require.NoError(t, err)
+			require.Zero(t, actual.Occupied)
+			t.Setenv(models.BillingEnabledEnv, "no")
+			actual, err = ResolveSeats(tx, r.Organization.ID)
+			require.NoError(t, err)
+			require.Equal(t, SeatUsage{}, *actual)
+			require.Nil(t, actual.JoinLimit())
+		})
+	}
+}
+
+func seatCount(quantity int) *int { return &quantity }

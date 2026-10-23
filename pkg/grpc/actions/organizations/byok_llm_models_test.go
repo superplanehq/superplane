@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"fmt"
+	"github.com/superplanehq/superplane/pkg/features"
 	"testing"
 
 	"github.com/google/uuid"
@@ -22,6 +23,7 @@ import (
 
 func Test__ListBYOKLLMModels(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	t.Cleanup(func() {
 		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
 	})
@@ -209,6 +211,7 @@ func Test__ListBYOKLLMModels(t *testing.T) {
 
 func Test__UpdateBYOKLLMModels(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	t.Cleanup(func() {
 		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
 	})

@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"github.com/superplanehq/superplane/pkg/features"
 	"testing"
 
 	"github.com/google/uuid"
@@ -20,6 +21,7 @@ import (
 
 func Test__ListSelectableLLMModels(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
@@ -73,6 +75,7 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 
 func Test__ListSelectableLLMModels__EnablesConnectedKeyModelsByDefault(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})

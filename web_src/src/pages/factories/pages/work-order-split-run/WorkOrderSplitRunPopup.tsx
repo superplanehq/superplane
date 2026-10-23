@@ -381,6 +381,7 @@ function analysisPopupReview(args: {
       onStart={args.draftStart}
       onArchive={args.mutations.onArchive}
       onReject={args.mutations.onReject}
+      onContinueFixes={args.mutations.onContinueFixes}
       onStop={args.mutations.onStop}
       startBusy={args.isDispatching}
       actionBusy={args.footerBusy}
