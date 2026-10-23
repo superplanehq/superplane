@@ -361,6 +361,28 @@ func TestLoadEnvironmentConfigurationAppliesInstallationAdminTokenOverride(t *te
 	}
 }
 
+func TestLoadEnvironmentConfigurationPrefersFleetManagerAPIToken(t *testing.T) {
+	t.Setenv("FLEET_MANAGER_CONFIG", `{
+		"id":"fleet-manager",
+		"superplaneUrl":"http://app:8000",
+		"fleets":[{
+			"id":"e1-large-amd64",
+			"provider":"docker",
+			"docker":{"image":"runner:dev","architecture":"amd64"}
+		}]
+	}`)
+	t.Setenv("INSTALLATION_ADMIN_TOKEN", "legacy-token")
+	t.Setenv("FLEET_MANAGER_API_TOKEN", "fleet-manager-token")
+
+	config, err := Load(filepath.Join(t.TempDir(), "missing.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.InstallationAdminToken != "fleet-manager-token" {
+		t.Fatalf("installation admin token = %q", config.InstallationAdminToken)
+	}
+}
+
 func TestLoadRejectsWarmCapacityAboveMaximum(t *testing.T) {
 	t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
 	_, err := Load(writeConfig(t, `{

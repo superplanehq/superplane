@@ -355,18 +355,6 @@ export function fleetManagerValuesFileCommand(values: string): string {
   return `cat > ${FLEET_MANAGER_VALUES_FILE} <<'EOF'\n${values.trimEnd()}\nEOF\n`;
 }
 
-const DOCKER_VM_FLEET_IDS = ["e1-large-amd64", "e1-large-arm64"];
-
-export function fleetManagerDockerCommand(token: string): string {
-  return `./enable-runners.sh '${token.replace(/'/g, `'\\''`)}'`;
-}
-
-export function fleetsMatchDockerVm(installed: InstalledFleet[], runnerVersion: string): boolean {
-  return installed.some((fleet) =>
-    Boolean(fleet.id && DOCKER_VM_FLEET_IDS.includes(fleet.id) && fleet.runnerVersion === runnerVersion),
-  );
-}
-
 export function fleetManagerHelmCommand(metadata: FleetManagerSetupMetadata, namespace: string): string {
   return [
     "helm upgrade --install fleet-manager",

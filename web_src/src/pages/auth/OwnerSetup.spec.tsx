@@ -128,7 +128,7 @@ function renderOwnerSetup() {
   );
 }
 
-async function reachFleetStep() {
+async function reachSmtpStep() {
   fireEvent.change(await screen.findByPlaceholderText("First name"), { target: { value: "Ada" } });
   fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
   fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "ada@example.com" } });
@@ -140,6 +140,10 @@ async function reachFleetStep() {
   fireEvent.click(screen.getByTestId("owner-setup-license-skip"));
 
   expect(await screen.findByTestId("owner-setup-smtp")).toBeInTheDocument();
+}
+
+async function reachFleetStep() {
+  await reachSmtpStep();
   fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
 
   expect(await screen.findByTestId("owner-setup-fleet")).toBeInTheDocument();
@@ -302,22 +306,23 @@ describe("OwnerSetup", () => {
     expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
   });
 
-  it("shows the single-VM runner command with the created token", async () => {
-    stubOwnerSetupFetch({ fleetManager: { ...fleetManagerMetadata, installationType: "single-host" } });
+  it("finishes single-host setup after SMTP without creating a Fleet Manager token", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "required", installation_type: "single-host" },
+    });
     renderOwnerSetup();
-    await reachFleetStep();
+    await reachSmtpStep();
 
-    expect(await screen.findByText(OWNER_SETUP_COPY.fleet.singleHostBody)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
-    expect(await screen.findByRole("heading", { name: "Runners on this VM" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "AWS" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", "Step 3 of 3");
+    fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
 
-    fireEvent.click(screen.getByRole("button", { name: "This VM" }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-
-    expect(await screen.findByRole("heading", { name: "Start runners on this VM" })).toBeInTheDocument();
-    expect(screen.getByText("./enable-runners.sh 'owner-setup-token'")).toBeInTheDocument();
-    expect(screen.queryByText(/helm upgrade --install fleet-manager/)).not.toBeInTheDocument();
+    await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
+    expect(createToken).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("owner-setup-fleet")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/setup-owner/progress",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ step: "" }) }),
+    );
   });
 
   it("leaves a cloud install off the This VM command", async () => {
@@ -339,18 +344,21 @@ describe("OwnerSetup", () => {
     );
   });
 
-  it("leaves a single-host install off the cloud chart steps", async () => {
-    stubOwnerSetupFetch({
-      status: { status: "in_progress", step: "fleet-fleets" },
+  it("finishes a legacy single-host setup saved on a fleet step", async () => {
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-fleets", installation_type: "single-host" },
       account: { status: 200 },
       organizations: [{ slug: "acme" }],
-      fleetManager: { ...fleetManagerMetadata, installationType: "single-host" },
     });
     renderOwnerSetup();
 
-    expect(await screen.findByRole("heading", { name: "Runners on this VM" })).toBeInTheDocument();
+    await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
     expect(screen.queryByRole("heading", { name: "Configure the default fleet" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "AWS" })).not.toBeInTheDocument();
+    expect(createToken).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/setup-owner/progress",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ step: "" }) }),
+    );
   });
 
   it("resumes the stored fleet step for the signed-in admin", async () => {
