@@ -2710,6 +2710,7 @@ message ListFactoryLineRunnerModelsRequest {
 
 message ListFactoryLineRunnerModelsResponse {
   repeated FactoryLLMModel models = 1;
+  bool uses_hosted_funding = 2;
 }
 
 message ListFactoryLLMModelsRequest {

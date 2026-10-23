@@ -1,6 +1,5 @@
 import type {
   FactoriesDescribeFactoryUsageResponse,
-  FactoriesFactoryLlmModel,
   OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
@@ -10,8 +9,6 @@ import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 
 import { workOrderCreditFailureCopy, type WorkOrderCreditFailureReason } from "../../lib/workOrderFailureReason";
 import type { SplitRunFooter, SplitRunFooterNote } from "./splitRunFooter";
-
-const HOSTED_MODEL_KEY_PREFIX = "hosted::";
 
 /** Keep Start and its explanation in sync with the current billing state. */
 export function useWorkOrderStartFooter(
@@ -25,7 +22,7 @@ export function useWorkOrderStartFooter(
   const billing = useOrganizationBilling(checkStart ? organizationId : undefined);
   const usage = useFactoryUsage(checkStart ? (organizationId ?? "") : "", checkStart ? (factoryId ?? "") : "");
   const runnerModels = useFactoryLineRunnerModels(organizationId, factoryId, lineName, checkStart);
-  const block = checkStart ? runStartBlock(billing.data, usage.data, runnerModels.data) : undefined;
+  const block = checkStart ? runStartBlock(billing.data, usage.data, runnerModels.data?.usesHostedFunding) : undefined;
   if (!block) {
     return footer;
   }
@@ -41,7 +38,7 @@ export function useWorkOrderStartFooter(
 function runStartBlock(
   billing: OrganizationsDescribeOrganizationBillingResponse | undefined,
   usage: FactoriesDescribeFactoryUsageResponse | undefined,
-  lineModels: FactoriesFactoryLlmModel[] | undefined,
+  usesHostedFunding: boolean | undefined,
 ): SplitRunFooterNote | undefined {
   if (billing?.hostedExecutionAllowed === false) {
     if (billing.requirePaymentMethod && !billing.hasPaymentMethod) {
@@ -54,10 +51,11 @@ function runStartBlock(
     return creditStartBlock("hosted_subscription_required");
   }
 
-  // A line that runs on the organization's own provider keys never spends
-  // hosted credit, so the hosted credit and workspace budget limits do not
-  // block its Start. An unloaded model list keeps the hosted checks.
-  if (lineModels && !lineModels.some((model) => model.id?.startsWith(HOSTED_MODEL_KEY_PREFIX))) {
+  // A line whose runners all run on the organization's own provider keys
+  // never spends hosted credit, so the hosted credit and workspace budget
+  // limits do not block its Start. An unknown funding state keeps the hosted
+  // checks.
+  if (usesHostedFunding === false) {
     return undefined;
   }
 

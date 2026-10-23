@@ -197,11 +197,15 @@ function renderSplitRun() {
   return renderPopup({ fixture: SPLIT_RUN_RUNNING });
 }
 
-/** The draft fixture starts on "plan-and-implement"; give it a hosted runner model list. */
+/**
+ * The draft fixture starts on "plan-and-implement"; mark its line as hosted.
+ * Hosted runnerClaudeCode, runnerCodex, and runnerOpenRouter lines return
+ * plain model IDs, so the footer must follow the response funding flag.
+ */
 function seedHostedLineModels(client: QueryClient) {
   client.setQueryData(
     factoryLineRunnerModelsQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, "plan-and-implement"),
-    [{ id: "hosted::anthropic::claude-sonnet-4-6", name: "claude-sonnet-4-6" }],
+    { models: [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }], usesHostedFunding: true },
   );
 }
 
@@ -1884,7 +1888,7 @@ describe("WorkOrderSplitRunPopup", () => {
     });
     client.setQueryData(
       factoryLineRunnerModelsQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, "plan-and-implement"),
-      [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }],
+      { models: [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }], usesHostedFunding: false },
     );
     const onDispatch = vi.fn();
     renderPopup(
@@ -1915,7 +1919,7 @@ describe("WorkOrderSplitRunPopup", () => {
     });
     client.setQueryData(
       factoryLineRunnerModelsQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, "plan-and-implement"),
-      [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }],
+      { models: [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }], usesHostedFunding: false },
     );
     const onDispatch = vi.fn();
     renderPopup(
