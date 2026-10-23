@@ -417,6 +417,24 @@ ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
 
 
 --
+-- Name: credit_packs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.credit_packs (
+    id uuid NOT NULL,
+    name text NOT NULL,
+    amount_cents bigint NOT NULL,
+    enabled boolean DEFAULT false NOT NULL,
+    polar_product_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    CONSTRAINT credit_packs_amount_cents_check CHECK (((amount_cents = 0) OR ((amount_cents >= 50) AND (amount_cents <= 99999999)))),
+    CONSTRAINT credit_packs_name_check CHECK ((length(TRIM(BOTH FROM name)) > 0))
+);
+
+
+--
 -- Name: data_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1140,6 +1158,10 @@ CREATE TABLE public.installation_llm_settings (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     default_hosted_provider text,
     default_hosted_model text,
+    credit_purchase_fee_bps integer DEFAULT 0 NOT NULL,
+    credit_purchase_fixed_fee_cents bigint DEFAULT 0 NOT NULL,
+    CONSTRAINT installation_llm_settings_credit_purchase_fee_range CHECK (((credit_purchase_fee_bps >= 0) AND (credit_purchase_fee_bps < 10000))),
+    CONSTRAINT installation_llm_settings_credit_purchase_fixed_fee_non_negativ CHECK ((credit_purchase_fixed_fee_cents >= 0)),
     CONSTRAINT installation_llm_settings_default_model_pair CHECK ((((default_hosted_provider IS NULL) AND (default_hosted_model IS NULL)) OR ((default_hosted_provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])) AND (default_hosted_model IS NOT NULL) AND (btrim(default_hosted_model) <> ''::text)))),
     CONSTRAINT installation_llm_settings_markup_non_negative CHECK ((markup_bps >= 0)),
     CONSTRAINT installation_llm_settings_singleton CHECK ((id = 1)),
@@ -2384,6 +2406,14 @@ ALTER TABLE ONLY public.casbin_rule
 
 
 --
+-- Name: credit_packs credit_packs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.credit_packs
+    ADD CONSTRAINT credit_packs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: data_migrations data_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3342,6 +3372,13 @@ CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.appli
 --
 
 CREATE INDEX bitbucket_forge_installations_workspace_uuid_idx ON public.bitbucket_forge_installations USING btree (workspace_uuid);
+
+
+--
+-- Name: credit_packs_polar_product_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX credit_packs_polar_product_id_idx ON public.credit_packs USING btree (polar_product_id) WHERE (deleted_at IS NULL);
 
 
 --

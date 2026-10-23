@@ -153,6 +153,14 @@ func (s *OrganizationService) ListHostedCreditProducts(
 	return organizations.ListHostedCreditProducts(ctx, orgID, req)
 }
 
+func (s *OrganizationService) QuoteHostedCreditCheckout(
+	ctx context.Context,
+	req *pb.QuoteHostedCreditCheckoutRequest,
+) (*pb.QuoteHostedCreditCheckoutResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.QuoteHostedCreditCheckout(ctx, orgID, req)
+}
+
 func (s *OrganizationService) CreateHostedCreditCheckout(
 	ctx context.Context,
 	req *pb.CreateHostedCreditCheckoutRequest,

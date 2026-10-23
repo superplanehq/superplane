@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { BillingHelp } from "./BillingHelp";
+import { PolarProductSelect } from "./PolarProductSelect";
 import type { BillingPlan, FeatureDefinition } from "./billingPlansApi";
 type PlanFieldsProps = { plan: BillingPlan; onChange: (plan: BillingPlan) => void };
 
@@ -260,21 +261,19 @@ function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
               </div>
             )}
             {section === "Pricing" && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <Label htmlFor="plan-polar-product">Polar product ID</Label>
-                  <BillingHelp
-                    label="Polar product ID"
-                    text="Links the plan to a Polar product. Once linked, the product ID and prices cannot change here."
-                  />
-                </div>
-                <Input
-                  id="plan-polar-product"
-                  disabled={linked || manual}
-                  value={plan.polar_product_id ?? ""}
-                  onChange={(event) => update({ polar_product_id: event.target.value || null })}
-                />
-              </div>
+              <PolarProductSelect
+                kind="subscription"
+                disabled={linked || manual}
+                value={plan.polar_product_id ?? ""}
+                onChange={(productID) => update({ polar_product_id: productID || null })}
+                description={
+                  manual
+                    ? "Business Manual does not use Polar products."
+                    : linked
+                      ? "This plan is linked to Polar. Create a new plan to change the product or price."
+                      : undefined
+                }
+              />
             )}
           </div>
         </section>

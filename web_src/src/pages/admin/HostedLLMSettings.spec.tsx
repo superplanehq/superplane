@@ -16,6 +16,8 @@ const settingsWithOpenRouterModels: InstallationLLMSettings = {
   welcome_grant_cents: 5000,
   markup_bps: 2000,
   warning_threshold_bps: 2000,
+  credit_purchase_fee_bps: 0,
+  credit_purchase_fixed_fee_cents: 0,
   providers: [
     {
       provider: "anthropic",
