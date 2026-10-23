@@ -48,6 +48,7 @@ it("creates a per-seat paid plan with dollar amounts and a markup percentage", a
   await user.clear(trialCredit);
   await user.type(trialCredit, "0.29");
   await user.click(screen.getByRole("switch", { name: "Per seat" }));
+  expect(screen.getByLabelText("Maximum seats", { exact: true })).toHaveValue(50);
   await user.click(screen.getByRole("checkbox", { name: "Require payment method" }));
   await user.click(await screen.findByRole("checkbox", { name: /Bring your own API key/ }));
   // Happy DOM incorrectly rejects decimal steps, so submit the form directly.
@@ -65,6 +66,7 @@ it("creates a per-seat paid plan with dollar amounts and a markup percentage", a
         credit_validity_days: null,
         trial_credit_cents: 29,
         per_seat: true,
+        seat_limit: 50,
         require_payment_method: true,
         features: ["byo_key"],
       }),
@@ -117,7 +119,7 @@ it("creates a feature and selects its string key in a plan", async () => {
   await waitFor(() => expect(savedPlans).toEqual([expect.objectContaining({ features: ["custom_reports"] })]));
 });
 
-it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimited limits", async () => {
+it("edits a linked plan in a dialog, preserves locked pricing and credit policies, and updates maximum seats", async () => {
   const plan = {
     id: "starter-plan",
     key: "starter",
@@ -169,9 +171,10 @@ it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimit
   await user.clear(screen.getByLabelText("Markup (%)", { exact: true }));
   expect(screen.getByRole("switch", { name: "Per seat" })).toBeDisabled();
   expect(screen.getByLabelText("Polar product ID", { exact: true })).toBeDisabled();
-  await user.hover(screen.getByRole("button", { name: "Help for Seat limit" }));
-  expect(await screen.findByRole("tooltip")).toHaveTextContent("Leave empty for unlimited seats.");
-  await user.clear(screen.getByLabelText("Seat limit", { exact: true }));
+  const maximum = screen.getByLabelText("Maximum seats", { exact: true });
+  expect(maximum).toHaveValue(10);
+  await user.clear(maximum);
+  await user.type(maximum, "75");
   await user.clear(screen.getByLabelText("Parallel task limit", { exact: true }));
   await user.type(screen.getByLabelText("Parallel task limit", { exact: true }), "2");
   // Happy DOM incorrectly rejects decimal steps, so submit the form directly.
@@ -180,7 +183,7 @@ it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimit
     expect(updates).toEqual([
       {
         path: "/admin/api/billing-plans/starter-plan",
-        body: { ...plan, seat_limit: null, parallel_task_limit: 2, markup_bps: null },
+        body: { ...plan, seat_limit: 75, parallel_task_limit: 2, markup_bps: null },
       },
     ]),
   );
@@ -282,4 +285,79 @@ it("links the empty plan feature selector to Features", async () => {
   await waitFor(() => expect(screen.getByRole("button", { name: "Create plan" })).toBeEnabled());
   await user.click(screen.getByRole("button", { name: "Create plan" }));
   expect(screen.getByRole("link", { name: "Features page" })).toHaveAttribute("href", "/admin/features");
+});
+
+it("keeps entered values and shows failed saves inside the editor", async () => {
+  const saves: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        saves.push(JSON.parse(String(init.body)));
+        return new Response("Polar seat price must match the catalog price.", { status: 400 });
+      }
+      return new Response("[]");
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(screen.getByRole("button", { name: "Create plan" })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: "Create plan" }));
+  await user.type(screen.getByLabelText("Name", { exact: true }), "Team");
+  await user.type(screen.getByLabelText("Key", { exact: true }), "team");
+  await user.type(screen.getByLabelText("Polar product ID", { exact: true }), "prod_team");
+  const seatLimit = screen.getByLabelText("Seat limit", { exact: true });
+  await user.type(seatLimit, "25");
+  await user.click(screen.getByRole("switch", { name: "Per seat" }));
+  const maximum = screen.getByLabelText("Maximum seats", { exact: true });
+  expect(maximum).toHaveValue(25);
+  for (const invalid of ["", "0", "-1", "1001", "1.5"]) {
+    fireEvent.change(maximum, { target: { value: invalid } });
+    fireEvent.submit(screen.getByRole("button", { name: "Save plan" }).closest("form")!);
+    expect(within(screen.getByRole("dialog")).getByRole("alert")).toHaveTextContent(
+      "Maximum seats must be an integer from 1 to 1,000.",
+    );
+    expect(saves).toHaveLength(0);
+  }
+  fireEvent.change(maximum, { target: { value: "80" } });
+  await user.click(screen.getByRole("button", { name: "Save plan" }));
+  const dialog = within(screen.getByRole("dialog"));
+  expect(await dialog.findByRole("alert")).toHaveTextContent("Polar seat price must match the catalog price.");
+  expect(dialog.getByLabelText("Name", { exact: true })).toHaveValue("Team");
+  expect(dialog.getByLabelText("Key", { exact: true })).toHaveValue("team");
+  expect(dialog.getByLabelText("Polar product ID", { exact: true })).toHaveValue("prod_team");
+  expect(dialog.getByLabelText("Maximum seats", { exact: true })).toHaveValue(80);
+  expect(saves).toEqual([expect.objectContaining({ seat_limit: 80, per_seat: true })]);
+  await user.click(dialog.getByRole("button", { name: "Cancel" }));
+  await user.click(screen.getByRole("button", { name: "Create plan" }));
+  expect(within(screen.getByRole("dialog")).queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("preserves unlimited seat limits for plans without per-seat pricing", async () => {
+  const saves: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") saves.push(JSON.parse(String(init.body)));
+      return new Response("[]");
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(screen.getByRole("button", { name: "Create plan" })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: "Create plan" }));
+  await user.type(screen.getByLabelText("Name", { exact: true }), "Flat");
+  await user.type(screen.getByLabelText("Key", { exact: true }), "flat");
+  await user.type(screen.getByLabelText("Seat limit", { exact: true }), "2000");
+  await user.clear(screen.getByLabelText("Seat limit", { exact: true }));
+  await user.click(screen.getByRole("button", { name: "Save plan" }));
+  await waitFor(() => expect(saves).toEqual([expect.objectContaining({ seat_limit: null, per_seat: false })]));
 });

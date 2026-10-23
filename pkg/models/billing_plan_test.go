@@ -45,6 +45,7 @@ func TestCatalogPlanAssignmentAndProtection(t *testing.T) {
 	plan.PolarProductID = &product
 	plan.PriceCents = 3000
 	plan.PerSeat = true
+	plan.SeatLimit = new(50)
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
 	stored, err := models.FindBillingPlan(db, plan.Key)
 	require.NoError(t, err)
@@ -53,6 +54,11 @@ func TestCatalogPlanAssignmentAndProtection(t *testing.T) {
 	plan.PerSeat = false
 	require.ErrorIs(t, models.SaveBillingPlan(db, &plan), models.ErrCatalogPlan)
 	plan.PerSeat = true
+	plan.SeatLimit = new(1000)
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	plan.PolarProductID = new("replacement_product")
+	require.ErrorIs(t, models.SaveBillingPlan(db, &plan), models.ErrCatalogPlan)
+	plan.PolarProductID = &product
 	plan.PriceCents = 2000
 	require.ErrorIs(t, models.SaveBillingPlan(db, &plan), models.ErrCatalogPlan)
 	manual, err := models.FindBillingPlan(db, "business_manual")
@@ -63,6 +69,49 @@ func TestCatalogPlanAssignmentAndProtection(t *testing.T) {
 	manual.Category = "paid"
 	manual.PolarProductID = &product
 	require.ErrorIs(t, models.SaveBillingPlan(db, manual), models.ErrCatalogPlan)
+}
+
+func TestPerSeatPlanMaximum(t *testing.T) {
+	support.Setup(t)
+	db := database.Conn()
+	for _, tc := range []struct {
+		name    string
+		maximum *int
+		valid   bool
+	}{
+		{"missing", nil, false},
+		{"zero", new(0), false},
+		{"negative", new(-1), false},
+		{"above Polar limit", new(1001), false},
+		{"minimum", new(1), true},
+		{"default", new(50), true},
+		{"Polar limit", new(1000), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := models.BillingPlan{Key: "seats_" + uuid.NewString()[:8], Name: "Seats", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: tc.maximum, CreditAmountCents: 1234, CreditFrequency: "billing_period", CreditExpiration: "never"}
+			t.Cleanup(func() { require.NoError(t, db.Where("key = ?", plan.Key).Delete(&models.BillingPlan{}).Error) })
+			err := models.SaveBillingPlan(db, &plan)
+			if !tc.valid {
+				require.ErrorIs(t, err, models.ErrCatalogPlan)
+				return
+			}
+			require.NoError(t, err)
+			stored, err := models.FindBillingPlan(db, plan.Key)
+			require.NoError(t, err)
+			require.Equal(t, *tc.maximum, *stored.SeatLimit)
+			require.Equal(t, int64(1234), stored.CreditAmountCents)
+		})
+	}
+	for _, tc := range []struct {
+		name    string
+		maximum *int
+	}{{"unlimited flat plan", nil}, {"large flat plan", new(1001)}} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := models.BillingPlan{Key: "flat_" + uuid.NewString()[:8], Name: "Flat", Category: "paid", Visibility: "private", SeatLimit: tc.maximum, CreditFrequency: "none", CreditExpiration: "never"}
+			require.NoError(t, models.SaveBillingPlan(db, &plan))
+			t.Cleanup(func() { require.NoError(t, models.DeleteBillingPlan(db, plan.ID)) })
+		})
+	}
 }
 
 func TestFeatureDeletionSerializesReferenceWrites(t *testing.T) {
