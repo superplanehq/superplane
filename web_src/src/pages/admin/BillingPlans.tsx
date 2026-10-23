@@ -39,6 +39,7 @@ export function BillingPlans() {
   const [features, setFeatures] = useState<FeatureDefinition[]>([]);
   const [editing, setEditing] = useState<BillingPlan | null>(null);
   const [error, setError] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   useReportPageReady(!loading, { failed: !!error });
@@ -61,8 +62,23 @@ export function BillingPlans() {
   useEffect(() => {
     void load();
   }, []);
+  const editPlan = (plan: BillingPlan) => {
+    setSaveError("");
+    setEditing({ ...plan });
+  };
   const save = async () => {
     if (!editing) return;
+    setSaveError("");
+    if (
+      editing.per_seat &&
+      (editing.seat_limit === null ||
+        !Number.isInteger(editing.seat_limit) ||
+        editing.seat_limit < 1 ||
+        editing.seat_limit > 1000)
+    ) {
+      setSaveError("Maximum seats must be an integer from 1 to 1,000.");
+      return;
+    }
     setSaving(true);
     try {
       await billingCatalogRequest(
@@ -73,7 +89,7 @@ export function BillingPlans() {
       setEditing(null);
       await load();
     } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : "Failed to save billing plan");
+      setSaveError(error instanceof Error ? error.message : "Failed to save billing plan");
     } finally {
       setSaving(false);
     }
@@ -107,7 +123,7 @@ export function BillingPlans() {
             <h2 className="font-semibold">Plans</h2>
             <p className="text-sm text-muted-foreground">Set the pricing and access available to each organization.</p>
           </div>
-          <Button disabled={loading || !!error} onClick={() => setEditing({ ...emptyPlan })}>
+          <Button disabled={loading || !!error} onClick={() => editPlan(emptyPlan)}>
             <Plus aria-hidden="true" />
             Create plan
           </Button>
@@ -118,7 +134,7 @@ export function BillingPlans() {
           !error && (
             <BillingPlansTable
               plans={plans}
-              onEdit={(plan) => setEditing(toEditableBillingPlan(plan))}
+              onEdit={(plan) => editPlan(toEditableBillingPlan(plan))}
               onDelete={(plan) => void remove(plan)}
             />
           )
@@ -133,6 +149,7 @@ export function BillingPlans() {
           onSave={() => void save()}
           onCancel={() => setEditing(null)}
           saving={saving}
+          error={saveError}
         />
       )}
     </div>

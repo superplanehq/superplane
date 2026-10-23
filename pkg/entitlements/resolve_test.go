@@ -139,8 +139,8 @@ func TestResolvePurchasedSeats(t *testing.T) {
 	require.NoError(t, models.DeleteOrganizationSeatLimitOverride(db, r.Organization.ID))
 	expected.PlanMaximum, expected.Purchasable = seatCount(60), seatCount(57)
 	check()
-	plan.SeatLimit = nil
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	// Simulate a stored plan that predates the required per-seat maximum.
+	require.NoError(t, db.Model(&plan).Update("seat_limit", nil).Error)
 	expected.PlanMaximum, expected.Purchasable = nil, nil
 	check()
 	plan.SeatLimit = seatCount(1)

@@ -334,8 +334,10 @@ The current Team plan includes no AI credit. Credit delivery is outside this
 release's scope.
 
 For a future plan with included credit, the allowance grows with the number
-of seats. Members share one organization credit pool. They do not receive
-separate personal balances.
+of successfully paid seats. Each paid seat adds its allowance to the
+organization ledger, even before a member occupies it. Delivery depends on
+purchased-seat tracking. Members share one organization credit pool. They do
+not receive separate personal balances.
 
 Partial-period grants, expiration, and adjustments after seat changes need
 their own specification before a plan offers included credit.

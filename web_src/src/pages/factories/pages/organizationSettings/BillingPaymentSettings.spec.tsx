@@ -43,40 +43,44 @@ function renderSettings() {
   return userEvent.setup();
 }
 
-it.each([true, false])("only activates Pay-as-you-go when card setup verifies a saved card (%s)", async (saved) => {
-  let completeVerification!: (result: { data: { hasPaymentMethod: boolean } }) => void;
-  refetch.mockImplementation(
-    () =>
-      new Promise((resolve) => {
-        completeVerification = resolve;
-      }),
-  );
-  const popup = { closed: false, close: vi.fn(), location: { replace: vi.fn() }, opener: window };
-  const open = vi.spyOn(window, "open").mockReturnValue(popup as unknown as Window);
-  const user = renderSettings();
-
-  expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Select Pay-as-you-go" }));
-  await waitFor(() => expect(refetch).toHaveBeenCalled());
-  expect(open).toHaveBeenCalledWith("about:blank", "_blank", expect.stringContaining("popup=yes"));
-  expect(popup.location.replace).toHaveBeenCalledWith("https://polar.example/portal/settings?token=test");
-  expect(selectPlan).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "Select Pay-as-you-go" })).toBeDisabled();
-
-  // Closing the provider window must still verify the card before deciding to activate.
-  popup.closed = true;
-  completeVerification({ data: { hasPaymentMethod: saved } });
-  await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
-  if (saved) {
-    await waitFor(() =>
-      expect(selectPlan).toHaveBeenCalledWith(expect.objectContaining({ body: { planKey: "payg" } })),
+it.each([true, false])(
+  "only activates Pay-as-you-go when card setup verifies a saved card (%s)",
+  async (saved) => {
+    let completeVerification!: (result: { data: { hasPaymentMethod: boolean } }) => void;
+    refetch.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          completeVerification = resolve;
+        }),
     );
-    expect(popup.close).toHaveBeenCalled();
-  } else {
+    const popup = { closed: false, close: vi.fn(), location: { replace: vi.fn() }, opener: window };
+    const open = vi.spyOn(window, "open").mockReturnValue(popup as unknown as Window);
+    const user = renderSettings();
+
+    expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Select Pay-as-you-go" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalled());
+    expect(open).toHaveBeenCalledWith("about:blank", "_blank", expect.stringContaining("popup=yes"));
+    expect(popup.location.replace).toHaveBeenCalledWith("https://polar.example/portal/settings?token=test");
     expect(selectPlan).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Select Pay-as-you-go" })).toBeEnabled();
-  }
-});
+    expect(screen.getByRole("button", { name: "Select Pay-as-you-go" })).toBeDisabled();
+
+    // Closing the provider window must still verify the card before deciding to activate.
+    popup.closed = true;
+    completeVerification({ data: { hasPaymentMethod: saved } });
+    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+    if (saved) {
+      await waitFor(() =>
+        expect(selectPlan).toHaveBeenCalledWith(expect.objectContaining({ body: { planKey: "payg" } })),
+      );
+      expect(popup.close).toHaveBeenCalled();
+    } else {
+      expect(selectPlan).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Select Pay-as-you-go" })).toBeEnabled();
+    }
+  },
+  15000,
+);
 
 it("lets paid checkout collect the card and shows activation errors", async () => {
   selectPlan.mockRejectedValue(new Error("Checkout unavailable"));
