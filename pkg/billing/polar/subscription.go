@@ -89,9 +89,13 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 				PeriodEnd:         periodEnd,
 				CancelAtPeriodEnd: data.CancelAtPeriodEnd,
 				ModifiedAt:        data.ModifiedAt.TimePtr(),
+				PurchasedSeats:    data.Seats,
 			},
 		)
 		if err != nil {
+			if errors.Is(err, models.ErrInvalidPurchasedSeats) {
+				return permanentApplyError(err.Error())
+			}
 			return err
 		}
 		if customerID := firstNonEmpty(data.Customer.ID, data.CustomerID); customerID != "" {

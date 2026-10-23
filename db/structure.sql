@@ -1259,6 +1259,8 @@ CREATE TABLE public.organization_billing_plans (
     cancel_at_period_end boolean DEFAULT false NOT NULL,
     polar_modified_at timestamp with time zone,
     plan_id uuid NOT NULL,
+    purchased_seats integer,
+    CONSTRAINT organization_billing_plans_purchased_seats_check CHECK ((purchased_seats >= 0)),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
 
@@ -6014,7 +6016,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261022195938	f
+20261023123107	f
 \.
 
 
