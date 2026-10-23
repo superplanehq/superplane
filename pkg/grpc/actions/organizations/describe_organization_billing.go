@@ -112,7 +112,7 @@ func DescribeOrganizationBilling(
 		return response, nil
 	}
 
-	seats, err := entitlements.ResolveSeats(db, organizationID)
+	seats, err := entitlements.ResolveSeatsForPlan(db, organizationID, plan)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "Could not load seat usage.")
 	}

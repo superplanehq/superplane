@@ -30,14 +30,31 @@ func ResolveSeats(tx *gorm.DB, orgID uuid.UUID) (*SeatUsage, error) {
 	if err != nil {
 		return nil, err
 	}
-	usage := &SeatUsage{Occupied: int(occupied)}
 	if !models.BillingEnabled() {
-		return usage, nil
+		return &SeatUsage{Occupied: int(occupied)}, nil
 	}
 	plan, err := models.ResolveOrganizationBillingPlan(tx, orgID)
 	if err != nil {
 		return nil, err
 	}
+	return resolvePlanSeats(tx, orgID, plan, int(occupied))
+}
+
+// ResolveSeatsForPlan resolves seat usage with the plan the caller already
+// loaded, so seat counts and prices come from a single plan read.
+func ResolveSeatsForPlan(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBillingPlan) (*SeatUsage, error) {
+	occupied, err := models.CountActiveHumanUsersByOrganization(tx, orgID.String())
+	if err != nil {
+		return nil, err
+	}
+	if !models.BillingEnabled() {
+		return &SeatUsage{Occupied: int(occupied)}, nil
+	}
+	return resolvePlanSeats(tx, orgID, plan, int(occupied))
+}
+
+func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBillingPlan, occupied int) (*SeatUsage, error) {
+	usage := &SeatUsage{Occupied: occupied}
 	override, err := models.FindOrganizationSeatLimitOverride(tx, orgID)
 	if err != nil {
 		return nil, err
