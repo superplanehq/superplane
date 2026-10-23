@@ -7,17 +7,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
+	"github.com/superplanehq/superplane/test/encryption"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 )
 
 func Test__UpdateSecretName(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{})
-	encryptor := crypto.NewAESGCMEncryptor([]byte("1234567890abcdefghijklmnopqrstuv"))
+	encryptor := encryption.NewEncryptor()
 
 	createEncryptedSecret := func(t *testing.T, name string, data map[string]string) {
 		t.Helper()

@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -64,6 +65,33 @@ func UpdatePlanFeatureDefinition(tx *gorm.DB, feature *PlanFeatureDefinition) er
 	return nil
 }
 
+// DeletePlanFeatureDefinition removes a feature key from every billing plan,
+// deletes every organization grant for the key, and deletes the definition.
+// The steps run in one transaction, so a failure leaves all records unchanged.
+func DeletePlanFeatureDefinition(tx *gorm.DB, key string) error {
+	return tx.Transaction(func(inner *gorm.DB) error {
+		var feature PlanFeatureDefinition
+		if err := inner.Clauses(clause.Locking{Strength: "UPDATE"}).Where("key = ?", key).First(&feature).Error; err != nil {
+			return err
+		}
+		if err := inner.Exec(`
+			UPDATE billing_plans
+			SET features = COALESCE((
+				SELECT jsonb_agg(element ORDER BY position)
+				FROM jsonb_array_elements_text(billing_plans.features) WITH ORDINALITY AS entries(element, position)
+				WHERE element <> ?
+			), '[]'::jsonb),
+			updated_at = now()
+			WHERE jsonb_exists(features, ?)`, key, key).Error; err != nil {
+			return err
+		}
+		if err := inner.Where("feature_key = ?", key).Delete(&OrganizationFeatureGrant{}).Error; err != nil {
+			return err
+		}
+		return inner.Delete(&feature).Error
+	})
+}
+
 func ListFeatureOrganizations(tx *gorm.DB, featureKey, search string, limit, offset int) ([]FeatureOrganization, int64, error) {
 	var feature PlanFeatureDefinition
 	if err := tx.Where("key = ?", featureKey).First(&feature).Error; err != nil {
@@ -82,6 +110,26 @@ func ListFeatureOrganizations(tx *gorm.DB, featureKey, search string, limit, off
 	err := query.Select("organizations.id, organizations.name, organizations.slug, (grants.organization_id IS NOT NULL) AS enabled_grant, plans.id AS plan_id, plans.key AS plan_key, plans.name AS plan_name").
 		Order("organizations.name, organizations.id").Limit(limit).Offset(offset).Scan(&items).Error
 	return items, total, err
+}
+
+// lockPlanFeatureReferences validates keys and holds their shared row locks until
+// the reference write commits. Deletion takes an exclusive lock on the same row.
+// Callers must run this before locking plans to keep the lock order consistent.
+func lockPlanFeatureReferences(tx *gorm.DB, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	keys = slices.Clone(keys)
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
+	var features []PlanFeatureDefinition
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("key IN ?", keys).Order("key").Find(&features).Error; err != nil {
+		return err
+	}
+	if len(features) != len(keys) {
+		return fmt.Errorf("%w: unknown feature", ErrCatalogPlan)
+	}
+	return nil
 }
 
 func validatePlanFeatureDefinition(feature *PlanFeatureDefinition) error {
