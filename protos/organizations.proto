@@ -928,12 +928,14 @@ message BillingPlanOption {
   bool per_seat = 4;
   bool require_payment_method = 5;
   bool subscription_required = 6;
+  optional int32 seat_maximum = 7;
 }
 
 message SelectBillingPlanRequest {
   string id = 1;
   string plan_key = 2;
   string return_path = 3;
+  optional int32 seats = 4;
 }
 
 message CreatePaymentMethodSessionRequest {

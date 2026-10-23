@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { organizationsCreateBillingPortalSession, organizationsSelectBillingPlan } from "@/api-client";
+import {
+  organizationsCreateBillingPortalSession,
+  organizationsSelectBillingPlan,
+  type OrganizationsBillingPlanOption,
+  type OrganizationsDescribeOrganizationBillingResponse,
+} from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useBillingCardSetup } from "@/hooks/useBillingCardSetup";
 import { organizationBillingQueryKey, useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { BillingSeatCheckout } from "./BillingSeatCheckout";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
 import { formatUsdCents } from "../../lib/workOrderUsage";
 
@@ -16,12 +22,14 @@ export function BillingPaymentSettings({
   organizationId: string;
   canManageBilling: boolean;
 }) {
-  const { data: billing } = useOrganizationBilling(organizationId);
+  const { data: billing, refetch } = useOrganizationBilling(organizationId);
   const cardSetup = useBillingCardSetup(organizationId);
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
+  const submitting = useRef(false);
   const action = useMutation({
-    mutationFn: async (planKey?: string) => {
+    retry: false,
+    mutationFn: async ({ planKey, seats }: { planKey?: string; seats?: number }) => {
       setError("");
       if (!planKey) {
         const response = await organizationsCreateBillingPortalSession(
@@ -32,7 +40,11 @@ export function BillingPaymentSettings({
         return;
       }
       const response = await organizationsSelectBillingPlan(
-        withOrganizationHeader({ organizationId, path: { id: organizationId }, body: { planKey } }),
+        withOrganizationHeader({
+          organizationId,
+          path: { id: organizationId },
+          body: { planKey, ...(seats == null ? {} : { seats }) },
+        }),
       );
       if (response.data?.checkoutUrl) {
         window.location.assign(response.data.checkoutUrl);
@@ -40,8 +52,20 @@ export function BillingPaymentSettings({
       }
       await queryClient.invalidateQueries({ queryKey: organizationBillingQueryKey(organizationId) });
     },
-    onError: (cause) => setError(getApiErrorMessage(cause, "Could not update billing.")),
+    onError: async (cause) => {
+      setError(getApiErrorMessage(cause, "Could not update billing."));
+      await refetch().catch(() => undefined);
+    },
+    onSettled: () => {
+      submitting.current = false;
+    },
   });
+
+  const submit = (planKey?: string, seats?: number) => {
+    if (submitting.current) return;
+    submitting.current = true;
+    action.mutate({ planKey, seats });
+  };
 
   if (!billing?.billingEnabled) return null;
   const plans = billing.availablePlans ?? [];
@@ -64,50 +88,22 @@ export function BillingPaymentSettings({
           )}
           <div className="flex flex-wrap gap-2">
             {manageInPortal && (
-              <Button disabled={busy} onClick={() => action.mutate(undefined)}>
+              <Button disabled={busy} onClick={() => submit()}>
                 {subscriptionActive ? "Manage subscription and card" : "Manage payment method"}
               </Button>
             )}
           </div>
-          {plans.map((plan) => {
-            const current = billing.catalogKey === plan.key;
-            const needsCard = plan.requirePaymentMethod && !billing.hasPaymentMethod && !plan.subscriptionRequired;
-            return (
-              <div key={plan.key} className="flex flex-wrap items-center justify-between gap-3 rounded border p-3">
-                <div>
-                  <p className="font-medium">{plan.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatUsdCents(Number(plan.priceCents ?? 0))}
-                    {plan.perSeat && " per seat"}
-                    {plan.requirePaymentMethod && " · Card required"}
-                  </p>
-                  {needsCard && (
-                    <p className="text-sm text-muted-foreground">
-                      Save a card in the Polar popup to activate this plan. No subscription required.
-                    </p>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  disabled={(current && !needsCard) || busy || subscriptionActive}
-                  onClick={() => {
-                    setError("");
-                    if (needsCard) {
-                      cardSetup.open(() => action.mutate(plan.key));
-                      return;
-                    }
-                    action.mutate(plan.key);
-                  }}
-                >
-                  {current && !needsCard
-                    ? "Current plan"
-                    : plan.subscriptionRequired
-                      ? `Subscribe to ${plan.name}`
-                      : `Select ${plan.name}`}
-                </Button>
-              </div>
-            );
-          })}
+          {plans.map((plan) => (
+            <BillingPlanChoice
+              key={plan.key}
+              plan={plan}
+              billing={billing}
+              busy={busy}
+              subscriptionActive={Boolean(subscriptionActive)}
+              cardSetup={cardSetup}
+              onSelect={submit}
+            />
+          ))}
           <BillingPaymentFeedback setup={cardSetup} error={error} subscriptionActive={Boolean(subscriptionActive)} />
         </div>
       ) : (
@@ -143,5 +139,93 @@ function BillingPaymentFeedback({
         </p>
       )}
     </>
+  );
+}
+
+function BillingPlanChoice({
+  plan,
+  billing,
+  busy,
+  subscriptionActive,
+  cardSetup,
+  onSelect,
+}: {
+  plan: OrganizationsBillingPlanOption;
+  billing: OrganizationsDescribeOrganizationBillingResponse;
+  busy: boolean;
+  subscriptionActive: boolean;
+  cardSetup: ReturnType<typeof useBillingCardSetup>;
+  onSelect: (planKey: string | undefined, seats?: number) => void;
+}) {
+  const current = billing.catalogKey === plan.key;
+  const needsCard = Boolean(plan.requirePaymentMethod && !billing.hasPaymentMethod && !plan.subscriptionRequired);
+  const canStartSeatCheckout = plan.perSeat && !current && !subscriptionActive;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded border p-3">
+      <div>
+        <p className="font-medium">{plan.name}</p>
+        <p className="text-sm text-muted-foreground">{billingPlanPrice(plan)}</p>
+        {needsCard && (
+          <p className="text-sm text-muted-foreground">
+            Save a card in the Polar popup to activate this plan. No subscription required.
+          </p>
+        )}
+      </div>
+      {canStartSeatCheckout ? (
+        <BillingSeatCheckout
+          plan={plan}
+          occupied={billing.occupiedSeats}
+          disabled={busy}
+          onSubscribe={(seats) => onSelect(plan.key, seats)}
+        />
+      ) : (
+        <BillingPlanButton
+          plan={plan}
+          current={current && !needsCard}
+          needsCard={needsCard}
+          disabled={busy || subscriptionActive}
+          onSelect={() => onSelect(plan.key)}
+          onSaveCard={(select) => cardSetup.open(select)}
+        />
+      )}
+    </div>
+  );
+}
+
+function billingPlanPrice(plan: OrganizationsBillingPlanOption): string {
+  const period = plan.perSeat ? " per seat per month" : plan.subscriptionRequired ? " per month" : "";
+  const card = plan.requirePaymentMethod ? " · Card required" : "";
+  return `${formatUsdCents(Number(plan.priceCents ?? 0))}${period}${card}`;
+}
+
+function BillingPlanButton({
+  plan,
+  current,
+  needsCard,
+  disabled,
+  onSelect,
+  onSaveCard,
+}: {
+  plan: OrganizationsBillingPlanOption;
+  current: boolean;
+  needsCard: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  onSaveCard: (select: () => void) => void;
+}) {
+  return (
+    <Button
+      variant="outline"
+      disabled={current || disabled}
+      onClick={() => {
+        if (needsCard) {
+          onSaveCard(onSelect);
+          return;
+        }
+        onSelect();
+      }}
+    >
+      {current ? "Current plan" : plan.subscriptionRequired ? `Subscribe to ${plan.name}` : `Select ${plan.name}`}
+    </Button>
   );
 }
