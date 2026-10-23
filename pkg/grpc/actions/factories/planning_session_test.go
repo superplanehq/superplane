@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -175,6 +176,97 @@ func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 	payload, ok := events[0].Data.Data().(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, factory.OnWorkOrderPayloadType, payload["type"])
+}
+
+func Test__SendPlanningSessionMessage__RecoversMissingSession(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		canceled       bool
+		cancelling     bool
+		newerCustomRun bool
+	}{
+		{name: "queued"},
+		{name: "canceled", canceled: true},
+		{name: "cancelling", canceled: true, cancelling: true},
+		{name: "canceled with newer custom automation", canceled: true, newerCustomRun: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			db := database.DB(t.Context())
+			factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			require.NoError(t, factoryModel.UpdatePlanning(db, models.FactoryPlanning{Enabled: true}))
+			order, err := factoryModel.CreateWorkOrder(db, "Preview intake", "Add a dry run.", &r.User, nil, nil)
+			require.NoError(t, err)
+			canvas := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+			version, err := models.FindCanvasVersionInTransaction(db, canvas.ID, *canvas.LiveVersionID)
+			require.NoError(t, err)
+			nodes := version.Nodes
+			nodes[0].ID = models.FactoryAppBacklogTriggerID
+			nodes[0].Metadata = models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 1)
+			require.NoError(t, db.Model(version).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+			require.NoError(t, db.Model(&models.CanvasNode{}).
+				Where("workflow_id = ? AND node_id = ?", canvas.ID, "start").
+				Update("node_id", models.FactoryAppBacklogTriggerID).Error)
+			require.NoError(t, workersctx.EmitWorkOrderCreatedOnCanvas(db, factoryModel, order, canvas.ID))
+			before, err := models.ListCanvasEvents(db, canvas.ID, models.FactoryAppBacklogTriggerID, 10, nil)
+			require.NoError(t, err)
+			require.Len(t, before, 1)
+			run, err := models.FindCanvasRunInTransaction(db, canvas.ID, before[0].RunID)
+			require.NoError(t, err)
+			if test.cancelling {
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					_, err := order.CancelQueuedTask(tx, before[0].ID)
+					return err
+				}))
+			}
+			if test.canceled && !test.cancelling {
+				require.NoError(t, finishCanvasRun(db, run, models.CanvasRunResultCancelled))
+			}
+			if test.newerCustomRun {
+				require.NoError(t, db.Model(canvas).Update("name", "Task refinement").Error)
+				custom := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+				require.NoError(t, workersctx.EmitWorkOrderCreatedOnCanvas(db, factoryModel, order, custom.ID))
+				customEvents, err := models.ListCanvasEvents(db, custom.ID, "start", 10, nil)
+				require.NoError(t, err)
+				require.Len(t, customEvents, 1)
+				customRun, err := models.FindCanvasRunInTransaction(db, custom.ID, customEvents[0].RunID)
+				require.NoError(t, err)
+				require.NoError(t, finishCanvasRun(db, customRun, models.CanvasRunResultPassed))
+			}
+			_, err = models.FindPlanningSessionByDraftWorkOrder(db, r.Organization.ID, factoryModel.ID, order.ID)
+			require.ErrorIs(t, err, models.ErrFactoryPlanningSessionNotFound)
+
+			sent, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+				FactoryId: factoryModel.ID.String(), WorkOrderId: order.ID.String(), Text: "Please analyze this task.",
+			})
+			if !test.canceled {
+				require.Error(t, err)
+				_, findErr := models.FindPlanningSessionByDraftWorkOrder(db, r.Organization.ID, factoryModel.ID, order.ID)
+				require.ErrorIs(t, findErr, models.ErrFactoryPlanningSessionNotFound)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, sent.Session)
+			assert.Equal(t, order.ID.String(), sent.Session.Draft.WorkOrderId)
+			require.Len(t, sent.Session.Messages, 1)
+			assert.Equal(t, "Please analyze this task.", sent.Session.Messages[0].Text)
+			after, err := models.ListCanvasEvents(db, canvas.ID, models.FactoryAppBacklogTriggerID, 10, nil)
+			require.NoError(t, err)
+			require.Len(t, after, 2)
+			assert.Equal(t, models.CanvasEventStatePending, after[0].State)
+
+			followUp, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+				FactoryId: factoryModel.ID.String(), SessionId: sent.Session.Id, Text: "Keep the existing retry helper.",
+			})
+			require.NoError(t, err)
+			require.Len(t, followUp.Session.Messages, 2)
+			after, err = models.ListCanvasEvents(db, canvas.ID, models.FactoryAppBacklogTriggerID, 10, nil)
+			require.NoError(t, err)
+			assert.Len(t, after, 2, "messages sent while the restart waits must share its queued run")
+		})
+	}
 }
 
 func Test__SendPlanningSessionMessage__RestartsCancelledAnalysisRun(t *testing.T) {

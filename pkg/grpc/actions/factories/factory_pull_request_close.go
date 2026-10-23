@@ -130,6 +130,9 @@ func applyGitHubPullRequestClosed(
 ) (*factoryPullRequestCloseResult, error) {
 	var outcome *factoryPullRequestCloseResult
 	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, factory.OrganizationID); err != nil {
+			return err
+		}
 		if err := stampFactoryPullRequestClosed(tx, pullRequest, merged, mergedAt, closedAt); err != nil {
 			return err
 		}
