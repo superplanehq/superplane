@@ -117,7 +117,7 @@ func TestResolvePurchasedSeats(t *testing.T) {
 	_, err = models.CreateAPIKey(db, r.Organization.ID, "service", nil, r.User, nil, nil)
 	require.NoError(t, err)
 
-	expected := SeatUsage{PerSeat: true, Purchased: seatCount(3), Occupied: 2, Available: seatCount(1), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(2)}
+	expected := SeatUsage{Invitable: seatCount(1), PerSeat: true, Purchased: seatCount(3), Occupied: 2, Available: seatCount(1), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(2)}
 	check := func() {
 		t.Helper()
 		actual, err := ResolveSeats(db, r.Organization.ID)
@@ -150,6 +150,7 @@ func TestResolvePurchasedSeats(t *testing.T) {
 
 	for _, quantity := range []*int{seatCount(1), seatCount(0), nil} {
 		require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", quantity).Error)
+		expected.Invitable = seatCount(0)
 		expected.Purchased, expected.Available = quantity, seatCount(0)
 		if quantity == nil {
 			expected.Purchased = seatCount(0)
@@ -235,6 +236,9 @@ func TestResolveSeatsForPlanUsesLoadedPlan(t *testing.T) {
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
 	loaded, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
+	now := time.Now()
+	invitation := models.OrganizationInvitation{OrganizationID: r.Organization.ID, Email: "pending@example.com", Role: models.RoleOrgOperator, InvitedBy: r.User, State: models.InvitationStatePending, SentAt: now, ExpiresAt: now.Add(time.Hour)}
+	require.NoError(t, invitation.Save(db))
 
 	// Change the stored plan after the caller's read. Seat usage must follow
 	// the loaded plan so counts and prices stay consistent.
@@ -242,7 +246,13 @@ func TestResolveSeatsForPlanUsesLoadedPlan(t *testing.T) {
 
 	actual, err := ResolveSeatsForPlan(db, r.Organization.ID, loaded)
 	require.NoError(t, err)
-	require.Equal(t, SeatUsage{PerSeat: true, Purchased: seatCount(3), Occupied: 1, Available: seatCount(2), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(1)}, *actual)
+	require.Equal(t, SeatUsage{PendingInvitations: 1, Invitable: seatCount(1), PerSeat: true, Purchased: seatCount(3), Occupied: 1, Available: seatCount(2), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(1)}, *actual)
+
+	current, err := ResolveSeats(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, 1, current.PendingInvitations)
+	require.Equal(t, seatCount(9), current.Purchased)
+	require.Equal(t, seatCount(7), current.Invitable)
 }
 
 func seatCount(quantity int) *int { return &quantity }

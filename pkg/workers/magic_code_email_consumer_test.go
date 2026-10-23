@@ -84,3 +84,7 @@ func (s *failingEmailService) SendWorkOrderNotificationEmail(_, _ string, _ serv
 func (s *failingEmailService) SendSupportFeedbackEmail(_ string, _ services.SupportFeedback) error {
 	return s.err
 }
+
+func (s *failingEmailService) SendOrganizationInvitationEmail(_ string, _ services.OrganizationInvitationTemplateData) error {
+	return s.err
+}

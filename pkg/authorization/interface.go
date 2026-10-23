@@ -27,6 +27,7 @@ type GroupManager interface {
 // Role management interface
 type RoleManager interface {
 	AssignRole(userID, role, domainID string, domainType string) error
+	AssignRoleInTransaction(tx *gorm.DB, userID, role, domainID, domainType string) error
 	RemoveRole(userID, role, domainID string, domainType string) error
 	GetOrgUsersForRole(ctx context.Context, role string, orgID string) ([]string, error)
 }

@@ -15,6 +15,7 @@ const waitlistWindow = window as SignupWaitlistWindow;
 const installationSettingsResponse = {
   allow_private_network_access: false,
   signups_enabled: false,
+  invitation_duration_days: 7,
   signups_blocked_by_environment: false,
   effective_blocked_http_hosts: [],
   effective_private_ip_ranges: [],
@@ -105,6 +106,7 @@ describe("InstallationSettings", () => {
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "Automations",
       "Email",
+      "Invitations",
       "Hosted LLM",
       "Network",
     ]);
@@ -150,6 +152,7 @@ describe("InstallationSettings", () => {
     expect((await screen.findAllByRole("tab")).map((tab) => tab.textContent)).toEqual([
       "Automations",
       "Email",
+      "Invitations",
       "Hosted LLM",
       "Network",
       "Signups",
@@ -160,4 +163,32 @@ describe("InstallationSettings", () => {
     expect(screen.getByTestId("installation-signups-switch")).toBeInTheDocument();
     expect(screen.queryByText("Network policy")).not.toBeInTheDocument();
   });
+});
+
+it("saves invitation duration and restores it after reload", async () => {
+  const user = userEvent.setup();
+  let settings = { ...installationSettingsResponse };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        settings = { ...settings, ...JSON.parse(String(init.body)) };
+      }
+      return Response.json(settings);
+    }),
+  );
+  const view = renderInstallationSettings();
+  await user.click(await screen.findByRole("tab", { name: "Invitations" }));
+  const duration = screen.getByRole("spinbutton", { name: "Invitation duration (days)" });
+  expect(duration).toHaveValue(7);
+  await user.clear(duration);
+  expect(screen.getByRole("button", { name: "Save invitation settings" })).toBeDisabled();
+  await user.type(duration, "14");
+  await user.click(screen.getByRole("button", { name: "Save invitation settings" }));
+  expect(await screen.findByRole("button", { name: "Save invitation settings" })).toBeDisabled();
+  expect(settings.invitation_duration_days).toBe(14);
+  view.unmount();
+  renderInstallationSettings();
+  await user.click(await screen.findByRole("tab", { name: "Invitations" }));
+  expect(screen.getByRole("spinbutton", { name: "Invitation duration (days)" })).toHaveValue(14);
 });

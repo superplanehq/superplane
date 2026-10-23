@@ -124,3 +124,43 @@ func TestSetOwnerSetupStepIfOpenDoesNotReopenAfterOverlappingClose(t *testing.T)
 	require.NoError(t, err)
 	assert.Empty(t, step)
 }
+
+func TestApplyInstallationMetadataKeepsConcurrentInvitationDuration(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	metadata, err := GetInstallationMetadata(database.Conn())
+	require.NoError(t, err)
+	require.Equal(t, 7, metadata.InvitationDurationDays)
+
+	tx := database.Conn().Begin()
+	require.NoError(t, tx.Error)
+	t.Cleanup(func() { tx.Rollback() })
+
+	locked, err := lockInstallationMetadata(tx)
+	require.NoError(t, err)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- ApplyInstallationMetadata(database.Conn(), func(current *InstallationMetadata) {
+			current.InvitationDurationDays = 14
+			current.UpdatedAt = time.Now()
+		})
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+	locked.AllowPrivateNetworkAccess = true
+	locked.UpdatedAt = time.Now()
+	require.NoError(t, writeInstallationMetadata(tx, locked))
+	require.NoError(t, tx.Commit().Error)
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("invitation duration update did not finish after the other save committed")
+	}
+
+	updated, err := GetInstallationMetadata(database.Conn())
+	require.NoError(t, err)
+	assert.True(t, updated.AllowPrivateNetworkAccess)
+	assert.Equal(t, 14, updated.InvitationDurationDays)
+}
