@@ -103,6 +103,9 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 				return err
 			}
 		}
+		if err := models.SettleSeatPurchase(inner, orgID, data.ID, data.Seats, data.ModifiedAt.TimePtr()); err != nil {
+			return err
+		}
 		return models.SyncIncludedLLMCreditGrant(inner, models.IncludedUsageSync{
 			OrganizationID:   orgID,
 			SubscriptionID:   data.ID,
@@ -111,6 +114,15 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 			IsActiveBusiness: plan != nil && plan.IsActiveBusiness(),
 		})
 	})
+}
+
+// ApplyOrganizationSubscription applies a snapshot that a direct Polar API call
+// returned. Those snapshots can omit the customer, so the organization fills it in.
+func ApplyOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, data SubscriptionData) error {
+	if strings.TrimSpace(data.organizationExternalID()) == "" {
+		data.ExternalCustomerID = orgID.String()
+	}
+	return ApplySubscription(ctx, tx, data)
 }
 
 func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) error {
@@ -142,10 +154,7 @@ func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.U
 	if selected == nil {
 		return nil
 	}
-	if strings.TrimSpace(selected.organizationExternalID()) == "" {
-		selected.ExternalCustomerID = orgID.String()
-	}
-	return ApplySubscription(ctx, tx, *selected)
+	return ApplyOrganizationSubscription(ctx, tx, orgID, *selected)
 }
 
 func selectBusinessSubscription(items []SubscriptionData) *SubscriptionData {
@@ -225,10 +234,7 @@ func setOrganizationSubscriptionCancelAtPeriodEnd(ctx context.Context, tx *gorm.
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(updated.organizationExternalID()) == "" {
-		updated.ExternalCustomerID = orgID.String()
-	}
-	return ApplySubscription(ctx, tx, *updated)
+	return ApplyOrganizationSubscription(ctx, tx, orgID, *updated)
 }
 
 func polarSubscriptionID(plan *models.OrganizationBillingPlan) string {

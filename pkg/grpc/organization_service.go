@@ -215,6 +215,17 @@ func (s *OrganizationService) CreatePaymentMethodSession(ctx context.Context, re
 	return organizations.CreatePaymentMethodSession(ctx, orgID, req, accountID)
 }
 
+func (s *OrganizationService) PreviewSeatPurchase(ctx context.Context, req *pb.PreviewSeatPurchaseRequest) (*pb.PreviewSeatPurchaseResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.PreviewSeatPurchase(ctx, orgID, req)
+}
+
+func (s *OrganizationService) PurchaseSeats(ctx context.Context, req *pb.PurchaseSeatsRequest) (*pb.PurchaseSeatsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	userID, _ := userIDFromContext(ctx)
+	return organizations.PurchaseSeats(ctx, orgID, req, userID)
+}
+
 func (s *OrganizationService) SyncOrganizationBilling(
 	ctx context.Context,
 	req *pb.SyncOrganizationBillingRequest,

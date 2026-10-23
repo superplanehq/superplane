@@ -1399,6 +1399,27 @@ CREATE TABLE public.organization_seat_limit_overrides (
 
 
 --
+-- Name: organization_seat_purchases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_seat_purchases (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid,
+    polar_subscription_id text NOT NULL,
+    from_seats integer NOT NULL,
+    to_seats integer NOT NULL,
+    status text NOT NULL,
+    error_code text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_seat_purchases_adds_seats CHECK ((to_seats > from_seats)),
+    CONSTRAINT organization_seat_purchases_from_seats_check CHECK ((from_seats >= 0)),
+    CONSTRAINT organization_seat_purchases_status CHECK ((status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'action_required'::text, 'unknown'::text])))
+);
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2918,6 +2939,14 @@ ALTER TABLE ONLY public.organization_seat_limit_overrides
 
 
 --
+-- Name: organization_seat_purchases organization_seat_purchases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4103,6 +4132,13 @@ CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm
 
 
 --
+-- Name: idx_organization_seat_purchases_organization_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_seat_purchases_organization_created ON public.organization_seat_purchases USING btree (organization_id, created_at);
+
+
+--
 -- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4625,6 +4661,13 @@ CREATE UNIQUE INDEX unique_api_key_in_organization ON public.users USING btree (
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
+
+
+--
+-- Name: uq_organization_seat_purchases_in_flight; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_seat_purchases_in_flight ON public.organization_seat_purchases USING btree (organization_id) WHERE (status = ANY (ARRAY['pending'::text, 'unknown'::text]));
 
 
 --
@@ -5526,6 +5569,22 @@ ALTER TABLE ONLY public.organization_seat_limit_overrides
 
 
 --
+-- Name: organization_seat_purchases organization_seat_purchases_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_seat_purchases organization_seat_purchases_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: organizations organizations_created_by_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6053,7 +6112,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261023153557	f
+20261023195812	f
 \.
 
 
