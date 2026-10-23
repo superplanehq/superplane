@@ -126,6 +126,12 @@ func DescribeOrganizationBilling(
 		return response, nil
 	}
 
+	lastSeatPurchase, err := models.FindLatestSeatPurchase(db, organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load the last seat purchase.")
+	}
+	response.LastSeatPurchase = seatPurchaseToProto(lastSeatPurchase)
+
 	seats, err := entitlements.ResolveSeatsForPlan(db, organizationID, plan)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "Could not load seat usage.")

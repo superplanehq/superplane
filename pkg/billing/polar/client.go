@@ -39,6 +39,29 @@ var (
 	ErrUnauthorized          = errors.New("polar unauthorized")
 	ErrTeamMemberRequired    = errors.New("polar team member required")
 	ErrUnsupportedAPIVersion = errors.New("polar api version is not supported")
+
+	// Subscription update failures. Polar leaves the subscription unchanged
+	// for each of them.
+	ErrPaymentFailed         = errors.New("polar payment failed")
+	ErrPaymentActionRequired = errors.New("polar payment needs customer action")
+	ErrSubscriptionLocked    = errors.New("polar subscription is locked by another update")
+	ErrSubscriptionInactive  = errors.New("polar subscription is canceled or inactive")
+
+	// ErrOutcomeUnknown marks a request that Polar may have applied. The
+	// connection failed, timed out, answered 5xx, or returned an unreadable body.
+	ErrOutcomeUnknown = errors.New("polar request outcome is unknown")
+
+	// ErrInvalidRequest marks a 422. Polar rejected the request values.
+	ErrInvalidRequest = errors.New("polar rejected the request values")
+)
+
+// Polar error codes in the "error" field of a response body.
+const (
+	errorCodePaymentFailed         = "PaymentFailed"
+	errorCodePaymentActionRequired = "PaymentActionRequired"
+	errorCodeSubscriptionLocked    = "SubscriptionLocked"
+	errorCodeAlreadyCanceled       = "AlreadyCanceledSubscription"
+	errorCodeInactiveSubscription  = "InactiveSubscription"
 )
 
 type Client struct {
@@ -533,6 +556,45 @@ func (c *Client) setSubscriptionCancelAtPeriodEnd(ctx context.Context, subscript
 	return &payload, nil
 }
 
+// UpdateSubscriptionSeats sets the absolute seat count and invoices the
+// prorated difference at once. Polar applies the change only when that payment
+// succeeds. The renewal date does not change.
+func (c *Client) UpdateSubscriptionSeats(ctx context.Context, subscriptionID string, seats int) (*SubscriptionData, error) {
+	id := strings.TrimSpace(subscriptionID)
+	if id == "" {
+		return nil, fmt.Errorf("subscription id is required")
+	}
+
+	var payload SubscriptionData
+	err := c.patch(ctx, "/subscriptions/"+url.PathEscape(id), map[string]any{
+		"seats":              seats,
+		"proration_behavior": "invoice",
+	}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(payload.ID) == "" {
+		return nil, classified(fmt.Errorf("polar subscription update did not return an id"), ErrOutcomeUnknown)
+	}
+	return &payload, nil
+}
+
+func (c *Client) GetSubscription(ctx context.Context, subscriptionID string) (*SubscriptionData, error) {
+	id := strings.TrimSpace(subscriptionID)
+	if id == "" {
+		return nil, fmt.Errorf("subscription id is required")
+	}
+
+	var payload SubscriptionData
+	if err := c.get(ctx, "/subscriptions/"+url.PathEscape(id), &payload); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(payload.ID) == "" {
+		return nil, fmt.Errorf("polar subscription response did not return an id")
+	}
+	return &payload, nil
+}
+
 func (c *Client) ListOrders(ctx context.Context, externalCustomerID string) ([]Order, error) {
 	externalID := strings.TrimSpace(externalCustomerID)
 	if externalID == "" {
@@ -607,13 +669,13 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return err
+		return classified(err, ErrOutcomeUnknown)
 	}
 	defer resp.Body.Close()
 
 	payload, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return classified(err, ErrOutcomeUnknown)
 	}
 	servedVersion := strings.TrimSpace(resp.Header.Get(apiVersionHeader))
 	// Polar echoes Polar-Version on every response it routes. A 404 without it
@@ -631,8 +693,23 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 			"polar_path":               path,
 		}).Warn("polar served a different api version than the pinned one")
 	}
+	errorCode := responseErrorCode(payload)
 	if resp.StatusCode == http.StatusConflict {
+		if errorCode == errorCodeSubscriptionLocked {
+			return fmt.Errorf("%w: %w: %s", ErrSubscriptionLocked, ErrConflict, strings.TrimSpace(string(payload)))
+		}
 		return fmt.Errorf("%w: %s", ErrConflict, strings.TrimSpace(string(payload)))
+	}
+	if resp.StatusCode == http.StatusPaymentRequired {
+		switch errorCode {
+		case errorCodePaymentFailed:
+			return fmt.Errorf("%w: %s", ErrPaymentFailed, strings.TrimSpace(string(payload)))
+		case errorCodePaymentActionRequired:
+			return fmt.Errorf("%w: %s", ErrPaymentActionRequired, strings.TrimSpace(string(payload)))
+		}
+	}
+	if resp.StatusCode == http.StatusForbidden && isSubscriptionInactiveCode(errorCode) {
+		return fmt.Errorf("%w: %s", ErrSubscriptionInactive, strings.TrimSpace(string(payload)))
 	}
 	if resp.StatusCode == http.StatusTooManyRequests {
 		retryAfter := strings.TrimSpace(resp.Header.Get("Retry-After"))
@@ -648,12 +725,58 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 		return fmt.Errorf("%w: %s", ErrTeamMemberRequired, strings.TrimSpace(string(payload)))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("polar api %s %s: %d %s", method, path, resp.StatusCode, strings.TrimSpace(string(payload)))
+		statusErr := fmt.Errorf("polar api %s %s: %d %s", method, path, resp.StatusCode, strings.TrimSpace(string(payload)))
+		if resp.StatusCode >= 500 || resp.StatusCode == http.StatusRequestTimeout {
+			return classified(statusErr, ErrOutcomeUnknown)
+		}
+		if resp.StatusCode == http.StatusUnprocessableEntity {
+			return classified(statusErr, ErrInvalidRequest)
+		}
+		return statusErr
 	}
 	if dest == nil || len(payload) == 0 {
 		return nil
 	}
-	return json.Unmarshal(payload, dest)
+	if err := json.Unmarshal(payload, dest); err != nil {
+		return classified(err, ErrOutcomeUnknown)
+	}
+	return nil
+}
+
+// classifiedError keeps the original message and also matches a sentinel.
+type classifiedError struct {
+	err   error
+	class error
+}
+
+func classified(err, class error) error {
+	return &classifiedError{err: err, class: class}
+}
+
+func (e *classifiedError) Error() string {
+	return e.err.Error()
+}
+
+func (e *classifiedError) Unwrap() error {
+	return e.err
+}
+
+func (e *classifiedError) Is(target error) bool {
+	return target == e.class
+}
+
+func responseErrorCode(payload []byte) string {
+	var body struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(payload, &body); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(body.Error)
+}
+
+func isSubscriptionInactiveCode(code string) bool {
+	return code == errorCodeAlreadyCanceled || code == errorCodeInactiveSubscription
 }
 
 func IsNotFound(err error) bool {
@@ -670,6 +793,31 @@ func IsRateLimited(err error) bool {
 
 func IsUnauthorized(err error) bool {
 	return err != nil && errors.Is(err, ErrUnauthorized)
+}
+
+func IsPaymentFailed(err error) bool {
+	return err != nil && errors.Is(err, ErrPaymentFailed)
+}
+
+func IsPaymentActionRequired(err error) bool {
+	return err != nil && errors.Is(err, ErrPaymentActionRequired)
+}
+
+func IsSubscriptionLocked(err error) bool {
+	return err != nil && errors.Is(err, ErrSubscriptionLocked)
+}
+
+func IsSubscriptionInactive(err error) bool {
+	return err != nil && errors.Is(err, ErrSubscriptionInactive)
+}
+
+func IsInvalidRequest(err error) bool {
+	return err != nil && errors.Is(err, ErrInvalidRequest)
+}
+
+// IsOutcomeUnknown reports that Polar may have applied the request.
+func IsOutcomeUnknown(err error) bool {
+	return err != nil && errors.Is(err, ErrOutcomeUnknown)
 }
 
 func IsUnsupportedAPIVersion(err error) bool {

@@ -136,3 +136,48 @@ capacity. Membership-based renewal estimates belong to
 field and allocate additional fields after field 34. An absent `seat_maximum` means
 unlimited. An organization override replaces the target catalog maximum,
 including an unlimited override.
+
+## Buy more seats in the sandbox
+
+A billing manager buys more seats during the billing period. Polar charges the
+prorated amount at once and does not change the renewal date. SuperPlane adds
+capacity only from the Polar subscription snapshot that follows a successful
+payment. The $20 monthly seat price below is an example. Use your catalog price.
+
+The API has two routes. Both need `org:update` and **New Billing**:
+
+- `POST /api/v1/organizations/{id}/billing/seats/preview` with `additional_seats`.
+  It estimates the charge and makes no change.
+- `POST /api/v1/organizations/{id}/billing/seats/purchase` with
+  `additional_seats` and `expected_purchased_seats`. The second field must equal
+  the current `purchased_seats`. A repeated or stale request gets HTTP 409.
+
+SuperPlane sends `PATCH /subscriptions/{id}` with the absolute seat count and
+`proration_behavior` set to `invoice`. It does not use any other value.
+
+1. Use an organization with an active Team subscription that is not set to cancel.
+2. Read `purchased_seats`, `current_period_end`, and `purchasable_seats` from the billing response.
+3. Call the preview route for one seat. Confirm that `prorated_charge_cents` equals
+   `seat price x remaining seconds / period seconds`, rounded to the nearest cent.
+4. Confirm that `estimate` and `excludes_tax` are `true`.
+5. Call the purchase route for one seat. Inspect the Polar request with a local HTTP proxy.
+6. Confirm that the body is `{"seats": <purchased + 1>, "proration_behavior": "invoice"}`.
+7. In the Polar sandbox dashboard, confirm that Polar created an order for the prorated amount at once.
+8. Confirm that `purchased_seats` grew by one, `last_seat_purchase.status` is `succeeded`,
+   and `current_period_end` did not change.
+9. Send the same purchase request again. Confirm HTTP 409 and no second Polar order.
+10. Set a sandbox payment method that Polar declines. Buy one seat. Confirm that the
+    request fails with the payment failed message and `purchased_seats` does not change.
+11. Set a sandbox payment method that needs bank confirmation. Confirm the distinct
+    bank confirmation message and that `purchased_seats` does not change.
+
+If Polar does not answer, the purchase has the status `awaiting_confirmation`.
+Capacity does not change. A `subscription.updated` webhook, a billing sync, or the
+next preview or purchase reads the subscription from Polar and settles the purchase.
+Only one purchase can be pending or unconfirmed for an organization at a time.
+A purchase that Polar never applied fails five minutes after it started, when the
+next preview or purchase checks Polar.
+
+The table `organization_seat_purchases` is the marker for seat changes that
+SuperPlane started. Use `models.FindExpectedSeatCount` to tell them from outside
+changes in Polar.
