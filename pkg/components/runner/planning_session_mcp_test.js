@@ -95,7 +95,7 @@ test("review user prompt scores three sub-parameters on the 1 through 3 scale", 
   assert.match(pack, /Publish the scores alone/);
   assert.match(pack, /If Clarity is 2, write the plan\. Say it is a first pass\./);
   assert.match(pack, /Keep refining until every score is 3/);
-  assert.match(pack, /A simple task can reach 3 on every score with no survey/);
+  assert.match(pack, /When all scores are 3, publish the plan without a survey/);
   assert.match(pack, /one sentence of 14 words or fewer/);
   assert.match(pack, /about the task, not to the user/);
   assert.match(pack, /name only the weakest sub-parameter/);
