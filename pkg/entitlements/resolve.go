@@ -51,14 +51,11 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 	}
 	result := &Entitlements{
 		PlanID: catalog.ID, PlanKey: catalog.Key, PlanName: catalog.Name,
-		PlanSeatLimit: catalog.SeatLimit, SeatLimitOverride: override, SeatLimit: catalog.SeatLimit, ParallelTaskLimit: catalog.ParallelTaskLimit,
+		PlanSeatLimit: catalog.SeatLimit, SeatLimitOverride: override, SeatLimit: seatMaximum(catalog.SeatLimit, override), ParallelTaskLimit: catalog.ParallelTaskLimit,
 		Features:         productFeatures,
 		CreditPolicy:     CreditPolicy{AmountCents: catalog.CreditAmountCents, Frequency: catalog.CreditFrequency, Expiration: catalog.CreditExpiration, ValidityDays: catalog.CreditValidityDays},
 		TrialCreditCents: catalog.TrialCreditCents, TrialLengthDays: catalog.TrialLengthDays, MarkupBPS: markup,
 		HostedExecutionAllowed: plan.AllowsHostedExecution(time.Now()), CreditPurchaseAllowed: plan.AllowsCreditPurchase(),
-	}
-	if override != nil {
-		result.SeatLimit = override.SeatLimit
 	}
 	if !models.BillingEnabled() {
 		result.SeatLimit = nil
