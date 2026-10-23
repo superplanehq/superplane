@@ -102,18 +102,27 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 
-	// The provider call stays outside the organization lock. A slow Git host
-	// must not block dispatch or cancellation for every task in the organization.
-	// The active-automation check runs before the call. The result is recorded
-	// under the lock after the host accepts the merge.
-	if err := rejectMergeWhileAutomationActive(db, factory, pullRequest); err != nil {
-		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
-	}
-	if err := provider.MergePullRequest(ctx, pullRequest, method, expectedSHA); err != nil {
-		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
-	}
-
-	closeOutcome, err := recordMergedFactoryPullRequest(db, factory, pullRequest)
+	// Reserve this task across the provider call without holding organization or
+	// row locks. Checks and completion use short, separate transactions.
+	var closeOutcome *factoryPullRequestCloseResult
+	err = db.Transaction(func(reservation *gorm.DB) error {
+		order := &models.FactoryWorkOrder{ID: pullRequest.WorkOrderID}
+		reserved, err := order.TryReserveMerge(reservation)
+		if err != nil {
+			return err
+		}
+		if !reserved {
+			return errFactoryPullRequestNotMergeable
+		}
+		if err := rejectMergeWhileAutomationActive(db, factory, pullRequest); err != nil {
+			return err
+		}
+		if err := provider.MergePullRequest(ctx, pullRequest, method, expectedSHA); err != nil {
+			return err
+		}
+		closeOutcome, err = recordMergedFactoryPullRequest(db, factory, pullRequest)
+		return err
+	})
 	if err != nil {
 		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
 	}

@@ -210,6 +210,13 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return nil, fmt.Errorf("step index %d out of range", stepIndex)
 	}
 
+	if err := checkTaskMergeAdmission(tx, order.ID); err != nil {
+		if errors.Is(err, ErrOrganizationTaskCapacity) {
+			return l.enqueueStep(tx, order, stepIndex)
+		}
+		return nil, err
+	}
+
 	line, err := lockFactoryLineForStepAdmission(tx, l.LineID)
 	if err != nil {
 		return nil, err

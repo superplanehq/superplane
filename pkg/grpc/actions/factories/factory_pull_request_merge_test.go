@@ -241,13 +241,40 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 		})
 	}
 
-	for _, startAutomation := range []bool{false, true} {
-		t.Run(fmt.Sprintf("leaves admission free and settles concurrent automation %t", startAutomation), func(t *testing.T) {
-			factory := newFactory(t)
-			order := createOrder(t, factory)
+	for _, mergeFails := range []bool{false, true} {
+		t.Run(fmt.Sprintf("reserves only the merging task and releases reservation after failure %t", mergeFails), func(t *testing.T) {
+			registry := *r
+			registry.Organization = support.CreateOrganization(t, r, r.User)
+			r := &registry
+			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			orgID := r.Organization.ID.String()
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+			require.NoError(t, err)
 			pr := createMergeTestPullRequest(t, db, order)
-			var startedRun *models.CanvasRun
+			app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step", "start")
+			line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+				{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+			})
+			require.NoError(t, err)
+			otherOrder, err := factory.CreateWorkOrder(db, "Other task", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			storedPR, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+			require.NoError(t, err)
+			feedbackRun, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			feedback, err := storedPR.CreateActivity(db, models.FactoryPullRequestActivityParams{
+				RunID: feedbackRun.ID, Access: models.FactoryPullRequestAccessConcurrent,
+			})
+			require.NoError(t, err)
 			api := readyAPI()
+			if mergeFails {
+				api.mergeErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusConflict}}
+			}
 			api.onMerge = func() {
 				err := db.Transaction(func(tx *gorm.DB) error {
 					locked, err := models.TryLockOrganizationTaskAdmission(tx, r.Organization.ID)
@@ -256,37 +283,68 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 					return nil
 				})
 				require.NoError(t, err)
-				if startAutomation {
-					app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step", "start")
-					line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
-						{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+				access, err := storedPR.RequestExclusiveAccess(db, feedback.Activity)
+				require.NoError(t, err)
+				assert.Equal(t, models.FactoryPullRequestActivityOutcomeWaiting, access.Outcome)
+				err = db.Transaction(func(tx *gorm.DB) error {
+					return models.CheckTaskRootEventAdmission(tx, app, &models.CanvasEvent{
+						Data: models.NewJSONValue(map[string]any{"work_order": map[string]any{"id": order.ID.String()}}),
 					})
-					require.NoError(t, err)
-					_, err = DispatchWorkOrder(ctx, orgID, &pb.DispatchWorkOrderRequest{
-						FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
-					})
-					require.NoError(t, err)
-					runs, err := order.ListRuns(db)
-					require.NoError(t, err)
-					require.Len(t, runs, 1)
-					startedRun = &runs[0]
-				}
+				})
+				assert.ErrorIs(t, err, models.ErrOrganizationTaskCapacity, "root events must wait during merge")
+				_, err = DispatchWorkOrder(ctx, orgID, &pb.DispatchWorkOrderRequest{
+					FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+				})
+				require.NoError(t, err)
+				err = db.Transaction(func(tx *gorm.DB) error {
+					_, err := models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+					return err
+				})
+				require.NoError(t, err)
+				runs, err := order.ListRuns(db)
+				require.NoError(t, err)
+				require.Len(t, runs, 1, "new line work must stay queued during merge")
+				assert.Equal(t, feedbackRun.ID, runs[0].ID)
+				_, err = DispatchWorkOrder(ctx, orgID, &pb.DispatchWorkOrderRequest{
+					FactoryId: factory.ID.String(), OrderId: otherOrder.ID.String(), LineName: line.Name,
+				})
+				require.NoError(t, err)
+				runs, err = otherOrder.ListRuns(db)
+				require.NoError(t, err)
+				assert.Len(t, runs, 1, "unrelated tasks must still start")
+				run, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateStarted, "")
+				require.NoError(t, err)
+				activity, err := storedPR.CreateActivity(db, models.FactoryPullRequestActivityParams{
+					RunID: run.ID, Access: models.FactoryPullRequestAccessExclusive,
+				})
+				require.NoError(t, err)
+				assert.Equal(t, models.FactoryPullRequestActivityOutcomeWaiting, activity.Outcome)
 			}
 			useGitHub(t, api)
 
-			resp, err := merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
-			require.NoError(t, err)
+			resp, err := MergeFactoryPullRequest(ctx, deps, orgID, &pb.MergeFactoryPullRequestRequest{
+				FactoryId: factory.ID.String(), PrId: pr.GetId(),
+				MergeMethod: pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, ExpectedHeadSha: headSHA,
+			})
 			assert.Equal(t, 1, api.mergeCalls)
-			assert.Equal(t, pb.FactoryPullRequest_STATE_MERGED, resp.GetPullRequest().GetState())
-			if startedRun != nil {
-				stored, err := factory.FindWorkOrder(db, order.ID)
+			if mergeFails {
+				require.Error(t, err)
+				err = db.Transaction(func(tx *gorm.DB) error {
+					_, err := models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+					return err
+				})
 				require.NoError(t, err)
-				assert.Equal(t, models.FactoryWorkOrderStateClosed, stored.State)
-				assert.Equal(t, models.FactoryWorkOrderResultCompleted, stored.Result)
-				run, err := models.FindCanvasRunInTransaction(db, startedRun.WorkflowID, startedRun.ID)
+				runs, err := order.ListRuns(db)
 				require.NoError(t, err)
-				assert.Equal(t, models.CanvasRunStateCancelling, run.State)
+				assert.Len(t, runs, 2, "failed merge must release queued work alongside the existing feedback run")
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, pb.FactoryPullRequest_STATE_MERGED, resp.GetPullRequest().GetState())
+			stored, err := factory.FindWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryWorkOrderStateClosed, stored.State)
+			assert.Equal(t, models.FactoryWorkOrderResultCompleted, stored.Result)
 		})
 	}
 

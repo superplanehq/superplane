@@ -233,6 +233,9 @@ func checkOrganizationTaskAdmission(tx *gorm.DB, orgID, workOrderID uuid.UUID) e
 	if workOrderID == uuid.Nil {
 		return nil
 	}
+	if err := checkTaskMergeAdmission(tx, workOrderID); err != nil {
+		return err
+	}
 	stopping, err := organizationTaskIsStopping(tx, orgID, workOrderID)
 	if err != nil {
 		return err
@@ -336,6 +339,12 @@ func queuedTaskCandidate(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*Factory
 }
 
 func admitQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*FactoryLineStepResult, error) {
+	if err := checkTaskMergeAdmission(tx, item.WorkOrderID); err != nil {
+		if errors.Is(err, ErrOrganizationTaskCapacity) {
+			return nil, nil
+		}
+		return nil, err
+	}
 	dispatch, order, line, err := queuedTaskCandidate(tx, item)
 	if err != nil {
 		return nil, err

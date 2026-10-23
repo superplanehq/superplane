@@ -152,6 +152,12 @@ func nextQueuedOrganizationTask(tx *gorm.DB, orgID uuid.UUID) (*OrganizationQueu
 	}
 	for i := range queued {
 		task := &queued[i]
+		if err := checkTaskMergeAdmission(tx, task.WorkOrderID); err != nil {
+			if errors.Is(err, ErrOrganizationTaskCapacity) {
+				continue
+			}
+			return nil, err
+		}
 		if slices.Contains(stopping, task.WorkOrderID) {
 			continue
 		}
