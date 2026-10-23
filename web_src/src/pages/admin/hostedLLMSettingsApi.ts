@@ -11,6 +11,8 @@ export type InstallationLLMSettings = {
   welcome_grant_cents: number;
   markup_bps: number;
   warning_threshold_bps: number;
+  credit_purchase_fee_bps: number;
+  credit_purchase_fixed_fee_cents: number;
   default_hosted_provider?: string;
   default_hosted_model?: string;
   providers: HostedLLMProvider[];
@@ -61,6 +63,8 @@ export const patchInstallationLLMPolicy = async (body: {
   welcome_grant_cents?: number;
   markup_bps?: number;
   warning_threshold_bps?: number;
+  credit_purchase_fee_bps?: number;
+  credit_purchase_fixed_fee_cents?: number;
   default_hosted_provider?: string;
   default_hosted_model?: string;
 }): Promise<InstallationLLMSettings> => {
