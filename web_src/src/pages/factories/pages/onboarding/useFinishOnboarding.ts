@@ -17,6 +17,7 @@ import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganiza
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { jiraCompletionSettingsToApi } from "../intakeSourceSettingsModel";
 import type { JiraCompletionColumnValue } from "../jiraCompletionColumn";
+import type { LinearIntakeScope } from "../linearIntakeScope";
 import { describeInstallationName, selectionsWithSavedVcsInstallation } from "./githubIntegrationSelection";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
@@ -50,7 +51,7 @@ export function finishOnboardingError(args: {
   jiraReady?: boolean;
   jiraProjectId?: string;
   linearReady?: boolean;
-  linearProjectIds?: string[];
+  linearScope?: LinearIntakeScope;
 }): string | null {
   if (!args.vcsReady) {
     return `Connect ${vcsLabel(args.vcsHost ?? "github")} before you continue.`;
@@ -61,8 +62,8 @@ export function finishOnboardingError(args: {
   if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
     return "Connect Jira, then choose a project.";
   }
-  if (args.issuesChoice === "linear" && (!args.linearReady || !args.linearProjectIds?.length)) {
-    return "Connect Linear, then choose a project.";
+  if (args.issuesChoice === "linear" && (!args.linearReady || !args.linearScope?.teamId)) {
+    return "Connect Linear, then choose a team.";
   }
   const agentError = firstWorkOrderAgentError({
     remainingCreditCents: args.remainingCreditCents,
@@ -153,7 +154,7 @@ export async function provisionWorkspace(args: {
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
   jira?: { integrationId: string; projectId: string; settings?: FactoriesFactoryIntakeSettings };
-  linear?: { integrationId: string; projectIds: string[] };
+  linear?: { integrationId: string; scope: LinearIntakeScope };
 }): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
@@ -222,10 +223,10 @@ export async function provisionWorkspace(args: {
 function linearIntakeBinding(
   issuesChoice: IssuesChoiceId | null,
   linearId: string | undefined,
-  projectIds: string[] | undefined,
-): { integrationId: string; projectIds: string[] } | undefined {
-  if (issuesChoice !== "linear" || !linearId || !projectIds?.length) return undefined;
-  return { integrationId: linearId, projectIds };
+  scope: LinearIntakeScope | undefined,
+): { integrationId: string; scope: LinearIntakeScope } | undefined {
+  if (issuesChoice !== "linear" || !linearId || !scope?.teamId) return undefined;
+  return { integrationId: linearId, scope };
 }
 
 function jiraIntakeBinding(
@@ -296,7 +297,7 @@ export function useFinishOnboarding(args: {
   githubOwner?: string;
   jiraProjectId?: string;
   jiraCompletion?: JiraCompletionColumnValue;
-  linearProjectIds?: string[];
+  linearScope?: LinearIntakeScope;
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
@@ -331,7 +332,7 @@ export function useFinishOnboarding(args: {
       jiraReady: Boolean(jira?.ready),
       jiraProjectId: args.jiraProjectId,
       linearReady: Boolean(linear?.ready),
-      linearProjectIds: args.linearProjectIds,
+      linearScope: args.linearScope,
     });
     if (error) {
       showErrorToast(error);
@@ -357,7 +358,7 @@ export function useFinishOnboarding(args: {
         agentRewrite: agentRewriteFromPlan(args.plan, selections),
         agentIntegrationId: agentIntegrationIdForPlan(args.plan, selections),
         jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId, args.jiraCompletion),
-        linear: linearIntakeBinding(issuesChoice, linear?.id, args.linearProjectIds),
+        linear: linearIntakeBinding(issuesChoice, linear?.id, args.linearScope),
       });
       await afterWorkspaceProvisioned({
         factory: args.factory,

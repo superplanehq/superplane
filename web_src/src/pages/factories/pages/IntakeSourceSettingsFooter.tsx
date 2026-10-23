@@ -14,6 +14,7 @@ import { useState } from "react";
 import {
   INTAKE_SETTINGS_COPY,
   intakeSupportsDelete,
+  linearIntakeScopeMissing,
   normalizeIntakeSourceSettings,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -46,13 +47,13 @@ export function IntakeSourceSettingsFooter({
 }) {
   const deleteControls = intakeSupportsDelete(sourceId);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const linearProjectsMissing = sourceId === "linear-issues" && draft.linearProjectIds.length === 0;
+  const linearScopeMissing = sourceId === "linear-issues" && linearIntakeScopeMissing(draft);
   const sentryProjectsMissing = sourceId === "sentry-exceptions" && draft.sentryProjectIds.length === 0;
-  const projectsMissing = linearProjectsMissing || sentryProjectsMissing;
+  const scopeMissing = linearScopeMissing || sentryProjectsMissing;
   const footerError =
     saveError ??
     (deleteOpen ? undefined : deleteError) ??
-    (linearProjectsMissing ? LINEAR_INTAKE_SETUP_COPY.projectsRequired : undefined) ??
+    (linearScopeMissing ? LINEAR_INTAKE_SETUP_COPY.teamRequired : undefined) ??
     (sentryProjectsMissing ? SENTRY_INTAKE_SETUP_COPY.projectsRequired : undefined);
 
   return (
@@ -80,7 +81,7 @@ export function IntakeSourceSettingsFooter({
         </div>
         <Button
           type="button"
-          disabled={savePending || projectsMissing}
+          disabled={savePending || scopeMissing}
           onClick={async () => {
             try {
               await onSave(normalizeIntakeSourceSettings(getDraft(), sourceId));

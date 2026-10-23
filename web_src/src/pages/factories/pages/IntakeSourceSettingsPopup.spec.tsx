@@ -443,20 +443,56 @@ describe("IntakeSourceSettingsPopup", () => {
     );
   });
 
-  it("does not save a Linear intake with no project", async () => {
+  it("does not save a Linear intake with no team and no projects", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();
     renderPopup({
       sourceId: "linear-issues",
-      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearProjectIds: [] },
+      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearTeamId: "", linearProjectIds: [] },
       onSave,
     });
 
-    expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.projectsRequired)).toBeInTheDocument();
+    expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.teamRequired)).toBeInTheDocument();
     const save = screen.getByTestId("intake-source-settings-save");
     expect(save).toBeDisabled();
     await user.click(save);
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("saves a Linear intake that has a team and no projects", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "linear-issues",
+      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearTeamId: "team-1" },
+      onSave,
+    });
+
+    expect(screen.queryByText(LINEAR_INTAKE_SETUP_COPY.teamRequired)).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        linearTeamId: "team-1",
+        linearProjectIds: [],
+        linearIncludeIssuesWithoutProject: true,
+      }),
+    );
+  });
+
+  it("saves an older Linear intake that has projects and no team unchanged", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "linear-issues",
+      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearProjectIds: ["project-1"] },
+      onSave,
+    });
+
+    expect(screen.queryByText(LINEAR_INTAKE_SETUP_COPY.teamRequired)).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ linearTeamId: "", linearProjectIds: ["project-1"] }));
   });
 
   it("does not save a Sentry intake with no project", async () => {

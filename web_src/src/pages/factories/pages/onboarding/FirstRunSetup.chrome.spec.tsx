@@ -9,6 +9,7 @@ import type { FactoriesFactory, OrganizationsBillingPlanOption } from "@/api-cli
 import { unmockedPackage } from "@/test/unmockedModule";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -168,12 +169,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
     linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
+    linearScope: EMPTY_LINEAR_INTAKE_SCOPE,
+    changeLinearScope: vi.fn(),
     ...overrides,
   };
 }
