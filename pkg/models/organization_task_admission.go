@@ -44,6 +44,13 @@ func TryLockOrganizationTaskAdmission(tx *gorm.DB, orgID uuid.UUID) (bool, error
 	return locked, err
 }
 
+// WorkOrderMergeAdvisoryKey identifies the session lock held while a merge
+// waits for the Git host. It is distinct from the organization admission lock.
+func WorkOrderMergeAdvisoryKey(workOrderID uuid.UUID) int64 {
+	sum := sha256.Sum256(append([]byte("work-order-merge:"), workOrderID[:]...))
+	return int64(binary.BigEndian.Uint64(sum[:8]))
+}
+
 // LockRunOrganizationTaskAdmission also covers automation callbacks that close
 // orders. Resolve without row locks, then lock the organization before the run.
 func LockRunOrganizationTaskAdmission(tx *gorm.DB, runID uuid.UUID) error {
@@ -233,6 +240,13 @@ func checkOrganizationTaskAdmission(tx *gorm.DB, orgID, workOrderID uuid.UUID) e
 	if workOrderID == uuid.Nil {
 		return nil
 	}
+	reserved, err := workOrderMergeInProgress(tx, workOrderID)
+	if err != nil {
+		return err
+	}
+	if reserved {
+		return ErrOrganizationTaskCapacity
+	}
 	stopping, err := organizationTaskIsStopping(tx, orgID, workOrderID)
 	if err != nil {
 		return err
@@ -356,6 +370,15 @@ func admitQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*FactoryLine
 	if active >= int64(admissionStep(line, dispatch, item.StepIndex).EffectiveMaxParallelism()) {
 		return nil, nil
 	}
+	// Take the merge lock only for a task this pass will start. A full step
+	// stays queued without blocking that task's merge.
+	reserved, err := workOrderMergeInProgress(tx, item.WorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if reserved {
+		return nil, nil
+	}
 	var result *FactoryLineStepResult
 	// GORM creates a savepoint for this nested transaction. Run creation and
 	// deletion roll back together before an invalid candidate is cleaned up.
@@ -434,6 +457,15 @@ func queuedTaskLookupError(err error) error {
 		return fmt.Errorf("%w: %w", errQueuedTaskUnstartable, err)
 	}
 	return err
+}
+
+// workOrderMergeInProgress reports a merge waiting on the Git host. A false
+// result holds this transaction's advisory lock until commit so the merge
+// cannot start while this transaction starts work.
+func workOrderMergeInProgress(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) {
+	var locked bool
+	err := tx.Raw("SELECT pg_try_advisory_xact_lock(?)", WorkOrderMergeAdvisoryKey(workOrderID)).Scan(&locked).Error
+	return !locked, err
 }
 
 func organizationAdmissionKey(orgID uuid.UUID) int64 {

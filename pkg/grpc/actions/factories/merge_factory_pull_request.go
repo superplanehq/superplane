@@ -103,9 +103,14 @@ func MergeFactoryPullRequest(
 	}
 
 	// The provider call stays outside the organization lock. A slow Git host
-	// must not block dispatch or cancellation for every task in the organization.
-	// The active-automation check runs before the call. The result is recorded
-	// under the lock after the host accepts the merge.
+	// must not block dispatch or cancellation for every other task. This task
+	// keeps a separate lock until the host accepts or rejects the merge, so
+	// its line and root events cannot start in that gap.
+	release, err := lockWorkOrderForMerge(ctx, db, models.WorkOrderMergeAdvisoryKey(pullRequest.WorkOrderID))
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+	}
+	defer release()
 	if err := rejectMergeWhileAutomationActive(db, factory, pullRequest); err != nil {
 		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
 	}
@@ -174,6 +179,25 @@ func rejectMergeWhileAutomationActive(db *gorm.DB, factory *models.Factory, pull
 		}
 		return nil
 	})
+}
+
+func lockWorkOrderForMerge(ctx context.Context, db *gorm.DB, key int64) (func(), error) {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	conn, err := sqlDB.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", key); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return func() {
+		_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", key)
+		_ = conn.Close()
+	}, nil
 }
 
 func recordMergedFactoryPullRequest(

@@ -218,7 +218,11 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 	if err != nil {
 		return nil, err
 	}
-	if stopping {
+	reserved, err := workOrderMergeInProgress(tx, order.ID)
+	if err != nil {
+		return nil, err
+	}
+	if stopping || reserved {
 		return l.enqueueStep(tx, order, stepIndex)
 	}
 
