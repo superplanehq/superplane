@@ -83,6 +83,11 @@ func PurchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 	}
 	db := database.DB(ctx)
 
+	// Settle an unfinished purchase before the local checks. When Polar
+	// applied it and renewed the subscription, reconciliation loads the new
+	// period, so a retry after a renewal works from the refreshed plan.
+	reconcileSeatPurchase(ctx, db, organizationID)
+
 	// The purchase sends an absolute seat count, so it must start from the
 	// seats Polar reports now. A stale local count could remove seats that
 	// were added elsewhere. Requests that cannot take seats are rejected

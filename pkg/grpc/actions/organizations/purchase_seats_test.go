@@ -522,9 +522,68 @@ func Test__RetryAfterAnUnconfirmedPurchaseDoesNotChargeAgain(t *testing.T) {
 
 	requireGRPCCode(t, codes.Aborted, err)
 	assert.Equal(t, 1, f.patchCount(), "the retry must not send a second update")
-	assert.Equal(t, 2, f.getCount, "each purchase reads the subscription once")
+	assert.Equal(t, 3, f.getCount, "each purchase reads the subscription once; the retry reconciles first")
 	assert.Equal(t, 4, f.purchasedSeats())
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
+}
+
+func Test__RetryAfterRenewalSettlesAnUnconfirmedPurchase(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	f.dropConnection()
+	_, err := f.purchase(1, 3)
+	require.NoError(t, err)
+
+	// Polar applied the purchase and renewed the subscription, but the
+	// renewal webhook has not arrived: the saved period already ended.
+	f.updateBillingPlan(map[string]any{
+		"current_period_start": time.Now().Add(-31 * 24 * time.Hour),
+		"current_period_end":   time.Now().Add(-time.Hour),
+	})
+	f.periodStart = time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	f.periodEnd = time.Now().Add(29 * 24 * time.Hour).UTC().Truncate(time.Second)
+	f.polarSeats = 4
+
+	_, err = f.purchase(1, 3)
+
+	requireGRPCCode(t, codes.Aborted, err)
+	assert.ErrorContains(t, err, "Seat count changed. Refresh and try again.")
+	assert.Equal(t, 1, f.patchCount(), "the retry must not send a second update")
+	assert.Equal(t, 4, f.purchasedSeats())
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
+	require.NotNil(t, f.plan().CurrentPeriodEnd)
+	assert.True(t, f.plan().CurrentPeriodEnd.Equal(f.periodEnd), "the retry loads the new period from Polar")
+}
+
+func Test__RetryAfterRenewalBuysWhenPolarNeverAppliedThePurchase(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	f.dropConnection()
+	_, err := f.purchase(1, 3)
+	require.NoError(t, err)
+	first := f.latestPurchase()
+
+	// Polar renewed without applying the purchase. The saved period ended,
+	// and the renewal proves that Polar did not apply the lost update.
+	stale := time.Now().Add(-time.Minute)
+	require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("id = ?", first.ID).Update("created_at", stale).Error)
+	f.updateBillingPlan(map[string]any{
+		"current_period_start": time.Now().Add(-31 * 24 * time.Hour),
+		"current_period_end":   time.Now().Add(-time.Hour),
+	})
+	f.periodStart = time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	f.periodEnd = time.Now().Add(29 * 24 * time.Hour).UTC().Truncate(time.Second)
+	f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
+		f.polarSeats = seats
+		f.writeJSON(w, http.StatusOK, f.snapshot(seats))
+	}
+
+	_, err = f.purchase(1, 3)
+
+	require.NoError(t, err, "the settled failure and the refreshed period let the retry buy")
+	assert.Equal(t, 2, f.patchCount())
+	assert.Equal(t, 4, f.purchasedSeats())
+	require.NoError(t, database.Conn().First(first, "id = ?", first.ID).Error)
+	assert.Equal(t, models.SeatPurchaseStatusFailed, first.Status)
+	assert.Equal(t, models.SeatPurchaseErrorNotApplied, first.ErrorCode)
 }
 
 func Test__PurchaseSeatsKeepsSeatsAddedElsewhere(t *testing.T) {
