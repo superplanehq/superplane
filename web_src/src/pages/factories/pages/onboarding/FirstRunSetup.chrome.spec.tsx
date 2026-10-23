@@ -9,6 +9,7 @@ import type { FactoriesFactory, OrganizationsBillingPlanOption } from "@/api-cli
 import { unmockedPackage } from "@/test/unmockedModule";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
