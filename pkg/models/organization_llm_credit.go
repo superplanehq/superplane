@@ -855,7 +855,7 @@ func AssertFactoryHostedBudgetAvailable(tx *gorm.DB, factory *Factory) error {
 }
 
 // AssertHostedRunAllowed rejects a new hosted start when the organization has
-// no open trial or active Business plan, remaining credit is empty, or the
+// no open trial or active paid plan, remaining credit is empty, or the
 // factory hosted budget is exhausted. Pass a committed connection so remaining
 // credit includes billed spend from other runs.
 func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) error {
@@ -865,14 +865,8 @@ func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) 
 	if orgID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
-	if HostedPlanGatesEnabled() {
-		plan, err := ResolveOrganizationBillingPlan(tx, orgID)
-		if err != nil {
-			return err
-		}
-		if !plan.AllowsHostedExecution(time.Now()) {
-			return ErrHostedSubscriptionRequired
-		}
+	if err := AssertOrganizationPlanAllowsRuns(tx, orgID); err != nil {
+		return err
 	}
 	if err := AssertHostedCreditAvailable(tx, orgID); err != nil {
 		return err
