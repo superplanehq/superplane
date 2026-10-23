@@ -162,6 +162,24 @@ export const BUSINESS_ORGANIZATION_BILLING = {
   hasBillingCustomer: true,
 };
 
+export const TEAM_ORGANIZATION_BILLING = {
+  ...BUSINESS_ORGANIZATION_BILLING,
+  plan: "team",
+  catalogKey: "team",
+  planName: "Team",
+  planCategory: "paid",
+  planPriceCents: "2900",
+  planPerSeat: true,
+  purchasedSeats: 10,
+  occupiedSeats: 9,
+  availableSeats: 1,
+  planMaximumSeats: 50,
+  purchasableSeats: 40,
+  expectedRenewalSeats: 9,
+  currentMonthlyTotalCents: "29000",
+  expectedRenewalCents: "26100",
+};
+
 export const ENDING_ORGANIZATION_BILLING = {
   ...BUSINESS_ORGANIZATION_BILLING,
   cancelAtPeriodEnd: true,
