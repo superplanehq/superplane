@@ -71,6 +71,8 @@ type OrderData struct {
 	BillingReason      string          `json:"billing_reason"`
 	RefundedAmount     int64           `json:"refunded_amount"`
 	NetAmount          int64           `json:"net_amount"`
+	Currency           string          `json:"currency"`
+	Metadata           map[string]any  `json:"metadata"`
 	ProductID          string          `json:"product_id"`
 	ExternalCustomerID string          `json:"external_customer_id"`
 	Customer           OrderCustomer   `json:"customer"`

@@ -316,6 +316,20 @@ func TestCreateFactoryAutomationUsesTemplateSpecificFeatureGuards(t *testing.T) 
 	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
 }
 
+func TestCreditPurchaseRoutesRequireOrganizationUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	for _, route := range []HTTPRoute{
+		{Method: http.MethodGet, Pattern: "/api/v1/organizations/{id}/hosted-credit-checkout-quote"},
+		{Method: http.MethodPost, Pattern: "/api/v1/organizations/{id}/hosted-credit-checkout"},
+	} {
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
+		assert.Equal(t, "org", rule.Resource)
+		assert.Equal(t, "update", rule.Action)
+		assert.Equal(t, models.DomainTypeOrganization, rule.DomainType)
+	}
+}
+
 func TestSchedulePreviewRequiresScheduledIntakeFeature(t *testing.T) {
 	rule, ok := DefaultAuthorizationRules()[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/scheduled-intake/preview"}]
 	require.True(t, ok)

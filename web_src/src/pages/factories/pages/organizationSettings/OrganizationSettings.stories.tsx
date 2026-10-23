@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { userEvent, within } from "storybook/test";
 
 import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
@@ -14,6 +15,7 @@ import {
   PURCHASED_CREDIT_USAGE_REPORT,
   SPENT_CREDIT_USAGE_REPORT,
   STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+  STORYBOOK_CUSTOM_CREDIT_PRODUCT,
 } from "../../__fixtures__/usageReportFixtures";
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
@@ -86,7 +88,7 @@ export const Billing: Story = {
       pathSuffix={organizationSettingsPath("billing")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        hostedCreditProducts: [...STORYBOOK_HOSTED_CREDIT_PRODUCTS, STORYBOOK_CUSTOM_CREDIT_PRODUCT],
         organizationBilling: BUSINESS_ORGANIZATION_BILLING,
         organizationCreditGrants: MIXED_CREDIT_GRANTS,
         organizationWorkspaceUsage: {
@@ -120,6 +122,29 @@ export const Billing: Story = {
       }}
     />
   ),
+};
+
+export const BillingCreditTopUp: Story = {
+  ...Billing,
+  name: "Billing (credit top-up)",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
+    await userEvent.click(await canvas.findByRole("button", { name: "Top up" }));
+    await userEvent.click(await canvas.findByRole("button", { name: "$100" }));
+    await canvas.findByText("$105.79");
+  },
+};
+
+export const BillingCustomCreditTopUp: Story = {
+  ...Billing,
+  name: "Billing (custom credit top-up)",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
+    await userEvent.click(await canvas.findByRole("button", { name: "Top up" }));
+    await userEvent.click(await canvas.findByRole("button", { name: "Custom" }));
+    await userEvent.type(canvas.getByRole("textbox", { name: "Credit amount in USD" }), "100");
+    await canvas.findByText("$105.79");
+  },
 };
 
 export const BillingEmptyHistory: Story = {

@@ -49,10 +49,13 @@ type Client struct {
 }
 
 type Product struct {
-	ID          string
-	Name        string
-	AmountCents int64
-	CustomPrice bool
+	ID                 string
+	Name               string
+	AmountCents        int64
+	CustomPrice        bool
+	Currency           string
+	MinimumAmountCents int64
+	MaximumAmountCents int64
 }
 
 type Customer struct {
@@ -270,7 +273,37 @@ func (c *Client) CreateCheckout(ctx context.Context, productID, externalCustomer
 	if strings.TrimSpace(customerIP) != "" {
 		body["customer_ip_address"] = customerIP
 	}
+	return c.createCheckout(ctx, body)
+}
 
+func (c *Client) CreateCreditCheckout(ctx context.Context, productID, externalCustomerID, successURL, customerIP string, quote *CreditPurchaseQuote) (*CheckoutSession, error) {
+	if quote == nil || quote.CreditAmountCents <= 0 || quote.CreditAmountCents > quote.SubtotalCents ||
+		quote.SubtotalCents < minimumUSDPriceCents || quote.SubtotalCents > maximumUSDPriceCents ||
+		quote.Currency != "usd" || quote.ProcessingFeeCents != quote.SubtotalCents-quote.CreditAmountCents {
+		return nil, fmt.Errorf("credit purchase quote is invalid")
+	}
+	body := map[string]any{
+		"products":             []string{productID},
+		"external_customer_id": externalCustomerID,
+		"success_url":          successURL,
+		"allow_discount_codes": false,
+		"metadata":             quote.metadata(),
+		"prices": map[string]any{
+			productID: []map[string]any{{
+				"amount_type":    "fixed",
+				"price_amount":   quote.SubtotalCents,
+				"price_currency": "usd",
+				"tax_behavior":   "exclusive",
+			}},
+		},
+	}
+	if strings.TrimSpace(customerIP) != "" {
+		body["customer_ip_address"] = customerIP
+	}
+	return c.createCheckout(ctx, body)
+}
+
+func (c *Client) createCheckout(ctx context.Context, body map[string]any) (*CheckoutSession, error) {
 	var payload checkoutJSON
 	if err := c.post(ctx, "/checkouts/", body, &payload); err != nil {
 		return nil, err
@@ -586,26 +619,25 @@ type productJSON struct {
 }
 
 func creditPackFromProduct(item productJSON) (Product, bool) {
-	amount := item.faceValueCents()
-	custom := item.hasCustomPrice() && amount <= 0
-	if !custom && amount <= 0 {
+	if item.IsRecurring {
 		return Product{}, false
 	}
-	return Product{
-		ID:          item.ID,
-		Name:        item.Name,
-		AmountCents: amount,
-		CustomPrice: custom,
-	}, true
-}
-
-func (p productJSON) hasCustomPrice() bool {
-	for _, price := range p.Prices {
-		if price.isCustom() {
-			return true
+	for _, price := range item.Prices {
+		if !price.IsArchived && price.isFixed() && price.PriceAmount > 0 {
+			return Product{
+				ID: item.ID, Name: item.Name, AmountCents: price.PriceAmount, Currency: price.currency(),
+			}, true
 		}
 	}
-	return false
+	for _, price := range item.Prices {
+		if !price.IsArchived && price.isCustom() {
+			return Product{
+				ID: item.ID, Name: item.Name, CustomPrice: true, Currency: price.currency(),
+				MinimumAmountCents: price.MinimumAmount, MaximumAmountCents: price.MaximumAmount,
+			}, true
+		}
+	}
+	return Product{}, false
 }
 
 func (p productJSON) faceValueCents() int64 {
@@ -621,8 +653,20 @@ func (p productJSON) faceValueCents() int64 {
 }
 
 type priceJSON struct {
-	AmountType  string `json:"amount_type"`
-	PriceAmount int64  `json:"price_amount"`
+	AmountType    string `json:"amount_type"`
+	PriceAmount   int64  `json:"price_amount"`
+	PriceCurrency string `json:"price_currency"`
+	MinimumAmount int64  `json:"minimum_amount"`
+	MaximumAmount int64  `json:"maximum_amount"`
+	IsArchived    bool   `json:"is_archived"`
+}
+
+func (p priceJSON) currency() string {
+	currency := strings.ToLower(strings.TrimSpace(p.PriceCurrency))
+	if currency == "" {
+		return "usd"
+	}
+	return currency
 }
 
 func (p priceJSON) isCustom() bool {

@@ -1140,6 +1140,10 @@ CREATE TABLE public.installation_llm_settings (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     default_hosted_provider text,
     default_hosted_model text,
+    credit_purchase_fee_bps integer DEFAULT 0 NOT NULL,
+    credit_purchase_fixed_fee_cents bigint DEFAULT 0 NOT NULL,
+    CONSTRAINT installation_llm_settings_credit_purchase_fee_range CHECK (((credit_purchase_fee_bps >= 0) AND (credit_purchase_fee_bps < 10000))),
+    CONSTRAINT installation_llm_settings_credit_purchase_fixed_fee_non_negativ CHECK ((credit_purchase_fixed_fee_cents >= 0)),
     CONSTRAINT installation_llm_settings_default_model_pair CHECK ((((default_hosted_provider IS NULL) AND (default_hosted_model IS NULL)) OR ((default_hosted_provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])) AND (default_hosted_model IS NOT NULL) AND (btrim(default_hosted_model) <> ''::text)))),
     CONSTRAINT installation_llm_settings_markup_non_negative CHECK ((markup_bps >= 0)),
     CONSTRAINT installation_llm_settings_singleton CHECK ((id = 1)),
@@ -6016,7 +6020,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261023123107	f
+20261023140545	f
 \.
 
 
