@@ -55,19 +55,8 @@ func (s *InvitationService) Create(ctx context.Context, orgID, inviterID string,
 	if err := s.validateRole(ctx, orgID, role); err != nil {
 		return nil, err
 	}
-	if role != models.RoleOrgOperator {
-		allowed, err := s.AuthService.CheckOrganizationPermission(ctx, inviterID, orgID, "members", "update")
-		if err != nil {
-			return nil, grpcerrors.Internal(err, "Failed to check invitation role permissions.")
-		}
-		md, _ := metadata.FromIncomingContext(ctx)
-		tokenScopes := ""
-		if values := md.Get("x-token-scopes"); len(values) > 0 {
-			tokenScopes = values[0]
-		}
-		if !allowed || !authorization.HasRequiredScopedTokenPermissionForScopes(tokenScopes, nil, authorization.AuthorizationRule{Resource: "members", Action: "update"}) {
-			return nil, grpcerrors.PermissionDenied(nil, "You do not have permission to invite members with this role.")
-		}
+	if err := s.authorizeInvitationRole(ctx, orgID, inviterID, role); err != nil {
+		return nil, err
 	}
 	invitation := &models.OrganizationInvitation{OrganizationID: organization, Email: email, Role: role, InvitedBy: inviter}
 	var token string
@@ -148,7 +137,7 @@ func (s *InvitationService) List(ctx context.Context, orgID string) (*pb.ListInv
 	return &response, nil
 }
 
-func (s *InvitationService) Resend(ctx context.Context, orgID, invitationID string) (*pb.ResendInvitationResponse, error) {
+func (s *InvitationService) Resend(ctx context.Context, orgID, actorID, invitationID string) (*pb.ResendInvitationResponse, error) {
 	organization, id, err := parseInvitationIDs(orgID, invitationID)
 	if err != nil {
 		return nil, err
@@ -174,6 +163,9 @@ func (s *InvitationService) Resend(ctx context.Context, orgID, invitationID stri
 			return grpcerrors.FailedPrecondition(nil, "Only pending or expired invitations can be resent.")
 		}
 		if err := s.validateRole(ctx, orgID, invitation.Role); err != nil {
+			return err
+		}
+		if err := s.authorizeInvitationRole(ctx, orgID, actorID, invitation.Role); err != nil {
 			return err
 		}
 		if err := requireInvitationNonmember(tx, invitation); err != nil {
@@ -228,6 +220,25 @@ func (s *InvitationService) Cancel(ctx context.Context, orgID, invitationID stri
 		return nil, invitationActionError(err)
 	}
 	return &pb.CancelInvitationResponse{}, nil
+}
+
+func (s *InvitationService) authorizeInvitationRole(ctx context.Context, orgID, actorID, role string) error {
+	if role == models.RoleOrgOperator {
+		return nil
+	}
+	allowed, err := s.AuthService.CheckOrganizationPermission(ctx, actorID, orgID, "members", "update")
+	if err != nil {
+		return grpcerrors.Internal(err, "Failed to check invitation role permissions.")
+	}
+	md, _ := metadata.FromIncomingContext(ctx)
+	tokenScopes := ""
+	if values := md.Get("x-token-scopes"); len(values) > 0 {
+		tokenScopes = values[0]
+	}
+	if !allowed || !authorization.HasRequiredScopedTokenPermissionForScopes(tokenScopes, nil, authorization.AuthorizationRule{Resource: "members", Action: "update"}) {
+		return grpcerrors.PermissionDenied(nil, "You do not have permission to invite members with this role.")
+	}
+	return nil
 }
 
 func (s *InvitationService) validateRole(ctx context.Context, orgID, role string) error {

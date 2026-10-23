@@ -176,13 +176,41 @@ const buildMagicCodeVerifyBody = (email: string, code: string, signup: boolean, 
   return formData.toString();
 };
 
-const buildSignupBody = (name: string, email: string, password: string, inviteToken: string) => {
+const invitationEmailProofRequired = "email_verification_required";
+
+const isInvitationEmailProofRequired = (body: string) => {
+  try {
+    return JSON.parse(body).error === invitationEmailProofRequired;
+  } catch {
+    return false;
+  }
+};
+
+type SignupFailure = { kind: "message"; message: string } | { kind: "email-proof" };
+
+const readSignupFailure = async (response: Response): Promise<SignupFailure> => {
+  if (response.status === 409) {
+    return { kind: "message", message: "Account already exists. Please sign in." };
+  }
+
+  const errorText = await response.text();
+  if (isInvitationEmailProofRequired(errorText)) {
+    return { kind: "email-proof" };
+  }
+
+  return { kind: "message", message: errorText.trim() || "Signup failed. Please try again." };
+};
+
+const buildSignupBody = (name: string, email: string, password: string, inviteToken: string, emailCode: string) => {
   const formData = new URLSearchParams();
   formData.append("name", name);
   formData.append("email", email.trim());
   formData.append("password", password);
   if (inviteToken) {
     formData.append("invite_token", inviteToken);
+  }
+  if (emailCode.trim()) {
+    formData.append("email_code", emailCode.trim());
   }
 
   return formData.toString();
@@ -202,15 +230,6 @@ const getMagicCodeVerifyError = async (response: Response) => {
   }
 
   return "Verification failed. Please try again.";
-};
-
-const getSignupError = async (response: Response) => {
-  if (response.status === 409) {
-    return "Account already exists. Please sign in.";
-  }
-
-  const errorText = await response.text();
-  return errorText || "Signup failed. Please try again.";
 };
 
 type SignupValidationFields = {
@@ -269,6 +288,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupEmailCode, setSignupEmailCode] = useState("");
+  const [signupEmailProofRequired, setSignupEmailProofRequired] = useState(false);
   const [signupProductUpdatesOptIn, setSignupProductUpdatesOptIn] = useState(true);
 
   const [magicCodeStep, setMagicCodeStep] = useState<MagicCodeStep>("email");
@@ -657,12 +678,18 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           signupEmail,
           signupPassword,
           inviteToken,
+          signupEmailCode,
         ),
       });
 
       if (!response.ok) {
-        setFormError(await getSignupError(response));
+        const failure = await readSignupFailure(response);
         setSubmitLoading(false);
+        if (failure.kind === "email-proof") {
+          setSignupEmailProofRequired(true);
+          return;
+        }
+        setFormError(failure.message);
         return;
       }
 
@@ -901,13 +928,30 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             />
           </div>
 
+          {signupEmailProofRequired && (
+            <div className="space-y-2">
+              <Label htmlFor="signup-email-code">Email code</Label>
+              <Input
+                id="signup-email-code"
+                name="emailCode"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="Enter 6-digit code"
+                required
+                value={signupEmailCode}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupEmailCode(e.target.value)}
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">Enter the code sent to this email address.</p>
+            </div>
+          )}
+
           <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
 
           <LoadingButton
             type="submit"
             disabled={!canSignup}
             loading={submitLoading}
-            loadingText="Creating account..."
+            loadingText={inviteToken && !signupEmailProofRequired ? "Sending code..." : "Creating account..."}
             className="w-full"
           >
             Create account

@@ -142,26 +142,22 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 	}
 	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil || req.InvitationDurationDays != nil {
-			metadata, err := models.GetInstallationMetadata(tx)
+			err := models.ApplyInstallationMetadata(tx, func(metadata *models.InstallationMetadata) {
+				if req.AllowPrivateNetworkAccess != nil {
+					metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
+				}
+
+				if req.SignupsEnabled != nil {
+					metadata.SignupsEnabled = *req.SignupsEnabled
+				}
+
+				if req.InvitationDurationDays != nil {
+					metadata.InvitationDurationDays = *req.InvitationDurationDays
+				}
+
+				metadata.UpdatedAt = time.Now()
+			})
 			if err != nil {
-				return err
-			}
-
-			if req.AllowPrivateNetworkAccess != nil {
-				metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
-			}
-
-			if req.SignupsEnabled != nil {
-				metadata.SignupsEnabled = *req.SignupsEnabled
-			}
-
-			if req.InvitationDurationDays != nil {
-				metadata.InvitationDurationDays = *req.InvitationDurationDays
-			}
-
-			metadata.UpdatedAt = time.Now()
-
-			if err := models.UpdateInstallationMetadata(tx, metadata); err != nil {
 				return err
 			}
 		}

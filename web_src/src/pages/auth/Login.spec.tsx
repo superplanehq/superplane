@@ -288,6 +288,47 @@ describe("Login signup-disabled return", () => {
     expect(screen.queryByRole("link", { name: "Continue with Google" })).not.toBeInTheDocument();
   });
 
+  it("asks for an email code before password signup with an invitation", async () => {
+    const user = userEvent.setup();
+    authConfig.passwordLoginEnabled = true;
+    authConfig.magicCodeEnabled = false;
+    const requests: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "/auth/config") {
+          return mockAuthConfig();
+        }
+        if (url.startsWith("/signup")) {
+          requests.push(String(init?.body));
+          if (!String(init?.body).includes("email_code=")) {
+            return new Response(JSON.stringify({ error: "email_verification_required" }), { status: 401 });
+          }
+          return new Response(null, { status: 303, headers: { Location: "/invitations/email-token" } });
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+
+    renderLogin("/signup?redirect=%2Finvitations%2Femail-token", "signup");
+    await user.type(await screen.findByPlaceholderText("First name"), "Ada");
+    await user.type(screen.getByPlaceholderText("Last name"), "Lovelace");
+    await user.type(screen.getByPlaceholderText("Email"), "invited@example.com");
+    await user.type(screen.getByPlaceholderText("Password"), "password123");
+    await user.type(screen.getByPlaceholderText("Repeat password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByLabelText("Email code")).toBeInTheDocument();
+    expect(screen.getByText("Enter the code sent to this email address.")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Email code"), "654321");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(requests[0]).not.toContain("email_code=");
+    expect(requests[1]).toContain("email_code=654321");
+    expect(requests[1]).toContain("invite_token=email-token");
+  });
+
   it("carries an email invitation through signup when open registration is disabled", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

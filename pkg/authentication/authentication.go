@@ -38,17 +38,18 @@ const SignupDisabledError = "signup is currently disabled"
 var errGitHubSignInNotConfigured = errors.New("sign-in with GitHub is not configured: create the GitHub App again")
 
 const (
-	magicCodeLength            = 6
-	magicCodeTTL               = 10 * time.Minute
-	magicCodeRateLimit         = 5
-	magicCodeRateWindow        = 10 * time.Minute
-	magicCodeMaxVerifyAttempts = 3
-	authSignupStatePrefix      = "signup:"
-	authSignupResultParam      = "auth_signup_result"
-	authErrorParam             = "auth_error"
-	authErrorSignupDisabled    = "signup_disabled"
-	authProviderParam          = "provider"
-	jsonContentType            = "application/json"
+	magicCodeLength                    = 6
+	magicCodeTTL                       = 10 * time.Minute
+	magicCodeRateLimit                 = 5
+	magicCodeRateWindow                = 10 * time.Minute
+	magicCodeMaxVerifyAttempts         = 3
+	authSignupStatePrefix              = "signup:"
+	authSignupResultParam              = "auth_signup_result"
+	authErrorParam                     = "auth_error"
+	authErrorSignupDisabled            = "signup_disabled"
+	authErrorEmailVerificationRequired = "email_verification_required"
+	authProviderParam                  = "provider"
+	jsonContentType                    = "application/json"
 )
 
 type Handler struct {
@@ -622,6 +623,12 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// The invitation link is also returned to the sender. A password alone does
+	// not prove that this person can read the invited mailbox.
+	if invitedSignup && !a.confirmInvitationEmailProof(w, r, utils.NormalizeEmail(email)) {
 		return
 	}
 
@@ -1214,11 +1221,67 @@ func (a *Handler) SignupsBlockedByEnvironment() bool {
 }
 
 func writeAuthErrorJSON(w http.ResponseWriter, authError string) {
+	writeAuthStatusJSON(w, http.StatusForbidden, authError)
+}
+
+func writeAuthStatusJSON(w http.ResponseWriter, status int, authError string) {
 	w.Header().Set("Content-Type", jsonContentType)
-	w.WriteHeader(http.StatusForbidden)
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(map[string]string{"error": authError}); err != nil {
 		log.Errorf("Error encoding authentication error response: %v", err)
 	}
+}
+
+func (a *Handler) confirmInvitationEmailProof(w http.ResponseWriter, r *http.Request, email string) bool {
+	code := stripNonDigits(r.FormValue("email_code"))
+	if code == "" {
+		if err := a.issueInvitationEmailProof(r, email); err != nil {
+			log.Errorf("Failed to send invitation email proof for %s: %v", email, err)
+			http.Error(w, "Could not send the email code. Try again.", http.StatusInternalServerError)
+			return false
+		}
+		writeAuthStatusJSON(w, http.StatusUnauthorized, authErrorEmailVerificationRequired)
+		return false
+	}
+
+	magicCode, err := a.findValidCode(email, code)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
+			return false
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return false
+	}
+	if err := a.consumeCode(magicCode, email); err != nil {
+		http.Error(w, err.Error(), errorStatusForCodeError(err))
+		return false
+	}
+	return true
+}
+
+func (a *Handler) issueInvitationEmailProof(r *http.Request, email string) error {
+	count, err := models.CountRecentMagicCodes(email, time.Now().Add(-magicCodeRateWindow))
+	if err != nil {
+		return err
+	}
+	if count >= magicCodeRateLimit {
+		return nil
+	}
+
+	code, err := generateMagicCode()
+	if err != nil {
+		return err
+	}
+	if _, err := models.CreateAccountMagicCode(email, crypto.HashToken(code), time.Now().Add(magicCodeTTL)); err != nil {
+		return err
+	}
+	magicLinkToken, err := a.generateMagicLinkToken(email, code)
+	if err != nil {
+		return err
+	}
+
+	return messages.NewMagicCodeRequestedMessage(email, code, magicLinkToken, inviteRedirectPath(r), true).Publish()
 }
 
 func inviteRedirectPath(r *http.Request) string {

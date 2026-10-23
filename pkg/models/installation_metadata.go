@@ -154,6 +154,22 @@ func SetShareOwnerIdentity(tx *gorm.DB, share bool) error {
 }
 
 func UpdateInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) error {
+	return writeInstallationMetadata(tx, metadata)
+}
+
+// ApplyInstallationMetadata updates installation settings while the row is locked.
+// The callback sees the current values, so one save cannot restore fields from an older read.
+func ApplyInstallationMetadata(tx *gorm.DB, apply func(*InstallationMetadata)) error {
+	metadata, err := lockInstallationMetadata(tx)
+	if err != nil {
+		return err
+	}
+
+	apply(metadata)
+	return writeInstallationMetadata(tx, metadata)
+}
+
+func writeInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) error {
 	if _, err := findOrCreateInstallationMetadata(tx); err != nil {
 		return err
 	}
@@ -167,6 +183,22 @@ func UpdateInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) err
 			"updated_at":                   metadata.UpdatedAt,
 		}).
 		Error
+}
+
+func lockInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error) {
+	if _, err := findOrCreateInstallationMetadata(tx); err != nil {
+		return nil, err
+	}
+
+	var metadata InstallationMetadata
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", installationMetadataID).
+		First(&metadata).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &metadata, nil
 }
 
 func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error) {

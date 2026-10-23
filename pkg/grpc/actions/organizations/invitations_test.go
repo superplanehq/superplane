@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -73,7 +75,7 @@ func TestInvitationSeatReservations(t *testing.T) {
 	require.Equal(t, before.JoinLimit(), after.JoinLimit())
 	require.Equal(t, 1, after.PendingInvitations)
 	require.Equal(t, 0, *after.Invitable)
-	resent, err := s.Resend(ctx, r.Organization.ID.String(), first.Invitation.Id)
+	resent, err := s.Resend(ctx, r.Organization.ID.String(), r.User.String(), first.Invitation.Id)
 	require.NoError(t, err)
 	require.NotEqual(t, first.AcceptanceUrl, resent.AcceptanceUrl)
 	stored, err = models.FindOrganizationInvitation(db, r.Organization.ID, stored.ID)
@@ -91,7 +93,7 @@ func TestInvitationSeatReservations(t *testing.T) {
 	stored, err = models.FindOrganizationInvitation(db, r.Organization.ID, stored.ID)
 	require.NoError(t, err)
 	require.Nil(t, stored.TokenHash)
-	_, err = s.Resend(ctx, r.Organization.ID.String(), first.Invitation.Id)
+	_, err = s.Resend(ctx, r.Organization.ID.String(), r.User.String(), first.Invitation.Id)
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	listed, err := s.List(ctx, r.Organization.ID.String())
 	require.NoError(t, err)
@@ -152,23 +154,23 @@ func TestInvitationExpiryAndValidation(t *testing.T) {
 	require.Nil(t, listed.Seats.Invitable)
 	next, err := create("PERSON@example.com", "")
 	require.NoError(t, err)
-	_, err = s.Resend(ctx, r.Organization.ID.String(), first.Invitation.Id)
+	_, err = s.Resend(ctx, r.Organization.ID.String(), r.User.String(), first.Invitation.Id)
 	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 	_, err = s.Cancel(ctx, r.Organization.ID.String(), next.Invitation.Id)
 	require.NoError(t, err)
-	revived, err := s.Resend(ctx, r.Organization.ID.String(), first.Invitation.Id)
+	revived, err := s.Resend(ctx, r.Organization.ID.String(), r.User.String(), first.Invitation.Id)
 	require.NoError(t, err)
 	require.NotEqual(t, first.AcceptanceUrl, revived.AcceptanceUrl)
 	require.Equal(t, 3*24*time.Hour, revived.Invitation.ExpiresAt.AsTime().Sub(revived.Invitation.SentAt.AsTime()))
 	require.NoError(t, db.Model(&models.OrganizationInvitation{}).Where("id = ?", first.Invitation.Id).Update("state", "accepted").Error)
 	_, err = s.Cancel(ctx, r.Organization.ID.String(), first.Invitation.Id)
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
-	_, err = s.Resend(ctx, r.Organization.ID.String(), first.Invitation.Id)
+	_, err = s.Resend(ctx, r.Organization.ID.String(), r.User.String(), first.Invitation.Id)
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	other := support.CreateOrganization(t, r, r.User)
 	_, err = s.Cancel(ctx, other.ID.String(), first.Invitation.Id)
 	require.Equal(t, codes.NotFound, grpcerrors.Code(err))
-	_, err = s.Resend(ctx, other.ID.String(), first.Invitation.Id)
+	_, err = s.Resend(ctx, other.ID.String(), r.User.String(), first.Invitation.Id)
 	require.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	otherList, err := s.List(ctx, other.ID.String())
 	require.NoError(t, err)
@@ -293,7 +295,7 @@ func TestInvitationCapacityPolicies(t *testing.T) {
 					continue
 				}
 				require.NoError(t, err)
-				_, err = s.Resend(context.Background(), r.Organization.ID.String(), resp.Invitation.Id)
+				_, err = s.Resend(context.Background(), r.Organization.ID.String(), r.User.String(), resp.Invitation.Id)
 				require.NoError(t, err)
 			}
 			if tc.reason == "" {
@@ -312,7 +314,7 @@ func TestInvitationCapacityPolicies(t *testing.T) {
 				support.CreateUser(t, r, r.Organization.ID)
 				list, err := s.List(context.Background(), r.Organization.ID.String())
 				require.NoError(t, err)
-				_, err = s.Resend(context.Background(), r.Organization.ID.String(), list.Invitations[0].Id)
+				_, err = s.Resend(context.Background(), r.Organization.ID.String(), r.User.String(), list.Invitations[0].Id)
 				requireInvitationReason(t, err, "MEMBER_LIMIT_REACHED")
 			}
 		})
@@ -331,7 +333,7 @@ func TestExpiredInvitationRequiresSeatOnResend(t *testing.T) {
 	require.NoError(t, db.Model(&models.OrganizationInvitation{}).Where("id = ?", first.Invitation.Id).Update("expires_at", time.Now().Add(-time.Hour)).Error)
 	_, err = s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.CreateInvitationRequest{Email: "second@example.com"})
 	require.NoError(t, err)
-	_, err = s.Resend(context.Background(), r.Organization.ID.String(), first.Invitation.Id)
+	_, err = s.Resend(context.Background(), r.Organization.ID.String(), r.User.String(), first.Invitation.Id)
 	requireInvitationReason(t, err, "SEAT_PURCHASE_REQUIRED")
 }
 
@@ -355,6 +357,49 @@ func TestInvitationCustomRoleEntitlement(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "support", resp.Invitation.Role)
 	s.Entitlements = invitationEntitlements(false)
-	_, err = s.Resend(context.Background(), r.Organization.ID.String(), resp.Invitation.Id)
+	_, err = s.Resend(context.Background(), r.Organization.ID.String(), r.User.String(), resp.Invitation.Id)
 	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+}
+
+func TestResendElevatedInvitationRequiresUpdatePermission(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "no")
+	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
+	adminInvite, err := s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.CreateInvitationRequest{Email: "admin-invite@example.com", Role: models.RoleOrgAdmin})
+	require.NoError(t, err)
+	operatorInvite, err := s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.CreateInvitationRequest{Email: "operator-invite@example.com"})
+	require.NoError(t, err)
+	stored, err := models.FindOrganizationInvitation(database.Conn(), r.Organization.ID, uuid.MustParse(adminInvite.Invitation.Id))
+	require.NoError(t, err)
+	originalHash := *stored.TokenHash
+
+	account, err := models.CreateAccount("Inviter", "inviter@example.com")
+	require.NoError(t, err)
+	member, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	require.NoError(t, r.AuthService.CreateCustomRole(r.Organization.ID.String(), &authorization.RoleDefinition{
+		Name:        "inviter",
+		DomainType:  models.DomainTypeOrganization,
+		Permissions: []*authorization.Permission{{Resource: "members", Action: "create"}},
+	}))
+	require.NoError(t, r.AuthService.AssignRole(member.ID.String(), "inviter", r.Organization.ID.String(), models.DomainTypeOrganization))
+
+	_, err = s.Resend(context.Background(), r.Organization.ID.String(), member.ID.String(), adminInvite.Invitation.Id)
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+	stored, err = models.FindOrganizationInvitation(database.Conn(), r.Organization.ID, stored.ID)
+	require.NoError(t, err)
+	require.Equal(t, originalHash, *stored.TokenHash)
+
+	_, err = s.Resend(context.Background(), r.Organization.ID.String(), member.ID.String(), operatorInvite.Invitation.Id)
+	require.NoError(t, err)
+
+	scopes, err := json.Marshal([]string{"members:create"})
+	require.NoError(t, err)
+	limited := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-token-scopes", string(scopes)))
+	_, err = s.Resend(limited, r.Organization.ID.String(), r.User.String(), adminInvite.Invitation.Id)
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+	stored, err = models.FindOrganizationInvitation(database.Conn(), r.Organization.ID, stored.ID)
+	require.NoError(t, err)
+	require.Equal(t, originalHash, *stored.TokenHash)
 }

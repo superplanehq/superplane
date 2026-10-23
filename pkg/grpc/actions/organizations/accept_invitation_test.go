@@ -103,7 +103,7 @@ func TestAcceptInvitationRejectsInvalidRecipientOrState(t *testing.T) {
 				require.NoError(t, err)
 				expected = codes.NotFound
 			case "rotated":
-				_, err := s.Resend(context.Background(), r.Organization.ID.String(), created.Invitation.Id)
+				_, err := s.Resend(context.Background(), r.Organization.ID.String(), r.User.String(), created.Invitation.Id)
 				require.NoError(t, err)
 				expected = codes.NotFound
 			case "capacity removed":

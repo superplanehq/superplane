@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/smtp"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -130,9 +132,28 @@ func (c *smtpClientAdapter) Close() error {
 	return c.client.Close()
 }
 
+// smtpConversationTimeout bounds the SMTP connection and the later commands.
+// A server that accepts the connection and then stops replying cannot hold the API request open.
+var smtpConversationTimeout = 30 * time.Second
+
 var smtpDial smtpDialer = func(addr string) (smtpClient, error) {
-	client, err := smtp.Dial(addr)
+	dialer := net.Dialer{Timeout: smtpConversationTimeout}
+	conn, err := dialer.Dial("tcp", addr)
 	if err != nil {
+		return nil, err
+	}
+	if err := conn.SetDeadline(time.Now().Add(smtpConversationTimeout)); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		conn.Close()
 		return nil, err
 	}
 	return &smtpClientAdapter{client: client}, nil

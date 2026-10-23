@@ -73,6 +73,20 @@ func TestInvitationSignupWithRegistrationDisabled(t *testing.T) {
 				switch method {
 				case "password":
 					form := url.Values{"name": {"Invited person"}, "email": {strings.ToUpper(email)}, "password": {"password123"}, "invite_token": {token}}
+					if scenario.allowed {
+						code := "654321"
+						_, err := models.CreateAccountMagicCode(email, crypto.HashToken(code), time.Now().Add(time.Hour))
+						require.NoError(t, err)
+						denied := httptest.NewRecorder()
+						request := httptest.NewRequest(http.MethodPost, "/signup?redirect="+url.QueryEscape(redirect), strings.NewReader(form.Encode()))
+						request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+						handler.handlePasswordSignup(denied, request)
+						_, err = models.FindAccountByEmail(email)
+						require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+						require.Empty(t, cookieValue(denied, "account_token"))
+						require.NotEqual(t, http.StatusSeeOther, denied.Code)
+						form.Set("email_code", code)
+					}
 					request := httptest.NewRequest(http.MethodPost, "/signup?redirect="+url.QueryEscape(redirect), strings.NewReader(form.Encode()))
 					request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 					handler.handlePasswordSignup(recorder, request)

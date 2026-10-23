@@ -380,7 +380,11 @@ func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListI
 }
 
 func (s *OrganizationService) ResendInvitation(ctx context.Context, req *pb.ResendInvitationRequest) (*pb.ResendInvitationResponse, error) {
-	return s.invitations.Resend(ctx, ctx.Value(authorization.DomainIdContextKey).(string), req.InvitationId)
+	actorID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.invitations.Resend(ctx, ctx.Value(authorization.DomainIdContextKey).(string), actorID, req.InvitationId)
 }
 
 func (s *OrganizationService) CancelInvitation(ctx context.Context, req *pb.CancelInvitationRequest) (*pb.CancelInvitationResponse, error) {
