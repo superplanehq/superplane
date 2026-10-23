@@ -346,6 +346,7 @@ func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
 	plans := []models.BillingPlan{
 		{Name: "Flat price", Visibility: "public", PriceCents: 2000},
 		{Name: "Seat price", Visibility: "public", PriceCents: 3000, PerSeat: true, SeatLimit: new(50)},
+		{Name: "Zero-price seats", Visibility: "public", PerSeat: true, SeatLimit: new(50)},
 		{Name: "Private", Visibility: "private", PriceCents: 1000},
 	}
 	for i := range plans {
@@ -372,8 +373,12 @@ func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
 		require.NotNil(t, option, "public plans must remain visible before Polar setup")
 		require.Equal(t, plan.PriceCents, option.PriceCents)
 		require.Equal(t, plan.PerSeat, option.PerSeat)
-		require.True(t, option.SubscriptionRequired, "priced plans must never use card-only activation")
-		_, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, r.Account.ID.String(), "http://localhost")
+		require.True(t, option.SubscriptionRequired, "priced and per-seat plans must never use card-only activation")
+		request := &pb.SelectBillingPlanRequest{PlanKey: plan.Key}
+		if plan.PerSeat {
+			request.Seats = new(int32(1))
+		}
+		_, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), request, r.Account.ID.String(), "http://localhost")
 		require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 		current, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
 		require.NoError(t, err)

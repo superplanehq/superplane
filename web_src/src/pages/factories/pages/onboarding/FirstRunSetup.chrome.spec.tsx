@@ -9,7 +9,6 @@ import type { FactoriesFactory, OrganizationsBillingPlanOption } from "@/api-cli
 import { unmockedPackage } from "@/test/unmockedModule";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
-import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -103,16 +102,6 @@ vi.mock("@/hooks/useOrganizationBilling", () => ({
     isSuccess: true,
     refetch: refetchBilling,
   }),
-}));
-vi.mock("./first-run/FirstRunBillingScreen", () => ({
-  FirstRunBillingScreen: ({ onContinue, chrome }: { onContinue: () => void; chrome?: FirstRunChrome }) => (
-    <section data-testid="first-run-billing">
-      <button data-testid="first-run-back" onClick={chrome?.onBack}>
-        Back
-      </button>
-      <button onClick={onContinue}>Finish with selected plan</button>
-    </section>
-  ),
 }));
 
 const navigateSpy = vi.fn();
@@ -345,7 +334,6 @@ describe("FirstRunSetup chrome", () => {
     { newBilling: true, planActive: false },
     { newBilling: true, planActive: true },
   ])("keeps repository and intake before the final model choice (%j)", async ({ newBilling, planActive }) => {
-    const billing = newBilling && !planActive;
     Object.assign(billingState, { enabled: newBilling, newBilling, planActive, byok: true });
     const user = userEvent.setup();
     const model = pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true, openSection: "vcs" });
@@ -366,22 +354,13 @@ describe("FirstRunSetup chrome", () => {
     expect(model.saveIssues).not.toHaveBeenCalled();
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.saveIssues).toHaveBeenCalledWith("vcs"));
-    if (billing) {
-      expect(await screen.findByTestId("first-run-billing")).toBeInTheDocument();
-      billingState.planActive = true; // Choosing a plan makes it the active plan.
-      await user.click(screen.getByRole("button", { name: "Finish with selected plan" }));
-    }
     expect(await screen.findByTestId("first-run-model-source")).toBeInTheDocument();
-    const steps = billing ? 6 : 5;
+    const steps = 5;
     expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", `Step ${steps} of ${steps}`);
     expect(model.finish).not.toHaveBeenCalled();
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
 
     await user.click(screen.getByTestId("first-run-back"));
-    if (billing) {
-      expect(screen.getByTestId("first-run-billing")).toBeInTheDocument();
-      await user.click(screen.getByTestId("first-run-back"));
-    }
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
     await user.click(screen.getByTestId("first-run-back"));
     expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
@@ -502,7 +481,7 @@ describe("FirstRunSetup chrome", () => {
   });
 
   it.each([false, true])(
-    "opens plan selection before provisioning (skip initial import: %s)",
+    "completes Trial setup without plan selection (skip initial import: %s)",
     async (skipInitialImport) => {
       billingState.enabled = true;
       billingState.newBilling = true;
@@ -514,55 +493,30 @@ describe("FirstRunSetup chrome", () => {
       });
       renderSetup(model);
       await user.click(screen.getByTestId("first-run-analyze-tickets"));
-      expect(await screen.findByRole("button", { name: "Finish with selected plan" })).toBeInTheDocument();
-      expect(model.finish).not.toHaveBeenCalled();
-      await user.click(screen.getByRole("button", { name: "Finish with selected plan" }));
+      expect(screen.queryByTestId("first-run-billing")).not.toBeInTheDocument();
       await waitFor(() => expect(model.finish).toHaveBeenCalled());
     },
   );
 
-  it.each(["issues", "billing"])("finishes with the legacy trial when new billing is off at step %s", async (step) => {
-    billingState.enabled = true;
-    billingState.newBilling = false;
-    const user = userEvent.setup();
-    const model = pageModel({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      setup: { ...setupState(), issuesChoice: "vcs" },
-    });
-    renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
-    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
-    await user.click(
-      step === "issues"
-        ? screen.getByTestId("first-run-analyze-tickets")
-        : screen.getByRole("button", { name: "Continue" }),
-    );
-    await waitFor(() => expect(model.finish).toHaveBeenCalled());
-  });
-
-  it.each([
-    { step: "issues", availablePlans: [] },
-    { step: "billing", availablePlans: [] },
-    { step: "issues", availablePlans: undefined },
-    { step: "billing", availablePlans: undefined },
-  ])("skips plan selection when no plans are available (%j)", async ({ step, availablePlans }) => {
+  it.each([false, true])("routes a restored billing URL through model access (own key: %s)", async (byok) => {
     billingState.enabled = true;
     billingState.newBilling = true;
-    billingState.availablePlans = availablePlans;
-    const user = userEvent.setup();
     const model = pageModel({
       hostedAgentReady: true,
       hostedModelsAvailable: true,
+      bringYourOwnKey: byok,
       setup: { ...setupState(), issuesChoice: "vcs" },
     });
-    renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
-    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
-    await user.click(
-      step === "issues"
-        ? screen.getByTestId("first-run-analyze-tickets")
-        : screen.getByRole("button", { name: "Continue" }),
-    );
-    await waitFor(() => expect(model.finish).toHaveBeenCalled());
-    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
+    renderSetup(model, "/org-1/workspaces/PAY/setup?step=billing&plan=team&subscribed=1&checkout_id=old");
+    expect(screen.queryByTestId("first-run-billing")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-complete")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Continue" }));
+    if (byok) {
+      expect(await screen.findByTestId("first-run-model-source")).toBeInTheDocument();
+      expect(model.finish).not.toHaveBeenCalled();
+    } else {
+      await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+    }
+    expect(billingState.planActive).toBe(false);
   });
 });
