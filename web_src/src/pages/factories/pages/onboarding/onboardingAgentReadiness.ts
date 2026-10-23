@@ -227,8 +227,8 @@ export function firstWorkOrderAgentError(args: {
   return "Ask an installation admin to set a SuperPlane agent model.";
 }
 
-export function shouldShowHostedCreditGrant(grantTotalCents: number): boolean {
-  return grantTotalCents > 0;
+export function shouldShowHostedCreditGrant(grantTotalCents: number, billingEnabled: boolean): boolean {
+  return billingEnabled && grantTotalCents > 0;
 }
 
 export function hostedCreditGrantCopy(remainingCreditCents: number): string {

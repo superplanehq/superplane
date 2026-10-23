@@ -144,13 +144,13 @@ posthog:
   key: ""
 
 #
-# Self-hosted billing is off when this value is empty and Polar is off.
-# An empty value follows polar.enabled. Set false or "no" to keep billing
-# off when Polar is on. Set true or "yes" to force billing on. SuperPlane
-# Cloud does not set this off.
+# Self-hosted product billing is off. A Helm install sets
+# SUPERPLANE_BILLING_ENABLED=no, so the trial credit notice stays hidden.
+# Set true or "yes" only when this install sells hosted credit.
+# Polar credentials do not turn billing on.
 #
 billing:
-  enabled: ""
+  enabled: "no"
 
 polar:
   secretName: ""
