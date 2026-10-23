@@ -228,7 +228,7 @@ func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := NewClient(server.URL, "oat_test", server.Client())
-	session, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "http://localhost:8000/return", "203.0.113.10")
+	session, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost:8000/return", CustomerIP: "203.0.113.10"})
 	require.NoError(t, err)
 	assert.Equal(t, "https://buy.polar.sh/polar_c_test", session.URL)
 	assert.Equal(t, "cust_1", session.CustomerID)
@@ -432,7 +432,7 @@ func Test__CreateCheckoutReportsRateLimit(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := NewClient(server.URL, "oat_test", server.Client())
-	_, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "http://localhost/return", "")
+	_, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost/return"})
 	require.ErrorIs(t, err, ErrRateLimited)
 }
 

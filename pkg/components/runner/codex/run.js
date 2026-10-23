@@ -88,7 +88,28 @@ function applyAnalysisContinuation(taskDir, promptCount, prompt) {
 }
 
 function envFlag(env, name) {
-  return Boolean(String((env && env[name]) || "").trim());
+  return Boolean(envValue(env, name));
+}
+
+function envValue(env, name) {
+  return String((env && env[name]) || "").trim();
+}
+
+function requireCodexAPIKey(env = process.env) {
+  const apiKey = envValue(env, "CODEX_API_KEY") || envValue(env, "OPENAI_API_KEY");
+  if (!apiKey) {
+    throw new Error(
+      "Codex API key is missing. Set OPENAI_API_KEY or CODEX_API_KEY.",
+    );
+  }
+  return apiKey;
+}
+
+function codexExecEnv(env = process.env) {
+  return {
+    ...env,
+    CODEX_API_KEY: requireCodexAPIKey(env),
+  };
 }
 
 function planningEnabled(env = process.env) {
@@ -173,6 +194,10 @@ function codexExecArgs(
     args.push("-m", model);
   }
   args.push(...thinkingArgs(thinking));
+  const baseURL = envValue(env, "OPENAI_BASE_URL");
+  if (baseURL) {
+    args.push("-c", `openai_base_url=${tomlString(baseURL)}`);
+  }
   return args;
 }
 
@@ -324,6 +349,7 @@ async function runPrompt(promptFile, model, thinking) {
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
+  requireCodexAPIKey(process.env);
 
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
@@ -370,6 +396,7 @@ async function runPrompt(promptFile, model, thinking) {
   codexArgs.push(prompt);
 
   const child = spawn("codex", codexArgs, {
+    env: codexExecEnv(process.env),
     stdio: ["ignore", "pipe", "pipe"],
   });
   const stderrDone = pipeRedactedStderr(child.stderr);
@@ -924,6 +951,7 @@ module.exports = {
   createCodexFormatter,
   normalizeCodexToolKind,
   codexExecArgs,
+  codexExecEnv,
   thinkingArgs,
   codexSessionForPrompt,
   codexSessionIDFromEvent,

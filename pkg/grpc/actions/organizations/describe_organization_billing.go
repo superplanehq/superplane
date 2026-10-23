@@ -72,12 +72,26 @@ func DescribeOrganizationBilling(
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "Could not load billing plans.")
 		}
+		override, err := models.FindOrganizationSeatLimitOverride(db, organizationID)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "Could not load seat limits.")
+		}
 		for _, item := range catalog {
 			if item.Visibility != "public" || item.Category != "paid" {
 				continue
 			}
 			checkoutEnabled = checkoutEnabled || item.PolarProductID != nil
-			available = append(available, &pb.BillingPlanOption{Key: item.Key, Name: item.Name, PriceCents: item.PriceCents, PerSeat: item.PerSeat, RequirePaymentMethod: item.RequirePaymentMethod, SubscriptionRequired: item.PolarProductID != nil || item.PriceCents != 0})
+			maximum := entitlements.SeatMaximum(item.SeatLimit, override)
+			var seatMaximum *int32
+			if maximum != nil {
+				seatMaximum = new(int32(*maximum))
+			}
+			available = append(available, &pb.BillingPlanOption{
+				Key: item.Key, Name: item.Name, PriceCents: item.PriceCents,
+				PerSeat: item.PerSeat, SeatMaximum: seatMaximum,
+				RequirePaymentMethod: item.RequirePaymentMethod,
+				SubscriptionRequired: item.PerSeat || item.PolarProductID != nil || item.PriceCents != 0,
+			})
 		}
 	}
 	response := &pb.DescribeOrganizationBillingResponse{
@@ -206,10 +220,7 @@ func CreateBusinessCheckout(
 
 	session, err := client.CreateCheckout(
 		ctx,
-		productID,
-		organizationID.String(),
-		businessCheckoutSuccessURL(baseURL, organizationID),
-		clientIPFromContext(ctx),
+		polar.CheckoutInput{ProductID: productID, ExternalCustomerID: organizationID.String(), SuccessURL: businessCheckoutSuccessURL(baseURL, organizationID), CustomerIP: clientIPFromContext(ctx)},
 	)
 	if err != nil {
 		return nil, polarBillingError(err, "failed to create Business checkout")
