@@ -59,5 +59,8 @@ describe("FirstRunArtPane", () => {
       overrides: { globe: { count: 100 } },
     });
     expect(screen.getByTestId("first-run-art-pane")).toHaveAttribute("data-art-count", "100");
+    expect(destroy).toHaveBeenCalledTimes(1);
+    view.unmount();
+    expect(destroy).toHaveBeenCalledTimes(2);
   });
 });
