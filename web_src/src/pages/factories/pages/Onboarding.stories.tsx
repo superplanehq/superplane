@@ -42,7 +42,7 @@ function SetupStep({
   orgIntegrations = CONNECTED_SETUP_INTEGRATIONS,
   organizationWorkspaceUsage,
 }: {
-  step: WizardStepId | "billing";
+  step: WizardStepId;
   answers?: FactoriesFactoryOnboarding;
   orgIntegrations?: StorybookOrgIntegration[];
   organizationWorkspaceUsage?: StorybookUsageReport;
@@ -110,27 +110,4 @@ export const AgentWithoutGrant: Story = {
       organizationWorkspaceUsage={NO_GRANT_USAGE_REPORT}
     />
   ),
-};
-
-export const Billing: Story = {
-  name: "5 Choose a plan",
-  render: () => <SetupStep step="billing" answers={SETUP_ANSWERS.agent} />,
-};
-
-export const BillingWithSavedCard: Story = {
-  name: "5b Choose a plan (card on file)",
-  render: () => {
-    const fixture = factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent);
-    return (
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=billing`}
-        factoriesFixture={{
-          ...fixture,
-          organizationBilling: { ...fixture.organizationBilling, hasPaymentMethod: true },
-        }}
-        onboardingSeed={pendingSeed}
-        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
-      />
-    );
-  },
 };

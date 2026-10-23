@@ -122,6 +122,11 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 	})
 
 	t.Run("complete without agent integration succeeds when hosted credit remains", func(t *testing.T) {
+		t.Setenv(models.BillingEnabledEnv, "yes")
+		require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+		before, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.Equal(t, models.BillingPlanTrial, before.Catalog.Key)
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
@@ -137,6 +142,11 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
+		after, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.Equal(t, before.PlanID, after.PlanID)
+		require.Equal(t, before.TrialEndsAt, after.TrialEndsAt)
+		require.Equal(t, before.PurchasedSeats, after.PurchasedSeats)
 	})
 
 	t.Run("complete without agent integration succeeds when hosted credit is empty", func(t *testing.T) {

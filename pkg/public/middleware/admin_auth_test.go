@@ -89,7 +89,7 @@ func TestAdminAuthMiddlewareAcceptsPersonalAPIToken(t *testing.T) {
 		assert.Equal(t, r.Account.ID, account.ID)
 		w.WriteHeader(http.StatusNoContent)
 	})
-	handler := AdminAuthMiddleware(signer)(RequireInstallationAdmin()(finalHandler))
+	handler := AdminAuthMiddleware(signer, "")(RequireInstallationAdmin()(finalHandler))
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/api/installation/fleets", nil)
 	req.Header.Set("Authorization", "Bearer "+rawToken)
@@ -108,7 +108,7 @@ func TestAdminAuthMiddlewareRejectsNonAdminPersonalAPITokenWithNotFound(t *testi
 	token := models.NewUserAPIToken(r.User, "Non-admin CLI", crypto.HashToken(rawToken))
 	require.NoError(t, models.CreateUserAPIToken(database.Conn(), token))
 
-	handler := AdminAuthMiddleware(signer)(RequireInstallationAdmin()(http.HandlerFunc(
+	handler := AdminAuthMiddleware(signer, "")(RequireInstallationAdmin()(http.HandlerFunc(
 		func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		},
@@ -130,13 +130,65 @@ func TestAdminAuthMiddlewareRejectsOrganizationAPIKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, r.UserModel.UpdateTokenHash(crypto.HashToken(rawToken)))
 
-	handler := AdminAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := AdminAuthMiddleware(signer, "")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/api/installation/fleets", nil)
 	req.Header.Set("Authorization", "Bearer "+rawToken)
 	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusUnauthorized, res.Code)
+}
+
+func TestAdminAuthMiddlewareScopesFleetManagerTokenToFleetRoutes(t *testing.T) {
+	signer := jwt.NewSigner("test-secret")
+	const fleetManagerToken = "fleet-manager-token"
+
+	handler := AdminAuthMiddleware(signer, fleetManagerToken)(
+		RequireInstallationAdmin()(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			assert.True(t, IsFleetManagerRequest(req.Context()))
+			w.WriteHeader(http.StatusNoContent)
+		})),
+	)
+
+	t.Run("accepts the token for fleet routes", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/api/installation/fleets/e1-large-amd64/capacity", nil)
+		req.Header.Set("Authorization", "Bearer "+fleetManagerToken)
+		res := httptest.NewRecorder()
+
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	for _, path := range []string{
+		"/admin/api/installation/fleet-manager/setup",
+		"/admin/api/installation/keys",
+		"/admin/api/organizations",
+	} {
+		t.Run("rejects the token for "+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.Header.Set("Authorization", "Bearer "+fleetManagerToken)
+			res := httptest.NewRecorder()
+
+			handler.ServeHTTP(res, req)
+
+			assert.Equal(t, http.StatusUnauthorized, res.Code)
+		})
+	}
+}
+
+func TestAdminAuthMiddlewareRejectsInvalidFleetManagerToken(t *testing.T) {
+	signer := jwt.NewSigner("test-secret")
+	handler := AdminAuthMiddleware(signer, "fleet-manager-token")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/admin/api/installation/fleets", nil)
+	req.Header.Set("Authorization", "Bearer invalid-token")
+	res := httptest.NewRecorder()
+
 	handler.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusUnauthorized, res.Code)
