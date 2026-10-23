@@ -55,11 +55,40 @@ type OrganizationFeatureGrant struct {
 	Enabled        bool      `json:"enabled"`
 }
 
+// BillingPlanAssignments is a set of billing plan IDs referenced by organizations.
+type BillingPlanAssignments map[uuid.UUID]struct{}
+
 func (p BillingPlan) ResponsePlan() string {
 	if p.Key == "business_legacy" || p.Key == BillingPlanBusinessManual {
 		return BillingPlanBusiness
 	}
 	return p.Key
+}
+
+// DeleteBlockReason returns the first rule that blocks deletion, or an empty
+// string when the plan can be deleted. Callers pass whether any organization
+// references the plan. Subscription status does not affect the result.
+func (p BillingPlan) DeleteBlockReason(assigned bool) string {
+	switch {
+	case p.IsSystem():
+		return BillingPlanDeleteReasonSystem
+	case p.PolarProductID != nil:
+		return BillingPlanDeleteReasonPolar
+	case assigned:
+		return BillingPlanDeleteReasonAssigned
+	}
+	return ""
+}
+
+// IsSystem reports whether the plan key is reserved for a built-in plan.
+func (p BillingPlan) IsSystem() bool {
+	return slices.Contains(systemBillingPlanKeys, p.Key)
+}
+
+// Contains reports whether the set references the plan.
+func (a BillingPlanAssignments) Contains(planID uuid.UUID) bool {
+	_, ok := a[planID]
+	return ok
 }
 
 func FindBillingPlan(tx *gorm.DB, key string) (*BillingPlan, error) {
@@ -130,35 +159,6 @@ func DeleteBillingPlan(tx *gorm.DB, id uuid.UUID) error {
 		}
 		return inner.Delete(&plan).Error
 	})
-}
-
-// DeleteBlockReason returns the first rule that blocks deletion, or an empty
-// string when the plan can be deleted. Callers pass whether any organization
-// references the plan. Subscription status does not affect the result.
-func (p BillingPlan) DeleteBlockReason(assigned bool) string {
-	switch {
-	case p.IsSystem():
-		return BillingPlanDeleteReasonSystem
-	case p.PolarProductID != nil:
-		return BillingPlanDeleteReasonPolar
-	case assigned:
-		return BillingPlanDeleteReasonAssigned
-	}
-	return ""
-}
-
-// IsSystem reports whether the plan key is reserved for a built-in plan.
-func (p BillingPlan) IsSystem() bool {
-	return slices.Contains(systemBillingPlanKeys, p.Key)
-}
-
-// BillingPlanAssignments is a set of billing plan IDs referenced by organizations.
-type BillingPlanAssignments map[uuid.UUID]struct{}
-
-// Contains reports whether the set references the plan.
-func (a BillingPlanAssignments) Contains(planID uuid.UUID) bool {
-	_, ok := a[planID]
-	return ok
 }
 
 // ListAssignedBillingPlanIDs returns the plan IDs that any organization
