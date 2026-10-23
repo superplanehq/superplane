@@ -241,26 +241,54 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 		})
 	}
 
-	t.Run("leaves the organization lock free during the provider call", func(t *testing.T) {
-		factory := newFactory(t)
-		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
-		api := readyAPI()
-		api.onMerge = func() {
-			err := database.Conn().Transaction(func(tx *gorm.DB) error {
-				locked, err := models.TryLockOrganizationTaskAdmission(tx, r.Organization.ID)
+	for _, startAutomation := range []bool{false, true} {
+		t.Run(fmt.Sprintf("leaves admission free and settles concurrent automation %t", startAutomation), func(t *testing.T) {
+			factory := newFactory(t)
+			order := createOrder(t, factory)
+			pr := createMergeTestPullRequest(t, db, order)
+			var startedRun *models.CanvasRun
+			api := readyAPI()
+			api.onMerge = func() {
+				err := db.Transaction(func(tx *gorm.DB) error {
+					locked, err := models.TryLockOrganizationTaskAdmission(tx, r.Organization.ID)
+					require.NoError(t, err)
+					assert.True(t, locked)
+					return nil
+				})
 				require.NoError(t, err)
-				assert.True(t, locked)
-				return nil
-			})
-			require.NoError(t, err)
-		}
-		useGitHub(t, api)
+				if startAutomation {
+					app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step", "start")
+					line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+						{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+					})
+					require.NoError(t, err)
+					_, err = DispatchWorkOrder(ctx, orgID, &pb.DispatchWorkOrderRequest{
+						FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+					})
+					require.NoError(t, err)
+					runs, err := order.ListRuns(db)
+					require.NoError(t, err)
+					require.Len(t, runs, 1)
+					startedRun = &runs[0]
+				}
+			}
+			useGitHub(t, api)
 
-		resp, err := merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
-		require.NoError(t, err)
-		assert.Equal(t, 1, api.mergeCalls)
-		assert.Equal(t, pb.FactoryPullRequest_STATE_MERGED, resp.GetPullRequest().GetState())
-	})
+			resp, err := merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
+			require.NoError(t, err)
+			assert.Equal(t, 1, api.mergeCalls)
+			assert.Equal(t, pb.FactoryPullRequest_STATE_MERGED, resp.GetPullRequest().GetState())
+			if startedRun != nil {
+				stored, err := factory.FindWorkOrder(db, order.ID)
+				require.NoError(t, err)
+				assert.Equal(t, models.FactoryWorkOrderStateClosed, stored.State)
+				assert.Equal(t, models.FactoryWorkOrderResultCompleted, stored.Result)
+				run, err := models.FindCanvasRunInTransaction(db, startedRun.WorkflowID, startedRun.ID)
+				require.NoError(t, err)
+				assert.Equal(t, models.CanvasRunStateCancelling, run.State)
+			}
+		})
+	}
 
 	t.Run("merges with squash", func(t *testing.T) {
 		factory := newFactory(t)

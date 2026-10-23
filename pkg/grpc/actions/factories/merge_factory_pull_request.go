@@ -166,7 +166,13 @@ func rejectMergeWhileAutomationActive(db *gorm.DB, factory *models.Factory, pull
 		if err := models.LockOrganizationTaskAdmission(tx, factory.OrganizationID); err != nil {
 			return err
 		}
-		return assertNoActiveAutomationLocked(tx, factory, pullRequest)
+		if err := assertNoActiveAutomationLocked(tx, factory, pullRequest); err != nil {
+			return err
+		}
+		if pullRequest.State != models.FactoryPullRequestStateOpen {
+			return errFactoryPullRequestNotOpen
+		}
+		return nil
 	})
 }
 
