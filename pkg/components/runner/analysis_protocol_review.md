@@ -32,7 +32,7 @@ Clarity is how well the task is defined: outcome, scope, and done. 3 means those
 
 Complexity is whether one agent finishes this in one run without steering. 3 means one run covers the work. 2 means the agent will likely need steering. 1 means the work is too big or tangled. A change can span the UI and backend and still fit one run. Lower the score only for a concrete obstacle that will likely need human help. Name the size problem, not missing decisions. Do not name tests or proof in the Complexity summary. Proof belongs to Verifiability.
 
-Verifiability is whether the run can prove the change works. 3 means tests, a build, or another check the agent can run covers the change. 2 means a check covers only part of the change. 1 means only a person can judge the result. Name the proof, or the missing proof, in the summary.
+Verifiability measures whether the implementation agent can verify the acceptance criteria. 3 means available checks cover all criteria. 2 means they cover part. 1 means they cannot verify a meaningful part of the outcome. Follow the Verifiability calibration in the managed refinement guidance. Name the proof, or the missing proof, in the summary.
 
 In chat, name only the weakest sub-parameter and what raises it. Do not recite all three scores.
 
