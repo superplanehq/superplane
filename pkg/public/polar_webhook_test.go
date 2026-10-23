@@ -105,7 +105,7 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
 		db := database.Conn()
 		product := "product_" + uuid.NewString()
-		catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+		catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: new(50), PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
 		require.NoError(t, models.SaveBillingPlan(db, &catalog))
 		body := []byte(fmt.Sprintf(`{"type":"subscription.updated","data":{"id":"sub_seats","status":"active","product_id":%q,"seats":3,"customer":{"external_id":%q}}}`, product, r.Organization.ID.String()))
 		for range 2 {

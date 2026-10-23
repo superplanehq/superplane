@@ -217,6 +217,9 @@ func validateBillingPlan(p *BillingPlan) error {
 	if p.PriceCents < 0 || p.CreditAmountCents < 0 || p.TrialCreditCents < 0 || p.CreditAmountCents > math.MaxInt64/MicrosPerCent || p.TrialCreditCents > math.MaxInt64/MicrosPerCent {
 		return invalid("invalid credit or price amount")
 	}
+	if p.PerSeat && (p.SeatLimit == nil || *p.SeatLimit < 1 || *p.SeatLimit > 1000) {
+		return invalid("maximum seats must be between 1 and 1,000 for per-seat plans")
+	}
 	if p.SeatLimit != nil && *p.SeatLimit <= 0 || p.ParallelTaskLimit != nil && *p.ParallelTaskLimit <= 0 || p.MarkupBPS != nil && *p.MarkupBPS < 0 {
 		return invalid("limits must be positive and markup cannot be negative")
 	}
