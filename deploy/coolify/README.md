@@ -123,3 +123,7 @@ the same host.
 [template/](template/) holds the files for the Coolify repository. Copy
 `template/superplane.yaml` to `templates/compose/superplane.yaml` and
 `template/svgs/superplane.svg` to `svgs/superplane.svg`.
+
+For coolify-docs, copy `coolify-docs-superplane.mdx` to
+`content/docs/services/superplane.mdx` and the same SVG to
+`public/images/services/superplane-logo.svg`.
