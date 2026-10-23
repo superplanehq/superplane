@@ -256,7 +256,9 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	}
 
 	// If the execution is already finished (e.g., timed out or stopped early),
-	// dequeue the item but don't process it further
+	// dequeue the item but don't process it further. No execution id is
+	// returned: the event is discarded rather than folded into the execution,
+	// and a replay rebuilds its inputs from the consumed-event rows.
 	if executionCtx.ExecutionState.IsFinished() {
 		if err := ctx.DequeueItem(); err != nil {
 			return nil, fmt.Errorf("error dequeuing item: %v", err)
@@ -279,10 +281,13 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 
 	//
 	// Check for optional stop expression
-	// If already short-circuited, do not finish again
+	// If already short-circuited, do not finish again. addEventToMetadata
+	// above has already folded this event into the execution's metadata, so
+	// the execution id is still returned to record the consumed-event link
+	// row truthfully.
 	//
 	if md.StopEarly {
-		return nil, nil
+		return &executionCtx.ID, nil
 	}
 
 	//

@@ -1935,6 +1935,18 @@ CREATE TABLE public.workflow_events (
 
 
 --
+-- Name: workflow_node_execution_consumed_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_node_execution_consumed_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    execution_id uuid NOT NULL,
+    event_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: workflow_node_execution_kvs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2057,7 +2069,10 @@ CREATE TABLE public.workflow_runs (
     parent_execution_id uuid,
     callbacks jsonb DEFAULT '[]'::jsonb NOT NULL,
     input jsonb DEFAULT '{}'::jsonb NOT NULL,
-    errors jsonb DEFAULT '[]'::jsonb NOT NULL
+    errors jsonb DEFAULT '[]'::jsonb NOT NULL,
+    is_replay boolean DEFAULT false NOT NULL,
+    replay_source_execution_id uuid,
+    replay_payload jsonb
 );
 
 
@@ -3197,6 +3212,14 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
+-- Name: workflow_node_execution_consumed_events workflow_node_execution_consumed_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_consumed_events
+    ADD CONSTRAINT workflow_node_execution_consumed_events_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_node_execution_kvs workflow_node_execution_kvs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4168,6 +4191,20 @@ CREATE INDEX idx_workflow_events_workflow_node_id ON public.workflow_events USIN
 
 
 --
+-- Name: idx_workflow_node_execution_consumed_events_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_execution_consumed_events_event_id ON public.workflow_node_execution_consumed_events USING btree (event_id);
+
+
+--
+-- Name: idx_workflow_node_execution_consumed_events_exec_event; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_workflow_node_execution_consumed_events_exec_event ON public.workflow_node_execution_consumed_events USING btree (execution_id, event_id);
+
+
+--
 -- Name: idx_workflow_node_execution_kvs_ekv; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4298,6 +4335,13 @@ CREATE INDEX idx_workflow_runs_parent_execution ON public.workflow_runs USING bt
 --
 
 CREATE INDEX idx_workflow_runs_parent_run_id ON public.workflow_runs USING btree (parent_run_id) INCLUDE (id) WHERE (parent_run_id IS NOT NULL);
+
+
+--
+-- Name: idx_workflow_runs_replay_source_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_replay_source_execution_id ON public.workflow_runs USING btree (replay_source_execution_id) WHERE (replay_source_execution_id IS NOT NULL);
 
 
 --
@@ -5750,6 +5794,22 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
+-- Name: workflow_node_execution_consumed_events workflow_node_execution_consumed_events_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_consumed_events
+    ADD CONSTRAINT workflow_node_execution_consumed_events_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_node_execution_consumed_events workflow_node_execution_consumed_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_consumed_events
+    ADD CONSTRAINT workflow_node_execution_consumed_events_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_node_execution_kvs workflow_node_execution_kvs_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5902,6 +5962,14 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: workflow_runs workflow_runs_replay_source_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_replay_source_execution_id_fkey FOREIGN KEY (replay_source_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE SET NULL;
+
+
+--
 -- Name: workflow_runs workflow_runs_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6013,7 +6081,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261022133415	f
+20261023094418	f
 \.
 
 

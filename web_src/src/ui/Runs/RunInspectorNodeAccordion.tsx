@@ -10,7 +10,7 @@ import { AccordionContent, AccordionItem } from "@/ui/accordion";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
 import { RunInspectorStepTimeline } from "./RunInspectorStepTimeline";
 import type { RunInspectorApprovalRecord, RunInspectorCurrentUser, RunInspectorNodeSection } from "./types";
-import type { useRunInspectorActions } from "./useRunInspectorActions";
+import { canReplaySection, type useRunInspectorActions } from "./useRunInspectorActions";
 
 export function RunInspectorNodeAccordion({
   section,
@@ -110,7 +110,12 @@ export function RunInspectorNodeAccordion({
           </span>
         </NodeHeaderButton>
         <RunInspectorNodeActions section={section} actions={actions} currentUser={currentUser} />
-        <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
+        <NodeMetadata
+          section={section}
+          onRerun={onRerun}
+          rerunPending={rerunPending}
+          onReplay={() => actions.openReplay(section)}
+        />
       </AccordionPrimitive.Header>
       {section.isQueued ? null : (
         <AccordionContent className="bg-slate-50 px-3 pb-3 pt-3 dark:bg-gray-950">
@@ -296,10 +301,12 @@ function NodeMetadata({
   section,
   onRerun,
   rerunPending,
+  onReplay,
 }: {
   section: RunInspectorNodeSection;
   onRerun: () => void;
   rerunPending: boolean;
+  onReplay: () => void;
 }) {
   return (
     <div className="ml-auto flex shrink-0 items-center gap-3 px-4 text-xs text-slate-500 dark:text-gray-400">
@@ -315,6 +322,20 @@ function NodeMetadata({
           }}
         >
           {rerunPending ? "Rerun..." : "Rerun"}
+        </Button>
+      ) : null}
+      {canReplaySection(section) ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          data-testid="replay-step-button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onReplay();
+          }}
+        >
+          Replay
         </Button>
       ) : null}
       {(section.isTrigger || section.isQueued) && section.createdAt ? (

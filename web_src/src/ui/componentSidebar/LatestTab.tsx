@@ -32,6 +32,7 @@ interface LatestTabProps {
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
   onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
+  nodeNamesById?: Record<string, string>;
 }
 
 function SectionHeader({ label }: { label: string }) {
@@ -62,6 +63,7 @@ export const LatestTab = ({
   resolveRunId,
   fetchRunId,
   onSelectRun,
+  nodeNamesById,
 }: LatestTabProps) => {
   const compactLatestEvents = useMemo(() => latestEvents.slice(0, 5), [latestEvents]);
   const compactQueueEvents = useMemo(() => nextInQueueEvents.slice(0, 5), [nextInQueueEvents]);
@@ -188,6 +190,8 @@ export const LatestTab = ({
                     onCancelExecution={onCancelExecution}
                     onReEmit={onReEmit}
                     getExecutionState={getExecutionState}
+                    nodeNamesById={nodeNamesById}
+                    onSelectRun={onSelectRun}
                   />
                 );
               })}
@@ -228,6 +232,8 @@ export const LatestTab = ({
                       onCancelQueueItem={onCancelQueueItem}
                       onReEmit={onReEmit}
                       getExecutionState={getExecutionState}
+                      nodeNamesById={nodeNamesById}
+                      onSelectRun={onSelectRun}
                     />
                   );
                 })}
