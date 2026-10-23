@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from "react-router";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { catalogEntryToAutomation, catalogForColumn } from "../lib/columnAutomations";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 
 const installFactory = vi.fn();
@@ -163,5 +164,76 @@ describe("add visual evidence", () => {
     );
     expect(installFactory).not.toHaveBeenCalled();
     expect(result.current.pickerOpen).toBe(true);
+  });
+});
+
+describe("add custom verification", () => {
+  it("opens the focused Verify setup route", async () => {
+    const { result } = renderHook(
+      () => ({
+        automation: useAddColumnAutomation({
+          organizationId: "org",
+          factoryId: "factory",
+          factoryKey: "workspace",
+          lineId: "line",
+          appRepository: "acme/app",
+          backlogRepository: "acme/app",
+          defaultBranch: "main",
+          githubIntegrationId: "vcs-integration",
+          vcsProvider: "bitbucket",
+          automationsFor: () => [],
+        }),
+        location: useLocation(),
+      }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={new QueryClient()}>
+            <MemoryRouter initialEntries={["/org/workspaces/workspace/lines/line"]}>{children}</MemoryRouter>
+          </QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => result.current.automation.openPicker("verify"));
+    const entry = result.current.automation.catalog.find((item) => item.kind === "custom-verification")!;
+    await act(async () => result.current.automation.onSelect(entry));
+
+    expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
+    expect(result.current.location.search).toBe("?customVerification=new");
+    expect(result.current.automation.naming).toBe(false);
+  });
+
+  it("opens focused setup when custom verification is the only available choice", () => {
+    const configured = catalogForColumn("verify").map((entry) => catalogEntryToAutomation(entry, "Verify", entry.id));
+    const { result } = renderHook(
+      () => ({
+        automation: useAddColumnAutomation({
+          organizationId: "org",
+          factoryId: "factory",
+          factoryKey: "workspace",
+          lineId: "line",
+          appRepository: "acme/app",
+          backlogRepository: "acme/app",
+          defaultBranch: "main",
+          githubIntegrationId: "vcs-integration",
+          vcsProvider: "github",
+          automationsFor: () => configured,
+        }),
+        location: useLocation(),
+      }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={new QueryClient()}>
+            <MemoryRouter initialEntries={["/org/workspaces/workspace/lines/line"]}>{children}</MemoryRouter>
+          </QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => result.current.automation.openPicker("verify"));
+
+    expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
+    expect(result.current.location.search).toBe("?customVerification=new");
+    expect(result.current.automation.naming).toBe(false);
   });
 });

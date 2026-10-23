@@ -91,10 +91,10 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 
-	t.Run("requires at least one prompt", func(t *testing.T) {
+	t.Run("allows bash only", func(t *testing.T) {
 		spec := valid
 		spec.Steps = []ClaudeCodeStep{{Name: "Echo", Type: runner.AgentStepBash, Command: strPtr("echo hi")}}
-		require.Error(t, validateRunClaudeCodeSpec(spec))
+		require.NoError(t, validateRunClaudeCodeSpec(spec))
 	})
 
 	t.Run("rejects hosted credentials", func(t *testing.T) {

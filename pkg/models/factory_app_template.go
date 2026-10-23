@@ -12,6 +12,7 @@ import (
 const (
 	FactoryAppTemplateMetadataKey      = "factoryTemplate"
 	FactoryAppTemplateBacklogID        = "backlog"
+	FactoryAppTemplateCustomVerifyID   = "custom-verification"
 	FactoryAppTemplateVisualEvidenceID = "visual-evidence"
 	FactoryAppBacklogTriggerID         = "trigger"
 )

@@ -2,9 +2,11 @@ import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
+import type { ManualCustomVerification } from "../../../lib/customVerification";
+import { CustomVerificationRunAction } from "../../CustomVerificationRunAction";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import { AutomationCardBody } from "./AutomationCardBody";
 import {
@@ -18,7 +20,7 @@ import {
 import { StepOutputCounts } from "./consoleOutputChips";
 import type { ConsoleAutomation } from "./automationsViewModel";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
-import { StageStatusGlyph } from "./redesignShared";
+import { NodeIcon, StageStatusGlyph } from "./redesignShared";
 
 function isLiveAutomationStatus(status: ConsoleDisplayStatus): boolean {
   return status === "running" || status === "waiting" || status === "queued";
@@ -29,6 +31,8 @@ export function ConsoleAutomationCard({
   phase,
   phases,
   organizationId,
+  factoryId,
+  orderId,
   factoryKey,
   orderNumber,
   expandIdle,
@@ -36,11 +40,14 @@ export function ConsoleAutomationCard({
   actionBusy,
   onStopRun,
   onRerunStep,
+  manualRun,
 }: {
   automation: ConsoleAutomation;
   phase?: SplitRunPhase;
   phases: SplitRunPhase[];
   organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
   factoryKey?: string;
   orderNumber?: string;
   /** True for the current-column card on a draft that has not started a run. */
@@ -49,6 +56,7 @@ export function ConsoleAutomationCard({
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
+  manualRun?: ManualCustomVerification;
 }) {
   const { latest } = automation;
   const { queuedIds, timing, report } = useAgentQueueReports();
@@ -116,6 +124,18 @@ export function ConsoleAutomationCard({
           shownPhase={shownPhase}
           timer={shownStatus === "queued" ? "" : runMetaLine(latest, automation.runs, timing, now)}
           queueSummary={mixedQueueSummary(automation.runs, queuedIds)}
+          iconSlug={manualRun?.icon}
+          runAction={
+            manualRun && organizationId && factoryId && orderId ? (
+              <CustomVerificationRunAction
+                organizationId={organizationId}
+                factoryId={factoryId}
+                workOrderId={orderId}
+                verifications={[manualRun]}
+                placement="logs"
+              />
+            ) : undefined
+          }
         />
         <CollapsibleContent>
           <FramePanel className="space-y-3">
@@ -144,12 +164,16 @@ function ConsoleCardHeader({
   shownPhase,
   timer,
   queueSummary,
+  iconSlug,
+  runAction,
 }: {
   automation: ConsoleAutomation;
   shownStatus: ConsoleDisplayStatus;
   shownPhase?: SplitRunPhase;
   timer: string;
   queueSummary: string;
+  iconSlug?: string;
+  runAction?: ReactNode;
 }) {
   return (
     <FrameHeader
@@ -161,6 +185,7 @@ function ConsoleCardHeader({
         aria-label={`Toggle ${automation.name} details`}
       />
       <StageStatusGlyph status={shownStatus} />
+      {iconSlug ? <NodeIcon iconSlug={iconSlug} /> : null}
       {shownStatus === "cancelled" ? (
         <span className="shrink-0 text-[13px] font-medium text-muted-foreground">Stopped</span>
       ) : null}
@@ -174,6 +199,7 @@ function ConsoleCardHeader({
         <StepOutputCounts stage={automation.latest} phase={shownPhase} runs={automation.runs} />
       )}
       <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{timer}</span>
+      {runAction}
       <ChevronRight
         className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
         aria-hidden

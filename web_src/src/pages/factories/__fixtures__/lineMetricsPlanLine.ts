@@ -3,7 +3,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
   FactoryAutomation,
-  FactoryLineStep,
+  FactoriesFactoryLineStep as FactoryLineStep,
 } from "@/api-client";
 
 import { LAST_WEEK, REFUND_FACTORY_APPS, REFUND_LINE_PLAN_ID, TWO_HOURS_AGO, YESTERDAY } from "./factoryPageResponses";

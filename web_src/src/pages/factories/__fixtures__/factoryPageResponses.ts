@@ -16,7 +16,7 @@ import type {
   FactoriesFactoryAgentResource,
   FactoriesFactoryMcpClient,
   FactoryAutomation,
-  FactoryLineStep,
+  FactoriesFactoryLineStep as FactoryLineStep,
   SuperplaneUsersUser,
 } from "@/api-client";
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useByokRunnerModelDefault } from "@/hooks/useByokRunnerModelDefault";
@@ -37,6 +37,10 @@ export function PlanningReviewForm({
   factoryKey,
   showResources = true,
   showConcurrency = true,
+  showSteps = true,
+  modelLabel,
+  modelDescription,
+  modelOnly = false,
   appearance = "card",
   view = "full",
   onRestoreDefaultPrompt,
@@ -45,6 +49,7 @@ export function PlanningReviewForm({
   onRetryRestore,
   restoreRetryDisabled = false,
   disabled = false,
+  beforeSteps,
 }: {
   draft: PlanningReviewDraft;
   onChange: (next: PlanningReviewDraft) => void;
@@ -53,6 +58,10 @@ export function PlanningReviewForm({
   factoryKey?: string;
   showResources?: boolean;
   showConcurrency?: boolean;
+  showSteps?: boolean;
+  modelLabel?: string;
+  modelDescription?: string;
+  modelOnly?: boolean;
   /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
   appearance?: "card" | "fields";
   view?: "full" | "implementation" | "planning";
@@ -62,6 +71,7 @@ export function PlanningReviewForm({
   onRetryRestore?: () => void;
   restoreRetryDisabled?: boolean;
   disabled?: boolean;
+  beforeSteps?: ReactNode;
 }) {
   const updateComponent = (id: string, next: PlanningReviewComponent) => {
     onChange({
@@ -83,12 +93,17 @@ export function PlanningReviewForm({
           factoryKey={factoryKey}
           showResources={showResources}
           showConcurrency={showConcurrency}
+          showSteps={showSteps}
+          modelLabel={modelLabel}
+          modelDescription={modelDescription}
+          modelOnly={modelOnly}
           onRestoreDefaultPrompt={onRestoreDefaultPrompt}
           restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
           restoreError={restoreError}
           onRetryRestore={onRetryRestore}
           restoreRetryDisabled={restoreRetryDisabled}
           disabled={disabled}
+          beforeSteps={beforeSteps}
           onChange={(next) => updateComponent(component.id, next)}
         />
       ))}
@@ -105,12 +120,17 @@ function AgentPanel({
   factoryKey,
   showResources,
   showConcurrency,
+  showSteps,
+  modelLabel,
+  modelDescription,
+  modelOnly,
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled,
   restoreError,
   onRetryRestore,
   restoreRetryDisabled,
   disabled,
+  beforeSteps,
   onChange,
 }: {
   appearance: "card" | "fields";
@@ -121,12 +141,17 @@ function AgentPanel({
   factoryKey?: string;
   showResources: boolean;
   showConcurrency: boolean;
+  showSteps: boolean;
+  modelLabel?: string;
+  modelDescription?: string;
+  modelOnly: boolean;
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled: boolean;
   restoreError?: string;
   onRetryRestore?: () => void;
   restoreRetryDisabled: boolean;
   disabled: boolean;
+  beforeSteps?: ReactNode;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
   const features = useExperimentalFeature(organizationId);
@@ -205,6 +230,7 @@ function AgentPanel({
       autocompleteExampleObj={EXPRESSION_CONTEXT}
       fieldPath="model"
       readOnly={disabled}
+      modelOnly={modelOnly}
     />
   ) : null;
 
@@ -241,10 +267,13 @@ function AgentPanel({
         data-testid="planning-review-settings"
       >
         {view !== "full" && modelControl ? (
-          <div role="group" aria-label="Default model">
+          <div role="group" aria-label={modelLabel ?? "Default model"}>
             <ImplementSettingRow
-              label="Default model"
-              description={view === "planning" ? "The model used to plan tasks." : "The model used to implement tasks."}
+              label={modelLabel ?? "Default model"}
+              description={
+                modelDescription ??
+                (view === "planning" ? "The model used to plan tasks." : "The model used to implement tasks.")
+              }
             >
               <div className="w-full min-w-0">{modelControl}</div>
             </ImplementSettingRow>
@@ -282,7 +311,8 @@ function AgentPanel({
           </div>
         ) : null}
       </section>
-      {view === "full" ? (
+      {view === "full" && showSteps ? beforeSteps : null}
+      {view === "full" && showSteps ? (
         <PlanningReviewStepList
           skills={promptSkills}
           skillHref={(skill) =>

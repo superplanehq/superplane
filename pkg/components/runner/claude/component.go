@@ -75,7 +75,7 @@ Example:
 
 ## Configuration
 - **Machine type**: Runner fleet available to the organization (required).
-- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Steps**: One or more ordered bash commands or agent prompts.
 - **Anthropic API Key**: SuperPlane secret or Claude integration used as ` + "`ANTHROPIC_API_KEY`" + `.
 - **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
