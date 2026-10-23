@@ -315,16 +315,25 @@ describe("WorkOrderIntentDocument composer", () => {
       <WorkOrderIntentDocument
         {...INTENT_DOC}
         artifacts={[INTENT]}
-        analysis={analysisChat({ view: WAITING_COMPOSER_VIEW, onUploadFiles, onSend })}
+        analysis={analysisChat({
+          view: WAITING_COMPOSER_VIEW,
+          onUploadFiles,
+          onSend,
+          canAnalyze: true,
+          onAnalyze: async () => true,
+        })}
       />,
     );
 
     expect(input().getAttribute("accept")).toBe(WORK_ORDER_FILE_ACCEPT);
+    expect(screen.getByRole("button", { name: "Analyze" })).toBeInTheDocument();
     await user.upload(input(), composerTextFile("notes.txt"));
     await waitFor(() => expect(screen.getByTestId("create-work-order-request-file-file-1")).toBeInTheDocument());
     expect(screen.getByTestId("create-work-order-request-file-file-1")).toHaveTextContent("notes.txt");
+    expect(screen.queryByRole("button", { name: "Analyze" })).not.toBeInTheDocument();
     await user.click(screen.getByTestId("create-work-order-request-file-remove-file-1"));
     expect(screen.queryByTestId("create-work-order-request-file-file-1")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Analyze" })).toBeInTheDocument();
 
     await user.upload(input(), composerPng("bug.png"));
     await waitFor(() => expect(screen.getByTestId("create-work-order-request-attachment-file-2")).toBeInTheDocument());

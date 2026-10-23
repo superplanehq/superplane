@@ -234,6 +234,7 @@ export function SplitRunReview({
       {confirmUnclearStart ? (
         <StartConfirmDialog
           open={confirmOpen}
+          queue={footer.actions.some((action) => action.kind === "start" && action.label === "Queue")}
           scores={splitRunFooterScores(footer)}
           onOpenChange={setConfirmOpen}
           onConfirm={confirmStart}
