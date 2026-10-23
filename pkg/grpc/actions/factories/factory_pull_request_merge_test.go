@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/getsentry/sentry-go"
@@ -247,6 +248,9 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 			registry.Organization = support.CreateOrganization(t, r, r.User)
 			r := &registry
 			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			db := db.WithContext(ctx)
 			orgID := r.Organization.ID.String()
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
 			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -322,6 +326,14 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 			}
 			useGitHub(t, api)
 
+			pool, err := db.DB()
+			require.NoError(t, err)
+			maxOpen := pool.Stats().MaxOpenConnections
+			pool.SetMaxOpenConns(1)
+			defer pool.SetMaxOpenConns(maxOpen)
+			// A merge must complete when the application pool has only one
+			// connection. Its reservation cannot consume that connection while
+			// its checks, provider callback, and result recording need the pool.
 			resp, err := MergeFactoryPullRequest(ctx, deps, orgID, &pb.MergeFactoryPullRequestRequest{
 				FactoryId: factory.ID.String(), PrId: pr.GetId(),
 				MergeMethod: pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, ExpectedHeadSha: headSHA,

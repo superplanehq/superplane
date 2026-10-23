@@ -2,11 +2,13 @@ package factories
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"time"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
@@ -102,27 +104,23 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 
-	// Reserve this task across the provider call without holding organization or
-	// row locks. Checks and completion use short, separate transactions.
-	var closeOutcome *factoryPullRequestCloseResult
-	err = db.Transaction(func(reservation *gorm.DB) error {
-		order := &models.FactoryWorkOrder{ID: pullRequest.WorkOrderID}
-		reserved, err := order.TryReserveMerge(reservation)
-		if err != nil {
-			return err
-		}
-		if !reserved {
-			return errFactoryPullRequestNotMergeable
-		}
-		if err := rejectMergeWhileAutomationActive(db, factory, pullRequest); err != nil {
-			return err
-		}
-		if err := provider.MergePullRequest(ctx, pullRequest, method, expectedSHA); err != nil {
-			return err
-		}
-		closeOutcome, err = recordMergedFactoryPullRequest(db, factory, pullRequest)
-		return err
-	})
+	// The provider call stays outside the organization lock. A slow Git host
+	// must not block dispatch or cancellation for every other task. This task
+	// keeps a separate lock until the host accepts or rejects the merge, so
+	// its line and root events cannot start in that gap.
+	release, err := lockWorkOrderForMerge(ctx, pullRequest.WorkOrderID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+	}
+	defer release()
+	if err := rejectMergeWhileAutomationActive(db, factory, pullRequest); err != nil {
+		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
+	}
+	if err := provider.MergePullRequest(ctx, pullRequest, method, expectedSHA); err != nil {
+		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
+	}
+
+	closeOutcome, err := recordMergedFactoryPullRequest(db, factory, pullRequest)
 	if err != nil {
 		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
 	}
@@ -183,6 +181,36 @@ func rejectMergeWhileAutomationActive(db *gorm.DB, factory *models.Factory, pull
 		}
 		return nil
 	})
+}
+
+func lockWorkOrderForMerge(ctx context.Context, workOrderID uuid.UUID) (func(), error) {
+	// A shared pool connection held for the provider call can exhaust that
+	// pool. The merge then cannot record its result or release the lock.
+	lockDB, err := database.OpenDedicatedSQLDB("work-order-merge-lock", 1)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := lockDB.Conn(ctx)
+	if err != nil {
+		_ = lockDB.Close()
+		return nil, err
+	}
+	if err := models.AcquireWorkOrderMergeLock(ctx, conn, workOrderID); err != nil {
+		_ = conn.Close()
+		_ = lockDB.Close()
+		return nil, err
+	}
+	return func() {
+		releaseWorkOrderMergeLock(conn, lockDB, workOrderID)
+	}, nil
+}
+
+func releaseWorkOrderMergeLock(conn *sql.Conn, lockDB *sql.DB, workOrderID uuid.UUID) {
+	defer lockDB.Close()
+	defer conn.Close()
+	if err := models.ReleaseWorkOrderMergeLock(context.Background(), conn, workOrderID); err != nil {
+		log.WithError(err).Warn("failed to release work order merge lock")
+	}
 }
 
 func recordMergedFactoryPullRequest(

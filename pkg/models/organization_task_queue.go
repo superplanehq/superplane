@@ -150,15 +150,13 @@ func nextQueuedOrganizationTask(tx *gorm.DB, orgID uuid.UUID) (*OrganizationQueu
 	if err := stoppingOrganizationTasks(tx, orgID).Scan(&stopping).Error; err != nil {
 		return nil, err
 	}
+	reserved, err := mergeReservedWorkOrderIDs(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
 	for i := range queued {
 		task := &queued[i]
-		if err := checkTaskMergeAdmission(tx, task.WorkOrderID); err != nil {
-			if errors.Is(err, ErrOrganizationTaskCapacity) {
-				continue
-			}
-			return nil, err
-		}
-		if slices.Contains(stopping, task.WorkOrderID) {
+		if slices.Contains(stopping, task.WorkOrderID) || slices.Contains(reserved, task.WorkOrderID) {
 			continue
 		}
 		if task.RunID != uuid.Nil {

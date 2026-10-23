@@ -314,11 +314,12 @@ func (p *FactoryPullRequest) existingActivityResult(
 }
 
 func (p *FactoryPullRequest) grantOrQueueExclusiveAccess(tx *gorm.DB, activity *FactoryPullRequestRun) (*FactoryPullRequestAccessResult, error) {
-	if err := checkTaskMergeAdmission(tx, p.WorkOrderID); err != nil {
-		if errors.Is(err, ErrOrganizationTaskCapacity) {
-			return &FactoryPullRequestAccessResult{Activity: activity, Outcome: FactoryPullRequestActivityOutcomeWaiting}, nil
-		}
+	reserved, err := workOrderMergeInProgress(tx, p.WorkOrderID)
+	if err != nil {
 		return nil, err
+	}
+	if reserved {
+		return &FactoryPullRequestAccessResult{Activity: activity, Outcome: FactoryPullRequestActivityOutcomeWaiting}, nil
 	}
 	if err := reloadActivity(tx, activity); err != nil {
 		return nil, err
