@@ -105,6 +105,10 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 		return nil, err
 	}
 
+	return f.createAnalysisSession(tx, order, params)
+}
+
+func (f *Factory) createAnalysisSession(tx *gorm.DB, order *FactoryWorkOrder, params AttachAnalysisSessionParams) (*FactoryPlanningSession, error) {
 	now := time.Now()
 	canvasID := params.CanvasID
 	runID := params.CanvasRunID
@@ -134,6 +138,83 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 		return nil, err
 	}
 	return session, nil
+}
+
+// RecoverAnalysisSession prepares the conversation for a task whose analysis
+// stopped before the event router created its session. It does
+// not reserve capacity: a restart still enters the normal root-event queue.
+func (f *Factory) RecoverAnalysisSession(tx *gorm.DB, workOrderID uuid.UUID) (*FactoryPlanningSession, error) {
+	if err := LockOrganizationTaskAdmission(tx, f.OrganizationID); err != nil {
+		return nil, err
+	}
+	order, err := f.planningRefineWorkOrder(tx, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil || !f.PlanningEnabled {
+		return nil, ErrFactoryPlanningSessionInvalid
+	}
+	session, err := FindPlanningSessionByDraftWorkOrder(tx, f.OrganizationID, f.ID, workOrderID)
+	if err == nil || !errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return session, err
+	}
+	run, err := f.recoverableAnalysisRun(tx, order.ID)
+	if err != nil {
+		return nil, err
+	}
+	if run.State != CanvasRunStateFinished && run.State != CanvasRunStateCancelling {
+		return nil, fmt.Errorf("%w: analysis is waiting to start", ErrFactoryPlanningSessionInvalid)
+	}
+	repository := strings.TrimSpace(f.OnboardingConfigValue().AppRepository)
+	if order.Repository != nil && strings.TrimSpace(*order.Repository) != "" {
+		repository = strings.TrimSpace(*order.Repository)
+	}
+	return f.createAnalysisSession(tx, order, AttachAnalysisSessionParams{
+		Repository: repository, CanvasID: run.WorkflowID, CanvasRunID: run.ID, WorkOrderID: order.ID,
+	})
+}
+
+// HasQueuedAnalysisRun finds a restart that the event router has not yet
+// attached to the session. Messages sent during this wait share that run.
+func (s *FactoryPlanningSession) HasQueuedAnalysisRun(tx *gorm.DB) (bool, error) {
+	if s.CanvasID == nil || s.DraftWorkOrderID == nil {
+		return false, nil
+	}
+	var count int64
+	err := tx.Table("workflow_events AS e").
+		Joins("JOIN workflow_runs r ON r.id = e.run_id").
+		Where("e.workflow_id = ? AND e.execution_id IS NULL AND e.state = ?", *s.CanvasID, CanvasEventStatePending).
+		Where("e.data->>'type' = ? AND e.data->'data'->>'taskRefinementEnabled' = ?", workOrderCreatedPayloadType, "true").
+		Where("e.data->'data'->'workOrder'->>'id' = ?", s.DraftWorkOrderID.String()).
+		Where("r.state IN ?", []string{CanvasRunStatePending, CanvasRunStateStarted}).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (f *Factory) recoverableAnalysisRun(tx *gorm.DB, workOrderID uuid.UUID) (*CanvasRun, error) {
+	var runs []CanvasRun
+	err := tx.Table("workflow_runs AS r").Select("r.*").
+		Joins("JOIN workflows c ON c.id = r.workflow_id AND c.deleted_at IS NULL").
+		Joins("JOIN workflow_events e ON e.run_id = r.id AND e.execution_id IS NULL").
+		Where("c.organization_id = ? AND c.factory_id = ?", f.OrganizationID, f.ID).
+		Where("e.node_id = ? AND r.node_id = ?", FactoryAppBacklogTriggerID, FactoryAppBacklogTriggerID).
+		Where("e.data->>'type' = ? AND e.data->'data'->>'taskRefinementEnabled' = ?", workOrderCreatedPayloadType, "true").
+		Where("e.data->'data'->'workOrder'->>'id' = ?", workOrderID.String()).
+		Order("r.created_at DESC, r.id DESC").Find(&runs).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range runs {
+		run := &runs[i]
+		version, err := FindCanvasVersionInTransaction(tx, run.WorkflowID, run.VersionID)
+		if err != nil {
+			return nil, err
+		}
+		if IsBacklogFactoryApp(version.Nodes, version.Edges) {
+			return run, nil
+		}
+	}
+	return nil, ErrFactoryPlanningSessionInvalid
 }
 
 func analysisSessionMatchesWorkOrder(session *FactoryPlanningSession, workOrderID uuid.UUID) bool {

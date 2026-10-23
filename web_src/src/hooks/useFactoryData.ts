@@ -1109,6 +1109,7 @@ export function useFactorySchedulePreview(
 export function useCancelWorkOrderQueue(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: ["factories", organizationId, factoryId, "cancel-work-order-queue"],
     mutationFn: async (input: { orderId: string; queueId: string }) => {
       const response = await factoriesCancelWorkOrderQueue(
         withOrganizationHeader({
@@ -1127,9 +1128,16 @@ export function useCancelWorkOrderQueue(organizationId: string, factoryId: strin
       applyWorkOrderToListCaches(queryClient, organizationId, factoryId, input.orderId, order);
       queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, input.orderId), order);
     },
-    onSettled: () => {
+    onSettled: (_order, _error, input) => {
       // Queue positions change for other tasks and workspaces, too.
-      void queryClient.invalidateQueries({ queryKey: ["factories", organizationId] });
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: factoryQueryKeys.list(organizationId) }),
+        queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] }),
+        queryClient.invalidateQueries({
+          queryKey: factoryQueryKeys.planningSession(organizationId, factoryId, input.orderId),
+        }),
+        queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "workspace-usage"] }),
+      ]);
     },
   });
 }

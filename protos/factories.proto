@@ -869,6 +869,10 @@ service Factories {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"
       body: "*"
+      additional_bindings {
+        post: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session/messages"
+        body: "*"
+      }
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Send planning session message";
@@ -3058,6 +3062,8 @@ message SendPlanningSessionMessageRequest {
   string factory_id = 1;
   string session_id = 2;
   string text = 3;
+  // Use when the task has no planning session yet.
+  string work_order_id = 4;
 }
 
 message SendPlanningSessionMessageResponse {

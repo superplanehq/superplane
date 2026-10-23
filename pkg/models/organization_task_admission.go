@@ -61,12 +61,6 @@ func LockRunOrganizationTaskAdmission(tx *gorm.DB, runID uuid.UUID) error {
 // component calls must not hold it while they wait on the network.
 var taskAdmissionLockComponents = []string{"updateWorkOrderStatus", "addPullRequestActivity"}
 
-// LockTaskStatusExecutionAdmission locks before the execution row because this
-// action can close an order and remove its queued work.
-func LockTaskStatusExecutionAdmission(tx *gorm.DB, executionID uuid.UUID) error {
-	return LockTaskExecutionAdmission(tx, executionID)
-}
-
 // LockTaskExecutionAdmission locks before the execution row only when this
 // execution can change task admission or takes the organization lock itself.
 // addPullRequestActivity and its hook call CreateActivity after the row lock.
@@ -221,8 +215,8 @@ func admitSharingQueuedTasks(tx *gorm.DB, orgID uuid.UUID, active []uuid.UUID) (
 	return admitted, nil
 }
 
-// Replacements must wait for their old line runs to stop. Other active tasks
-// can continue line work without reserving another organization slot.
+// Replacements must wait for their previous runs and descendants to stop.
+// Other active tasks can continue work without another organization slot.
 func continuableOrganizationTaskIDs(tx *gorm.DB, orgID uuid.UUID) ([]uuid.UUID, error) {
 	active, err := ListActiveOrganizationTaskIDs(tx, orgID)
 	if err != nil || len(active) == 0 {
@@ -230,9 +224,7 @@ func continuableOrganizationTaskIDs(tx *gorm.DB, orgID uuid.UUID) ([]uuid.UUID, 
 	}
 	var ids []uuid.UUID
 	err = tx.Model(&FactoryWorkOrder{}).Where("id IN ?", active).
-		Where(`NOT EXISTS (SELECT 1 FROM factory_work_order_executions e
-			JOIN workflow_runs r ON r.id = e.run_id
-			WHERE e.work_order_id = factory_work_orders.id AND r.state = ?)`, CanvasRunStateCancelling).
+		Where("id NOT IN (?)", stoppingOrganizationTasks(tx, orgID)).
 		Pluck("id", &ids).Error
 	return ids, err
 }
@@ -240,6 +232,13 @@ func continuableOrganizationTaskIDs(tx *gorm.DB, orgID uuid.UUID) ([]uuid.UUID, 
 func checkOrganizationTaskAdmission(tx *gorm.DB, orgID, workOrderID uuid.UUID) error {
 	if workOrderID == uuid.Nil {
 		return nil
+	}
+	stopping, err := organizationTaskIsStopping(tx, orgID, workOrderID)
+	if err != nil {
+		return err
+	}
+	if stopping {
+		return ErrOrganizationTaskCapacity
 	}
 	active, err := ListActiveOrganizationTaskIDs(tx, orgID)
 	if err != nil {
@@ -383,6 +382,7 @@ func admitQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem) (*FactoryLine
 func eligibleQueuedTasks(tx *gorm.DB, orgID uuid.UUID) *gorm.DB {
 	return tx.Model(&FactoryWorkOrderQueueItem{}).
 		Where("organization_id = ?", orgID).
+		Where("work_order_id NOT IN (?)", stoppingOrganizationTasks(tx, orgID)).
 		Where(`NOT EXISTS (
 			SELECT 1 FROM factory_lines l
 			JOIN factory_work_order_line_dispatches d ON d.id = factory_work_order_queue_items.line_dispatch_id
@@ -400,13 +400,7 @@ func eligibleQueuedTasks(tx *gorm.DB, orgID uuid.UUID) *gorm.DB {
 // Select sharing tasks directly so older inactive rows cannot hide them.
 func sharingEligibleQueuedTasks(tx *gorm.DB, orgID uuid.UUID, active []uuid.UUID) *gorm.DB {
 	return eligibleQueuedTasks(tx, orgID).
-		Where("factory_work_order_queue_items.work_order_id IN ?", active).
-		Where(`NOT EXISTS (
-			SELECT 1 FROM factory_work_order_executions e
-			JOIN workflow_runs r ON r.id = e.run_id
-			WHERE e.work_order_id = factory_work_order_queue_items.work_order_id
-			AND r.state = ?
-		)`, CanvasRunStateCancelling)
+		Where("factory_work_order_queue_items.work_order_id IN ?", active)
 }
 
 func failQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem, dispatch *FactoryWorkOrderLineDispatch, cause error) (*FactoryLineStepResult, error) {
@@ -429,34 +423,8 @@ func discardQueuedTask(tx *gorm.DB, item *FactoryWorkOrderQueueItem, dispatch *F
 }
 
 func hasEligibleQueuedTask(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
-	roots, err := listQueuedRootTasks(tx, orgID, 1)
-	if err != nil {
-		return false, err
-	}
-	if len(roots) > 0 {
-		return true, nil
-	}
-	var items []FactoryWorkOrderQueueItem
-	if err := eligibleQueuedTasks(tx, orgID).Limit(organizationTaskAdmissionBatchSize).Find(&items).Error; err != nil {
-		return false, err
-	}
-	for i := range items {
-		dispatch, order, line, err := queuedTaskCandidate(tx, &items[i])
-		if err != nil {
-			return false, err
-		}
-		if dispatch == nil || order == nil || line == nil || items[i].StepIndex < 0 || items[i].StepIndex >= len(dispatch.Steps) {
-			continue
-		}
-		active, err := countActiveFactoryStepExecutions(tx, line.ID, items[i].StepIndex)
-		if err != nil {
-			return false, err
-		}
-		if active < int64(admissionStep(line, dispatch, items[i].StepIndex).EffectiveMaxParallelism()) {
-			return true, nil
-		}
-	}
-	return false, nil
+	head, err := nextQueuedOrganizationTask(tx, orgID)
+	return head != nil, err
 }
 
 var errQueuedTaskUnstartable = errors.New("queued task cannot start")

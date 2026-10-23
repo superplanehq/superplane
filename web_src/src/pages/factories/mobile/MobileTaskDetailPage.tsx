@@ -22,7 +22,6 @@ import {
   boardLineIdFromNavigationState,
   displayedBoardLineId,
 } from "../lib/workOrderNumberResolution";
-import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { formatWorkOrderIdentifier } from "../lib/workspaceKey";
 import { OwnerTimeCostRow } from "../pages/work-order-popup-redesign/popupShared";
 import { SPLIT_RUN_ANALYZING_NOTE } from "../pages/work-order-split-run/splitRunFooter";
@@ -30,6 +29,7 @@ import { ANALYSIS_PLANNING_COPY } from "../pages/work-order-split-run/useAnalysi
 import type { IntentAnalysisChat } from "../pages/work-order-split-run/intentAnalysisChat";
 import { WorkOrderSplitRunOverview } from "../pages/work-order-split-run/WorkOrderSplitRunOverview";
 import { DRAFT_START_MODEL_AUTO } from "../pages/work-order-split-run/draftStartModel";
+import { draftAnalysisQueued } from "../pages/work-order-split-run/draftStripAnalysis";
 import { factoryPlanningEnabled } from "../pages/planningSettingsModel";
 import {
   columnAppsFromFactoryApps,
@@ -44,7 +44,7 @@ import { useColumnAppCheckRuns } from "../pages/work-order-split-run/useColumnAp
 import { useWorkOrderPRFeedbackLog } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileDraftStartModelSelect } from "./MobileDraftStartModelSelect";
-import { MobileTaskSections, PhoneTaskReview, Section } from "./MobileTaskSections";
+import { MobileTaskSections, MobileTaskStatus, PhoneTaskReview, Section } from "./MobileTaskSections";
 import { useMobileRefineChat } from "./useMobileRefineChat";
 
 function taskBackLineId(
@@ -300,11 +300,6 @@ function LoadedMobileTask({
           organizationId={organizationId}
           ownerEdits={model.ownerEdits}
         />
-        {refine.sessionMissing ? (
-          <p className="text-[13px] text-muted-foreground" role="status">
-            {MOBILE_TASK_COPY.noRefinementSession}
-          </p>
-        ) : null}
         {review(true)}
         <Section title={MOBILE_TASK_COPY.description}>
           {fixture.descriptionText?.trim() ? (
@@ -408,7 +403,9 @@ function MobileRefineBody({
         artifactsLoading={model.artifactsLoading}
         pullRequests={model.pullRequests}
         checks={fixture.checks}
-        isAnalyzing={fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline}
+        isAnalyzing={
+          !draftAnalysisQueued(fixture) && fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline
+        }
         organizationId={organizationId}
         factoryId={factoryId}
         factoryKey={routeSegment}
@@ -441,7 +438,6 @@ function MobileTaskHeader({
   ownerEdits: MobileTaskModel["ownerEdits"];
 }) {
   const { factoryKey } = useFactoriesLayout();
-  const statusMeta = getWorkOrderDisplayStatusMeta(getWorkOrderDisplayStatus(order));
   const identifier = fixture.identifier?.trim() || formatWorkOrderIdentifier(factoryKey, order.number);
 
   return (
@@ -452,13 +448,7 @@ function MobileTaskHeader({
             {identifier}
           </span>
         ) : null}
-        <span
-          className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium", statusMeta.className)}
-          data-testid="mobile-task-status"
-        >
-          <span className={cn("size-1.5 rounded-full", statusMeta.dotClassName)} aria-hidden />
-          {statusMeta.label}
-        </span>
+        <MobileTaskStatus order={order} fixture={fixture} />
       </div>
       <h1 className="text-[20px] leading-snug font-semibold tracking-[-0.02em] text-foreground break-words">
         {fixture.title}

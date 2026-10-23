@@ -1,3 +1,4 @@
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
@@ -888,6 +889,8 @@ function LineDetailHeader({
   onColorViewChange: (view: LineBoardColumnColorView) => void;
 }) {
   const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
+  const { data: workspaceUsage } = useOrganizationWorkspaceUsage(organizationId, 30, true);
+  const parallelTaskLimit = workspaceUsage?.parallelTaskLimit;
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
@@ -913,8 +916,16 @@ function LineDetailHeader({
         data-testid="lines-detail-header"
         title={factory?.name?.trim() || "Workspace"}
         leading={
-          nextStepsRestore || hostedCreditHeaderKicker ? (
+          parallelTaskLimit != null || nextStepsRestore || hostedCreditHeaderKicker ? (
             <>
+              {parallelTaskLimit != null ? (
+                <span
+                  className="whitespace-nowrap text-[13px] text-muted-foreground tabular-nums"
+                  title="Active tasks across the organization."
+                >
+                  {workspaceUsage?.activeTaskCount ?? 0} of {parallelTaskLimit} active tasks
+                </span>
+              ) : null}
               {hostedCreditHeaderKicker}
               {nextStepsRestore}
             </>

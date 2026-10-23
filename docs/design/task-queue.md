@@ -1,7 +1,7 @@
 # Task queue and admission
 
 This document describes the queue implementation in the repository as of
-October 22, 2026. It covers Factory tasks, line steps, and canvas node queues.
+October 23, 2026. It covers Factory tasks, line steps, and canvas node queues.
 Use it with the [Factory design](factory.md) when changing task execution.
 
 SuperPlane saves waiting work in PostgreSQL. Admission decides when that work
@@ -10,12 +10,25 @@ in the organization. Each line step also has a separate execution limit.
 RabbitMQ messages notify workers about changes. Database scans provide recovery
 when a notification does not arrive.
 
+## Summary
+
+1. A task requests analysis or starts a line.
+2. SuperPlane locks admission for the organization and checks task and step capacity.
+3. Eligible work starts. Other work stays in PostgreSQL until capacity becomes available.
+4. Workers create component executions from canvas node queues.
+5. Completion releases capacity. Notifications and periodic scans start the next eligible work.
+
+For example, an organization with a limit of two can run tasks A and B.
+Task C waits even when its line has spare capacity.
+More work for task A can share its existing slot, subject to local limits.
+When A finishes all its work, C can start if no older eligible task waits.
+
 ## Queue layers
 
 | Layer | Waiting work | Capacity scope |
 | --- | --- | --- |
 | Organization task admission | Line queue items and pending task root events | Distinct active work orders across the organization |
-| Line step admission | One pending step per line dispatch | Pending and running step executions at the same line and step index |
+| Line step admission | One pending step per line dispatch | Pending and running step executions, plus runs still stopping, at the same line and step index |
 | Canvas node queue | Events routed to a component | Active executions at the same canvas, node, and resolved queue key |
 | RabbitMQ | Change notifications for workers and clients | Message delivery; the database holds task admission state |
 
@@ -98,7 +111,8 @@ A dispatch saves a snapshot of the line name and steps.
 Each step has `max_parallelism`, with a default of 10.
 There is no unlimited line step setting.
 The limit counts pending and running executions across all work orders on that
-line at that step index.
+line at that step index. A finished execution also retains its reservation
+while its run is unfinished.
 
 The live line supplies the current limit at the same step index.
 If the live line no longer has that index, admission uses the dispatch snapshot.
@@ -175,6 +189,11 @@ Field names below use protobuf notation. JSON uses camelCase.
 `task_limit_reached` does not describe line capacity or older waiting tasks.
 It is a UI hint. The backend checks current state again when a request arrives.
 
+The workspace usage response includes `active_task_count` and optional
+`parallel_task_limit`. The workspace header shows these organization totals
+when the limit is present. The header refreshes capacity every 10 seconds.
+An absent limit means unlimited organization capacity.
+
 Task cards show `Queued #N` for waiting work. Queue status takes precedence
 over the card's score or analysis indicator.
 The task popup labels its start action **Queue** when the organization limit
@@ -241,6 +260,44 @@ the router admits it.
 Closing a work order removes its queued line items.
 Queue removal does not imply that all already running work stops immediately.
 Active descendant and cancelling runs can continue to hold the organization slot.
+Replacement work waits for cancellation to finish, including cancelled descendant
+runs. Spare organization capacity does not permit an overlapping replacement.
+These waiting replacements do not block other eligible tasks.
+
+### Analysis recovery
+
+Analysis can stop before the event router attaches a planning session.
+After queue removal, the task popup restores the chat and the analysis action.
+The action shows **Analyze** when capacity is available and **Queue analysis**
+when the organization limit is full. Both actions use the same queue as
+implementation. A queued analysis shows its queue position instead of an
+active analysis state.
+
+The action sends a message through the work order endpoint when no session
+exists:
+
+```text
+POST /api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session/messages
+Body: { "text": "Analyze this task." }
+```
+
+The server validates the task and its analysis run before it creates a session.
+The request requires the same work order update permission as a session message.
+An active analysis stays queued or running. A cancelled analysis can queue a
+restart while its previous run stops. Recovery does not bypass organization
+admission or reserve a slot.
+The restarted analysis enters the root-event queue through the normal path.
+
+## Diagnose waiting work
+
+| Observation | Check |
+| --- | --- |
+| Organization capacity is full | Check all factories, including active analysis, approvals, descendants, and cancelling runs. |
+| Capacity is available but a task waits | Check older eligible tasks and the line step limit. |
+| A replacement waits after cancellation | Wait for the previous run and its descendants to stop. |
+| A root event waits after capacity becomes available | Allow the event router's minute scan to retry admission. |
+| A task started, but its component waits | Check the node queue limit and runner availability. |
+| Queue cancellation returns `FailedPrecondition` | Refresh the task. The pending entry may have started or been replaced. |
 
 ## Canvas node queues
 

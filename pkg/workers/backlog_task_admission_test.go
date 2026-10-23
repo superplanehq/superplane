@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__BacklogAdmission_ConcurrentEventsShareOrganizationCapacity(t *testing.T) {
@@ -101,6 +102,54 @@ func Test__BacklogAdmission_SharesCapacityWithLineTasks(t *testing.T) {
 	assert.Zero(t, queued)
 }
 
+func TestTaskRootAdmissionWaitsForAnalysisCancellationWithSpareCapacity(t *testing.T) {
+	r := support.Setup(t)
+	setTaskPlanLimit(t, r, 2)
+	event, order := createBacklogAdmissionEvent(t, r)
+	router := NewEventRouter("")
+	logger := log.NewEntry(log.New())
+	require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
+	db := database.DB(t.Context())
+	run, err := models.FindUnscopedCanvasRun(db, event.RunID)
+	require.NoError(t, err)
+	child, err := models.CreateCanvasRunInTransaction(db, run.WorkflowID, run.NodeID, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(child).Update("parent_run_id", run.ID).Error)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, r.Organization.ID); err != nil {
+			return err
+		}
+		_, err := run.RequestCancellation(tx, nil)
+		return err
+	}))
+	replacement := support.EmitCanvasEventForNodeWithData(t, event.WorkflowID, event.NodeID, event.Channel, nil, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			models.WorkOrderCreatedRefinementEnabledDataKey: true,
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	})
+
+	for _, old := range []*models.CanvasRun{run, child} {
+		require.NoError(t, router.LockAndProcessEvent(logger, *replacement, time.Now()))
+		stored, err := models.FindCanvasEvent(replacement.ID)
+		require.NoError(t, err)
+		require.Equal(t, models.CanvasEventStatePending, stored.State, "replacement analysis must wait for the cancelled run subtree")
+		var queued int64
+		require.NoError(t, db.Model(&models.CanvasNodeQueueItem{}).Where("event_id = ?", replacement.ID).Count(&queued).Error)
+		require.Zero(t, queued, "spare capacity must not allow replacement work before cancellation completes")
+		require.NoError(t, NewRunFinalizer("", r.Registry).finalizeRun(old.WorkflowID, old.ID, runFinalizerTriggerSweep))
+	}
+
+	require.NoError(t, router.LockAndProcessEvent(logger, *replacement, time.Now()))
+	stored, err := models.FindCanvasEvent(replacement.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStateRouted, stored.State)
+	session, err := models.FindPlanningSessionByRun(db, replacement.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, *session.DraftWorkOrderID)
+}
+
 func createBacklogAdmissionEvent(t *testing.T, r *support.ResourceRegistry) (*models.CanvasEvent, *models.FactoryWorkOrder) {
 	t.Helper()
 	db := database.DB(t.Context())
@@ -174,6 +223,80 @@ func Test__BacklogAdmission_QueuePositionAndCancellation(t *testing.T) {
 	run, err = models.FindUnscopedCanvasRun(db, second.RunID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateStarted, run.State)
+}
+
+func TestBacklogAdmissionRestartsDequeuedAnalysisThroughSharedQueue(t *testing.T) {
+	r := support.Setup(t)
+	setTaskPlanLimit(t, r, 1)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	db := database.DB(ctx)
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+	_, active := fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Implementation uses the slot"))
+	event, order := createBacklogAdmissionEvent(t, r)
+	factory, err := models.FindFactory(db, r.Organization.ID, order.FactoryID)
+	require.NoError(t, err)
+	require.NoError(t, factory.UpdatePlanning(db, models.FactoryPlanning{Enabled: true}))
+	_, err = factoryactions.CancelWorkOrderQueue(ctx, r.Organization.ID.String(), &pb.CancelWorkOrderQueueRequest{
+		FactoryId: order.FactoryID.String(), OrderId: order.ID.String(), QueueId: event.ID.String(),
+	})
+	require.NoError(t, err)
+
+	response, err := factoryactions.SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: order.FactoryID.String(), WorkOrderId: order.ID.String(), Text: "Analyze this task.",
+	})
+	require.NoError(t, err, "a dequeued analysis must be restartable before cancellation finalizes")
+	require.NotNil(t, response.Session)
+	queued, err := models.ListOrganizationQueuedTasks(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Len(t, queued, 1)
+	assert.Equal(t, order.ID, queued[0].WorkOrderID)
+	require.NotEqual(t, event.ID, queued[0].ID, "the restart must have a new cancellable queue identity")
+	replacement, err := models.FindCanvasEvent(queued[0].ID)
+	require.NoError(t, err)
+	router := NewEventRouter("")
+	logger := log.NewEntry(log.New())
+	require.NoError(t, router.LockAndProcessEvent(logger, *replacement, time.Now()))
+	stored, err := models.FindCanvasEvent(replacement.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStatePending, stored.State, "analysis must wait for the implementation slot")
+
+	_, err = factoryactions.SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: order.FactoryID.String(), SessionId: response.Session.Id, Text: "Keep the existing retry helper.",
+	})
+	require.NoError(t, err)
+	queued, err = models.ListOrganizationQueuedTasks(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Len(t, queued, 1, "messages during the wait must share the queued analysis")
+	dequeued, err := factoryactions.CancelWorkOrderQueue(ctx, r.Organization.ID.String(), &pb.CancelWorkOrderQueueRequest{
+		FactoryId: order.FactoryID.String(), OrderId: order.ID.String(), QueueId: replacement.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, dequeued.Order.PlanningSession)
+	assert.Equal(t, models.PlanningSessionStateEnded, dequeued.Order.PlanningSession.State, "dequeue must stop the waiting conversation's analyzing state")
+	_, err = factoryactions.SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: order.FactoryID.String(), SessionId: response.Session.Id, Text: "Analyze this task.",
+	})
+	require.NoError(t, err)
+	queued, err = models.ListOrganizationQueuedTasks(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Len(t, queued, 1)
+	restarted, err := models.FindCanvasEvent(queued[0].ID)
+	require.NoError(t, err)
+
+	for _, old := range []*models.CanvasEvent{event, replacement} {
+		cancelled, err := models.FindUnscopedCanvasRun(db, old.RunID)
+		require.NoError(t, err)
+		require.NoError(t, NewRunFinalizer("", r.Registry).finalizeRun(cancelled.WorkflowID, cancelled.ID, runFinalizerTriggerSweep))
+	}
+	finishRun(t, active.Run, models.CanvasRunResultPassed)
+	advanceFactoryLine(t, r, active.Run.ID)
+	require.NoError(t, router.LockAndProcessEvent(logger, *restarted, time.Now()))
+	stored, err = models.FindCanvasEvent(restarted.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStateRouted, stored.State)
+	session, err := models.FindPlanningSessionByRun(db, restarted.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, response.Session.Id, session.ID.String(), "admission must reconnect the existing conversation")
 }
 
 func Test__BacklogAdmission_UnscheduleKeepsTaskInBacklogAndAdvancesQueue(t *testing.T) {

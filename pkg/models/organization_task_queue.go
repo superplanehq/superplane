@@ -40,7 +40,7 @@ func ListOrganizationQueuedTasks(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationQu
 	if err != nil {
 		return nil, err
 	}
-	analysis, err := listQueuedRootTasks(tx, orgID, 0)
+	analysis, err := listQueuedRootTasks(tx, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -99,12 +99,32 @@ func (o *FactoryWorkOrder) CancelQueuedTask(tx *gorm.DB, queueID uuid.UUID) (*Ru
 		if err != nil {
 			return nil, err
 		}
+		if err := o.endQueuedAnalysisSession(tx, run); err != nil {
+			return nil, err
+		}
 		return run.RequestCancellation(tx, nil)
 	}
 	return nil, ErrTaskNoLongerQueued
 }
 
-func listQueuedRootTasks(tx *gorm.DB, orgID uuid.UUID, limit int) ([]OrganizationQueuedTask, error) {
+func (o *FactoryWorkOrder) endQueuedAnalysisSession(tx *gorm.DB, run *CanvasRun) error {
+	session, err := FindPlanningSessionByDraftWorkOrder(tx, o.OrganizationID, o.FactoryID, o.ID)
+	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if session.CanvasID == nil || *session.CanvasID != run.WorkflowID {
+		return nil
+	}
+	if session.CanvasRunID != nil && *session.CanvasRunID != run.ID {
+		return nil
+	}
+	return session.End(tx)
+}
+
+func listQueuedRootTasks(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationQueuedTask, error) {
 	var queued []OrganizationQueuedTask
 	query := tx.Table("workflow_events AS e").
 		Select("e.id, c.factory_id, o.id AS work_order_id, e.run_id, e.created_at, c.name").
@@ -115,22 +135,26 @@ func listQueuedRootTasks(tx *gorm.DB, orgID uuid.UUID, limit int) ([]Organizatio
 		Where("c.organization_id = ? AND e.execution_id IS NULL AND e.state = ?", orgID, CanvasEventStatePending).
 		Where("o.state IN ? AND r.state IN ?", []string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen}, []string{CanvasRunStateStarted, CanvasRunStatePending}).
 		Where("NOT EXISTS (SELECT 1 FROM factory_work_order_executions x WHERE x.run_id = r.id)")
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
 	err := query.Order("e.created_at, e.id").Scan(&queued).Error
 	return queued, err
 }
 
-// Locally full line steps do not prevent another eligible task from using an
-// organization slot. The card position retains the full queue order.
+// Locally full steps and stopping tasks do not prevent other eligible tasks
+// from using an organization slot. Cards retain the full queue order.
 func nextQueuedOrganizationTask(tx *gorm.DB, orgID uuid.UUID) (*OrganizationQueuedTask, error) {
 	queued, err := ListOrganizationQueuedTasks(tx, orgID)
 	if err != nil {
 		return nil, err
 	}
+	var stopping []uuid.UUID
+	if err := stoppingOrganizationTasks(tx, orgID).Scan(&stopping).Error; err != nil {
+		return nil, err
+	}
 	for i := range queued {
 		task := &queued[i]
+		if slices.Contains(stopping, task.WorkOrderID) {
+			continue
+		}
 		if task.RunID != uuid.Nil {
 			return task, nil
 		}

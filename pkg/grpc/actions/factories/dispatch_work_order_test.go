@@ -250,6 +250,7 @@ func Test__DispatchWorkOrder__SecondDispatchAfterFirstFinishesCreatesSeparateTra
 func Test__DispatchWorkOrder__ReplaceActiveFinishesCurrentAndStartsAgain(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
 
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -269,7 +270,11 @@ func Test__DispatchWorkOrder__ReplaceActiveFinishesCurrentAndStartsAgain(t *test
 		LineName:  line.Name,
 	})
 	require.NoError(t, err)
+	require.Len(t, firstResp.Order.LineDispatches, 1)
+	require.Len(t, firstResp.Order.LineDispatches[0].StepExecutions, 1)
+	require.NotNil(t, firstResp.Order.LineDispatches[0].StepExecutions[0].Run)
 	firstID := firstResp.Order.LineDispatches[0].Id
+	firstRunID := firstResp.Order.LineDispatches[0].StepExecutions[0].Run.Id
 
 	resp, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
 		FactoryId:     factoryModel.ID.String(),
@@ -281,8 +286,31 @@ func Test__DispatchWorkOrder__ReplaceActiveFinishesCurrentAndStartsAgain(t *test
 	require.Len(t, resp.Order.LineDispatches, 2)
 	assert.Equal(t, firstID, resp.Order.LineDispatches[0].Id)
 	assert.Equal(t, pb.WorkOrderLineDispatch_STATE_FINISHED, resp.Order.LineDispatches[0].State)
+	assert.Equal(t, pb.WorkOrderLineDispatch_RESULT_CANCELLED, resp.Order.LineDispatches[0].Result)
 	assert.Equal(t, pb.WorkOrderLineDispatch_STATE_ACTIVE, resp.Order.LineDispatches[1].State)
-	assert.Equal(t, int32(0), resp.Order.LineDispatches[1].StepExecutions[0].StepIndex)
+	require.NotNil(t, resp.Order.LineDispatches[1].QueueItem, "replacement must wait for the cancelled run to stop")
+	assert.Empty(t, resp.Order.LineDispatches[1].StepExecutions)
+
+	run, err := models.FindUnscopedCanvasRun(db, uuid.MustParse(firstRunID))
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasRunStateCancelling, run.State)
+	now := time.Now()
+	require.NoError(t, db.Model(run).Updates(map[string]any{"state": models.CanvasRunStateFinished, "finished_at": &now}).Error)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := models.AdmitQueuedForOrganization(tx, r.Organization.ID)
+		return err
+	}))
+	described, err := DescribeWorkOrder(ctx, r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.Len(t, described.Order.LineDispatches, 2)
+	assert.Equal(t, resp.Order.LineDispatches[1].Id, described.Order.LineDispatches[1].Id)
+	assert.Nil(t, described.Order.LineDispatches[1].QueueItem)
+	require.Len(t, described.Order.LineDispatches[1].StepExecutions, 1)
+	require.NotNil(t, described.Order.LineDispatches[1].StepExecutions[0].Run)
+	assert.Equal(t, int32(0), described.Order.LineDispatches[1].StepExecutions[0].StepIndex)
+	assert.NotEqual(t, firstRunID, described.Order.LineDispatches[1].StepExecutions[0].Run.Id)
 }
 
 func Test__DispatchWorkOrder__StartsAtRequestedStep(t *testing.T) {

@@ -8,6 +8,7 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
   FactoryAutomation,
+  OrganizationsDescribeOrganizationWorkspaceUsageResponse,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import type * as integrationsData from "@/hooks/useIntegrations";
@@ -114,6 +115,11 @@ const updateFactoryLineMutateAsync = vi.fn();
 const cancelQueuedTask = vi.fn().mockResolvedValue(undefined);
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
+const workspaceUsage = { data: {} as OrganizationsDescribeOrganizationWorkspaceUsageResponse };
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => workspaceUsage,
+}));
+
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
 const useFactoryBoardWorkOrders = vi.fn((_organizationId?: string, _factoryId?: string, _options?: unknown) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
@@ -339,6 +345,7 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 async function resetLinesBoardMocks() {
+  workspaceUsage.data = {};
   window.localStorage.clear();
   resetFactoryBoardLaneScrollPositions();
   updateFactoryLineMutateAsync.mockReset();
@@ -382,6 +389,18 @@ async function resetLinesBoardMocks() {
 describe("LinesPage board", () => {
   beforeEach(async () => {
     await resetLinesBoardMocks();
+  });
+
+  it("shows organization task capacity even when the board has no tasks", () => {
+    workspaceUsage.data = { activeTaskCount: 2, parallelTaskLimit: 5 };
+    renderLinesBoard();
+    expect(within(screen.getByTestId("lines-detail-header")).getByText("2 of 5 active tasks")).toBeInTheDocument();
+  });
+
+  it("hides task capacity for unlimited plans", () => {
+    workspaceUsage.data = { activeTaskCount: 2 };
+    renderLinesBoard();
+    expect(screen.queryByText(/of .* active tasks/)).not.toBeInTheDocument();
   });
 
   it("does not show a back link to the lines list", () => {

@@ -1,4 +1,5 @@
 import { PlanningReview } from "./PlanningReview";
+import { Button } from "@/components/ui/button";
 import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import { hasPendingPlanningQuestions } from "./planningReviewState";
 
@@ -30,6 +31,13 @@ export function AnalysisPlanControls({
       planStatus={analysis.planStatus}
       onToggle={analysis.onTogglePlan}
       creditVerdict={analysis.creditVerdict}
+      actions={
+        analysis.canAnalyze && analysis.onAnalyze && !analysis.creditVerdict ? (
+          <Button type="button" size="sm" onClick={() => void analysis.onAnalyze?.()}>
+            {analysis.analyzeLabel ?? "Analyze"}
+          </Button>
+        ) : undefined
+      }
     />
   );
 }

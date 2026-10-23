@@ -351,6 +351,56 @@ func Test__OrganizationQueue_RetryAndReplacementAdmitOlderWorkspaceFirst(t *test
 	}
 }
 
+func TestOrganizationQueueReplacementWaitsForCancellationWithSpareCapacity(t *testing.T) {
+	for _, operation := range []string{"retry", "replace"} {
+		t.Run(operation, func(t *testing.T) {
+			r := support.Setup(t)
+			setTaskPlanLimit(t, r, 2)
+			fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(10)})
+			order := fixture.createOpenWorkOrder(t, r, "Replace after cancellation")
+			_, running := fixture.dispatchLine(t, order)
+			db := database.DB(t.Context())
+			child, err := models.CreateCanvasRunInTransaction(db, running.Run.WorkflowID, running.Run.NodeID, models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			require.NoError(t, db.Model(child).Update("parent_run_id", running.Run.ID).Error)
+
+			var replacement *models.FactoryLineStepResult
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				if operation == "retry" {
+					var err error
+					replacement, _, err = order.RetryLineStep(tx, fixture.line, 0)
+					return err
+				}
+				if _, err := order.AbandonActiveLineDispatch(tx); err != nil {
+					return err
+				}
+				var err error
+				_, replacement, err = fixture.line.Dispatch(tx, order)
+				return err
+			}))
+			require.NotNil(t, replacement.QueueItem, "spare capacity must not start replacement work while its old run is stopping")
+			finalizer := NewRunFinalizer("", r.Registry)
+			finalizer.sweepQueuedTasks(t.Context())
+			require.Len(t, executionsForOrder(t, order.ID), 1, "the sweep must keep the replacement queued")
+			_, unrelated := fixture.dispatchLine(t, fixture.createOpenWorkOrder(t, r, "Use the spare slot"))
+			require.NotNil(t, unrelated.Run, "a stopping task must not block unrelated eligible work")
+
+			require.NoError(t, finalizer.finalizeRun(running.Run.WorkflowID, running.Run.ID, runFinalizerTriggerSweep))
+			stored, err := models.FindUnscopedCanvasRun(db, running.Run.ID)
+			require.NoError(t, err)
+			require.Equal(t, models.CanvasRunStateFinished, stored.State)
+			finalizer.sweepQueuedTasks(t.Context())
+			require.Len(t, executionsForOrder(t, order.ID), 1, "the replacement must wait for the cancelled descendant after its root finishes")
+			require.NotNil(t, queueItemForDispatch(t, replacement.QueueItem.LineDispatchID))
+
+			require.NoError(t, finalizer.finalizeRun(child.WorkflowID, child.ID, runFinalizerTriggerSweep))
+			finalizer.sweepQueuedTasks(t.Context())
+			assert.Nil(t, queueItemForDispatch(t, replacement.QueueItem.LineDispatchID))
+			assert.Len(t, executionsForOrder(t, order.ID), 2, "the replacement starts after the old run subtree stops")
+		})
+	}
+}
+
 func Test__OrganizationQueue_FullCapacityDoesNotLoadCandidates(t *testing.T) {
 	r := support.Setup(t)
 	plan := setTaskPlanLimit(t, r, 1)

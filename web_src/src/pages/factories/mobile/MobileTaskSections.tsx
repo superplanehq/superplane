@@ -1,15 +1,53 @@
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { type DraftReadinessTone } from "../lib/draftReadiness";
+import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { OutputList } from "../pages/work-order-popup-redesign/popupShared";
 import { SplitRunReview } from "../pages/work-order-split-run/SplitRunReview";
-import type { SplitRunStopChoice } from "../pages/work-order-split-run/splitRunFooter";
+import { withTaskQueueActions, type SplitRunStopChoice } from "../pages/work-order-split-run/splitRunFooter";
 import type { SplitRunFixture, SplitRunPhase } from "../pages/work-order-split-run/splitRunMocks";
+import { WorkOrderQueueStatus } from "../workOrders/WorkOrderQueueStatus";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileTaskActivity } from "./MobileTaskActivity";
+
+export function MobileTaskStatus({
+  order,
+  fixture,
+}: {
+  order: FactoriesWorkOrder;
+  fixture: Pick<SplitRunFixture, "queuedTasks" | "title">;
+}) {
+  const queuedTasks = fixture.queuedTasks ?? [];
+  const showTaskStatus = queuedTasks.length === 0 || queuedTasks.some((queue) => queue.taskActive);
+  const statusMeta = getWorkOrderDisplayStatusMeta(getWorkOrderDisplayStatus(order));
+  return (
+    <>
+      {showTaskStatus ? (
+        <span
+          className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium", statusMeta.className)}
+          data-testid="mobile-task-status"
+        >
+          <span className={cn("size-1.5 rounded-full", statusMeta.dotClassName)} aria-hidden />
+          {statusMeta.label}
+        </span>
+      ) : null}
+      {queuedTasks.map((queue) => (
+        <WorkOrderQueueStatus
+          key={queue.id}
+          queue={queue}
+          orderId={order.id ?? ""}
+          title={fixture.title}
+          canCancel={false}
+          canDispatch={false}
+        />
+      ))}
+    </>
+  );
+}
 
 export function PhoneTaskReview({
   model,
@@ -48,7 +86,7 @@ export function PhoneTaskReview({
   const { fixture, pullRequests, canUpdate, lineName } = model;
   return (
     <SplitRunReview
-      footer={fixture.footer}
+      footer={withTaskQueueActions(fixture.footer, fixture)}
       organizationId={scope.organizationId}
       factoryId={scope.factoryId}
       factoryKey={scope.factoryKey}

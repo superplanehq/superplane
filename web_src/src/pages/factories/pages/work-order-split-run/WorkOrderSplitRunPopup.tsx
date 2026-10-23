@@ -4,6 +4,7 @@ import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client
 import { WorkOrderQueueStatus } from "../../workOrders/WorkOrderQueueStatus";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
@@ -14,8 +15,13 @@ import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { draftStripAnalysis } from "./draftStripAnalysis";
-import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import { draftAnalysisQueued, draftStripAnalysis } from "./draftStripAnalysis";
+import {
+  classicSplitRunFooter,
+  isTaskResultFooter,
+  SPLIT_RUN_ANALYZING_NOTE,
+  withTaskQueueActions,
+} from "./splitRunFooter";
 import { refinePopupShowsAutomations, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
@@ -53,7 +59,8 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   const factoryQuery = useFactory(organizationId ?? "", factoryId ?? "");
   const refinementEnabled = factoryPlanningEnabled(factoryQuery.data);
   const refinementFeature = { isLoading: factoryQuery.isPending };
-  const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
+  const analysisQueued = draftAnalysisQueued(fixture);
+  const isAnalyzing = !analysisQueued && fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
   const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
   const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
@@ -68,6 +75,8 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     workOrderId: orderId,
     enabled: canLookupSession,
     canUpdate,
+    analysisActive: isAnalyzing,
+    analysisQueued,
     refinementCanStart: planningSessionCanStart({
       factoryLoaded: Boolean(factoryQuery.data),
       planningEnabled: refinementEnabled,
@@ -130,6 +139,11 @@ function AnalysisWorkOrderPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
+  const { data: workspaceUsage } = useOrganizationWorkspaceUsage(organizationId ?? "", 30, true);
+  const analysisTaskLimitReached =
+    workspaceUsage?.activeTaskCount != null
+      ? workspaceUsage.parallelTaskLimit != null && workspaceUsage.activeTaskCount >= workspaceUsage.parallelTaskLimit
+      : fixture.taskLimitReached;
   const draftStart = draftStartAction(
     fixture.footer.kind,
     onDispatch,
@@ -148,6 +162,7 @@ function AnalysisWorkOrderPopup({
     lineId,
     fixture: viewFixture,
     analysis,
+    taskLimitReached: analysisTaskLimitReached,
     draftModel,
     draftThinking,
     onDraftStartChange: ({ model, thinkingLevel }) => {
@@ -387,6 +402,7 @@ type AnalysisDraftChromeArgs = {
   lineId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  taskLimitReached?: boolean;
   draftModel: string;
   draftThinking: string;
   onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
@@ -437,16 +453,15 @@ function analysisPopupClassName(fullPage: boolean, unified: boolean, sourceOnly:
  */
 function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], factory: FactoriesFactory | undefined) {
   const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
-  const footer = sourceOnly ? classicSplitRunFooter(fixture.footer) : fixture.footer;
-  const queuedStart = fixture.queuedTasks?.some((queue) => queue.startsLine);
-  const actions = footer.actions.flatMap((action) => {
-    if (action.kind !== "start") return [action];
-    if (queuedStart) return [];
-    return [{ ...action, label: fixture.taskLimitReached ? "Queue" : "Start" }];
-  });
+  const queuedAnalysis = draftAnalysisQueued(fixture);
+  const analysisNote =
+    queuedAnalysis && fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline
+      ? { headline: "Analysis queued", text: "Analysis starts when a task slot is available." }
+      : fixture.footer.note;
+  const footer = sourceOnly ? classicSplitRunFooter(fixture.footer) : { ...fixture.footer, note: analysisNote };
   return {
     sourceOnly,
-    viewFixture: { ...fixture, footer: { ...footer, actions } },
+    viewFixture: { ...fixture, footer: withTaskQueueActions(footer, fixture) },
   };
 }
 

@@ -214,6 +214,13 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 	if err != nil {
 		return nil, err
 	}
+	stopping, err := organizationTaskIsStopping(tx, l.OrganizationID, order.ID)
+	if err != nil {
+		return nil, err
+	}
+	if stopping {
+		return l.enqueueStep(tx, order, stepIndex)
+	}
 
 	activeTasks, err := continuableOrganizationTaskIDs(tx, l.OrganizationID)
 	if err != nil {
