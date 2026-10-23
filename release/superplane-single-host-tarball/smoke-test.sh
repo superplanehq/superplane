@@ -119,12 +119,15 @@ fi
 
 warm_runner_ready="no"
 runner_network="$(awk '$1 == "network:" { print $2; exit }' fleet-manager.yaml)"
-for _ in $(seq 1 30); do
+fleet_id="$(awk '$2 == "id:" && $3 ~ /^e1-large-/ { print $3; exit }' fleet-manager.yaml)"
+for _ in $(seq 1 45); do
   warm_runner_id="$(docker ps \
     --filter label=superplane.managed-runner=true \
     --filter "network=${runner_network}" \
     --format '{{.ID}}' | head -n 1)"
-  if [[ -n "${warm_runner_id}" ]]; then
+  capacity="$(curl -kfsS -H "Authorization: Bearer ${fleet_manager_token}" \
+    "https://localhost/admin/api/installation/fleets/${fleet_id}/capacity" 2>/dev/null || true)"
+  if [[ -n "${warm_runner_id}" ]] && printf '%s\n' "${capacity}" | grep -Eq '"idleRunners"[[:space:]]*:[[:space:]]*"1"'; then
     warm_runner_ready="yes"
     break
   fi

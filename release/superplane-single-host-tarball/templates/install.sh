@@ -116,12 +116,19 @@ resolve_runner_capacity() {
     RUNNER_WARM_CAPACITY="${DEFAULT_RUNNER_WARM_CAPACITY}"
   fi
 
-  if [[ ! "${RUNNER_MAX_CAPACITY}" =~ ^[1-9][0-9]*$ ]]; then
+  if [[ ! "${RUNNER_MAX_CAPACITY}" =~ ^[0-9]+$ ]]; then
     echo "SUPERPLANE_RUNNER_MAX_CAPACITY must be a positive integer." >&2
     exit 1
   fi
   if [[ ! "${RUNNER_WARM_CAPACITY}" =~ ^[0-9]+$ ]]; then
     echo "SUPERPLANE_RUNNER_WARM_CAPACITY must be a non-negative integer." >&2
+    exit 1
+  fi
+  # 10# keeps values such as 08 in decimal. Bash otherwise treats them as octal.
+  RUNNER_MAX_CAPACITY="$((10#${RUNNER_MAX_CAPACITY}))"
+  RUNNER_WARM_CAPACITY="$((10#${RUNNER_WARM_CAPACITY}))"
+  if ((RUNNER_MAX_CAPACITY < 1)); then
+    echo "SUPERPLANE_RUNNER_MAX_CAPACITY must be a positive integer." >&2
     exit 1
   fi
   if ((RUNNER_WARM_CAPACITY > RUNNER_MAX_CAPACITY)); then

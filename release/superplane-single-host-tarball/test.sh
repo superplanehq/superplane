@@ -209,4 +209,17 @@ test "${legacy_mode}" = "600"
 grep -Eq '^    warmCapacity: 2$' fleet-manager.yaml
 grep -Eq '^    maxCapacity: 8$' fleet-manager.yaml
 
+SUPERPLANE_DOMAIN=superplane.example.com \
+  SUPERPLANE_RUNNER_MAX_CAPACITY=10 \
+  SUPERPLANE_RUNNER_WARM_CAPACITY=08 \
+  SUPERPLANE_CONFIG_ONLY=yes \
+  ./install.sh >/dev/null
+grep -Eq '^    warmCapacity: 8$' fleet-manager.yaml
+grep -Eq '^    maxCapacity: 10$' fleet-manager.yaml
+grep -Eq '^SUPERPLANE_RUNNER_WARM_CAPACITY=8$' superplane.env
+if SUPERPLANE_RUNNER_MAX_CAPACITY=5 SUPERPLANE_RUNNER_WARM_CAPACITY=09 SUPERPLANE_CONFIG_ONLY=yes ./install.sh >/dev/null 2>&1; then
+  echo "Error: zero-padded warm capacity above the maximum was accepted" >&2
+  exit 1
+fi
+
 echo "Single-host tarball tests passed."
