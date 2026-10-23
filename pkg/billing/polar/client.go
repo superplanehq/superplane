@@ -342,14 +342,27 @@ func (c *Client) EnsureCustomer(ctx context.Context, input CreateCustomerInput) 
 	return nil, fmt.Errorf("%w: polar customer already exists for a different organization", ErrConflict)
 }
 
-func (c *Client) CreateCheckout(ctx context.Context, productID, externalCustomerID, successURL, customerIP string) (*CheckoutSession, error) {
+type CheckoutInput struct {
+	ProductID          string
+	ExternalCustomerID string
+	SuccessURL         string
+	CustomerIP         string
+	Seats              *int
+}
+
+func (c *Client) CreateCheckout(ctx context.Context, input CheckoutInput) (*CheckoutSession, error) {
 	body := map[string]any{
-		"products":             []string{productID},
-		"external_customer_id": externalCustomerID,
-		"success_url":          successURL,
+		"products":             []string{input.ProductID},
+		"external_customer_id": input.ExternalCustomerID,
+		"success_url":          input.SuccessURL,
 	}
-	if strings.TrimSpace(customerIP) != "" {
-		body["customer_ip_address"] = customerIP
+	if strings.TrimSpace(input.CustomerIP) != "" {
+		body["customer_ip_address"] = input.CustomerIP
+	}
+	if input.Seats != nil {
+		body["seats"] = *input.Seats
+		body["min_seats"] = *input.Seats
+		body["max_seats"] = *input.Seats
 	}
 	return c.createCheckout(ctx, body)
 }
