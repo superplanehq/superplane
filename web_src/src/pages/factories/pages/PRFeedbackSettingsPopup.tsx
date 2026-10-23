@@ -59,7 +59,7 @@ export function PRFeedbackSettingsPopup({
 }: PRFeedbackSettingsPopupProps) {
   const [draft, setDraft] = useState(settings);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const agentTabAvailable = false;
+  const agentTabAvailable = Boolean(agent);
   const history = useFactoryAutomationNavigation({
     organizationId,
     factoryId,

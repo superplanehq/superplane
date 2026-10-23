@@ -11,7 +11,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
-import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
+import type { PRFeedbackDraftSettings, PRFeedbackSettingsTab } from "./prFeedbackSettingsModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 export function mockConnectedIntegrations(data: unknown[] = []) {
@@ -157,25 +157,39 @@ export function renderAutomationPopup(props: { canvasId?: string } = {}) {
   );
 }
 
-export function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, initialPath = "/", probe?: ReactNode) {
-  return render(
+export function renderAgentSettingsPopup(
+  settings: PRFeedbackDraftSettings,
+  {
+    initialPath = "/",
+    initialTab = "general",
+    withAgent = true,
+    probe,
+  }: { initialPath?: string; initialTab?: PRFeedbackSettingsTab; withAgent?: boolean; probe?: ReactNode } = {},
+) {
+  const onAgentSave = vi.fn();
+  render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter initialEntries={[initialPath]}>
         <PRFeedbackSettingsPopup
           settings={settings}
           automationGraph={automationGraph}
-          agent={{
-            draft: PLANNING_REVIEW_DRAFT,
-            organizationId: "org-1",
-            onSave: vi.fn(),
-          }}
+          agent={
+            withAgent
+              ? {
+                  draft: PLANNING_REVIEW_DRAFT,
+                  organizationId: "org-1",
+                  onSave: onAgentSave,
+                }
+              : undefined
+          }
           onSave={vi.fn()}
           onClose={vi.fn()}
-          initialTab="agent"
+          initialTab={initialTab}
           fixed={false}
         />
         {probe}
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { onAgentSave };
 }
