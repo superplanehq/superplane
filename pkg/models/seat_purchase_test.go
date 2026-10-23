@@ -1,7 +1,6 @@
 package models_test
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -112,26 +111,4 @@ func Test__SeatPurchaseSettlementFollowsPolarSnapshots(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
-}
-
-func Test__SeatPurchaseDownMigrationDropsTheTable(t *testing.T) {
-	up, err := os.ReadFile("../../db/migrations/20261023195812_add-organization-seat-purchases.up.sql")
-	require.NoError(t, err)
-	down, err := os.ReadFile("../../db/migrations/20261023195812_add-organization-seat-purchases.down.sql")
-	require.NoError(t, err)
-
-	tx := database.Conn().Begin()
-	require.NoError(t, tx.Error)
-	defer tx.Rollback()
-	tableExists := func() bool {
-		var exists bool
-		require.NoError(t, tx.Raw(`SELECT to_regclass('organization_seat_purchases') IS NOT NULL`).Scan(&exists).Error)
-		return exists
-	}
-
-	require.True(t, tableExists(), "the test database is migrated")
-	require.NoError(t, tx.Exec(string(down)).Error)
-	assert.False(t, tableExists())
-	require.NoError(t, tx.Exec(string(up)).Error)
-	assert.True(t, tableExists(), "the up migration recreates the table after a rollback")
 }

@@ -153,7 +153,10 @@ The API has two routes. Both need `org:update` and **New Billing**:
   the current `purchased_seats`. A repeated or stale request gets HTTP 409.
 
 SuperPlane sends `PATCH /subscriptions/{id}` with the absolute seat count and
-`proration_behavior` set to `invoice`. It does not use any other value.
+`proration_behavior` set to `invoice`. It does not use any other value. A
+purchase first reads the current subscription from Polar and applies the
+snapshot. The absolute count builds on the seats Polar reports, so a purchase
+does not remove seats that were added elsewhere.
 
 1. Use an organization with an active Team subscription that is not set to cancel.
 2. Read `purchased_seats`, `current_period_end`, and `purchasable_seats` from the billing response.
@@ -176,7 +179,8 @@ Capacity does not change. A `subscription.updated` webhook, a billing sync, or t
 next preview or purchase reads the subscription from Polar and settles the purchase.
 Only one purchase can be pending or unconfirmed for an organization at a time.
 A purchase that Polar never applied fails five minutes after it started, when the
-next preview or purchase checks Polar.
+next preview or purchase checks Polar. The same rule applies when Polar reports
+fewer seats than the target after an outside change.
 
 The table `organization_seat_purchases` is the marker for seat changes that
 SuperPlane started. Use `models.FindExpectedSeatCount` to tell them from outside

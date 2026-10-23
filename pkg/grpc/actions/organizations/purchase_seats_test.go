@@ -197,11 +197,12 @@ func requireGRPCCode(t *testing.T, want codes.Code, err error) {
 }
 
 func Test__ProratedChargeCentsFollowsThePolarFormula(t *testing.T) {
-	start := time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2026, time.December, 1, 0, 0, 0, 0, time.UTC)
+	now := time.Now()
+	start := now.Add(-7 * 24 * time.Hour)
+	end := start.Add(30 * 24 * time.Hour)
 
-	assert.EqualValues(t, 1533, proratedChargeCents(1, 2000, start, end, time.Date(2026, time.November, 8, 0, 0, 0, 0, time.UTC)))
-	assert.EqualValues(t, 4600, proratedChargeCents(3, 2000, start, end, time.Date(2026, time.November, 8, 0, 0, 0, 0, time.UTC)))
+	assert.EqualValues(t, 1533, proratedChargeCents(1, 2000, start, end, now), "23 of 30 days of a $20 seat")
+	assert.EqualValues(t, 4600, proratedChargeCents(3, 2000, start, end, now))
 	assert.EqualValues(t, 2000, proratedChargeCents(1, 2000, start, end, start))
 	assert.EqualValues(t, 1, proratedChargeCents(1, 2000, start, end, end.Add(-12*time.Minute)), "0.56 cents rounds up")
 	assert.EqualValues(t, 0, proratedChargeCents(1, 2000, start, end, end.Add(-5*time.Minute)), "0.23 cents rounds down")
@@ -521,9 +522,51 @@ func Test__RetryAfterAnUnconfirmedPurchaseDoesNotChargeAgain(t *testing.T) {
 
 	requireGRPCCode(t, codes.Aborted, err)
 	assert.Equal(t, 1, f.patchCount(), "the retry must not send a second update")
-	assert.Equal(t, 1, f.getCount)
+	assert.Equal(t, 2, f.getCount, "each purchase reads the subscription once")
 	assert.Equal(t, 4, f.purchasedSeats())
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
+}
+
+func Test__PurchaseSeatsKeepsSeatsAddedElsewhere(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	f.polarSeats = 6 // an admin added seats in Polar before the webhook arrived
+
+	_, err := f.purchase(1, 3)
+
+	requireGRPCCode(t, codes.Aborted, err)
+	assert.ErrorContains(t, err, "Seat count changed. Refresh and try again.")
+	assert.Zero(t, f.patchCount(), "no update may send an absolute count below the Polar seats")
+	assert.Equal(t, 6, f.purchasedSeats(), "the Polar snapshot refreshes the local count")
+
+	_, err = f.purchase(1, 6)
+	require.NoError(t, err)
+	require.Equal(t, 1, f.patchCount())
+	assert.Equal(t, map[string]any{"seats": float64(7), "proration_behavior": "invoice"}, f.patchBodies[0])
+	assert.Equal(t, 7, f.purchasedSeats())
+}
+
+func Test__PurchaseRecoversAnUnconfirmedPurchaseBelowTheTarget(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	f.dropConnection()
+	_, err := f.purchase(2, 3)
+	require.NoError(t, err)
+	first := f.latestPurchase()
+	stale := time.Now().Add(-2 * polar.SeatPurchaseConfirmationWindow)
+	require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("id = ?", first.ID).Update("created_at", stale).Error)
+	f.polarSeats = 4 // Polar never applied 5; an outside change set 4 instead
+	f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
+		f.polarSeats = seats
+		f.writeJSON(w, http.StatusOK, f.snapshot(seats))
+	}
+
+	_, err = f.purchase(1, 4)
+
+	require.NoError(t, err, "the expired purchase below its target must not block purchases")
+	assert.Equal(t, 2, f.patchCount())
+	assert.Equal(t, 5, f.purchasedSeats())
+	require.NoError(t, database.Conn().First(first, "id = ?", first.ID).Error)
+	assert.Equal(t, models.SeatPurchaseStatusFailed, first.Status)
+	assert.Equal(t, models.SeatPurchaseErrorNotApplied, first.ErrorCode)
 }
 
 func Test__PreviewSettlesAnUnconfirmedPurchaseFromPolar(t *testing.T) {

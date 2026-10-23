@@ -42,10 +42,6 @@ type SeatPurchase struct {
 	UpdatedAt           time.Time
 }
 
-func (SeatPurchase) TableName() string {
-	return "organization_seat_purchases"
-}
-
 func NewSeatPurchase(orgID uuid.UUID, userID *uuid.UUID, subscriptionID string, fromSeats, toSeats int) *SeatPurchase {
 	return &SeatPurchase{
 		OrganizationID:      orgID,
@@ -55,6 +51,10 @@ func NewSeatPurchase(orgID uuid.UUID, userID *uuid.UUID, subscriptionID string, 
 		ToSeats:             toSeats,
 		Status:              SeatPurchaseStatusPending,
 	}
+}
+
+func (SeatPurchase) TableName() string {
+	return "organization_seat_purchases"
 }
 
 // InFlight reports that the outcome is not settled yet.

@@ -81,7 +81,19 @@ func PurchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 	if err != nil {
 		return nil, err
 	}
-	reconcileSeatPurchase(ctx, database.DB(ctx), organizationID)
+	db := database.DB(ctx)
+
+	// The purchase sends an absolute seat count, so it must start from the
+	// seats Polar reports now. A stale local count could remove seats that
+	// were added elsewhere. Requests that cannot take seats are rejected
+	// before the Polar read.
+	state, err := checkSeatPurchase(db, organizationID, req.GetAdditionalSeats(), time.Now())
+	if err != nil {
+		return nil, err
+	}
+	if err := polar.RefreshSeatPurchaseState(ctx, db, polar.NewClientFromEnv(), organizationID, state.subscriptionID); err != nil {
+		return nil, polarBillingError(err, "Could not confirm the seat count with Polar. Try again.")
+	}
 
 	purchase, err := beginSeatPurchase(ctx, organizationID, req, userID)
 	if err != nil {
