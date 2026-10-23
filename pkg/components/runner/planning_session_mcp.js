@@ -144,8 +144,9 @@ async function proposeUpdate(input) {
   if (spec) {
     body.spec = spec;
   }
-  if (input && input.survey) {
-    body.survey = { questions: surveyQuestions(input.survey) };
+  const questions = surveyQuestions(input && input.survey);
+  if (questions.length > 0) {
+    body.survey = { questions };
   }
   if (!body.scores && !body.spec && !body.survey) {
     throw new Error("scores, spec, or survey is required");
@@ -400,6 +401,7 @@ const UPDATE_TOOL = {
         properties: {
           questions: {
             type: "array",
+            minItems: 1,
             items: {
               type: "object",
               properties: {
@@ -414,6 +416,7 @@ const UPDATE_TOOL = {
             },
           },
         },
+        required: ["questions"],
       },
     },
   },

@@ -246,7 +246,7 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: false}))
 	text, err = AnalysisContinuationText(db, session)
 	require.NoError(t, err)
-	assert.Contains(t, text, "Call propose_update with scores, spec, and survey in one call")
+	assert.Contains(t, text, "Call propose_update with scores and any updated spec in one call")
 	assert.Contains(t, text, "When every required score is 3, publish each required score on that plan turn")
 	assert.NotContains(t, text, "Publish the Clarity score when the plan changes")
 	assert.Contains(t, text, "Current Confidence: 3/5\nThis issue is a mixed fit for an agent.")

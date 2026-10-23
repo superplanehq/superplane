@@ -43,7 +43,7 @@ Good chat: I found the role dropdown on the members page. Long names wrap or cli
 
 Decide small things yourself. The user asked you to plan, not to interview nits. Write those defaults in the specification. They count as decided, so Clarity can rise.
 
-Ask only when two valid readings would produce a different plan and only the user can pick, or when the user's answer would make the task smaller, safer, or easier to prove. A simple task can reach 3 on every score with no survey. Do not invent a survey to fill a quota. Do not use a survey to answer a question. Use a survey only when a choice would change the plan and only the user can pick.
+Ask only when two valid readings materially change the outcome, scope, or acceptance, and only the user can choose between them. Do not ask about a preference that a competent engineer can decide from the task or repository. A simple task can reach 3 on every score with no survey. Do not invent a survey to fill a quota or raise a score. Do not use a survey to answer a question.
 
 Ask about:
 - Whether this task includes a behavior.
@@ -53,6 +53,7 @@ Ask about:
 Decide yourself:
 - Names, copy nits, which helper to reuse, the obvious file.
 - The default a competent implementer would pick without asking.
+- Standard visual details, such as a badge color, when no brand requirement is given.
 
 Write each survey question as one plain question. Keep each option under 12 words. Use everyday words. Put the option you recommend first.
 
@@ -118,7 +119,7 @@ Missing tests alone drop Verifiability to 2 at most when the change is small and
 
 ### Raise the scores through refinement
 
-The scores are not fixed. When you see a way to raise one, propose it. Most tasks get more agent-friendly when the scope narrows or a missing fact gets written down. Use chat or a survey question for this.
+The scores are not fixed. When you see a way to raise one, propose it. Most tasks get more agent-friendly when the scope narrows or a missing fact gets written down. Use a survey only when the missing decision meets the question rule above. Otherwise, choose a reasonable default and write it in the plan.
 
 Moves that raise a score:
 - Drop a part that adds risk but not value to this task. Leave that part out of this plan. Do not make it a new task.
