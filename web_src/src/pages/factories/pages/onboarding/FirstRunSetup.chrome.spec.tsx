@@ -526,6 +526,7 @@ describe("FirstRunSetup chrome", () => {
     ]),
   )("finishes without plan selection (%j)", async ({ step, newBilling, availablePlans }) => {
     Object.assign(billingState, { enabled: true, newBilling, availablePlans });
+    const user = userEvent.setup();
     const model = pageModel({
       hostedAgentReady: true,
       hostedModelsAvailable: true,
