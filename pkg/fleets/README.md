@@ -11,7 +11,10 @@ files with a `.json` extension and YAML files with a `.yml` or `.yaml`
 extension. The default file path is `/etc/superplane/fleet-manager.yaml`.
 
 `INSTALLATION_ADMIN_TOKEN` overrides `installationAdminToken` from either
-configuration source.
+configuration source. `FLEET_MANAGER_API_TOKEN` overrides that value when
+it is set. Single-host installations write the same generated token to
+both variables so current Fleet Manager releases can read it. The token
+has access only to the installation fleet API.
 
 Set the top-level `id` to a stable identifier for the Fleet Manager
 deployment. AWS and Azure providers apply it as the
@@ -26,9 +29,10 @@ tags. The legacy `superplane_managed_runner` tag is also reserved and omitted
 from new resources. A fleet can define at most 44 additional tags because EC2
 allows 50 tags per resource and Fleet Manager applies six reserved tags.
 
-Use a personal API token that belongs to an installation administrator. The
-Fleet Manager sends it as an HTTP bearer token. Runner instances receive only
-their short-lived registration token.
+Cloud installations use a personal API token that belongs to an installation
+administrator. Single-host installations use the generated fleet token.
+The Fleet Manager sends the token as an HTTP bearer token. Runner instances
+receive only their short-lived registration token.
 
 The local Compose service waits for owner setup and manages a development
 token automatically. It does not require `INSTALLATION_ADMIN_TOKEN`.

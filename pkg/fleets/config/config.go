@@ -28,6 +28,7 @@ const (
 
 	fleetManagerConfigEnvironment = "FLEET_MANAGER_CONFIG"
 	installationTokenEnvironment  = "INSTALLATION_ADMIN_TOKEN"
+	fleetManagerTokenEnvironment  = "FLEET_MANAGER_API_TOKEN"
 
 	ProviderAWS    = "aws"
 	ProviderAzure  = "azure"
@@ -184,6 +185,9 @@ func Load(path string) (*Config, error) {
 		}
 	}
 	if token := strings.TrimSpace(os.Getenv(installationTokenEnvironment)); token != "" {
+		config.InstallationAdminToken = token
+	}
+	if token := strings.TrimSpace(os.Getenv(fleetManagerTokenEnvironment)); token != "" {
 		config.InstallationAdminToken = token
 	}
 	config.applyDefaults()

@@ -10,6 +10,7 @@ import type {
   OrganizationsHostedCreditInvoice,
   OrganizationsHostedCreditProduct,
   OrganizationsOrganizationCreditGrant,
+  OrganizationsCreateHostedCreditCheckoutBody,
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useHostedCreditActions, useHostedCreditOwnerContactMessage } from "@/hooks/useHostedCreditActions";
@@ -32,12 +33,24 @@ type HostedCreditBillingActions = {
   checkoutPending: boolean;
   businessCheckoutPending: boolean;
   portalPending: boolean;
-  startCheckout: (productId: string) => Promise<void>;
+  startCheckout: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
   startBusinessCheckout: () => Promise<void>;
   openInvoices: () => Promise<void>;
 };
 
+export type BillingSeatSummary = {
+  purchased?: number;
+  occupied?: number;
+  available?: number;
+  planMaximum?: number;
+  purchasable?: number;
+  expectedRenewalSeats?: number;
+  currentMonthlyTotalCents?: string;
+  expectedRenewalCents?: string;
+};
+
 export type OrganizationBillingPageModel = {
+  seats?: BillingSeatSummary;
   organizationName: string;
   canManageBilling: boolean;
   billingEnabled: boolean;
@@ -99,6 +112,19 @@ function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse 
     planName: billing.planName,
     planPriceCents: billing.planPriceCents,
     planPerSeat: billing.planPerSeat,
+    seats:
+      billing.billingEnabled && billing.planPerSeat
+        ? {
+            purchased: billing.purchasedSeats,
+            occupied: billing.occupiedSeats,
+            available: billing.availableSeats,
+            planMaximum: billing.planMaximumSeats,
+            purchasable: billing.purchasableSeats,
+            expectedRenewalSeats: billing.expectedRenewalSeats,
+            currentMonthlyTotalCents: billing.currentMonthlyTotalCents,
+            expectedRenewalCents: billing.expectedRenewalCents,
+          }
+        : undefined,
     trialEndsAt: billing.trialEndsAt,
     currentPeriodEnd: billing.currentPeriodEnd,
     includedRemaining: parseWorkOrderMetric(billing.includedRemainingCents),
@@ -178,6 +204,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     planName: flags.planName,
     planPriceCents: flags.planPriceCents,
     planPerSeat: flags.planPerSeat,
+    seats: flags.seats,
     trialEndsAt: flags.trialEndsAt,
     billing,
     creditRefreshStatus,

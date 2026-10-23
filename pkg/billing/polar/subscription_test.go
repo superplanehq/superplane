@@ -680,7 +680,7 @@ func TestSubscriptionSeatSnapshots(t *testing.T) {
 	org := setupBillingOrganization(t)
 	db := database.Conn()
 	product := "product_" + uuid.NewString()
-	catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: new(50), PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &catalog))
 	now := time.Now().UTC().Truncate(time.Second)
 	end := now.AddDate(0, 1, 0)

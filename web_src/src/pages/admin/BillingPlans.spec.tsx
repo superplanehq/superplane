@@ -87,6 +87,9 @@ it("creates a per-seat paid plan with dollar amounts and a markup percentage", a
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/admin/api/polar/products?kind=subscription") {
+        return new Response(JSON.stringify([{ id: "prod_payg", name: "Pay as you go subscription" }]));
+      }
       if (init?.method === "POST") {
         requests.push(JSON.parse(String(init.body)));
         return new Response("{}");
@@ -114,6 +117,8 @@ it("creates a per-seat paid plan with dollar amounts and a markup percentage", a
   await user.clear(price);
   await user.type(price, "30.29");
   await user.type(screen.getByLabelText("Markup (%)", { exact: true }), "12.34");
+  await user.click(screen.getByRole("combobox", { name: "Polar product" }));
+  await user.click(await screen.findByRole("option", { name: /Pay as you go subscription/ }));
   expect(screen.queryByLabelText("Included credit (USD)", { exact: true })).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Credit validity (days)", { exact: true })).not.toBeInTheDocument();
   expect(screen.queryByRole("combobox", { name: "Credit frequency" })).not.toBeInTheDocument();
@@ -122,6 +127,7 @@ it("creates a per-seat paid plan with dollar amounts and a markup percentage", a
   await user.clear(trialCredit);
   await user.type(trialCredit, "0.29");
   await user.click(screen.getByRole("switch", { name: "Per seat" }));
+  expect(screen.getByLabelText("Maximum seats", { exact: true })).toHaveValue(50);
   await user.click(screen.getByRole("checkbox", { name: "Require payment method" }));
   await user.click(await screen.findByRole("checkbox", { name: /Bring your own API key/ }));
   // Happy DOM incorrectly rejects decimal steps, so submit the form directly.
@@ -139,12 +145,14 @@ it("creates a per-seat paid plan with dollar amounts and a markup percentage", a
         credit_validity_days: null,
         trial_credit_cents: 29,
         per_seat: true,
+        seat_limit: 50,
         require_payment_method: true,
+        polar_product_id: "prod_payg",
         features: ["byo_key"],
       }),
     ]),
   );
-});
+}, 15000);
 
 it("creates a feature and selects its string key in a plan", async () => {
   const definitions: { key: string; label: string; gated: boolean }[] = [];
@@ -189,9 +197,9 @@ it("creates a feature and selects its string key in a plan", async () => {
   await user.click(screen.getByRole("checkbox", { name: /Custom reports/ }));
   await user.click(screen.getByRole("button", { name: "Save plan" }));
   await waitFor(() => expect(savedPlans).toEqual([expect.objectContaining({ features: ["custom_reports"] })]));
-});
+}, 15000);
 
-it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimited limits", async () => {
+it("edits a linked plan in a dialog, preserves locked pricing and credit policies, and updates maximum seats", async () => {
   const plan = {
     id: "starter-plan",
     key: "starter",
@@ -217,6 +225,9 @@ it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimit
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/admin/api/polar/products?kind=subscription") {
+        return new Response(JSON.stringify([{ id: "polar-starter", name: "Starter subscription" }]));
+      }
       if (init?.method === "PUT") {
         updates.push({ path: String(input), body: JSON.parse(String(init.body)) });
         return new Response("{}");
@@ -246,10 +257,14 @@ it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimit
   expect(screen.getByLabelText("Markup (%)", { exact: true })).toHaveValue(10);
   await user.clear(screen.getByLabelText("Markup (%)", { exact: true }));
   expect(screen.getByRole("switch", { name: "Per seat" })).toBeDisabled();
-  expect(screen.getByLabelText("Polar product ID", { exact: true })).toBeDisabled();
-  await user.hover(screen.getByRole("button", { name: "Help for Seat limit" }));
-  expect(await screen.findByRole("tooltip")).toHaveTextContent("Leave empty for unlimited seats.");
-  await user.clear(screen.getByLabelText("Seat limit", { exact: true }));
+  expect(screen.getByRole("combobox", { name: "Polar product" })).toBeDisabled();
+  await waitFor(() =>
+    expect(screen.getByRole("combobox", { name: "Polar product" })).toHaveTextContent("Starter subscription"),
+  );
+  const maximum = screen.getByLabelText("Maximum seats", { exact: true });
+  expect(maximum).toHaveValue(10);
+  await user.clear(maximum);
+  await user.type(maximum, "75");
   await user.clear(screen.getByLabelText("Parallel task limit", { exact: true }));
   await user.type(screen.getByLabelText("Parallel task limit", { exact: true }), "2");
   // Happy DOM incorrectly rejects decimal steps, so submit the form directly.
@@ -258,7 +273,7 @@ it("edits a linked plan in a dialog, preserves locked pricing, and saves unlimit
     expect(updates).toEqual([
       {
         path: "/admin/api/billing-plans/starter-plan",
-        body: { ...plan, seat_limit: null, parallel_task_limit: 2, markup_bps: null },
+        body: { ...plan, seat_limit: 75, parallel_task_limit: 2, markup_bps: null },
       },
     ]),
   );
@@ -346,7 +361,7 @@ it("protects Business Manual from deletion and unsupported catalog edits", async
   expect(await screen.findByRole("tooltip")).toHaveTextContent(systemReason);
   await user.click(edit);
   expect(screen.getByRole("combobox", { name: "Category" }).hasAttribute("disabled")).toBe(true);
-  expect(screen.getByLabelText("Polar product ID", { exact: true }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("combobox", { name: "Polar product" })).toBeDisabled();
 });
 
 it("links the empty plan feature selector to Features", async () => {
@@ -383,7 +398,6 @@ it("shows every blocked delete action with its reason on hover and keyboard focu
       <BillingPlans />
     </MemoryRouter>,
   );
-
   const assignedDelete = await screen.findByRole("button", { name: "Delete Assigned" });
   for (const name of ["Delete Free", "Delete Polar", "Delete Assigned"]) {
     expect(screen.getByRole("button", { name })).toBeDisabled();

@@ -139,8 +139,8 @@ func TestResolvePurchasedSeats(t *testing.T) {
 	require.NoError(t, models.DeleteOrganizationSeatLimitOverride(db, r.Organization.ID))
 	expected.PlanMaximum, expected.Purchasable = seatCount(60), seatCount(57)
 	check()
-	plan.SeatLimit = nil
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	// Simulate a stored plan that predates the required per-seat maximum.
+	require.NoError(t, db.Model(&plan).Update("seat_limit", nil).Error)
 	expected.PlanMaximum, expected.Purchasable = nil, nil
 	check()
 	plan.SeatLimit = seatCount(1)
@@ -221,6 +221,28 @@ func TestResolveMemberLimits(t *testing.T) {
 			require.Nil(t, actual.JoinLimit())
 		})
 	}
+}
+
+func TestResolveSeatsForPlanUsesLoadedPlan(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: seatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
+	loaded, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+
+	// Change the stored plan after the caller's read. Seat usage must follow
+	// the loaded plan so counts and prices stay consistent.
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 9).Error)
+
+	actual, err := ResolveSeatsForPlan(db, r.Organization.ID, loaded)
+	require.NoError(t, err)
+	require.Equal(t, SeatUsage{PerSeat: true, Purchased: seatCount(3), Occupied: 1, Available: seatCount(2), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(1)}, *actual)
 }
 
 func seatCount(quantity int) *int { return &quantity }

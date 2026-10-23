@@ -10,6 +10,13 @@ fi
 TARBALL="$1"
 APP_IMAGE="$2"
 install_dir=""
+warm_runner_id=""
+smoke_project="${SUPERPLANE_SMOKE_PROJECT:-superplane-smoke-$$}"
+
+if [[ ! "${smoke_project}" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "Error: SUPERPLANE_SMOKE_PROJECT must contain lowercase letters, numbers, hyphens, or underscores" >&2
+  exit 1
+fi
 
 cleanup() {
   if [[ "${SUPERPLANE_SMOKE_KEEP:-no}" == "yes" ]]; then
@@ -19,7 +26,10 @@ cleanup() {
     return 0
   fi
   if [[ -n "${install_dir}" && -f "${install_dir}/docker-compose.yml" ]]; then
-    docker compose -f "${install_dir}/docker-compose.yml" --profile runners down -v --remove-orphans >/dev/null 2>&1 || true
+    if [[ -n "${warm_runner_id}" ]]; then
+      docker rm -f "${warm_runner_id}" >/dev/null 2>&1 || true
+    fi
+    docker compose -f "${install_dir}/docker-compose.yml" down -v --remove-orphans >/dev/null 2>&1 || true
     rm -rf "${install_dir}"
   fi
 }
@@ -39,9 +49,8 @@ tar -C "${install_dir}" -xzf "${TARBALL}"
 install_dir="${install_dir}/superplane"
 cd "${install_dir}"
 
-if [[ -n "${SUPERPLANE_SMOKE_PROJECT:-}" ]]; then
-  perl -i -pe "s/^name: superplane\$/name: ${SUPERPLANE_SMOKE_PROJECT}/" docker-compose.yml
-fi
+perl -i -pe "s/^name: superplane\$/name: ${smoke_project}/" docker-compose.yml
+perl -i -pe "s/network: superplane_default/network: ${smoke_project}_default/" install.sh
 
 expected_image="$(awk '/image: ghcr.io\/superplanehq\/superplane:/ { print $2; exit }' docker-compose.yml)"
 if [[ -z "${expected_image}" ]]; then
@@ -54,12 +63,13 @@ fi
 
 echo "Pulling dependency images..."
 docker compose pull db rabbitmq caddy
+fleet_manager_image="$(awk '/image: ghcr.io\/superplanehq\/fleet-manager:/ { print $2; exit }' docker-compose.yml)"
+docker pull "${fleet_manager_image}"
+runner_version="$(awk -F'"' '/^RUNNER_VERSION=/ { print $2; exit }' install.sh)"
+docker pull "ghcr.io/superplanehq/runner:${runner_version}"
 
 echo "Installing..."
 SUPERPLANE_DOMAIN=localhost SUPERPLANE_SKIP_PULL=yes ./install.sh
-if [[ -n "${SUPERPLANE_SMOKE_PROJECT:-}" ]]; then
-  perl -i -pe "s/network: superplane_default/network: ${SUPERPLANE_SMOKE_PROJECT}_default/" fleet-manager.yaml
-fi
 
 secret_value() {
   local key="$1"
@@ -90,6 +100,44 @@ wait_for_health() {
 }
 
 wait_for_health
+
+fleet_manager_token="$(secret_value FLEET_MANAGER_API_TOKEN)"
+fleet_ready="no"
+for _ in $(seq 1 30); do
+  fleets="$(curl -kfsS -H "Authorization: Bearer ${fleet_manager_token}" https://localhost/admin/api/installation/fleets 2>/dev/null || true)"
+  if printf '%s\n' "${fleets}" | grep -q 'e1-large-'; then
+    fleet_ready="yes"
+    break
+  fi
+  sleep 2
+done
+if [[ "${fleet_ready}" != "yes" ]]; then
+  echo "Error: Fleet Manager did not synchronize the local fleet" >&2
+  docker compose logs --tail 80 fleet-manager >&2 || true
+  exit 1
+fi
+
+warm_runner_ready="no"
+runner_network="$(awk '$1 == "network:" { print $2; exit }' fleet-manager.yaml)"
+fleet_id="$(awk '$2 == "id:" && $3 ~ /^e1-large-/ { print $3; exit }' fleet-manager.yaml)"
+for _ in $(seq 1 45); do
+  warm_runner_id="$(docker ps \
+    --filter label=superplane.managed-runner=true \
+    --filter "network=${runner_network}" \
+    --format '{{.ID}}' | head -n 1)"
+  capacity="$(curl -kfsS -H "Authorization: Bearer ${fleet_manager_token}" \
+    "https://localhost/admin/api/installation/fleets/${fleet_id}/capacity" 2>/dev/null || true)"
+  if [[ -n "${warm_runner_id}" ]] && printf '%s\n' "${capacity}" | grep -Eq '"idleRunners"[[:space:]]*:[[:space:]]*"1"'; then
+    warm_runner_ready="yes"
+    break
+  fi
+  sleep 2
+done
+if [[ "${warm_runner_ready}" != "yes" ]]; then
+  echo "Error: Fleet Manager did not start the warm runner" >&2
+  docker compose logs --tail 80 fleet-manager >&2 || true
+  exit 1
+fi
 
 http_status="$(curl -s -o /dev/null -w '%{http_code}' http://localhost/health || true)"
 case "${http_status}" in
@@ -150,7 +198,19 @@ for port in 5672 15672; do
   fi
 done
 
-users="$(docker compose exec -T rabbitmq rabbitmqctl list_users)"
+users=""
+rabbit_ready="no"
+for _ in $(seq 1 30); do
+  if users="$(docker compose exec -T rabbitmq rabbitmqctl list_users 2>/dev/null)"; then
+    rabbit_ready="yes"
+    break
+  fi
+  sleep 2
+done
+if [[ "${rabbit_ready}" != "yes" ]]; then
+  echo "Error: RabbitMQ did not accept rabbitmqctl" >&2
+  exit 1
+fi
 printf '%s\n' "${users}" | awk 'NR > 1 { print $1 }' | grep -qx superplane
 if printf '%s\n' "${users}" | awk 'NR > 1 { print $1 }' | grep -qx guest; then
   echo "Error: RabbitMQ still has the guest user" >&2

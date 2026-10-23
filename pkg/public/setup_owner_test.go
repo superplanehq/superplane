@@ -188,6 +188,7 @@ func TestSetupOwnerStatusReportsBeacon(t *testing.T) {
 
 	status := getSetupOwnerStatus(t, server, "")
 	assert.Equal(t, true, status["beacon_enabled"])
+	assert.Equal(t, "kubernetes", status["installation_type"])
 }
 
 func TestSetupOwnerPersistsShareOwnerIdentity(t *testing.T) {

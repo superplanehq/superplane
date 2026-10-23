@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { BillingHelp } from "./BillingHelp";
+import { PolarProductSelect } from "./PolarProductSelect";
 import type { BillingPlan, FeatureDefinition } from "./billingPlansApi";
 type PlanFieldsProps = { plan: BillingPlan; onChange: (plan: BillingPlan) => void };
 
@@ -26,6 +27,7 @@ export function BillingPlanEditor({
   onSave,
   onCancel,
   saving,
+  error,
 }: {
   plan: BillingPlan;
   features: FeatureDefinition[];
@@ -33,6 +35,7 @@ export function BillingPlanEditor({
   onSave: () => void;
   onCancel: () => void;
   saving: boolean;
+  error: string;
 }) {
   const [returnFocus] = useState(() => document.activeElement);
   return (
@@ -71,6 +74,11 @@ export function BillingPlanEditor({
               <PlanAccessFields plan={plan} features={features} onChange={onChange} />
             </fieldset>
           </div>
+          {error && (
+            <div role="alert" className="mx-6 mb-4 shrink-0 rounded-lg border p-4 text-sm text-destructive">
+              {error}
+            </div>
+          )}
           <DialogFooter className="shrink-0 border-t bg-muted/20 px-6 py-4">
             <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>
               Cancel
@@ -245,27 +253,27 @@ function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
                   id="plan-per-seat"
                   checked={plan.per_seat}
                   disabled={linked || legacy}
-                  onCheckedChange={(per_seat) => update({ per_seat })}
+                  onCheckedChange={(per_seat) =>
+                    update({ per_seat, seat_limit: per_seat ? (plan.seat_limit ?? 50) : plan.seat_limit })
+                  }
                 />
                 <Label htmlFor="plan-per-seat">Per seat</Label>
               </div>
             )}
             {section === "Pricing" && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <Label htmlFor="plan-polar-product">Polar product ID</Label>
-                  <BillingHelp
-                    label="Polar product ID"
-                    text="Links the plan to a Polar product. Once linked, the product ID and prices cannot change here."
-                  />
-                </div>
-                <Input
-                  id="plan-polar-product"
-                  disabled={linked || manual}
-                  value={plan.polar_product_id ?? ""}
-                  onChange={(event) => update({ polar_product_id: event.target.value || null })}
-                />
-              </div>
+              <PolarProductSelect
+                kind="subscription"
+                disabled={linked || manual}
+                value={plan.polar_product_id ?? ""}
+                onChange={(productID) => update({ polar_product_id: productID || null })}
+                description={
+                  manual
+                    ? "Business Manual does not use Polar products."
+                    : linked
+                      ? "This plan is linked to Polar. Create a new plan to change the product or price."
+                      : undefined
+                }
+              />
             )}
           </div>
         </section>
@@ -275,7 +283,7 @@ function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
 }
 function PlanNumbers({ plan, section, onChange }: PlanFieldsProps & { section: string }) {
   const update = (patch: Partial<BillingPlan>) => onChange({ ...plan, ...patch });
-  const numberFields = planNumberFields(!!plan.id && !!plan.polar_product_id, plan.key === "business_legacy");
+  const numberFields = planNumberFields(plan);
   return (
     <>
       {numberFields
@@ -289,19 +297,24 @@ function PlanNumbers({ plan, section, onChange }: PlanFieldsProps & { section: s
             <Input
               id={`plan-${key}`}
               type="number"
-              min={0}
+              min={key === "seat_limit" && plan.per_seat ? 1 : 0}
+              max={key === "seat_limit" && plan.per_seat ? 1000 : undefined}
+              required={key === "seat_limit" && plan.per_seat}
               step={unit ? 0.01 : 1}
               disabled={locked}
               placeholder={placeholder}
-              defaultValue={
-                plan[key] == null
-                  ? ""
-                  : unit === "USD"
-                    ? centsToDollarInput(Number(plan[key]))
-                    : unit === "%"
-                      ? bpsToPercentInput(Number(plan[key]))
-                      : String(plan[key])
-              }
+              {...(key === "seat_limit"
+                ? { value: plan.seat_limit ?? "" }
+                : {
+                    defaultValue:
+                      plan[key] == null
+                        ? ""
+                        : unit === "USD"
+                          ? centsToDollarInput(Number(plan[key]))
+                          : unit === "%"
+                            ? bpsToPercentInput(Number(plan[key]))
+                            : String(plan[key]),
+                  })}
               onChange={(event) =>
                 update({
                   [key]:
@@ -320,7 +333,10 @@ function PlanNumbers({ plan, section, onChange }: PlanFieldsProps & { section: s
     </>
   );
 }
-function planNumberFields(linked: boolean, legacy: boolean) {
+function planNumberFields(plan: BillingPlan) {
+  const linked = !!plan.id && !!plan.polar_product_id;
+  const legacy = plan.key === "business_legacy";
+  const perSeat = plan.per_seat;
   const fields: {
     key: keyof BillingPlan;
     label: string;
@@ -352,12 +368,14 @@ function planNumberFields(linked: boolean, legacy: boolean) {
     },
     {
       key: "seat_limit",
-      label: "Seat limit",
-      help: legacy
-        ? "Legacy Business seat limit cannot change."
-        : "Maximum organization members. Leave empty for unlimited seats.",
+      label: perSeat ? "Maximum seats" : "Seat limit",
+      help: perSeat
+        ? "Maximum purchasable seats. Enter an integer from 1 to 1,000."
+        : legacy
+          ? "Legacy Business seat limit cannot change."
+          : "Maximum organization members. Leave empty for unlimited seats.",
       nullable: true,
-      placeholder: "Unlimited",
+      placeholder: perSeat ? undefined : "Unlimited",
       locked: legacy,
       section: "Usage limits",
     },

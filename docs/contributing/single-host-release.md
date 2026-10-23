@@ -16,10 +16,14 @@ and `install.sh`.
 
 The archive contains:
 
-- `docker-compose.yml` for the app, Postgres, RabbitMQ, and Caddy
+- `docker-compose.yml` for the app, Fleet Manager, Postgres, RabbitMQ, and Caddy
 - `install.sh`, which keeps existing secrets when you run it again
-- `enable-runners.sh`, which starts Fleet Manager with the Docker provider
+- `fleet-manager.yaml`, which configures the local Docker runner fleet
 - `Caddyfile` for automatic HTTPS
+
+The installer starts Fleet Manager automatically. Set
+`SUPERPLANE_RUNNER_MAX_CAPACITY` and `SUPERPLANE_RUNNER_WARM_CAPACITY` when
+you run `install.sh` to change the default capacities of five and one.
 
 Fleet Manager and the runner image are separate release artifacts:
 
