@@ -1,6 +1,6 @@
 # Team plan seats and billing
 
-> Status: Draft. Billing, invitation, and membership rules are agreed. Two
+> Status: Draft. Billing, invitation, and membership rules are agreed. Three
 > decisions remain open. They are listed at the end.
 >
 > Audience: Product, design, and engineering
@@ -31,12 +31,19 @@ The first release covers:
 
 Deferred: annual billing, cancellation policy, and migration of existing
 organizations above the Team maximum. The current Team plan has no included
-AI credit. Two decisions remain open: access after a failed renewal payment,
-and acceptance of invitations near renewal.
+AI credit. Three decisions remain open: access after a failed renewal
+payment, acceptance of invitations near renewal, and seat counts lowered
+outside SuperPlane.
+
+Purchased seats are required only on per-seat plans, such as Team. Email
+invitations and the removal of shared invite links apply to every plan and
+deployment.
 
 ## Agreed rules
 
 ### Billing
+
+The billing rules apply to per-seat plans, such as Team.
 
 | Topic | Rule |
 | --- | --- |
@@ -63,7 +70,8 @@ and acceptance of invitations near renewal.
 | Service accounts | Service accounts do not occupy seats. Only human members occupy seats. |
 | Invitations | Send invitations to specific email addresses. |
 | Inviters | Organization Admins send invitations. Inviters and billing managers are the same group. |
-| Invitation capacity | Each pending invitation uses one free purchased seat until it is accepted, canceled, or expires. An Admin can send any number of invitations, but pending invitations cannot exceed free seats. To invite more people, the Admin buys seats first. |
+| Invitation capacity on per-seat plans | Each pending invitation uses one free purchased seat until it is accepted, canceled, or expires. An Admin can send any number of invitations, but pending invitations cannot exceed free seats. To invite more people, the Admin buys seats first. |
+| Invitations on other plans | Plans that are not per-seat need no purchased seats. Invitations and acceptance follow the plan's member limit, if the plan has one. With billing off, no seat or member limit applies. |
 | Invitation role | The inviter selects the role. The default is Operator. |
 | Invitation lifetime | An invitation expires 7 days after it is sent. Resend sends a new link and restarts the 7 days. |
 | Joining | Sending or accepting an invitation does not create a separate charge or subscription. |
@@ -74,6 +82,9 @@ and acceptance of invitations near renewal.
 | Pending invitations at renewal | Pending invitations expire at renewal. |
 
 ## Definitions
+
+Seat terms (purchased, occupied, available, invitable, unused, and renewal
+quantity) apply to per-seat plans.
 
 | Term | Meaning |
 | --- | --- |
@@ -139,15 +150,17 @@ and can change before renewal.
 
 - An Admin sends an invitation to a specific email address and selects a
   role. The default role is Operator.
-- On Team, sending requires at least one invitable seat. Example: with 9 of 10
-  seats occupied and no pending invitations, the Admin can send 1 invitation.
-  To send a second, the Admin buys 1 more seat first.
-- An Admin can send any number of invitations over time. Pending invitations
-  can never exceed free purchased seats.
+- On per-seat plans, sending requires at least one invitable seat. Example:
+  with 9 of 10 seats occupied and no pending invitations, the Admin can send 1
+  invitation. To send a second, the Admin buys 1 more seat first.
+- On per-seat plans, an Admin can send any number of invitations over time.
+  Pending invitations can never exceed free purchased seats.
+- On plans that are not per-seat, sending needs no purchased seat. The plan's
+  member limit applies, if the plan has one. With billing off, no limit applies.
 - Sending an invitation never purchases a seat.
-- When no invitable seat exists, explain why and offer the seat purchase.
-  At the plan maximum, explain that the organization must remove a member or
-  cancel an invitation first.
+- On per-seat plans, when no invitable seat exists, explain why and offer the
+  seat purchase. At the plan maximum, explain that the organization must
+  remove a member or cancel an invitation first.
 - The invitation email contains the organization name, the inviter, the role,
   the expiry date, and the acceptance link.
 - Each acceptance link belongs to one invitation. It does not provide reusable
@@ -159,10 +172,14 @@ and can change before renewal.
 Invitation management shows the recipient, role, inviter, sent date, expiry
 date, and status. It supports resending and canceling an invitation.
 
-- Resending a pending invitation does not use another seat. It sends a new
-  link, invalidates the previous link, and restarts the 7 days.
-- Resending an expired invitation makes it pending again. It needs an
-  invitable seat.
+- Resending a pending invitation sends a new link, invalidates the previous
+  link, and restarts the 7 days.
+- Resending an expired invitation makes it pending again.
+
+On per-seat plans:
+
+- Resending a pending invitation does not use another seat.
+- Resending an expired invitation needs an invitable seat.
 - Canceling an invitation, or its expiry, makes its seat invitable again.
 
 ### Accept an invitation
@@ -175,9 +192,12 @@ date, and status. It supports resending and canceling an invitation.
 - Acceptance adds the recipient with the invited role, without another charge.
 - Repeated acceptance must not create another membership, occupied seat, or charge.
 - Canceled and expired invitations admit no one.
-- Acceptance must never admit a member without purchased capacity. If no seat
-  is available, the recipient is not admitted and the invitation stays
-  pending. Acceptance never purchases a seat.
+- On per-seat plans, acceptance must never admit a member without purchased
+  capacity. If no seat is available, the recipient is not admitted and the
+  invitation stays pending. Acceptance never purchases a seat.
+- On plans that are not per-seat, acceptance needs no purchased seat. The
+  plan's member limit applies, if the plan has one. With billing off, no
+  limit applies.
 
 ### Remove shared invite links
 
@@ -242,8 +262,9 @@ See [Polar proration](https://polar.sh/docs/features/subscriptions/proration).
 Polar seat-based products also offer seat assignment and seat changes in the
 Polar customer portal. SuperPlane does not use Polar seat assignment. The
 portal must not let customers change seat counts. If a seat count changes
-outside SuperPlane, SuperPlane treats the new count as purchased capacity,
-never exceeds it, and alerts the team.
+outside SuperPlane, SuperPlane treats the new count as purchased capacity and
+alerts the team. A higher count is paid capacity. What happens when a lower
+count leaves fewer seats than current members is an open question.
 
 ## Information customers need
 
@@ -321,6 +342,9 @@ their own specification before a plan offers included credit.
 
 ## Acceptance scenarios
 
+Scenarios apply to per-seat plans unless the scenario names another plan or
+billing state.
+
 | Scenario | Required outcome |
 | --- | --- |
 | Start Team with fewer seats than current members. | Reject before payment. |
@@ -345,7 +369,10 @@ their own specification before a plan offers included credit.
 | Renew with unused seats and pending invitations. | Charge only for current, accepted members, reduce capacity to that count, and expire pending invitations. |
 | Attempt to accept an invitation after renewal. | Admit no one. The invitation has expired. |
 | Purchase or accept invitations concurrently. | Respect both purchased capacity and the configured maximum. |
-| Change seat count outside SuperPlane. | Treat the new count as capacity, never exceed it, and alert the team. |
+| Raise the seat count outside SuperPlane. | Treat the new count as purchased capacity and alert the team. |
+| Lower the seat count outside SuperPlane below current members. | Alert the team. The access outcome is an open question. |
+| Invite and accept on a plan that is not per-seat. | Require no purchased seat. Apply the plan's member limit, if any. |
+| Invite and accept with billing off. | Apply no seat or member limit. |
 
 ## Open questions
 
@@ -353,6 +380,7 @@ their own specification before a plan offers included credit.
 | --- | --- | --- | --- |
 | 1 | What access does an organization keep after a failed renewal payment? | Polar starts the new period, then charges. If the charge fails, the subscription becomes past due. Polar retries after 2, 7, 14, and 21 days, then revokes the subscription. Polar can keep benefits for 0, 2, 7, 14, or 21 days. Today SuperPlane removes paid access at the first failure, and the fallback plan has no seat limit. Options: keep member access for the retry window with no new invitations or purchases; keep access for a shorter grace period; or remove paid access at once. In every option, no new member can join. | Launch |
 | 2 | How is an invitation acceptance just before renewal handled? | Polar renews with the seat count set before the period ends. An acceptance after the last update can leave more members than renewed seats. Options: update the next-period seat count on every acceptance and reject acceptance when that update fails near renewal; or block all acceptances in a short window before renewal. In every option, there is no automatic charge. | Renewal implementation |
+| 3 | What happens when the seat count drops below current members outside SuperPlane? | Seat counts must change only through SuperPlane, but the payment provider's portal or a support action can still lower them. Example: 10 seats and 10 members, then the count drops to 9. Options: restore the previous count in the payment provider; keep access for all current members and block new joins and invitations until capacity exceeds the member count; or remove access for one member. In every option, SuperPlane alerts the team. | Seat change safeguards |
 
 ## Deferred work
 
