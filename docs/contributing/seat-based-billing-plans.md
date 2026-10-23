@@ -55,6 +55,26 @@ Create a new plan and product for a new price. The maximum can change within
 the valid range and the Polar tier's capacity. Unlinked per-seat plans remain
 allowed and still require a valid maximum.
 
+## Local development defaults
+
+`make dev.setup` seeds the sandbox catalog in `superplane_dev` outside CI.
+Run `make dev.setup.billing.catalog` to apply these defaults separately.
+The target requires the Docker `db` service and the Polar sandbox.
+
+| Plan | Monthly price | Maximum seats | Sandbox product ID |
+| --- | --- | --- | --- |
+| Team | $50 per seat | 50 | `633e8026-988b-44de-8d65-31829948c975` |
+| Starter | $20 | Unlimited | `abc9ef98-20c0-48b5-8204-1448df733737` |
+| Pay-as-you-go | Usage-based | Existing setting | None |
+
+All three plans are public and require a payment card. Team includes every
+defined feature. Starter and Pay-as-you-go include only BYOS.
+The seed enables local gating for features other than BYOS to enforce plan access.
+Repeated runs refresh these settings and preserve existing prices, product links,
+seat limits, and credit policies.
+The seed does not assign plans to organizations or change subscriptions.
+Production migrations do not run this seed.
+
 ## Credit policy and follow-up work
 
 The initial Team plan has `credit_amount_cents = 0` and
