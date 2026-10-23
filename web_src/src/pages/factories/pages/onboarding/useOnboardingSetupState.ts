@@ -166,10 +166,8 @@ export function useOnboardingSetupState(
 
   const resetIssuesState = useCallback(() => {
     clearDiscoveryTimer();
-    setIssuesRepo(null);
     setIssuesDiscovering(false);
     setIssuesDiscovered(false);
-    setIssuesChoice(null);
     setIssuesCommitted(false);
   }, [clearDiscoveryTimer]);
 
@@ -180,30 +178,33 @@ export function useOnboardingSetupState(
       if (options?.persistVcsHostKey) writeOnboardingVcsHostChoice(options.persistVcsHostKey, host);
       rememberRepository(options?.persistRepoKey, null);
       setVcsHost(host);
+      setIssuesRepo((current) => (current === selectedRepo ? null : current));
       setSelectedRepo(null);
       setRepoCommitted(false);
       resetIssuesState();
     },
-    [options?.persistVcsHostKey, options?.persistRepoKey, vcsHost, resetIssuesState],
+    [options?.persistVcsHostKey, options?.persistRepoKey, vcsHost, selectedRepo, resetIssuesState],
   );
 
   const selectRepo = useCallback(
     (repo: string) => {
       rememberRepository(options?.persistRepoKey, repo);
+      setIssuesRepo((current) => (current === selectedRepo ? null : current));
       setSelectedRepo(repo);
       setRepoCommitted(false);
       resetIssuesState();
       suggestWorkspaceName(workspaceNameFromRepository(repo));
     },
-    [options?.persistRepoKey, resetIssuesState, suggestWorkspaceName],
+    [options?.persistRepoKey, resetIssuesState, suggestWorkspaceName, selectedRepo],
   );
 
   const clearRepository = useCallback(() => {
     rememberRepository(options?.persistRepoKey, null);
+    setIssuesRepo((current) => (current === selectedRepo ? null : current));
     setSelectedRepo(null);
     setRepoCommitted(false);
     resetIssuesState();
-  }, [options?.persistRepoKey, resetIssuesState]);
+  }, [options?.persistRepoKey, selectedRepo, resetIssuesState]);
 
   const commitRepoStep = useCallback(() => {
     setRepoCommitted(true);

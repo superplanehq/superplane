@@ -146,6 +146,7 @@ export const STORYBOOK_CUSTOM_CREDIT_PRODUCT = {
 };
 
 export const BUSINESS_ORGANIZATION_BILLING = {
+  productFeatures: { byo_key: true },
   plan: "business",
   planSource: "polar",
   polarSubscriptionStatus: "active",

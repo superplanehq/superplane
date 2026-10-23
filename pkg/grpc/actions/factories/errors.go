@@ -33,6 +33,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	}
 
 	switch {
+	case errors.Is(err, models.ErrBYOKAccessDenied):
+		return grpcerrors.PermissionDenied(err, err.Error())
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory with the same name already exists")
 	case errors.Is(err, models.ErrFactoryNameRequired):

@@ -105,10 +105,26 @@ func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node model
 	if err != nil {
 		return nil, err
 	}
-	if stored := storedRunnerModel(node.Configuration); stored != "" {
-		ids = append(ids, stored)
+	stored := storedRunnerModel(node.Configuration)
+	if stored != "" {
+		include, err := storedRunnerModelIsAvailable(tx, orgID, factoryID, node)
+		if err != nil {
+			return nil, err
+		}
+		if include {
+			ids = append(ids, stored)
+		}
 	}
 	return concreteLineRunnerModels(ids), nil
+}
+
+// storedRunnerModelIsAvailable applies the execution gate to stored BYOK
+// models. Hosted models stay available.
+func storedRunnerModelIsAvailable(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node) (bool, error) {
+	if runnerFundingSource(node.Configuration) == models.UsageFundingSourceHosted {
+		return true, nil
+	}
+	return models.RunnerAcceptsModel(tx, orgID, &factoryID, node.ComponentName(), node.Configuration, storedRunnerModel(node.Configuration))
 }
 
 func hostedSelectableLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, stored string) ([]string, error) {
