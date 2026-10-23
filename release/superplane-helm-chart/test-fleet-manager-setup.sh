@@ -68,9 +68,23 @@ helm template superplane "${CHART_DIR}" \
   "${common_args[@]}" \
   --set polar.enabled=true \
   --set polar.secretName=test-polar >"${polar_manifest}"
-billing_on="$(grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${polar_manifest}" | grep -c 'value: "yes"' || true)"
+if grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${polar_manifest}" | grep -q 'value: "yes"'; then
+  echo "Polar credentials must not turn SUPERPLANE_BILLING_ENABLED on" >&2
+  exit 1
+fi
+polar_billing_off="$(grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${polar_manifest}" | grep -c 'value: "no"' || true)"
+if [ "${polar_billing_off}" -lt 3 ]; then
+  echo "expected SUPERPLANE_BILLING_ENABLED=no when Polar is enabled" >&2
+  exit 1
+fi
+
+explicit_on="${TMP_DIR}/billing-on.yaml"
+helm template superplane "${CHART_DIR}" \
+  "${common_args[@]}" \
+  --set billing.enabled=yes >"${explicit_on}"
+billing_on="$(grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${explicit_on}" | grep -c 'value: "yes"' || true)"
 if [ "${billing_on}" -lt 3 ]; then
-  echo "expected SUPERPLANE_BILLING_ENABLED=yes when Polar is enabled" >&2
+  echo "expected SUPERPLANE_BILLING_ENABLED=yes when billing.enabled=yes" >&2
   exit 1
 fi
 

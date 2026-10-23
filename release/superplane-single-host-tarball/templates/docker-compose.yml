@@ -32,6 +32,8 @@ services:
       SUPERPLANE_VERSION: __SUPERPLANE_VERSION__
     env_file:
       - superplane.env
+    environment:
+      SUPERPLANE_BILLING_ENABLED: "no"
     volumes:
       - ${OIDC_KEYS_HOST_PATH:-./oidc}:${OIDC_KEYS_CONTAINER_PATH:-/app/oidc-keys}
       - blob-data:/var/lib/superplane/blobs

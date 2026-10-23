@@ -38,7 +38,8 @@ export function AgentStep({
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const grantTotalCents = parseWorkOrderMetric(spend.data?.grantTotalCents);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
-  const showGrant = showHostedCredit && shouldShowHostedCreditGrant(grantTotalCents);
+  const billingEnabled = spend.data?.billingEnabled === true;
+  const showGrant = showHostedCredit && shouldShowHostedCreditGrant(grantTotalCents, billingEnabled);
 
   return (
     <div className="grid gap-3">
