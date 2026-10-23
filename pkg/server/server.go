@@ -414,13 +414,7 @@ func startWorkers(
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
-	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
-		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
-		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
-		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
-		FromName:          os.Getenv("EMAIL_FROM_NAME"),
-		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
-	})
+	emailService := buildEmailService(encryptor)
 	discord := services.NewDiscordWebhookClient(os.Getenv("DISCORD_FEEDBACK_WEBHOOK_URL"))
 
 	if emailService == nil && !discord.Enabled() {
@@ -488,6 +482,7 @@ func buildGRPCServices(
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
 
 	return grpc.NewServices(grpc.ServicesConfig{
+		EmailService:     buildEmailService(encryptor),
 		BaseURL:          baseURL,
 		WebhooksBaseURL:  webhooksBaseURL,
 		RunnerAPIBaseURL: runnerAPIBaseURL,
@@ -1045,3 +1040,13 @@ func newRunnerActiveLogStore() (runnerlogs.Store, error) {
  * and also from emitting large events.
  */
 var DefaultMaxHTTPResponseBytes int64 = 8 * 1024 * 1024
+
+func buildEmailService(encryptor crypto.Encryptor) services.EmailService {
+	return services.BuildEmailService(encryptor, services.EmailServiceConfig{
+		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
+		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
+		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+		FromName:          os.Getenv("EMAIL_FROM_NAME"),
+		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
+	})
+}

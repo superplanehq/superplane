@@ -13,9 +13,18 @@ import (
 )
 
 type EmailService interface {
+	SendOrganizationInvitationEmail(toEmail string, data OrganizationInvitationTemplateData) error
 	SendMagicCodeEmail(toEmail, code, magicLink string) error
 	SendWorkOrderNotificationEmail(toEmail, subject string, data WorkOrderNotificationTemplateData) error
 	SendSupportFeedbackEmail(toEmail string, feedback SupportFeedback) error
+}
+
+type OrganizationInvitationTemplateData struct {
+	OrganizationName string
+	InviterName      string
+	Role             string
+	ExpiresAt        string
+	AcceptanceURL    string
 }
 
 type MagicCodeTemplateData struct {
@@ -214,4 +223,20 @@ func renderEmailTemplate(templateDir, templateName string, data any) (string, er
 	}
 
 	return buf.String(), nil
+}
+
+func (s *ResendEmailService) SendOrganizationInvitationEmail(toEmail string, data OrganizationInvitationTemplateData) error {
+	text, err := s.renderTemplate("organization_invitation.txt", data)
+	if err != nil {
+		return fmt.Errorf("render invitation text: %w", err)
+	}
+	html, err := s.renderTemplate("organization_invitation.html", data)
+	if err != nil {
+		return fmt.Errorf("render invitation HTML: %w", err)
+	}
+	_, err = s.client.Emails.Send(&resend.SendEmailRequest{
+		From: fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail), To: []string{toEmail},
+		Subject: "Invitation to " + data.OrganizationName + " on SuperPlane", Text: text, Html: html,
+	})
+	return err
 }

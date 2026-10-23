@@ -415,3 +415,19 @@ func randomBoundary() (string, error) {
 	}
 	return hex.EncodeToString(b), nil
 }
+
+func (s *SMTPEmailService) SendOrganizationInvitationEmail(toEmail string, data OrganizationInvitationTemplateData) error {
+	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
+	if err != nil {
+		return err
+	}
+	text, err := s.renderTemplate("organization_invitation.txt", data)
+	if err != nil {
+		return fmt.Errorf("render invitation text: %w", err)
+	}
+	html, err := s.renderTemplate("organization_invitation.html", data)
+	if err != nil {
+		return fmt.Errorf("render invitation HTML: %w", err)
+	}
+	return s.sendEmail(settings, outgoingMail{to: []string{toEmail}, subject: "Invitation to " + data.OrganizationName + " on SuperPlane", textBody: text, htmlBody: html})
+}

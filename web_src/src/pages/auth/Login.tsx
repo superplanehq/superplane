@@ -286,12 +286,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const safeRedirect = useMemo(() => getSafeRedirectPath(redirectParam), [redirectParam]);
 
   const inviteToken = useMemo(() => {
-    if (!safeRedirect || !safeRedirect.startsWith("/invite/")) {
-      return "";
-    }
-
-    const parts = safeRedirect.split("/");
-    return parts.length >= 3 ? parts[2] : "";
+    const path = safeRedirect?.split(/[?#]/)[0];
+    return path?.match(/^\/invitations\/([^/]+)$/)?.[1] ?? "";
   }, [safeRedirect]);
 
   const magicLinkToken = searchParams.get("magic_link_token");

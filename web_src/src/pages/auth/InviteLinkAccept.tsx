@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { useAccount } from "@/contexts/useAccount";
 import { showErrorToast } from "@/lib/toast";
@@ -9,6 +9,7 @@ type AcceptStatus = "idle" | "loading" | "error";
 
 export default function InviteLinkAccept() {
   const { token } = useParams();
+  const { pathname } = useLocation();
   const { account, loading } = useAccount();
   const navigate = useNavigate();
   const [status, setStatus] = useState<AcceptStatus>("idle");
@@ -26,12 +27,12 @@ export default function InviteLinkAccept() {
 
     if (!token) {
       setStatus("error");
-      setErrorMessage("Invalid invite link.");
+      setErrorMessage("This invitation link is invalid. Ask an organization admin for a new invitation.");
       return;
     }
 
     if (!account) {
-      const redirect = encodeURIComponent(`/invite/${token}`);
+      const redirect = encodeURIComponent(pathname);
       window.location.href = `/login?redirect=${redirect}`;
       return;
     }
@@ -41,7 +42,8 @@ export default function InviteLinkAccept() {
     const acceptInvite = async () => {
       try {
         setStatus("loading");
-        const response = await fetch(`/api/v1/invite-links/${token}/accept`, {
+        const resource = pathname.startsWith("/invitations/") ? "invitations" : "invite-links";
+        const response = await fetch(`/api/v1/${resource}/${encodeURIComponent(token)}/accept`, {
           method: "POST",
           credentials: "include",
         });
@@ -59,17 +61,17 @@ export default function InviteLinkAccept() {
             responseMessage = rawResponse;
           }
 
-          throw new Error(responseMessage || "Unable to accept invite link.");
+          throw new Error(responseMessage || "SuperPlane could not accept this invitation. Try again.");
         }
 
         const data = (await response.json()) as { organization_id?: string; organization_slug?: string };
         if (!data.organization_id || !data.organization_slug) {
-          throw new Error("Invite link response was missing organization details.");
+          throw new Error("SuperPlane could not open the organization. Try the invitation link again.");
         }
 
         navigate(`/${data.organization_slug}`);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unable to accept invite link.";
+        const message = err instanceof Error ? err.message : "SuperPlane could not accept this invitation. Try again.";
         setStatus("error");
         setErrorMessage(message);
         showErrorToast(message);
@@ -77,15 +79,15 @@ export default function InviteLinkAccept() {
     };
 
     acceptInvite();
-  }, [account, loading, navigate, token]);
+  }, [account, loading, navigate, pathname, token]);
 
   if (status === "error") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
         <div className="max-w-md w-full">
           <Alert variant="destructive">
-            <AlertTitle>Invite link not available</AlertTitle>
-            <AlertDescription>{errorMessage || "This invite link is invalid or has been disabled."}</AlertDescription>
+            <AlertTitle>Invitation unavailable</AlertTitle>
+            <AlertDescription>{errorMessage || "Ask an organization admin for a new invitation."}</AlertDescription>
           </Alert>
         </div>
       </div>
@@ -97,7 +99,7 @@ export default function InviteLinkAccept() {
       <div className="flex flex-col items-center space-y-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {status === "loading" ? "Joining organization..." : "Preparing invite..."}
+          {status === "loading" ? "Joining organization..." : "Opening invitation..."}
         </p>
       </div>
     </div>
