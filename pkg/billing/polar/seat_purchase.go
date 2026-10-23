@@ -21,6 +21,10 @@ const SeatPurchaseConfirmationWindow = 5 * time.Minute
 // A pending purchase is left to its own request until the confirmation window
 // passes. Polar can still be processing an unknown purchase inside the window,
 // so only an applied or clearly rejected update settles it before then.
+//
+// A snapshot that proves the outcome is applied, so the plan, the period, and
+// the purchase match what Polar reports. A retry after a renewal then works
+// from the refreshed plan.
 func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client *Client, orgID uuid.UUID) error {
 	purchase, err := models.FindInFlightSeatPurchase(db, orgID)
 	if err != nil || purchase == nil || !seatPurchaseNeedsReconciliation(purchase, time.Now()) {
@@ -40,12 +44,10 @@ func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client *Client, org
 			return err
 		}
 
-		status, settled := current.SettlementFor(snapshot.Seats, snapshot.ModifiedAt.TimePtr())
-		if settled && status == models.SeatPurchaseStatusSucceeded {
+		// A snapshot that proves the outcome is applied. SettleSeatPurchase,
+		// inside ApplyOrganizationSubscription, records the proved status.
+		if _, settled := current.SettlementFor(snapshot.Seats, snapshot.ModifiedAt.TimePtr()); settled {
 			return ApplyOrganizationSubscription(ctx, tx, orgID, *snapshot)
-		}
-		if settled {
-			return current.UpdateStatus(tx, status, models.SeatPurchaseErrorNotApplied)
 		}
 		return failExpiredSeatPurchase(tx, current, snapshot.Seats, time.Now())
 	})
