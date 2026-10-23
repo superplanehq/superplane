@@ -7,7 +7,7 @@ let newBilling = true;
 let billing: OrganizationsDescribeOrganizationBillingResponse;
 let lookupFailed = false;
 const verify = vi.fn(async () => true);
-vi.mock("@/hooks/useBYOKAccess", () => ({ useBYOKAccess: () => ({ allowed: true, verify }) }));
+vi.mock("@/hooks/useBYOKAccess", () => ({ useBYOKAccess: () => ({ allowed: true, ready: true, verify }) }));
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({ organizationReady: true, isLoading: false, has: () => newBilling }),
 }));
@@ -80,4 +80,77 @@ it.each(["rollout-off", "billing-off", "no-plans"])("omits the plan step for %s"
   await act(async () => result.current.afterTickets());
   await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("agent"));
   expect(goToScreen).not.toHaveBeenCalledWith("billing");
+});
+
+const activePlans: Record<string, Partial<OrganizationsDescribeOrganizationBillingResponse>> = {
+  "system $0 plan": { planCategory: "paid", creditPurchaseAllowed: true, planSource: "system" },
+  "admin plan": { planCategory: "paid", creditPurchaseAllowed: true, planSource: "admin" },
+  subscription: { planCategory: "paid", creditPurchaseAllowed: true, planSource: "polar" },
+  "plan with card on file": {
+    planCategory: "paid",
+    creditPurchaseAllowed: true,
+    requirePaymentMethod: true,
+    hasPaymentMethod: true,
+  },
+};
+const inactivePlans: Record<string, Partial<OrganizationsDescribeOrganizationBillingResponse>> = {
+  "no plan": { planCategory: "none", creditPurchaseAllowed: false },
+  "lapsed trial or ended subscription": { planCategory: "paid", creditPurchaseAllowed: false },
+  "card required without card": {
+    planCategory: "paid",
+    creditPurchaseAllowed: true,
+    requirePaymentMethod: true,
+    hasPaymentMethod: false,
+  },
+};
+
+it.each(Object.keys(activePlans))("skips the plan step for an active plan: %s", async (name) => {
+  Object.assign(billing, activePlans[name]);
+  const { result, goToScreen } = mount();
+  expect(result.current.hasBillingStep).toBe(false);
+  await act(async () => result.current.afterTickets());
+  await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("agent"));
+  expect(goToScreen).not.toHaveBeenCalledWith("billing");
+});
+it("finishes setup for an active plan when own-key access is not verified", async () => {
+  Object.assign(billing, activePlans["admin plan"]);
+  verify.mockResolvedValue(false);
+  const { result, finish, goToScreen } = mount();
+  await act(async () => result.current.afterTickets());
+  await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
+  expect(goToScreen).not.toHaveBeenCalled();
+});
+it.each(Object.keys(inactivePlans))("keeps the plan step for an inactive plan: %s", async (name) => {
+  Object.assign(billing, inactivePlans[name]);
+  const { result, goToScreen } = mount();
+  expect(result.current.hasBillingStep).toBe(true);
+  await act(async () => result.current.afterTickets());
+  await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("billing"));
+  expect(goToScreen).not.toHaveBeenCalledWith("agent");
+});
+it("keeps the plan step after the user activates a plan on it", async () => {
+  const { result, rerender, goToScreen } = mount();
+  await act(async () => result.current.afterTickets());
+  await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("billing"));
+  Object.assign(billing, activePlans["subscription"]);
+  rerender();
+  expect(result.current.hasBillingStep).toBe(true);
+});
+it("keeps the plan step after a card save on a restored visit", () => {
+  Object.assign(billing, inactivePlans["card required without card"]);
+  const finish = vi.fn(async () => {});
+  const goToScreen = vi.fn();
+  const { result, rerender } = renderHook(() =>
+    useOnboardingPlanTransition({ saving: false, finish }, { screen: "billing", goToScreen }, "org"),
+  );
+  expect(result.current.hasBillingStep).toBe(true);
+  Object.assign(billing, activePlans["plan with card on file"]);
+  rerender();
+  expect(result.current.hasBillingStep).toBe(true);
+});
+it("sends the agent screen back to the plan step for an inactive plan", async () => {
+  const finish = vi.fn(async () => {});
+  const goToScreen = vi.fn();
+  renderHook(() => useOnboardingPlanTransition({ saving: false, finish }, { screen: "agent", goToScreen }, "org"));
+  await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("billing"));
 });
