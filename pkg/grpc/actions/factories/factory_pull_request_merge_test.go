@@ -36,6 +36,7 @@ type fakeFactoryGitHub struct {
 	mergedMethod  string
 	mergedSHA     string
 	mergeCalls    int
+	onMerge       func()
 	editErr       error
 	editFailAfter int
 	editCalls     int
@@ -108,6 +109,9 @@ func (f *fakeFactoryGitHub) MergePullRequest(_ context.Context, _ string, _ int,
 	if options != nil {
 		f.mergedMethod = options.MergeMethod
 		f.mergedSHA = options.SHA
+	}
+	if f.onMerge != nil {
+		f.onMerge()
 	}
 	if f.mergeErr != nil {
 		return nil, nil, f.mergeErr
@@ -236,6 +240,27 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 			ExpectedHeadSha: sha,
 		})
 	}
+
+	t.Run("leaves the organization lock free during the provider call", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
+		api := readyAPI()
+		api.onMerge = func() {
+			err := database.Conn().Transaction(func(tx *gorm.DB) error {
+				locked, err := models.TryLockOrganizationTaskAdmission(tx, r.Organization.ID)
+				require.NoError(t, err)
+				assert.True(t, locked)
+				return nil
+			})
+			require.NoError(t, err)
+		}
+		useGitHub(t, api)
+
+		resp, err := merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
+		require.NoError(t, err)
+		assert.Equal(t, 1, api.mergeCalls)
+		assert.Equal(t, pb.FactoryPullRequest_STATE_MERGED, resp.GetPullRequest().GetState())
+	})
 
 	t.Run("merges with squash", func(t *testing.T) {
 		factory := newFactory(t)

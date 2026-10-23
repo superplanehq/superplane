@@ -105,6 +105,7 @@ export function LineBoardOrderCard({
 
 export function LineBoardWorkOrderCard({
   order,
+  queuedLabel,
   workOrderCardContext,
   onOpen,
   isAnalyzing = false,
@@ -112,6 +113,7 @@ export function LineBoardWorkOrderCard({
   showMergeConfidence = true,
 }: {
   order: FactoriesWorkOrderSummary;
+  queuedLabel?: string;
   workOrderCardContext: WorkOrderCardContext;
   onOpen: () => void;
   isAnalyzing?: boolean;
@@ -132,6 +134,7 @@ export function LineBoardWorkOrderCard({
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
+      queuedLabel={queuedLabel}
       {...scores}
       hasAgentQuestion={showConfidence && planningSessionHasPendingSurvey(session)}
       creditLabel={creditLabel}

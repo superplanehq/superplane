@@ -172,6 +172,9 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 	var pendingFactoryRuns []factoryLinePendingRun
 	var factoryOrderUpdates []factoryWorkOrderUpdate
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.LockRunOrganizationTaskAdmission(tx, runID); err != nil {
+			return err
+		}
 		locked, err := models.LockCanvasRunInTransaction(tx, runID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -246,18 +249,6 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		}
 	}
 
-	for _, event := range newEvents {
-		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
-			return err
-		}
-	}
-
-	for _, execution := range executionUpdates {
-		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
-			return err
-		}
-	}
-
 	// A failed factory step run frees its slot: kick off the runs of the
 	// queued dispatches admitted in its place and refresh their work
 	// orders. The pending-run sweep is the safety net when a publish here
@@ -275,6 +266,18 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 			factoryevents.EventTypeLineStepExecutionCreated,
 		); err != nil {
 			logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", update.orderID)
+		}
+	}
+
+	for _, event := range newEvents {
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			return err
+		}
+	}
+
+	for _, execution := range executionUpdates {
+		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
+			return err
 		}
 	}
 
@@ -376,9 +379,15 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 		return nil, err
 	}
 
-	if err := dispatch.Finish(tx, result); err != nil {
+	open, err := dispatch.HasOpenWork(tx)
+	if err != nil {
 		return nil, err
 	}
+	if !open {
+		if err := dispatch.Finish(tx, result); err != nil {
+			return nil, err
+		}
+	}
 
-	return models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
+	return models.AdmitQueuedForOrganization(tx, execution.OrganizationID)
 }

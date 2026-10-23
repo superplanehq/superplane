@@ -1,4 +1,4 @@
-import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
+import { useCancelWorkOrderQueue, useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useState } from "react";
 
@@ -8,6 +8,22 @@ const NO_ORDERS: ReadonlySet<string> = new Set();
 export function useWorkOrderCardActions(organizationId: string, factoryId: string) {
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
+  const cancelQueue = useCancelWorkOrderQueue(organizationId, factoryId);
+  const [cancellingQueueOrderIds, setCancellingQueueOrderIds] = useState<ReadonlySet<string>>(NO_ORDERS);
+
+  const onCancelQueuedTask = useCallback(
+    async (orderId: string, queueId: string) => {
+      setCancellingQueueOrderIds((current) => withOrderId(current, orderId));
+      try {
+        await cancelQueue.mutateAsync({ orderId, queueId });
+      } catch {
+        showErrorToast("Could not remove the task from the queue. Refresh and try again.");
+      } finally {
+        setCancellingQueueOrderIds((current) => withoutOrderId(current, orderId));
+      }
+    },
+    [cancelQueue],
+  );
   // The mutation is shared by every card on the page, so its pending flag
   // cannot say which card the user clicked. Track the tasks in flight
   // instead, so only their controls show a busy state.
@@ -44,6 +60,8 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
   );
 
   return {
+    onCancelQueuedTask,
+    cancellingQueueOrderIds,
     dispatchingOrderIds,
     isAssigneesSaving: updateAssignees.isPending,
     onDispatch,

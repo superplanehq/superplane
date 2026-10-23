@@ -102,59 +102,20 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 
-	var closeOutcome *factoryPullRequestCloseResult
-	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := assertNoActiveAutomationLocked(tx, factory, pullRequest); err != nil {
-			return err
-		}
+	// The provider call stays outside the organization lock. A slow Git host
+	// must not block dispatch or cancellation for every task in the organization.
+	// The active-automation check runs before the call. The result is recorded
+	// under the lock after the host accepts the merge.
+	if err := rejectMergeWhileAutomationActive(db, factory, pullRequest); err != nil {
+		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
+	}
+	if err := provider.MergePullRequest(ctx, pullRequest, method, expectedSHA); err != nil {
+		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
+	}
 
-		if err := provider.MergePullRequest(ctx, pullRequest, method, expectedSHA); err != nil {
-			return err
-		}
-
-		state := models.FactoryPullRequestStateMerged
-		mergedAt := time.Now()
-		if err := pullRequest.Update(tx, models.FactoryPullRequestPatch{
-			State:    &state,
-			MergedAt: &mergedAt,
-		}); err != nil {
-			return err
-		}
-
-		outcome, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, true, nil)
-		if err != nil {
-			return err
-		}
-		closeOutcome = outcome
-		return nil
-	})
+	closeOutcome, err := recordMergedFactoryPullRequest(db, factory, pullRequest)
 	if err != nil {
-		if errors.Is(err, vcs.ErrNotSupported) {
-			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
-		}
-		if errors.Is(err, errFactoryPullRequestNotMergeable) {
-			return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedActiveRun)), "failed to merge factory pull request")
-		}
-		if errors.Is(err, errFactoryPullRequestHeadMoved) {
-			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
-		}
-		if isGitHubHeadMovedError(err) {
-			_, _ = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
-			return nil, factoryErrorToStatus(errFactoryPullRequestHeadMoved, "failed to merge factory pull request")
-		}
-		message := errFactoryPullRequestNotMergeable.Error()
-		if synced, syncErr := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); syncErr == nil {
-			if !synced.CanMerge && synced.Message != "" {
-				message = synced.Message
-			} else if synced.CanMerge {
-				_ = pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
-					BlockedMessage: message,
-					HeadSHA:        pullRequest.MergeableHeadSHA,
-					AllowedMethods: pullRequest.MergeableAllowedMethods,
-				})
-			}
-		}
-		return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(message)), "failed to merge factory pull request")
+		return nil, mergeFactoryPullRequestError(ctx, db, deps, factory, pullRequest, err)
 	}
 
 	if closeOutcome != nil && closeOutcome.closed {
@@ -198,6 +159,91 @@ func MergeFactoryPullRequest(
 	}
 
 	return &pb.MergeFactoryPullRequestResponse{PullRequest: serialized[0]}, nil
+}
+
+func rejectMergeWhileAutomationActive(db *gorm.DB, factory *models.Factory, pullRequest *models.FactoryPullRequest) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, factory.OrganizationID); err != nil {
+			return err
+		}
+		return assertNoActiveAutomationLocked(tx, factory, pullRequest)
+	})
+}
+
+func recordMergedFactoryPullRequest(
+	db *gorm.DB,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (*factoryPullRequestCloseResult, error) {
+	var closeOutcome *factoryPullRequestCloseResult
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, factory.OrganizationID); err != nil {
+			return err
+		}
+		order, err := factory.FindWorkOrder(tx, pullRequest.WorkOrderID)
+		if err != nil {
+			return err
+		}
+		if err := order.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if err := pullRequest.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if pullRequest.State != models.FactoryPullRequestStateMerged {
+			state := models.FactoryPullRequestStateMerged
+			mergedAt := time.Now()
+			if err := pullRequest.Update(tx, models.FactoryPullRequestPatch{
+				State:    &state,
+				MergedAt: &mergedAt,
+			}); err != nil {
+				return err
+			}
+		}
+		outcome, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, true, nil)
+		if err != nil {
+			return err
+		}
+		closeOutcome = outcome
+		return nil
+	})
+	return closeOutcome, err
+}
+
+func mergeFactoryPullRequestError(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+	err error,
+) error {
+	if errors.Is(err, vcs.ErrNotSupported) {
+		return factoryErrorToStatus(err, "failed to merge factory pull request")
+	}
+	if errors.Is(err, errFactoryPullRequestNotMergeable) {
+		return factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedActiveRun)), "failed to merge factory pull request")
+	}
+	if errors.Is(err, errFactoryPullRequestHeadMoved) {
+		return factoryErrorToStatus(err, "failed to merge factory pull request")
+	}
+	if isGitHubHeadMovedError(err) {
+		_, _ = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+		return factoryErrorToStatus(errFactoryPullRequestHeadMoved, "failed to merge factory pull request")
+	}
+	message := errFactoryPullRequestNotMergeable.Error()
+	if synced, syncErr := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); syncErr == nil {
+		if !synced.CanMerge && synced.Message != "" {
+			message = synced.Message
+		} else if synced.CanMerge {
+			_ = pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+				BlockedMessage: message,
+				HeadSHA:        pullRequest.MergeableHeadSHA,
+				AllowedMethods: pullRequest.MergeableAllowedMethods,
+			})
+		}
+	}
+	return factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(message)), "failed to merge factory pull request")
 }
 
 func assertNoActiveAutomationLocked(tx *gorm.DB, factory *models.Factory, pullRequest *models.FactoryPullRequest) error {

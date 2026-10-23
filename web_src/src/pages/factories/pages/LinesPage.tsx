@@ -1,3 +1,4 @@
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
@@ -34,7 +35,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
-import { Clock, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
@@ -97,7 +98,7 @@ import {
   type LinePhaseRunCard,
   type PhaseGlyphKind,
 } from "../lib/linePhaseRuns";
-import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExecutions";
+import { flattenWorkOrderExecutions } from "../lib/workOrderExecutions";
 import {
   latestDispatchForLine,
   boardLineIdFromNavigationState,
@@ -888,6 +889,8 @@ function LineDetailHeader({
   onColorViewChange: (view: LineBoardColumnColorView) => void;
 }) {
   const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
+  const { data: workspaceUsage } = useOrganizationWorkspaceUsage(organizationId, 30, true);
+  const parallelTaskLimit = workspaceUsage?.parallelTaskLimit;
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
@@ -913,8 +916,16 @@ function LineDetailHeader({
         data-testid="lines-detail-header"
         title={factory?.name?.trim() || "Workspace"}
         leading={
-          nextStepsRestore || hostedCreditHeaderKicker ? (
+          parallelTaskLimit != null || nextStepsRestore || hostedCreditHeaderKicker ? (
             <>
+              {parallelTaskLimit != null ? (
+                <span
+                  className="whitespace-nowrap text-[13px] text-muted-foreground tabular-nums"
+                  title="Active tasks across the organization."
+                >
+                  {workspaceUsage?.activeTaskCount ?? 0} of {parallelTaskLimit} active tasks
+                </span>
+              ) : null}
               {hostedCreditHeaderKicker}
               {nextStepsRestore}
             </>
@@ -1768,7 +1779,7 @@ function VerifyColumn({
           <li key={order.id}>
             <LineBoardOrderCard
               order={order}
-              workOrderCardContext={workOrderCardContext}
+              workOrderCardContext={{ ...workOrderCardContext, onCancelQueuedTask: undefined }}
               onOpenWorkOrder={onOpenWorkOrder}
             />
           </li>
@@ -2042,12 +2053,14 @@ function PhaseRunCard({
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
-  const queuedLabel = isQueuedStepRow(run.execution) ? resolvePhaseRunStatus(run.execution).label : null;
+  const status = resolvePhaseRunStatus(run.execution);
+  const queuedLabel = status.kind === "queued" ? status.label : null;
 
   return (
     <div data-testid={`lines-phase-run-${run.executionId}`}>
       <LineBoardWorkOrderCard
         order={run.order}
+        queuedLabel={queuedLabel ?? undefined}
         workOrderCardContext={workOrderCardContext}
         onOpen={() => {
           if (run.workOrderId) {
@@ -2055,12 +2068,6 @@ function PhaseRunCard({
           }
         }}
       />
-      {queuedLabel ? (
-        <p className="mt-1 flex items-center gap-1 px-0.5 text-[11px] text-muted-foreground">
-          <Clock className="size-3 shrink-0" aria-hidden />
-          {queuedLabel} — waiting for a free slot
-        </p>
-      ) : null}
     </div>
   );
 }

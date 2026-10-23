@@ -406,3 +406,8 @@ func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.Rev
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
 }
+
+func (s *FactoryService) CancelWorkOrderQueue(ctx context.Context, req *pb.CancelWorkOrderQueueRequest) (*pb.CancelWorkOrderQueueResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CancelWorkOrderQueue(ctx, organizationID, req)
+}
