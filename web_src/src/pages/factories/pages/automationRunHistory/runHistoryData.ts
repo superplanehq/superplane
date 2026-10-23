@@ -8,7 +8,6 @@ import type {
 import { intakeRunPresentation, recordedExistingTaskId, type RunHistoryIntakeSource } from "./intakeRunData";
 import { formatCompactDuration } from "@/lib/duration";
 import type { AutomationRun, RunActivity, RunStatus } from "@/ui/AutomationRunHistory/types";
-import { findWorkOrderForAutomationRun } from "../../lib/factoryAutomationStatus";
 
 export function recordedStatus(record: Pick<CanvasesCanvasRun, "state" | "result">): RunStatus {
   if (record.state === "STATE_CANCELLING") return "Cancelling";
@@ -32,12 +31,12 @@ export function toAutomationRun(
   now: number,
   intakeSource?: RunHistoryIntakeSource,
 ): AutomationRun {
-  const order = intakeSource ? intakeWorkOrder(run, orders) : findWorkOrderForAutomationRun(orders, run.id ?? "", run);
+  const order = intakeSource ? intakeWorkOrder(run, orders) : undefined;
   return {
     ...(intakeSource ? intakeRunPresentation(run, intakeSource, recordedStatus(run), orders) : {}),
     id: run.id ?? "",
     title: run.rootEvent?.customName,
-    task: order ? { id: order.key || order.id || "—", title: order.title || "Untitled task" } : undefined,
+    task: taskLabel(run, order),
     status: recordedStatus(run),
     startedAt: run.createdAt ?? "",
     finishedAt: run.finishedAt,
@@ -47,11 +46,39 @@ export function toAutomationRun(
   };
 }
 
+export function taskPageNumber(taskId: string | undefined): string | undefined {
+  if (!taskId || isUuid(taskId)) return undefined;
+  return /-(\d+)$/.exec(taskId)?.[1];
+}
+
+function taskLabel(run: CanvasesCanvasRun, order: FactoriesWorkOrder | undefined): AutomationRun["task"] {
+  const indexed = taskFromRun(run);
+  if (indexed && (!order || order.id !== run.task?.id)) return indexed;
+  if (!order) return indexed;
+  return {
+    id: order.key || order.id || "—",
+    title: order.title || "Untitled task",
+  };
+}
+
+function taskFromRun(run: CanvasesCanvasRun): AutomationRun["task"] {
+  const task = run.task;
+  if (!task?.id) return undefined;
+  return {
+    id: task.key || task.id,
+    title: task.title || "Untitled task",
+  };
+}
+
 function intakeWorkOrder(run: CanvasesCanvasRun, orders: FactoriesWorkOrder[]): FactoriesWorkOrder | undefined {
   const created = orders.find((order) => Boolean(run.id) && order.sourceRunId === run.id);
   if (created) return created;
   const existingTaskId = recordedExistingTaskId(run);
   return existingTaskId ? orders.find((order) => order.id === existingTaskId) : undefined;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 export function toRunActivities(

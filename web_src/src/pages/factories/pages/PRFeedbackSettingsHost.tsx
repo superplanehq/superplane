@@ -12,7 +12,7 @@ import { factoryVCSProvider } from "@/pages/home/factories";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
-import { PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS, supportsPRFeedbackVisualEvidence } from "../lib/columnCanvasAgent";
+import { PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS } from "../lib/columnCanvasAgent";
 import { factoryPRFeedbackSetupPath, prFeedbackSetupKindFromSourceId } from "../lib/factoryPagePaths";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
@@ -152,7 +152,6 @@ export function PRFeedbackSettingsHost({
       handlerId={handler.id}
       canvasId={handler.canvasId}
       settings={prFeedbackDraftFromHandler(handler)}
-      healthy={Boolean(handler.healthy)}
       onClose={onClose}
     />
   );
@@ -169,7 +168,6 @@ function PRFeedbackSettingsLoaded({
   handlerId,
   canvasId,
   settings,
-  healthy,
   onClose,
 }: {
   organizationId: string;
@@ -183,16 +181,12 @@ function PRFeedbackSettingsLoaded({
   handlerId: string;
   canvasId?: string;
   settings: PRFeedbackDraftSettings;
-  healthy: boolean;
   onClose: () => void;
 }) {
   const [saveError, setSaveError] = useState<string | undefined>();
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const isDiscussionHandler = settings.source === "discussion";
-  const supportsVisualEvidence =
-    isDiscussionHandler && supportsPRFeedbackVisualEvidence({ nodes: automation.graph.specNodes });
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId, {
-    showVisualEvidenceSetting: supportsVisualEvidence,
     synchronizedAgentNodeIds: isDiscussionHandler ? PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS : undefined,
   });
   const updateHandler = useUpdateFactoryPRFeedbackHandler(organizationId, factoryId);
@@ -205,7 +199,6 @@ function PRFeedbackSettingsLoaded({
       githubIntegrationId={githubIntegrationId}
       vcsProvider={vcsProvider}
       settings={settings}
-      healthy={healthy}
       automationGraph={automation.graph}
       automationLoading={automation.isLoading}
       automationError={automation.isError}
@@ -250,7 +243,6 @@ function PRFeedbackSettingsLoaded({
               factoryKey,
               automationId: canvasId,
               onSave: agent.save,
-              showVisualEvidenceSetting: agent.showVisualEvidenceSetting,
             }
           : undefined
       }

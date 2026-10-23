@@ -68,7 +68,7 @@ secret_value() {
 
 snapshot_secrets() {
   local key
-  for key in ENCRYPTION_KEY ENCRYPTION_MASTER_KEYS JWT_SECRET DB_PASSWORD BLOB_STORAGE_SIGNING_KEY RABBITMQ_DEFAULT_PASS; do
+  for key in ENCRYPTION_MASTER_KEYS JWT_SECRET DB_PASSWORD BLOB_STORAGE_SIGNING_KEY RABBITMQ_DEFAULT_PASS; do
     printf '%s=%s\n' "${key}" "$(secret_value "${key}")"
   done
 }

@@ -52,7 +52,14 @@ func DescribeOrganizationBilling(
 		}
 	}
 	available := []*pb.BillingPlanOption{}
-	checkoutEnabled := models.BillingEnabled() && polar.SubscriptionCheckoutEnabled()
+	checkoutEnabled := false
+	if billingEnabled && !newBilling {
+		productID, err := polar.BusinessCheckoutProductID(db)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "Could not load billing plans.")
+		}
+		checkoutEnabled = productID != ""
+	}
 	if billingEnabled && newBilling {
 		checkoutEnabled = false
 		catalog, err := models.ListBillingPlans(db)
@@ -128,7 +135,14 @@ func CreateBusinessCheckout(
 	if err != nil {
 		return nil, err
 	}
-	if !models.BillingEnabled() || !polar.SubscriptionCheckoutEnabled() {
+	if !models.BillingEnabled() || !polar.Configured() {
+		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
+	}
+	productID, err := polar.BusinessCheckoutProductID(database.DB(ctx))
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load billing plans.")
+	}
+	if productID == "" {
 		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
 	}
 
@@ -160,7 +174,7 @@ func CreateBusinessCheckout(
 
 	session, err := client.CreateCheckout(
 		ctx,
-		polar.BusinessProductID(),
+		productID,
 		organizationID.String(),
 		businessCheckoutSuccessURL(baseURL, organizationID),
 		clientIPFromContext(ctx),

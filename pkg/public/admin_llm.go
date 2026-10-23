@@ -123,18 +123,21 @@ type organizationLLMMarkupRequest struct {
 }
 
 type organizationBillingPlanResponse struct {
-	CreditExpiration        string    `json:"credit_expiration"`
-	CreditValidityDays      *int      `json:"credit_validity_days"`
-	CatalogID               uuid.UUID `json:"catalog_id"`
-	CatalogKey              string    `json:"catalog_key"`
-	CatalogName             string    `json:"catalog_name"`
-	CatalogCategory         string    `json:"catalog_category"`
-	Plan                    string    `json:"plan"`
-	PlanSource              string    `json:"plan_source"`
-	PolarSubscriptionStatus string    `json:"polar_subscription_status"`
-	PolarManaged            bool      `json:"polar_managed"`
-	TrialEndsAt             *string   `json:"trial_ends_at"`
-	CurrentPeriodEnd        *string   `json:"current_period_end"`
+	CreditExpiration              string    `json:"credit_expiration"`
+	CreditValidityDays            *int      `json:"credit_validity_days"`
+	CatalogID                     uuid.UUID `json:"catalog_id"`
+	CatalogKey                    string    `json:"catalog_key"`
+	CatalogName                   string    `json:"catalog_name"`
+	CatalogCategory               string    `json:"catalog_category"`
+	Plan                          string    `json:"plan"`
+	PlanSource                    string    `json:"plan_source"`
+	PolarSubscriptionVerification string    `json:"polar_subscription_verification"`
+	PolarSubscriptionID           string    `json:"polar_subscription_id"`
+	PolarSubscriptionURL          string    `json:"polar_subscription_url,omitempty"`
+	PolarSubscriptionStatus       string    `json:"polar_subscription_status"`
+	PolarManaged                  bool      `json:"polar_managed"`
+	TrialEndsAt                   *string   `json:"trial_ends_at"`
+	CurrentPeriodEnd              *string   `json:"current_period_end"`
 }
 
 type organizationBillingPlanRequest struct {
@@ -582,15 +585,17 @@ func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 	if !ok {
 		return
 	}
-	if err := polar.SyncOrganizationSubscription(r.Context(), database.Conn(), orgID); err != nil {
-		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
-	}
 	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
 	if err != nil {
 		log.Errorf("admin: failed to load organization billing plan: %v", err)
 		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
 		return
 	}
+	verification, verifyErr := polar.VerifyOrganizationSubscription(r.Context(), orgID)
+	if verifyErr != nil {
+		log.WithError(verifyErr).Warn("admin: failed to verify Polar subscription")
+	}
+	response.PolarSubscriptionVerification = verification
 	respondJSON(w, response)
 }
 
@@ -610,8 +615,21 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := polar.SyncOrganizationSubscription(r.Context(), database.Conn(), orgID); err != nil {
-		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
+	db := database.DB(r.Context())
+	snapshot, err := models.ResolveOrganizationBillingPlan(db, orgID)
+	if err != nil {
+		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
+		return
+	}
+	verification, err := polar.VerifyOrganizationSubscription(r.Context(), orgID)
+	if err != nil {
+		log.WithError(err).Warn("admin: failed to verify Polar subscription")
+		http.Error(w, "SuperPlane could not verify the Polar subscription. Refresh and try again.", http.StatusBadGateway)
+		return
+	}
+	if verification == "active" {
+		http.Error(w, models.ErrPolarManagedBillingPlan.Error(), http.StatusBadRequest)
+		return
 	}
 
 	planName := strings.TrimSpace(req.Plan)
@@ -621,7 +639,15 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		return
 	}
 
-	_, err = models.SetAdminOrganizationPlan(database.Conn(), orgID, planName, trialEndsAt)
+	if verification == "none" {
+		_, err = snapshot.AssignAdminPlanAfterPolarVerification(db, planName, trialEndsAt)
+	} else {
+		_, err = models.SetAdminOrganizationPlan(db, orgID, planName, trialEndsAt)
+	}
+	if errors.Is(err, models.ErrBillingPlanChanged) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -633,6 +659,7 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
 		return
 	}
+	response.PolarSubscriptionVerification = verification
 	respondJSON(w, response)
 }
 
@@ -641,7 +668,13 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 	if err != nil {
 		return organizationBillingPlanResponse{}, err
 	}
+	subscriptionID := ""
+	if plan.PolarSubscriptionID != nil {
+		subscriptionID = *plan.PolarSubscriptionID
+	}
 	return organizationBillingPlanResponse{
+		PolarSubscriptionID:     subscriptionID,
+		PolarSubscriptionURL:    polar.SubscriptionDashboardURL(subscriptionID),
 		CatalogID:               plan.PlanID,
 		CatalogKey:              plan.Catalog.Key,
 		CatalogName:             plan.Catalog.Name,

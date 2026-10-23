@@ -52,6 +52,11 @@ const historyRuns = Array.from({ length: 50 }, (_, index) => ({
   ...(index === 0 ? run : olderRun),
   id: index === 0 ? runId : `${index.toString(16).padStart(8, "0")}-7b41-4d2e-9c83-6a0295dce108`,
   createdAt: new Date(Date.parse(run.createdAt!) - index * 30 * 60 * 1000).toISOString(),
+  task: {
+    id: `task-${index + 1}`,
+    key: `SUPER-${971 - index}`,
+    title: index === 0 ? "Keep MCP tool timeouts as retries" : "Use the default branch when starting a task",
+  },
 }));
 const orders = historyRuns.map((item, index) => ({
   id: `task-${index + 1}`,
