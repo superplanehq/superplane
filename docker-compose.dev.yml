@@ -246,12 +246,15 @@ services:
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 3s
-      timeout: 3s
+      # The ping starts a full Erlang CLI each time. On loaded CI runners
+      # it can take longer than 3s, which counts as a failed check.
+      timeout: 10s
       # Allow time for RabbitMQ to boot on loaded CI runners. Without a
       # start period, a slow boot marks the container unhealthy and fails
-      # every dependent service.
+      # every dependent service. Allow enough failed checks to survive
+      # slow pings during long setup steps.
       start_period: 30s
-      retries: 10
+      retries: 20
 
   # Build-only service. Fleet Manager starts ephemeral containers from this
   # image when a task is queued.
