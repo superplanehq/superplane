@@ -269,12 +269,8 @@ func resolveIntakeGraph(source string, spec models.LiveCanvasSpec) intakeGraph {
 		return slices.Contains(intakeAnalysisComponents, node.ComponentName())
 	})
 	graph.FilterNodeID = resolveIntakeFilterNode(nodes)
-	if findIntakeNode(nodes, intakeAuthorPermissionNodeID) != nil {
-		graph.AuthorPermissionNodeID = intakeAuthorPermissionNodeID
-	}
-	if findIntakeNode(nodes, intakeAuthorFilterNodeID) != nil {
-		graph.AuthorFilterNodeID = intakeAuthorFilterNodeID
-	}
+	graph.AuthorPermissionNodeID = resolveIntakeNode(nodes, intakeAuthorPermissionNodeID, isIntakeAuthorPermissionNode)
+	graph.AuthorFilterNodeID = resolveIntakeNode(nodes, intakeAuthorFilterNodeID, isIntakeAuthorFilterNode)
 	graph.CreateNodeID = resolveIntakeNode(nodes, intakeCreateNodeID, func(node *models.Node) bool {
 		return node.ComponentName() == intakeCreateComponent
 	})
@@ -292,14 +288,26 @@ func resolveIntakeGraph(source string, spec models.LiveCanvasSpec) intakeGraph {
 
 func resolveIntakeFilterNode(nodes []models.Node) string {
 	if id := resolveIntakeNode(nodes, intakeFilterNodeID, func(node *models.Node) bool {
-		return node.ComponentName() == intakeFilterComponent
+		return node.ComponentName() == intakeFilterComponent && !isIntakeAuthorFilterNode(node)
 	}); id != "" {
 		return id
 	}
 
 	return resolveIntakeNode(nodes, intakeThresholdNodeID, func(node *models.Node) bool {
-		return node.ComponentName() == intakeFilterComponent
+		return node.ComponentName() == intakeFilterComponent && !isIntakeAuthorFilterNode(node)
 	})
+}
+
+func isIntakeAuthorPermissionNode(node *models.Node) bool {
+	return node.ID == intakeAuthorPermissionNodeID ||
+		(node.ComponentName() == intakeAuthorPermissionComponent &&
+			node.Configuration["username"] == "{{ root().data.issue.user.login }}")
+}
+
+func isIntakeAuthorFilterNode(node *models.Node) bool {
+	return node.ID == intakeAuthorFilterNodeID ||
+		(node.ComponentName() == intakeFilterComponent &&
+			node.Configuration["expression"] == `root().data.permission != "none"`)
 }
 
 func resolveIntakeNode(nodes []models.Node, preferredID string, matches func(*models.Node) bool) string {

@@ -1005,6 +1005,33 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			SourceID: intakeFilterNodeID,
 			TargetID: intakeCreateNodeID,
 		})
+
+		// Re-enabling a deleted gate makes the publisher assign new node IDs.
+		for _, enabled := range []bool{true, true, false} {
+			response, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+				FactoryId: factory.ID.String(),
+				IntakeId:  intake.GetId(),
+				Settings:  &pb.FactoryIntake_Settings{AuthorsWithAccess: enabled},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, enabled, response.GetIntake().GetSettings().GetAuthorsWithAccess())
+
+			canvas, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			liveVersion, err = models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+			require.NoError(t, err)
+			permissionCount := 0
+			for _, node := range liveVersion.Nodes {
+				if node.ComponentName() == intakeAuthorPermissionComponent {
+					permissionCount++
+				}
+			}
+			if enabled {
+				assert.Equal(t, 1, permissionCount)
+				continue
+			}
+			assert.Zero(t, permissionCount)
+		}
 	})
 
 	t.Run("the authors filter stays off by default", func(t *testing.T) {
