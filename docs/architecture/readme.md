@@ -4,6 +4,25 @@ Start here for a visual map of the runtime and the React interface.
 The diagrams show logical responsibilities and the integrated runner path.
 Deployment roles, storage providers, and optional execution paths depend on configuration.
 
+## Purpose
+
+This guide offers a starting point for new users and contributors, including readers who are less familiar with software architecture.
+Start with the diagrams to see how the main parts fit together.
+Follow the documentation and source links when you want more detail.
+
+The maps can also serve as a shared reference for planning changes, discussing dependencies, maintaining the system, and reviewing contributions.
+They complement the existing guides and can improve as contributors share corrections and clearer explanations.
+
+### Reading the maps
+
+- **System architecture:** Follow a request from the web interface to the application, its background work, and the services it uses.
+- **Design system:** See how shared colors, styles, and controls combine into the screens people use.
+- **Source links:** Use the tables below each diagram to explore the implementation at your own pace.
+
+An API is an entry point where software receives requests.
+Workers handle background work, while runners execute tasks such as shell commands and agent tools.
+Design tokens are shared values for visual choices such as colors, borders, and spacing.
+
 ## System architecture
 
 [![SuperPlane system architecture: clients, Go application modules, durable state, runners, and external providers](images/system-architecture.png)](images/system-architecture.png)
