@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -13,6 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -203,6 +205,7 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account) ([]models.Organization, error) {
 	var users []models.User
 	var deletedOrganizations []models.Organization
+	var capacityChecks []polar.SeatCapacityCheck
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(account, "id = ?", account.ID).Error; err != nil {
 			return err
@@ -219,10 +222,17 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 		if err != nil {
 			return err
 		}
-		return account.SoftDelete(tx, time.Now())
+		if err := account.SoftDelete(tx, time.Now()); err != nil {
+			return err
+		}
+		capacityChecks, err = recheckSeatCapacityAfterAccountDeletion(tx, users, deletedOrganizations)
+		return err
 	})
 	if err != nil {
 		return nil, err
+	}
+	for _, check := range capacityChecks {
+		check.Log()
 	}
 
 	if err := s.removeAccountOrganizationRoles(ctx, users); err != nil {
@@ -230,6 +240,30 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 	}
 
 	return deletedOrganizations, nil
+}
+
+// recheckSeatCapacityAfterAccountDeletion updates the over-capacity record of
+// each organization that keeps running after the account left it.
+func recheckSeatCapacityAfterAccountDeletion(
+	tx *gorm.DB,
+	users []models.User,
+	deletedOrganizations []models.Organization,
+) ([]polar.SeatCapacityCheck, error) {
+	var checks []polar.SeatCapacityCheck
+	for _, user := range users {
+		isDeleted := slices.ContainsFunc(deletedOrganizations, func(organization models.Organization) bool {
+			return organization.ID == user.OrganizationID
+		})
+		if isDeleted {
+			continue
+		}
+		check, err := polar.RecheckSeatCapacity(tx, user.OrganizationID, polar.SeatCapacityCauseAccountDeleted)
+		if err != nil {
+			return nil, err
+		}
+		checks = append(checks, check)
+	}
+	return checks, nil
 }
 
 func (s *Server) refuseAccountDeleteGuards(tx *gorm.DB, account *models.Account) error {

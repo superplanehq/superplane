@@ -98,6 +98,36 @@ describe("Organization billing seats", () => {
     );
   });
 
+  describe("when members exceed paid seats", () => {
+    const overCapacity = { ...TEAM_ORGANIZATION_BILLING, purchasedSeats: 8, occupiedSeats: 9, availableSeats: 0 };
+
+    it("tells admins to buy seats or remove members", async () => {
+      renderBilling(overCapacity);
+      const card = await screen.findByTestId("billing-seats");
+      expect(card).toHaveTextContent("9 members, 8 paid seats. Buy seats or remove members to invite again.");
+      expect(card).not.toHaveTextContent("Ask an organization admin");
+    });
+
+    it("uses singular forms for one member and one paid seat", async () => {
+      renderBilling({ ...overCapacity, purchasedSeats: 1, occupiedSeats: 2 });
+      expect(await screen.findByTestId("billing-seats")).toHaveTextContent("2 members, 1 paid seat. Buy seats");
+    });
+
+    it("tells other users to ask an admin", async () => {
+      canManageBilling = false;
+      renderBilling(overCapacity);
+      const card = await screen.findByTestId("billing-seats");
+      expect(card).toHaveTextContent("Ask an organization admin to buy seats or remove members.");
+      expect(card).not.toHaveTextContent("Buy seats or remove members to invite again.");
+    });
+
+    it.each([8, 7])("shows no notice when occupied seats do not exceed %s purchased seats", async (occupied) => {
+      renderBilling({ ...overCapacity, occupiedSeats: occupied });
+      const card = await screen.findByTestId("billing-seats");
+      expect(within(card).queryByRole("status")).not.toBeInTheDocument();
+    });
+  });
+
   it.each([undefined, "", "invalid-date"])(
     "handles an unavailable renewal date (%s) and amounts",
     async (currentPeriodEnd) => {
