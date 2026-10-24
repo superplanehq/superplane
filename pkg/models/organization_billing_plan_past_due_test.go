@@ -306,12 +306,12 @@ func Test__PausedSubscriptionLapsesPaidPlan(t *testing.T) {
 	}
 }
 
-// Rows written before past_due_since existed, or before a paused snapshot
-// lapsed the plan, still sit on the paid catalog. Resolve lapses them, and
-// the stored subscription details and seats stay for the billing page and the
-// seat lock.
+// Rows written before past_due_since existed, or before paused and unpaid
+// subscriptions lapsed the plan, still sit on the paid catalog. Resolve lapses
+// them, and the stored subscription details and seats stay for the billing page
+// and the seat lock.
 func Test__PaymentBlockedRowWithoutGraceLapsesOnResolve(t *testing.T) {
-	for _, status := range []string{models.PolarSubscriptionStatusPastDue, models.PolarSubscriptionStatusPaused} {
+	for _, status := range []string{models.PolarSubscriptionStatusPastDue, models.PolarSubscriptionStatusPaused, models.PolarSubscriptionStatusUnpaid} {
 		for _, product := range pastDueProducts {
 			t.Run(status+" "+product.name, func(t *testing.T) {
 				replay := newPastDueReplay(t, product)
@@ -379,12 +379,14 @@ func Test__PaymentBlockedLapseDropsPaidCatalogFeatures(t *testing.T) {
 	replay.apply(models.PolarSubscriptionStatusPaused)
 	assert.False(t, features()[feature.Key], "a paused snapshot lapses the paid catalog")
 
-	requirePaid(t, replay.apply(models.PolarSubscriptionStatusActive), pastDueProducts[1])
-	require.True(t, features()[feature.Key])
-	require.NoError(t, replay.db.Model(&models.OrganizationBillingPlan{}).
-		Where("organization_id = ?", replay.orgID).
-		Update("polar_subscription_status", models.PolarSubscriptionStatusPastDue).Error)
-	assert.False(t, features()[feature.Key], "a past-due row without grace lapses on resolve")
+	for _, status := range []string{models.PolarSubscriptionStatusPastDue, models.PolarSubscriptionStatusUnpaid} {
+		requirePaid(t, replay.apply(models.PolarSubscriptionStatusActive), pastDueProducts[1])
+		require.True(t, features()[feature.Key])
+		require.NoError(t, replay.db.Model(&models.OrganizationBillingPlan{}).
+			Where("organization_id = ?", replay.orgID).
+			Updates(map[string]any{"polar_subscription_status": status, "cancel_at_period_end": true}).Error)
+		assert.False(t, features()[feature.Key], "%s without grace lapses on resolve", status)
+	}
 }
 
 func Test__AgentRunGateNamesPaymentFailure(t *testing.T) {

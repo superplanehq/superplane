@@ -874,12 +874,12 @@ func (p *OrganizationBillingPlan) shouldLapseEndedPolarBusiness(now time.Time) b
 
 // shouldLapsePaymentBlockedCatalog is true for a Polar row on a paid catalog
 // while Polar does not collect payment and no grace period applies: a paused
-// subscription, or a past-due row written before the failure start was
+// or unpaid subscription, or a past-due row written before the failure start was
 // recorded. ApplyPolarSubscription lapses new snapshots; this catches rows
 // written before it did.
 func (p *OrganizationBillingPlan) shouldLapsePaymentBlockedCatalog() bool {
 	return p != nil && p.isPaidPlan() && p.PlanSource == BillingPlanSourcePolar &&
-		PolarSubscriptionIsPaymentBlocked(p.PolarSubscriptionStatus) && !p.holdsPastDueGraceRow()
+		polarSubscriptionCannotCollectPayment(p.PolarSubscriptionStatus) && !p.holdsPastDueGraceRow()
 }
 
 func periodStillOpen(periodEnd *time.Time, now time.Time) bool {
@@ -967,7 +967,7 @@ func lapsePaymentBlockedCatalog(tx *gorm.DB, plan *OrganizationBillingPlan) (*Or
 		nextPlan := planAfterPaidSubscriptionEnds(plan, now)
 		result := inner.Model(&OrganizationBillingPlan{}).
 			Where("organization_id = ? AND plan = ? AND plan_source = ?", plan.OrganizationID, plan.Plan, BillingPlanSourcePolar).
-			Where("polar_subscription_status IN ?", []string{PolarSubscriptionStatusPastDue, PolarSubscriptionStatusPaused}).
+			Where("polar_subscription_status IN ?", []string{PolarSubscriptionStatusPastDue, PolarSubscriptionStatusPaused, PolarSubscriptionStatusUnpaid}).
 			Where("past_due_since IS NULL").
 			Updates(map[string]any{
 				"plan":       nextPlan,
