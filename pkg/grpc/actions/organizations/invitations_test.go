@@ -214,7 +214,12 @@ func TestInvitationFinalSeatConcurrent(t *testing.T) {
 
 func requireInvitationReason(t *testing.T, err error, reason string) {
 	t.Helper()
-	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	requireInvitationErrorReason(t, err, codes.FailedPrecondition, reason)
+}
+
+func requireInvitationErrorReason(t *testing.T, err error, code codes.Code, reason string) {
+	t.Helper()
+	require.Equal(t, code, grpcerrors.Code(err))
 	details := status.Convert(err).Details()
 	require.Len(t, details, 1)
 	require.Equal(t, reason, details[0].(*errdetails.ErrorInfo).Reason)
