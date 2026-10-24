@@ -146,7 +146,7 @@ function BillingPaymentControls({
   const paymentBlocked = billingPaymentBlocked(billing.polarSubscriptionStatus);
   const plans = paymentBlocked ? [] : (billing.availablePlans ?? []);
   const subscriptionActive = billing.planSource === "polar" && billing.creditPurchaseAllowed;
-  const manageInPortal = subscriptionActive || billing.hasPaymentMethod;
+  const manageInPortal = subscriptionActive || billing.hasPaymentMethod || paymentBlocked;
   const cardRequiredPlan = plans.some((plan) => plan.requirePaymentMethod && !plan.subscriptionRequired);
   return (
     <div className="mt-3 space-y-3">

@@ -7,6 +7,7 @@ import { BillingPaymentSettings } from "./BillingPaymentSettings";
 
 const selectPlan = vi.fn();
 const createSession = vi.fn();
+const createPortalSession = vi.fn();
 const refetch = vi.fn();
 const billing: OrganizationsDescribeOrganizationBillingResponse = {
   billingEnabled: true,
@@ -22,7 +23,7 @@ const billing: OrganizationsDescribeOrganizationBillingResponse = {
 vi.mock("@/api-client", () => ({
   organizationsSelectBillingPlan: selectPlan,
   organizationsCreatePaymentMethodSession: createSession,
-  organizationsCreateBillingPortalSession: vi.fn(),
+  organizationsCreateBillingPortalSession: createPortalSession,
 }));
 vi.mock("@/hooks/useOrganizationBilling", () => ({
   organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
@@ -38,6 +39,7 @@ beforeEach(() => {
   billing.availablePlans![1].seatMaximum = 5;
   selectPlan.mockReset().mockResolvedValue({ data: {} });
   createSession.mockReset().mockResolvedValue({ data: { portalUrl: "https://polar.example/portal?token=test" } });
+  createPortalSession.mockReset().mockResolvedValue({ data: { portalUrl: "https://polar.example/portal" } });
   refetch.mockReset().mockResolvedValue({ data: billing });
 });
 afterEach(() => vi.restoreAllMocks());
@@ -271,4 +273,21 @@ it("keeps the banner text but removes the action for members without billing per
   renderSettings(false);
   expect(screen.getByRole("alert")).toHaveTextContent("The renewal payment failed on");
   expect(screen.queryByRole("button", { name: "Update payment method" })).not.toBeInTheDocument();
+});
+
+it.each([false, true])("opens the portal for a paused subscription with a saved card: %s", async (saved) => {
+  Object.assign(billing, { polarSubscriptionStatus: "paused", hasPaymentMethod: saved });
+  const assign = vi.fn();
+  const previousAssign = window.location.assign.bind(window.location);
+  window.location.assign = assign;
+  try {
+    const user = renderSettings();
+    await user.click(screen.getByRole("button", { name: "Manage payment method" }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://polar.example/portal"));
+    expect(createPortalSession).toHaveBeenCalledWith(expect.objectContaining({ path: { id: "org-1" }, body: {} }));
+    expect(createSession).not.toHaveBeenCalled();
+    expect(selectPlan).not.toHaveBeenCalled();
+  } finally {
+    window.location.assign = previousAssign;
+  }
 });
