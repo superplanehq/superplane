@@ -65,6 +65,7 @@ import {
   workspaceNextSteps,
 } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
+import type { BacklogColumnPaging } from "./useBacklogColumnSearch";
 
 type BoardColumnPaging = {
   hasMore: boolean;
@@ -73,7 +74,7 @@ type BoardColumnPaging = {
 };
 
 type BoardPaging = {
-  backlog: BoardColumnPaging;
+  backlog: BacklogColumnPaging;
   open: BoardColumnPaging;
   done: BoardColumnPaging;
 };
@@ -821,6 +822,7 @@ export function LinesPage() {
               backlog: {
                 hasMore: !isPlaceholderData && backlogPage.hasNextPage,
                 isLoading: backlogPage.isFetchingNextPage,
+                hasPageError: Boolean(backlogPage.isFetchNextPageError),
                 onLoadMore: backlogPage.fetchNextPage,
               },
               open: {
