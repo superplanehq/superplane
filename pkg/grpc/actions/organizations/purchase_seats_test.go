@@ -41,6 +41,8 @@ type seatPurchaseFixture struct {
 	onPatch func(w http.ResponseWriter, f *seatPurchaseFixture, seats int)
 	// polarSeats is the seat count that GET reports.
 	polarSeats int
+	// replays counts webhook replays so each snapshot is newer than the last.
+	replays int
 }
 
 func newSeatPurchaseFixture(t *testing.T, purchased int, seatLimit *int) *seatPurchaseFixture {

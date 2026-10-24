@@ -147,6 +147,11 @@ func PolarSubscriptionIsPaid(status string) bool {
 	}
 }
 
+// PolarSubscriptionIsPastDue is true while Polar retries a failed renewal payment.
+func PolarSubscriptionIsPastDue(status string) bool {
+	return strings.ToLower(strings.TrimSpace(status)) == PolarSubscriptionStatusPastDue
+}
+
 // AssignAdminPlanAfterPolarVerification requires a confirmed absence from Polar.
 // Keep the subscription ID and event timestamp for history and webhook ordering.
 func (p *OrganizationBillingPlan) AssignAdminPlanAfterPolarVerification(tx *gorm.DB, planName string, trialEndsAt *time.Time) (*OrganizationBillingPlan, error) {
