@@ -747,6 +747,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/public/organizations/{org}/workspaces/{key}/lines/{lineId}/board", s.handlePublicFactoryBoard).Methods("GET")
+	publicRoute.HandleFunc("/api/v1/public/organizations/{org}/workspaces/{key}/lines/{lineId}/tasks/{number}", s.handlePublicFactoryTask).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/public/artifacts/{public_id}/{filename}", s.handlePublicArtifactDownload).Methods(http.MethodGet, http.MethodHead)
 	publicRoute.HandleFunc("/api/v1/public/badges/{token}.svg", s.handlePublicBadge).Methods(http.MethodGet)
 
