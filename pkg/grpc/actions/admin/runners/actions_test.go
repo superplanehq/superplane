@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -612,15 +613,7 @@ func TestDeleteRunnerChecksStatesAfterConcurrentRegistration(t *testing.T) {
 
 	// Wait for deletion to reach the row held by registration before the
 	// pending-to-idle transition commits.
-	require.Eventually(t, func() bool {
-		var waiting bool
-		err := db.Raw(`SELECT EXISTS (
-			SELECT 1 FROM pg_stat_activity
-			WHERE datname = current_database() AND wait_event_type = 'Lock'
-			AND pid <> pg_backend_pid() AND query LIKE '%runners%'
-		)`).Scan(&waiting).Error
-		return err == nil && waiting
-	}, 5*time.Second, 10*time.Millisecond)
+	waitForRunnerLockWaiters(t, db, 1)
 
 	require.NoError(t, registration.Model(runner).Update("state", models.RunnerStateIdle).Error)
 	require.NoError(t, registration.Commit().Error)
@@ -634,6 +627,78 @@ func TestDeleteRunnerChecksStatesAfterConcurrentRegistration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerStateIdle, stored.State)
 	assert.Nil(t, stored.TerminatedAt)
+}
+
+func TestDeleteBusyRunnerDoesNotDeadlockWithTaskCompletion(t *testing.T) {
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+	runner := createListedRunner(t, fleet.ID, uuid.New(), models.RunnerStateIdle, time.Now())
+	require.NoError(t, db.Model(runner).Update("ephemeral", true).Error)
+	runner.Ephemeral = true
+	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
+	require.NoError(t, task.Reserve(db, runner.ID))
+	require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, time.Now()))
+
+	// Hold the task so completion and cancellation overlap at their first
+	// contended lock, rather than relying on scheduler timing.
+	heldTask := db.Begin()
+	require.NoError(t, heldTask.Error)
+	defer heldTask.Rollback()
+	_, err := models.FindRunnerTask(heldTask.Clauses(clause.Locking{Strength: "UPDATE"}), task.ID)
+	require.NoError(t, err)
+
+	completion := make(chan error, 1)
+	go func() {
+		completingTask, completingRunner := *task, *runner
+		completion <- db.Transaction(func(tx *gorm.DB) error {
+			_, err := completingTask.Complete(tx, &completingRunner, "completion", datatypes.JSON(`{}`), 0, "", false, time.Now())
+			return err
+		})
+	}()
+	waitForRunnerLockWaiters(t, db, 1)
+
+	cancellation := make(chan error, 1)
+	go func() {
+		_, err := newTestRunnerService().DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{
+			FleetId: fleet.Slug, RunnerId: runner.ID.String(), States: []string{models.RunnerStateBusy},
+		})
+		cancellation <- err
+	}()
+	waitForRunnerLockWaiters(t, db, 2)
+	require.NoError(t, heldTask.Rollback().Error)
+
+	select {
+	case err := <-completion:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("task completion did not finish after releasing the task")
+	}
+	select {
+	case err := <-cancellation:
+		require.Equal(t, codes.Aborted, grpcerrors.Code(err))
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancellation did not finish after task completion")
+	}
+	storedTask, err := models.FindRunnerTask(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStateSucceeded, storedTask.State)
+	assert.Nil(t, storedTask.CancelRequestedAt)
+	storedRunner, err := models.FindRunner(db, runner.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerStateTerminated, storedRunner.State)
+}
+
+func waitForRunnerLockWaiters(t *testing.T, db *gorm.DB, count int) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		var waiting int
+		err := db.Raw(`SELECT COUNT(*) FROM pg_stat_activity
+			WHERE datname = current_database() AND wait_event_type = 'Lock'
+			AND pid <> pg_backend_pid() AND query LIKE '%runner%'
+		`).Scan(&waiting).Error
+		return err == nil && waiting >= count
+	}, 5*time.Second, 10*time.Millisecond)
 }
 
 func TestDeleteRunnerRejectsBusyReusableRunnerWithConflict(t *testing.T) {
