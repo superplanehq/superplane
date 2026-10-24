@@ -1,4 +1,4 @@
-import { billingPeriodEndLabel } from "../../lib/billingPlans";
+import { BILLING_PAYMENT_BLOCKED_SEATS_COPY, billingPeriodEndLabel } from "../../lib/billingPlans";
 import { formatUsdCents } from "../../lib/workOrderUsage";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
 import type { BillingSeatSummary } from "./useOrganizationBillingPageModel";
@@ -10,6 +10,9 @@ type BillingSeatsCardProps = {
 };
 
 export function BillingSeatsCard({ seats, currentPeriodEnd, cancelAtPeriodEnd }: BillingSeatsCardProps) {
+  if (seats.paymentBlocked) {
+    return <BlockedSeatsSummary seats={seats} />;
+  }
   const date = billingPeriodEndLabel(currentPeriodEnd);
   const renewalSeats = seats.expectedRenewalSeats;
   const renewalQuantity = renewalSeats === undefined ? "Not available" : String(renewalSeats);
@@ -50,6 +53,20 @@ export function BillingSeatsCard({ seats, currentPeriodEnd, cancelAtPeriodEnd }:
       <p className="mt-3 text-xs text-muted-foreground">Estimates exclude taxes and discounts.</p>
       <p className="mt-2 text-xs text-muted-foreground">
         Unused seats are removed at renewal. Pending invitations are not renewed and expire at renewal.
+      </p>
+    </FactorySettingsCard>
+  );
+}
+
+// While payment is blocked, the server sends only the stored and used seats.
+function BlockedSeatsSummary({ seats }: { seats: BillingSeatSummary }) {
+  return (
+    <FactorySettingsCard title="Seats" data-testid="billing-seats">
+      <p className="text-xl font-semibold tracking-[-0.02em] tabular-nums">
+        {seats.occupied ?? "Not available"} of {seats.purchased ?? "Not available"} seats used
+      </p>
+      <p className="mt-3 text-sm text-muted-foreground" data-testid="billing-seats-blocked">
+        {BILLING_PAYMENT_BLOCKED_SEATS_COPY}
       </p>
     </FactorySettingsCard>
   );

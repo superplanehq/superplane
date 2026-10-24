@@ -964,6 +964,12 @@ message DescribeOrganizationBillingResponse {
   // so clients must use this flag instead of remaining_credit_cents.
   bool hosted_credit_available = 35;
   SeatPurchase last_seat_purchase = 36;
+  // When the current renewal payment failure started. Set only while the
+  // subscription is past due.
+  google.protobuf.Timestamp payment_failed_at = 37;
+  // When Team features end after a failed renewal payment. Set only while a
+  // grace period keeps them on.
+  google.protobuf.Timestamp paid_access_ends_at = 38;
 }
 
 message SeatPurchase {

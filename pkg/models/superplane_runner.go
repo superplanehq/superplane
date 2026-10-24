@@ -17,6 +17,7 @@ const hostedLLMModelKeySeparator = "::"
 const (
 	SuperPlaneRunnerNoCreditMessage        = "This organization has no hosted credit."
 	SuperPlaneRunnerSubscribeMessage       = "Subscribe to a plan to run agents."
+	SuperPlaneRunnerPaymentPastDueMessage  = "The renewal payment failed. Update the payment method to run agents."
 	SuperPlaneRunnerNoFactoryBudgetMessage = "This workspace has no remaining hosted credit."
 	SuperPlaneRunnerNoModelMessage         = "The instance has no SuperPlane agent model."
 	SuperPlaneRunnerModelNotAllowedMessage = "This workspace does not allow the SuperPlane agent model."
@@ -176,6 +177,9 @@ func SuperPlaneRunnerReadinessError(tx *gorm.DB, orgID uuid.UUID, factoryID *uui
 	}
 
 	if err := AssertHostedRunAllowed(tx, orgID, factoryID); err != nil {
+		if errors.Is(err, ErrHostedPaymentPastDue) {
+			return ErrHostedPaymentPastDue
+		}
 		if errors.Is(err, ErrHostedSubscriptionRequired) {
 			return ErrHostedSubscriptionRequired
 		}
@@ -305,6 +309,8 @@ func AnnotateSuperPlaneRunnerNodes(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid
 
 func SuperPlaneRunnerReadinessMessage(err error) string {
 	switch {
+	case errors.Is(err, ErrHostedPaymentPastDue):
+		return SuperPlaneRunnerPaymentPastDueMessage
 	case errors.Is(err, ErrHostedSubscriptionRequired):
 		return SuperPlaneRunnerSubscribeMessage
 	case errors.Is(err, ErrSuperPlaneRunnerNoCredit), errors.Is(err, ErrHostedCreditEmpty):
@@ -332,6 +338,7 @@ func isSuperPlaneReadinessError(err error) bool {
 func isSuperPlaneReadinessMessage(message string) bool {
 	switch strings.TrimSpace(message) {
 	case SuperPlaneRunnerSubscribeMessage,
+		SuperPlaneRunnerPaymentPastDueMessage,
 		legacySuperPlaneRunnerSubscribeMessage,
 		SuperPlaneRunnerNoCreditMessage,
 		SuperPlaneRunnerNoFactoryBudgetMessage,
