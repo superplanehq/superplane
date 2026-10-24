@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -71,6 +72,31 @@ func Test__UserAPIToken__TouchLastUsed(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, found.LastUsedAt)
 	assert.WithinDuration(t, now, *found.LastUsedAt, time.Second)
+}
+
+func TestUserAPITokenCreationDuringMemberRemoval(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	member, err := models.FindActiveUserByID(r.Organization.ID.String(), r.User.String())
+	require.NoError(t, err)
+	removal := db.Begin()
+	require.NoError(t, removal.Error)
+	t.Cleanup(func() { removal.Rollback() })
+	require.NoError(t, member.SoftDelete(removal, time.Now(), ""))
+
+	// A token request must wait for an in-flight removal to commit or roll back.
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	t.Cleanup(cancel)
+	token := models.NewUserAPIToken(member.ID, "In-flight request", "hash-during-removal")
+	err = models.CreateUserAPIToken(db.WithContext(ctx), token)
+	require.Error(t, err)
+	require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+	require.NoError(t, removal.Commit().Error)
+
+	// A request that reaches persistence after removal must also be rejected.
+	require.ErrorIs(t, models.CreateUserAPIToken(db, token), gorm.ErrRecordNotFound)
+	_, err = models.FindUserAPITokenByHash(db, token.TokenHash)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
 func Test__UserAPIToken__HardDelete(t *testing.T) {
