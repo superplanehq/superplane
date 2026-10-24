@@ -9,6 +9,7 @@ import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
 import { Heading } from "../../../components/Heading/heading";
 import { Input } from "../../../components/Input/input";
 import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/useOrganizationData";
+import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -289,14 +290,15 @@ export function General({ organization }: GeneralProps) {
                   {deleteError.subscriptionLive && organizationId && (
                     <>
                       {" "}
-                      <button
+                      <Button
                         type="button"
+                        variant="link"
                         onClick={openBillingPortal}
                         disabled={billingPortalPending}
-                        className="font-medium underline underline-offset-2 disabled:opacity-60"
+                        className="h-auto p-0 font-medium text-red-600 underline underline-offset-2 disabled:opacity-60 dark:text-red-400"
                       >
                         Open Billing
-                      </button>
+                      </Button>
                     </>
                   )}
                 </p>
