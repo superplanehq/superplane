@@ -29,7 +29,7 @@ func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	router := NewEventRouter(amqpURL)
+	router := NewEventRouter(r.Registry, amqpURL)
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 	logger := log.NewEntry(log.New())
 
@@ -146,7 +146,7 @@ func Test__RunFinalizer_EndsPlanningSessionWhenRunPasses(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	router := NewEventRouter(amqpURL)
+	router := NewEventRouter(r.Registry, amqpURL)
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 	logger := log.NewEntry(log.New())
 	canvas, run, rootEvent := setupPassedComponentRun(t, r)
@@ -511,7 +511,7 @@ func Test__RunFinalizer__CallsFinishedCallbackWhenConfigured(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 
-	router := NewEventRouter(amqpURL)
+	router := NewEventRouter(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 	require.NoError(t, router.LockAndProcessEvent(logger, events[0], time.Now()))
 

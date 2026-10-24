@@ -246,7 +246,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
 		log.Println("Starting Event Router")
 
-		w := workers.NewEventRouter(rabbitMQURL)
+		w := workers.NewEventRouter(registry, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 

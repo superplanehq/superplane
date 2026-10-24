@@ -65,7 +65,7 @@ func TestFactoryChecksStartupRoutesCurrentResults(t *testing.T) {
 				"pull_request": map[string]any{"number": 42, "head": map[string]any{"sha": "attached-head", "ref": "feature"}},
 				"pullRequest":  map[string]any{"id": pr.ID.String()},
 			}))
-			router := NewEventRouter("")
+			router := NewEventRouter(r.Registry, "")
 			queue := NewNodeQueueWorker(r.Registry, "")
 			executor := newTestNodeExecutor(t, r)
 			logger := log.NewEntry(log.New())

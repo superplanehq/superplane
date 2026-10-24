@@ -288,7 +288,7 @@ func Test__Queueing_SelfManagedMergeIsNotCapacityGated(t *testing.T) {
 
 	amqpURL, _ := config.RabbitMQURL()
 	worker := queueWorkerForTest(r)
-	router := NewEventRouter(amqpURL)
+	router := NewEventRouter(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	mergeNode := "merge-node"

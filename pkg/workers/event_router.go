@@ -17,18 +17,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 type EventRouter struct {
+	registry    *registry.Registry
 	semaphore   *semaphore.Weighted
 	logger      *log.Entry
 	rabbitMQURL string
 	consumer    *tackle.Consumer
 }
 
-func NewEventRouter(rabbitMQURL string) *EventRouter {
+func NewEventRouter(registry *registry.Registry, rabbitMQURL string) *EventRouter {
 	return &EventRouter{
+		registry:    registry,
 		semaphore:   semaphore.NewWeighted(25),
 		logger:      log.WithFields(log.Fields{"worker": "EventRouter"}),
 		rabbitMQURL: rabbitMQURL,
@@ -308,7 +311,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 
 	var queueItems []models.CanvasNodeQueueItem
 	for _, edge := range outgoingEdges {
-		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
+		targetNode, err := w.findTargetNode(tx, canvas, edge.TargetID)
 		if err != nil {
 			return nil, uuid.Nil, err
 		}
@@ -369,7 +372,7 @@ func (w *EventRouter) processExecutionEvent(
 	var createdQueueItems []models.CanvasNodeQueueItem
 	outgoingEdges := findOutgoingEdges(edges, execution.NodeID, event.Channel)
 	for _, edge := range outgoingEdges {
-		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
+		targetNode, err := w.findTargetNode(tx, canvas, edge.TargetID)
 		if err != nil {
 			return nil, err
 		}
@@ -399,4 +402,22 @@ func (w *EventRouter) processExecutionEvent(
 	}
 
 	return createdQueueItems, nil
+}
+
+func (w *EventRouter) findTargetNode(tx *gorm.DB, canvas *models.Canvas, nodeID string) (*models.CanvasNode, error) {
+	node, err := models.FindCanvasNode(tx, canvas.ID, nodeID)
+	if err != nil || !node.IsHostedCreditBlocked() {
+		return node, err
+	}
+
+	// A locked target must retry the event rather than mark it routed without
+	// its queue item. Reload under the lock before validating or changing state.
+	node, err = models.LockCanvasNode(tx, canvas.ID, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	if err := recoverHostedCreditNode(tx, w.registry, canvas, node); err != nil {
+		return nil, err
+	}
+	return node, nil
 }

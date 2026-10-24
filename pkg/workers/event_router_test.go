@@ -19,9 +19,9 @@ import (
 func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	amqpURL, _ := config.RabbitMQURL()
 
-	router := NewEventRouter(amqpURL)
-	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
+	router := NewEventRouter(r.Registry, amqpURL)
+	logger := log.NewEntry(log.New())
 
 	queueConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemCreatedRoutingKey)
 	queueConsumer.Start()
@@ -88,9 +88,9 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T) {
 	amqpURL, _ := config.RabbitMQURL()
 
-	router := NewEventRouter(amqpURL)
-	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
+	router := NewEventRouter(r.Registry, amqpURL)
+	logger := log.NewEntry(log.New())
 
 	queueConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemCreatedRoutingKey)
 	queueConsumer.Start()
@@ -136,9 +136,9 @@ func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T)
 func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	amqpURL, _ := config.RabbitMQURL()
 
-	router := NewEventRouter(amqpURL)
-	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
+	router := NewEventRouter(r.Registry, amqpURL)
+	logger := log.NewEntry(log.New())
 
 	queueConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemCreatedRoutingKey)
 	queueConsumer.Start()
