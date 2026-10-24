@@ -304,6 +304,8 @@ func requireInvitationCapacity(tx *gorm.DB, orgID uuid.UUID, alreadyPending bool
 }
 
 func prepareInvitation(tx *gorm.DB, invitation *models.OrganizationInvitation, now time.Time) (string, error) {
+	// Match PostgreSQL precision so the response and refreshed list identify the same link.
+	now = now.UTC().Truncate(time.Microsecond)
 	settings, err := models.GetInstallationMetadata(tx)
 	if err != nil {
 		return "", err
