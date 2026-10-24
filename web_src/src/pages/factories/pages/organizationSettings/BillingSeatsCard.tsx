@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { BillingSeatPurchaseLimit } from "./BillingSeatPurchaseStatus";
 import { billingPeriodEndLabel } from "../../lib/billingPlans";
@@ -13,7 +12,6 @@ type BillingSeatsCardProps = {
   canManageBilling: boolean;
   canBuySeats: boolean;
   onBuySeats: () => void;
-  purchaseFeedback?: ReactNode;
 };
 
 export function BillingSeatsCard({
@@ -23,7 +21,6 @@ export function BillingSeatsCard({
   canManageBilling,
   canBuySeats,
   onBuySeats,
-  purchaseFeedback,
 }: BillingSeatsCardProps) {
   const date = billingPeriodEndLabel(currentPeriodEnd);
   const estimate = renewalEstimate(seats, date);
@@ -78,7 +75,6 @@ export function BillingSeatsCard({
           ) : (
             <Button onClick={onBuySeats}>Buy seats</Button>
           ))}
-        {purchaseFeedback}
       </div>
     </FactorySettingsCard>
   );

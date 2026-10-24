@@ -22,6 +22,7 @@ export type BillingSeatPurchaseDialogProps = {
   purchasableSeats?: number;
   planMaximumSeats?: number;
   cancelAtPeriodEnd: boolean;
+  purchasesAllowed?: boolean;
   paymentPending: boolean;
   paymentError?: string;
   onUpdatePaymentMethod: () => void;
@@ -32,12 +33,13 @@ export function BillingSeatPurchaseDialog({
   purchasableSeats,
   planMaximumSeats,
   cancelAtPeriodEnd,
+  purchasesAllowed = true,
   paymentPending,
   paymentError,
   onUpdatePaymentMethod,
 }: BillingSeatPurchaseDialogProps) {
   const visiblePurchase = recentSeatPurchase(purchase.purchase);
-  const showForm = canShowPurchaseForm({ purchase, purchasableSeats, cancelAtPeriodEnd });
+  const showForm = purchasesAllowed && canShowPurchaseForm({ purchase, purchasableSeats, cancelAtPeriodEnd });
   const blocked = purchase.submitting || paymentPending;
 
   return (
@@ -47,11 +49,15 @@ export function BillingSeatPurchaseDialog({
           <DialogTitle>Buy seats</DialogTitle>
           <DialogDescription>Add seats to your current subscription.</DialogDescription>
         </DialogHeader>
-        <PurchaseAvailability
-          cancelAtPeriodEnd={cancelAtPeriodEnd}
-          purchasableSeats={purchasableSeats}
-          planMaximumSeats={planMaximumSeats}
-        />
+        {!purchasesAllowed ? (
+          <p role="status">Seat purchases are unavailable until the subscription is active.</p>
+        ) : (
+          <PurchaseAvailability
+            cancelAtPeriodEnd={cancelAtPeriodEnd}
+            purchasableSeats={purchasableSeats}
+            planMaximumSeats={planMaximumSeats}
+          />
+        )}
         {showForm && <SeatPurchaseForm purchase={purchase} maximum={purchasableSeats} disabled={blocked} />}
         {purchase.previewError && <p role="alert">{purchase.previewError}</p>}
         <BillingSeatPurchaseStatus

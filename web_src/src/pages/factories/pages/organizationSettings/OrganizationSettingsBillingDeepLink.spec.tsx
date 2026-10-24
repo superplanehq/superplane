@@ -1,7 +1,7 @@
 import { within } from "@testing-library/react";
 import type { OrganizationsDescribeOrganizationBillingResponse } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { TEAM_ORGANIZATION_BILLING } from "../../__fixtures__/usageReportFixtures";
@@ -15,6 +15,7 @@ let newBilling = true;
 const previewPurchase = vi.fn();
 const purchaseSeats = vi.fn();
 const refetch = vi.fn();
+const syncBilling = vi.fn();
 
 vi.mock("@/api-client", () => ({
   organizationsPreviewSeatPurchase: previewPurchase,
@@ -41,7 +42,7 @@ vi.mock("@/hooks/useOrganizationBilling", () => ({
     onCancelSubscription: vi.fn(),
     onKeepSubscription: vi.fn(),
   }),
-  syncOrganizationBilling: vi.fn(),
+  syncOrganizationBilling: syncBilling,
 }));
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
   useOrganizationWorkspaceUsage: () => ({ data: {}, isLoading: false, refetch }),
@@ -102,6 +103,7 @@ beforeEach(() => {
   newBilling = true;
   previewPurchase.mockReset().mockResolvedValue({ data: { purchasedSeats: 10, targetSeats: 11 } });
   purchaseSeats.mockReset();
+  syncBilling.mockReset().mockImplementation(async () => billing);
 });
 
 describe("billing purchase deep-link readiness", () => {
@@ -162,9 +164,9 @@ describe("billing purchase deep-link readiness", () => {
       },
     };
     render(<BillingRoute client={new QueryClient()} />);
-    const card = await screen.findByTestId("billing-seats");
-    if (visible) expect(within(card).getByText(message)).toBeInTheDocument();
-    else expect(within(card).queryByText(message)).not.toBeInTheDocument();
+    await screen.findByTestId("billing-seats");
+    if (visible) expect(screen.getByText(message)).toBeInTheDocument();
+    else expect(screen.queryByText(message)).not.toBeInTheDocument();
   });
 
   it("does not revive an old payment failure when the dialog opens", async () => {
@@ -203,12 +205,57 @@ describe("billing purchase deep-link readiness", () => {
       };
       render(<BillingRoute client={new QueryClient()} />);
       const card = await screen.findByTestId("billing-seats");
-      expect(card).toHaveTextContent("Confirm the payment with your bank.");
-      if (canManage) expect(within(card).getByRole("button", { name: "Update payment method" })).toBeInTheDocument();
-      else expect(within(card).queryByRole("button", { name: "Update payment method" })).not.toBeInTheDocument();
+      expect(screen.getByText("Confirm the payment with your bank.")).toBeInTheDocument();
+      if (canManage) expect(screen.getByRole("button", { name: "Update payment method" })).toBeInTheDocument();
+      else expect(screen.queryByRole("button", { name: "Update payment method" })).not.toBeInTheDocument();
       expect(within(card).queryByRole("button", { name: "Buy seats" })).not.toBeInTheDocument();
       expect(previewPurchase).not.toHaveBeenCalled();
       expect(purchaseSeats).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["past_due", "paused"])(
+    "keeps timed-out purchase recovery visible after the subscription becomes %s",
+    async (status) => {
+      const client = new QueryClient();
+      const view = render(<BillingRoute client={client} />);
+      const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
+      await waitFor(() =>
+        expect(screen.getByRole<HTMLButtonElement>("button", { name: "Confirm purchase" }).disabled).toBe(false),
+      );
+      billing = {
+        ...billing,
+        lastSeatPurchase: {
+          id: "pending-purchase",
+          status: "awaiting_confirmation",
+          createdAt: new Date().toISOString(),
+        },
+      };
+      purchaseSeats.mockResolvedValue({ data: { billing, purchase: billing.lastSeatPurchase } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Confirm purchase" }));
+      await within(dialog).findByText("Waiting for payment confirmation.");
+      billing = { ...billing, polarSubscriptionStatus: status, creditPurchaseAllowed: false };
+      view.rerender(<BillingRoute client={client} />);
+      expect(screen.getByRole("dialog", { name: "Buy seats" })).toBeInTheDocument();
+      expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("button", { name: "Confirm purchase" })).not.toBeInTheDocument();
+      vi.useFakeTimers();
+      try {
+        // Re-enter the polling effect with an already expired window.
+        vi.setSystemTime(Date.now() + 120_001);
+        billing = { ...billing, lastSeatPurchase: { ...billing.lastSeatPurchase, status: "pending" } };
+        view.rerender(<BillingRoute client={client} />);
+        await act(async () => {});
+      } finally {
+        vi.useRealTimers();
+      }
+      fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+      expect(screen.getByText("Waiting for payment confirmation.")).toBeInTheDocument();
+      const requestsBeforeRefresh = syncBilling.mock.calls.length;
+      fireEvent.click(screen.getByRole("button", { name: "Refresh billing" }));
+      await waitFor(() => expect(syncBilling).toHaveBeenCalledTimes(requestsBeforeRefresh + 1));
+      expect(purchaseSeats).toHaveBeenCalledTimes(1);
+      expect(previewPurchase).toHaveBeenCalledTimes(1);
     },
   );
 });

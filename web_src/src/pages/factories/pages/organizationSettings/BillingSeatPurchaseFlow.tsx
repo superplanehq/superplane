@@ -9,6 +9,7 @@ import { recentSeatPurchase } from "@/lib/seatPurchases";
 import { BillingSeatPurchaseDialog } from "./BillingSeatPurchaseDialog";
 import { BillingSeatPurchaseStatus } from "./BillingSeatPurchaseStatus";
 import { BillingSeatsCard } from "./BillingSeatsCard";
+import { FactorySettingsCard } from "../settings/FactorySettingsCard";
 import type { BillingSeatSummary } from "./useOrganizationBillingPageModel";
 
 type BillingSeatPurchaseFlowProps = {
@@ -34,6 +35,8 @@ export function BillingSeatPurchaseFlow(props: BillingSeatPurchaseFlowProps) {
     pollingEnabled: newBilling && canManageBilling,
   });
   const cardSetup = useBillingCardSetup(organizationId);
+  const canRecoverPurchase = newBilling && canManageBilling;
+  const updatePaymentMethod = () => cardSetup.open(() => purchase.setAdditionalSeats(purchase.additionalSeats));
   const denied = useSeatPurchaseDeepLink({
     organizationId,
     canBuySeats,
@@ -53,28 +56,29 @@ export function BillingSeatPurchaseFlow(props: BillingSeatPurchaseFlowProps) {
           canManageBilling={canManageBilling}
           canBuySeats={canBuySeats}
           onBuySeats={() => purchase.setOpen(true)}
-          purchaseFeedback={
-            <BillingSeatPurchaseFeedback
-              purchase={purchase}
-              cardSetup={cardSetup}
-              canUpdatePaymentMethod={newBilling && canManageBilling}
-            />
-          }
         />
       )}
+      <BillingSeatPurchaseFeedback
+        purchase={purchase}
+        cardSetup={cardSetup}
+        canRecoverPurchase={canRecoverPurchase}
+        onUpdatePaymentMethod={updatePaymentMethod}
+      />
     </>
   );
-  const dialog = canBuySeats ? (
-    <BillingSeatPurchaseDialog
-      purchase={purchase}
-      purchasableSeats={billing?.purchasableSeats}
-      planMaximumSeats={billing?.planMaximumSeats}
-      cancelAtPeriodEnd={cancelAtPeriodEnd}
-      paymentPending={cardSetup.isPending}
-      paymentError={cardSetup.error}
-      onUpdatePaymentMethod={() => cardSetup.open()}
-    />
-  ) : null;
+  const dialog =
+    canRecoverPurchase && (canBuySeats || purchase.isOpen) ? (
+      <BillingSeatPurchaseDialog
+        purchase={purchase}
+        purchasableSeats={billing?.purchasableSeats}
+        planMaximumSeats={billing?.planMaximumSeats}
+        cancelAtPeriodEnd={cancelAtPeriodEnd}
+        purchasesAllowed={canBuySeats}
+        paymentPending={cardSetup.isPending}
+        paymentError={cardSetup.error}
+        onUpdatePaymentMethod={updatePaymentMethod}
+      />
+    ) : null;
   return props.children(seatsCard, dialog);
 }
 
@@ -126,28 +130,32 @@ function useSeatPurchaseDeepLink({
 function BillingSeatPurchaseFeedback({
   purchase,
   cardSetup,
-  canUpdatePaymentMethod,
+  canRecoverPurchase,
+  onUpdatePaymentMethod,
 }: {
   purchase: UseSeatPurchaseResult;
   cardSetup: ReturnType<typeof useBillingCardSetup>;
-  canUpdatePaymentMethod: boolean;
+  canRecoverPurchase: boolean;
+  onUpdatePaymentMethod: () => void;
 }) {
   const visiblePurchase = recentSeatPurchase(purchase.purchase);
-  if (!visiblePurchase) return null;
+  if (!visiblePurchase && !purchase.submissionUnresolved) return null;
   return (
-    <>
+    <FactorySettingsCard title="Seat purchase" data-testid="billing-seat-purchase">
       <BillingSeatPurchaseStatus
         purchase={visiblePurchase}
-        timedOut={purchase.timedOut}
+        message={purchase.submissionUnresolved ? purchase.purchaseMessage : undefined}
+        timedOut={canRecoverPurchase && purchase.timedOut}
+        submissionUnresolved={canRecoverPurchase && purchase.submissionUnresolved}
         refreshing={purchase.refreshing}
         paymentPending={cardSetup.isPending}
         onRefresh={purchase.refreshBilling}
-        onUpdatePaymentMethod={canUpdatePaymentMethod ? () => cardSetup.open() : undefined}
+        onUpdatePaymentMethod={canRecoverPurchase ? onUpdatePaymentMethod : undefined}
       />
       {!purchase.isOpen && cardSetup.isPending && (
         <p role="status">Update your card in the payment window, then close it.</p>
       )}
       {!purchase.isOpen && cardSetup.error && <p role="alert">{cardSetup.error}</p>}
-    </>
+    </FactorySettingsCard>
   );
 }

@@ -201,6 +201,73 @@ describe("Organization billing seat purchases", () => {
     expect(purchaseRequests.filter((url) => url.endsWith("/purchase"))).toHaveLength(0);
   });
 
+  it.each(["failed", "action_required"])(
+    "requires a fresh estimate and explicit confirmation after replacing a %s card",
+    async (status) => {
+      const user = userEvent.setup();
+      const configuredFetch = client.getConfig().fetch;
+      const popup = { closed: false, close: vi.fn(), location: { replace: vi.fn() }, opener: null };
+      const openPopup = vi.spyOn(window, "open").mockReturnValue(popup as unknown as Window);
+      const failed = {
+        id: "declined-purchase",
+        status,
+        message: "Replace your card.",
+        createdAt: new Date().toISOString(),
+      };
+      let attempts = 0;
+      client.setConfig({
+        fetch: (input, init) => {
+          const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+          const response = (body: unknown, status = 200) =>
+            Promise.resolve(
+              new Response(JSON.stringify(body), {
+                status,
+                headers: { "Content-Type": "application/json" },
+              }),
+            );
+          if (url.endsWith("/billing/seats/purchase")) {
+            attempts += 1;
+            if (attempts === 1) return response({ message: failed.message }, 412);
+          }
+          if (attempts === 1 && (url.endsWith("/billing") || url.endsWith("/billing/sync"))) {
+            return response({ ...TEAM_ORGANIZATION_BILLING, hasPaymentMethod: true, lastSeatPurchase: failed });
+          }
+          if (url.endsWith("/billing/payment-method-session")) {
+            return response({ portalUrl: "https://polar.example/portal" });
+          }
+          return (configuredFetch ?? window.fetch)(input, init);
+        },
+      });
+      try {
+        renderBilling(
+          { ...TEAM_ORGANIZATION_BILLING, hasPaymentMethod: true },
+          { newBilling: true, query: "?buySeats=1" },
+        );
+        const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
+        const confirm = () => screen.getByRole<HTMLButtonElement>("button", { name: "Confirm purchase" });
+        await waitFor(() => expect(confirm().disabled).toBe(false));
+        await user.click(confirm());
+        await within(dialog).findByText(failed.message);
+        expect(confirm().disabled).toBe(true);
+        const estimatesBeforeSetup = purchaseRequests.filter((url) => url.endsWith("/preview")).length;
+        await user.click(within(dialog).getByRole("button", { name: "Update payment method" }));
+        await waitFor(() => expect(popup.location.replace).toHaveBeenCalled());
+        expect(attempts).toBe(1);
+        popup.closed = true;
+        await waitFor(() => expect(confirm().disabled).toBe(false), { timeout: 4000 });
+        expect(within(dialog).getByRole("spinbutton", { name: "Additional seats" })).toHaveValue(1);
+        expect(purchaseRequests.filter((url) => url.endsWith("/preview"))).toHaveLength(estimatesBeforeSetup + 1);
+        expect(attempts).toBe(1);
+        await user.click(confirm());
+        await within(dialog).findByText("Seats added.");
+        expect(attempts).toBe(2);
+      } finally {
+        client.setConfig({ fetch: configuredFetch });
+        openPopup.mockRestore();
+      }
+    },
+  );
+
   it("keeps the purchase form when a new attempt is rejected after an earlier success", async () => {
     const user = userEvent.setup();
     const message = "Seat purchases pause while the subscription renews. Try again after renewal.";
