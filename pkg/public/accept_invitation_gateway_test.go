@@ -65,9 +65,10 @@ func TestInvitationGatewayReportsPastDuePayment(t *testing.T) {
 	db := database.Conn()
 	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
-	require.NoError(t, err)
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
+		"plan_id":                   plan.ID,
+		"plan":                      plan.Key,
+		"plan_source":               models.BillingPlanSourceAdmin,
 		"purchased_seats":           3,
 		"polar_subscription_status": models.PolarSubscriptionStatusPastDue,
 	}).Error)
