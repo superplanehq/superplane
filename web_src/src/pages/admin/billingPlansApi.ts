@@ -1,3 +1,5 @@
+import { getResponseErrorMessage } from "@/lib/errors";
+
 export type BillingPlan = {
   id?: string;
   key: string;
@@ -41,7 +43,7 @@ export async function billingCatalogRequest<T>(path: string, method = "GET", bod
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!response.ok) throw new Error((await response.text()) || "Failed to update billing catalog");
+  if (!response.ok) throw new Error(await getResponseErrorMessage(response, "Failed to update billing catalog"));
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }

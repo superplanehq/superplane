@@ -1,8 +1,19 @@
 package public
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"maps"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -13,8 +24,6 @@ import (
 	"gorm.io/gorm"
 	"net/http"
 	"net/http/httptest"
-	"testing"
-	"time"
 )
 
 func TestAdminCatalogAuthorizationAndAssignment(t *testing.T) {
@@ -473,4 +482,243 @@ func TestAdminBillingPlanInactiveSubscriptionAssignmentBlocksDeletion(t *testing
 	response = request("DELETE", "billing-plans/"+plan.ID.String(), "")
 	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
 	require.Contains(t, response.Body.String(), models.BillingPlanDeleteReasonAssigned)
+}
+
+// requireBillingPlanJSONError checks a billing-plan error response and returns its message.
+func requireBillingPlanJSONError(t *testing.T, response *httptest.ResponseRecorder, status int) string {
+	t.Helper()
+	require.Equal(t, status, response.Code, response.Body.String())
+	require.Equal(t, "application/json", response.Header().Get("Content-Type"))
+	var body struct {
+		Message string `json:"message"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body), response.Body.String())
+	require.NotEmpty(t, body.Message)
+	return body.Message
+}
+
+// billingPlanBody returns a valid plan payload. Fields in overrides replace the defaults.
+func billingPlanBody(t *testing.T, overrides map[string]any) string {
+	t.Helper()
+	fields := map[string]any{"name": "Plan", "category": "paid", "visibility": "private", "credit_frequency": "none", "credit_expiration": "never"}
+	maps.Copy(fields, overrides)
+	body, err := json.Marshal(fields)
+	require.NoError(t, err)
+	return string(body)
+}
+
+// memorySentryEvents records Sentry events sent by the test client.
+type memorySentryEvents struct {
+	mu     sync.Mutex
+	events []*sentry.Event
+}
+
+func (m *memorySentryEvents) Configure(sentry.ClientOptions) {}
+
+func (m *memorySentryEvents) Flush(time.Duration) bool { return true }
+
+func (m *memorySentryEvents) SendEvent(event *sentry.Event) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	clone := *event
+	m.events = append(m.events, &clone)
+}
+
+func (m *memorySentryEvents) Events() []*sentry.Event {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]*sentry.Event(nil), m.events...)
+}
+
+func bindAdminSentryEvents(t *testing.T) *memorySentryEvents {
+	t.Helper()
+	transport := &memorySentryEvents{}
+	client, err := sentry.NewClient(sentry.ClientOptions{Dsn: "https://public@localhost/1", Transport: transport})
+	require.NoError(t, err)
+	hub := sentry.CurrentHub()
+	previous := hub.Client()
+	hub.BindClient(client)
+	t.Cleanup(func() { hub.BindClient(previous) })
+	return transport
+}
+
+// captureAdminErrorLogs returns the buffer that receives the request logger output.
+func captureAdminErrorLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buffer := &bytes.Buffer{}
+	logger := log.StandardLogger()
+	previous := logger.Out
+	logger.SetOutput(buffer)
+	t.Cleanup(func() { logger.SetOutput(previous) })
+	return buffer
+}
+
+func sentryExceptionValues(event *sentry.Event) []string {
+	values := make([]string, 0, len(event.Exception))
+	for _, exception := range event.Exception {
+		values = append(values, exception.Value)
+	}
+	return values
+}
+
+// failBillingPlanWrite makes a trigger raise an error for one plan key. The
+// database returns the detail, so the test can check it stays out of responses.
+func failBillingPlanWrite(t *testing.T, name, event, rowCondition string) {
+	t.Helper()
+	db := database.Conn()
+	require.NoError(t, db.Exec(`CREATE OR REPLACE FUNCTION fail_billing_plan_write() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'billing plan storage detail'; END $$`).Error)
+	require.NoError(t, db.Exec(fmt.Sprintf(`CREATE TRIGGER %s BEFORE %s ON billing_plans FOR EACH ROW WHEN (%s) EXECUTE FUNCTION fail_billing_plan_write()`, name, event, rowCondition)).Error)
+	t.Cleanup(func() {
+		require.NoError(t, db.Exec(fmt.Sprintf(`DROP TRIGGER IF EXISTS %s ON billing_plans`, name)).Error)
+		require.NoError(t, db.Exec(`DROP FUNCTION IF EXISTS fail_billing_plan_write()`).Error)
+	})
+}
+
+// failQueriesOnTable makes GORM queries on one table return an error.
+func failQueriesOnTable(t *testing.T, table string) {
+	t.Helper()
+	db := database.Conn()
+	callbackName := "test:fail_queries_on_" + table
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if tx.Statement.Table == table {
+			tx.AddError(errors.New("billing list storage detail"))
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callbackName)) })
+}
+
+func TestAdminBillingPlanErrorsAreJSON(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	request := newAdminCatalogRequest(server, token)
+	var trial models.BillingPlan
+	require.NoError(t, database.Conn().Where("key = ?", "trial").First(&trial).Error)
+	missing := uuid.NewString()
+	validBody := billingPlanBody(t, map[string]any{"key": "json_errors_missing", "name": "Missing"})
+
+	for _, tc := range []struct {
+		name    string
+		method  string
+		path    string
+		body    string
+		status  int
+		message string
+	}{
+		{"malformed body", "POST", "billing-plans", `{`, http.StatusBadRequest, "Invalid billing plan"},
+		{"invalid update ID", "PUT", "billing-plans/not-a-uuid", validBody, http.StatusBadRequest, "Invalid billing plan ID"},
+		{"invalid delete ID", "DELETE", "billing-plans/not-a-uuid", "", http.StatusBadRequest, "Invalid billing plan ID"},
+		{"model validation", "POST", "billing-plans", billingPlanBody(t, map[string]any{"key": "Invalid Key"}), http.StatusBadRequest, "a valid key and name are required"},
+		{"missing update target", "PUT", "billing-plans/" + missing, validBody, http.StatusNotFound, "Billing plan not found"},
+		{"missing delete target", "DELETE", "billing-plans/" + missing, "", http.StatusNotFound, "Billing plan not found"},
+		{"blocked deletion", "DELETE", "billing-plans/" + trial.ID.String(), "", http.StatusBadRequest, models.BillingPlanDeleteReasonSystem},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			response := request(tc.method, tc.path, tc.body)
+			message := requireBillingPlanJSONError(t, response, tc.status)
+			require.Contains(t, message, tc.message)
+			require.NotContains(t, message, models.ErrCatalogPlan.Error())
+		})
+	}
+}
+
+func TestAdminBillingPlanConflictsReturnBadRequestAndKeepRows(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	request := newAdminCatalogRequest(server, token)
+	db := database.Conn()
+	suffix := strings.ReplaceAll(uuid.NewString(), "-", "")
+	keyA, keyB, keyC := "conflict_a_"+suffix, "conflict_b_"+suffix, "conflict_c_"+suffix
+	productA := "prod_a_" + suffix
+	const keyMessage = "This plan key already exists. Enter a different key."
+	const productMessage = "This Polar product is already linked to another plan. Select a different product."
+	t.Cleanup(func() {
+		require.NoError(t, db.Where("key IN ?", []string{keyA, keyB, keyC}).Delete(&models.BillingPlan{}).Error)
+	})
+
+	createAdminTestPlan(t, request, billingPlanBody(t, map[string]any{"key": keyA, "polar_product_id": productA}))
+
+	response := request("POST", "billing-plans", billingPlanBody(t, map[string]any{"key": keyA, "name": "Duplicate key"}))
+	require.Equal(t, keyMessage, requireBillingPlanJSONError(t, response, http.StatusBadRequest))
+	var count int64
+	require.NoError(t, db.Model(&models.BillingPlan{}).Where("key = ?", keyA).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+
+	response = request("POST", "billing-plans", billingPlanBody(t, map[string]any{"key": keyB, "polar_product_id": productA}))
+	require.Equal(t, productMessage, requireBillingPlanJSONError(t, response, http.StatusBadRequest))
+	_, err := models.FindBillingPlan(db, keyB)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	unlinked := createAdminTestPlan(t, request, billingPlanBody(t, map[string]any{"key": keyC}))
+	before, err := models.FindBillingPlan(db, keyC)
+	require.NoError(t, err)
+	unlinked.PolarProductID = &productA
+	body, err := json.Marshal(unlinked)
+	require.NoError(t, err)
+	response = request("PUT", "billing-plans/"+unlinked.ID.String(), string(body))
+	require.Equal(t, productMessage, requireBillingPlanJSONError(t, response, http.StatusBadRequest))
+	after, err := models.FindBillingPlan(db, keyC)
+	require.NoError(t, err)
+	require.Equal(t, before, after, "rejected update must not change the stored plan")
+	linked, err := models.FindBillingPlanByProduct(db, productA)
+	require.NoError(t, err)
+	require.Equal(t, keyA, linked.Key)
+}
+
+func TestAdminBillingPlanUnexpectedSaveErrorIsReported(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	request := newAdminCatalogRequest(server, token)
+	const key = "storage_failure_plan"
+	const planName = "Customer pricing draft"
+	failBillingPlanWrite(t, "fail_billing_plan_insert", "INSERT", "NEW.key = '"+key+"'")
+	t.Cleanup(func() {
+		require.NoError(t, database.Conn().Where("key = ?", key).Delete(&models.BillingPlan{}).Error)
+	})
+	logs := captureAdminErrorLogs(t)
+	reports := bindAdminSentryEvents(t)
+
+	response := request("POST", "billing-plans", billingPlanBody(t, map[string]any{"key": key, "name": planName}))
+	message := requireBillingPlanJSONError(t, response, http.StatusInternalServerError)
+	require.NotContains(t, message, "storage")
+	require.NotContains(t, response.Body.String(), planName)
+
+	require.Contains(t, logs.String(), "billing plan storage detail")
+	events := reports.Events()
+	require.Len(t, events, 1)
+	require.Contains(t, sentryExceptionValues(events[0]), "ERROR: billing plan storage detail (SQLSTATE P0001)")
+	payload, err := json.Marshal(events[0])
+	require.NoError(t, err)
+	require.NotContains(t, string(payload), planName, "error reports must omit the request body")
+}
+
+func TestAdminBillingPlanUnexpectedErrorsReturnSafeJSON(t *testing.T) {
+	const detail = "billing plan storage detail"
+
+	t.Run("delete", func(t *testing.T) {
+		server, _, token := setupAdminTestServer(t)
+		request := newAdminCatalogRequest(server, token)
+		const key = "delete_failure_plan"
+		plan := createAdminTestPlan(t, request, billingPlanBody(t, map[string]any{"key": key}))
+		t.Cleanup(func() {
+			require.NoError(t, database.Conn().Where("key = ?", key).Delete(&models.BillingPlan{}).Error)
+		})
+		failBillingPlanWrite(t, "fail_billing_plan_delete", "DELETE", "OLD.key = '"+key+"'")
+
+		response := request("DELETE", "billing-plans/"+plan.ID.String(), "")
+		message := requireBillingPlanJSONError(t, response, http.StatusInternalServerError)
+		require.NotContains(t, message, "storage")
+		require.NotContains(t, response.Body.String(), detail)
+		_, err := models.FindBillingPlan(database.Conn(), key)
+		require.NoError(t, err)
+	})
+
+	for _, table := range []string{"billing_plans", "organization_billing_plans"} {
+		t.Run("list "+table, func(t *testing.T) {
+			server, _, token := setupAdminTestServer(t)
+			request := newAdminCatalogRequest(server, token)
+			failQueriesOnTable(t, table)
+
+			response := request("GET", "billing-plans", "")
+			message := requireBillingPlanJSONError(t, response, http.StatusInternalServerError)
+			require.NotContains(t, message, "storage")
+			require.NotContains(t, response.Body.String(), detail)
+		})
+	}
 }

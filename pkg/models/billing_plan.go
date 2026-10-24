@@ -10,12 +10,21 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 var ErrCatalogPlan = errors.New("invalid billing catalog plan")
 var catalogKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// pgUniqueViolation is the PostgreSQL SQLSTATE for unique constraint violations.
+const pgUniqueViolation = "23505"
+
+const (
+	billingPlanKeyConflictMessage     = "This plan key already exists. Enter a different key."
+	billingPlanProductConflictMessage = "This Polar product is already linked to another plan. Select a different product."
+)
 
 const (
 	BillingPlanDeleteReasonSystem   = "System plans cannot be deleted."
@@ -116,7 +125,7 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 	if err := validateBillingPlan(plan); err != nil {
 		return err
 	}
-	return tx.Transaction(func(inner *gorm.DB) error {
+	err := tx.Transaction(func(inner *gorm.DB) error {
 		if err := lockPlanFeatureReferences(inner, plan.Features); err != nil {
 			return err
 		}
@@ -140,6 +149,23 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 		plan.CreatedAt = current.CreatedAt
 		return inner.Save(plan).Error
 	})
+	return billingPlanConflictError(err)
+}
+
+// billingPlanConflictError maps the unique constraints on plan keys and Polar
+// products to user-facing catalog errors. Other errors pass through unchanged.
+func billingPlanConflictError(err error) error {
+	var conflict *pgconn.PgError
+	if !errors.As(err, &conflict) || conflict.Code != pgUniqueViolation {
+		return err
+	}
+	switch conflict.ConstraintName {
+	case "billing_plans_key_key":
+		return fmt.Errorf("%w: %s", ErrCatalogPlan, billingPlanKeyConflictMessage)
+	case "billing_plans_polar_product_id_key":
+		return fmt.Errorf("%w: %s", ErrCatalogPlan, billingPlanProductConflictMessage)
+	}
+	return err
 }
 
 // DeleteBillingPlan removes a plan when no deletion rule blocks it. The row
