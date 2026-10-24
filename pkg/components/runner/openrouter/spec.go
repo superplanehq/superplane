@@ -77,14 +77,14 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 	return err
 }
 
-// OpenRouterBrokerTask is the ordered broker commands and task files for a run.
-type OpenRouterBrokerTask struct {
-	Commands []runner.BrokerCommand
-	Files    []runner.BrokerTaskFile
+// OpenRouterTask is the ordered runner commands and task files for a run.
+type OpenRouterTask struct {
+	Commands []runner.TaskCommand
+	Files    []runner.TaskFile
 }
 
-func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) OpenRouterBrokerTask {
-	commands, files := runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
+func buildOpenRouterTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) OpenRouterTask {
+	commands, files := runner.BuildAgentTask(runner.AgentTaskInput{
 		PrepareName:      "Prepare OpenRouter agent",
 		PrepareScript:    runner.NodePrepareScript("opencode", opencodeMissingMessage, spec.WorkingDirectory),
 		RunScriptName:    "run.js",
@@ -101,22 +101,22 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []ru
 			return runner.PromptNodeCommand(promptName, model, spec.ThinkingLevel)
 		},
 	})
-	return OpenRouterBrokerTask{Commands: commands, Files: files}
+	return OpenRouterTask{Commands: commands, Files: files}
 }
 
-func BuildBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup) OpenRouterBrokerTask {
-	return buildOpenRouterBrokerTask(spec, usage, setups, nil, nil, false)
+func BuildBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup) OpenRouterTask {
+	return buildOpenRouterTask(spec, usage, setups, nil, nil, false)
 }
 
-func BuildDispatchedBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) OpenRouterBrokerTask {
-	return buildOpenRouterBrokerTask(spec, usage, setups, dispatched, attachments, inspectImages)
+func BuildDispatchedBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) OpenRouterTask {
+	return buildOpenRouterTask(spec, usage, setups, dispatched, attachments, inspectImages)
 }
 
-func ApplyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterBrokerTask {
+func ApplyPlanningFollowUp(task OpenRouterTask, environment []runner.TaskEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterTask {
 	return applyPlanningFollowUp(task, environment, spec)
 }
 
-func attachPlanningSessionFiles(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable) OpenRouterBrokerTask {
+func attachPlanningSessionFiles(task OpenRouterTask, environment []runner.TaskEnvironmentVariable) OpenRouterTask {
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
 	}
@@ -129,7 +129,7 @@ func attachPlanningSessionFiles(task OpenRouterBrokerTask, environment []runner.
 // next user message, then exits so the run finishes and the session closes.
 // Line apps never attach a planning token, so they keep the default step list
 // and finish.
-func applyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterBrokerTask {
+func applyPlanningFollowUp(task OpenRouterTask, environment []runner.TaskEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterTask {
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
 	}
@@ -138,10 +138,10 @@ func applyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.Broke
 	return task
 }
 
-func planningFollowUpCommand(spec RunOpenRouterSpec) runner.BrokerCommand {
+func planningFollowUpCommand(spec RunOpenRouterSpec) runner.TaskCommand {
 	workdir := planningFollowUpWorkingDirectory(spec)
 	model := strings.TrimSpace(spec.Model)
-	return runner.BrokerCommand{
+	return runner.TaskCommand{
 		Name: "Wait for the next message",
 		Command: runner.WrapAgentStepCommand(
 			runner.WrapPromptCommandInWorkingDirectory(

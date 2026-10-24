@@ -34,20 +34,12 @@ type FleetFixture = {
   runnerTotal?: string;
   taskTotal?: string;
   runnersHaveNextPage?: boolean;
-  brokerConfigured?: boolean;
-  brokerTasks?: Array<{ id: string; status: string; fleet_id: string; created_at: string }>;
 };
 
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), {
     status: 200,
     headers: { "Content-Type": "application/json" },
-  });
-
-const brokerBody = (fleets: FleetFixture[]) =>
-  json({
-    configured: fleets[0]?.brokerConfigured ?? false,
-    tasks: fleets[0]?.brokerTasks ?? [],
   });
 
 const fleetListBody = (fleets: FleetFixture[]) =>
@@ -112,9 +104,6 @@ const fleetRecordBody = (url: URL, fleets: FleetFixture[]) => {
 };
 
 const responseFor = (url: URL, fleets: FleetFixture[]) => {
-  if (url.pathname === "/admin/api/runner/tasks") {
-    return brokerBody(fleets);
-  }
   if (url.pathname === "/admin/api/installation/fleets") {
     return fleetListBody(fleets);
   }
@@ -191,6 +180,8 @@ describe("RunnerTasks", () => {
       expect(fleetCalls(calls, "e1-tiny-arm64", "/runners").length).toBeGreaterThan(0);
     });
     expect(await screen.findByText("runner-2")).toBeInTheDocument();
+    expect(calls.some((call) => call.startsWith("/admin/api/runner/tasks"))).toBe(false);
+    expect(screen.queryByRole("heading", { name: "Task broker" })).not.toBeInTheDocument();
   });
 
   it("shows the shortage sentence and pages runners with afterId", async () => {
@@ -204,15 +195,6 @@ describe("RunnerTasks", () => {
         runners: [{ id: "runner-9", state: "idle" }],
         runnerTotal: "60",
         runnersHaveNextPage: true,
-        brokerConfigured: true,
-        brokerTasks: [
-          {
-            id: "broker-task-1",
-            status: "queued",
-            fleet_id: "legacy",
-            created_at: "2026-10-06T12:00:00Z",
-          },
-        ],
       },
     ]);
 
@@ -221,8 +203,6 @@ describe("RunnerTasks", () => {
 
     expect(await screen.findByText("More queued tasks than ready runners.")).toBeInTheDocument();
     expect(screen.getByText("Ready runners").parentElement).toHaveTextContent("2");
-    expect(await screen.findByText("broker-task-1")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Task broker" })).toBeInTheDocument();
 
     await user.click(screen.getByTestId("fleet-runners-next"));
 
@@ -266,46 +246,12 @@ describe("RunnerTasks", () => {
     expect(calls).toContain("/admin/api/installation/fleets/e1-large-amd64/runners/runner-terminated");
   });
 
-  it("keeps the task broker not-configured state", async () => {
+  it("shows an empty fleet list", async () => {
     installFetch([]);
     renderPage();
 
     expect(await screen.findByText("No machine types are configured.")).toBeInTheDocument();
     expect(screen.queryByTestId("fleet-capacity-summary")).not.toBeInTheDocument();
-    expect(await screen.findByText(/Runner task broker is not configured/)).toBeInTheDocument();
-    expect(screen.getByText("TASK_BROKER_BASE_URL")).toBeInTheDocument();
-  });
-
-  it("shows broker tasks while the fleet list is still loading", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = new URL(String(input), "http://localhost");
-        if (url.pathname === "/admin/api/installation/fleets") {
-          return new Promise<Response>(() => {});
-        }
-        if (url.pathname === "/admin/api/runner/tasks") {
-          return json({
-            configured: true,
-            tasks: [
-              {
-                id: "broker-while-loading",
-                status: "queued",
-                fleet_id: "legacy",
-                created_at: "2026-10-06T12:00:00Z",
-              },
-            ],
-          });
-        }
-        return json({});
-      }),
-    );
-
-    renderPage();
-
-    expect(await screen.findByText("broker-while-loading")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Task broker" })).toBeInTheDocument();
-    expect(screen.getByText("Loading fleets...")).toBeInTheDocument();
   });
 
   it("shows a fleet list that finishes after the next poll is due", async () => {
@@ -319,9 +265,6 @@ describe("RunnerTasks", () => {
           return new Promise<Response>((resolve) => {
             listResponses.push(resolve);
           });
-        }
-        if (url.pathname === "/admin/api/runner/tasks") {
-          return json({ configured: false, tasks: [] });
         }
         if (url.pathname.includes("/fleets/slow-fleet/runners")) {
           return runnersBody({ id: "slow-fleet", runners: [{ id: "slow-runner" }] });
@@ -367,9 +310,6 @@ describe("RunnerTasks", () => {
         if (url.pathname === "/admin/api/installation/fleets") {
           return fleetListBody([{ id: "slow-fleet" }]);
         }
-        if (url.pathname === "/admin/api/runner/tasks") {
-          return json({ configured: false, tasks: [] });
-        }
         if (url.pathname.endsWith("/capacity")) {
           capacityCalls += 1;
           return new Promise<Response>((resolve) => {
@@ -409,9 +349,6 @@ describe("RunnerTasks", () => {
         const url = new URL(String(input), "http://localhost");
         if (url.pathname === "/admin/api/installation/fleets") {
           return fleetListBody([{ id: "first-fleet" }, { id: "second-fleet" }]);
-        }
-        if (url.pathname === "/admin/api/runner/tasks") {
-          return json({ configured: false, tasks: [] });
         }
         if (
           url.pathname.includes("/fleets/") &&
@@ -474,9 +411,6 @@ describe("RunnerTasks", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = new URL(String(input), "http://localhost");
-        if (url.pathname === "/admin/api/runner/tasks") {
-          return json({ configured: false, tasks: [] });
-        }
         if (url.pathname === "/admin/api/installation/fleets") {
           return fleetListBody([{ id: "e1-large-amd64" }]);
         }

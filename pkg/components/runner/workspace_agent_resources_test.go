@@ -332,7 +332,7 @@ func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
 	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/refine.txt", Content: "Refine the request.\n", Mode: "0644"},
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n\n", Mode: "0644"},
 	})
@@ -412,7 +412,7 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing
 		Configuration: map[string]any{
 			"disabledAgentResourceIds": []any{disabled.ID.String()},
 		},
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 	require.Len(t, environment, 1)
@@ -607,7 +607,7 @@ func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
 		Configuration: map[string]any{
 			"disabledAgentResourceIds": []string{disabled.ID.String()},
 		},
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 	assert.Empty(t, environment)
@@ -634,7 +634,7 @@ func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
 	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 
@@ -686,7 +686,7 @@ func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testin
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
 		Configuration:  map[string]any{runner.SkipSetupCommandsField: true},
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 
@@ -752,7 +752,7 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledSetupAndContext(t *testing.T)
 		Configuration: map[string]any{
 			"disabledAgentResourceIds": []string{setup.ID.String(), repo.ID.String()},
 		},
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 	// The prompt stays untouched, but the checkout helper still ships: it
