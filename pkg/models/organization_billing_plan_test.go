@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -182,6 +183,121 @@ func Test__ApplyPolarSubscriptionEndsAdminBusinessOnCancel(t *testing.T) {
 	assert.Equal(t, models.BillingPlanSourcePolar, after.PlanSource)
 	assert.False(t, after.IsOpenTrial(time.Now()))
 	assert.False(t, after.IsActiveBusiness())
+}
+
+func Test__ApplyPolarSubscriptionSerializesCatalogSave(t *testing.T) {
+	newLinkedPlan := func(t *testing.T, db *gorm.DB) *models.BillingPlan {
+		t.Helper()
+		plan := &models.BillingPlan{
+			Key: "race_" + uuid.NewString()[:8], Name: "Race", Category: "paid", Visibility: "private",
+			PolarProductID: new("product_" + uuid.NewString()), PriceCents: 2000,
+			CreditFrequency: "none", CreditExpiration: "never",
+		}
+		require.NoError(t, models.SaveBillingPlan(db, plan))
+		return plan
+	}
+
+	t.Run("apply holds the plan lock and save rejects after", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		plan := newLinkedPlan(t, db)
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+		_, _, err := models.ApplyPolarSubscription(tx, r.Organization.ID, models.PolarSubscriptionApply{
+			ID: "sub_race_apply", ProductID: *plan.PolarProductID, Status: models.PolarSubscriptionStatusActive,
+		})
+		require.NoError(t, err)
+
+		changed := *plan
+		changed.PriceCents = 4000
+		saveError := runAfterCommit(t, db, tx, func(conn *gorm.DB) error {
+			return models.SaveBillingPlan(conn, &changed)
+		})
+		require.ErrorIs(t, saveError, models.ErrCatalogPlan)
+
+		stored, err := models.FindBillingPlan(db, plan.Key)
+		require.NoError(t, err)
+		require.Equal(t, int64(2000), stored.PriceCents)
+		assigned, err := models.ListAssignedBillingPlanIDs(db, []uuid.UUID{plan.ID})
+		require.NoError(t, err)
+		require.True(t, assigned.Contains(plan.ID))
+	})
+
+	t.Run("save holds the plan lock and apply re-reads the product", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		plan := newLinkedPlan(t, db)
+		productID := *plan.PolarProductID
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+		moved := *plan
+		moved.PolarProductID = new("moved_" + uuid.NewString())
+		require.NoError(t, models.SaveBillingPlan(tx, &moved))
+
+		applyError := runAfterCommit(t, db, tx, func(conn *gorm.DB) error {
+			_, _, err := models.ApplyPolarSubscription(conn, r.Organization.ID, models.PolarSubscriptionApply{
+				ID: "sub_race_save", ProductID: productID, Status: models.PolarSubscriptionStatusActive,
+			})
+			return err
+		})
+		require.ErrorContains(t, applyError, "unknown subscription product")
+
+		assigned, err := models.ListAssignedBillingPlanIDs(db, []uuid.UUID{plan.ID})
+		require.NoError(t, err)
+		require.False(t, assigned.Contains(plan.ID))
+	})
+}
+
+// runAfterCommit requires op on another connection to block on the first
+// transaction's locks, then commits the first transaction and returns the
+// error op finished with.
+func runAfterCommit(t *testing.T, db, first *gorm.DB, op func(*gorm.DB) error) error {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	pid := make(chan int, 1)
+	finished := make(chan struct{})
+	var opError error
+	go func() {
+		defer close(finished)
+		opError = db.WithContext(ctx).Connection(func(conn *gorm.DB) error {
+			var backendPID int
+			if err := conn.Raw("SELECT pg_backend_pid()").Scan(&backendPID).Error; err != nil {
+				return err
+			}
+			pid <- backendPID
+			return op(conn)
+		})
+	}()
+	defer func() { first.Rollback(); <-finished }()
+	var backendPID int
+	select {
+	case backendPID = <-pid:
+	case <-finished:
+		t.Fatalf("concurrent operation could not start: %v", opError)
+	}
+	require.Eventually(t, func() bool {
+		select {
+		case <-finished:
+			return true
+		default:
+		}
+		var blocked bool
+		err := db.Raw("SELECT cardinality(pg_blocking_pids(?)) > 0", backendPID).Scan(&blocked).Error
+		return err == nil && blocked
+	}, 5*time.Second, 10*time.Millisecond)
+	select {
+	case <-finished:
+		t.Fatalf("concurrent operation did not wait for the first transaction: %v", opError)
+	default:
+	}
+	require.NoError(t, first.Commit().Error)
+	<-finished
+	return opError
 }
 
 func Test__SetAdminOrganizationPlanAllowsPolarCustomerWithoutSubscription(t *testing.T) {

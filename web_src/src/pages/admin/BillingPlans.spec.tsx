@@ -36,6 +36,7 @@ function listedPlan(overrides: Partial<BillingPlanListItem>): BillingPlanListIte
     markup_bps: null,
     features: [],
     delete_disabled_reason: null,
+    assigned: false,
     ...overrides,
   };
 }
@@ -234,7 +235,9 @@ it("edits a linked plan in a dialog, preserves locked pricing and credit policie
       }
       return new Response(
         JSON.stringify(
-          String(input).endsWith("feature-definitions") ? [] : [{ ...plan, delete_disabled_reason: null }],
+          String(input).endsWith("feature-definitions")
+            ? []
+            : [{ ...plan, delete_disabled_reason: null, assigned: true }],
         ),
       );
     }),
@@ -258,6 +261,7 @@ it("edits a linked plan in a dialog, preserves locked pricing and credit policie
   await user.clear(screen.getByLabelText("Markup (%)", { exact: true }));
   expect(screen.getByRole("switch", { name: "Per seat" })).toBeDisabled();
   expect(screen.getByRole("combobox", { name: "Polar product" })).toBeDisabled();
+  expect(screen.getByText(/Create a new plan to change the product or price/)).toBeInTheDocument();
   await waitFor(() =>
     expect(screen.getByRole("combobox", { name: "Polar product" })).toHaveTextContent("Starter subscription"),
   );

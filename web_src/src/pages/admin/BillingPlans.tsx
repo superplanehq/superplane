@@ -34,10 +34,18 @@ const emptyPlan: BillingPlan = {
   features: [],
 };
 
+function seatLimitError(plan: BillingPlan) {
+  if (!plan.per_seat) return "";
+  const limit = plan.seat_limit;
+  if (limit !== null && Number.isInteger(limit) && limit >= 1 && limit <= 1000) return "";
+  return "Maximum seats must be an integer from 1 to 1,000.";
+}
+
 export function BillingPlans() {
   const [plans, setPlans] = useState<BillingPlanListItem[]>([]);
   const [features, setFeatures] = useState<FeatureDefinition[]>([]);
   const [editing, setEditing] = useState<BillingPlan | null>(null);
+  const [editingAssigned, setEditingAssigned] = useState(false);
   const [error, setError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -62,21 +70,17 @@ export function BillingPlans() {
   useEffect(() => {
     void load();
   }, []);
-  const editPlan = (plan: BillingPlan) => {
+  const editPlan = (plan: BillingPlan, assigned: boolean) => {
     setSaveError("");
+    setEditingAssigned(assigned);
     setEditing({ ...plan });
   };
   const save = async () => {
     if (!editing) return;
     setSaveError("");
-    if (
-      editing.per_seat &&
-      (editing.seat_limit === null ||
-        !Number.isInteger(editing.seat_limit) ||
-        editing.seat_limit < 1 ||
-        editing.seat_limit > 1000)
-    ) {
-      setSaveError("Maximum seats must be an integer from 1 to 1,000.");
+    const seatError = seatLimitError(editing);
+    if (seatError) {
+      setSaveError(seatError);
       return;
     }
     setSaving(true);
@@ -123,7 +127,7 @@ export function BillingPlans() {
             <h2 className="font-semibold">Plans</h2>
             <p className="text-sm text-muted-foreground">Set the pricing and access available to each organization.</p>
           </div>
-          <Button disabled={loading || !!error} onClick={() => editPlan(emptyPlan)}>
+          <Button disabled={loading || !!error} onClick={() => editPlan(emptyPlan, false)}>
             <Plus aria-hidden="true" />
             Create plan
           </Button>
@@ -134,7 +138,7 @@ export function BillingPlans() {
           !error && (
             <BillingPlansTable
               plans={plans}
-              onEdit={(plan) => editPlan(toEditableBillingPlan(plan))}
+              onEdit={(plan) => editPlan(toEditableBillingPlan(plan), plan.assigned)}
               onDelete={(plan) => void remove(plan)}
             />
           )
@@ -144,6 +148,7 @@ export function BillingPlans() {
       {editing && (
         <BillingPlanEditor
           plan={editing}
+          assigned={editingAssigned}
           features={features}
           onChange={setEditing}
           onSave={() => void save()}

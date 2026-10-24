@@ -578,9 +578,11 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 }
 
 // adminBillingPlanListItem is an admin list response item. It is not a
-// persisted model and the reason is never accepted as deletion authorization.
+// persisted model. The display fields are never accepted as authorization:
+// the server checks assignments again on save and delete.
 type adminBillingPlanListItem struct {
 	models.BillingPlan
+	Assigned             bool    `json:"assigned"`
 	DeleteDisabledReason *string `json:"delete_disabled_reason"`
 }
 
@@ -602,7 +604,7 @@ func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]adminBillingPlanListItem, 0, len(plans))
 	for _, plan := range plans {
-		item := adminBillingPlanListItem{BillingPlan: plan}
+		item := adminBillingPlanListItem{BillingPlan: plan, Assigned: assigned.Contains(plan.ID)}
 		if reason := plan.DeleteBlockReason(assigned.Contains(plan.ID)); reason != "" {
 			item.DeleteDisabledReason = &reason
 		}
