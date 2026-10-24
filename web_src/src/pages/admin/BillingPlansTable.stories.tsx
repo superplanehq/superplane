@@ -29,6 +29,7 @@ const basePlan: BillingPlanListItem = {
   markup_bps: null,
   features: [],
   delete_disabled_reason: null,
+  assigned: false,
 };
 
 const plans: BillingPlanListItem[] = [
@@ -61,6 +62,7 @@ const plans: BillingPlanListItem[] = [
     key: "pilot",
     name: "Pilot",
     delete_disabled_reason: assignedReason,
+    assigned: true,
   },
 ];
 
