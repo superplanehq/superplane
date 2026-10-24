@@ -17,11 +17,11 @@ import (
 )
 
 var (
-	ErrSubscriptionCheckoutDisabled = errors.New("business checkout is not configured")
+	ErrSubscriptionCheckoutDisabled = errors.New("subscription checkout is not configured")
 	ErrAdminPlanCannotCancel        = errors.New("an admin plan cannot be canceled from billing")
-	ErrSubscriptionNotCancelable    = errors.New("this organization has no business subscription to cancel")
-	ErrSubscriptionAlreadyCanceling = errors.New("business is already set to end at the period end")
-	ErrSubscriptionNotCanceling     = errors.New("business is not set to end at the period end")
+	ErrSubscriptionNotCancelable    = errors.New("this organization has no subscription to cancel")
+	ErrSubscriptionAlreadyCanceling = errors.New("the subscription is already set to end at the period end")
+	ErrSubscriptionNotCanceling     = errors.New("the subscription is not set to end at the period end")
 	// ErrSubscriptionForDeletedOrganization marks a subscription webhook for a
 	// soft-deleted organization. ApplySubscription already recorded it with the
 	// billing.subscription_for_deleted_organization log key, so the webhook
