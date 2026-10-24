@@ -309,12 +309,7 @@ function StepDuration({ duration }: { duration?: string }) {
     return null;
   }
   return (
-    <span
-      className={cn(
-        META_TEXT_CLASSNAME,
-        "ml-auto shrink-0 whitespace-nowrap text-end opacity-0 transition-opacity duration-150 group-hover/step:opacity-100",
-      )}
-    >
+    <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 whitespace-nowrap text-end tabular-nums")}>
       <span className="sr-only">Duration </span>
       {duration}
     </span>

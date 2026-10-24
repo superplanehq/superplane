@@ -28,7 +28,6 @@ describe("agentRunnerQueue", () => {
     const queue = agentRunnerQueue(agentCanvas("runnerClaudeCode"), startedRun());
 
     expect(queue).toEqual({ queued: true });
-    expect(queue.workStartedAt).toBeUndefined();
   });
 
   it("does not treat a finished agent execution as working", () => {
@@ -56,18 +55,7 @@ describe("agentRunnerQueue", () => {
           ],
         }),
       ),
-    ).toEqual({ queued: false, workStartedAt: "2026-10-13T11:10:00.000Z" });
-    expect(
-      agentRunnerQueue(
-        agentCanvas(),
-        startedRun({
-          executions: [
-            { nodeId: "trigger", state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { nodeId: "agent", state: "STATE_STARTED", createdAt: "2026-10-13T11:10:00.000Z" },
-          ],
-        }),
-      ).workEndedAt,
-    ).toBeUndefined();
+    ).toEqual({ queued: false });
   });
 
   it("shows a pending agent execution as queued before it starts", () => {
@@ -107,133 +95,5 @@ describe("agentRunnerQueue", () => {
 
   it("does not mark a finished run queued", () => {
     expect(agentRunnerQueue(agentCanvas(), startedRun({ state: "STATE_FINISHED" })).queued).toBe(false);
-  });
-
-  it("keeps the agent working interval after the execution finishes", () => {
-    expect(
-      agentRunnerQueue(
-        agentCanvas(),
-        startedRun({
-          queueItems: [],
-          executions: [
-            {
-              nodeId: "agent",
-              state: "STATE_FINISHED",
-              createdAt: "2026-10-13T11:10:00.000Z",
-              updatedAt: "2026-10-13T11:12:00.000Z",
-            },
-          ],
-        }),
-      ),
-    ).toEqual({
-      queued: false,
-      workStartedAt: "2026-10-13T11:10:00.000Z",
-      workEndedAt: "2026-10-13T11:12:00.000Z",
-    });
-  });
-
-  it("sums each agent execution and skips the wait between them", () => {
-    expect(
-      agentRunnerQueue(
-        agentCanvas(),
-        startedRun({
-          queueItems: [],
-          executions: [
-            {
-              nodeId: "access",
-              state: "STATE_FINISHED",
-              createdAt: "2026-10-13T11:02:00.000Z",
-              updatedAt: "2026-10-13T11:40:00.000Z",
-            },
-            {
-              nodeId: "agent",
-              state: "STATE_FINISHED",
-              createdAt: "2026-10-13T11:00:00.000Z",
-              updatedAt: "2026-10-13T11:02:00.000Z",
-            },
-            { nodeId: "agent", state: "STATE_STARTED", createdAt: "2026-10-13T11:40:00.000Z" },
-          ],
-        }),
-      ),
-    ).toEqual({
-      queued: false,
-      workStartedAt: "2026-10-13T11:40:00.000Z",
-      completedWorkMs: 2 * 60 * 1000,
-    });
-  });
-
-  it("adds each open agent execution instead of the earliest start", () => {
-    expect(
-      agentRunnerQueue(
-        agentCanvas(),
-        startedRun({
-          queueItems: [],
-          executions: [
-            { nodeId: "agent", state: "STATE_STARTED", createdAt: "2026-10-13T11:58:00.000Z" },
-            { nodeId: "agent", state: "STATE_STARTED", createdAt: "2026-10-13T11:59:00.000Z" },
-          ],
-        }),
-      ),
-    ).toEqual({
-      queued: false,
-      workStartedAt: "2026-10-13T11:58:00.000Z",
-      openStartedAt: ["2026-10-13T11:58:00.000Z", "2026-10-13T11:59:00.000Z"],
-    });
-  });
-
-  it("sums finished agent executions instead of the span that includes the wait", () => {
-    expect(
-      agentRunnerQueue(
-        agentCanvas(),
-        startedRun({
-          state: "STATE_FINISHED",
-          finishedAt: "2026-10-13T12:00:00.000Z",
-          queueItems: [],
-          executions: [
-            {
-              nodeId: "agent",
-              state: "STATE_FINISHED",
-              createdAt: "2026-10-13T11:00:00.000Z",
-              updatedAt: "2026-10-13T11:02:00.000Z",
-            },
-            {
-              nodeId: "agent",
-              state: "STATE_FINISHED",
-              createdAt: "2026-10-13T11:40:00.000Z",
-              updatedAt: "2026-10-13T11:43:00.000Z",
-            },
-          ],
-        }),
-      ),
-    ).toEqual({
-      queued: false,
-      completedWorkMs: 5 * 60 * 1000,
-      workEndedAt: "2026-10-13T11:43:00.000Z",
-    });
-  });
-
-  it("keeps the agent working interval after the run finishes", () => {
-    expect(
-      agentRunnerQueue(
-        agentCanvas(),
-        startedRun({
-          state: "STATE_FINISHED",
-          finishedAt: "2026-10-13T12:00:00.000Z",
-          queueItems: [],
-          executions: [
-            {
-              nodeId: "agent",
-              state: "STATE_FINISHED",
-              createdAt: "2026-10-13T11:10:00.000Z",
-              updatedAt: "2026-10-13T11:12:00.000Z",
-            },
-          ],
-        }),
-      ),
-    ).toEqual({
-      queued: false,
-      workStartedAt: "2026-10-13T11:10:00.000Z",
-      workEndedAt: "2026-10-13T11:12:00.000Z",
-    });
   });
 });

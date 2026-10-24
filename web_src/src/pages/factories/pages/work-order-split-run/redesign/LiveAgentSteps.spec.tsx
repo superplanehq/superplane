@@ -30,6 +30,46 @@ describe("LiveAgentSteps", () => {
     vi.mocked(useLiveLogStream).mockReturnValue(idleStream());
   });
 
+  it("updates a recorded command duration when the log supplies a correction", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      rootEventId: undefined,
+      stream: [{ ...RUNNING_RUNNER, status: "passed" }],
+    });
+    const recorded = (duration: number) =>
+      idleStream({
+        isStreaming: false,
+        sections: [
+          {
+            index: 1,
+            text: "Run script",
+            kind: "bash",
+            lines: [],
+            events: [],
+            status: "passed",
+            started_at: 1,
+            collapsed: true,
+            duration_ms: duration,
+          },
+        ],
+      });
+    vi.mocked(useLiveLogStream).mockReturnValue(recorded(1000));
+    const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
+    const phase = { ...implementPhase(), status: "passed" as const };
+    const ui = <LiveAgentSteps stage={stage} phase={phase} organizationId="org-1" />;
+    const view = render(ui);
+
+    expect(await screen.findByText("1s")).toBeInTheDocument();
+    vi.mocked(useLiveLogStream).mockReturnValue(recorded(29000));
+    view.rerender(<LiveAgentSteps stage={stage} phase={phase} organizationId="org-1" />);
+
+    expect(await screen.findByText("29s")).toBeInTheDocument();
+    expect(screen.queryByText("1s")).not.toBeInTheDocument();
+  });
+
   it("streams the running turn like refinement chat, not expanded tool dumps", async () => {
     vi.mocked(useLiveLogStream).mockReturnValue(
       idleStream({

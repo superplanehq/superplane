@@ -77,71 +77,13 @@ describe("runMetaLine", () => {
     const working = { ...runningStage("implement"), id: "working", status: "running" as const, duration: "3m 12s" };
     const queued = { ...working, id: "queued", duration: "83m 51s" };
 
-    expect(runMetaLine(working, [queued, working], new Map([["queued", { queued: true }]]))).toBe("3m 12s");
+    expect(runMetaLine(working, [queued, working], new Set(["queued"]))).toBe("3m 12s");
   });
 
   it("does not grow a timer when every live run is queued", () => {
     const queued = { ...runningStage("implement"), status: "running" as const, duration: "83m 51s" };
 
-    expect(runMetaLine(queued, [queued], new Map([[queued.id, { queued: true }]]))).toBe("");
-  });
-
-  it("counts working time from the agent execution, not the run start", () => {
-    const now = Date.parse("2026-10-13T12:00:00.000Z");
-    const working = { ...runningStage("implement"), status: "running" as const, duration: "83m 51s" };
-
-    expect(
-      runMetaLine(working, [working], new Map([[working.id, { workStartedAt: "2026-10-13T11:58:00.000Z" }]]), now),
-    ).toBe("2m");
-  });
-
-  it("keeps finished working time instead of the full run duration", () => {
-    const now = Date.parse("2026-10-13T12:00:00.000Z");
-    const finished = { ...runningStage("implement"), status: "passed" as const, duration: "42m" };
-    const live = { ...finished, id: "live", status: "running" as const, duration: "40m" };
-    const timing = new Map([
-      [finished.id, { workStartedAt: "2026-10-13T11:58:00.000Z", workEndedAt: "2026-10-13T12:00:00.000Z" }],
-      [live.id, { workStartedAt: "2026-10-13T11:59:00.000Z" }],
-    ]);
-
-    expect(runMetaLine(finished, [finished], timing, now)).toBe("2m");
-    expect(runMetaLine(live, [finished, live], timing, now)).toBe("3m");
-  });
-
-  it("adds each agent working interval and skips the wait between them", () => {
-    const now = Date.parse("2026-10-13T12:00:00.000Z");
-    const finished = { ...runningStage("implement"), status: "passed" as const, duration: "42m" };
-    const live = { ...finished, id: "live", status: "running" as const, duration: "40m" };
-    const timing = new Map([
-      [finished.id, { completedWorkMs: 5 * 60 * 1000, workEndedAt: "2026-10-13T11:43:00.000Z" }],
-      [live.id, { workStartedAt: "2026-10-13T11:59:00.000Z", completedWorkMs: 2 * 60 * 1000 }],
-    ]);
-
-    expect(runMetaLine(finished, [finished], timing, now)).toBe("5m");
-    expect(runMetaLine(live, [live], timing, now)).toBe("3m");
-    expect(runMetaLine(live, [finished, live], timing, now)).toBe("8m");
-  });
-
-  it("adds each open agent execution to the header timer", () => {
-    const now = Date.parse("2026-10-13T12:00:00.000Z");
-    const live = { ...runningStage("implement"), status: "running" as const, duration: "40m" };
-
-    expect(
-      runMetaLine(
-        live,
-        [live],
-        new Map([
-          [
-            live.id,
-            {
-              workStartedAt: "2026-10-13T11:58:00.000Z",
-              openStartedAt: ["2026-10-13T11:58:00.000Z", "2026-10-13T11:59:00.000Z"],
-            },
-          ],
-        ]),
-        now,
-      ),
-    ).toBe("3m");
+    expect(runMetaLine(queued, [queued], new Set([queued.id]))).toBe("");
   });
 });
 
