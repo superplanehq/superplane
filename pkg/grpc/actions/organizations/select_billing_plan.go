@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
@@ -85,6 +86,13 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 	// from an updated payment method or a cancellation in the billing portal.
 	if models.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) {
 		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
+	}
+	// A live subscription can still charge, and a local plan change would
+	// clear its stored state. This covers billed states like paused that
+	// OrganizationBillingIsPolarManaged does not. The subscription must be
+	// canceled in the billing portal before any plan selection.
+	if current.HasLivePolarSubscription(time.Now()) {
+		return nil, grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
 	}
 	if strings.TrimSpace(req.GetPlanKey()) == models.BillingPlanNone {
 		if req.Seats != nil {
