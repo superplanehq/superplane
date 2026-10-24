@@ -30,6 +30,7 @@ const (
 	PolarSubscriptionStatusUnpaid     = "unpaid"
 	PolarSubscriptionStatusRevoked    = "revoked"
 	PolarSubscriptionStatusPastDue    = "past_due"
+	PolarSubscriptionStatusPaused     = "paused"
 	PolarSubscriptionStatusIncomplete = "incomplete"
 
 	DefaultIncludedGrantCents  int64 = 5000
@@ -46,7 +47,13 @@ var (
 	ErrPolarManagedBillingPlan    = errors.New("this organization uses Polar for billing. Cancel or change the subscription in Polar")
 )
 
+// ErrHostedPaymentPastDue wraps ErrHostedSubscriptionRequired, so callers that
+// match the broader error keep working.
+var ErrHostedPaymentPastDue = fmt.Errorf("the renewal payment is past due: %w", ErrHostedSubscriptionRequired)
+
 // OrganizationBillingPlan is the org plan and Polar subscription period.
+// PastDueSince is when the current renewal payment failure started. It is set
+// only while the subscription status is past_due.
 type OrganizationBillingPlan struct {
 	OrganizationID          uuid.UUID `gorm:"primary_key"`
 	PlanID                  uuid.UUID
@@ -58,6 +65,7 @@ type OrganizationBillingPlan struct {
 	CancelAtPeriodEnd       bool
 	PolarModifiedAt         *time.Time
 	PurchasedSeats          *int
+	PastDueSince            *time.Time
 	CurrentPeriodStart      *time.Time
 	CurrentPeriodEnd        *time.Time
 	TrialStartedAt          *time.Time
@@ -75,6 +83,7 @@ type PolarSubscriptionApply struct {
 	CancelAtPeriodEnd bool
 	ModifiedAt        *time.Time
 	PurchasedSeats    *int
+	PastDueAt         *time.Time
 }
 
 func (OrganizationBillingPlan) TableName() string {
@@ -114,10 +123,10 @@ func (p *OrganizationBillingPlan) IsActiveBusiness() bool {
 	if p.PlanSource == BillingPlanSourceSystem && p.Catalog.ID != uuid.Nil && p.Catalog.PolarProductID == nil && p.Catalog.PriceCents == 0 {
 		return true
 	}
-	if PolarSubscriptionIsPaid(p.PolarSubscriptionStatus) {
+	if PolarSubscriptionKeepsAccess(p.PolarSubscriptionStatus, p.CancelAtPeriodEnd, p.CurrentPeriodEnd, time.Now()) {
 		return true
 	}
-	return p.CancelAtPeriodEnd && periodStillOpen(p.CurrentPeriodEnd, time.Now())
+	return p.holdsPastDueGraceRow()
 }
 
 func (p *OrganizationBillingPlan) IsOpenTrial(now time.Time) bool {
@@ -147,9 +156,46 @@ func PolarSubscriptionIsPaid(status string) bool {
 	}
 }
 
+// PolarSubscriptionKeepsAccess reports whether a subscription snapshot still
+// gives paid access. An active or trialing subscription does. A subscription
+// set to cancel keeps access until its period ends, unless payment failed or
+// the customer paused it. Those subscriptions must not regain access by
+// setting "cancel at period end" in the Polar portal.
+func PolarSubscriptionKeepsAccess(status string, cancelAtPeriodEnd bool, periodEnd *time.Time, now time.Time) bool {
+	if PolarSubscriptionIsPaid(status) {
+		return true
+	}
+	if polarSubscriptionCannotCollectPayment(status) {
+		return false
+	}
+	return cancelAtPeriodEnd && periodStillOpen(periodEnd, now)
+}
+
 // PolarSubscriptionIsPastDue is true while Polar retries a failed renewal payment.
 func PolarSubscriptionIsPastDue(status string) bool {
 	return strings.ToLower(strings.TrimSpace(status)) == PolarSubscriptionStatusPastDue
+}
+
+// PolarSubscriptionIsPaymentBlocked is true while Polar does not collect
+// payment for the subscription, because the renewal failed or the customer
+// paused it. No new members can join in either state.
+func PolarSubscriptionIsPaymentBlocked(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case PolarSubscriptionStatusPastDue, PolarSubscriptionStatusPaused:
+		return true
+	default:
+		return false
+	}
+}
+
+// PastDueAccessEndsAt is when Team features end after a failed renewal.
+// It returns nil when the subscription is not past due or no grace applies.
+func (p *OrganizationBillingPlan) PastDueAccessEndsAt(graceDays int) *time.Time {
+	if p == nil || p.PastDueSince == nil || graceDays <= 0 || !PolarSubscriptionIsPastDue(p.PolarSubscriptionStatus) {
+		return nil
+	}
+	end := p.PastDueSince.Add(pastDueGrace(graceDays))
+	return &end
 }
 
 // AssignAdminPlanAfterPolarVerification requires a confirmed absence from Polar.
@@ -165,7 +211,7 @@ func (p *OrganizationBillingPlan) AssignAdminPlanAfterPolarVerification(tx *gorm
 			return ErrBillingPlanChanged
 		}
 		if err := inner.Model(current).Updates(map[string]any{
-			"polar_subscription_status": "", "cancel_at_period_end": false,
+			"polar_subscription_status": "", "cancel_at_period_end": false, "past_due_since": nil,
 		}).Error; err != nil {
 			return err
 		}
@@ -202,7 +248,8 @@ func lockOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBil
 }
 
 // ResolveOrganizationBillingPlan loads the org plan and writes plan=none when
-// there is no row or the trial window has ended.
+// there is no row or the trial window has ended. It also ends a scheduled
+// cancellation and a past-due grace period, because Polar sends no event then.
 func ResolveOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
 	if orgID == uuid.Nil {
 		return nil, fmt.Errorf("organization is required")
@@ -222,6 +269,16 @@ func ResolveOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*Organization
 	if plan.shouldLapseEndedPolarBusiness(now) {
 		return lapseEndedPolarBusiness(tx, plan)
 	}
+	if !plan.holdsPastDueGraceRow() {
+		return plan, nil
+	}
+	graceDays, err := installationPastDueGraceDays(tx)
+	if err != nil {
+		return nil, err
+	}
+	if plan.pastDueGraceEnded(now, graceDays) {
+		return lapseEndedPastDueGrace(tx, plan, graceDays)
+	}
 	return plan, nil
 }
 
@@ -237,10 +294,13 @@ func AssertOrganizationPlanAllowsRuns(tx *gorm.DB, orgID uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	if !plan.AllowsHostedExecution(time.Now()) {
-		return ErrHostedSubscriptionRequired
+	if plan.AllowsHostedExecution(time.Now()) {
+		return nil
 	}
-	return nil
+	if PolarSubscriptionIsPaymentBlocked(plan.PolarSubscriptionStatus) {
+		return ErrHostedPaymentPastDue
+	}
+	return ErrHostedSubscriptionRequired
 }
 
 func EnsureOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
@@ -383,6 +443,7 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 		}
 		next.PolarSubscriptionStatus = strings.ToLower(strings.TrimSpace(sub.Status))
 		next.CancelAtPeriodEnd = sub.CancelAtPeriodEnd
+		next.PastDueSince = nextPastDueSince(existing, sub, now)
 		if sub.PeriodStart != nil {
 			start := sub.PeriodStart.UTC()
 			next.CurrentPeriodStart = &start
@@ -392,7 +453,15 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 			next.CurrentPeriodEnd = &end
 		}
 
-		if polarPaidAccessContinues(&next, now) {
+		keepsPastDueGrace := false
+		if catalogErr == nil && catalog.Category == "paid" && next.PastDueSince != nil {
+			graceDays, err := installationPastDueGraceDays(inner)
+			if err != nil {
+				return err
+			}
+			keepsPastDueGrace = next.pastDueGraceOpen(now, graceDays)
+		}
+		if polarPaidAccessContinues(&next, now) || keepsPastDueGrace {
 			if catalogErr != nil {
 				return fmt.Errorf("unknown subscription product: %w", catalogErr)
 			}
@@ -423,6 +492,7 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 				"cancel_at_period_end",
 				"polar_modified_at",
 				"purchased_seats",
+				"past_due_since",
 				"current_period_start",
 				"current_period_end",
 				"trial_started_at",
@@ -518,14 +588,71 @@ func polarPaidAccessContinues(plan *OrganizationBillingPlan, now time.Time) bool
 	if plan == nil || polarScheduledCancelEnded(plan, now) {
 		return false
 	}
-	if PolarSubscriptionIsPaid(plan.PolarSubscriptionStatus) {
-		return true
+	return PolarSubscriptionKeepsAccess(plan.PolarSubscriptionStatus, plan.CancelAtPeriodEnd, plan.CurrentPeriodEnd, now)
+}
+
+// nextPastDueSince keeps the start of one failure across snapshots. It is
+// empty for every status except past_due, so a later failure starts a new one.
+func nextPastDueSince(existing *OrganizationBillingPlan, sub PolarSubscriptionApply, now time.Time) *time.Time {
+	if !PolarSubscriptionIsPastDue(sub.Status) {
+		return nil
 	}
-	return plan.CancelAtPeriodEnd && periodStillOpen(plan.CurrentPeriodEnd, now)
+	if existing.PastDueSince != nil {
+		return existing.PastDueSince
+	}
+	since := now
+	if sub.PastDueAt != nil {
+		since = *sub.PastDueAt
+	}
+	since = since.UTC()
+	return &since
+}
+
+// holdsPastDueGraceRow is true for a past-due Polar row that still sits on a
+// paid catalog plan. Only a grace period keeps a row in that state.
+func (p *OrganizationBillingPlan) holdsPastDueGraceRow() bool {
+	return p != nil && p.PastDueSince != nil && p.isPaidPlan() &&
+		p.PlanSource == BillingPlanSourcePolar && PolarSubscriptionIsPastDue(p.PolarSubscriptionStatus)
+}
+
+func pastDueGrace(graceDays int) time.Duration {
+	return time.Duration(graceDays) * 24 * time.Hour
+}
+
+// installationPastDueGraceDays reads the grace setting. Only a past-due
+// subscription needs it, so other statuses skip the read.
+func installationPastDueGraceDays(tx *gorm.DB) (int, error) {
+	metadata, err := GetInstallationMetadata(tx)
+	if err != nil {
+		return 0, err
+	}
+	return metadata.PastDueGraceDays, nil
+}
+
+func (p *OrganizationBillingPlan) pastDueGraceOpen(now time.Time, graceDays int) bool {
+	if p == nil || p.PastDueSince == nil || !PolarSubscriptionIsPastDue(p.PolarSubscriptionStatus) || polarScheduledCancelEnded(p, now) {
+		return false
+	}
+	return now.Before(p.PastDueSince.Add(pastDueGrace(graceDays)))
+}
+
+func (p *OrganizationBillingPlan) pastDueGraceEnded(now time.Time, graceDays int) bool {
+	return p.holdsPastDueGraceRow() && !now.Before(p.PastDueSince.Add(pastDueGrace(graceDays)))
 }
 
 func polarScheduledCancelEnded(plan *OrganizationBillingPlan, now time.Time) bool {
 	return plan != nil && plan.CancelAtPeriodEnd && !periodStillOpen(plan.CurrentPeriodEnd, now)
+}
+
+// polarSubscriptionCannotCollectPayment is true when Polar cannot collect payment:
+// a renewal failed and is retried, retries ended, or the customer paused it.
+func polarSubscriptionCannotCollectPayment(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case PolarSubscriptionStatusPastDue, PolarSubscriptionStatusUnpaid, PolarSubscriptionStatusPaused:
+		return true
+	default:
+		return false
+	}
 }
 
 func polarSnapshotIsStale(existing *OrganizationBillingPlan, incoming *time.Time) bool {
@@ -563,6 +690,41 @@ func lapseEndedPolarBusiness(tx *gorm.DB, plan *OrganizationBillingPlan) (*Organ
 			Where("organization_id = ? AND plan = ? AND plan_source <> ?", plan.OrganizationID, plan.Plan, BillingPlanSourceAdmin).
 			Where("cancel_at_period_end = ?", true).
 			Where("current_period_end IS NOT NULL AND current_period_end <= ?", now).
+			Updates(map[string]any{
+				"plan":       nextPlan,
+				"plan_id":    inner.Model(&BillingPlan{}).Select("id").Where("key = ?", nextPlan),
+				"updated_at": now,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+
+		loaded, err := loadedOrganizationBillingPlan(inner, plan.OrganizationID)
+		if err != nil {
+			return err
+		}
+		saved = loaded
+		return SyncIncludedLLMCreditGrant(inner, IncludedUsageSync{
+			OrganizationID:   plan.OrganizationID,
+			SubscriptionID:   includedUsageSubscriptionID(saved),
+			IsActiveBusiness: saved.IsActiveBusiness(),
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return saved, nil
+}
+
+func lapseEndedPastDueGrace(tx *gorm.DB, plan *OrganizationBillingPlan, graceDays int) (*OrganizationBillingPlan, error) {
+	var saved *OrganizationBillingPlan
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		now := time.Now()
+		nextPlan := planAfterPaidSubscriptionEnds(plan, now)
+		result := inner.Model(&OrganizationBillingPlan{}).
+			Where("organization_id = ? AND plan = ? AND plan_source = ?", plan.OrganizationID, plan.Plan, BillingPlanSourcePolar).
+			Where("polar_subscription_status = ?", PolarSubscriptionStatusPastDue).
+			Where("past_due_since IS NOT NULL AND past_due_since <= ?", now.Add(-pastDueGrace(graceDays))).
 			Updates(map[string]any{
 				"plan":       nextPlan,
 				"plan_id":    inner.Model(&BillingPlan{}).Select("id").Where("key = ?", nextPlan),
@@ -714,6 +876,7 @@ func setOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, catalog *BillingPl
 		if existing != nil && (source == BillingPlanSourceAdmin || existing.PlanSource == source) {
 			next.PolarSubscriptionID = existing.PolarSubscriptionID
 			next.PolarSubscriptionStatus = existing.PolarSubscriptionStatus
+			next.PastDueSince = existing.PastDueSince
 			next.CancelAtPeriodEnd = existing.CancelAtPeriodEnd
 			next.PolarModifiedAt = existing.PolarModifiedAt
 			next.CurrentPeriodStart = existing.CurrentPeriodStart
@@ -735,6 +898,7 @@ func setOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, catalog *BillingPl
 				"polar_subscription_status",
 				"cancel_at_period_end",
 				"polar_modified_at",
+				"past_due_since",
 				"current_period_start",
 				"current_period_end",
 				"trial_started_at",

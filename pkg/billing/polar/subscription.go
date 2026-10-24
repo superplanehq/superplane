@@ -90,6 +90,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 				CancelAtPeriodEnd: data.CancelAtPeriodEnd,
 				ModifiedAt:        data.ModifiedAt.TimePtr(),
 				PurchasedSeats:    data.Seats,
+				PastDueAt:         data.PastDueAt.TimePtr(),
 			},
 		)
 		if err != nil {
@@ -260,14 +261,15 @@ func VerifyOrganizationSubscription(ctx context.Context, orgID uuid.UUID) (strin
 		}
 		status := strings.ToLower(strings.TrimSpace(item.Status))
 		switch status {
-		case "active", "trialing", "canceled", "unpaid", "revoked", "past_due", "incomplete", "incomplete_expired":
+		case "active", "trialing", "canceled", "unpaid", "revoked", "past_due", "paused", "incomplete", "incomplete_expired":
 		default:
 			return "failed", fmt.Errorf("unexpected Polar subscription status %q", item.Status)
 		}
 		if !item.EndedAt.Time.IsZero() && !item.EndedAt.Time.After(now) {
 			continue
 		}
-		if models.PolarSubscriptionIsPaid(status) || (item.CancelAtPeriodEnd && item.CurrentPeriodEnd.Time.After(now)) {
+		periodEnd := item.CurrentPeriodEnd.TimePtr()
+		if models.PolarSubscriptionKeepsAccess(status, item.CancelAtPeriodEnd, periodEnd, now) {
 			active = true
 		}
 	}

@@ -43,6 +43,8 @@ type seatPurchaseFixture struct {
 	polarSeats int
 	// replays counts webhook replays so each snapshot is newer than the last.
 	replays int
+	// pastDueAt is sent as past_due_at in a past_due replay when set.
+	pastDueAt *time.Time
 }
 
 func newSeatPurchaseFixture(t *testing.T, purchased int, seatLimit *int) *seatPurchaseFixture {

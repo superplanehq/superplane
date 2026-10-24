@@ -2147,7 +2147,7 @@ message WorkOrderExecution {
   repeated string models = 13;
   // Why the step failed before it could run. Set only for SuperPlane
   // hosted credit failures: no_hosted_credit,
-  // hosted_subscription_required, or workspace_budget_empty.
+  // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
 }
 
