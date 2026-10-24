@@ -31,6 +31,7 @@ const (
 	PolarSubscriptionStatusRevoked    = "revoked"
 	PolarSubscriptionStatusPastDue    = "past_due"
 	PolarSubscriptionStatusIncomplete = "incomplete"
+	PolarSubscriptionStatusPaused     = "paused"
 
 	DefaultIncludedGrantCents  int64 = 5000
 	DefaultIncludedGrantMonths       = 1
@@ -178,10 +179,12 @@ func PolarSubscriptionIsPastDue(status string) bool {
 	return strings.ToLower(strings.TrimSpace(status)) == PolarSubscriptionStatusPastDue
 }
 
-// PolarSubscriptionIsLive protects subscription identity, including failed renewals.
+// PolarSubscriptionIsLive protects subscription identity, including failed renewals
+// and paused subscriptions that can resume.
 // Paid access remains governed by PolarSubscriptionIsPaid and the billing period.
 func PolarSubscriptionIsLive(status string, cancelAtPeriodEnd bool, periodEnd *time.Time, now time.Time) bool {
 	return PolarSubscriptionIsPaid(status) || PolarSubscriptionIsPastDue(status) ||
+		strings.ToLower(strings.TrimSpace(status)) == PolarSubscriptionStatusPaused ||
 		cancelAtPeriodEnd && periodStillOpen(periodEnd, now)
 }
 
@@ -190,7 +193,7 @@ func PolarSubscriptionStatusIsKnown(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case PolarSubscriptionStatusActive, PolarSubscriptionStatusTrialing, PolarSubscriptionStatusCanceled,
 		PolarSubscriptionStatusUnpaid, PolarSubscriptionStatusRevoked, PolarSubscriptionStatusPastDue,
-		PolarSubscriptionStatusIncomplete, "incomplete_expired", "paused":
+		PolarSubscriptionStatusIncomplete, "incomplete_expired", PolarSubscriptionStatusPaused:
 		return true
 	default:
 		return false

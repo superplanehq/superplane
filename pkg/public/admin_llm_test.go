@@ -836,12 +836,15 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 		saveCode     int
 		concurrent   bool
 		paginate     bool
+		storedStatus string
 	}{
 		{name: "stale active", items: []map[string]any{}, verification: "none", saveCode: 200},
 		{name: "ended", items: []map[string]any{{"id": "sub_ended", "status": "active", "ended_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)}}, verification: "none", saveCode: 200},
 		{name: "ended with cancel flag", items: []map[string]any{{"id": "sub_ended", "status": "canceled", "ended_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339), "cancel_at_period_end": true, "current_period_end": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}}, verification: "none", saveCode: 200},
 		{name: "active unknown product", items: []map[string]any{{"id": "sub_unknown", "product_id": "unknown", "status": "active"}}, verification: "active", saveCode: 400},
 		{name: "trialing", items: []map[string]any{{"id": "sub_trial", "status": "trialing"}}, verification: "active", saveCode: 400},
+		{name: "paused without scheduled cancellation", items: []map[string]any{{"id": "sub_stored", "status": "paused", "cancel_at_period_end": false}}, verification: "active", saveCode: 400, storedStatus: "paused"},
+		{name: "ended paused", items: []map[string]any{{"id": "sub_stored", "status": "paused", "ended_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)}}, verification: "none", saveCode: 200, storedStatus: "paused"},
 		{name: "canceling", items: []map[string]any{{"id": "sub_canceling", "status": "canceled", "cancel_at_period_end": true, "current_period_end": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}}, verification: "active", saveCode: 400},
 		{name: "canceled", items: []map[string]any{{"id": "sub_canceled", "status": "canceled"}}, verification: "none", saveCode: 200},
 		{name: "pagination", items: []map[string]any{{"id": "sub_page2", "status": "active"}}, verification: "active", saveCode: 400, paginate: true},
@@ -863,8 +866,16 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 			catalog, err := models.FindBillingPlan(database.Conn(), models.BillingPlanBusiness)
 			require.NoError(t, err)
 			require.NotNil(t, catalog.PolarProductID)
-			_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: "active", PeriodStart: &now, PeriodEnd: &end, CancelAtPeriodEnd: true}, nil)
+			storedStatus := tc.storedStatus
+			if storedStatus == "" {
+				storedStatus = "active"
+			}
+			_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: "active", PeriodStart: &now, PeriodEnd: &end, CancelAtPeriodEnd: storedStatus == "active"}, nil)
 			require.NoError(t, err)
+			if storedStatus == "paused" {
+				_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: storedStatus, PeriodStart: &now, PeriodEnd: &end}, nil)
+				require.NoError(t, err)
+			}
 			saving := false
 			calls := 0
 			polarServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -911,7 +922,7 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 			assert.Equal(t, "sub_stored", plan.PolarSubscriptionID)
 			assert.Equal(t, "https://polar.sh/dashboard/superplane-inc/sales/subscriptions/sub_stored", plan.PolarSubscriptionURL)
 			assert.Equal(t, "polar", plan.PlanSource)
-			assert.Equal(t, "active", plan.PolarSubscriptionStatus)
+			assert.Equal(t, storedStatus, plan.PolarSubscriptionStatus)
 			beforeSave := calls
 			saving = true
 			response := execRequest(server, requestParams{method: "PUT", path: path, authCookie: token, body: []byte(`{"plan":"business_manual"}`), contentType: "application/json"})
@@ -931,7 +942,16 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 				assert.Equal(t, "sub_stored", after.PolarSubscriptionID)
 			} else {
 				assert.Equal(t, "polar", after.PlanSource)
-				assert.Equal(t, "active", after.PolarSubscriptionStatus)
+				assert.Equal(t, "sub_stored", after.PolarSubscriptionID)
+				assert.Equal(t, storedStatus, after.PolarSubscriptionStatus)
+				if storedStatus == "paused" {
+					stored, err := models.FindOrganizationBillingPlan(database.DB(t.Context()), r.Organization.ID)
+					require.NoError(t, err)
+					assert.False(t, stored.CancelAtPeriodEnd)
+					assert.False(t, stored.IsActiveBusiness())
+					assert.False(t, stored.AllowsHostedExecution(time.Now()))
+					assert.False(t, stored.AllowsCreditPurchase())
+				}
 			}
 		})
 	}
