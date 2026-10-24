@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -16,6 +17,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 )
+
+func setAdminBillingTestProduct(t *testing.T, productID string) {
+	t.Helper()
+	db := database.DB(t.Context())
+	catalog, err := models.FindBillingPlan(db, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	originalProduct := catalog.PolarProductID
+	if originalProduct != nil {
+		originalProduct = new(*originalProduct)
+	}
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.WithoutCancel(t.Context())).Model(catalog).Update("polar_product_id", originalProduct).Error)
+	})
+	require.NoError(t, db.Model(catalog).Update("polar_product_id", productID).Error)
+}
 
 func TestResolveHostedListModelsBaseURL(t *testing.T) {
 	proxy := "https://proxy.example/v1"
@@ -576,15 +592,15 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		}))
 		defer activeServer.Close()
 		t.Setenv("POLAR_API_BASE_URL", activeServer.URL)
-		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+		setAdminBillingTestProduct(t, "prod_business")
 		now := time.Now()
 		end := now.AddDate(0, 1, 0)
-		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
+		_, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 			ID:          "sub_admin_put",
 			Status:      models.PolarSubscriptionStatusActive,
 			PeriodStart: &now,
 			PeriodEnd:   &end,
-		})
+		}, nil)
 		require.NoError(t, err)
 		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 
@@ -843,11 +859,11 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 			server, r, token := setupAdminTestServer(t)
 			now := time.Now()
 			end := now.Add(time.Hour)
-			require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_verify"))
+			setAdminBillingTestProduct(t, "prod_verify")
 			catalog, err := models.FindBillingPlan(database.Conn(), models.BillingPlanBusiness)
 			require.NoError(t, err)
 			require.NotNil(t, catalog.PolarProductID)
-			_, _, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: "active", PeriodStart: &now, PeriodEnd: &end, CancelAtPeriodEnd: true})
+			_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: "active", PeriodStart: &now, PeriodEnd: &end, CancelAtPeriodEnd: true}, nil)
 			require.NoError(t, err)
 			saving := false
 			calls := 0
