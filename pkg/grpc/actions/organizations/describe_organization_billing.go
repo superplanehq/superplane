@@ -106,6 +106,7 @@ func DescribeOrganizationBilling(
 		PlanPerSeat:                 plan.Catalog.PerSeat,
 		CatalogKey:                  plan.Catalog.Key,
 		HostedExecutionAllowed:      !models.BillingEnabled() || plan.AllowsHostedExecution(time.Now()) && (!newBilling || !plan.Catalog.RequirePaymentMethod || hasCard),
+		HostedCreditAvailable:       !models.BillingEnabled() || credit.RemainingMicros > 0,
 		PlanSource:                  plan.PlanSource,
 		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
 		TrialEndsAt:                 protoTimestamp(plan.TrialEndsAt),

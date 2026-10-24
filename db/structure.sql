@@ -1183,6 +1183,8 @@ CREATE TABLE public.installation_metadata (
     signups_enabled boolean DEFAULT true NOT NULL,
     owner_setup_step text,
     share_owner_identity boolean DEFAULT false NOT NULL,
+    invitation_duration_days integer DEFAULT 7 NOT NULL,
+    CONSTRAINT installation_metadata_invitation_duration_days_check CHECK (((invitation_duration_days >= 1) AND (invitation_duration_days <= 365))),
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -1336,7 +1338,13 @@ CREATE TABLE public.organization_invitations (
     state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    canvas_ids jsonb DEFAULT '[]'::jsonb
+    canvas_ids jsonb DEFAULT '[]'::jsonb,
+    role character varying(255) DEFAULT 'org_operator'::character varying NOT NULL,
+    token_hash character varying(64),
+    expires_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    accepted_at timestamp without time zone,
+    accepted_by uuid,
+    sent_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -2888,6 +2896,14 @@ ALTER TABLE ONLY public.organization_hosted_model_allowlists
 
 ALTER TABLE ONLY public.organization_invitations
     ADD CONSTRAINT organization_invitations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_invitations organization_invitations_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitations
+    ADD CONSTRAINT organization_invitations_token_hash_key UNIQUE (token_hash);
 
 
 --
@@ -4566,6 +4582,13 @@ CREATE INDEX organization_billing_plans_catalog ON public.organization_billing_p
 
 
 --
+-- Name: organization_invitations_pending_email_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organization_invitations_pending_email_idx ON public.organization_invitations USING btree (organization_id, lower((email)::text)) WHERE ((state)::text = 'pending'::text);
+
+
+--
 -- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5542,6 +5565,14 @@ ALTER TABLE ONLY public.organization_feature_grants
 
 ALTER TABLE ONLY public.organization_hosted_model_allowlists
     ADD CONSTRAINT organization_hosted_model_allowlists_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_invitations organization_invitations_accepted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitations
+    ADD CONSTRAINT organization_invitations_accepted_by_fkey FOREIGN KEY (accepted_by) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --

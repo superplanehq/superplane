@@ -180,7 +180,7 @@ func TestHasRequiredScopedTokenPermissionForScopes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			allowed := hasRequiredScopedTokenPermissionForScopes(tt.scopes, tt.pathParams, tt.rule)
+			allowed := HasRequiredScopedTokenPermissionForScopes(tt.scopes, tt.pathParams, tt.rule)
 			assert.Equal(t, tt.expectAllow, allowed)
 		})
 	}

@@ -40,8 +40,8 @@ func TestSettingsPermissionGuards(t *testing.T) {
 		steps.assertRoleDeleteDisabled("readonly-role")
 
 		steps.visitMembersSettings()
-		steps.assertInviteLinkCreateDisabled()
 		steps.assertMemberUpdateDisabled(memberEmail)
+		steps.assertInviteMemberHidden()
 		steps.assertMemberDeleteDisabled(memberEmail)
 
 		steps.visitAPIKeysSettings()
@@ -202,13 +202,15 @@ func (s *settingsPermissionGuardSteps) assertRoleDeleteDisabled(name string) {
 	require.True(s.t, disabled)
 }
 
-func (s *settingsPermissionGuardSteps) assertInviteLinkCreateDisabled() {
-	s.session.AssertDisabled(q.Locator(`[aria-label="Toggle invite link"]`))
+func (s *settingsPermissionGuardSteps) assertInviteMemberHidden() {
+	s.session.AssertHidden(q.Text("Invite member"))
 }
 
 func (s *settingsPermissionGuardSteps) assertMemberUpdateDisabled(email string) {
 	row := s.rowByText(email)
-	disabled, err := row.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Operator"}).IsDisabled()
+	role := row.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Role for"})
+	require.NoError(s.t, role.WaitFor())
+	disabled, err := role.IsDisabled()
 	require.NoError(s.t, err)
 	require.True(s.t, disabled)
 }

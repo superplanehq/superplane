@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -44,9 +45,20 @@ func (p *OrganizationBillingPlan) ResolveProductFeatures(tx *gorm.DB) (map[strin
 	return resolved, nil
 }
 
-// OrganizationBYOKAccess requires both the rollout and product permission.
-// Custom providers also require their own rollout.
+// OrganizationBYOKAccess allows standard providers when no hosted default exists.
+// Otherwise, rollout and product permissions apply. Custom providers need both rollouts.
 func OrganizationBYOKAccess(tx *gorm.DB, orgID uuid.UUID, provider string) (bool, error) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider != UsageProviderCustom {
+		defaultModel, err := GetInstallationDefaultHostedLLMModel(tx)
+		if err != nil {
+			return false, err
+		}
+		if !defaultModel.IsSet() {
+			return true, nil
+		}
+	}
+
 	required := []string{features.FeatureOrganizationBYOK}
 	if provider == UsageProviderCustom {
 		required = append(required, features.FeatureOrganizationBYOKCustomProvider)

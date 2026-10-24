@@ -36,7 +36,7 @@ func DefineAgentOutcome(ctx context.Context, svc AgentsService, orgID, userID st
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "agent chat not found")
 		}
-		if errors.Is(err, models.ErrPaymentMethodRequired) {
+		if errors.Is(err, models.ErrPaymentMethodRequired) || errors.Is(err, models.ErrHostedSubscriptionRequired) {
 			return nil, grpcerrors.FailedPrecondition(err, err.Error())
 		}
 		if errors.Is(err, agentservice.ErrSessionBusy) {

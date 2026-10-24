@@ -280,7 +280,7 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
-	if err := polar.AssertOrganizationPaymentMethod(database.DB(ctx), organizationID); err != nil {
+	if err := assertAgentRunsAllowed(ctx, organizationID); err != nil {
 		return err
 	}
 	if session.Status == models.AgentSessionStatusStreaming {
@@ -361,7 +361,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	if err := polar.AssertOrganizationPaymentMethod(database.DB(ctx), organizationID); err != nil {
+	if err := assertAgentRunsAllowed(ctx, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -716,7 +716,17 @@ func (s *Service) checkAgentAccess(ctx context.Context, userID, organizationID u
 			return ErrSessionForbidden
 		}
 	}
-	return polar.AssertOrganizationPaymentMethod(database.DB(ctx), organizationID)
+	return assertAgentRunsAllowed(ctx, organizationID)
+}
+
+// assertAgentRunsAllowed checks the billing requirements for agent sessions:
+// a payment method when the plan needs one, and a plan that can run agents.
+func assertAgentRunsAllowed(ctx context.Context, organizationID uuid.UUID) error {
+	db := database.DB(ctx)
+	if err := polar.AssertOrganizationPaymentMethod(db, organizationID); err != nil {
+		return err
+	}
+	return models.AssertOrganizationPlanAllowsRuns(db, organizationID)
 }
 
 func findCanvasSession(tx *gorm.DB, orgID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
