@@ -382,6 +382,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_SEAT_RENEWAL_SYNC_WORKER") == "yes" {
+		log.Println("Starting Seat Renewal Sync Worker")
+
+		w := workers.NewSeatRenewalSyncWorker()
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_PLANNING_SESSION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Planning Session Cleanup Worker")
 

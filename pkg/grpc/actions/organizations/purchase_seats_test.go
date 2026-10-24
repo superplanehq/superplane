@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -34,13 +35,22 @@ type seatPurchaseFixture struct {
 	periodStart    time.Time
 	periodEnd      time.Time
 
-	mu          sync.Mutex
+	mu sync.Mutex
+	// patchBodies are the seat purchase updates. Renewal schedules are in schedules.
 	patchBodies []map[string]any
 	getCount    int
-	// onPatch writes the PATCH response. The default applies the update.
+	// onPatch writes the seat purchase response. The default applies the update.
 	onPatch func(w http.ResponseWriter, f *seatPurchaseFixture, seats int)
 	// polarSeats is the seat count that GET reports.
 	polarSeats int
+	// schedules are the next_period updates that schedule the renewal seat count.
+	schedules []map[string]any
+	// pendingSeats is the seat count that Polar renews with, when it differs
+	// from polarSeats.
+	pendingSeats *int
+	// modifiedAt is the subscription modification time that snapshots report.
+	// The zero value makes each snapshot report the current time.
+	modifiedAt time.Time
 	// replays counts webhook replays so each snapshot is newer than the last.
 	replays int
 }
@@ -75,12 +85,17 @@ func newSeatPurchaseFixture(t *testing.T, purchased int, seatLimit *int) *seatPu
 		"cancel_at_period_end": false,
 	}).Error)
 	f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
+		// An applied seat update replaces the scheduled one.
 		f.polarSeats = seats
+		f.pendingSeats = nil
 		f.writeJSON(w, http.StatusOK, f.snapshot(seats))
 	}
 
 	server := polarAPIServer(t, f.serve)
 	usePolarTestServer(t, server)
+	// Background renewal schedules must end before the server and the
+	// database close.
+	t.Cleanup(seatrenewal.Wait)
 	return f
 }
 
@@ -89,6 +104,10 @@ func (f *seatPurchaseFixture) serve(w http.ResponseWriter, req *http.Request) {
 	defer f.mu.Unlock()
 	if req.URL.Path == "/customers/external/"+f.r.Organization.ID.String()+"/payment-methods" {
 		f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
+		return
+	}
+	if req.URL.Path == "/subscriptions/" && req.Method == http.MethodGet {
+		f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{f.snapshot(f.polarSeats)}, "pagination": map[string]int{"max_page": 1}})
 		return
 	}
 	if req.URL.Path != "/subscriptions/"+f.subscriptionID {
@@ -103,20 +122,40 @@ func (f *seatPurchaseFixture) serve(w http.ResponseWriter, req *http.Request) {
 	case http.MethodPatch:
 		var body map[string]any
 		require.NoError(f.t, json.NewDecoder(req.Body).Decode(&body))
+		seats := int(body["seats"].(float64))
+		if body["proration_behavior"] == "next_period" {
+			// Like Polar, an update back to the current seats clears the scheduled one.
+			f.schedules = append(f.schedules, body)
+			f.pendingSeats = &seats
+			if seats == f.polarSeats {
+				f.pendingSeats = nil
+			}
+			f.writeJSON(w, http.StatusOK, f.snapshot(f.polarSeats))
+			return
+		}
 		f.patchBodies = append(f.patchBodies, body)
-		f.onPatch(w, f, int(body["seats"].(float64)))
+		f.onPatch(w, f, seats)
 	default:
 		f.t.Errorf("unexpected Polar method %s", req.Method)
 	}
 }
 
 func (f *seatPurchaseFixture) snapshot(seats int) map[string]any {
-	return map[string]any{
+	modifiedAt := f.modifiedAt
+	if modifiedAt.IsZero() {
+		modifiedAt = time.Now()
+	}
+	snapshot := map[string]any{
 		"id": f.subscriptionID, "product_id": f.product, "status": "active", "seats": seats,
-		"cancel_at_period_end": false, "modified_at": time.Now().UTC().Format(time.RFC3339),
+		"cancel_at_period_end": false, "modified_at": modifiedAt.UTC().Format(time.RFC3339),
 		"current_period_start": f.periodStart.Format(time.RFC3339), "current_period_end": f.periodEnd.Format(time.RFC3339),
 		"customer_id": "cust_1", "external_customer_id": f.r.Organization.ID.String(),
+		"pending_update": nil,
 	}
+	if f.pendingSeats != nil {
+		snapshot["pending_update"] = map[string]any{"seats": *f.pendingSeats, "applies_at": f.periodEnd.Format(time.RFC3339)}
+	}
+	return snapshot
 }
 
 func (f *seatPurchaseFixture) writeJSON(w http.ResponseWriter, status int, body any) {
@@ -524,7 +563,7 @@ func Test__RetryAfterAnUnconfirmedPurchaseDoesNotChargeAgain(t *testing.T) {
 
 	requireGRPCCode(t, codes.Aborted, err)
 	assert.Equal(t, 1, f.patchCount(), "the retry must not send a second update")
-	assert.Equal(t, 3, f.getCount, "each purchase reads the subscription once; the retry reconciles first")
+	assert.Equal(t, new(1), f.pendingRenewalSeats(), "reconciliation restores the reduction without another purchase")
 	assert.Equal(t, 4, f.purchasedSeats())
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
 }

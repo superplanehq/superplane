@@ -51,7 +51,7 @@ func ApplySubscriptionEvent(ctx context.Context, tx *gorm.DB, event *Subscriptio
 }
 
 func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) error {
-	orgID, err := parseSubscriptionOrganizationID(data)
+	orgID, err := data.OrganizationID()
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,8 @@ func selectBusinessSubscription(items []SubscriptionData) *SubscriptionData {
 	return &items[0]
 }
 
-func parseSubscriptionOrganizationID(data SubscriptionData) (uuid.UUID, error) {
+// OrganizationID identifies the organization in a subscription snapshot.
+func (data SubscriptionData) OrganizationID() (uuid.UUID, error) {
 	orgID, err := uuid.Parse(data.organizationExternalID())
 	if err != nil {
 		return uuid.Nil, permanentApplyError("subscription customer external id is not an organization id")

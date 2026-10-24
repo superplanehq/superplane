@@ -1,0 +1,399 @@
+package seatrenewal
+
+import (
+	"context"
+	"net/http"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/polarfake"
+	"gorm.io/gorm"
+)
+
+type scheduleFixture struct {
+	t         *testing.T
+	r         *support.ResourceRegistry
+	polar     *polarfake.Server
+	sub       polarfake.Subscription
+	scheduler *Scheduler
+	now       time.Time
+}
+
+// newScheduleFixture is an organization with the owner and members-1 other
+// members on an active per-seat Polar subscription with the given seats.
+func newScheduleFixture(t *testing.T, seats, members int) *scheduleFixture {
+	t.Helper()
+	r := support.Setup(t)
+	t.Cleanup(r.Close)
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	f := &scheduleFixture{t: t, r: r, polar: polarfake.NewServer(t), now: time.Now().UTC().Truncate(time.Second)}
+	f.sub = f.polar.AddSeatPlan(database.Conn(), r.Organization.ID, seats, f.now.Add(10*24*time.Hour))
+	for range members - 1 {
+		support.CreateUser(t, r, r.Organization.ID)
+	}
+	f.scheduler = NewScheduler(database.Conn(), polar.NewClientFromEnv(), func() time.Time { return f.now })
+	return f
+}
+
+func (f *scheduleFixture) schedule() Result {
+	f.t.Helper()
+	result, err := f.scheduler.Schedule(context.Background(), f.r.Organization.ID)
+	require.NoError(f.t, err)
+	return result
+}
+
+func (f *scheduleFixture) updatePlan(values map[string]any) {
+	f.t.Helper()
+	require.NoError(f.t, database.Conn().Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", f.r.Organization.ID).Updates(values).Error)
+}
+
+func (f *scheduleFixture) plan() *models.OrganizationBillingPlan {
+	f.t.Helper()
+	plan, err := models.FindOrganizationBillingPlan(database.Conn(), f.r.Organization.ID)
+	require.NoError(f.t, err)
+	return plan
+}
+
+func nextPeriod(seats int) map[string]any {
+	return map[string]any{"seats": float64(seats), "proration_behavior": "next_period"}
+}
+
+func Test__ScheduleSetsTheNextPeriodSeatsToTheMemberCount(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+
+	result := f.schedule()
+
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, new(9), result.Target)
+	assert.Equal(t, new(10), result.NextPeriodSeats)
+	assert.Equal(t, new(10), result.CurrentSeats)
+	require.Len(t, f.polar.Patches(), 1)
+	assert.Equal(t, nextPeriod(9), f.polar.Patches()[0].Body)
+	sub := f.polar.Subscription(f.sub.ID)
+	assert.Equal(t, 10, sub.Seats, "the current period keeps its seats")
+	assert.Equal(t, new(9), sub.PendingSeats)
+
+	plan := f.plan()
+	assert.Equal(t, new(9), plan.RenewalSeatsScheduled)
+	require.NotNil(t, plan.RenewalSeatsScheduledAt)
+	assert.True(t, plan.RenewalSeatsScheduledAt.Equal(f.now))
+	assert.Equal(t, new(10), plan.PurchasedSeats)
+	assert.True(t, plan.CurrentPeriodEnd.Equal(f.sub.PeriodEnd))
+}
+
+type pausedSubscriptionClient struct {
+	Client
+	once   sync.Once
+	read   chan struct{}
+	resume chan struct{}
+}
+
+func (c *pausedSubscriptionClient) GetSubscription(ctx context.Context, id string) (*polar.SubscriptionData, error) {
+	snapshot, err := c.Client.GetSubscription(ctx, id)
+	c.once.Do(func() {
+		close(c.read)
+		<-c.resume
+	})
+	return snapshot, err
+}
+
+func Test__ConcurrentSchedulesCannotLeaveAnOlderRenewalTarget(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	client := &pausedSubscriptionClient{Client: polar.NewClientFromEnv(), read: make(chan struct{}), resume: make(chan struct{})}
+	first := NewScheduler(database.Conn(), client, time.Now)
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := first.Schedule(t.Context(), f.r.Organization.ID)
+		firstDone <- err
+		close(firstDone)
+	}()
+	<-client.read // A captured nine members and is paused outside the row lock.
+	var resume sync.Once
+	t.Cleanup(func() { resume.Do(func() { close(client.resume) }); require.NoError(t, <-firstDone) })
+
+	// Membership can still change while A is making an external request.
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	require.NoError(t, database.Conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := models.LockOrganization(tx, f.r.Organization.ID); err != nil {
+			return err
+		}
+		return tx.Model(&models.User{}).Where("organization_id = ? AND is_owner = false", f.r.Organization.ID).
+			Where("id = (SELECT id FROM users WHERE organization_id = ? AND is_owner = false LIMIT 1)", f.r.Organization.ID).
+			Update("deleted_at", time.Now()).Error
+	}))
+
+	second := NewScheduler(database.Conn(), polar.NewClientFromEnv(), time.Now)
+	secondDone := make(chan error, 1)
+	go func() {
+		_, err := second.Schedule(t.Context(), f.r.Organization.ID)
+		secondDone <- err
+	}()
+	// Without coordination, B completes with eight before A resumes. With
+	// coordination, B waits in PostgreSQL and reads its target after A ends.
+	completed := false
+	require.Eventually(t, func() bool {
+		select {
+		case err := <-secondDone:
+			require.NoError(t, err)
+			completed = true
+			return true
+		default:
+			var waiting bool
+			require.NoError(t, database.Conn().Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE wait_event = 'advisory' AND query LIKE '%pg_advisory_lock%')").Scan(&waiting).Error)
+			return waiting
+		}
+	}, 5*time.Second, 10*time.Millisecond)
+	resume.Do(func() { close(client.resume) })
+	if !completed {
+		require.NoError(t, <-secondDone)
+	}
+	require.NoError(t, <-firstDone)
+	assert.Equal(t, new(8), f.polar.Subscription(f.sub.ID).PendingSeats)
+	assert.Equal(t, new(8), f.plan().RenewalSeatsScheduled)
+}
+
+func Test__CanceledScheduleReleasesOrganizationCoordination(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	client := &pausedSubscriptionClient{Client: polar.NewClientFromEnv(), read: make(chan struct{}), resume: make(chan struct{})}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := NewScheduler(database.Conn(), client, time.Now).Schedule(ctx, f.r.Organization.ID)
+		done <- err
+	}()
+	<-client.read
+	cancel()
+	close(client.resume)
+	require.ErrorIs(t, <-done, context.Canceled)
+
+	retryCtx, retryCancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer retryCancel()
+	result, err := f.scheduler.Schedule(retryCtx, f.r.Organization.ID)
+	require.NoError(t, err, "a canceled request must release its session lock")
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, new(9), f.polar.Subscription(f.sub.ID).PendingSeats)
+}
+
+func Test__ScheduleRecordsTheCountPolarAlreadyRenews(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(9) })
+
+	// Polar already renews the member count, but nothing records a send of
+	// it. The record describes only counts SuperPlane sent, so the count is
+	// sent once and recorded. The send changes nothing in Polar.
+	result := f.schedule()
+
+	assert.Equal(t, ActionInSync, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	assert.Equal(t, new(9), f.polar.Subscription(f.sub.ID).PendingSeats)
+	plan := f.plan()
+	assert.Equal(t, new(9), plan.RenewalSeatsScheduled)
+	assert.True(t, plan.RenewalSeatsScheduledAt.Equal(f.now))
+
+	result = f.schedule()
+
+	assert.Equal(t, ActionInSync, result.Action)
+	assert.Len(t, f.polar.Patches(), 1, "the stored record matches the target now")
+}
+
+func Test__ScheduleSendsAgainWhenTheStoredRecordIsStale(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(9) })
+	require.NoError(t, f.plan().RecordScheduledRenewalSeats(database.Conn(), 8, f.now.Add(-time.Hour)))
+
+	// Polar renews the target, but the record names a count SuperPlane sent
+	// earlier. A matching Polar count alone never proves who set it, so the
+	// target is sent again and the record is repaired.
+	result := f.schedule()
+
+	assert.Equal(t, ActionInSync, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	plan := f.plan()
+	assert.Equal(t, new(9), plan.RenewalSeatsScheduled)
+	assert.True(t, plan.RenewalSeatsScheduledAt.Equal(f.now))
+}
+
+func Test__ScheduleBackToTheCurrentSeatsClearsTheScheduledReduction(t *testing.T) {
+	f := newScheduleFixture(t, 10, 10)
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(9) })
+
+	result := f.schedule()
+
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(10)}}, f.polar.Patches())
+	assert.Nil(t, f.polar.Subscription(f.sub.ID).PendingSeats)
+}
+
+func Test__ScheduleNeverSendsMoreSeatsThanTheCurrentPeriod(t *testing.T) {
+	// An outside change lowered the seats below the member count.
+	f := newScheduleFixture(t, 2, 3)
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(1) })
+
+	result := f.schedule()
+
+	assert.Equal(t, new(2), result.Target)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(2)}}, f.polar.Patches())
+
+	assert.Equal(t, ActionInSync, f.schedule().Action)
+	assert.Len(t, f.polar.Patches(), 1)
+}
+
+func Test__ScheduleSkipsOrganizationsWithoutARenewalSeatCountToKeep(t *testing.T) {
+	tests := []struct {
+		name   string
+		change func(f *scheduleFixture)
+		reason string
+	}{
+		{name: "plan is not per seat", reason: SkipNotPerSeat, change: func(f *scheduleFixture) {
+			catalog := models.BillingPlan{Key: "flat_" + uuid.NewString()[:8], Name: "Flat", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+			require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+			f.updatePlan(map[string]any{"plan_id": catalog.ID, "plan": catalog.Key})
+		}},
+		{name: "admin plan", reason: SkipAdminPlan, change: func(f *scheduleFixture) {
+			f.updatePlan(map[string]any{"plan_source": models.BillingPlanSourceAdmin})
+		}},
+		{name: "no subscription", reason: SkipNoSubscription, change: func(f *scheduleFixture) {
+			f.updatePlan(map[string]any{"polar_subscription_id": nil})
+		}},
+		{name: "renewal is past due", reason: SkipSubscriptionNotActive, change: func(f *scheduleFixture) {
+			f.updatePlan(map[string]any{"polar_subscription_status": models.PolarSubscriptionStatusPastDue})
+		}},
+		{name: "set to cancel", reason: SkipSubscriptionCanceling, change: func(f *scheduleFixture) {
+			f.updatePlan(map[string]any{"cancel_at_period_end": true})
+		}},
+		{name: "billing is off", reason: SkipNoRenewalQuantity, change: func(f *scheduleFixture) {
+			f.t.Setenv(models.BillingEnabledEnv, "no")
+		}},
+		{name: "seat purchase in flight", reason: SkipSeatPurchaseInFlight, change: func(f *scheduleFixture) {
+			purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 11)
+			require.NoError(t, purchase.Create(database.Conn()))
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newScheduleFixture(t, 10, 9)
+			tt.change(f)
+
+			result := f.schedule()
+
+			assert.Equal(t, ActionSkipped, result.Action)
+			assert.Equal(t, tt.reason, result.SkipReason)
+			assert.Empty(t, f.polar.Requests())
+		})
+	}
+}
+
+func Test__ScheduleSkipsWhenPolarReportsTheSubscriptionEnding(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.CancelAtPeriodEnd = true })
+
+	result := f.schedule()
+
+	assert.Equal(t, ActionSkipped, result.Action)
+	assert.Empty(t, f.polar.Patches())
+}
+
+func Test__ScheduleFailsAnAbandonedPurchaseAndSchedules(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12)
+	require.NoError(t, purchase.Create(database.Conn()))
+	require.NoError(t, purchase.UpdateStatus(database.Conn(), models.SeatPurchaseStatusUnknown, ""))
+
+	result := f.schedule()
+
+	// Polar still reports the original seats after the purchase, so the
+	// abandoned purchase failed and no longer blocks the renewal seat count.
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	stored, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.SeatPurchaseStatusFailed, stored.Status)
+	assert.Equal(t, models.SeatPurchaseErrorNotApplied, stored.ErrorCode)
+}
+
+func Test__ScheduleExpiresAPendingPurchaseAfterTheConfirmationWindow(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12)
+	require.NoError(t, purchase.Create(database.Conn()))
+	created := time.Now().Add(-polar.SeatPurchaseConfirmationWindow - time.Minute)
+	require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("id = ?", purchase.ID).Update("created_at", created).Error)
+
+	result := f.schedule()
+
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	stored, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.SeatPurchaseStatusFailed, stored.Status)
+	assert.Equal(t, models.SeatPurchaseErrorNotApplied, stored.ErrorCode)
+}
+
+func Test__ScheduleAppliesTheSnapshotThatConfirmsAPurchase(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12)
+	require.NoError(t, purchase.Create(database.Conn()))
+	require.NoError(t, purchase.UpdateStatus(database.Conn(), models.SeatPurchaseStatusUnknown, ""))
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.Seats = 12 })
+
+	result := f.schedule()
+
+	// Polar reports the purchased seats, so the purchase succeeded and the
+	// stored plan picks up the seats. The purchase replaced the scheduled
+	// count, so it is scheduled again.
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	stored, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, stored.Status)
+	assert.Equal(t, new(12), f.plan().PurchasedSeats)
+}
+
+func Test__ScheduleWithRetryRetriesOnlyTransientPolarFailures(t *testing.T) {
+	tests := []struct {
+		name     string
+		status   int
+		code     string
+		failures int
+		attempts int
+		fixed    bool
+	}{
+		{name: "rate limited", status: http.StatusTooManyRequests, failures: 2, attempts: 3, fixed: true},
+		{name: "subscription locked", status: http.StatusConflict, code: "SubscriptionLocked", failures: 1, attempts: 2, fixed: true},
+		{name: "server error", status: http.StatusBadGateway, failures: 2, attempts: 3, fixed: true},
+		{name: "outage longer than the retries", status: http.StatusServiceUnavailable, failures: 3, attempts: 3},
+		{name: "rejected values", status: http.StatusUnprocessableEntity, code: "RequestValidationError", failures: 1, attempts: 1},
+		{name: "unauthorized", status: http.StatusUnauthorized, failures: 1, attempts: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newScheduleFixture(t, 10, 9)
+			f.polar.FailNext(tt.failures, tt.status, tt.code)
+
+			f.scheduler.scheduleWithRetry(context.Background(), f.r.Organization.ID, []time.Duration{0, 0})
+
+			gets := 0
+			for _, request := range f.polar.Requests() {
+				if request.Method == http.MethodGet {
+					gets++
+				}
+			}
+			assert.Equal(t, tt.attempts, gets)
+			if tt.fixed {
+				assert.Equal(t, new(9), f.polar.Subscription(f.sub.ID).PendingSeats)
+				return
+			}
+			assert.Empty(t, f.polar.Patches())
+			assert.Nil(t, f.polar.Subscription(f.sub.ID).PendingSeats)
+		})
+	}
+}

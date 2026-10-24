@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -112,6 +113,8 @@ func PurchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 		if err := recordAppliedSeatPurchase(settleCtx, purchase, snapshot); err != nil {
 			return nil, err
 		}
+		// The invoice update replaced any scheduled renewal seat count.
+		seatrenewal.ScheduleAsync(settleCtx, organizationID)
 		return seatPurchaseResponse(ctx, organizationID, purchase), nil
 	}
 
@@ -359,7 +362,9 @@ func seatPurchaseResponse(ctx context.Context, orgID uuid.UUID, purchase *models
 func reconcileSeatPurchase(ctx context.Context, db *gorm.DB, orgID uuid.UUID) {
 	if err := polar.ReconcileSeatPurchase(ctx, db, polar.NewClientFromEnv(), orgID); err != nil {
 		log.WithError(err).WithField("organization_id", orgID.String()).Warn("could not reconcile the seat purchase")
+		return
 	}
+	seatrenewal.ScheduleAfterSeatPurchaseAsync(ctx, orgID)
 }
 
 func parseUserID(userID string) *uuid.UUID {
