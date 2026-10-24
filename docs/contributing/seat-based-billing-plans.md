@@ -227,6 +227,12 @@ local reads, Polar requests, and record write. API processes and workers use
 the same lock. Each schedule reads its target after it acquires this lock, so
 an older job cannot overwrite a newer scheduled target.
 
+Each process admits at most two schedules before it reserves database
+connections. API schedules and reconciliation workers share this limit.
+Other schedules wait without a database connection, and cancellation ends
+that wait. This leaves three connections in the default five-connection pool
+available for foreground requests, even when Polar is slow.
+
 Schedule reads local state under the organization row lock. It releases the
 row lock before it calls Polar. Membership changes do not wait for HTTP.
 After each update, it stores the target in

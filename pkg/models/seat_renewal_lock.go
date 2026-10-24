@@ -12,11 +12,24 @@ import (
 	"gorm.io/gorm"
 )
 
+// Reserve at most two connections for renewal schedules in each process.
+// The default pool has five connections; queued schedules wait here instead
+// of occupying connections that foreground requests need. API schedules and
+// reconciliation workers share this limit, including advisory-lock waiters.
+var seatRenewalScheduleSlots = make(chan struct{}, 2)
+
 // WithSeatRenewalScheduleLock serializes renewal schedules across processes.
 // The session lock spans HTTP calls without holding a transaction or row lock.
-// Local transactions use the same reserved connection, so waiting schedulers
-// cannot exhaust the pool and prevent the lock holder from finishing.
+// Admission is bounded before reserving a connection. Local transactions use
+// that reserved connection, so the lock holder does not need another slot.
 func WithSeatRenewalScheduleLock(db *gorm.DB, orgID uuid.UUID, schedule func(*gorm.DB) error) error {
+	select {
+	case seatRenewalScheduleSlots <- struct{}{}:
+		defer func() { <-seatRenewalScheduleSlots }()
+	case <-db.Statement.Context.Done():
+		return fmt.Errorf("wait for seat renewal scheduling capacity: %w", db.Statement.Context.Err())
+	}
+
 	key := "seat-renewal:" + orgID.String()
 	return db.Connection(func(conn *gorm.DB) (err error) {
 		if err := conn.Exec("SELECT pg_advisory_lock(hashtextextended(?, 0))", key).Error; err != nil {

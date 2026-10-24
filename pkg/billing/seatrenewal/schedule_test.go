@@ -184,6 +184,64 @@ func Test__CanceledScheduleReleasesOrganizationCoordination(t *testing.T) {
 	assert.Equal(t, new(9), f.polar.Subscription(f.sub.ID).PendingSeats)
 }
 
+func Test__SlowPolarSchedulesLeaveConnectionsForForegroundRequests(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	pool, err := database.Conn().DB()
+	require.NoError(t, err)
+	previousLimit := pool.Stats().MaxOpenConnections
+	pool.SetMaxOpenConns(5)
+	t.Cleanup(func() { pool.SetMaxOpenConns(previousLimit) })
+
+	client := &pausedSubscriptionClient{Client: f.scheduler.client, read: make(chan struct{}), resume: make(chan struct{})}
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := NewScheduler(database.Conn(), client, time.Now).Schedule(t.Context(), f.r.Organization.ID)
+		firstDone <- err
+		close(firstDone)
+	}()
+	<-client.read
+	var resume sync.Once
+	t.Cleanup(func() { resume.Do(func() { close(client.resume) }); require.NoError(t, <-firstDone) })
+
+	// Five more schedules for the same organization must wait without taking
+	// every connection. Their deadlines also exercise cancellation in the queue.
+	queuedCtx, cancelQueued := context.WithTimeout(t.Context(), time.Second)
+	defer cancelQueued()
+	queuedDone := make(chan error, 5)
+	for range 5 {
+		go func() {
+			_, err := f.scheduler.Schedule(queuedCtx, f.r.Organization.ID)
+			queuedDone <- err
+		}()
+	}
+
+	peakConnections := 0
+	foregroundFailures := 0
+	for remaining := 5; remaining > 0; {
+		select {
+		case err := <-queuedDone:
+			assert.ErrorIs(t, err, context.DeadlineExceeded)
+			remaining--
+		default:
+			peakConnections = max(peakConnections, pool.Stats().InUse)
+			ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+			if err := pool.PingContext(ctx); err != nil {
+				foregroundFailures++
+			}
+			cancel()
+			time.Sleep(time.Millisecond)
+		}
+	}
+	assert.Zero(t, foregroundFailures, "foreground database requests must finish while Polar is paused")
+	assert.LessOrEqual(t, peakConnections, 2, "renewal schedules must leave capacity in the five-connection pool")
+
+	resume.Do(func() { close(client.resume) })
+	require.NoError(t, <-firstDone)
+	result := f.schedule()
+	assert.Equal(t, ActionInSync, result.Action, "canceled waiters must release their scheduling capacity")
+	assert.Equal(t, new(9), f.polar.Subscription(f.sub.ID).PendingSeats)
+}
+
 func Test__ScheduleRecordsTheCountPolarAlreadyRenews(t *testing.T) {
 	f := newScheduleFixture(t, 10, 9)
 	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(9) })
