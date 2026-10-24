@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func TestInvitationSeatReservations(t *testing.T) {
@@ -92,7 +93,7 @@ func TestInvitationSeatReservations(t *testing.T) {
 	require.NoError(t, err)
 	stored, err = models.FindOrganizationInvitation(db, r.Organization.ID, stored.ID)
 	require.NoError(t, err)
-	require.Nil(t, stored.TokenHash)
+	require.NotNil(t, stored.TokenHash)
 	_, err = s.Resend(ctx, r.Organization.ID.String(), r.User.String(), first.Invitation.Id)
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	listed, err := s.List(ctx, r.Organization.ID.String())
@@ -402,4 +403,52 @@ func TestResendElevatedInvitationRequiresUpdatePermission(t *testing.T) {
 	stored, err = models.FindOrganizationInvitation(database.Conn(), r.Organization.ID, stored.ID)
 	require.NoError(t, err)
 	require.Equal(t, originalHash, *stored.TokenHash)
+}
+
+func TestInvitationEmailRoleLabels(t *testing.T) {
+	for _, tc := range []struct {
+		role, displayName, expected string
+		missing, lookupFailure      bool
+	}{
+		{role: models.RoleOrgAdmin, expected: "Admin"},
+		{role: models.RoleOrgMaintainer, expected: "Maintainer"},
+		{role: models.RoleOrgOperator, expected: "Operator"},
+		{role: "incident_responder", displayName: "Incident responder", expected: "Incident responder"},
+		{role: "empty_label", expected: "empty_label"},
+		{role: "missing_metadata", expected: "missing_metadata", missing: true},
+		{role: "unavailable_metadata", displayName: "Unavailable metadata", expected: "unavailable_metadata", lookupFailure: true},
+	} {
+		t.Run(tc.role, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			t.Setenv(models.BillingEnabledEnv, "no")
+			if !r.AuthService.IsDefaultRole(tc.role, models.DomainTypeOrganization) {
+				require.NoError(t, r.AuthService.CreateCustomRole(r.Organization.ID.String(), &authorization.RoleDefinition{Name: tc.role, DisplayName: tc.displayName, DomainType: models.DomainTypeOrganization, InheritsFrom: &authorization.RoleDefinition{Name: models.RoleOrgOperator}}))
+				if tc.missing {
+					require.NoError(t, models.DeleteRoleMetadata(tc.role, models.DomainTypeOrganization, r.Organization.ID.String()))
+				}
+			}
+			if tc.lookupFailure {
+				db := database.Conn()
+				callback := "test:fail_invitation_role_metadata"
+				require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+					if tx.Statement.Table == "role_metadata" {
+						tx.AddError(errors.New("metadata lookup interrupted"))
+					}
+				}))
+				defer db.Callback().Query().Remove(callback)
+			}
+			mail := services.NewNoopEmailService()
+			s := InvitationService{AuthService: r.AuthService, EmailService: mail, Entitlements: invitationEntitlements(true), BaseURL: "https://example.com"}
+			created, err := s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.CreateInvitationRequest{Email: "invitee@example.com", Role: tc.role})
+			require.NoError(t, err)
+			_, err = s.Resend(context.Background(), r.Organization.ID.String(), r.User.String(), created.Invitation.Id)
+			require.NoError(t, err)
+			emails := mail.SentOrganizationInvitationEmails()
+			require.Len(t, emails, 2)
+			for _, email := range emails {
+				require.Equal(t, tc.expected, email.Data.Role)
+			}
+		})
+	}
 }
