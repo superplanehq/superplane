@@ -119,7 +119,7 @@ func sendPlanningSessionMessage(
 	}
 	if err := models.AssertOrganizationPlanAllowsRuns(db, session.OrganizationID); err != nil {
 		if errors.Is(err, models.ErrHostedSubscriptionRequired) {
-			return nil, grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerSubscribeMessage)
+			return nil, grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
 		}
 		return nil, grpcerrors.Internal(err, "Could not verify the organization plan.")
 	}

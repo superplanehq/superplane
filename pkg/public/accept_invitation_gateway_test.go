@@ -63,9 +63,12 @@ func TestInvitationGatewayReportsPastDuePayment(t *testing.T) {
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	db := database.Conn()
-	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
+	productID := "prod_invite_" + uuid.NewString()
+	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: &productID, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+		ID: "sub_invite", ProductID: productID, Status: models.PolarSubscriptionStatusActive, PurchasedSeats: gatewaySeatCount(3),
+	}, nil)
 	require.NoError(t, err)
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
 		"purchased_seats":           3,
@@ -100,7 +103,10 @@ func TestInvitationGatewayReportsPastDuePayment(t *testing.T) {
 		{status: models.PolarSubscriptionStatusActive, blocked: false},
 	} {
 		t.Run(phase.status, func(t *testing.T) {
-			require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("polar_subscription_status", phase.status).Error)
+			_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+				ID: "sub_invite", ProductID: productID, Status: phase.status, PurchasedSeats: gatewaySeatCount(3),
+			}, nil)
+			require.NoError(t, err)
 			response := execRequest(server, requestParams{method: http.MethodGet, path: "/api/v1/organizations/" + r.Organization.ID.String() + "/invitations", authCookie: ownerCookie, headers: map[string]string{"x-organization-id": r.Organization.ID.String()}})
 			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 			var listed struct {

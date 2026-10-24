@@ -36,6 +36,56 @@ func TestVerifyOrganizationSubscriptionDeadline(t *testing.T) {
 	assert.Equal(t, "failed", verification)
 }
 
+func TestVerifyOrganizationSubscriptionProtectsLiveIdentity(t *testing.T) {
+	orgID := uuid.New()
+	periodEnd := time.Now().Add(7 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	for _, tc := range []struct {
+		name         string
+		status       string
+		cancelAtEnd  bool
+		verification string
+	}{
+		{name: "active", status: "active", verification: "active"},
+		{name: "active set to cancel", status: "active", cancelAtEnd: true, verification: "active"},
+		{name: "past due", status: "past_due", verification: "active"},
+		{name: "past due set to cancel", status: "past_due", cancelAtEnd: true, verification: "active"},
+		{name: "paused", status: "paused", verification: "active"},
+		{name: "paused set to cancel", status: "paused", cancelAtEnd: true, verification: "active"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			usePolarSubscriptionServer(t, orgID.String(), []map[string]any{{
+				"id": "sub_1", "status": tc.status, "cancel_at_period_end": tc.cancelAtEnd, "current_period_end": periodEnd,
+				"external_customer_id": orgID.String(),
+			}})
+
+			verification, err := VerifyOrganizationSubscription(context.Background(), orgID)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.verification, verification)
+		})
+	}
+}
+
+func TestApplySubscriptionStoresPastDueAtFromPolar(t *testing.T) {
+	org := setupBillingOrganization(t)
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	db := database.Conn()
+	failure := time.Now().Add(-2 * 24 * time.Hour).UTC().Truncate(time.Second)
+	body := fmt.Sprintf(`{"type":"subscription.updated","data":{"id":"sub_late","product_id":"prod_business","status":"past_due",
+		"past_due_at":%q,"current_period_start":%q,"current_period_end":%q,"external_customer_id":%q}}`,
+		failure.Format(time.RFC3339), time.Now().Add(-30*24*time.Hour).UTC().Format(time.RFC3339),
+		time.Now().Add(24*time.Hour).UTC().Format(time.RFC3339), org.ID.String())
+	var event SubscriptionWebhookEvent
+	require.NoError(t, json.Unmarshal([]byte(body), &event))
+
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, &event))
+
+	plan, err := models.FindOrganizationBillingPlan(db, org.ID)
+	require.NoError(t, err)
+	require.NotNil(t, plan.PastDueSince)
+	assert.True(t, plan.PastDueSince.Equal(failure))
+}
+
 func Test__ApplySubscriptionActivatesBusinessAndGrantsIncluded(t *testing.T) {
 	org := setupBillingOrganization(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))

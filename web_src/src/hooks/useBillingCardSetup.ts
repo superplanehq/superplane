@@ -5,6 +5,13 @@ import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
+/** Points a Polar portal session URL at the portal settings page, where payment methods are managed. */
+export function polarPortalSettingsUrl(portalUrl: string): string {
+  const portal = new URL(portalUrl);
+  portal.pathname = portal.pathname.replace(/\/portal(?:\/.*)?$/, "/portal/settings");
+  return portal.toString();
+}
+
 interface CardSetupPopup {
   opened: Window;
   hadPaymentMethod: boolean;
@@ -24,9 +31,7 @@ export function useBillingCardSetup(organizationId: string) {
         withOrganizationHeader({ organizationId, path: { id: organizationId }, body: {} }),
       );
       if (!response.data?.portalUrl) throw new Error("Could not open card setup. Try again.");
-      const portal = new URL(response.data.portalUrl);
-      portal.pathname = portal.pathname.replace(/\/portal(?:\/.*)?$/, "/portal/settings");
-      if (!popup.opened.closed) popup.opened.location.replace(portal.toString());
+      if (!popup.opened.closed) popup.opened.location.replace(polarPortalSettingsUrl(response.data.portalUrl));
       return popup;
     },
     onSuccess: setPopup,
