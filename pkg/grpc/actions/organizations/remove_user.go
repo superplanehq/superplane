@@ -24,6 +24,11 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 
 	var capacity polar.SeatCapacityCheck
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		// Serialize with invitation acceptance, which takes the same lock.
+		if _, err := models.LockOrganization(tx, orgUUID); err != nil {
+			return err
+		}
+
 		user, err := models.FindActiveUserByIDInTransaction(tx, orgID, userID)
 		if err != nil {
 			return err
@@ -33,6 +38,11 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 			if err := models.RefuseIfLastOrganizationOwner(tx, orgUUID, user.ID); err != nil {
 				return err
 			}
+		}
+
+		// Operator invitations grant no member management, so they stay valid.
+		if err := models.CancelPendingOrganizationInvitationsByInviter(tx, orgUUID, user.ID, models.RoleOrgOperator); err != nil {
+			return err
 		}
 
 		roles, err := authService.GetUserRolesForOrg(ctx, user.ID.String(), orgID)

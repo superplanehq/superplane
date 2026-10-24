@@ -279,6 +279,97 @@ func TestSeatsOverCapacityResolvesWhenSeatsCoverMembers(t *testing.T) {
 	require.Nil(t, f.overCapacitySince())
 }
 
+func TestSeatsOverCapacityUsesFinalVerifiedSubscription(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		storedStillLive    bool
+		verificationFails  bool
+		replacementStatus  string
+		replacementSeats   int
+		wantOverCapacity   bool
+		wantResolutionLogs int
+	}{
+		{name: "conflicting live subscription is ignored", storedStillLive: true, replacementStatus: "active", replacementSeats: 2, wantOverCapacity: true},
+		{name: "replacement remains over capacity", replacementStatus: "active", replacementSeats: 1, wantOverCapacity: true},
+		{name: "replacement covers members", replacementStatus: "active", replacementSeats: 2, wantResolutionLogs: 1},
+		{name: "ended replacement clears silently", replacementStatus: "canceled", replacementSeats: 2},
+		{name: "failed verification rolls back", verificationFails: true, wantOverCapacity: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newSeatPurchaseFixture(t, 1, new(50))
+			logs := captureSeatLogs(t)
+			f.addMembers(1)
+			f.replay(models.PolarSubscriptionStatusActive, 1)
+			since := f.overCapacitySince()
+			require.NotNil(t, since)
+			logs.hook.Reset()
+			replacementID := "sub_" + uuid.NewString()
+			server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+				require.Equal(t, http.MethodGet, req.Method)
+				data := f.snapshot(1)
+				data["modified_at"] = time.Now().Add(5 * time.Minute).UTC().Format(time.RFC3339)
+				switch req.URL.Path {
+				case "/subscriptions/" + f.subscriptionID:
+					data["status"] = models.PolarSubscriptionStatusCanceled
+					if tc.storedStillLive {
+						data["status"] = models.PolarSubscriptionStatusActive
+					}
+				case "/subscriptions/" + replacementID:
+					if tc.verificationFails {
+						http.Error(w, "verification failed", http.StatusInternalServerError)
+						return
+					}
+					data["id"] = replacementID
+					data["status"] = tc.replacementStatus
+					data["seats"] = tc.replacementSeats
+				default:
+					t.Errorf("unexpected Polar request: %s", req.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				f.writeJSON(w, http.StatusOK, data)
+			})
+			usePolarTestServer(t, server)
+
+			// The unverified event claims sufficient seats. Only the verified
+			// final snapshot can change capacity or produce a resolution log.
+			incoming := f.snapshot(2)
+			incoming["id"] = replacementID
+			body, err := json.Marshal(incoming)
+			require.NoError(t, err)
+			var data polar.SubscriptionData
+			require.NoError(t, json.Unmarshal(body, &data))
+			err = polar.ApplySubscription(t.Context(), database.Conn(), data)
+			if tc.verificationFails {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			plan := f.plan()
+			if tc.wantOverCapacity {
+				require.NotNil(t, plan.OverCapacitySince)
+				require.True(t, since.Equal(*plan.OverCapacitySince))
+			} else {
+				require.Nil(t, plan.OverCapacitySince)
+			}
+			if tc.storedStillLive || tc.verificationFails || tc.replacementStatus == "canceled" {
+				require.Equal(t, f.subscriptionID, *plan.PolarSubscriptionID)
+			} else {
+				require.Equal(t, replacementID, *plan.PolarSubscriptionID)
+			}
+			require.Empty(t, logs.overCapacity())
+			resolved := logs.resolved()
+			require.Len(t, resolved, tc.wantResolutionLogs)
+			if len(resolved) > 0 {
+				require.Equal(t, replacementID, resolved[0].Data["subscription_id"])
+				require.Equal(t, 2, resolved[0].Data["purchased"])
+				require.Equal(t, 2, resolved[0].Data["occupied"])
+			}
+		})
+	}
+}
+
 func TestSeatsOverCapacityClearsSilentlyWhenPlanHasNoSeats(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 1, new(50))
 	logs := captureSeatLogs(t)

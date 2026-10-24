@@ -386,6 +386,7 @@ func (c *Client) CreateCheckout(ctx context.Context, input CheckoutInput) (*Chec
 		body["seats"] = *input.Seats
 		body["min_seats"] = *input.Seats
 		body["max_seats"] = *input.Seats
+		body["allow_discount_codes"] = false
 	}
 	return c.createCheckout(ctx, body)
 }

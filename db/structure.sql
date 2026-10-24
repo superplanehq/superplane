@@ -1338,6 +1338,18 @@ CREATE TABLE public.organization_invitation_replaced_tokens (
 
 
 --
+-- Name: organization_invitation_sends; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_invitation_sends (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    email character varying(255) NOT NULL,
+    sent_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2907,6 +2919,14 @@ ALTER TABLE ONLY public.organization_hosted_model_allowlists
 
 ALTER TABLE ONLY public.organization_invitation_replaced_tokens
     ADD CONSTRAINT organization_invitation_replaced_tokens_pkey PRIMARY KEY (token_hash);
+
+
+--
+-- Name: organization_invitation_sends organization_invitation_sends_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_sends
+    ADD CONSTRAINT organization_invitation_sends_pkey PRIMARY KEY (id);
 
 
 --
@@ -4608,6 +4628,27 @@ CREATE INDEX organization_invitation_replaced_tokens_invitation_id_idx ON public
 
 
 --
+-- Name: organization_invitation_sends_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_email_sent_at_idx ON public.organization_invitation_sends USING btree (email, sent_at);
+
+
+--
+-- Name: organization_invitation_sends_organization_id_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_organization_id_email_sent_at_idx ON public.organization_invitation_sends USING btree (organization_id, email, sent_at);
+
+
+--
+-- Name: organization_invitation_sends_organization_id_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_organization_id_sent_at_idx ON public.organization_invitation_sends USING btree (organization_id, sent_at);
+
+
+--
 -- Name: organization_invitations_pending_email_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5602,6 +5643,14 @@ ALTER TABLE ONLY public.organization_invitation_replaced_tokens
 
 
 --
+-- Name: organization_invitation_sends organization_invitation_sends_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_sends
+    ADD CONSTRAINT organization_invitation_sends_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_invitations organization_invitations_accepted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6177,7 +6226,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261024160634	f
+20261024192424	f
 \.
 
 

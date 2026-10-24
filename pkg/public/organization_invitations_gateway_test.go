@@ -3,6 +3,7 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -24,9 +25,12 @@ func TestInvitationGatewayPermissionsAndCapacityDetails(t *testing.T) {
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	db := database.Conn()
-	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
+	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+		ID: "sub_" + uuid.NewString(), ProductID: *plan.PolarProductID,
+		Status: models.PolarSubscriptionStatusActive, PurchasedSeats: new(1),
+	}, nil)
 	require.NoError(t, err)
 	path := "/api/v1/organizations/" + r.Organization.ID.String() + "/invitations"
 	response := execRequest(server, requestParams{method: http.MethodPost, path: path, authCookie: token, headers: map[string]string{"x-organization-id": r.Organization.ID.String()}, contentType: "application/json", body: []byte(`{"email":"recipient@example.com"}`)})
@@ -111,3 +115,38 @@ func TestInvitationGatewayPermissionsAndCapacityDetails(t *testing.T) {
 }
 
 func gatewaySeatCount(count int) *int { return &count }
+
+func TestInvitationGatewayLimitReasons(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
+	server.InitRouter()
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
+	t.Setenv(models.BillingEnabledEnv, "no")
+	path := "/api/v1/organizations/" + r.Organization.ID.String() + "/invitations"
+	invite := func(email string) *httptest.ResponseRecorder {
+		body := []byte(`{"email":"` + email + `"}`)
+		return execRequest(server, requestParams{method: http.MethodPost, path: path, authCookie: token, headers: map[string]string{"x-organization-id": r.Organization.ID.String()}, contentType: "application/json", body: body})
+	}
+	requireReason := func(response *httptest.ResponseRecorder, status int, reason string) {
+		t.Helper()
+		require.Equal(t, status, response.Code, response.Body.String())
+		var body struct {
+			Details []struct {
+				Type   string `json:"@type"`
+				Reason string `json:"reason"`
+			} `json:"details"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		require.Len(t, body.Details, 1)
+		require.Equal(t, "type.googleapis.com/google.rpc.ErrorInfo", body.Details[0].Type)
+		require.Equal(t, reason, body.Details[0].Reason)
+	}
+
+	t.Setenv("PENDING_INVITATION_LIMIT", "1")
+	require.Equal(t, http.StatusOK, invite("first@example.com").Code)
+	requireReason(invite("second@example.com"), http.StatusBadRequest, "PENDING_INVITATION_LIMIT_REACHED")
+
+	t.Setenv("PENDING_INVITATION_LIMIT", "100")
+	t.Setenv("INVITATION_ORG_HOURLY_LIMIT", "1")
+	requireReason(invite("second@example.com"), http.StatusTooManyRequests, "INVITATION_RATE_LIMITED")
+}

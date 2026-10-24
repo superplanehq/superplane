@@ -77,6 +77,14 @@ func ExpireOrganizationInvitations(tx *gorm.DB, orgID uuid.UUID, now time.Time) 
 	return tx.Model(&OrganizationInvitation{}).Where("organization_id = ? AND state = ? AND expires_at <= ?", orgID, InvitationStatePending, now).Updates(map[string]any{"state": InvitationStateExpired}).Error
 }
 
+// CancelPendingOrganizationInvitationsByInviter cancels every pending
+// invitation that the inviter sent, except invitations for keepRole.
+func CancelPendingOrganizationInvitationsByInviter(tx *gorm.DB, orgID, inviterID uuid.UUID, keepRole string) error {
+	return tx.Model(&OrganizationInvitation{}).
+		Where("organization_id = ? AND invited_by = ? AND state = ? AND role <> ?", orgID, inviterID, InvitationStatePending, keepRole).
+		Updates(map[string]any{"state": InvitationStateCanceled}).Error
+}
+
 func invitationQuery(tx *gorm.DB, orgID uuid.UUID) *gorm.DB {
 	return tx.Model(&OrganizationInvitation{}).Select("organization_invitations.*, users.name AS inviter_name").Joins("LEFT JOIN users ON users.id = organization_invitations.invited_by AND users.organization_id = organization_invitations.organization_id").Where("organization_invitations.organization_id = ?", orgID)
 }

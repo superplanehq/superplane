@@ -130,6 +130,29 @@ func Test__NodeRequestCleanupWorker_DeletesExpiredDatadogWebhookReceipts(t *test
 	assert.Equal(t, int64(1), countDatadogReceiptsByID(t, recent))
 }
 
+func Test__NodeRequestCleanupWorker_DeletesExpiredOrganizationInvitationSends(t *testing.T) {
+	r := support.Setup(t)
+	now := time.Now().UTC()
+
+	expiredAt := now.Add(-models.OrganizationInvitationSendRetention - time.Hour)
+	require.NoError(t, models.RecordOrganizationInvitationSend(database.Conn(), r.Organization.ID, "expired@example.com", expiredAt))
+	require.NoError(t, models.RecordOrganizationInvitationSend(database.Conn(), r.Organization.ID, "recent@example.com", now))
+
+	worker := NewNodeRequestCleanupWorker()
+	worker.deleteExpiredOrganizationInvitationSends()
+
+	assert.Equal(t, int64(0), countOrganizationInvitationSendsByEmail(t, "expired@example.com"))
+	assert.Equal(t, int64(1), countOrganizationInvitationSendsByEmail(t, "recent@example.com"))
+}
+
+func countOrganizationInvitationSendsByEmail(t *testing.T, email string) int64 {
+	t.Helper()
+
+	var count int64
+	require.NoError(t, database.Conn().Model(&models.OrganizationInvitationSend{}).Where("email = ?", email).Count(&count).Error)
+	return count
+}
+
 func createLinearReceiptForCleanup(t *testing.T, receivedAt time.Time) uuid.UUID {
 	t.Helper()
 

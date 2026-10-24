@@ -214,7 +214,12 @@ func TestInvitationFinalSeatConcurrent(t *testing.T) {
 
 func requireInvitationReason(t *testing.T, err error, reason string) {
 	t.Helper()
-	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	requireInvitationErrorReason(t, err, codes.FailedPrecondition, reason)
+}
+
+func requireInvitationErrorReason(t *testing.T, err error, code codes.Code, reason string) {
+	t.Helper()
+	require.Equal(t, code, grpcerrors.Code(err))
 	details := status.Convert(err).Details()
 	require.Len(t, details, 1)
 	require.Equal(t, reason, details[0].(*errdetails.ErrorInfo).Reason)
@@ -287,9 +292,21 @@ func TestInvitationCapacityPolicies(t *testing.T) {
 			}
 			db := database.Conn()
 			plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Invitation plan", Category: "paid", Visibility: "private", PerSeat: tc.perSeat, SeatLimit: tc.maximum, CreditFrequency: "none", CreditExpiration: "never"}
+			if tc.perSeat {
+				plan.PolarProductID = new("prod_" + uuid.NewString())
+			}
 			require.NoError(t, models.SaveBillingPlan(db, &plan))
-			_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
-			require.NoError(t, err)
+			if tc.perSeat {
+				_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+					ID: "sub_" + uuid.NewString(), ProductID: *plan.PolarProductID,
+					Status: models.PolarSubscriptionStatusActive, PurchasedSeats: new(1),
+				}, nil)
+				require.NoError(t, err)
+			}
+			if !tc.perSeat {
+				_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+				require.NoError(t, err)
+			}
 			require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", tc.purchased).Error)
 			if tc.override != nil || tc.unlimitedOverride {
 				require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, tc.override))

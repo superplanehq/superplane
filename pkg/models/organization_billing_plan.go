@@ -31,6 +31,7 @@ const (
 	PolarSubscriptionStatusRevoked    = "revoked"
 	PolarSubscriptionStatusPastDue    = "past_due"
 	PolarSubscriptionStatusIncomplete = "incomplete"
+	PolarSubscriptionStatusPaused     = "paused"
 
 	DefaultIncludedGrantCents  int64 = 5000
 	DefaultIncludedGrantMonths       = 1
@@ -38,12 +39,13 @@ const (
 )
 
 var (
-	ErrPaymentMethodRequired      = errors.New("add a payment method in organization billing before usage")
-	ErrHostedSubscriptionRequired = errors.New("an active plan is required to run agents")
-	ErrInvalidBillingPlan         = errors.New("billing plan is invalid")
-	ErrInvalidPurchasedSeats      = errors.New("purchased seats must be a nonnegative integer")
-	ErrBillingPlanChanged         = errors.New("the billing record changed. Refresh and try again")
-	ErrPolarManagedBillingPlan    = errors.New("this organization uses Polar for billing. Cancel or change the subscription in Polar")
+	ErrPaymentMethodRequired          = errors.New("add a payment method in organization billing before usage")
+	ErrHostedSubscriptionRequired     = errors.New("an active plan is required to run agents")
+	ErrInvalidBillingPlan             = errors.New("billing plan is invalid")
+	ErrInvalidPurchasedSeats          = errors.New("purchased seats must be a nonnegative integer")
+	ErrPolarSubscriptionRefreshFailed = errors.New("stored Polar subscription refresh failed")
+	ErrBillingPlanChanged             = errors.New("the billing record changed. Refresh and try again")
+	ErrPolarManagedBillingPlan        = errors.New("this organization uses Polar for billing. Cancel or change the subscription in Polar")
 )
 
 // OrganizationBillingPlan is the org plan and Polar subscription period.
@@ -98,6 +100,31 @@ type PolarSubscriptionApply struct {
 	CancelAtPeriodEnd bool
 	ModifiedAt        *time.Time
 	PurchasedSeats    *int
+	// Verified marks a snapshot that a direct Polar API call returned. Webhook
+	// payloads are unverified: they can arrive delayed and claim access that
+	// Polar already ended.
+	Verified bool
+}
+
+type PolarSubscriptionDisposition string
+
+const (
+	PolarSubscriptionApplied         PolarSubscriptionDisposition = "applied"
+	PolarSubscriptionIgnored         PolarSubscriptionDisposition = "ignored"
+	PolarSubscriptionRefreshRequired PolarSubscriptionDisposition = "refresh_required"
+	// PolarSubscriptionVerificationRequired asks the caller to fetch the
+	// incoming subscription from the Polar API and retry with the verified
+	// snapshot before it can replace an ended stored subscription.
+	PolarSubscriptionVerificationRequired PolarSubscriptionDisposition = "verification_required"
+)
+
+// PolarSubscriptionApplyResult describes an accepted or ignored snapshot.
+// RefreshedStored carries the ended subscription's effects before a replacement.
+type PolarSubscriptionApplyResult struct {
+	Plan            *OrganizationBillingPlan
+	GrantIncluded   bool
+	Disposition     PolarSubscriptionDisposition
+	RefreshedStored *PolarSubscriptionApplyResult
 }
 
 func (OrganizationBillingPlan) TableName() string {
@@ -178,6 +205,27 @@ func PolarSubscriptionIsPaid(status string) bool {
 // PolarSubscriptionIsPastDue is true while Polar retries a failed renewal payment.
 func PolarSubscriptionIsPastDue(status string) bool {
 	return strings.ToLower(strings.TrimSpace(status)) == PolarSubscriptionStatusPastDue
+}
+
+// PolarSubscriptionIsLive protects subscription identity, including failed renewals
+// and paused subscriptions that can resume.
+// Paid access remains governed by PolarSubscriptionIsPaid and the billing period.
+func PolarSubscriptionIsLive(status string, cancelAtPeriodEnd bool, periodEnd *time.Time, now time.Time) bool {
+	return PolarSubscriptionIsPaid(status) || PolarSubscriptionIsPastDue(status) ||
+		strings.ToLower(strings.TrimSpace(status)) == PolarSubscriptionStatusPaused ||
+		cancelAtPeriodEnd && periodStillOpen(periodEnd, now)
+}
+
+// PolarSubscriptionStatusIsKnown rejects unusable snapshots before conflict resolution.
+func PolarSubscriptionStatusIsKnown(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case PolarSubscriptionStatusActive, PolarSubscriptionStatusTrialing, PolarSubscriptionStatusCanceled,
+		PolarSubscriptionStatusUnpaid, PolarSubscriptionStatusRevoked, PolarSubscriptionStatusPastDue,
+		PolarSubscriptionStatusIncomplete, "incomplete_expired", PolarSubscriptionStatusPaused:
+		return true
+	default:
+		return false
+	}
 }
 
 // AssignAdminPlanAfterPolarVerification requires a confirmed absence from Polar.
@@ -388,6 +436,11 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 	if err != nil {
 		return nil, ErrInvalidBillingPlan
 	}
+	if catalog.PerSeat {
+		// Preserve the billing API's required override guidance.
+		//revive:disable-next-line:error-strings
+		return nil, errors.New("Per-seat plans need a Polar subscription. Use a seat limit override instead.")
+	}
 	if catalog.RequirePaymentMethod {
 		return nil, errors.New("Plans that require a payment method cannot be assigned by an admin")
 	}
@@ -420,124 +473,225 @@ func ActivateOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, planKey strin
 	return setOrganizationBillingPlan(tx, orgID, catalog, BillingPlanSourceSystem, nil)
 }
 
-func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionApply) (*OrganizationBillingPlan, bool, error) {
-	var saved *OrganizationBillingPlan
-	var grantIncluded bool
+// ApplyPolarSubscription checks identity before snapshot ordering or side effects.
+// The caller can refresh a conflicting stored subscription and retry under its lock.
+func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionApply, refreshedStored *PolarSubscriptionApply) (*PolarSubscriptionApplyResult, error) {
+	var result *PolarSubscriptionApplyResult
 	err := tx.Transaction(func(inner *gorm.DB) error {
 		if _, err := LockOrganization(inner, orgID); err != nil {
 			return err
 		}
-		existing, err := EnsureOrganizationBillingPlan(inner, orgID)
-		if err != nil {
-			return err
-		}
-		existing, err = lockOrganizationBillingPlan(inner, orgID)
+		existing, err := lockOrganizationBillingPlan(inner, orgID)
 		if err != nil {
 			return err
 		}
 		if existing == nil {
-			return fmt.Errorf("organization billing plan is missing")
-		}
-		if polarSnapshotIsStale(existing, sub.ModifiedAt) {
-			log.WithFields(log.Fields{
-				"organization_id":      orgID.String(),
-				"polar_modified_at":    existing.PolarModifiedAt,
-				"incoming_modified_at": sub.ModifiedAt,
-			}).Warn("skipped stale polar subscription snapshot")
-			saved = existing
-			return nil
-		}
-		// Only a snapshot fresh enough to apply can prove the outcome of an
-		// in-flight seat purchase. A stale snapshot can report seats that
-		// Polar no longer has, so it must not settle a purchase.
-		if err := SettleSeatPurchase(inner, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
-			return err
-		}
-		catalog, catalogErr := FindBillingPlanByProduct(inner, sub.ProductID)
-		if catalogErr != nil && !errors.Is(catalogErr, gorm.ErrRecordNotFound) {
-			return catalogErr
-		}
-		if sub.PurchasedSeats != nil && *sub.PurchasedSeats < 0 || catalog.PerSeat && sub.PurchasedSeats == nil {
-			return ErrInvalidPurchasedSeats
-		}
-
-		now := time.Now()
-		next := *existing
-		next.PlanSource = BillingPlanSourcePolar
-		next.UpdatedAt = now
-		next.PolarModifiedAt = polarSnapshotModifiedAt(existing.PolarModifiedAt, sub.ModifiedAt)
-		next.PurchasedSeats = sub.PurchasedSeats
-		if strings.TrimSpace(sub.ID) != "" {
-			id := strings.TrimSpace(sub.ID)
-			next.PolarSubscriptionID = &id
-		}
-		next.PolarSubscriptionStatus = strings.ToLower(strings.TrimSpace(sub.Status))
-		next.CancelAtPeriodEnd = sub.CancelAtPeriodEnd
-		if sub.PeriodStart != nil {
-			start := sub.PeriodStart.UTC()
-			next.CurrentPeriodStart = &start
-		}
-		if sub.PeriodEnd != nil {
-			end := sub.PeriodEnd.UTC()
-			next.CurrentPeriodEnd = &end
-		}
-
-		if polarPaidAccessContinues(&next, now) {
-			if catalogErr != nil {
-				return fmt.Errorf("unknown subscription product: %w", catalogErr)
-			}
-			if catalog.Category != "paid" {
-				return ErrInvalidBillingPlan
-			}
-			next.Plan = catalog.ResponsePlan()
-			next.PlanID = catalog.ID
-			next.Catalog = *catalog
-		} else if polarSubscriptionIsCanceled(next.PolarSubscriptionStatus) || polarScheduledCancelEnded(&next, now) {
-			next.Plan = planAfterPaidSubscriptionEnds(&next, now)
-			catalog, err := FindBillingPlan(inner, next.Plan)
+			existing, err = EnsureOrganizationBillingPlan(inner, orgID)
 			if err != nil {
 				return err
 			}
-			next.PlanID = catalog.ID
-			next.Catalog = *catalog
 		}
 
-		err = inner.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "organization_id"}},
-			DoUpdates: clause.AssignmentColumns([]string{
-				"plan",
-				"plan_id",
-				"plan_source",
-				"polar_subscription_id",
-				"polar_subscription_status",
-				"cancel_at_period_end",
-				"polar_modified_at",
-				"purchased_seats",
-				"current_period_start",
-				"current_period_end",
-				"trial_started_at",
-				"trial_ends_at",
-				"updated_at",
-			}),
-		}).Omit("Catalog").Create(&next).Error
+		now := time.Now()
+		var refreshedResult *PolarSubscriptionApplyResult
+		if existing.PolarSubscriptionID != nil && strings.TrimSpace(*existing.PolarSubscriptionID) != "" && !samePolarSubscription(existing, sub.ID) {
+			fields := log.Fields{
+				"organization_id":              orgID.String(),
+				"stored_subscription_id":       strings.TrimSpace(*existing.PolarSubscriptionID),
+				"incoming_subscription_id":     strings.TrimSpace(sub.ID),
+				"stored_subscription_status":   existing.PolarSubscriptionStatus,
+				"incoming_subscription_status": strings.ToLower(strings.TrimSpace(sub.Status)),
+			}
+			if PolarSubscriptionIsLive(existing.PolarSubscriptionStatus, existing.CancelAtPeriodEnd, existing.CurrentPeriodEnd, now) {
+				if !PolarSubscriptionIsLive(sub.Status, sub.CancelAtPeriodEnd, sub.PeriodEnd, now) {
+					if err := settleIgnoredForeignSeatPurchase(inner, orgID, sub); err != nil {
+						return err
+					}
+					log.WithFields(fields).Warn("billing.foreign_subscription_snapshot_ignored")
+					result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}
+					return nil
+				}
+				if refreshedStored == nil {
+					result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionRefreshRequired}
+					return nil
+				}
+				if !samePolarSubscription(existing, refreshedStored.ID) {
+					return fmt.Errorf("%w: subscription does not match stored identity", ErrPolarSubscriptionRefreshFailed)
+				}
+				if !PolarSubscriptionStatusIsKnown(refreshedStored.Status) {
+					return fmt.Errorf("%w: unexpected status %q", ErrPolarSubscriptionRefreshFailed, refreshedStored.Status)
+				}
+				// Same-subscription snapshots retain omitted periods when applied.
+				refreshedPeriodEnd := refreshedStored.PeriodEnd
+				if refreshedPeriodEnd == nil {
+					refreshedPeriodEnd = existing.CurrentPeriodEnd
+				}
+				if PolarSubscriptionIsLive(refreshedStored.Status, refreshedStored.CancelAtPeriodEnd, refreshedPeriodEnd, now) {
+					fields["stored_subscription_status"] = strings.ToLower(strings.TrimSpace(refreshedStored.Status))
+					log.WithFields(fields).Error("billing.multiple_live_subscriptions")
+					result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}
+					return nil
+				}
+				if polarSnapshotIsStale(existing, refreshedStored.ModifiedAt) {
+					return fmt.Errorf("%w: cancellation is older than stored subscription", ErrPolarSubscriptionRefreshFailed)
+				}
+				refreshedResult, err = applyPolarSubscriptionSnapshot(inner, existing, *refreshedStored)
+				if err != nil {
+					return fmt.Errorf("%w: %w", ErrPolarSubscriptionRefreshFailed, err)
+				}
+				existing = refreshedResult.Plan
+			}
+			// The stored subscription has ended, so its timestamp no longer
+			// orders a foreign snapshot: a delayed event can claim access that
+			// Polar already ended. Accept a different subscription only after
+			// the caller verifies it against the Polar API, and only while the
+			// verified subscription is live.
+			if !PolarSubscriptionIsLive(sub.Status, sub.CancelAtPeriodEnd, sub.PeriodEnd, now) {
+				if err := settleIgnoredForeignSeatPurchase(inner, orgID, sub); err != nil {
+					return err
+				}
+				log.WithFields(fields).Warn("billing.foreign_subscription_snapshot_ignored")
+				result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored, RefreshedStored: refreshedResult}
+				return nil
+			}
+			if !sub.Verified {
+				result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionVerificationRequired, RefreshedStored: refreshedResult}
+				return nil
+			}
+		}
+
+		result, err = applyPolarSubscriptionSnapshot(inner, existing, sub)
 		if err != nil {
 			return err
 		}
-
-		saved, err = loadedOrganizationBillingPlan(inner, orgID)
-		if err != nil {
-			return err
-		}
-		if err := addInitialPlanTrialCredit(inner, existing, saved); err != nil {
-			return err
-		}
-		grantIncluded = shouldGrantIncludedUsage(existing, saved)
+		result.RefreshedStored = refreshedResult
 		return nil
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	return saved, grantIncluded, nil
+	return result, nil
+}
+
+func samePolarSubscription(existing *OrganizationBillingPlan, subscriptionID string) bool {
+	return existing.PolarSubscriptionID != nil && strings.TrimSpace(*existing.PolarSubscriptionID) == strings.TrimSpace(subscriptionID)
+}
+
+// settleIgnoredForeignSeatPurchase settles the in-flight purchase of a
+// subscription whose snapshot cannot replace the stored one. The snapshot
+// must be newer than the purchase: an old seat count does not prove success.
+// Fresh snapshots unblock purchases without changing the replacement's state.
+func settleIgnoredForeignSeatPurchase(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionApply) error {
+	if sub.ModifiedAt == nil {
+		return nil
+	}
+	purchase, err := FindInFlightSeatPurchase(tx, orgID)
+	if err != nil || purchase == nil || !sub.ModifiedAt.After(purchase.CreatedAt) {
+		return err
+	}
+	return SettleSeatPurchase(tx, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt)
+}
+
+func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPlan, sub PolarSubscriptionApply) (*PolarSubscriptionApplyResult, error) {
+	orgID := existing.OrganizationID
+	if samePolarSubscription(existing, sub.ID) && polarSnapshotIsStale(existing, sub.ModifiedAt) {
+		log.WithFields(log.Fields{
+			"organization_id":      orgID.String(),
+			"polar_modified_at":    existing.PolarModifiedAt,
+			"incoming_modified_at": sub.ModifiedAt,
+		}).Warn("skipped stale polar subscription snapshot")
+		return &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}, nil
+	}
+	// Only a snapshot fresh enough to apply can prove the outcome of an
+	// in-flight seat purchase. A stale snapshot can report seats that
+	// Polar no longer has, so it must not settle a purchase.
+	if err := SettleSeatPurchase(tx, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
+		return nil, err
+	}
+	catalog, catalogErr := FindBillingPlanByProduct(tx, sub.ProductID)
+	if catalogErr != nil && !errors.Is(catalogErr, gorm.ErrRecordNotFound) {
+		return nil, catalogErr
+	}
+	if sub.PurchasedSeats != nil && *sub.PurchasedSeats < 0 || catalog.PerSeat && sub.PurchasedSeats == nil {
+		return nil, ErrInvalidPurchasedSeats
+	}
+
+	now := time.Now()
+	next := *existing
+	next.PlanSource = BillingPlanSourcePolar
+	next.UpdatedAt = now
+	if !samePolarSubscription(existing, sub.ID) {
+		next.PolarModifiedAt = nil
+		next.CurrentPeriodStart = nil
+		next.CurrentPeriodEnd = nil
+	}
+	next.PolarModifiedAt = polarSnapshotModifiedAt(next.PolarModifiedAt, sub.ModifiedAt)
+	next.PurchasedSeats = sub.PurchasedSeats
+	if strings.TrimSpace(sub.ID) != "" {
+		id := strings.TrimSpace(sub.ID)
+		next.PolarSubscriptionID = &id
+	}
+	next.PolarSubscriptionStatus = strings.ToLower(strings.TrimSpace(sub.Status))
+	next.CancelAtPeriodEnd = sub.CancelAtPeriodEnd
+	if sub.PeriodStart != nil {
+		start := sub.PeriodStart.UTC()
+		next.CurrentPeriodStart = &start
+	}
+	if sub.PeriodEnd != nil {
+		end := sub.PeriodEnd.UTC()
+		next.CurrentPeriodEnd = &end
+	}
+
+	if polarPaidAccessContinues(&next, now) {
+		if catalogErr != nil {
+			return nil, fmt.Errorf("unknown subscription product: %w", catalogErr)
+		}
+		if catalog.Category != "paid" {
+			return nil, ErrInvalidBillingPlan
+		}
+		next.Plan = catalog.ResponsePlan()
+		next.PlanID = catalog.ID
+		next.Catalog = *catalog
+	} else if polarSubscriptionIsCanceled(next.PolarSubscriptionStatus) || polarScheduledCancelEnded(&next, now) {
+		next.Plan = planAfterPaidSubscriptionEnds(&next, now)
+		catalog, err := FindBillingPlan(tx, next.Plan)
+		if err != nil {
+			return nil, err
+		}
+		next.PlanID = catalog.ID
+		next.Catalog = *catalog
+	}
+
+	err := tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "organization_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"plan",
+			"plan_id",
+			"plan_source",
+			"polar_subscription_id",
+			"polar_subscription_status",
+			"cancel_at_period_end",
+			"polar_modified_at",
+			"purchased_seats",
+			"current_period_start",
+			"current_period_end",
+			"trial_started_at",
+			"trial_ends_at",
+			"updated_at",
+		}),
+	}).Omit("Catalog").Create(&next).Error
+	if err != nil {
+		return nil, err
+	}
+
+	saved, err := loadedOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if err := addInitialPlanTrialCredit(tx, existing, saved); err != nil {
+		return nil, err
+	}
+	return &PolarSubscriptionApplyResult{Plan: saved, GrantIncluded: shouldGrantIncludedUsage(existing, saved), Disposition: PolarSubscriptionApplied}, nil
 }
 
 func loadedOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
