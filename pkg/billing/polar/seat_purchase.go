@@ -14,6 +14,12 @@ import (
 // It is longer than the Polar request timeout.
 const SeatPurchaseConfirmationWindow = 5 * time.Minute
 
+// SubscriptionReader is the part of the Polar API that purchase
+// reconciliation uses.
+type SubscriptionReader interface {
+	GetSubscription(ctx context.Context, subscriptionID string) (*SubscriptionData, error)
+}
+
 // ReconcileSeatPurchase settles the in-flight seat purchase of an organization
 // from the Polar subscription. It makes no write call to Polar, so it never
 // buys seats. Capacity changes only through the applied snapshot.
@@ -25,7 +31,7 @@ const SeatPurchaseConfirmationWindow = 5 * time.Minute
 // A snapshot that proves the outcome is applied, so the plan, the period, and
 // the purchase match what Polar reports. A retry after a renewal then works
 // from the refreshed plan.
-func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client *Client, orgID uuid.UUID) error {
+func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client SubscriptionReader, orgID uuid.UUID) error {
 	purchase, err := models.FindInFlightSeatPurchase(db, orgID)
 	if err != nil || purchase == nil || !seatPurchaseNeedsReconciliation(purchase, time.Now()) {
 		return err

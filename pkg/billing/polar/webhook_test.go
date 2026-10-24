@@ -136,6 +136,45 @@ func Test__VerifyAndParseSubscriptionReadsModifiedAt(t *testing.T) {
 	assert.True(t, parsed.Subscription.Timestamp.Time.Equal(modifiedAt.Add(time.Minute)))
 }
 
+func Test__VerifyAndParseSubscriptionCycledReadsThePendingSeatUpdate(t *testing.T) {
+	secret := "whsec_test-secret"
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	cycled := func(pendingUpdate string) []byte {
+		return []byte(fmt.Sprintf(`{
+			"type": "subscription.cycled",
+			"data": {
+				"id": "sub_team",
+				"status": "active",
+				"seats": 3,
+				"current_period_start": %q,
+				"current_period_end": %q,
+				"external_customer_id": "11111111-1111-1111-1111-111111111111"%s
+			}
+		}`, periodStart.Format(time.RFC3339), periodStart.AddDate(0, 1, 0).Format(time.RFC3339), pendingUpdate))
+	}
+
+	t.Run("scheduled reduction applied at renewal", func(t *testing.T) {
+		body := cycled(`, "pending_update": null`)
+		parsed, err := VerifyAndParseWebhook(signedHeaders("msg_cycled", body, secret), body, secret)
+		require.NoError(t, err)
+		require.NotNil(t, parsed.Subscription)
+		assert.Nil(t, parsed.Subscription.Data.PendingUpdate)
+		assert.Equal(t, 3, *parsed.Subscription.Data.Seats)
+		assert.Equal(t, 3, *parsed.Subscription.Data.NextPeriodSeats())
+	})
+
+	t.Run("reduction scheduled for the following period", func(t *testing.T) {
+		appliesAt := periodStart.AddDate(0, 1, 0)
+		body := cycled(fmt.Sprintf(`, "pending_update": {"seats": 2, "applies_at": %q}`, appliesAt.Format(time.RFC3339)))
+		parsed, err := VerifyAndParseWebhook(signedHeaders("msg_cycled_pending", body, secret), body, secret)
+		require.NoError(t, err)
+		require.NotNil(t, parsed.Subscription.Data.PendingUpdate)
+		assert.True(t, parsed.Subscription.Data.PendingUpdate.AppliesAt.Time.Equal(appliesAt))
+		assert.Equal(t, 3, *parsed.Subscription.Data.Seats)
+		assert.Equal(t, 2, *parsed.Subscription.Data.NextPeriodSeats())
+	})
+}
+
 func Test__VerifyAndParseWebhookReadsAPIVersion(t *testing.T) {
 	t.Setenv("POLAR_API_VERSION", "")
 	secret := "whsec_test-secret"

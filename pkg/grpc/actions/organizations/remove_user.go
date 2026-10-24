@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -63,5 +64,7 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, grpcerrors.Internal(err, "error deleting user")
 	}
 
+	// The freed seat stays usable until renewal. Polar renews one seat less.
+	seatrenewal.ScheduleAsync(ctx, orgUUID)
 	return &pb.RemoveUserResponse{}, nil
 }
