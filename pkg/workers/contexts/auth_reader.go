@@ -59,7 +59,7 @@ func (c *AuthReader) GetRole(name string) (*core.RoleRef, error) {
 		return nil, fmt.Errorf("error getting role definition: %v", err)
 	}
 
-	roleMetadata, err := models.FindRoleMetadata(name, models.DomainTypeOrganization, c.orgID.String())
+	roleMetadata, err := models.FindRoleMetadata(c.tx, name, models.DomainTypeOrganization, c.orgID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error getting role metadata: %v", err)
 	}

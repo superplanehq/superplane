@@ -102,10 +102,16 @@ func Test__GenerateUniqueOrganizationSlug(t *testing.T) {
 	})
 
 	t.Run("appends a suffix for reserved slugs", func(t *testing.T) {
-		slug, err := GenerateUniqueOrganizationSlug(database.Conn(), "Admin", uuid.Nil)
-		require.NoError(t, err)
-		assert.False(t, IsReservedOrganizationSlug(slug))
-		assert.Equal(t, "admin-org", slug)
+		for _, tc := range []struct{ name, expected string }{
+			{name: "Admin", expected: "admin-org"},
+			{name: "Invitations", expected: "invitations-org"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				slug, err := GenerateUniqueOrganizationSlug(database.Conn(), tc.name, uuid.Nil)
+				require.NoError(t, err)
+				assert.Equal(t, tc.expected, slug)
+			})
+		}
 	})
 }
 

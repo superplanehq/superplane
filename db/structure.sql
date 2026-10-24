@@ -1183,6 +1183,8 @@ CREATE TABLE public.installation_metadata (
     signups_enabled boolean DEFAULT true NOT NULL,
     owner_setup_step text,
     share_owner_identity boolean DEFAULT false NOT NULL,
+    invitation_duration_days integer DEFAULT 7 NOT NULL,
+    CONSTRAINT installation_metadata_invitation_duration_days_check CHECK (((invitation_duration_days >= 1) AND (invitation_duration_days <= 365))),
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -1325,6 +1327,16 @@ CREATE TABLE public.organization_hosted_model_allowlists (
 
 
 --
+-- Name: organization_invitation_replaced_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_invitation_replaced_tokens (
+    token_hash character varying(64) NOT NULL,
+    invitation_id uuid NOT NULL
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1336,7 +1348,13 @@ CREATE TABLE public.organization_invitations (
     state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    canvas_ids jsonb DEFAULT '[]'::jsonb
+    canvas_ids jsonb DEFAULT '[]'::jsonb,
+    role character varying(255) DEFAULT 'org_operator'::character varying NOT NULL,
+    token_hash character varying(64),
+    expires_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    accepted_at timestamp without time zone,
+    accepted_by uuid,
+    sent_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -1395,6 +1413,27 @@ CREATE TABLE public.organization_seat_limit_overrides (
     organization_id uuid NOT NULL,
     seat_limit integer,
     CONSTRAINT organization_seat_limit_overrides_seat_limit_check CHECK ((seat_limit > 0))
+);
+
+
+--
+-- Name: organization_seat_purchases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_seat_purchases (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid,
+    polar_subscription_id text NOT NULL,
+    from_seats integer NOT NULL,
+    to_seats integer NOT NULL,
+    status text NOT NULL,
+    error_code text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_seat_purchases_adds_seats CHECK ((to_seats > from_seats)),
+    CONSTRAINT organization_seat_purchases_from_seats_check CHECK ((from_seats >= 0)),
+    CONSTRAINT organization_seat_purchases_status CHECK ((status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'action_required'::text, 'unknown'::text])))
 );
 
 
@@ -2862,11 +2901,27 @@ ALTER TABLE ONLY public.organization_hosted_model_allowlists
 
 
 --
+-- Name: organization_invitation_replaced_tokens organization_invitation_replaced_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_replaced_tokens
+    ADD CONSTRAINT organization_invitation_replaced_tokens_pkey PRIMARY KEY (token_hash);
+
+
+--
 -- Name: organization_invitations organization_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_invitations
     ADD CONSTRAINT organization_invitations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_invitations organization_invitations_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitations
+    ADD CONSTRAINT organization_invitations_token_hash_key UNIQUE (token_hash);
 
 
 --
@@ -2915,6 +2970,14 @@ ALTER TABLE ONLY public.organization_llm_settings
 
 ALTER TABLE ONLY public.organization_seat_limit_overrides
     ADD CONSTRAINT organization_seat_limit_overrides_pkey PRIMARY KEY (organization_id);
+
+
+--
+-- Name: organization_seat_purchases organization_seat_purchases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_pkey PRIMARY KEY (id);
 
 
 --
@@ -4103,6 +4166,13 @@ CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm
 
 
 --
+-- Name: idx_organization_seat_purchases_organization_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_seat_purchases_organization_created ON public.organization_seat_purchases USING btree (organization_id, created_at);
+
+
+--
 -- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4530,6 +4600,20 @@ CREATE INDEX organization_billing_plans_catalog ON public.organization_billing_p
 
 
 --
+-- Name: organization_invitation_replaced_tokens_invitation_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_replaced_tokens_invitation_id_idx ON public.organization_invitation_replaced_tokens USING btree (invitation_id);
+
+
+--
+-- Name: organization_invitations_pending_email_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organization_invitations_pending_email_idx ON public.organization_invitations USING btree (organization_id, lower((email)::text)) WHERE ((state)::text = 'pending'::text);
+
+
+--
 -- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4625,6 +4709,13 @@ CREATE UNIQUE INDEX unique_api_key_in_organization ON public.users USING btree (
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
+
+
+--
+-- Name: uq_organization_seat_purchases_in_flight; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_seat_purchases_in_flight ON public.organization_seat_purchases USING btree (organization_id) WHERE (status = ANY (ARRAY['pending'::text, 'unknown'::text]));
 
 
 --
@@ -5502,6 +5593,22 @@ ALTER TABLE ONLY public.organization_hosted_model_allowlists
 
 
 --
+-- Name: organization_invitation_replaced_tokens organization_invitation_replaced_tokens_invitation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_replaced_tokens
+    ADD CONSTRAINT organization_invitation_replaced_tokens_invitation_id_fkey FOREIGN KEY (invitation_id) REFERENCES public.organization_invitations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_invitations organization_invitations_accepted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitations
+    ADD CONSTRAINT organization_invitations_accepted_by_fkey FOREIGN KEY (accepted_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: organization_invitations organization_invitations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5523,6 +5630,22 @@ ALTER TABLE ONLY public.organization_invite_links
 
 ALTER TABLE ONLY public.organization_seat_limit_overrides
     ADD CONSTRAINT organization_seat_limit_overrides_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_seat_purchases organization_seat_purchases_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_seat_purchases organization_seat_purchases_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -6053,7 +6176,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261023153557	f
+20261024133316	f
 \.
 
 

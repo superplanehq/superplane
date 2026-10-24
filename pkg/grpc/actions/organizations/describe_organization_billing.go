@@ -106,6 +106,7 @@ func DescribeOrganizationBilling(
 		PlanPerSeat:                 plan.Catalog.PerSeat,
 		CatalogKey:                  plan.Catalog.Key,
 		HostedExecutionAllowed:      !models.BillingEnabled() || plan.AllowsHostedExecution(time.Now()) && (!newBilling || !plan.Catalog.RequirePaymentMethod || hasCard),
+		HostedCreditAvailable:       !models.BillingEnabled() || credit.RemainingMicros > 0,
 		PlanSource:                  plan.PlanSource,
 		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
 		TrialEndsAt:                 protoTimestamp(plan.TrialEndsAt),
@@ -125,6 +126,12 @@ func DescribeOrganizationBilling(
 	if !models.BillingEnabled() {
 		return response, nil
 	}
+
+	lastSeatPurchase, err := models.FindLatestSeatPurchase(db, organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load the last seat purchase.")
+	}
+	response.LastSeatPurchase = seatPurchaseToProto(lastSeatPurchase)
 
 	seats, err := entitlements.ResolveSeatsForPlan(db, organizationID, plan)
 	if err != nil {

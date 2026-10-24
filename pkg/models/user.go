@@ -86,7 +86,13 @@ func (u *User) SoftDelete(tx *gorm.DB, now time.Time, tombstoneEmail string) err
 		updates["email"] = tombstoneEmail
 	}
 
-	return tx.Unscoped().Model(u).Updates(updates).Error
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Model(u).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		return tx.Where("user_id = ?", u.ID).Delete(&UserAPIToken{}).Error
+	})
 }
 
 func (u *User) Restore() error {

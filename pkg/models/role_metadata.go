@@ -77,9 +77,9 @@ func (gm *GroupMetadata) UpdateInTransaction(tx *gorm.DB) error {
 	return tx.Save(gm).Error
 }
 
-func FindRoleMetadata(roleName, domainType, domainID string) (*RoleMetadata, error) {
+func FindRoleMetadata(tx *gorm.DB, roleName, domainType, domainID string) (*RoleMetadata, error) {
 	var metadata RoleMetadata
-	err := database.Conn().Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
+	err := tx.Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
 	if err != nil {
 		return nil, err
 	}

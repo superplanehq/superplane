@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -606,6 +607,168 @@ func Test__CancelSubscriptionAtPeriodEndRequiresID(t *testing.T) {
 	_, err := client.CancelSubscriptionAtPeriodEnd(context.Background(), "  ")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "subscription id is required")
+}
+
+func Test__UpdateSubscriptionSeatsInvoicesTheProratedChange(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/subscriptions/sub_team", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "sub_team", "status": "active", "seats": 5}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	updated, err := client.UpdateSubscriptionSeats(context.Background(), " sub_team ", 5)
+	require.NoError(t, err)
+	assert.Equal(t, 5, *updated.Seats)
+	assert.Equal(t, map[string]any{"seats": float64(5), "proration_behavior": "invoice"}, body)
+}
+
+func Test__UpdateSubscriptionSeatsRequiresIDInRequestAndResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"status": "active"}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.UpdateSubscriptionSeats(context.Background(), " ", 5)
+	require.ErrorContains(t, err, "subscription id is required")
+	_, err = client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+	require.ErrorContains(t, err, "did not return an id")
+	assert.True(t, IsOutcomeUnknown(err), "a 200 without a snapshot may still have charged the customer")
+}
+
+func Test__SubscriptionUpdateErrorsAreTyped(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		code   string
+		match  func(error) bool
+		also   func(error) bool
+		not    []func(error) bool
+	}{
+		{name: "payment failed", status: http.StatusPaymentRequired, code: "PaymentFailed", match: IsPaymentFailed,
+			not: []func(error) bool{IsOutcomeUnknown}},
+		{name: "payment action required", status: http.StatusPaymentRequired, code: "PaymentActionRequired", match: IsPaymentActionRequired,
+			not: []func(error) bool{IsPaymentFailed}},
+		{name: "locked", status: http.StatusConflict, code: "SubscriptionLocked", match: IsSubscriptionLocked, also: IsConflict},
+		{name: "already canceled", status: http.StatusForbidden, code: "AlreadyCanceledSubscription", match: IsSubscriptionInactive,
+			not: []func(error) bool{IsUnauthorized}},
+		{name: "inactive", status: http.StatusForbidden, code: "InactiveSubscription", match: IsSubscriptionInactive,
+			not: []func(error) bool{IsUnauthorized}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.status)
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"error": tt.code, "detail": "details"}))
+			}))
+			t.Cleanup(server.Close)
+
+			client := NewClient(server.URL, "oat_test", server.Client())
+			_, err := client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+			require.Error(t, err)
+			assert.True(t, tt.match(err))
+			if tt.also != nil {
+				assert.True(t, tt.also(err))
+			}
+			for _, other := range tt.not {
+				assert.False(t, other(err))
+			}
+		})
+	}
+}
+
+func Test__UntypedSubscriptionErrorsKeepExistingMapping(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		body   string
+		match  func(error) bool
+	}{
+		{name: "forbidden without a code", status: http.StatusForbidden, body: `{"error":"NotPermitted"}`, match: IsUnauthorized},
+		{name: "forbidden with plain text", status: http.StatusForbidden, body: "forbidden", match: IsUnauthorized},
+		{name: "conflict without a code", status: http.StatusConflict, body: `{"error":"ResourceAlreadyExists"}`, match: IsConflict},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			t.Cleanup(server.Close)
+
+			client := NewClient(server.URL, "oat_test", server.Client())
+			_, err := client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+			assert.True(t, tt.match(err))
+			assert.False(t, IsSubscriptionInactive(err) || IsSubscriptionLocked(err) || IsOutcomeUnknown(err))
+		})
+	}
+}
+
+func Test__UpdateSubscriptionSeatsReportsUnknownOutcome(t *testing.T) {
+	t.Run("server error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "boom", http.StatusBadGateway)
+		}))
+		t.Cleanup(server.Close)
+
+		client := NewClient(server.URL, "oat_test", server.Client())
+		_, err := client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+		assert.True(t, IsOutcomeUnknown(err))
+		assert.Contains(t, err.Error(), "502")
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		release := make(chan struct{})
+		server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			<-release
+		}))
+		t.Cleanup(server.Close)
+		t.Cleanup(func() { close(release) })
+
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		client := NewClient(server.URL, "oat_test", server.Client())
+		_, err := client.UpdateSubscriptionSeats(ctx, "sub_team", 5)
+		assert.True(t, IsOutcomeUnknown(err))
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("validation rejection", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "invalid seats", http.StatusUnprocessableEntity)
+		}))
+		t.Cleanup(server.Close)
+
+		client := NewClient(server.URL, "oat_test", server.Client())
+		_, err := client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+		require.Error(t, err)
+		assert.True(t, IsInvalidRequest(err))
+		assert.False(t, IsOutcomeUnknown(err), "a 422 means Polar did not apply the update")
+	})
+}
+
+func Test__GetSubscriptionReadsSnapshot(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/subscriptions/sub_team", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id": "sub_team", "status": "active", "seats": 7, "modified_at": "2026-11-08T00:00:00Z",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	snapshot, err := client.GetSubscription(context.Background(), "sub_team")
+	require.NoError(t, err)
+	assert.Equal(t, 7, *snapshot.Seats)
+	assert.False(t, snapshot.ModifiedAt.Time.IsZero())
+
+	_, err = client.GetSubscription(context.Background(), " ")
+	require.ErrorContains(t, err, "subscription id is required")
 }
 
 func Test__ListOrdersFiltersByExternalCustomerID(t *testing.T) {

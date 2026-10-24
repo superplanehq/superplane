@@ -8,6 +8,10 @@ import (
 
 func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 	return map[HTTPRoute]AuthorizationRule{
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/invitations"}:                        {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/invitations"}:                         {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/invitations/{invitation_id}/resend"}: {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		{Method: "DELETE", Pattern: "/api/v1/organizations/{id}/invitations/{invitation_id}"}:      {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
 		{Method: "DELETE", Pattern: "/api/v1/canvases/{canvas_id}/memory/{memory_id}"}: {
 			Resource:           "canvases",
 			Action:             "update",
@@ -941,6 +945,14 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/select-plan"}: {
+			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureNewBilling},
+		},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/seats/preview"}: {
+			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureNewBilling},
+		},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/seats/purchase"}: {
 			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureNewBilling},
 		},

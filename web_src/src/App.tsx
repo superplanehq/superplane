@@ -293,6 +293,7 @@ function AppRouter() {
               </Route>
               <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
+              <Route path="invitations/:token" element={withAuthOnly(InviteLinkAccept)} />
               {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
               <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
               {organizationScopedRouteTree()}

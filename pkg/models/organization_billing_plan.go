@@ -39,7 +39,7 @@ const (
 
 var (
 	ErrPaymentMethodRequired      = errors.New("add a payment method in organization billing before usage")
-	ErrHostedSubscriptionRequired = errors.New("an active paid plan is required for SuperPlane-hosted runs")
+	ErrHostedSubscriptionRequired = errors.New("an active plan is required to run agents")
 	ErrInvalidBillingPlan         = errors.New("billing plan is invalid")
 	ErrInvalidPurchasedSeats      = errors.New("purchased seats must be a nonnegative integer")
 	ErrBillingPlanChanged         = errors.New("the billing record changed. Refresh and try again")
@@ -147,6 +147,11 @@ func PolarSubscriptionIsPaid(status string) bool {
 	}
 }
 
+// PolarSubscriptionIsPastDue is true while Polar retries a failed renewal payment.
+func PolarSubscriptionIsPastDue(status string) bool {
+	return strings.ToLower(strings.TrimSpace(status)) == PolarSubscriptionStatusPastDue
+}
+
 // AssignAdminPlanAfterPolarVerification requires a confirmed absence from Polar.
 // Keep the subscription ID and event timestamp for history and webhook ordering.
 func (p *OrganizationBillingPlan) AssignAdminPlanAfterPolarVerification(tx *gorm.DB, planName string, trialEndsAt *time.Time) (*OrganizationBillingPlan, error) {
@@ -218,6 +223,24 @@ func ResolveOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*Organization
 		return lapseEndedPolarBusiness(tx, plan)
 	}
 	return plan, nil
+}
+
+// AssertOrganizationPlanAllowsRuns rejects an agent run when the organization
+// plan is not an active paid plan or an open trial. Remaining credit does not
+// override the plan. The gate applies to hosted and BYOK runs, with or without
+// Polar. It does nothing when billing is off.
+func AssertOrganizationPlanAllowsRuns(tx *gorm.DB, orgID uuid.UUID) error {
+	if !BillingEnabled() {
+		return nil
+	}
+	plan, err := ResolveOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return err
+	}
+	if !plan.AllowsHostedExecution(time.Now()) {
+		return ErrHostedSubscriptionRequired
+	}
+	return nil
 }
 
 func EnsureOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
@@ -333,6 +356,12 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 			}).Warn("skipped stale polar subscription snapshot")
 			saved = existing
 			return nil
+		}
+		// Only a snapshot fresh enough to apply can prove the outcome of an
+		// in-flight seat purchase. A stale snapshot can report seats that
+		// Polar no longer has, so it must not settle a purchase.
+		if err := SettleSeatPurchase(inner, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
+			return err
 		}
 		catalog, catalogErr := FindBillingPlanByProduct(inner, sub.ProductID)
 		if catalogErr != nil && !errors.Is(catalogErr, gorm.ErrRecordNotFound) {
