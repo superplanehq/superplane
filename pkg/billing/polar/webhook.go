@@ -150,6 +150,7 @@ type SubscriptionData struct {
 	CurrentPeriodStart polarTime     `json:"current_period_start"`
 	EndedAt            polarTime     `json:"ended_at"`
 	CurrentPeriodEnd   polarTime     `json:"current_period_end"`
+	PastDueAt          polarTime     `json:"past_due_at"`
 	CustomerID         string        `json:"customer_id"`
 	ExternalCustomerID string        `json:"external_customer_id"`
 	Customer           OrderCustomer `json:"customer"`

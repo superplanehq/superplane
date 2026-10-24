@@ -324,6 +324,11 @@ func Test__OrganizationBillingIsPolarManaged(t *testing.T) {
 		CancelAtPeriodEnd:       true,
 		CurrentPeriodEnd:        &ended,
 	}
+	pastDueCanceling := &models.OrganizationBillingPlan{
+		PolarSubscriptionStatus: models.PolarSubscriptionStatusPastDue,
+		CancelAtPeriodEnd:       true,
+		CurrentPeriodEnd:        &end,
+	}
 	incomplete := &models.OrganizationBillingPlan{
 		PlanSource:              models.BillingPlanSourcePolar,
 		PolarSubscriptionStatus: models.PolarSubscriptionStatusIncomplete,
@@ -333,6 +338,7 @@ func Test__OrganizationBillingIsPolarManaged(t *testing.T) {
 	assert.True(t, models.OrganizationBillingIsPolarManaged(paid))
 	assert.True(t, models.OrganizationBillingIsPolarManaged(canceling))
 	assert.False(t, models.OrganizationBillingIsPolarManaged(endedPlan))
+	assert.False(t, models.OrganizationBillingIsPolarManaged(pastDueCanceling))
 	assert.False(t, models.OrganizationBillingIsPolarManaged(incomplete))
 	assert.False(t, models.OrganizationBillingIsPolarManaged(adminTrial))
 	assert.False(t, models.OrganizationBillingIsPolarManaged(nil))
