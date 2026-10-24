@@ -279,23 +279,111 @@ func Test__NonPayingStatusesLapseDespiteGrace(t *testing.T) {
 	}
 }
 
-func Test__PausedSubscriptionGivesNoHostedExecution(t *testing.T) {
+func Test__PausedSubscriptionLapsesPaidPlan(t *testing.T) {
 	for _, product := range pastDueProducts {
 		t.Run(product.name, func(t *testing.T) {
 			replay := newPastDueReplay(t, product)
 			replay.endTrial()
-			replay.apply(models.PolarSubscriptionStatusActive)
+			requirePaid(t, replay.apply(models.PolarSubscriptionStatusActive), product)
 
 			for _, mutate := range [][]func(*models.PolarSubscriptionApply){nil, {cancelAtPeriodEnd}} {
 				plan := replay.apply(models.PolarSubscriptionStatusPaused, mutate...)
 
-				assert.False(t, plan.IsActiveBusiness())
-				assert.False(t, plan.AllowsHostedExecution(time.Now()))
+				requireLapsed(t, plan)
 				assert.Nil(t, plan.PastDueSince)
-				assert.Equal(t, product.perSeat, plan.Catalog.PerSeat, "paused keeps the plan row for the seat lock")
+				assert.Equal(t, models.PolarSubscriptionStatusPaused, plan.PolarSubscriptionStatus, "the status stays for the billing page and the seat lock")
+				if product.perSeat {
+					require.NotNil(t, plan.PurchasedSeats, "the stored seats stay for the seat lock")
+					assert.Equal(t, 3, *plan.PurchasedSeats)
+				}
 			}
+
+			stored, err := models.FindOrganizationBillingPlan(replay.db, replay.orgID)
+			require.NoError(t, err)
+			requireLapsed(t, stored)
 		})
 	}
+}
+
+// Rows written before past_due_since existed, or before a paused snapshot
+// lapsed the plan, still sit on the paid catalog. Resolve lapses them, and
+// the stored subscription details and seats stay for the billing page and the
+// seat lock.
+func Test__PaymentBlockedRowWithoutGraceLapsesOnResolve(t *testing.T) {
+	for _, status := range []string{models.PolarSubscriptionStatusPastDue, models.PolarSubscriptionStatusPaused} {
+		for _, product := range pastDueProducts {
+			t.Run(status+" "+product.name, func(t *testing.T) {
+				replay := newPastDueReplay(t, product)
+				replay.endTrial()
+				requirePaid(t, replay.apply(models.PolarSubscriptionStatusActive), product)
+
+				require.NoError(t, replay.db.Model(&models.OrganizationBillingPlan{}).
+					Where("organization_id = ?", replay.orgID).
+					Updates(map[string]any{"polar_subscription_status": status, "cancel_at_period_end": true}).Error)
+
+				plan := replay.resolve()
+
+				requireLapsed(t, plan)
+				assert.Equal(t, status, plan.PolarSubscriptionStatus, "the status stays for the billing page and the seat lock")
+				assert.Nil(t, plan.PastDueSince)
+				if product.perSeat {
+					require.NotNil(t, plan.PurchasedSeats, "the stored seats stay for the seat lock")
+					assert.Equal(t, 3, *plan.PurchasedSeats)
+				}
+				stored, err := models.FindOrganizationBillingPlan(replay.db, replay.orgID)
+				require.NoError(t, err)
+				requireLapsed(t, stored)
+			})
+		}
+	}
+}
+
+// A past-due row without a recorded failure start cannot measure a grace
+// period, so it lapses even when the installation allows grace days.
+func Test__PastDueRowWithoutFailureStartGetsNoGrace(t *testing.T) {
+	replay := newPastDueReplay(t, pastDueProducts[1])
+	replay.endTrial()
+	replay.setGraceDays(7)
+	requirePaid(t, replay.apply(models.PolarSubscriptionStatusActive), pastDueProducts[1])
+
+	require.NoError(t, replay.db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", replay.orgID).
+		Update("polar_subscription_status", models.PolarSubscriptionStatusPastDue).Error)
+
+	requireLapsed(t, replay.resolve())
+}
+
+// Paid catalog features must not survive the lapse: a payment-blocked row
+// resolves features from the lapsed catalog, not from the paid one.
+func Test__PaymentBlockedLapseDropsPaidCatalogFeatures(t *testing.T) {
+	replay := newPastDueReplay(t, pastDueProducts[1])
+	replay.endTrial()
+
+	feature := models.PlanFeatureDefinition{Key: "paid_feature_" + uuid.NewString()[:8], Label: "Paid feature", Gated: true}
+	require.NoError(t, models.CreatePlanFeatureDefinition(replay.db, &feature))
+	catalog, err := models.FindBillingPlanByProduct(replay.db, replay.productID)
+	require.NoError(t, err)
+	catalog.Features = append(catalog.Features, feature.Key)
+	require.NoError(t, models.SaveBillingPlan(replay.db, catalog))
+
+	features := func() map[string]bool {
+		resolved, err := models.ResolveOrganizationProductFeatures(replay.db, replay.orgID)
+		require.NoError(t, err)
+		return resolved
+	}
+
+	requirePaid(t, replay.apply(models.PolarSubscriptionStatusActive), pastDueProducts[1])
+	assert.True(t, features()[feature.Key], "the paid catalog grants the feature")
+
+	replay.apply(models.PolarSubscriptionStatusPaused)
+	assert.False(t, features()[feature.Key], "a paused snapshot lapses the paid catalog")
+
+	requirePaid(t, replay.apply(models.PolarSubscriptionStatusActive), pastDueProducts[1])
+	require.True(t, features()[feature.Key])
+	require.NoError(t, replay.db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", replay.orgID).
+		Update("polar_subscription_status", models.PolarSubscriptionStatusPastDue).Error)
+	assert.False(t, features()[feature.Key], "a past-due row without grace lapses on resolve")
 }
 
 func Test__AgentRunGateNamesPaymentFailure(t *testing.T) {
