@@ -76,6 +76,10 @@ type PolarSubscriptionApply struct {
 	CancelAtPeriodEnd bool
 	ModifiedAt        *time.Time
 	PurchasedSeats    *int
+	// Verified marks a snapshot that a direct Polar API call returned. Webhook
+	// payloads are unverified: they can arrive delayed and claim access that
+	// Polar already ended.
+	Verified bool
 }
 
 type PolarSubscriptionDisposition string
@@ -84,6 +88,10 @@ const (
 	PolarSubscriptionApplied         PolarSubscriptionDisposition = "applied"
 	PolarSubscriptionIgnored         PolarSubscriptionDisposition = "ignored"
 	PolarSubscriptionRefreshRequired PolarSubscriptionDisposition = "refresh_required"
+	// PolarSubscriptionVerificationRequired asks the caller to fetch the
+	// incoming subscription from the Polar API and retry with the verified
+	// snapshot before it can replace an ended stored subscription.
+	PolarSubscriptionVerificationRequired PolarSubscriptionDisposition = "verification_required"
 )
 
 // PolarSubscriptionApplyResult describes an accepted or ignored snapshot.
@@ -393,8 +401,7 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 
 		now := time.Now()
 		var refreshedResult *PolarSubscriptionApplyResult
-		if existing.PolarSubscriptionID != nil && strings.TrimSpace(*existing.PolarSubscriptionID) != "" && !samePolarSubscription(existing, sub.ID) &&
-			PolarSubscriptionIsLive(existing.PolarSubscriptionStatus, existing.CancelAtPeriodEnd, existing.CurrentPeriodEnd, now) {
+		if existing.PolarSubscriptionID != nil && strings.TrimSpace(*existing.PolarSubscriptionID) != "" && !samePolarSubscription(existing, sub.ID) {
 			fields := log.Fields{
 				"organization_id":              orgID.String(),
 				"stored_subscription_id":       strings.TrimSpace(*existing.PolarSubscriptionID),
@@ -402,40 +409,56 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 				"stored_subscription_status":   existing.PolarSubscriptionStatus,
 				"incoming_subscription_status": strings.ToLower(strings.TrimSpace(sub.Status)),
 			}
+			if PolarSubscriptionIsLive(existing.PolarSubscriptionStatus, existing.CancelAtPeriodEnd, existing.CurrentPeriodEnd, now) {
+				if !PolarSubscriptionIsLive(sub.Status, sub.CancelAtPeriodEnd, sub.PeriodEnd, now) {
+					log.WithFields(fields).Warn("billing.foreign_subscription_snapshot_ignored")
+					result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}
+					return nil
+				}
+				if refreshedStored == nil {
+					result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionRefreshRequired}
+					return nil
+				}
+				if !samePolarSubscription(existing, refreshedStored.ID) {
+					return fmt.Errorf("%w: subscription does not match stored identity", ErrPolarSubscriptionRefreshFailed)
+				}
+				if !PolarSubscriptionStatusIsKnown(refreshedStored.Status) {
+					return fmt.Errorf("%w: unexpected status %q", ErrPolarSubscriptionRefreshFailed, refreshedStored.Status)
+				}
+				// Same-subscription snapshots retain omitted periods when applied.
+				refreshedPeriodEnd := refreshedStored.PeriodEnd
+				if refreshedPeriodEnd == nil {
+					refreshedPeriodEnd = existing.CurrentPeriodEnd
+				}
+				if PolarSubscriptionIsLive(refreshedStored.Status, refreshedStored.CancelAtPeriodEnd, refreshedPeriodEnd, now) {
+					fields["stored_subscription_status"] = strings.ToLower(strings.TrimSpace(refreshedStored.Status))
+					log.WithFields(fields).Error("billing.multiple_live_subscriptions")
+					result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}
+					return nil
+				}
+				if polarSnapshotIsStale(existing, refreshedStored.ModifiedAt) {
+					return fmt.Errorf("%w: cancellation is older than stored subscription", ErrPolarSubscriptionRefreshFailed)
+				}
+				refreshedResult, err = applyPolarSubscriptionSnapshot(inner, existing, *refreshedStored)
+				if err != nil {
+					return fmt.Errorf("%w: %w", ErrPolarSubscriptionRefreshFailed, err)
+				}
+				existing = refreshedResult.Plan
+			}
+			// The stored subscription has ended, so its timestamp no longer
+			// orders a foreign snapshot: a delayed event can claim access that
+			// Polar already ended. Accept a different subscription only after
+			// the caller verifies it against the Polar API, and only while the
+			// verified subscription is live.
 			if !PolarSubscriptionIsLive(sub.Status, sub.CancelAtPeriodEnd, sub.PeriodEnd, now) {
 				log.WithFields(fields).Warn("billing.foreign_subscription_snapshot_ignored")
-				result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}
+				result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored, RefreshedStored: refreshedResult}
 				return nil
 			}
-			if refreshedStored == nil {
-				result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionRefreshRequired}
+			if !sub.Verified {
+				result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionVerificationRequired, RefreshedStored: refreshedResult}
 				return nil
 			}
-			if !samePolarSubscription(existing, refreshedStored.ID) {
-				return fmt.Errorf("%w: subscription does not match stored identity", ErrPolarSubscriptionRefreshFailed)
-			}
-			if !PolarSubscriptionStatusIsKnown(refreshedStored.Status) {
-				return fmt.Errorf("%w: unexpected status %q", ErrPolarSubscriptionRefreshFailed, refreshedStored.Status)
-			}
-			// Same-subscription snapshots retain omitted periods when applied.
-			refreshedPeriodEnd := refreshedStored.PeriodEnd
-			if refreshedPeriodEnd == nil {
-				refreshedPeriodEnd = existing.CurrentPeriodEnd
-			}
-			if PolarSubscriptionIsLive(refreshedStored.Status, refreshedStored.CancelAtPeriodEnd, refreshedPeriodEnd, now) {
-				fields["stored_subscription_status"] = strings.ToLower(strings.TrimSpace(refreshedStored.Status))
-				log.WithFields(fields).Error("billing.multiple_live_subscriptions")
-				result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}
-				return nil
-			}
-			if polarSnapshotIsStale(existing, refreshedStored.ModifiedAt) {
-				return fmt.Errorf("%w: cancellation is older than stored subscription", ErrPolarSubscriptionRefreshFailed)
-			}
-			refreshedResult, err = applyPolarSubscriptionSnapshot(inner, existing, *refreshedStored)
-			if err != nil {
-				return fmt.Errorf("%w: %w", ErrPolarSubscriptionRefreshFailed, err)
-			}
-			existing = refreshedResult.Plan
 		}
 
 		result, err = applyPolarSubscriptionSnapshot(inner, existing, sub)

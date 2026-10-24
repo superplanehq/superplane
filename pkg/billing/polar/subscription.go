@@ -52,6 +52,13 @@ func ApplySubscriptionEvent(ctx context.Context, tx *gorm.DB, event *Subscriptio
 }
 
 func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) error {
+	return applySubscription(ctx, tx, data, false)
+}
+
+// applySubscription applies a subscription snapshot. Snapshots that a direct
+// Polar API call returned are verified; webhook payloads are not, because a
+// delayed event can claim access that Polar already ended.
+func applySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData, verified bool) error {
 	orgID, err := parseSubscriptionOrganizationID(data)
 	if err != nil {
 		return err
@@ -67,6 +74,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 			return err
 		}
 		incoming := subscriptionSnapshot(data)
+		incoming.Verified = verified
 		result, err := models.ApplyPolarSubscription(inner, orgID, incoming, nil)
 		if err != nil {
 			return err
@@ -91,6 +99,24 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 				if err := syncSubscriptionSideEffects(inner, orgID, *refreshed, result.RefreshedStored); err != nil {
 					return err
 				}
+			}
+		}
+		if result.Disposition == models.PolarSubscriptionVerificationRequired {
+			refreshCtx, cancel := context.WithTimeout(ctx, httpTimeout)
+			defer cancel()
+			refreshed, err := NewClientFromEnv().GetSubscription(refreshCtx, incoming.ID)
+			if err != nil {
+				return fmt.Errorf("verify Polar subscription %q: %w", incoming.ID, err)
+			}
+			if externalID := refreshed.organizationExternalID(); externalID != "" && externalID != orgID.String() {
+				return fmt.Errorf("verified Polar subscription customer does not match organization")
+			}
+			data = *refreshed
+			incoming = subscriptionSnapshot(*refreshed)
+			incoming.Verified = true
+			result, err = models.ApplyPolarSubscription(inner, orgID, incoming, nil)
+			if err != nil {
+				return err
 			}
 		}
 		return syncSubscriptionSideEffects(inner, orgID, data, result)
@@ -138,7 +164,7 @@ func ApplyOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.
 	if strings.TrimSpace(data.organizationExternalID()) == "" {
 		data.ExternalCustomerID = orgID.String()
 	}
-	return ApplySubscription(ctx, tx, data)
+	return applySubscription(ctx, tx, data, true)
 }
 
 func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) error {
@@ -170,11 +196,35 @@ func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.U
 	if err != nil {
 		return err
 	}
-	selected := selectBusinessSubscription(known, polarSubscriptionID(plan), time.Now())
+	now := time.Now()
+	selected := selectBusinessSubscription(known, polarSubscriptionID(plan), now)
 	if selected == nil {
 		return nil
 	}
+	reportConflictingLiveSubscriptions(orgID, known, selected, now)
 	return ApplyOrganizationSubscription(ctx, tx, orgID, *selected)
+}
+
+// Sync keeps one subscription, but Polar can hold more than one live
+// subscription for the same organization. Report every conflicting live
+// subscription so operators can cancel the duplicate charges.
+func reportConflictingLiveSubscriptions(orgID uuid.UUID, items []SubscriptionData, selected *SubscriptionData, now time.Time) {
+	for i := range items {
+		item := &items[i]
+		if item.ID == selected.ID {
+			continue
+		}
+		if !models.PolarSubscriptionIsLive(item.Status, item.CancelAtPeriodEnd, item.CurrentPeriodEnd.TimePtr(), now) {
+			continue
+		}
+		log.WithFields(log.Fields{
+			"organization_id":              orgID.String(),
+			"stored_subscription_id":       selected.ID,
+			"incoming_subscription_id":     item.ID,
+			"stored_subscription_status":   strings.ToLower(strings.TrimSpace(selected.Status)),
+			"incoming_subscription_status": strings.ToLower(strings.TrimSpace(item.Status)),
+		}).Error("billing.multiple_live_subscriptions")
+	}
 }
 
 func selectBusinessSubscription(items []SubscriptionData, storedID string, now time.Time) *SubscriptionData {
