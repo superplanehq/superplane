@@ -84,3 +84,27 @@ export function billingUsagePercentUsed(remainingCents: number, allowanceCents: 
   const used = Math.max(0, allowanceCents - remainingCents);
   return Math.min(100, Math.round((used / allowanceCents) * 100));
 }
+
+export const BILLING_UPDATE_PAYMENT_METHOD_LABEL = "Update payment method";
+export const BILLING_PAYMENT_BLOCKED_SEATS_COPY = "No one can join until the payment is updated.";
+
+/** True while Polar retries a failed renewal payment. */
+export function billingIsPastDue(status?: string): boolean {
+  return status === "past_due";
+}
+
+/** True while no new member can join because payment is failed or paused. */
+export function billingPaymentBlocked(status?: string): boolean {
+  return billingIsPastDue(status) || status === "paused";
+}
+
+/** Banner text for a failed renewal. A grace period adds the date that Team features end. */
+export function billingPaymentFailedCopy(failedAt?: string, accessEndsAt?: string): string {
+  const failedDate = billingPeriodEndLabel(failedAt);
+  const failure = failedDate ? `The renewal payment failed on ${failedDate}.` : "The renewal payment failed.";
+  const endDate = billingPeriodEndLabel(accessEndsAt);
+  if (endDate) {
+    return `${failure} Update the payment method by ${endDate} to keep Team features.`;
+  }
+  return `${failure} Team features are off until you update the payment method.`;
+}

@@ -1184,7 +1184,9 @@ CREATE TABLE public.installation_metadata (
     owner_setup_step text,
     share_owner_identity boolean DEFAULT false NOT NULL,
     invitation_duration_days integer DEFAULT 7 NOT NULL,
+    past_due_grace_days integer DEFAULT 0 NOT NULL,
     CONSTRAINT installation_metadata_invitation_duration_days_check CHECK (((invitation_duration_days >= 1) AND (invitation_duration_days <= 365))),
+    CONSTRAINT installation_metadata_past_due_grace_days_check CHECK (((past_due_grace_days >= 0) AND (past_due_grace_days <= 21))),
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -1285,6 +1287,7 @@ CREATE TABLE public.organization_billing_plans (
     plan_id uuid NOT NULL,
     purchased_seats integer,
     over_capacity_since timestamp with time zone,
+    past_due_since timestamp with time zone,
     CONSTRAINT organization_billing_plans_purchased_seats_check CHECK ((purchased_seats >= 0)),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
@@ -6177,7 +6180,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261024160634	f
+20261024161003	f
 \.
 
 

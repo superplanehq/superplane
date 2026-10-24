@@ -152,6 +152,7 @@ func subscriptionSnapshot(data SubscriptionData) models.PolarSubscriptionApply {
 		CancelAtPeriodEnd: data.CancelAtPeriodEnd,
 		ModifiedAt:        data.ModifiedAt.TimePtr(),
 		PurchasedSeats:    data.Seats,
+		PastDueAt:         data.PastDueAt.TimePtr(),
 	}
 }
 
