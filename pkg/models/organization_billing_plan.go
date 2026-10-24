@@ -443,19 +443,29 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 	if planName == "business_legacy" {
 		return nil, ErrInvalidBillingPlan
 	}
-	catalog, err := FindBillingPlan(tx, planName)
-	if err != nil {
-		return nil, ErrInvalidBillingPlan
-	}
-	if catalog.PerSeat {
-		// Preserve the billing API's required override guidance.
-		//revive:disable-next-line:error-strings
-		return nil, errors.New("Per-seat plans need a Polar subscription. Use a seat limit override instead.")
-	}
-	if catalog.RequirePaymentMethod {
-		return nil, errors.New("Plans that require a payment method cannot be assigned by an admin")
-	}
-	return setOrganizationBillingPlan(tx, orgID, catalog, BillingPlanSourceAdmin, trialEndsAt)
+	var saved *OrganizationBillingPlan
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		// Match the subscription path's lock order: organization billing row,
+		// then catalog row. Keep both locks through validation and assignment.
+		if _, err := lockOrganizationBillingPlan(inner, orgID); err != nil {
+			return err
+		}
+		catalog, err := FindBillingPlan(inner.Clauses(clause.Locking{Strength: "UPDATE"}), planName)
+		if err != nil {
+			return ErrInvalidBillingPlan
+		}
+		if catalog.PerSeat {
+			// Preserve the billing API's required override guidance.
+			//revive:disable-next-line:error-strings
+			return errors.New("Per-seat plans need a Polar subscription. Use a seat limit override instead.")
+		}
+		if catalog.RequirePaymentMethod {
+			return errors.New("Plans that require a payment method cannot be assigned by an admin")
+		}
+		saved, err = setOrganizationBillingPlan(inner, orgID, catalog, BillingPlanSourceAdmin, trialEndsAt)
+		return err
+	})
+	return saved, err
 }
 
 // ActivateOrganizationBillingPlan assigns a public plan after the caller verifies its payment requirements.

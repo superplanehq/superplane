@@ -235,6 +235,60 @@ func Test__SetAdminOrganizationPlanRejectsPerSeatPlans(t *testing.T) {
 	}
 }
 
+func Test__SetAdminOrganizationPlanSerializesCatalogSave(t *testing.T) {
+	for _, assignmentFirst := range []bool{false, true} {
+		name := "save commits first and assignment rejects the per-seat plan"
+		if assignmentFirst {
+			name = "assignment commits first and save rejects the seat change"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			catalog := models.BillingPlan{
+				Key: "admin_race_" + uuid.NewString()[:8], Name: "Admin race", Category: "paid", Visibility: "private",
+				PolarProductID: new("product_" + uuid.NewString()), SeatLimit: new(50),
+				CreditFrequency: "none", CreditExpiration: "never",
+			}
+			require.NoError(t, models.SaveBillingPlan(db, &catalog))
+			before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+			changed := catalog
+			changed.PerSeat = true
+			tx := db.Begin()
+			require.NoError(t, tx.Error)
+			defer tx.Rollback()
+
+			if assignmentFirst {
+				_, err := models.SetAdminOrganizationPlan(tx, r.Organization.ID, catalog.Key, nil)
+				require.NoError(t, err)
+				saveError := runAfterCommit(t, db, tx, func(conn *gorm.DB) error {
+					return models.SaveBillingPlan(conn, &changed)
+				})
+				require.ErrorIs(t, saveError, models.ErrCatalogPlan)
+			} else {
+				require.NoError(t, models.SaveBillingPlan(tx, &changed))
+				assignmentError := runAfterCommit(t, db, tx, func(conn *gorm.DB) error {
+					_, err := models.SetAdminOrganizationPlan(conn, r.Organization.ID, catalog.Key, nil)
+					return err
+				})
+				require.EqualError(t, assignmentError, "Per-seat plans need a Polar subscription. Use a seat limit override instead.")
+			}
+
+			stored, err := models.FindBillingPlan(db, catalog.Key)
+			require.NoError(t, err)
+			require.Equal(t, !assignmentFirst, stored.PerSeat)
+			after, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+			if assignmentFirst {
+				require.Equal(t, catalog.ID, after.PlanID)
+				require.Equal(t, models.BillingPlanSourceAdmin, after.PlanSource)
+				return
+			}
+			require.Equal(t, before, after)
+		})
+	}
+}
+
 func Test__ApplyPolarSubscriptionSerializesCatalogSave(t *testing.T) {
 	newLinkedPlan := func(t *testing.T, db *gorm.DB) *models.BillingPlan {
 		t.Helper()
@@ -320,7 +374,7 @@ func runAfterCommit(t *testing.T, db, first *gorm.DB, op func(*gorm.DB) error) e
 				return err
 			}
 			pid <- backendPID
-			return op(conn)
+			return op(conn.Session(&gorm.Session{NewDB: true}))
 		})
 	}()
 	defer func() { first.Rollback(); <-finished }()
