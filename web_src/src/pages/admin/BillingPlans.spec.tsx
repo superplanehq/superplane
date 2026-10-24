@@ -496,3 +496,101 @@ it("keeps the delete error when the reload fails and recovers with Try again", a
   expect(await screen.findByRole("button", { name: "Delete Stale" })).toBeDisabled();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
+
+it("keeps a rejected create open with its values and saves a corrected retry", async () => {
+  const saves: unknown[] = [];
+  let plans: BillingPlanListItem[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.endsWith("feature-definitions")) return new Response("[]");
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        saves.push(body);
+        if (saves.length === 1) {
+          return Response.json({ message: "This plan key already exists. Enter a different key." }, { status: 400 });
+        }
+        plans = [listedPlan({ id: "team-two", key: body.key, name: body.name })];
+        return Response.json(plans[0]);
+      }
+      return Response.json(plans);
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(screen.getByRole("button", { name: "Create plan" })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: "Create plan" }));
+  await user.type(screen.getByLabelText("Name", { exact: true }), "Team");
+  await user.type(screen.getByLabelText("Key", { exact: true }), "team");
+  await user.click(screen.getByRole("button", { name: "Save plan" }));
+
+  const dialog = within(screen.getByRole("dialog"));
+  const alert = await dialog.findByRole("alert");
+  expect(alert).toHaveTextContent("This plan key already exists. Enter a different key.");
+  expect(alert).not.toHaveTextContent("{");
+  expect(dialog.getByLabelText("Name", { exact: true })).toHaveValue("Team");
+  expect(dialog.getByLabelText("Key", { exact: true })).toHaveValue("team");
+  expect(dialog.getByRole("button", { name: "Save plan" })).toBeEnabled();
+
+  await user.clear(dialog.getByLabelText("Key", { exact: true }));
+  await user.type(dialog.getByLabelText("Key", { exact: true }), "team_two");
+  await user.click(dialog.getByRole("button", { name: "Save plan" }));
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(saves).toEqual([
+    expect.objectContaining({ key: "team", name: "Team" }),
+    expect.objectContaining({ key: "team_two", name: "Team" }),
+  ]);
+  expect(await screen.findByRole("row", { name: /Team/ })).toBeInTheDocument();
+});
+
+it("keeps a rejected update open with its values and saves a corrected retry", async () => {
+  const plan = listedPlan({ id: "custom-plan", key: "custom", name: "Custom" });
+  const updates: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.endsWith("feature-definitions")) return new Response("[]");
+      if (init?.method === "PUT") {
+        const body = JSON.parse(String(init.body));
+        updates.push(body);
+        if (updates.length === 1) {
+          return Response.json({ message: "Billing plan changes were rejected. Try again." }, { status: 400 });
+        }
+        return Response.json(plan);
+      }
+      return Response.json([plan]);
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await user.click(await screen.findByRole("button", { name: "Edit Custom" }));
+  const dialog = within(screen.getByRole("dialog", { name: "Edit Custom" }));
+  fireEvent.change(dialog.getByLabelText("Name", { exact: true }), { target: { value: "Custom Pro" } });
+  fireEvent.change(dialog.getByLabelText("Parallel task limit", { exact: true }), { target: { value: "3" } });
+  // Happy DOM incorrectly rejects decimal steps, so submit the form directly.
+  fireEvent.submit(dialog.getByRole("button", { name: "Save plan" }).closest("form")!);
+
+  const alert = await dialog.findByRole("alert");
+  expect(alert).toHaveTextContent("Billing plan changes were rejected. Try again.");
+  expect(alert).not.toHaveTextContent("{");
+  expect(dialog.getByLabelText("Name", { exact: true })).toHaveValue("Custom Pro");
+  expect(dialog.getByLabelText("Parallel task limit", { exact: true })).toHaveValue(3);
+
+  fireEvent.submit(dialog.getByRole("button", { name: "Save plan" }).closest("form")!);
+  await waitFor(() => expect(updates).toHaveLength(2));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  for (const update of updates) {
+    expect(update).toMatchObject({ id: "custom-plan", name: "Custom Pro", parallel_task_limit: 3 });
+  }
+});
