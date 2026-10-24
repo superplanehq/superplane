@@ -2,6 +2,7 @@ import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { EventStatusBadge } from "@/ui/EventStatusBadge";
@@ -10,7 +11,7 @@ import { AccordionContent, AccordionItem } from "@/ui/accordion";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
 import { RunInspectorStepTimeline } from "./RunInspectorStepTimeline";
 import type { RunInspectorApprovalRecord, RunInspectorCurrentUser, RunInspectorNodeSection } from "./types";
-import type { useRunInspectorActions } from "./useRunInspectorActions";
+import { canvasUpdatePermissionMessage, type useRunInspectorActions } from "./useRunInspectorActions";
 
 export function RunInspectorNodeAccordion({
   section,
@@ -110,7 +111,13 @@ export function RunInspectorNodeAccordion({
           </span>
         </NodeHeaderButton>
         <RunInspectorNodeActions section={section} actions={actions} currentUser={currentUser} />
-        <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
+        <NodeMetadata
+          section={section}
+          onRerun={onRerun}
+          rerunPending={rerunPending}
+          rerunDisabled={actions.rerunDisabled}
+          canUpdateCanvas={actions.canUpdateCanvas}
+        />
       </AccordionPrimitive.Header>
       {section.isQueued ? null : (
         <AccordionContent className="bg-slate-50 px-3 pb-3 pt-3 dark:bg-gray-950">
@@ -178,6 +185,8 @@ export function RunInspectorNodeActions({
 
   if (!hasActions) return null;
 
+  const updateLocked = !actions.canUpdateCanvas;
+
   return (
     <div
       className={cn(
@@ -191,7 +200,8 @@ export function RunInspectorNodeActions({
         <NodeActionButton
           label="Cancel"
           tone="danger"
-          disabled={actions.cancelQueuedItemPending}
+          pending={actions.cancelQueuedItemPending}
+          locked={updateLocked}
           onClick={() => actions.cancelQueuedItem(section)}
         />
       ) : null}
@@ -200,13 +210,15 @@ export function RunInspectorNodeActions({
           <NodeActionButton
             label="Approve"
             tone="success"
-            disabled={actions.nodeHookPending}
+            pending={actions.nodeHookPending}
+            locked={updateLocked}
             onClick={() => actions.invokeNodeHook(section, "approve", { index: actionableApproval.index, comment: "" })}
           />
           <NodeActionButton
             label="Reject"
             tone="danger"
-            disabled={actions.nodeHookPending}
+            pending={actions.nodeHookPending}
+            locked={updateLocked}
             onClick={() => {
               const reason = window.prompt("Reason for rejection");
               if (!reason?.trim()) return;
@@ -219,7 +231,8 @@ export function RunInspectorNodeActions({
         <NodeActionButton
           label="Push through"
           tone="neutral"
-          disabled={actions.nodeHookPending}
+          pending={actions.nodeHookPending}
+          locked={updateLocked}
           onClick={() => actions.invokeNodeHook(section, "pushThrough", null)}
         />
       ) : null}
@@ -227,7 +240,8 @@ export function RunInspectorNodeActions({
         <NodeActionButton
           label="Stop"
           tone="danger"
-          disabled={actions.stopNodePending}
+          pending={actions.stopNodePending}
+          locked={updateLocked}
           onClick={() => actions.stopNode(section)}
         />
       ) : null}
@@ -238,15 +252,18 @@ export function RunInspectorNodeActions({
 function NodeActionButton({
   label,
   tone,
-  disabled,
+  pending,
+  locked,
   onClick,
 }: {
   label: string;
   tone: "success" | "danger" | "neutral";
-  disabled: boolean;
+  pending: boolean;
+  locked: boolean;
   onClick: () => void;
 }) {
-  return (
+  const disabled = pending || locked;
+  const button = (
     <button
       type="button"
       disabled={disabled}
@@ -261,12 +278,15 @@ function NodeActionButton({
       )}
       onClick={(event) => {
         event.stopPropagation();
+        if (disabled) return;
         onClick();
       }}
     >
       {label}
     </button>
   );
+
+  return <CanvasUpdateLock locked={locked}>{button}</CanvasUpdateLock>;
 }
 
 function findActionableApprovalRecord(
@@ -296,27 +316,34 @@ function NodeMetadata({
   section,
   onRerun,
   rerunPending,
+  rerunDisabled,
+  canUpdateCanvas,
 }: {
   section: RunInspectorNodeSection;
   onRerun: () => void;
   rerunPending: boolean;
+  rerunDisabled: boolean;
+  canUpdateCanvas: boolean;
 }) {
+  const rerunButton = section.isTrigger ? (
+    <Button
+      type="button"
+      variant="outline"
+      size="xs"
+      disabled={rerunPending || rerunDisabled}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (rerunPending || rerunDisabled) return;
+        onRerun();
+      }}
+    >
+      {rerunPending ? "Rerun..." : "Rerun"}
+    </Button>
+  ) : null;
+
   return (
     <div className="ml-auto flex shrink-0 items-center gap-3 px-4 text-xs text-slate-500 dark:text-gray-400">
-      {section.isTrigger ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          disabled={rerunPending}
-          onClick={(event) => {
-            event.stopPropagation();
-            onRerun();
-          }}
-        >
-          {rerunPending ? "Rerun..." : "Rerun"}
-        </Button>
-      ) : null}
+      {rerunButton ? <CanvasUpdateLock locked={!canUpdateCanvas}>{rerunButton}</CanvasUpdateLock> : null}
       {(section.isTrigger || section.isQueued) && section.createdAt ? (
         <span>{formatEventTimestamp(section.createdAt)}</span>
       ) : section.durationMs !== undefined ? (
@@ -324,6 +351,19 @@ function NodeMetadata({
       ) : null}
       {section.badge ? <EventStatusBadge badgeColor={section.badge.badgeColor} label={section.badge.label} /> : null}
     </div>
+  );
+}
+
+function CanvasUpdateLock({ locked, children }: { locked: boolean; children: ReactNode }) {
+  if (!locked) return children;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{canvasUpdatePermissionMessage}</TooltipContent>
+    </Tooltip>
   );
 }
 
