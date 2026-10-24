@@ -22,6 +22,16 @@ sandbox. Remove a local `POLAR_API_BASE_URL` override before production use.
 Do not use `POLAR_BUSINESS_PRODUCT_ID` for Team. That setting links the legacy
 Business product.
 
+### Gate G1: Allow one subscription per organization
+
+Before rollout, disable **Allow multiple subscriptions** in the Polar organization
+settings. Apply this setting in both sandbox and production. Verify both settings
+before you enable Team checkout.
+
+SuperPlane also protects the stored subscription identity. A subscription that is
+not live cannot replace a different live subscription. A live subscription includes
+`active`, `trialing`, `past_due`, and scheduled cancellation with an open period.
+
 ## Configure the product and catalog plan
 
 1. Create an active recurring Polar product with a monthly interval and interval count 1.
@@ -127,6 +137,9 @@ an example. Use your catalog price for the actual estimates.
 17. Repeat the flow with a separate two-member Trial organization, then abandon checkout before payment.
 18. Confirm that this organization remains on Trial and its purchased capacity and expiration stay unchanged.
 
+Team checkout sends `allow_discount_codes: false`. Legacy Business checkout omits
+this field.
+
 Checkout creation does not activate a plan or grant capacity. Only subscription
 activation stores the purchased quantity. The monthly total describes purchased
 capacity. Membership-based renewal estimates belong to
@@ -185,3 +198,27 @@ fewer seats than the target after an outside change.
 The table `organization_seat_purchases` is the marker for seat changes that
 SuperPlane started. Use `models.FindExpectedSeatCount` to tell them from outside
 changes in Polar.
+
+## Resolve subscription identity conflicts
+
+The log `billing.foreign_subscription_snapshot_ignored` means a snapshot arrived
+for another subscription that is not live. SuperPlane keeps the live subscription's
+billing state, customer, credits, and pending seat purchases. The log includes the
+organization ID, both subscription IDs, and their statuses.
+
+The Error log `billing.multiple_live_subscriptions` means Polar confirmed two live
+subscriptions for one organization. SuperPlane keeps the stored subscription and
+does not apply the incoming snapshot. This condition requires manual operator
+resolution.
+
+1. Find the organization and both subscription IDs in the log.
+2. Open both subscriptions in the correct Polar environment.
+3. Confirm which subscription the organization must retain.
+4. Manually end the unintended subscription in Polar.
+5. Sync organization billing and confirm its plan, purchased seats, credits, and customer.
+6. Confirm that **Allow multiple subscriptions** remains disabled in sandbox and production.
+
+SuperPlane does not cancel duplicate subscriptions or issue refunds automatically.
+Handle any required refund separately. If the refresh fails, retry webhook delivery
+or sync billing after Polar recovers. SuperPlane preserves local state until it
+can verify the stored subscription.
