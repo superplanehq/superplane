@@ -19,9 +19,11 @@ import { BillingHelp } from "./BillingHelp";
 import { PolarProductSelect } from "./PolarProductSelect";
 import type { BillingPlan, FeatureDefinition } from "./billingPlansApi";
 type PlanFieldsProps = { plan: BillingPlan; onChange: (plan: BillingPlan) => void };
+type PlanPricingProps = PlanFieldsProps & { assigned: boolean };
 
 export function BillingPlanEditor({
   plan,
+  assigned,
   features,
   onChange,
   onSave,
@@ -30,6 +32,7 @@ export function BillingPlanEditor({
   error,
 }: {
   plan: BillingPlan;
+  assigned: boolean;
   features: FeatureDefinition[];
   onChange: (plan: BillingPlan) => void;
   onSave: () => void;
@@ -70,7 +73,7 @@ export function BillingPlanEditor({
           <div className="min-h-0 flex-1 overflow-y-auto">
             <fieldset disabled={saving} className="space-y-6 p-6">
               <PlanDetails plan={plan} onChange={onChange} />
-              <PlanPolicies plan={plan} onChange={onChange} />
+              <PlanPolicies plan={plan} assigned={assigned} onChange={onChange} />
               <PlanAccessFields plan={plan} features={features} onChange={onChange} />
             </fieldset>
           </div>
@@ -235,9 +238,9 @@ function PlanDetails({ plan, onChange }: PlanFieldsProps) {
     </section>
   );
 }
-function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
+function PlanPolicies({ plan, assigned, onChange }: PlanPricingProps) {
   const update = (patch: Partial<BillingPlan>) => onChange({ ...plan, ...patch });
-  const linked = !!plan.id && !!plan.polar_product_id;
+  const locked = isPolarLocked(plan, assigned);
   const legacy = plan.key === "business_legacy";
   const manual = plan.key === "business_manual";
   return (
@@ -246,13 +249,13 @@ function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
         <section key={section} className="space-y-4 border-t pt-5" aria-label={section}>
           <h3 className="text-sm font-semibold">{section}</h3>
           <div className="grid gap-4 sm:grid-cols-2">
-            <PlanNumbers plan={plan} section={section} onChange={onChange} />
+            <PlanNumbers plan={plan} assigned={assigned} section={section} onChange={onChange} />
             {section === "Pricing" && (
               <div className="flex items-center gap-3">
                 <Switch
                   id="plan-per-seat"
                   checked={plan.per_seat}
-                  disabled={linked || legacy}
+                  disabled={locked || legacy}
                   onCheckedChange={(per_seat) =>
                     update({ per_seat, seat_limit: per_seat ? (plan.seat_limit ?? 50) : plan.seat_limit })
                   }
@@ -263,13 +266,13 @@ function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
             {section === "Pricing" && (
               <PolarProductSelect
                 kind="subscription"
-                disabled={linked || manual}
+                disabled={locked || manual}
                 value={plan.polar_product_id ?? ""}
                 onChange={(productID) => update({ polar_product_id: productID || null })}
                 description={
                   manual
                     ? "Business Manual does not use Polar products."
-                    : linked
+                    : locked
                       ? "This plan is linked to Polar. Create a new plan to change the product or price."
                       : undefined
                 }
@@ -281,9 +284,9 @@ function PlanPolicies({ plan, onChange }: PlanFieldsProps) {
     </>
   );
 }
-function PlanNumbers({ plan, section, onChange }: PlanFieldsProps & { section: string }) {
+function PlanNumbers({ plan, assigned, section, onChange }: PlanPricingProps & { section: string }) {
   const update = (patch: Partial<BillingPlan>) => onChange({ ...plan, ...patch });
-  const numberFields = planNumberFields(plan);
+  const numberFields = planNumberFields(plan, assigned);
   return (
     <>
       {numberFields
@@ -333,8 +336,13 @@ function PlanNumbers({ plan, section, onChange }: PlanFieldsProps & { section: s
     </>
   );
 }
-function planNumberFields(plan: BillingPlan) {
-  const linked = !!plan.id && !!plan.polar_product_id;
+// A Polar link is locked only while an organization uses the plan. The server
+// checks assignments again on save.
+function isPolarLocked(plan: BillingPlan, assigned: boolean) {
+  return !!plan.id && !!plan.polar_product_id && assigned;
+}
+function planNumberFields(plan: BillingPlan, assigned: boolean) {
+  const locked = isPolarLocked(plan, assigned);
   const legacy = plan.key === "business_legacy";
   const perSeat = plan.per_seat;
   const fields: {
@@ -351,10 +359,10 @@ function planNumberFields(plan: BillingPlan) {
       key: "price_cents",
       label: "Price (USD)",
       unit: "USD",
-      help: linked
+      help: locked
         ? "Pricing is locked because this plan is linked to a Polar product."
         : "The plan price in US dollars.",
-      locked: linked || legacy,
+      locked: locked || legacy,
       section: "Pricing",
     },
     {
