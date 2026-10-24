@@ -10,14 +10,16 @@ import {
 } from "./lineBoardColumnColors";
 
 describe("lineBoardColumnColors", () => {
-  it("lists six colours and uses a quieter wash than vivid in both themes", () => {
-    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(6);
+  it("lists eight colours and uses a quieter wash than vivid in both themes", () => {
+    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(8);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.className.includes("bg-"))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.laneClassName !== color.className)).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /bg-\S+-100/.test(color.laneClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:bg-\S+\/\d+/.test(color.laneClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:border-\S+\/\d+/.test(color.borderClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).not.toContain("red");
+    expect(lineBoardColumnColorById("rose")?.label).toBe("Rose");
+    expect(lineBoardColumnColorById("indigo")?.label).toBe("Indigo");
   });
 
   it("resolves a lane class from a colour id", () => {
@@ -51,5 +53,28 @@ describe("lineBoardColumnColors", () => {
       className: `bg-muted ${lineBoardColumnColorById("lime")?.borderClassName}`,
     });
     expect(lineBoardColumnLaneProps(null, "dim", { mutedFallback: true })).toEqual({ className: "bg-muted" });
+  });
+
+  it("keeps rose and indigo through save and view modes", () => {
+    expect(normalizeColumnColors({ plan: "rose", review: "indigo", weird: "not-a-color" })).toEqual({
+      plan: "rose",
+      review: "indigo",
+    });
+    expect(serializeColumnColors({ plan: "rose", review: "indigo", done: null })).toEqual({
+      plan: "rose",
+      review: "indigo",
+    });
+
+    for (const id of ["rose", "indigo"] as const) {
+      expect(lineBoardColumnLaneProps(id, "dim")).toEqual({
+        surfaceClassName: `bg-${id}-100 dark:bg-${id}-950/40`,
+      });
+      expect(lineBoardColumnLaneProps(id, "vivid")).toEqual({
+        surfaceClassName: `bg-${id}-300 dark:bg-${id}-800`,
+      });
+      expect(lineBoardColumnLaneProps(id, "borders", { mutedFallback: true })).toEqual({
+        className: `bg-muted border-${id}-400 dark:border-${id}-800/45`,
+      });
+    }
   });
 });

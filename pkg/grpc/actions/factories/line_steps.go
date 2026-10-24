@@ -118,6 +118,8 @@ var factoryLineColumnColorIDs = map[string]bool{
 	"sky":    true,
 	"purple": true,
 	"slate":  true,
+	"rose":   true,
+	"indigo": true,
 }
 
 const (
