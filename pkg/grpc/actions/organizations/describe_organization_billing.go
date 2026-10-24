@@ -227,6 +227,24 @@ func CreateBusinessCheckout(
 		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
 	}
 
+	current, err := models.FindOrganizationBillingPlan(database.DB(ctx), organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load the current plan.")
+	}
+	if current != nil && models.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) {
+		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
+	}
+	newBilling, err := models.OrganizationHasExperimentalFeatures(database.DB(ctx), organizationID, features.FeatureNewBilling)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
+	}
+	if newBilling {
+		return nil, grpcerrors.FailedPrecondition(nil, "Select a plan in Billing.")
+	}
+	if models.OrganizationBillingIsPolarManaged(current) {
+		return nil, grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
+	}
+
 	email := actingUserEmail(ctx, organizationID.String(), accountID)
 	if email == "" {
 		return nil, grpcerrors.FailedPrecondition(nil, "A user email is required to start checkout.")

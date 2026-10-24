@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -51,66 +52,156 @@ func ApplySubscriptionEvent(ctx context.Context, tx *gorm.DB, event *Subscriptio
 }
 
 func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) error {
+	return applySubscription(ctx, tx, data, false)
+}
+
+// applySubscription applies a subscription snapshot. Snapshots that a direct
+// Polar API call returned are verified; webhook payloads are not, because a
+// delayed event can claim access that Polar already ended.
+func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, verified bool) error {
 	orgID, err := parseSubscriptionOrganizationID(data)
 	if err != nil {
 		return err
 	}
-	tx = tx.WithContext(ctx)
-	if err := models.BindLegacyBillingProduct(tx, BusinessProductID()); err != nil {
-		return err
-	}
-	if _, err := models.FindOrganizationByIDInTransaction(tx, orgID.String()); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return permanentApplyError("organization not found")
+	incoming := subscriptionSnapshot(data)
+	incoming.Verified = verified
+	var refreshedStored, verifiedIncoming *SubscriptionData
+	needsSnapshot := errors.New("Polar subscription snapshot required")
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		return err
-	}
-
-	status := strings.ToLower(strings.TrimSpace(data.Status))
-	var periodStart, periodEnd *time.Time
-	if !data.CurrentPeriodStart.Time.IsZero() {
-		start := data.CurrentPeriodStart.Time
-		periodStart = &start
-	}
-	if !data.CurrentPeriodEnd.Time.IsZero() {
-		end := data.CurrentPeriodEnd.Time
-		periodEnd = &end
-	}
-
-	return tx.Transaction(func(inner *gorm.DB) error {
-		plan, grantIncluded, err := models.ApplyPolarSubscription(
-			inner,
-			orgID,
-			models.PolarSubscriptionApply{
-				ID:                data.ID,
-				ProductID:         data.ProductID,
-				Status:            status,
-				PeriodStart:       periodStart,
-				PeriodEnd:         periodEnd,
-				CancelAtPeriodEnd: data.CancelAtPeriodEnd,
-				ModifiedAt:        data.ModifiedAt.TimePtr(),
-				PurchasedSeats:    data.Seats,
-				PastDueAt:         data.PastDueAt.TimePtr(),
-			},
-		)
-		if err != nil {
-			if errors.Is(err, models.ErrInvalidPurchasedSeats) {
+		var readID, readReason string
+		err = db.WithContext(ctx).Transaction(func(inner *gorm.DB) error {
+			if _, err := models.LockOrganization(inner, orgID); err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return permanentApplyError("organization not found")
+				}
+				return err
+			}
+			if err := models.BindLegacyBillingProduct(inner, BusinessProductID()); err != nil {
+				return err
+			}
+			attemptIncoming, appliedData := incoming, data
+			if verifiedIncoming != nil {
+				current, err := models.FindOrganizationBillingPlan(inner, orgID)
+				if err != nil {
+					return err
+				}
+				// Another apply can adopt this identity during verification.
+				// Use the verified snapshot even when it is no longer foreign.
+				if polarSubscriptionID(current) == incoming.ID {
+					attemptIncoming = subscriptionSnapshot(*verifiedIncoming)
+					attemptIncoming.Verified = true
+					appliedData = *verifiedIncoming
+				}
+			}
+			result, err := models.ApplyPolarSubscription(inner, orgID, attemptIncoming, nil)
+			if err != nil {
+				return err
+			}
+			if result.Disposition == models.PolarSubscriptionRefreshRequired {
+				storedID := polarSubscriptionID(result.Plan)
+				if refreshedStored == nil || refreshedStored.ID != storedID {
+					readID, readReason = storedID, "refresh stored"
+					return needsSnapshot
+				}
+				stored := subscriptionSnapshot(*refreshedStored)
+				result, err = models.ApplyPolarSubscription(inner, orgID, attemptIncoming, &stored)
+				if err != nil {
+					return err
+				}
+			}
+			refreshedResult := result.RefreshedStored
+			if result.Disposition == models.PolarSubscriptionVerificationRequired {
+				if verifiedIncoming == nil {
+					readID, readReason = incoming.ID, "verify"
+					return needsSnapshot
+				}
+				verifiedSnapshot := subscriptionSnapshot(*verifiedIncoming)
+				verifiedSnapshot.Verified = true
+				result, err = models.ApplyPolarSubscription(inner, orgID, verifiedSnapshot, nil)
+				if err != nil {
+					return err
+				}
+				appliedData = *verifiedIncoming
+			}
+			if refreshedResult != nil {
+				if err := syncSubscriptionSideEffects(inner, orgID, *refreshedStored, refreshedResult); err != nil {
+					return err
+				}
+			}
+			return syncSubscriptionSideEffects(inner, orgID, appliedData, result)
+		})
+		if !errors.Is(err, needsSnapshot) {
+			if errors.Is(err, models.ErrInvalidPurchasedSeats) && !errors.Is(err, models.ErrPolarSubscriptionRefreshFailed) {
 				return permanentApplyError(err.Error())
 			}
 			return err
 		}
-		if customerID := firstNonEmpty(data.Customer.ID, data.CustomerID); customerID != "" {
-			if err := models.SetOrganizationPolarCustomerID(inner, orgID, customerID); err != nil {
-				return err
-			}
+		// Roll back every tentative write before HTTP. A new transaction
+		// rechecks identity and ordering under the lock after the response.
+		// An outer transaction belongs to the caller and cannot be released here.
+		if _, inTransaction := db.Statement.ConnPool.(gorm.TxCommitter); inTransaction {
+			return fmt.Errorf("%w: %s Polar subscription %q outside the caller transaction", models.ErrPolarSubscriptionRefreshFailed, readReason, readID)
 		}
-		return models.SyncIncludedLLMCreditGrant(inner, models.IncludedUsageSync{
-			OrganizationID:   orgID,
-			SubscriptionID:   data.ID,
-			PeriodEnd:        periodEnd,
-			GrantIncluded:    grantIncluded,
-			IsActiveBusiness: plan != nil && plan.IsActiveBusiness(),
-		})
+		refreshed, err := readOrganizationSubscription(ctx, orgID, readID, readReason)
+		if err != nil {
+			return err
+		}
+		if readReason == "verify" {
+			verifiedIncoming = refreshed
+			continue
+		}
+		refreshedStored = refreshed
+	}
+}
+
+func readOrganizationSubscription(ctx context.Context, orgID uuid.UUID, subscriptionID, reason string) (*SubscriptionData, error) {
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+	snapshot, err := NewClientFromEnv().GetSubscription(ctx, subscriptionID)
+	if err != nil {
+		return nil, fmt.Errorf("%s Polar subscription %q: %w", reason, subscriptionID, err)
+	}
+	if snapshot.ID != subscriptionID {
+		return nil, fmt.Errorf("%s Polar subscription does not match requested identity", reason)
+	}
+	if externalID := snapshot.organizationExternalID(); externalID != "" && externalID != orgID.String() {
+		return nil, fmt.Errorf("%s Polar subscription customer does not match organization", reason)
+	}
+	return snapshot, nil
+}
+
+func subscriptionSnapshot(data SubscriptionData) models.PolarSubscriptionApply {
+	return models.PolarSubscriptionApply{
+		ID:                data.ID,
+		ProductID:         data.ProductID,
+		Status:            strings.ToLower(strings.TrimSpace(data.Status)),
+		PeriodStart:       data.CurrentPeriodStart.TimePtr(),
+		PeriodEnd:         data.CurrentPeriodEnd.TimePtr(),
+		CancelAtPeriodEnd: data.CancelAtPeriodEnd,
+		ModifiedAt:        data.ModifiedAt.TimePtr(),
+		PurchasedSeats:    data.Seats,
+		PastDueAt:         data.PastDueAt.TimePtr(),
+	}
+}
+
+func syncSubscriptionSideEffects(tx *gorm.DB, orgID uuid.UUID, data SubscriptionData, result *models.PolarSubscriptionApplyResult) error {
+	if result.Disposition != models.PolarSubscriptionApplied {
+		return nil
+	}
+	if customerID := firstNonEmpty(data.Customer.ID, data.CustomerID); customerID != "" {
+		if err := models.SetOrganizationPolarCustomerID(tx, orgID, customerID); err != nil {
+			return err
+		}
+	}
+	return models.SyncIncludedLLMCreditGrant(tx, models.IncludedUsageSync{
+		OrganizationID:   orgID,
+		SubscriptionID:   data.ID,
+		PeriodEnd:        data.CurrentPeriodEnd.TimePtr(),
+		GrantIncluded:    result.GrantIncluded,
+		IsActiveBusiness: result.Plan != nil && result.Plan.IsActiveBusiness(),
 	})
 }
 
@@ -120,7 +211,7 @@ func ApplyOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.
 	if strings.TrimSpace(data.organizationExternalID()) == "" {
 		data.ExternalCustomerID = orgID.String()
 	}
-	return ApplySubscription(ctx, tx, data)
+	return applySubscription(ctx, tx, data, true)
 }
 
 func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) error {
@@ -148,23 +239,72 @@ func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.U
 		}
 		known = append(known, item)
 	}
-	selected := selectBusinessSubscription(known)
+	plan, err := models.FindOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	selected := selectBusinessSubscription(known, polarSubscriptionID(plan), now)
 	if selected == nil {
 		return nil
 	}
+	reportConflictingLiveSubscriptions(orgID, known, selected, now)
 	return ApplyOrganizationSubscription(ctx, tx, orgID, *selected)
 }
 
-func selectBusinessSubscription(items []SubscriptionData) *SubscriptionData {
-	if len(items) == 0 {
-		return nil
-	}
+// Sync keeps one subscription, but Polar can hold more than one live
+// subscription for the same organization. Report every conflicting live
+// subscription so operators can cancel the duplicate charges.
+func reportConflictingLiveSubscriptions(orgID uuid.UUID, items []SubscriptionData, selected *SubscriptionData, now time.Time) {
 	for i := range items {
-		if models.PolarSubscriptionIsPaid(items[i].Status) {
-			return &items[i]
+		item := &items[i]
+		if item.ID == selected.ID {
+			continue
+		}
+		if !models.PolarSubscriptionIsLive(item.Status, item.CancelAtPeriodEnd, item.CurrentPeriodEnd.TimePtr(), now) {
+			continue
+		}
+		log.WithFields(log.Fields{
+			"organization_id":              orgID.String(),
+			"stored_subscription_id":       selected.ID,
+			"incoming_subscription_id":     item.ID,
+			"stored_subscription_status":   strings.ToLower(strings.TrimSpace(selected.Status)),
+			"incoming_subscription_status": strings.ToLower(strings.TrimSpace(item.Status)),
+		}).Error("billing.multiple_live_subscriptions")
+	}
+}
+
+func selectBusinessSubscription(items []SubscriptionData, storedID string, now time.Time) *SubscriptionData {
+	slices.SortFunc(items, func(a, b SubscriptionData) int {
+		if a.CreatedAt.Time.IsZero() != b.CreatedAt.Time.IsZero() {
+			if a.CreatedAt.Time.IsZero() {
+				return 1
+			}
+			return -1
+		}
+		if order := b.CreatedAt.Time.Compare(a.CreatedAt.Time); order != 0 {
+			return order
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	var stored, newestLive *SubscriptionData
+	for i := range items {
+		item := &items[i]
+		live := models.PolarSubscriptionIsLive(item.Status, item.CancelAtPeriodEnd, item.CurrentPeriodEnd.TimePtr(), now)
+		if item.ID == storedID {
+			stored = item
+			if live {
+				return stored
+			}
+		}
+		if live && newestLive == nil {
+			newestLive = item
 		}
 	}
-	return &items[0]
+	if newestLive != nil {
+		return newestLive
+	}
+	return stored
 }
 
 func parseSubscriptionOrganizationID(data SubscriptionData) (uuid.UUID, error) {
@@ -260,16 +400,13 @@ func VerifyOrganizationSubscription(ctx context.Context, orgID uuid.UUID) (strin
 			return "failed", fmt.Errorf("polar subscription customer does not match organization")
 		}
 		status := strings.ToLower(strings.TrimSpace(item.Status))
-		switch status {
-		case "active", "trialing", "canceled", "unpaid", "revoked", "past_due", "paused", "incomplete", "incomplete_expired":
-		default:
+		if !models.PolarSubscriptionStatusIsKnown(status) {
 			return "failed", fmt.Errorf("unexpected Polar subscription status %q", item.Status)
 		}
 		if !item.EndedAt.Time.IsZero() && !item.EndedAt.Time.After(now) {
 			continue
 		}
-		periodEnd := item.CurrentPeriodEnd.TimePtr()
-		if models.PolarSubscriptionKeepsAccess(status, item.CancelAtPeriodEnd, periodEnd, now) {
+		if models.PolarSubscriptionIsLive(status, item.CancelAtPeriodEnd, item.CurrentPeriodEnd.TimePtr(), now) {
 			active = true
 		}
 	}

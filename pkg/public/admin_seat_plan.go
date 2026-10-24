@@ -8,6 +8,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
 
 func validateSeatPlanProduct(ctx context.Context, plan *models.BillingPlan) (int, error) {
@@ -22,6 +23,7 @@ func validateSeatPlanProduct(ctx context.Context, plan *models.BillingPlan) (int
 		return http.StatusBadRequest, errors.New("Polar product not found. Check the product ID and Polar environment")
 	}
 	if err != nil {
+		middleware.SetServerError(ctx, err, nil)
 		return http.StatusBadGateway, errors.New("Could not validate the Polar product. Check the Polar configuration and try again")
 	}
 	if err := validateSeatProductPricing(product, plan); err != nil {

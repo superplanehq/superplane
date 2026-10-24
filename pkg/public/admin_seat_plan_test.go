@@ -21,6 +21,7 @@ func TestAdminSeatPlanProductValidation(t *testing.T) {
 	server, _, token := setupAdminTestServer(t)
 	request := newAdminCatalogRequest(server, token)
 	db := database.Conn()
+	reports := bindAdminSentryEvents(t)
 	for _, tc := range []struct {
 		name       string
 		product    string
@@ -88,18 +89,27 @@ func TestAdminSeatPlanProductValidation(t *testing.T) {
 					body, err := json.Marshal(plan)
 					require.NoError(t, err)
 					before := calls.Load()
+					reportsBefore := len(reports.Events())
 					response := request(method, path, string(body))
 					require.Equal(t, before+1, calls.Load(), "every save must fetch the product")
-					require.Equal(t, tc.wantStatus, response.Code, response.Body.String())
 					require.NotContains(t, response.Body.String(), "private provider detail")
+					reported := reports.Events()[reportsBefore:]
 					if tc.wantStatus == http.StatusOK {
+						require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+						require.Empty(t, reported)
 						stored, err := models.FindBillingPlan(db, plan.Key)
 						require.NoError(t, err)
 						require.Equal(t, 50, *stored.SeatLimit)
 						require.Equal(t, plan.Name, stored.Name)
 						return
 					}
-					require.Contains(t, response.Body.String(), tc.message)
+					require.Contains(t, requireBillingPlanJSONError(t, response, tc.wantStatus), tc.message)
+					if tc.wantStatus == http.StatusBadGateway {
+						require.Len(t, reported, 1, "provider failures keep their cause in the error report")
+						require.NotEmpty(t, sentryExceptionValues(reported[0]))
+					} else {
+						require.Empty(t, reported)
+					}
 					if operation == "create" {
 						var count int64
 						require.NoError(t, db.Model(&models.BillingPlan{}).Where("key = ?", plan.Key).Count(&count).Error)
@@ -128,8 +138,7 @@ func TestAdminUnlinkedSeatPlansDoNotRequirePolar(t *testing.T) {
 	body, err := json.Marshal(plan)
 	require.NoError(t, err)
 	response := request("PUT", "billing-plans/"+plan.ID.String(), string(body))
-	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
-	require.Contains(t, response.Body.String(), "Configure Polar")
+	require.Contains(t, requireBillingPlanJSONError(t, response, http.StatusBadRequest), "Configure Polar")
 	stored, err := models.FindBillingPlan(database.Conn(), plan.Key)
 	require.NoError(t, err)
 	require.Nil(t, stored.PolarProductID)

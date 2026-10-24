@@ -109,15 +109,13 @@ func TestResolvePurchasedSeats(t *testing.T) {
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	maximum := 50
-	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, CreditFrequency: "none", CreditExpiration: "never"}
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
-	require.NoError(t, err)
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
+	newSubscriptionReplay(t, r.Organization.ID, &plan).apply("active", seatCount(3))
 	member := support.CreateUser(t, r, r.Organization.ID)
 	removed := support.CreateUser(t, r, r.Organization.ID)
 	require.NoError(t, db.Delete(removed).Error)
-	_, err = models.CreateAPIKey(db, r.Organization.ID, "service", nil, r.User, nil, nil)
+	_, err := models.CreateAPIKey(db, r.Organization.ID, "service", nil, r.User, nil, nil)
 	require.NoError(t, err)
 
 	expected := SeatUsage{Invitable: seatCount(1), PerSeat: true, Purchased: seatCount(3), Occupied: 2, Available: seatCount(1), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(2)}
@@ -232,11 +230,9 @@ func TestResolveSeatsForPlanUsesLoadedPlan(t *testing.T) {
 	defer r.Close()
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	db := database.Conn()
-	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: seatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: seatCount(50), PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
-	require.NoError(t, err)
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
+	newSubscriptionReplay(t, r.Organization.ID, &plan).apply("active", seatCount(3))
 	loaded, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
 	now := time.Now()

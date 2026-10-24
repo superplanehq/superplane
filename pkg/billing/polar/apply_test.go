@@ -573,6 +573,17 @@ func (f creditPackLookupFunc) GetCreditPack(ctx context.Context, productID strin
 func setupBillingOrganization(t *testing.T) *models.Organization {
 	t.Helper()
 	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+	catalog, err := models.FindBillingPlan(db, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	originalProduct := catalog.PolarProductID
+	if originalProduct != nil {
+		originalProduct = new(*originalProduct)
+	}
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.WithoutCancel(t.Context())).Model(catalog).Update("polar_product_id", originalProduct).Error)
+	})
+	require.NoError(t, db.Model(catalog).Update("polar_product_id", nil).Error)
 	org, err := models.CreateOrganization("billing-"+uuid.NewString(), "")
 	require.NoError(t, err)
 	account, err := models.CreateAccount("Billing test", uuid.NewString()+"@example.com")

@@ -1357,6 +1357,7 @@ message InvitationSeatSummary {
   optional int64 invitable = 5;
   optional int64 purchasable = 6;
   optional int64 member_limit = 7;
+  bool payment_blocked = 8;
 }
 message CreateInvitationRequest {
   string id = 1;

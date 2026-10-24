@@ -225,6 +225,9 @@ message DescribeRunnerResponse {
 message DeleteRunnerRequest {
   string fleet_id = 1;
   string runner_id = 2;
+  // When nonempty, delete only if the current state is in this list.
+  // A mismatch returns a conflict without changing the runner or task.
+  repeated string states = 3;
 }
 
 message DeleteRunnerResponse {

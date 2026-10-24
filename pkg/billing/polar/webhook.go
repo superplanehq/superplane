@@ -145,6 +145,7 @@ type SubscriptionData struct {
 	Status             string        `json:"status"`
 	Seats              *int          `json:"seats"`
 	CancelAtPeriodEnd  bool          `json:"cancel_at_period_end"`
+	CreatedAt          polarTime     `json:"created_at"`
 	ModifiedAt         polarTime     `json:"modified_at"`
 	CurrentPeriodStart polarTime     `json:"current_period_start"`
 	EndedAt            polarTime     `json:"ended_at"`

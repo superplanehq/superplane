@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // replay delivers a Polar webhook with the given status, newer than the last one.
@@ -54,6 +55,7 @@ func saveFreePlan(t *testing.T) *models.BillingPlan {
 
 func TestPastDueRenewalLocksMembershipUntilPaymentRecovers(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 3, new(50))
+	f.replay(models.PolarSubscriptionStatusActive, 3)
 	db := database.Conn()
 	orgID := f.r.Organization.ID
 	support.CreateUser(t, f.r, orgID)
@@ -73,6 +75,9 @@ func TestPastDueRenewalLocksMembershipUntilPaymentRecovers(t *testing.T) {
 	require.NoError(t, err)
 	token := strings.TrimPrefix(pending.AcceptanceUrl, "https://example.com/invitations/")
 	require.EqualValues(t, 2, occupied())
+	listed, err := service.List(context.Background(), orgID.String())
+	require.NoError(t, err)
+	require.False(t, listed.Seats.PaymentBlocked)
 
 	f.replay(models.PolarSubscriptionStatusPastDue, 3)
 
@@ -81,15 +86,22 @@ func TestPastDueRenewalLocksMembershipUntilPaymentRecovers(t *testing.T) {
 	_, err = service.Resend(context.Background(), orgID.String(), f.r.User.String(), pending.Invitation.Id)
 	requireInvitationReason(t, err, "PAYMENT_PAST_DUE")
 	_, err = service.Accept(context.Background(), invitee.ID.String(), token)
-	requireGRPCCode(t, codes.FailedPrecondition, err)
+	requireInvitationReason(t, err, "PAYMENT_PAST_DUE")
+	require.Equal(t, "This organization cannot add members until its payment is updated. Ask an organization admin.", status.Convert(err).Message())
 	require.EqualValues(t, 2, occupied())
 	stored, err := models.FindOrganizationInvitation(db, orgID, uuid.MustParse(pending.Invitation.Id))
 	require.NoError(t, err)
 	require.Equal(t, models.InvitationStatePending, stored.State)
-	listed, err := service.List(context.Background(), orgID.String())
+	listed, err = service.List(context.Background(), orgID.String())
 	require.NoError(t, err)
+	require.True(t, listed.Seats.PaymentBlocked)
 	require.EqualValues(t, 0, *listed.Seats.Invitable)
 	require.EqualValues(t, 0, *listed.Seats.Purchasable)
+	billing, err := DescribeOrganizationBilling(context.Background(), orgID.String(), &pb.DescribeOrganizationBillingRequest{Id: orgID.String()})
+	require.NoError(t, err)
+	require.Equal(t, models.PolarSubscriptionStatusPastDue, billing.PolarSubscriptionStatus)
+	require.NotNil(t, billing.OccupiedSeats)
+	require.EqualValues(t, 2, *billing.OccupiedSeats)
 
 	require.NoError(t, db.Model(&models.BillingPlan{}).Where("id = ?", f.catalog.ID).Update("visibility", "public").Error)
 	for name, request := range map[string]*pb.SelectBillingPlanRequest{
@@ -110,6 +122,9 @@ func TestPastDueRenewalLocksMembershipUntilPaymentRecovers(t *testing.T) {
 	require.Equal(t, models.BillingPlanSourcePolar, locked.PlanSource)
 
 	f.replay(models.PolarSubscriptionStatusActive, 3)
+	listed, err = service.List(context.Background(), orgID.String())
+	require.NoError(t, err)
+	require.False(t, listed.Seats.PaymentBlocked)
 
 	_, err = create("late@example.com")
 	requireInvitationReason(t, err, "SEAT_PURCHASE_REQUIRED")

@@ -588,7 +588,7 @@ func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
 	db := database.DB(r.Context())
 	plans, err := models.ListBillingPlans(db)
 	if err != nil {
-		http.Error(w, "Failed to load billing plans", http.StatusInternalServerError)
+		writeBillingPlanServerError(w, r, err, billingPlanLoadErrorMessage)
 		return
 	}
 	planIDs := make([]uuid.UUID, 0, len(plans))
@@ -597,7 +597,7 @@ func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
 	}
 	assigned, err := models.ListAssignedBillingPlanIDs(db, planIDs)
 	if err != nil {
-		http.Error(w, "Failed to load billing plans", http.StatusInternalServerError)
+		writeBillingPlanServerError(w, r, err, billingPlanLoadErrorMessage)
 		return
 	}
 	items := make([]adminBillingPlanListItem, 0, len(plans))
