@@ -8,7 +8,7 @@ import {
   type LineBoardColumnColorView,
 } from "../lib/lineBoardColumnColorViewPreference";
 
-export type LineBoardColumnColorId = "lime" | "yellow" | "teal" | "sky" | "purple" | "slate";
+export type LineBoardColumnColorId = "lime" | "yellow" | "orange" | "teal" | "sky" | "purple" | "pink" | "slate";
 
 export interface LineBoardColumnColor {
   id: LineBoardColumnColorId;
@@ -38,6 +38,13 @@ export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
     borderClassName: "border-amber-400 dark:border-amber-800/45",
   },
   {
+    id: "orange",
+    label: "Orange",
+    className: "bg-orange-300 dark:bg-orange-800",
+    laneClassName: "bg-orange-100 dark:bg-orange-950/40",
+    borderClassName: "border-orange-400 dark:border-orange-800/45",
+  },
+  {
     id: "teal",
     label: "Teal",
     className: "bg-teal-300 dark:bg-teal-800",
@@ -57,6 +64,13 @@ export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
     className: "bg-violet-300 dark:bg-violet-800",
     laneClassName: "bg-violet-100 dark:bg-violet-950/40",
     borderClassName: "border-violet-400 dark:border-violet-800/45",
+  },
+  {
+    id: "pink",
+    label: "Pink",
+    className: "bg-pink-300 dark:bg-pink-800",
+    laneClassName: "bg-pink-100 dark:bg-pink-950/40",
+    borderClassName: "border-pink-400 dark:border-pink-800/45",
   },
   {
     id: "slate",
