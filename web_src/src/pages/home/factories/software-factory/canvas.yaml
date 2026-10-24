@@ -158,6 +158,9 @@ spec:
           - name: PR_NUMBER
             value: '{{ split(split(root().data.comment.html_url, "/pull/")[1], "#")[0] }}'
             valueSource: literal
+          - name: COMMENT_NODE_ID
+            value: '{{ root().data.comment.node_id }}'
+            valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
         steps:
@@ -172,6 +175,9 @@ spec:
               gh pr checkout "$PR_NUMBER"
               # Embed the token so later git push is non-interactive (gh clone leaves a bare https remote).
               git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git"
+              # Record where the branch started, so the resolve step below can tell whether this
+              # run actually produced a commit.
+              git rev-parse HEAD > ../.factory_head_before
             name: Checkout PR
             type: bash
           - command: 'echo "REPLACE ME WITH: commit signing / DCO prepare-commit-msg hook for your org"'
@@ -219,6 +225,94 @@ spec:
               git push origin HEAD
               echo "Pushed changes for PR #${PR_NUMBER}"
             name: Commit and push
+            type: bash
+            workingDirectory: repo
+          - command: |-
+              set -euo pipefail
+              export GH_TOKEN="$GITHUB_TOKEN"
+
+              # This node is wired to BOTH on-pr-comment-trigger and on-pr-review-comment-trigger.
+              # A plain PR conversation comment has no review thread, so there is nothing to resolve
+              # on that path. Review comment node IDs are prefixed PRRC_.
+              case "${COMMENT_NODE_ID:-}" in
+                PRRC_*) ;;
+                *)
+                  echo "Trigger was not a PR review comment (node id '${COMMENT_NODE_ID:-unset}'), nothing to resolve."
+                  exit 0
+                  ;;
+              esac
+
+              # "Pushed" is not "committed": the step above absorbs the empty-commit case, so the
+              # push runs even when nothing changed. Resolving then would mark a reviewer's comment
+              # resolved on no work.
+              HEAD_BEFORE="$(cat ../.factory_head_before 2>/dev/null || true)"
+              HEAD_AFTER="$(git rev-parse HEAD)"
+              if [ -z "$HEAD_BEFORE" ] || [ "$HEAD_BEFORE" = "$HEAD_AFTER" ]; then
+                echo "No new commit on this run, leaving the review thread open."
+                exit 0
+              fi
+
+              OWNER="${REPO%%/*}"
+              NAME="${REPO##*/}"
+
+              read -r -d '' THREAD_QUERY <<'GRAPHQL' || true
+              query($owner:String!,$name:String!,$pr:Int!,$cursor:String){
+                repository(owner:$owner,name:$name){
+                  pullRequest(number:$pr){
+                    reviewThreads(first:100,after:$cursor){
+                      pageInfo{ hasNextPage endCursor }
+                      nodes{ id comments(last:100){ nodes{ id } } }
+                    }
+                  }
+                }
+              }
+              GRAPHQL
+
+              # resolveReviewThread takes a PullRequestReviewThread (PRRT_) node, but the trigger
+              # only gives the review comment (PRRC_) and GitHub exposes no direct lookup between
+              # them. Walk the PR's review threads to find the one holding this comment. Paginated
+              # deliberately: long PRs are exactly where this feature matters.
+              #
+              # comments(last:100), not first:100. The comment that triggered this run is by
+              # definition the newest in its thread, so on a thread longer than one page the first
+              # page is the one guaranteed NOT to contain it.
+              THREAD_ID=""
+              CURSOR=""
+              while : ; do
+                ARGS=(-f "query=$THREAD_QUERY" -f "owner=$OWNER" -f "name=$NAME" -F "pr=$PR_NUMBER")
+                if [ -n "$CURSOR" ]; then
+                  ARGS+=(-f "cursor=$CURSOR")
+                fi
+                RESPONSE="$(gh api graphql "${ARGS[@]}")"
+
+                # jq's first() rather than a `| head -1` pipeline: under `set -o pipefail` head
+                # closes the pipe early and the step would die with 141 on any long thread list.
+                THREAD_ID="$(printf '%s' "$RESPONSE" | jq -r --arg c "$COMMENT_NODE_ID" '
+                  [ .data.repository.pullRequest.reviewThreads.nodes[]
+                    | select(any(.comments.nodes[]?; .id == $c)) | .id ] | first // ""')"
+                if [ -n "$THREAD_ID" ]; then
+                  break
+                fi
+
+                HAS_NEXT="$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')"
+                if [ "$HAS_NEXT" != "true" ]; then
+                  break
+                fi
+                CURSOR="$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')"
+              done
+
+              if [ -z "$THREAD_ID" ]; then
+                echo "No review thread found containing comment ${COMMENT_NODE_ID}, leaving it open."
+                exit 0
+              fi
+
+              gh api graphql \
+                -f query='mutation($threadId:ID!){
+                  resolveReviewThread(input:{threadId:$threadId}){ thread{ id isResolved } }
+                }' \
+                -f threadId="$THREAD_ID" > /dev/null
+              echo "Resolved review thread ${THREAD_ID} on PR #${PR_NUMBER}"
+            name: Resolve review thread
             type: bash
             workingDirectory: repo
         credentials:
