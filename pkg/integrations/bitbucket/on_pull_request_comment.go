@@ -428,14 +428,28 @@ func matchBitbucketContentFilter(filter string, event map[string]any) bool {
 
 // bitbucketMentionMatches reports whether body contains mention as a whole
 // nickname. A longer nickname that only starts with the filter does not match.
+// The SuperPlane app on Bitbucket shows up as SuperPlane, while older
+// canvases store the superplaneagent mention. Each name accepts the other,
+// so comments with either mention start a run. Custom mentions match exactly.
 func bitbucketMentionMatches(mention, body string) bool {
-	mention = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(mention), "@"))
-	if mention == "" {
+	names := []string{strings.ToLower(strings.TrimPrefix(strings.TrimSpace(mention), "@"))}
+	if names[0] == "" {
 		return false
+	}
+	if slices.Contains(names, "superplane") || slices.Contains(names, "superplaneagent") {
+		names = []string{"superplane", "superplaneagent"}
 	}
 
 	lower := strings.ToLower(body)
-	needle := "@" + mention
+	for _, name := range names {
+		if bodyContainsWholeNickname(lower, "@"+name) {
+			return true
+		}
+	}
+	return false
+}
+
+func bodyContainsWholeNickname(lower, needle string) bool {
 	start := 0
 	for {
 		index := strings.Index(lower[start:], needle)

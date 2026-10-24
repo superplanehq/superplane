@@ -31,6 +31,21 @@ func Test__PRFeedbackSettings__Normalized(t *testing.T) {
 	})
 }
 
+func Test__PRFeedbackSettings__DefaultMentionPerProvider(t *testing.T) {
+	t.Run("Bitbucket defaults to the SuperPlane mention", func(t *testing.T) {
+		settings := defaultPRFeedbackSettings(models.ProviderBitbucket)
+		assert.Equal(t, prFeedbackBitbucketMention, settings.Mention)
+		assert.True(t, settings.IgnoreBots)
+		assert.Equal(t, prFeedbackDefaultMaximumAttempts, settings.MaximumAttempts)
+	})
+
+	t.Run("GitHub and unknown providers keep the agent mention", func(t *testing.T) {
+		assert.Equal(t, prFeedbackDefaultMention, defaultPRFeedbackSettings("").Mention)
+		assert.Equal(t, prFeedbackDefaultMention, defaultPRFeedbackSettings(models.ProviderGitHub).Mention)
+		assert.Equal(t, prFeedbackDefaultMention, defaultPRFeedbackSettings("nonsense").Mention)
+	})
+}
+
 func Test__PRFeedbackSettingsFromGraph__ReadsAllowedBots(t *testing.T) {
 	spec := prFeedbackSpecFromTemplate(t, "acme/app")
 	graph := resolvePRFeedbackGraph(spec)
@@ -55,7 +70,7 @@ func Test__PRFeedbackSettings__SerializeAndParseAllowedBots(t *testing.T) {
 	serialized := serializePRFeedbackSettings(settings)
 	assert.Equal(t, []string{"coderabbitai", "bugbot"}, serialized.GetDiscussion().GetAllowedBots())
 
-	parsed := parsePRFeedbackSettings(defaultPRFeedbackSettings(), &pb.FactoryPRFeedbackHandler_Settings{
+	parsed := parsePRFeedbackSettings(defaultPRFeedbackSettings(""), &pb.FactoryPRFeedbackHandler_Settings{
 		Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{Repository: "acme/app"},
 		Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
 			Mention:     prFeedbackDefaultMention,
@@ -91,7 +106,7 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 
 	t.Run("rejects attempt values outside 1 through 10", func(t *testing.T) {
 		zero := int32(0)
-		parsed := parsePRFeedbackSettings(defaultPRFeedbackSettings(), &pb.FactoryPRFeedbackHandler_Settings{
+		parsed := parsePRFeedbackSettings(defaultPRFeedbackSettings(""), &pb.FactoryPRFeedbackHandler_Settings{
 			Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{MaximumAttempts: &zero},
 		})
 		err := validatePRFeedbackSettingsForSource(
@@ -106,7 +121,7 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 		require.Error(t, err)
 
 		tooHigh := int32(11)
-		parsed = parsePRFeedbackSettings(defaultPRFeedbackSettings(), &pb.FactoryPRFeedbackHandler_Settings{
+		parsed = parsePRFeedbackSettings(defaultPRFeedbackSettings(""), &pb.FactoryPRFeedbackHandler_Settings{
 			Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{MaximumAttempts: &tooHigh},
 		})
 		err = validatePRFeedbackSettingsForSource(
@@ -126,7 +141,7 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 			nil,
 			uuid.Nil,
 			models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
-			defaultPRFeedbackSettings(),
+			defaultPRFeedbackSettings(""),
 			nil,
 		)
 		require.Error(t, err)

@@ -32,6 +32,7 @@ const (
 	prFeedbackDefaultName         = "Address PR feedback"
 	prFeedbackDefaultDescription  = "Address pull request comments and reviews after a mention."
 	prFeedbackDefaultMention      = "@superplaneagent"
+	prFeedbackBitbucketMention    = "@SuperPlane"
 	prFeedbackCommentScopeReplies = "replies"
 
 	prFeedbackRunnerNodeName = "Address PR feedback"

@@ -21,9 +21,16 @@ type prFeedbackSettings struct {
 	RunnerIntegrationNames []string
 }
 
-func defaultPRFeedbackSettings() prFeedbackSettings {
+// defaultPRFeedbackSettings returns the settings a new handler starts
+// with. The mention depends on the Git host: the Bitbucket app shows up
+// as @SuperPlane, while GitHub keeps the @superplaneagent bot login.
+func defaultPRFeedbackSettings(vcsProvider string) prFeedbackSettings {
+	mention := prFeedbackDefaultMention
+	if prFeedbackVCSProvider(prFeedbackBuildRequest{VCSProvider: vcsProvider}) == models.ProviderBitbucket {
+		mention = prFeedbackBitbucketMention
+	}
 	return prFeedbackSettings{
-		Mention:         prFeedbackDefaultMention,
+		Mention:         mention,
 		IgnoreBots:      true,
 		MaximumAttempts: prFeedbackDefaultMaximumAttempts,
 	}
@@ -92,7 +99,7 @@ func allowedBotsNodeValue(bots []string) []any {
 }
 
 func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSpec) prFeedbackSettings {
-	settings := defaultPRFeedbackSettings()
+	settings := defaultPRFeedbackSettings("")
 	for _, nodeID := range graph.triggerNodeIDs() {
 		node := findIntakeNode(spec.Nodes, nodeID)
 		if node == nil {
