@@ -4627,6 +4627,13 @@ CREATE INDEX organization_invitation_replaced_tokens_invitation_id_idx ON public
 
 
 --
+-- Name: organization_invitation_sends_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_email_sent_at_idx ON public.organization_invitation_sends USING btree (email, sent_at);
+
+
+--
 -- Name: organization_invitation_sends_organization_id_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6218,7 +6225,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261024160439	f
+20261024184644	f
 \.
 
 

@@ -3,6 +3,8 @@ package organizations
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -141,11 +143,107 @@ func TestInvitationRecipientSendLimitWindowAndScope(t *testing.T) {
 	f.seedSends(f.r.Organization.ID, "recipient@example.com", 5, 25*time.Hour)
 
 	_, err := f.create("recipient@example.com")
-	require.NoError(t, err, "other organizations and sends older than one day must not count")
+	require.NoError(t, err, "other organizations do not consume the organization-specific recipient allowance")
 
 	f.seedSends(f.r.Organization.ID, "other@example.com", 5, 23*time.Hour)
 	_, err = f.create("other@example.com")
 	requireInvitationErrorReason(t, err, codes.ResourceExhausted, rateLimitedReason)
+}
+
+func TestInvitationSharedRecipientSendLimit(t *testing.T) {
+	f := newInvitationLimitFixture(t)
+	t.Setenv("INVITATION_SHARED_RECIPIENT_DAILY_LIMIT", "3")
+	otherOrg := support.CreateOrganization(t, f.r, f.r.User)
+	const address = "recipient@example.com"
+	f.seedSends(otherOrg.ID, address, 3, 25*time.Hour)
+	first, err := f.create(" Recipient@Example.com ")
+	require.NoError(t, err, "sends older than 24 hours must not consume the shared allowance")
+	require.NoError(t, f.resend(first.Invitation.Id))
+	second, err := f.service.Create(context.Background(), otherOrg.ID.String(), f.r.User.String(), &pb.CreateInvitationRequest{Email: "RECIPIENT@example.com"})
+	require.NoError(t, err)
+	require.Len(t, f.mail.SentOrganizationInvitationEmails(), 3)
+	for _, email := range f.mail.SentOrganizationInvitationEmails() {
+		require.Equal(t, address, email.ToEmail)
+	}
+	f.mail.Reset()
+
+	requireInvitationErrorReason(t, f.resend(first.Invitation.Id), codes.ResourceExhausted, rateLimitedReason)
+	_, err = f.service.Resend(context.Background(), otherOrg.ID.String(), f.r.User.String(), second.Invitation.Id)
+	requireInvitationErrorReason(t, err, codes.ResourceExhausted, rateLimitedReason)
+	_, err = f.service.Cancel(context.Background(), otherOrg.ID.String(), second.Invitation.Id)
+	require.NoError(t, err)
+	_, err = f.service.Create(context.Background(), otherOrg.ID.String(), f.r.User.String(), &pb.CreateInvitationRequest{Email: address})
+	requireInvitationErrorReason(t, err, codes.ResourceExhausted, rateLimitedReason)
+	require.Empty(t, f.mail.SentOrganizationInvitationEmails(), "blocked creates and resends must send no email")
+	require.EqualValues(t, 2, f.sendCount(), "blocked requests must not reserve another send")
+	var otherSends int64
+	require.NoError(t, f.db.Model(&models.OrganizationInvitationSend{}).Where("organization_id = ?", otherOrg.ID).Count(&otherSends).Error)
+	require.EqualValues(t, 4, otherSends)
+
+	_, err = f.create("different@example.com")
+	require.NoError(t, err, "another recipient retains its own shared allowance")
+}
+
+func TestInvitationSharedRecipientSendLimitConcurrentRequests(t *testing.T) {
+	f := newInvitationLimitFixture(t)
+	t.Setenv("INVITATION_SHARED_RECIPIENT_DAILY_LIMIT", "2")
+	otherOrg := support.CreateOrganization(t, f.r, f.r.User)
+	first, err := f.create("recipient@example.com")
+	require.NoError(t, err)
+	f.mail.Reset()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Pause the resend before its send reservation is inserted. A create from
+	// another organization must wait, then see the committed reservation.
+	reservationReached := make(chan struct{})
+	resume := make(chan struct{})
+	var release sync.Once
+	var paused atomic.Bool
+	callback := "test:pause_invitation_send_reservation"
+	require.NoError(t, f.db.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table != "organization_invitation_sends" || !paused.CompareAndSwap(false, true) {
+			return
+		}
+		close(reservationReached)
+		select {
+		case <-resume:
+		case <-ctx.Done():
+			tx.AddError(ctx.Err())
+		}
+	}))
+	defer f.db.Callback().Create().Remove(callback)
+	var requests sync.WaitGroup
+	defer requests.Wait()
+	defer release.Do(func() { close(resume) })
+	resent := make(chan error, 1)
+	requests.Go(func() {
+		_, err := f.service.Resend(ctx, f.r.Organization.ID.String(), f.r.User.String(), first.Invitation.Id)
+		resent <- err
+	})
+	select {
+	case <-reservationReached:
+	case <-ctx.Done():
+		t.Fatal("resend did not reach its send reservation")
+	}
+	created := make(chan error, 1)
+	requests.Go(func() {
+		_, err := f.service.Create(ctx, otherOrg.ID.String(), f.r.User.String(), &pb.CreateInvitationRequest{Email: " Recipient@Example.com "})
+		created <- err
+	})
+	require.Eventually(t, func() bool {
+		var waiting int64
+		err := f.db.Raw("SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%pg_advisory_xact_lock%'").Scan(&waiting).Error
+		return err == nil && waiting > 0
+	}, 5*time.Second, 10*time.Millisecond, "another organization must wait for the recipient lock")
+	release.Do(func() { close(resume) })
+	require.NoError(t, <-resent)
+	requireInvitationErrorReason(t, <-created, codes.ResourceExhausted, rateLimitedReason)
+	require.Len(t, f.mail.SentOrganizationInvitationEmails(), 1, "only the reserved resend may send email")
+	require.EqualValues(t, 2, f.sendCount())
+	var otherInvitations int64
+	require.NoError(t, f.db.Model(&models.OrganizationInvitation{}).Where("organization_id = ?", otherOrg.ID).Count(&otherInvitations).Error)
+	require.Zero(t, otherInvitations, "the rejected create must roll back its invitation")
 }
 
 func TestInvitationLimitEnvironmentOverride(t *testing.T) {
@@ -172,8 +270,9 @@ func TestLoadInvitationLimitsIgnoresInvalidValues(t *testing.T) {
 		t.Run(value, func(t *testing.T) {
 			t.Setenv("INVITATION_ORG_HOURLY_LIMIT", value)
 			t.Setenv("INVITATION_RECIPIENT_DAILY_LIMIT", value)
+			t.Setenv("INVITATION_SHARED_RECIPIENT_DAILY_LIMIT", value)
 			t.Setenv("PENDING_INVITATION_LIMIT", value)
-			require.Equal(t, invitationLimits{orgHourly: 50, recipientDaily: 5, pending: 100}, loadInvitationLimits())
+			require.Equal(t, invitationLimits{orgHourly: 50, recipientDaily: 5, sharedRecipientDaily: 10, pending: 100}, loadInvitationLimits())
 		})
 	}
 	t.Setenv("INVITATION_ORG_HOURLY_LIMIT", "7")

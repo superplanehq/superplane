@@ -38,6 +38,20 @@ func CountRecipientInvitationSendsSince(tx *gorm.DB, orgID uuid.UUID, email stri
 	return count, err
 }
 
+// LockInvitationRecipient serializes send reservations for one normalized
+// address across organizations and replicas. The caller must use a transaction
+// and hold its organization lock first. PostgreSQL releases this lock on commit
+// or rollback, including when no send rows exist yet.
+func LockInvitationRecipient(tx *gorm.DB, email string) error {
+	return tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "invitation-recipient:"+email).Error
+}
+
+func CountSharedRecipientInvitationSendsSince(tx *gorm.DB, email string, since time.Time) (int64, error) {
+	var count int64
+	err := tx.Model(&OrganizationInvitationSend{}).Where("email = ? AND sent_at > ?", email, since).Count(&count).Error
+	return count, err
+}
+
 // DeleteExpiredOrganizationInvitationSends removes send rows older than
 // olderThan. It deletes at most limit rows so one pass cannot scan the whole
 // table.
