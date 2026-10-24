@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
+	"gorm.io/gorm/clause"
 )
 
 func TestCreateRunnerIsIdempotentAndReservesTask(t *testing.T) {
@@ -502,40 +503,137 @@ func TestListFleetTasksPagesOldestFirst(t *testing.T) {
 	assert.Equal(t, int64(3), missing.TotalCount)
 }
 
-func TestDeleteBusyEphemeralRunnerRequestsTaskCancellation(t *testing.T) {
-	resource := support.Setup(t)
+func TestDeleteBusyEphemeralRunnerHandlesStatePrecondition(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		states     []string
+		wantCode   codes.Code
+		wantCancel bool
+	}{
+		{name: "explicit cancellation", wantCode: codes.OK, wantCancel: true},
+		{name: "idle precondition after task claim", states: []string{models.RunnerStateIdle}, wantCode: codes.Aborted},
+		{name: "matching busy state requests cancellation", states: []string{models.RunnerStateBusy}, wantCode: codes.OK, wantCancel: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			resource := support.Setup(t)
+			db := database.DB(t.Context())
+			fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+			task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
+			now := time.Now()
+			runner := &models.Runner{
+				ID:            uuid.New(),
+				FleetID:       fleet.ID,
+				State:         models.RunnerStateIdle,
+				RunnerVersion: "0.1.0",
+				Ephemeral:     true,
+				CreatedAt:     now,
+				UpdatedAt:     now,
+			}
+			require.NoError(t, db.Create(runner).Error)
+			require.NoError(t, task.Reserve(db, runner.ID))
+			require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, now))
+
+			ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
+			service := newTestRunnerService()
+			response, err := service.DeleteRunner(ctx, &pb.DeleteRunnerRequest{
+				FleetId:  fleet.Slug,
+				RunnerId: runner.ID.String(),
+				States:   test.states,
+			})
+			require.Equal(t, test.wantCode, grpcerrors.Code(err))
+			if err == nil {
+				assert.Equal(t, models.RunnerStateBusy, response.Runner.State)
+			}
+
+			reloadedTask, err := models.FindRunnerTask(db, task.ID)
+			require.NoError(t, err)
+			assert.Equal(t, test.wantCancel, reloadedTask.CancelRequestedAt != nil)
+			assert.Equal(t, models.RunnerTaskStateRunning, reloadedTask.State)
+			reloadedRunner, err := models.FindRunner(db, runner.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.RunnerStateBusy, reloadedRunner.State)
+		})
+	}
+}
+
+func TestDeleteRunnerValidatesStatePrecondition(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		state    string
+		states   []string
+		wantCode codes.Code
+	}{
+		{name: "matching idle state", state: models.RunnerStateIdle, states: []string{models.RunnerStateIdle}, wantCode: codes.OK},
+		{name: "registration changed pending to idle", state: models.RunnerStateIdle, states: []string{models.RunnerStatePending}, wantCode: codes.Aborted},
+		{name: "unknown state", state: models.RunnerStateIdle, states: []string{"unknown"}, wantCode: codes.InvalidArgument},
+		{name: "multiple allowed states", state: models.RunnerStateIdle, states: []string{models.RunnerStatePending, models.RunnerStateIdle}, wantCode: codes.OK},
+		{name: "empty state entry", state: models.RunnerStateIdle, states: []string{""}, wantCode: codes.InvalidArgument},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			support.Setup(t)
+			db := database.DB(t.Context())
+			fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+			runner := createListedRunner(t, fleet.ID, uuid.New(), test.state, time.Now())
+			response, err := newTestRunnerService().DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{
+				FleetId: fleet.Slug, RunnerId: runner.ID.String(), States: test.states,
+			})
+			require.Equal(t, test.wantCode, grpcerrors.Code(err))
+			stored, err := models.FindRunner(db, runner.ID)
+			require.NoError(t, err)
+			if test.wantCode == codes.OK {
+				assert.Equal(t, models.RunnerStateTerminated, response.Runner.State)
+				assert.Equal(t, models.RunnerStateTerminated, stored.State)
+				return
+			}
+			assert.Equal(t, test.state, stored.State)
+		})
+	}
+}
+
+func TestDeleteRunnerChecksStatesAfterConcurrentRegistration(t *testing.T) {
+	support.Setup(t)
 	db := database.DB(t.Context())
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
-	now := time.Now()
-	runner := &models.Runner{
-		ID:            uuid.New(),
-		FleetID:       fleet.ID,
-		State:         models.RunnerStateIdle,
-		RunnerVersion: "0.1.0",
-		Ephemeral:     true,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+	runner := createListedRunner(t, fleet.ID, uuid.New(), models.RunnerStatePending, time.Now())
+
+	registration := db.Begin()
+	require.NoError(t, registration.Error)
+	defer registration.Rollback()
+	_, err := fleet.FindRunner(registration.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
+	require.NoError(t, err)
+
+	deleted := make(chan error, 1)
+	go func() {
+		_, err := newTestRunnerService().DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{
+			FleetId: fleet.Slug, RunnerId: runner.ID.String(), States: []string{models.RunnerStatePending},
+		})
+		deleted <- err
+	}()
+
+	// Wait for deletion to reach the row held by registration before the
+	// pending-to-idle transition commits.
+	require.Eventually(t, func() bool {
+		var waiting bool
+		err := db.Raw(`SELECT EXISTS (
+			SELECT 1 FROM pg_stat_activity
+			WHERE datname = current_database() AND wait_event_type = 'Lock'
+			AND pid <> pg_backend_pid() AND query LIKE '%runners%'
+		)`).Scan(&waiting).Error
+		return err == nil && waiting
+	}, 5*time.Second, 10*time.Millisecond)
+
+	require.NoError(t, registration.Model(runner).Update("state", models.RunnerStateIdle).Error)
+	require.NoError(t, registration.Commit().Error)
+	select {
+	case err := <-deleted:
+		require.Equal(t, codes.Aborted, grpcerrors.Code(err))
+	case <-time.After(5 * time.Second):
+		t.Fatal("runner deletion did not finish after registration committed")
 	}
-	require.NoError(t, db.Create(runner).Error)
-	require.NoError(t, task.Reserve(db, runner.ID))
-	require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, now))
-
-	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
-	service := newTestRunnerService()
-	response, err := service.DeleteRunner(ctx, &pb.DeleteRunnerRequest{
-		FleetId:  fleet.Slug,
-		RunnerId: runner.ID.String(),
-	})
+	stored, err := models.FindRunner(db, runner.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.RunnerStateBusy, response.Runner.State)
-
-	reloadedTask, err := models.FindRunnerTask(db, task.ID)
-	require.NoError(t, err)
-	assert.NotNil(t, reloadedTask.CancelRequestedAt)
-	reloadedRunner, err := models.FindRunner(db, runner.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.RunnerStateBusy, reloadedRunner.State)
+	assert.Equal(t, models.RunnerStateIdle, stored.State)
+	assert.Nil(t, stored.TerminatedAt)
 }
 
 func TestDeleteRunnerRejectsBusyReusableRunnerWithConflict(t *testing.T) {
