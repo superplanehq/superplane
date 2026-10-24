@@ -100,6 +100,20 @@ func TestFailedPreconditionWithReason(t *testing.T) {
 	assert.Equal(t, "superplane.com", info.GetDomain())
 }
 
+func TestResourceExhaustedWithReason(t *testing.T) {
+	err := ResourceExhaustedWithReason("Too many invitations were sent. Try again later.", "INVITATION_RATE_LIMITED")
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.ResourceExhausted, st.Code())
+	assert.Equal(t, "Too many invitations were sent. Try again later.", st.Message())
+
+	require.Len(t, st.Details(), 1)
+	info, ok := st.Details()[0].(*errdetails.ErrorInfo)
+	require.True(t, ok)
+	assert.Equal(t, "INVITATION_RATE_LIMITED", info.GetReason())
+	assert.Equal(t, "superplane.com", info.GetDomain())
+}
+
 func TestPermissionDeniedWithReason(t *testing.T) {
 	metadata := map[string]string{"invited_email": "i***@example.com"}
 	err := PermissionDeniedWithReason("Use the invited account.", "INVITATION_EMAIL_MISMATCH", metadata)

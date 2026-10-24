@@ -185,6 +185,15 @@ func FailedPreconditionWithReason(message, reason string) error {
 	return s.Err()
 }
 
+// ResourceExhaustedWithReason preserves a machine-readable reason.
+func ResourceExhaustedWithReason(message, reason string) error {
+	s, err := status.New(codes.ResourceExhausted, message).WithDetails(&errdetails.ErrorInfo{Reason: reason, Domain: "superplane.com"})
+	if err != nil {
+		return status.Error(codes.Internal, "Failed to create rate limit error.")
+	}
+	return s.Err()
+}
+
 // PermissionDeniedWithReason preserves a machine-readable reason and metadata.
 func PermissionDeniedWithReason(message, reason string, metadata map[string]string) error {
 	s, err := status.New(codes.PermissionDenied, message).WithDetails(&errdetails.ErrorInfo{
