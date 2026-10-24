@@ -244,7 +244,7 @@ function WidgetTableGrid({
                       {rowActions
                         .filter((action) => evaluateRowShow(action.show, row))
                         .map((action, ai) => (
-                          <WidgetRowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
+                          <WidgetRowActionButton key={`${rowKey}-${ai}`} action={action} row={row} rowKey={rowKey} />
                         ))}
                     </div>
                   </td>
