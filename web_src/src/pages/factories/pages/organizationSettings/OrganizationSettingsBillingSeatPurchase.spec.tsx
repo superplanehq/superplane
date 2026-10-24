@@ -201,9 +201,13 @@ describe("Organization billing seat purchases", () => {
     expect(purchaseRequests.filter((url) => url.endsWith("/purchase"))).toHaveLength(0);
   });
 
-  it.each(["failed", "action_required"])(
-    "requires a fresh estimate and explicit confirmation after replacing a %s card",
-    async (status) => {
+  it.each([
+    { status: "failed", reopen: false },
+    { status: "action_required", reopen: false },
+    { status: "failed", reopen: true },
+  ])(
+    "requires a fresh estimate for the current quantity after card replacement ($status, reopen=$reopen)",
+    async ({ status, reopen }) => {
       const user = userEvent.setup();
       const configuredFetch = client.getConfig().fetch;
       const popup = { closed: false, close: vi.fn(), location: { replace: vi.fn() }, opener: null };
@@ -243,24 +247,40 @@ describe("Organization billing seat purchases", () => {
           { ...TEAM_ORGANIZATION_BILLING, hasPaymentMethod: true },
           { newBilling: true, query: "?buySeats=1" },
         );
-        const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
+        let dialog = await screen.findByRole("dialog", { name: "Buy seats" });
         const confirm = () => screen.getByRole<HTMLButtonElement>("button", { name: "Confirm purchase" });
+        const quantity = within(dialog).getByRole("spinbutton", { name: "Additional seats" });
+        await user.clear(quantity);
+        await user.type(quantity, "3");
         await waitFor(() => expect(confirm().disabled).toBe(false));
         await user.click(confirm());
         await within(dialog).findByText(failed.message);
         expect(confirm().disabled).toBe(true);
-        const estimatesBeforeSetup = purchaseRequests.filter((url) => url.endsWith("/preview")).length;
         await user.click(within(dialog).getByRole("button", { name: "Update payment method" }));
         await waitFor(() => expect(popup.location.replace).toHaveBeenCalled());
         expect(attempts).toBe(1);
+        if (reopen) {
+          await user.click(within(dialog).getByRole("button", { name: "Close" }));
+          await user.click(within(screen.getByTestId("billing-seats")).getByRole("button", { name: "Buy seats" }));
+          dialog = await screen.findByRole("dialog", { name: "Buy seats" });
+          const currentQuantity = within(dialog).getByRole("spinbutton", { name: "Additional seats" });
+          expect(currentQuantity).toHaveValue(1);
+          await waitFor(() => expect(dialog).toHaveTextContent("New monthly total: $319.00"));
+        }
+        const estimatesBeforeSetup = purchaseRequests.filter((url) => url.endsWith("/preview")).length;
         popup.closed = true;
         await waitFor(() => expect(confirm().disabled).toBe(false), { timeout: 4000 });
-        expect(within(dialog).getByRole("spinbutton", { name: "Additional seats" })).toHaveValue(1);
+        expect(within(dialog).getByRole("spinbutton", { name: "Additional seats" })).toHaveValue(reopen ? 1 : 3);
+        expect(dialog).toHaveTextContent(reopen ? "New monthly total: $319.00" : "New monthly total: $377.00");
         expect(purchaseRequests.filter((url) => url.endsWith("/preview"))).toHaveLength(estimatesBeforeSetup + 1);
         expect(attempts).toBe(1);
         await user.click(confirm());
         await within(dialog).findByText("Seats added.");
         expect(attempts).toBe(2);
+        await user.click(within(dialog).getByRole("button", { name: "Close" }));
+        await waitFor(() =>
+          expect(screen.getByTestId("billing-seats")).toHaveTextContent(`9 of ${reopen ? 11 : 13} seats used`),
+        );
       } finally {
         client.setConfig({ fetch: configuredFetch });
         openPopup.mockRestore();

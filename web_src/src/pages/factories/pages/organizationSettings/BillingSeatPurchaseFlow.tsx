@@ -36,7 +36,7 @@ export function BillingSeatPurchaseFlow(props: BillingSeatPurchaseFlowProps) {
   });
   const cardSetup = useBillingCardSetup(organizationId);
   const canRecoverPurchase = newBilling && canManageBilling;
-  const updatePaymentMethod = () => cardSetup.open(() => purchase.setAdditionalSeats(purchase.additionalSeats));
+  const updatePaymentMethod = () => cardSetup.open(purchase.requestPreview);
   const denied = useSeatPurchaseDeepLink({
     organizationId,
     canBuySeats,

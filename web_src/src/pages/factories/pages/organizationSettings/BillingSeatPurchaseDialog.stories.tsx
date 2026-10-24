@@ -24,6 +24,7 @@ const ready: UseSeatPurchaseResult = {
   setOpen: (open: boolean) => console.log("Change purchase dialog", { open }),
   additionalSeats: "1",
   setAdditionalSeats: (value: string) => console.log("Change additional seats", { value }),
+  requestPreview: () => console.log("Request seat purchase estimate"),
   preview,
   previewPending: false,
   previewError: null,

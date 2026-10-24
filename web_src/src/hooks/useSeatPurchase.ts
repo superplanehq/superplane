@@ -18,6 +18,7 @@ export type UseSeatPurchaseResult = {
   setOpen: (open: boolean) => void;
   additionalSeats: string;
   setAdditionalSeats: (value: string) => void;
+  requestPreview: () => void;
   preview: OrganizationsPreviewSeatPurchaseResponse | undefined;
   previewPending: boolean;
   previewError: string | null;
@@ -90,6 +91,7 @@ export function useSeatPurchase({
     setOpen: input.setOpen,
     additionalSeats: input.additionalSeats,
     setAdditionalSeats: input.setAdditionalSeats,
+    requestPreview: input.requestPreview,
     preview: preview.preview,
     previewPending: preview.pending,
     previewError: preview.error,
