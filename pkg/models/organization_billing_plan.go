@@ -352,6 +352,12 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 			saved = existing
 			return nil
 		}
+		// Only a snapshot fresh enough to apply can prove the outcome of an
+		// in-flight seat purchase. A stale snapshot can report seats that
+		// Polar no longer has, so it must not settle a purchase.
+		if err := SettleSeatPurchase(inner, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
+			return err
+		}
 		catalog, catalogErr := FindBillingPlanByProduct(inner, sub.ProductID)
 		if catalogErr != nil && !errors.Is(catalogErr, gorm.ErrRecordNotFound) {
 			return catalogErr
