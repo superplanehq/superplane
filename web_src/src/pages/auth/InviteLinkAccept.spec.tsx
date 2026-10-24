@@ -148,6 +148,7 @@ describe("Email invitation acceptance", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   for (const [reason, message] of Object.entries({
+    PAYMENT_PAST_DUE: "This organization cannot add members until its payment is updated. Ask an organization admin.",
     NO_SEAT_AVAILABLE: "No seat is available. Ask an organization admin to free or buy a seat.",
     MEMBER_LIMIT_REACHED: "This organization reached its member limit. Ask an organization admin.",
     INVITATION_EXPIRED: "This invitation expired. Ask an organization admin for a new invitation.",
@@ -155,6 +156,7 @@ describe("Email invitation acceptance", () => {
     INVITATION_ALREADY_ACCEPTED:
       "This invitation was already accepted. Ask an organization admin for a new invitation.",
     INVITATION_REPLACED: "A new invitation replaced this link. Open the latest invitation email.",
+    INVITATION_INVITER_REVOKED: "Ask an organization admin to send this invitation again.",
     INVITATION_EMAIL_MISMATCH:
       "This invitation is for j***@example.com. Sign out, then sign in with the invited email address.",
   })) {

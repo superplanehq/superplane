@@ -211,3 +211,50 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoveUserHandlesPendingInvitationsOfInviter(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		role        string
+		wantState   string
+		wantAcceptE string
+	}{
+		{name: "admin invitation is canceled", role: models.RoleOrgAdmin, wantState: models.InvitationStateCanceled, wantAcceptE: "INVITATION_CANCELED"},
+		{name: "operator invitation stays valid", role: models.RoleOrgOperator, wantState: models.InvitationStatePending},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			t.Setenv(models.BillingEnabledEnv, "no")
+			orgID := r.Organization.ID.String()
+			s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
+			inviter := createInvitationAdmin(t, r, "inviter@example.com")
+			recipient, err := models.CreateAccount("Recipient", "recipient@example.com")
+			require.NoError(t, err)
+			created, err := s.Create(context.Background(), orgID, inviter.ID.String(), &pb.CreateInvitationRequest{Email: recipient.Email, Role: tc.role})
+			require.NoError(t, err)
+			token := strings.TrimPrefix(created.AcceptanceUrl, "https://example.com/invitations/")
+
+			_, err = RemoveUser(context.Background(), r.AuthService, orgID, inviter.ID.String())
+			require.NoError(t, err)
+
+			stored, err := models.FindOrganizationInvitation(database.Conn(), r.Organization.ID, uuid.MustParse(created.Invitation.Id))
+			require.NoError(t, err)
+			require.Equal(t, tc.wantState, stored.State)
+
+			_, err = s.Accept(context.Background(), recipient.ID.String(), token)
+			if tc.wantAcceptE != "" {
+				requireInvitationReason(t, err, tc.wantAcceptE)
+				_, err = models.FindActiveUserByEmail(orgID, recipient.Email)
+				require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+				return
+			}
+			require.NoError(t, err)
+			member, err := models.FindActiveUserByEmail(orgID, recipient.Email)
+			require.NoError(t, err)
+			roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), member.ID.String(), orgID)
+			require.NoError(t, err)
+			require.Equal(t, []string{models.RoleOrgOperator}, invitationRoleNames(roles))
+		})
+	}
+}
