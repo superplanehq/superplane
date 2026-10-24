@@ -1,0 +1,92 @@
+package polar
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/logging"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
+)
+
+// SeatCapacityCause says what made a capacity check run. It is a log field.
+type SeatCapacityCause string
+
+const (
+	SeatCapacityCauseActivation     SeatCapacityCause = "activation"
+	SeatCapacityCauseUpdate         SeatCapacityCause = "update"
+	SeatCapacityCauseCycle          SeatCapacityCause = "cycle"
+	SeatCapacityCauseRecovery       SeatCapacityCause = "recovery"
+	SeatCapacityCauseRemoval        SeatCapacityCause = "removal"
+	SeatCapacityCauseAccountDeleted SeatCapacityCause = "account_deletion"
+)
+
+// SeatCapacityCheck is a capacity transition and the cause to log with it.
+type SeatCapacityCheck struct {
+	OrganizationID uuid.UUID
+	Cause          SeatCapacityCause
+	Transition     models.SeatCapacityTransition
+}
+
+// RecheckSeatCapacity counts the active members of the organization and
+// updates its over-capacity record. Call it inside the transaction that
+// changed membership or the plan, and call Log after that transaction commits.
+// It does nothing when billing is off.
+func RecheckSeatCapacity(tx *gorm.DB, orgID uuid.UUID, cause SeatCapacityCause) (SeatCapacityCheck, error) {
+	check := SeatCapacityCheck{
+		OrganizationID: orgID,
+		Cause:          cause,
+		Transition:     models.SeatCapacityTransition{Change: models.SeatCapacityUnchanged},
+	}
+	if !models.BillingEnabled() {
+		return check, nil
+	}
+	occupied, err := models.CountActiveHumanUsersByOrganization(tx, orgID.String())
+	if err != nil {
+		return check, err
+	}
+	check.Transition, err = models.UpdateSeatCapacityState(tx, orgID, int(occupied), time.Now())
+	return check, err
+}
+
+// Log writes the alert for a started state or the resolution for an ended
+// state. It writes nothing when the state did not change.
+func (c SeatCapacityCheck) Log() {
+	fields := log.Fields{
+		"organization_id": c.OrganizationID.String(),
+		"subscription_id": c.Transition.SubscriptionID,
+		"purchased":       c.Transition.Purchased,
+		"occupied":        c.Transition.Occupied,
+		"cause":           string(c.Cause),
+	}
+	switch c.Transition.Change {
+	case models.SeatCapacityStarted:
+		logging.LogSeatsOverCapacity(fields)
+	case models.SeatCapacityResolved:
+		logging.LogSeatsOverCapacityResolved(fields)
+	}
+}
+
+// snapshotSeatCapacityCause says why a Polar snapshot changed the seat state.
+// previous is the plan before the snapshot. saved is the plan after it.
+func snapshotSeatCapacityCause(previous, saved *models.OrganizationBillingPlan) SeatCapacityCause {
+	switch {
+	case previous != nil && models.PolarSubscriptionIsPastDue(previous.PolarSubscriptionStatus) &&
+		models.PolarSubscriptionIsPaid(saved.PolarSubscriptionStatus):
+		return SeatCapacityCauseRecovery
+	case !previous.IsPaidPerSeat():
+		return SeatCapacityCauseActivation
+	case periodStartChanged(previous.CurrentPeriodStart, saved.CurrentPeriodStart):
+		return SeatCapacityCauseCycle
+	default:
+		return SeatCapacityCauseUpdate
+	}
+}
+
+func periodStartChanged(previous, next *time.Time) bool {
+	if previous == nil || next == nil {
+		return previous != next
+	}
+	return !previous.Equal(*next)
+}

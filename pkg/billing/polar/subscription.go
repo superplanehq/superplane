@@ -77,7 +77,12 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 		periodEnd = &end
 	}
 
-	return tx.Transaction(func(inner *gorm.DB) error {
+	var capacity SeatCapacityCheck
+	err = tx.Transaction(func(inner *gorm.DB) error {
+		previous, err := models.FindOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
+		}
 		plan, grantIncluded, err := models.ApplyPolarSubscription(
 			inner,
 			orgID,
@@ -103,14 +108,26 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 				return err
 			}
 		}
-		return models.SyncIncludedLLMCreditGrant(inner, models.IncludedUsageSync{
+		err = models.SyncIncludedLLMCreditGrant(inner, models.IncludedUsageSync{
 			OrganizationID:   orgID,
 			SubscriptionID:   data.ID,
 			PeriodEnd:        periodEnd,
 			GrantIncluded:    grantIncluded,
 			IsActiveBusiness: plan != nil && plan.IsActiveBusiness(),
 		})
+		if err != nil {
+			return err
+		}
+		capacity, err = RecheckSeatCapacity(inner, orgID, snapshotSeatCapacityCause(previous, plan))
+		return err
 	})
+	if err != nil {
+		return err
+	}
+
+	// When tx is itself a transaction, this runs before the outer commit.
+	capacity.Log()
+	return nil
 }
 
 // ApplyOrganizationSubscription applies a snapshot that a direct Polar API call
