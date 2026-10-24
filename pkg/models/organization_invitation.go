@@ -74,7 +74,7 @@ func CountPendingOrganizationInvitations(tx *gorm.DB, orgID uuid.UUID) (int64, e
 }
 
 func ExpireOrganizationInvitations(tx *gorm.DB, orgID uuid.UUID, now time.Time) error {
-	return tx.Model(&OrganizationInvitation{}).Where("organization_id = ? AND state = ? AND expires_at <= ?", orgID, InvitationStatePending, now).Updates(map[string]any{"state": InvitationStateExpired, "token_hash": nil}).Error
+	return tx.Model(&OrganizationInvitation{}).Where("organization_id = ? AND state = ? AND expires_at <= ?", orgID, InvitationStatePending, now).Updates(map[string]any{"state": InvitationStateExpired}).Error
 }
 
 func invitationQuery(tx *gorm.DB, orgID uuid.UUID) *gorm.DB {

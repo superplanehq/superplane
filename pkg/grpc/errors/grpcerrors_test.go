@@ -100,6 +100,22 @@ func TestFailedPreconditionWithReason(t *testing.T) {
 	assert.Equal(t, "superplane.com", info.GetDomain())
 }
 
+func TestPermissionDeniedWithReason(t *testing.T) {
+	metadata := map[string]string{"invited_email": "i***@example.com"}
+	err := PermissionDeniedWithReason("Use the invited account.", "INVITATION_EMAIL_MISMATCH", metadata)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, st.Code())
+	assert.Equal(t, "Use the invited account.", st.Message())
+
+	require.Len(t, st.Details(), 1)
+	info, ok := st.Details()[0].(*errdetails.ErrorInfo)
+	require.True(t, ok)
+	assert.Equal(t, "INVITATION_EMAIL_MISMATCH", info.GetReason())
+	assert.Equal(t, "superplane.com", info.GetDomain())
+	assert.Equal(t, metadata, info.GetMetadata())
+}
+
 func TestStatusMessage(t *testing.T) {
 	assert.Equal(t, "user not found", StatusMessage(NotFound(gorm.ErrRecordNotFound, "user not found")))
 	assert.Equal(t, "organization canvas limit exceeded", StatusMessage(status.Error(codes.ResourceExhausted, "organization canvas limit exceeded")))

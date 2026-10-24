@@ -26,14 +26,17 @@ func TestInvitationSignupWithRegistrationDisabled(t *testing.T) {
 			expired    bool
 			wrongEmail bool
 			sharedLink bool
+			replaced   bool
 			allowed    bool
 		}{
 			{name: "invited email", state: models.InvitationStatePending, allowed: true},
 			{name: "different email", state: models.InvitationStatePending, wrongEmail: true},
 			{name: "expired invitation", state: models.InvitationStatePending, expired: true},
 			{name: "canceled invitation", state: models.InvitationStateCanceled},
+			{name: "swept expired invitation", state: models.InvitationStateExpired},
 			{name: "accepted invitation", state: models.InvitationStateAccepted},
 			{name: "shared invite link", sharedLink: true},
+			{name: "replaced invitation", state: models.InvitationStatePending, replaced: true},
 		} {
 			t.Run(method+"/"+scenario.name, func(t *testing.T) {
 				handler, registry := setupAuthHandler(t, true)
@@ -64,6 +67,12 @@ func TestInvitationSignupWithRegistrationDisabled(t *testing.T) {
 						ExpiresAt:      expiresAt,
 					}
 					require.NoError(t, invitation.Save(database.Conn()))
+					if scenario.replaced {
+						require.NoError(t, database.Conn().Exec("INSERT INTO organization_invitation_replaced_tokens (invitation_id, token_hash) VALUES (?, ?)", invitation.ID, hash).Error)
+						currentHash := crypto.HashToken(uuid.NewString())
+						invitation.TokenHash = &currentHash
+						require.NoError(t, invitation.Save(database.Conn()))
+					}
 				}
 				if scenario.wrongEmail {
 					email = "someone-else@example.com"
