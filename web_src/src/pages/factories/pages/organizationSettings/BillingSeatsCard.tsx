@@ -7,9 +7,15 @@ type BillingSeatsCardProps = {
   seats: BillingSeatSummary;
   currentPeriodEnd?: string;
   cancelAtPeriodEnd: boolean;
+  canManageBilling: boolean;
 };
 
-export function BillingSeatsCard({ seats, currentPeriodEnd, cancelAtPeriodEnd }: BillingSeatsCardProps) {
+export function BillingSeatsCard({
+  seats,
+  currentPeriodEnd,
+  cancelAtPeriodEnd,
+  canManageBilling,
+}: BillingSeatsCardProps) {
   const date = billingPeriodEndLabel(currentPeriodEnd);
   const renewalSeats = seats.expectedRenewalSeats;
   const renewalQuantity = renewalSeats === undefined ? "Not available" : String(renewalSeats);
@@ -23,6 +29,7 @@ export function BillingSeatsCard({ seats, currentPeriodEnd, cancelAtPeriodEnd }:
       <p className="text-xl font-semibold tracking-[-0.02em] tabular-nums">
         {seats.occupied ?? "Not available"} of {seats.purchased ?? "Not available"} seats used
       </p>
+      <OverCapacityNotice seats={seats} canManageBilling={canManageBilling} />
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-xs text-muted-foreground">Available seats</dt>
@@ -53,6 +60,26 @@ export function BillingSeatsCard({ seats, currentPeriodEnd, cancelAtPeriodEnd }:
       </p>
     </FactorySettingsCard>
   );
+}
+
+function OverCapacityNotice({ seats, canManageBilling }: { seats: BillingSeatSummary; canManageBilling: boolean }) {
+  const { occupied, purchased } = seats;
+  if (occupied === undefined || purchased === undefined || occupied <= purchased) {
+    return null;
+  }
+
+  const message = canManageBilling
+    ? `${pluralize(occupied, "member")}, ${pluralize(purchased, "paid seat")}. Buy seats or remove members to invite again.`
+    : "Ask an organization admin to buy seats or remove members.";
+  return (
+    <p role="status" className="mt-3 text-sm text-destructive">
+      {message}
+    </p>
+  );
+}
+
+function pluralize(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 function seatAmountLabel(cents: string | undefined) {
