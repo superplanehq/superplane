@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import type { OrganizationsDescribeOrganizationBillingResponse } from "@/api-client";
 import { useBillingCardSetup } from "@/hooks/useBillingCardSetup";
@@ -111,10 +111,20 @@ function useSeatPurchaseDeepLink({
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [deniedFor, setDeniedFor] = useState<string>();
+  const setOpenRef = useRef(setOpen);
+  const openedFor = useRef<string | null>(null);
+  setOpenRef.current = setOpen;
   useEffect(() => {
-    if (loading || searchParams.get("buySeats") !== "1") return;
+    if (loading) return;
+    if (searchParams.get("buySeats") !== "1") {
+      if (openedFor.current === organizationId) openedFor.current = null;
+      return;
+    }
     if (!canManageBilling) setDeniedFor(organizationId);
-    if (canBuySeats) setOpen(true);
+    if (canBuySeats && openedFor.current !== organizationId) {
+      openedFor.current = organizationId;
+      setOpenRef.current(true);
+    }
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -123,7 +133,7 @@ function useSeatPurchaseDeepLink({
       },
       { replace: true },
     );
-  }, [organizationId, canBuySeats, canManageBilling, loading, setOpen, searchParams, setSearchParams]);
+  }, [organizationId, canBuySeats, canManageBilling, loading, searchParams, setSearchParams]);
   return deniedFor === organizationId && !canManageBilling;
 }
 
