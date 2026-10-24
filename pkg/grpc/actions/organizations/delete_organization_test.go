@@ -56,9 +56,9 @@ func TestDeleteOrganizationWaitsForSubscriptionActivation(t *testing.T) {
 	activation := db.Begin()
 	require.NoError(t, activation.Error)
 	defer activation.Rollback()
-	_, _, err := models.ApplyPolarSubscription(activation, r.Organization.ID, models.PolarSubscriptionApply{
+	_, err := models.ApplyPolarSubscription(activation, r.Organization.ID, models.PolarSubscriptionApply{
 		ID: "sub_concurrent_delete", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive,
-	})
+	}, nil)
 	require.NoError(t, err)
 	var activationPID int
 	require.NoError(t, activation.Raw("SELECT pg_backend_pid()").Scan(&activationPID).Error)
@@ -193,10 +193,10 @@ func Test__DeleteOrganization_LivePolarSubscription(t *testing.T) {
 	applySubscription := func(t *testing.T, orgID uuid.UUID, status string, cancelAtPeriodEnd bool, periodEnd time.Time) {
 		t.Helper()
 		start := periodEnd.AddDate(0, -1, 0)
-		_, _, err := models.ApplyPolarSubscription(database.Conn(), orgID, models.PolarSubscriptionApply{
+		_, err := models.ApplyPolarSubscription(database.Conn(), orgID, models.PolarSubscriptionApply{
 			ID: "sub_delete_guard", ProductID: "prod_business", Status: status,
 			PeriodStart: &start, PeriodEnd: &periodEnd, CancelAtPeriodEnd: cancelAtPeriodEnd,
-		})
+		}, nil)
 		require.NoError(t, err)
 	}
 

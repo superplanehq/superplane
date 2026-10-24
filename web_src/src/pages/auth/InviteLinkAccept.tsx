@@ -129,12 +129,14 @@ export default function InviteLinkAccept() {
 const acceptanceFallback = "SuperPlane could not accept this invitation. Try again.";
 const invalidInvitationMessage = "This invitation link is invalid. Ask an organization admin for a new invitation.";
 const invitationReasonMessages: Record<string, string> = {
+  PAYMENT_PAST_DUE: "This organization cannot add members until its payment is updated. Ask an organization admin.",
   NO_SEAT_AVAILABLE: "No seat is available. Ask an organization admin to free or buy a seat.",
   MEMBER_LIMIT_REACHED: "This organization reached its member limit. Ask an organization admin.",
   INVITATION_EXPIRED: "This invitation expired. Ask an organization admin for a new invitation.",
   INVITATION_CANCELED: "This invitation was canceled. Ask an organization admin for a new invitation.",
   INVITATION_ALREADY_ACCEPTED: "This invitation was already accepted. Ask an organization admin for a new invitation.",
   INVITATION_REPLACED: "A new invitation replaced this link. Open the latest invitation email.",
+  INVITATION_INVITER_REVOKED: "Ask an organization admin to send this invitation again.",
 };
 
 async function readInvitationAcceptance(response: Response): Promise<InvitationAcceptance> {

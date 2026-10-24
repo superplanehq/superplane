@@ -318,9 +318,9 @@ func TestDeleteAccount_LeavesCreatedOrgWhenOtherOwnerRemains(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, models.SetUserIsOwner(database.Conn(), otherUser.ID, true))
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
-	_, _, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
+	_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
 		ID: "sub_other_owner", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	server, account, token := setupTestServer(r, t)
@@ -362,9 +362,9 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 				protected = second
 			}
 			require.NoError(t, models.BindLegacyBillingProduct(db, "prod_business"))
-			_, _, err := models.ApplyPolarSubscription(db, protected.ID, models.PolarSubscriptionApply{
+			_, err := models.ApplyPolarSubscription(db, protected.ID, models.PolarSubscriptionApply{
 				ID: "sub_account_delete", ProductID: "prod_business", Status: status,
-			})
+			}, nil)
 			require.NoError(t, err)
 			server, account, token := setupTestServer(r, t)
 			beforeAccount, err := models.FindAccountByID(account.ID.String())
@@ -406,9 +406,9 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 				assert.False(t, stored.DeletedAt.Valid)
 			}
 
-			_, _, err = models.ApplyPolarSubscription(db, protected.ID, models.PolarSubscriptionApply{
+			_, err = models.ApplyPolarSubscription(db, protected.ID, models.PolarSubscriptionApply{
 				ID: "sub_account_delete", ProductID: "prod_business", Status: models.PolarSubscriptionStatusCanceled,
-			})
+			}, nil)
 			require.NoError(t, err)
 			require.Equal(t, http.StatusNoContent, deleteAccount().Code)
 			_, err = models.FindAccountByID(account.ID.String())
