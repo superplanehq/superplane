@@ -210,29 +210,51 @@ func Test__GetCreditPackKeepsFixedPriceOnMixedProducts(t *testing.T) {
 	assert.False(t, pack.CustomPrice)
 }
 
-func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/checkouts/", r.URL.Path)
-		var body map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
-		assert.Equal(t, "org-1", body["external_customer_id"])
-		assert.NotContains(t, body, "prices")
-		assert.NotContains(t, body, "metadata")
-		_, hasCustomerEmail := body["customer_email"]
-		assert.False(t, hasCustomerEmail)
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
-			"url":         "https://buy.polar.sh/polar_c_test",
-			"customer_id": "cust_1",
-		}))
-	}))
-	t.Cleanup(server.Close)
+func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		seats *int
+	}{
+		{name: "Business"},
+		{name: "Team", seats: new(5)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/checkouts/", r.URL.Path)
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
+				assert.Equal(t, "org-1", body["external_customer_id"])
+				assert.NotContains(t, body, "prices")
+				assert.NotContains(t, body, "metadata")
+				assert.NotContains(t, body, "customer_email")
+				if tc.seats == nil {
+					assert.NotContains(t, body, "allow_discount_codes")
+					assert.NotContains(t, body, "seats")
+					assert.NotContains(t, body, "min_seats")
+					assert.NotContains(t, body, "max_seats")
+				}
+				if tc.seats != nil {
+					require.Contains(t, body, "allow_discount_codes")
+					assert.Equal(t, false, body["allow_discount_codes"])
+					for _, field := range []string{"seats", "min_seats", "max_seats"} {
+						assert.Equal(t, float64(*tc.seats), body[field], field)
+					}
+				}
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"url":         "https://buy.polar.sh/polar_c_test",
+					"customer_id": "cust_1",
+				}))
+			}))
+			t.Cleanup(server.Close)
 
-	client := NewClient(server.URL, "oat_test", server.Client())
-	session, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost:8000/return", CustomerIP: "203.0.113.10"})
-	require.NoError(t, err)
-	assert.Equal(t, "https://buy.polar.sh/polar_c_test", session.URL)
-	assert.Equal(t, "cust_1", session.CustomerID)
+			client := NewClient(server.URL, "oat_test", server.Client())
+			session, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost:8000/return", CustomerIP: "203.0.113.10", Seats: tc.seats})
+			require.NoError(t, err)
+			assert.Equal(t, "https://buy.polar.sh/polar_c_test", session.URL)
+			assert.Equal(t, "cust_1", session.CustomerID)
+		})
+	}
 }
 
 func TestCreateCreditCheckoutLocksChargeAndCreditMetadata(t *testing.T) {
