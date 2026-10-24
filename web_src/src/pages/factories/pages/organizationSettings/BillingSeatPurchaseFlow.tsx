@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import type { OrganizationsDescribeOrganizationBillingResponse } from "@/api-client";
 import { useBillingCardSetup } from "@/hooks/useBillingCardSetup";
@@ -43,6 +43,7 @@ export function BillingSeatPurchaseFlow(props: BillingSeatPurchaseFlowProps) {
     canManageBilling,
     loading: props.loading || features.isLoading || !features.organizationReady,
     setOpen: purchase.setOpen,
+    dialogResetCount: purchase.dialogResetCount,
   });
 
   const seatsCard = (
@@ -102,19 +103,26 @@ function useSeatPurchaseDeepLink({
   canManageBilling,
   loading,
   setOpen,
+  dialogResetCount,
 }: {
   organizationId: string;
   canBuySeats: boolean;
   canManageBilling: boolean;
   loading: boolean;
   setOpen: (open: boolean) => void;
+  dialogResetCount: RefObject<number>;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [deniedFor, setDeniedFor] = useState<string>();
   const setOpenRef = useRef(setOpen);
   const openedFor = useRef<string | null>(null);
+  const acknowledgedReset = useRef(dialogResetCount.current);
   setOpenRef.current = setOpen;
   useEffect(() => {
+    if (acknowledgedReset.current !== dialogResetCount.current) {
+      acknowledgedReset.current = dialogResetCount.current;
+      openedFor.current = null;
+    }
     if (loading) return;
     if (searchParams.get("buySeats") !== "1") {
       if (openedFor.current === organizationId) openedFor.current = null;
@@ -133,7 +141,7 @@ function useSeatPurchaseDeepLink({
       },
       { replace: true },
     );
-  }, [organizationId, canBuySeats, canManageBilling, loading, searchParams, setSearchParams]);
+  }, [organizationId, canBuySeats, canManageBilling, loading, searchParams, setSearchParams, dialogResetCount]);
   return deniedFor === organizationId && !canManageBilling;
 }
 
