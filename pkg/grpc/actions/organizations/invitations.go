@@ -288,6 +288,9 @@ func requireInvitationCapacity(tx *gorm.DB, orgID uuid.UUID, alreadyPending bool
 	if err != nil {
 		return err
 	}
+	if seats.PaymentBlocked {
+		return grpcerrors.FailedPreconditionWithReason("The last renewal payment failed. Update the payment method before you invite members.", "PAYMENT_PAST_DUE")
+	}
 	if seats.PerSeat {
 		if alreadyPending || *seats.Invitable > 0 {
 			return nil

@@ -93,6 +93,9 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 	if err != nil || catalog.Category != "paid" || catalog.Visibility != "public" {
 		return nil, grpcerrors.InvalidArgument(nil, "Select an available paid plan.")
 	}
+	if models.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) && billingPlanNeedsPayment(catalog) {
+		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
+	}
 	if models.OrganizationBillingIsPolarManaged(current) {
 		return nil, grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
 	}
@@ -140,6 +143,10 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		return nil, grpcerrors.FailedPrecondition(err, "Could not select this plan.")
 	}
 	return &pb.CreateBusinessCheckoutResponse{}, nil
+}
+
+func billingPlanNeedsPayment(catalog *models.BillingPlan) bool {
+	return catalog.PolarProductID != nil || catalog.RequirePaymentMethod
 }
 
 func requireNewBilling(ctx context.Context, orgID uuid.UUID) error {
