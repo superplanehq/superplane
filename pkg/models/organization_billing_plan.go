@@ -52,6 +52,8 @@ var (
 // match the broader error keep working.
 var ErrHostedPaymentPastDue = fmt.Errorf("the renewal payment is past due: %w", ErrHostedSubscriptionRequired)
 
+var ErrHostedSubscriptionPaused = fmt.Errorf("the subscription is paused: %w", ErrHostedSubscriptionRequired)
+
 // OrganizationBillingPlan is the org plan and Polar subscription period.
 // PastDueSince is when the current renewal payment failure started. It is set
 // only while the subscription status is past_due.
@@ -352,8 +354,11 @@ func AssertOrganizationPlanAllowsRuns(tx *gorm.DB, orgID uuid.UUID) error {
 	if plan.AllowsHostedExecution(time.Now()) {
 		return nil
 	}
-	if PolarSubscriptionIsPaymentBlocked(plan.PolarSubscriptionStatus) {
+	if PolarSubscriptionIsPastDue(plan.PolarSubscriptionStatus) {
 		return ErrHostedPaymentPastDue
+	}
+	if strings.EqualFold(strings.TrimSpace(plan.PolarSubscriptionStatus), PolarSubscriptionStatusPaused) {
+		return ErrHostedSubscriptionPaused
 	}
 	return ErrHostedSubscriptionRequired
 }

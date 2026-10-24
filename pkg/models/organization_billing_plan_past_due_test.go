@@ -401,7 +401,11 @@ func Test__AgentRunGateNamesPaymentFailure(t *testing.T) {
 	assert.Equal(t, models.WorkOrderExecutionFailureReasonPaymentPastDue, models.WorkOrderExecutionFailureReasonFor(err))
 
 	replay.apply(models.PolarSubscriptionStatusPaused)
-	require.ErrorIs(t, models.AssertOrganizationPlanAllowsRuns(replay.db, replay.orgID), models.ErrHostedPaymentPastDue)
+	err = models.SuperPlaneRunnerReadinessError(replay.db, replay.orgID, nil)
+	require.ErrorIs(t, err, models.ErrHostedSubscriptionRequired)
+	require.NotErrorIs(t, err, models.ErrHostedPaymentPastDue)
+	assert.Equal(t, "The subscription is paused. Resume the subscription in Billing to run agents.", models.SuperPlaneRunnerReadinessMessage(err))
+	assert.Equal(t, "subscription_paused", models.WorkOrderExecutionFailureReasonFor(err))
 
 	replay.apply(models.PolarSubscriptionStatusCanceled)
 	err = models.AssertOrganizationPlanAllowsRuns(replay.db, replay.orgID)

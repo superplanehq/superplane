@@ -40,6 +40,18 @@ describe("workOrderCreditFailureCopy", () => {
     });
   });
 
+  it("tells owners to resume a paused subscription", () => {
+    expect(workOrderExecutionCreditFailure({ result: "RESULT_FAILED", failureReason: "subscription_paused" })).toEqual({
+      label: "Subscription paused",
+      message: "This agent run is blocked. Resume the subscription in Billing to run agents.",
+      actionLabel: "View billing",
+    });
+    expect(
+      workOrderCreditFailureFromMessage("The subscription is paused. Resume the subscription in Billing to run agents.")
+        ?.label,
+    ).toBe("Subscription paused");
+  });
+
   it("maps a runner credit message to the same copy", () => {
     expect(workOrderCreditFailureFromMessage("This organization has no hosted credit.")?.label).toBe("No credit");
     expect(workOrderCreditFailureFromMessage("  Subscribe to a plan to run agents.  ")?.label).toBe("No plan");

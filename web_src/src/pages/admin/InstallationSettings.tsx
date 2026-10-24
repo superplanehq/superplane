@@ -548,23 +548,20 @@ const useInstallationSettingsState = () => {
 
   const patchSettings = useCallback(
     async (body: Record<string, unknown>, successMessage: string, fallbackError: string) => {
-      const response = await fetch("/admin/api/installation/network-settings", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        throw new Error(await getErrorMessage(response, fallbackError));
+      const data = await patchInstallationSettings(body, fallbackError);
+      setSettings(data);
+      if (body.allow_private_network_access !== undefined)
+        setAllowPrivateNetworkAccess(data.allow_private_network_access);
+      if (body.signups_enabled !== undefined) setSignupsEnabled(data.signups_enabled);
+      if (body.invitation_duration_days !== undefined) {
+        setInvitationDuration((current) =>
+          current === String(body.invitation_duration_days) ? String(data.invitation_duration_days) : current,
+        );
       }
-
-      applySettings(await response.json());
+      if (body.smtp_enabled !== undefined) setSMTPForm(toSMTPFormState(data));
       showSuccessToast(successMessage);
     },
-    [applySettings],
+    [],
   );
 
   const saveNetworkSettings = useCallback(async () => {
@@ -638,6 +635,22 @@ const useInstallationSettingsState = () => {
     saveSignupSettings,
     saveSMTPSettings,
   };
+};
+
+const patchInstallationSettings = async (
+  body: Record<string, unknown>,
+  fallbackError: string,
+): Promise<InstallationSettingsResponse> => {
+  const response = await fetch("/admin/api/installation/network-settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, fallbackError));
+  }
+  return response.json();
 };
 
 const InstallationSettings: React.FC = () => {

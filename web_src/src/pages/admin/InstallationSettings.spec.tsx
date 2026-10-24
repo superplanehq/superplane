@@ -217,9 +217,17 @@ it("saves the payment grace period and restores it after reload", async () => {
   expect(save).toBeDisabled();
   await user.clear(grace);
   await user.type(grace, "7");
+  const duration = screen.getByRole("spinbutton", { name: "Invitation duration (days)" });
+  await user.clear(duration);
+  await user.type(duration, "14");
   await user.click(save);
   expect(await screen.findByRole("button", { name: "Save payment settings" })).toBeDisabled();
   expect(settings.past_due_grace_days).toBe(7);
+  expect(duration).toHaveValue(14);
+  expect(settings.invitation_duration_days).toBe(7);
+  await user.click(screen.getByRole("button", { name: "Save invitation settings" }));
+  expect(await screen.findByRole("button", { name: "Save invitation settings" })).toBeDisabled();
+  expect(settings.invitation_duration_days).toBe(14);
   view.unmount();
   renderInstallationSettings();
   await user.click(await screen.findByRole("tab", { name: "Invitations" }));

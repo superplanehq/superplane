@@ -25,6 +25,7 @@ const (
 	WorkOrderExecutionFailureReasonNoHostedCredit             = "no_hosted_credit"
 	WorkOrderExecutionFailureReasonHostedSubscriptionRequired = "hosted_subscription_required"
 	WorkOrderExecutionFailureReasonPaymentPastDue             = "payment_past_due"
+	WorkOrderExecutionFailureReasonSubscriptionPaused         = "subscription_paused"
 	WorkOrderExecutionFailureReasonWorkspaceBudgetEmpty       = "workspace_budget_empty"
 )
 
@@ -71,6 +72,8 @@ func WorkOrderExecutionFailureReasonFor(err error) string {
 		return ""
 	case errors.Is(err, ErrHostedPaymentPastDue):
 		return WorkOrderExecutionFailureReasonPaymentPastDue
+	case errors.Is(err, ErrHostedSubscriptionPaused):
+		return WorkOrderExecutionFailureReasonSubscriptionPaused
 	case errors.Is(err, ErrHostedSubscriptionRequired):
 		return WorkOrderExecutionFailureReasonHostedSubscriptionRequired
 	case errors.Is(err, ErrHostedCreditEmpty), errors.Is(err, ErrSuperPlaneRunnerNoCredit):
