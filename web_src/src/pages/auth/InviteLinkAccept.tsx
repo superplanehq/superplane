@@ -99,7 +99,7 @@ export default function InviteLinkAccept() {
       <div className="flex flex-col items-center space-y-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {status === "loading" ? "Joining organization..." : "Opening invitation..."}
+          {status === "loading" ? "Opening organization..." : "Opening invitation..."}
         </p>
       </div>
     </div>
