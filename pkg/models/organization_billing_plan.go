@@ -31,6 +31,7 @@ const (
 	PolarSubscriptionStatusRevoked    = "revoked"
 	PolarSubscriptionStatusPastDue    = "past_due"
 	PolarSubscriptionStatusIncomplete = "incomplete"
+	PolarSubscriptionStatusPaused     = "paused"
 
 	DefaultIncludedGrantCents  int64 = 5000
 	DefaultIncludedGrantMonths       = 1
@@ -141,6 +142,45 @@ func (p *OrganizationBillingPlan) AllowsCreditPurchase() bool {
 func PolarSubscriptionIsPaid(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case PolarSubscriptionStatusActive, PolarSubscriptionStatusTrialing:
+		return true
+	default:
+		return false
+	}
+}
+
+// HasLivePolarSubscription reports whether Polar can still charge for this
+// plan. Scheduled cancellation stays live until the paid period ends.
+// Admin and system plans do not have a live Polar subscription.
+func (p *OrganizationBillingPlan) HasLivePolarSubscription(now time.Time) bool {
+	if p == nil || p.PlanSource != BillingPlanSourcePolar {
+		return false
+	}
+	if p.PolarSubscriptionID == nil || strings.TrimSpace(*p.PolarSubscriptionID) == "" {
+		return false
+	}
+	return PolarSubscriptionIsLive(p.PolarSubscriptionStatus, p.CancelAtPeriodEnd, p.CurrentPeriodEnd, now)
+}
+
+// OrganizationHasLivePolarSubscription reports whether the organization has a
+// Polar subscription that can still charge. An organization without a billing
+// row has none.
+func OrganizationHasLivePolarSubscription(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	plan, err := FindOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return false, err
+	}
+	return plan.HasLivePolarSubscription(time.Now()), nil
+}
+
+// PolarSubscriptionIsLive defines live status for deletion and identity guards.
+// Scheduled cancellation stays live only while the paid period is open.
+func PolarSubscriptionIsLive(status string, cancelAtPeriodEnd bool, periodEnd *time.Time, now time.Time) bool {
+	if cancelAtPeriodEnd {
+		return periodStillOpen(periodEnd, now)
+	}
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case PolarSubscriptionStatusActive, PolarSubscriptionStatusTrialing,
+		PolarSubscriptionStatusPastDue, PolarSubscriptionStatusPaused:
 		return true
 	default:
 		return false

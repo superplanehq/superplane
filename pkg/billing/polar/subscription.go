@@ -21,6 +21,11 @@ var (
 	ErrSubscriptionNotCancelable    = errors.New("this organization has no business subscription to cancel")
 	ErrSubscriptionAlreadyCanceling = errors.New("business is already set to end at the period end")
 	ErrSubscriptionNotCanceling     = errors.New("business is not set to end at the period end")
+	// ErrSubscriptionForDeletedOrganization marks a subscription webhook for a
+	// soft-deleted organization. ApplySubscription already recorded it with the
+	// billing.subscription_for_deleted_organization log key, so the webhook
+	// handler must not write the generic permanent-apply error for it.
+	ErrSubscriptionForDeletedOrganization = errors.New("subscription targets a deleted organization")
 )
 
 func BusinessCheckoutProductID(tx *gorm.DB) (string, error) {
@@ -61,7 +66,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 	}
 	if _, err := models.FindOrganizationByIDInTransaction(tx, orgID.String()); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return permanentApplyError("organization not found")
+			return subscriptionOrganizationNotFound(tx, orgID, data)
 		}
 		return err
 	}
@@ -77,7 +82,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 		periodEnd = &end
 	}
 
-	return tx.Transaction(func(inner *gorm.DB) error {
+	err = tx.Transaction(func(inner *gorm.DB) error {
 		plan, grantIncluded, err := models.ApplyPolarSubscription(
 			inner,
 			orgID,
@@ -111,6 +116,57 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 			IsActiveBusiness: plan != nil && plan.IsActiveBusiness(),
 		})
 	})
+	// Deletion can commit after the initial lookup but before the model takes
+	// the organization lock. Classify and log it after this transaction ends.
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		_, lookupErr := models.FindOrganizationByIDInTransaction(tx, orgID.String())
+		if errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+			return subscriptionOrganizationNotFound(tx, orgID, data)
+		}
+		if lookupErr != nil {
+			return lookupErr
+		}
+	}
+	return err
+}
+
+func subscriptionOrganizationNotFound(tx *gorm.DB, orgID uuid.UUID, data SubscriptionData) error {
+	logged, err := logSubscriptionForDeletedOrganization(tx, orgID, data)
+	if err != nil {
+		return err
+	}
+	if logged {
+		return fmt.Errorf("%w: %w", ErrPermanentApply, ErrSubscriptionForDeletedOrganization)
+	}
+	return permanentApplyError("organization not found")
+}
+
+// subscriptionForDeletedOrganizationEvent is the stable log key for a
+// subscription webhook that targets a soft-deleted organization. Polar can
+// still charge for that subscription, so an operator must cancel it in Polar.
+const subscriptionForDeletedOrganizationEvent = "billing.subscription_for_deleted_organization"
+
+// logSubscriptionForDeletedOrganization records one error log when the webhook
+// targets a soft-deleted organization and reports whether it did.
+func logSubscriptionForDeletedOrganization(tx *gorm.DB, orgID uuid.UUID, data SubscriptionData) (bool, error) {
+	organization, err := models.FindOrganizationByIDIncludingDeleted(tx, orgID.String())
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !organization.DeletedAt.Valid {
+		return false, nil
+	}
+
+	log.WithFields(log.Fields{
+		"event":                     subscriptionForDeletedOrganizationEvent,
+		"organization_id":           orgID.String(),
+		"polar_subscription_id":     data.ID,
+		"polar_subscription_status": strings.ToLower(strings.TrimSpace(data.Status)),
+	}).Error(subscriptionForDeletedOrganizationEvent)
+	return true, nil
 }
 
 // ApplyOrganizationSubscription applies a snapshot that a direct Polar API call
