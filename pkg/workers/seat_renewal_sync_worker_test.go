@@ -78,7 +78,10 @@ func Test__SeatRenewalSyncFixesTheOrganizationThatRenewsFirstFirst(t *testing.T)
 
 	f.worker.tick(context.Background())
 
-	assert.Equal(t, []string{soon.ID, later.ID}, f.patchedSubscriptions())
+	// The in-sync organization renews first and already has the target
+	// count. It still gets one idempotent update, because the plan records
+	// only counts that SuperPlane sent.
+	assert.Equal(t, []string{inSync.ID, soon.ID, later.ID}, f.patchedSubscriptions())
 	for _, patch := range f.polar.Patches() {
 		assert.Equal(t, map[string]any{"seats": float64(1), "proration_behavior": "next_period"}, patch.Body)
 	}
@@ -86,7 +89,7 @@ func Test__SeatRenewalSyncFixesTheOrganizationThatRenewsFirstFirst(t *testing.T)
 	assert.Equal(t, 3, f.polar.Subscription(soon.ID).Seats, "the current period keeps its seats")
 
 	fixed := f.entries(log.WarnLevel, seatRenewalMismatchFixedKey)
-	require.Len(t, fixed, 2)
+	require.Len(t, fixed, 2, "a count that already matches is recorded, not fixed")
 	assert.Equal(t, soonOrg.String(), fixed[0].Data["organization_id"])
 	assert.Equal(t, soon.ID, fixed[0].Data["polar_subscription_id"])
 	assert.Equal(t, 1, fixed[0].Data["renewal_target_seats"])
@@ -95,7 +98,46 @@ func Test__SeatRenewalSyncFixesTheOrganizationThatRenewsFirstFirst(t *testing.T)
 	assert.Equal(t, laterOrg.String(), fixed[1].Data["organization_id"])
 
 	f.worker.tick(context.Background())
-	assert.Len(t, f.polar.Patches(), 2, "counts that already match need no update")
+	assert.Len(t, f.polar.Patches(), 3, "counts and records that already match need no update")
+}
+
+func Test__SeatRenewalSyncResumesWhereARateLimitStopped(t *testing.T) {
+	f := newSeatRenewalSyncFixture(t)
+	_, soon := f.addOrganization(3, 12*time.Hour)
+	middleOrg, middle := f.addOrganization(3, 2*24*time.Hour)
+	_, later := f.addOrganization(3, 10*24*time.Hour)
+	// A server error skips the first organization, and a rate limit then
+	// stops the run at the second one.
+	f.polar.FailNext(1, http.StatusServiceUnavailable, "")
+	f.polar.FailNext(1, http.StatusTooManyRequests, "")
+
+	f.worker.tick(context.Background())
+
+	assert.Empty(t, f.polar.Patches())
+	assert.Equal(t, middleOrg, f.worker.resumeAfter)
+	for _, request := range f.polar.Requests() {
+		assert.NotEqual(t, later.ID, request.SubscriptionID, "the rate limit stops the run before later organizations")
+	}
+
+	requests := len(f.polar.Requests())
+	f.worker.tick(context.Background())
+
+	// The next run continues where the rate limit stopped it, so the
+	// organizations later in the list are checked too.
+	assert.Equal(t, []string{middle.ID, later.ID}, f.patchedSubscriptions())
+	for _, request := range f.polar.Requests()[requests:] {
+		assert.NotEqual(t, soon.ID, request.SubscriptionID, "the resumed run does not spend its budget again on earlier organizations")
+	}
+	assert.Equal(t, uuid.Nil, f.worker.resumeAfter, "a completed run clears the position")
+
+	requests = len(f.polar.Requests())
+	f.worker.tick(context.Background())
+
+	// After a completed run, the next run starts again with the
+	// organization that renews first.
+	require.Greater(t, len(f.polar.Requests()), requests)
+	assert.Equal(t, soon.ID, f.polar.Requests()[requests].SubscriptionID)
+	assert.Equal(t, []string{middle.ID, later.ID, soon.ID}, f.patchedSubscriptions())
 }
 
 func Test__SeatRenewalSyncFixesTheCountAfterAPolarOutage(t *testing.T) {

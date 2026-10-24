@@ -189,6 +189,9 @@ func Test__NoRenewalScheduleWhileASeatPurchaseIsInFlight(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 3, new(50))
 	members := f.addMembers(1)
 	f.dropConnection()
+	// Polar never answered the purchase, so the subscription has no
+	// modification that proves whether Polar applied it.
+	f.modifiedAt = time.Now().Add(-time.Hour)
 	_, err := f.purchase(1, 3)
 	require.NoError(t, err)
 	require.Equal(t, models.SeatPurchaseStatusUnknown, f.latestPurchase().Status)
@@ -196,4 +199,6 @@ func Test__NoRenewalScheduleWhileASeatPurchaseIsInFlight(t *testing.T) {
 	f.removeMember(members[0])
 
 	assert.Empty(t, f.renewalSchedules(), "the purchase replaces any scheduled count when it settles")
+	assert.Equal(t, models.SeatPurchaseStatusUnknown, f.latestPurchase().Status,
+		"nothing proves the outcome yet, so the purchase stays in flight")
 }

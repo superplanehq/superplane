@@ -87,16 +87,43 @@ func Test__ScheduleSetsTheNextPeriodSeatsToTheMemberCount(t *testing.T) {
 	assert.True(t, plan.CurrentPeriodEnd.Equal(f.sub.PeriodEnd))
 }
 
-func Test__ScheduleMakesNoUpdateWhenPolarAlreadyRenewsTheMemberCount(t *testing.T) {
+func Test__ScheduleRecordsTheCountPolarAlreadyRenews(t *testing.T) {
 	f := newScheduleFixture(t, 10, 9)
 	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(9) })
 
+	// Polar already renews the member count, but nothing records a send of
+	// it. The record describes only counts SuperPlane sent, so the count is
+	// sent once and recorded. The send changes nothing in Polar.
 	result := f.schedule()
 
 	assert.Equal(t, ActionInSync, result.Action)
-	assert.Len(t, f.polar.Requests(), 1)
-	assert.Empty(t, f.polar.Patches())
-	assert.Nil(t, f.plan().RenewalSeatsScheduled)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	assert.Equal(t, new(9), f.polar.Subscription(f.sub.ID).PendingSeats)
+	plan := f.plan()
+	assert.Equal(t, new(9), plan.RenewalSeatsScheduled)
+	assert.True(t, plan.RenewalSeatsScheduledAt.Equal(f.now))
+
+	result = f.schedule()
+
+	assert.Equal(t, ActionInSync, result.Action)
+	assert.Len(t, f.polar.Patches(), 1, "the stored record matches the target now")
+}
+
+func Test__ScheduleSendsAgainWhenTheStoredRecordIsStale(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(9) })
+	require.NoError(t, f.plan().RecordScheduledRenewalSeats(database.Conn(), 8, f.now.Add(-time.Hour)))
+
+	// Polar renews the target, but the record names a count SuperPlane sent
+	// earlier. A matching Polar count alone never proves who set it, so the
+	// target is sent again and the record is repaired.
+	result := f.schedule()
+
+	assert.Equal(t, ActionInSync, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	plan := f.plan()
+	assert.Equal(t, new(9), plan.RenewalSeatsScheduled)
+	assert.True(t, plan.RenewalSeatsScheduledAt.Equal(f.now))
 }
 
 func Test__ScheduleBackToTheCurrentSeatsClearsTheScheduledReduction(t *testing.T) {
@@ -177,6 +204,61 @@ func Test__ScheduleSkipsWhenPolarReportsTheSubscriptionEnding(t *testing.T) {
 
 	assert.Equal(t, ActionSkipped, result.Action)
 	assert.Empty(t, f.polar.Patches())
+}
+
+func Test__ScheduleFailsAnAbandonedPurchaseAndSchedules(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12)
+	require.NoError(t, purchase.Create(database.Conn()))
+	require.NoError(t, purchase.UpdateStatus(database.Conn(), models.SeatPurchaseStatusUnknown, ""))
+
+	result := f.schedule()
+
+	// Polar still reports the original seats after the purchase, so the
+	// abandoned purchase failed and no longer blocks the renewal seat count.
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	stored, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.SeatPurchaseStatusFailed, stored.Status)
+	assert.Equal(t, models.SeatPurchaseErrorNotApplied, stored.ErrorCode)
+}
+
+func Test__ScheduleExpiresAPendingPurchaseAfterTheConfirmationWindow(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12)
+	require.NoError(t, purchase.Create(database.Conn()))
+	created := time.Now().Add(-polar.SeatPurchaseConfirmationWindow - time.Minute)
+	require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("id = ?", purchase.ID).Update("created_at", created).Error)
+
+	result := f.schedule()
+
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	stored, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.SeatPurchaseStatusFailed, stored.Status)
+	assert.Equal(t, models.SeatPurchaseErrorNotApplied, stored.ErrorCode)
+}
+
+func Test__ScheduleAppliesTheSnapshotThatConfirmsAPurchase(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12)
+	require.NoError(t, purchase.Create(database.Conn()))
+	require.NoError(t, purchase.UpdateStatus(database.Conn(), models.SeatPurchaseStatusUnknown, ""))
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.Seats = 12 })
+
+	result := f.schedule()
+
+	// Polar reports the purchased seats, so the purchase succeeded and the
+	// stored plan picks up the seats. The purchase replaced the scheduled
+	// count, so it is scheduled again.
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	stored, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, stored.Status)
+	assert.Equal(t, new(12), f.plan().PurchasedSeats)
 }
 
 func Test__ScheduleWithRetryRetriesOnlyTransientPolarFailures(t *testing.T) {

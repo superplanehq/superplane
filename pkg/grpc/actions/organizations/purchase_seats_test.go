@@ -48,6 +48,9 @@ type seatPurchaseFixture struct {
 	// pendingSeats is the seat count that Polar renews with, when it differs
 	// from polarSeats.
 	pendingSeats *int
+	// modifiedAt is the subscription modification time that snapshots report.
+	// The zero value makes each snapshot report the current time.
+	modifiedAt time.Time
 	// replays counts webhook replays so each snapshot is newer than the last.
 	replays int
 }
@@ -134,9 +137,13 @@ func (f *seatPurchaseFixture) serve(w http.ResponseWriter, req *http.Request) {
 }
 
 func (f *seatPurchaseFixture) snapshot(seats int) map[string]any {
+	modifiedAt := f.modifiedAt
+	if modifiedAt.IsZero() {
+		modifiedAt = time.Now()
+	}
 	snapshot := map[string]any{
 		"id": f.subscriptionID, "product_id": f.product, "status": "active", "seats": seats,
-		"cancel_at_period_end": false, "modified_at": time.Now().UTC().Format(time.RFC3339),
+		"cancel_at_period_end": false, "modified_at": modifiedAt.UTC().Format(time.RFC3339),
 		"current_period_start": f.periodStart.Format(time.RFC3339), "current_period_end": f.periodEnd.Format(time.RFC3339),
 		"customer_id": "cust_1", "external_customer_id": f.r.Organization.ID.String(),
 		"pending_update": nil,

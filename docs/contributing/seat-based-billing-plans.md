@@ -175,12 +175,13 @@ does not remove seats that were added elsewhere.
     bank confirmation message and that `purchased_seats` does not change.
 
 If Polar does not answer, the purchase has the status `awaiting_confirmation`.
-Capacity does not change. A `subscription.updated` webhook, a billing sync, or the
-next preview or purchase reads the subscription from Polar and settles the purchase.
+Capacity does not change. A `subscription.updated` webhook, a billing sync, the
+renewal seat schedule, or the next preview or purchase reads the subscription
+from Polar and settles the purchase.
 Only one purchase can be pending or unconfirmed for an organization at a time.
 A purchase that Polar never applied fails five minutes after it started, when the
-next preview or purchase checks Polar. The same rule applies when Polar reports
-fewer seats than the target after an outside change.
+next preview, purchase, or renewal seat schedule checks Polar. The same rule
+applies when Polar reports fewer seats than the target after an outside change.
 
 The table `organization_seat_purchases` is the marker for seat changes that
 SuperPlane started. Use `models.FindExpectedSeatCount` to tell them from outside
@@ -209,21 +210,30 @@ An admin removes a member on November 10. SuperPlane schedules 9 seats for
 December 1. The freed seat stays usable until December 1. When a member joins
 before December 1, SuperPlane schedules 10 seats again.
 
-`seatrenewal.Schedule` in `pkg/billing/seatrenewal` does the work. It does
-nothing when one of these conditions is true:
+`seatrenewal.Schedule` in `pkg/billing/seatrenewal` does the work. It first
+settles or expires an old seat purchase from Polar, so an abandoned purchase
+cannot keep its organization unchecked forever. It then does nothing when one
+of these conditions is true:
 
 - The plan is not per seat, or `RenewalQuantity` is not set (for example, the renewal is past due).
 - An admin assigned the plan.
 - The plan has no Polar subscription, the subscription is not `active`, or it is set to cancel.
-- A seat purchase is pending or unconfirmed. The purchase replaces any
-  scheduled count when it settles. The worker schedules the count after that.
+- A seat purchase is still inside its confirmation window. The purchase
+  replaces any scheduled count when it settles, and SuperPlane schedules the
+  count again after that.
 
 Schedule reads local state under the organization lock. It calls Polar after
-it releases the lock. It sends the update only when the next-period count
-differs from the target. After each update, it stores the target in
+it releases the lock. After each update, it stores the target in
 `organization_billing_plans.renewal_seats_scheduled` and the send time in
 `renewal_seats_scheduled_at`. Subscription snapshots do not change these
 columns. Outside-change detection can compare them with the Polar count.
+
+These columns record only counts that SuperPlane sent. When Polar already
+renews with the target but the record is missing or names a different count
+(for example, because the record write failed after Polar accepted an
+update), Schedule sends the target again and repairs the record. A matching
+Polar count alone never repairs it. The send is idempotent: Polar keeps the
+current period, and the scheduled count stays the target.
 
 ### Live updates
 
@@ -248,6 +258,12 @@ go first. The worker uses `seatrenewal.Schedule`, so the same rules apply. It
 fixes counts after a Polar outage, a lost update, a race between a purchase and
 a removal, and membership changes without a live update, such as account
 deletion.
+
+When Polar rate-limits a request, the run stops and keeps its position. The
+next run continues at the organization where the rate limit stopped it, so a
+request budget smaller than the list cannot keep later organizations
+unchecked. A run that reaches the end of the list clears the position, and the
+next run starts again with the organizations that renew first.
 
 The worker writes these log entries. Each entry has `organization_id`,
 `polar_subscription_id`, `renewal_target_seats`, `next_period_seats`, and

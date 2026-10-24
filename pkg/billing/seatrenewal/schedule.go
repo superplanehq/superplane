@@ -33,7 +33,8 @@ const (
 	// ActionSkipped means that the organization has no renewal seat count to
 	// keep, or that another flow owns the next seat change.
 	ActionSkipped Action = "skipped"
-	// ActionInSync means that Polar already renews with the target.
+	// ActionInSync means that Polar already renews with the target. SuperPlane
+	// can still have sent the target again to repair the stored record.
 	ActionInSync Action = "in_sync"
 	// ActionFixed means that SuperPlane scheduled the target in Polar.
 	ActionFixed Action = "fixed"
@@ -101,6 +102,13 @@ func NewScheduler(db *gorm.DB, client Client, now func() time.Time) *Scheduler {
 // differ. The organization lock is held only to read local state, never
 // during a Polar call.
 func (s *Scheduler) Schedule(ctx context.Context, orgID uuid.UUID) (Result, error) {
+	// An abandoned purchase can stay in flight forever when nobody previews
+	// or buys seats again, and the skip rules would keep its organization
+	// unchecked. Settle or expire it from Polar before the skip rules.
+	if err := polar.ReconcileSeatPurchase(ctx, s.db.WithContext(ctx), s.client, orgID); err != nil {
+		return Result{OrganizationID: orgID}, err
+	}
+
 	result, plan, err := s.loadLocalState(ctx, orgID)
 	if err != nil || result.Action == ActionSkipped {
 		return result, err
@@ -125,15 +133,24 @@ func (s *Scheduler) Schedule(ctx context.Context, orgID uuid.UUID) (Result, erro
 	// exceeds them.
 	target := min(*result.Target, *snapshot.Seats)
 	result.Target = &target
-	if result.NextPeriodSeats != nil && *result.NextPeriodSeats == target {
+	inSync := result.NextPeriodSeats != nil && *result.NextPeriodSeats == target
+	if inSync && scheduledRecordMatches(plan, target) {
 		result.Action = ActionInSync
 		return result, nil
 	}
 
+	// The target is sent even when Polar already renews with it but the
+	// stored record is missing or stale: the record describes only counts
+	// that SuperPlane sent, so a matching Polar count alone never repairs
+	// it. The send is idempotent, and the next attempt retries the record
+	// when this write fails.
 	if _, err := s.client.ScheduleSubscriptionSeats(ctx, result.SubscriptionID, target); err != nil {
 		return result, err
 	}
 	result.Action = ActionFixed
+	if inSync {
+		result.Action = ActionInSync
+	}
 	if err := plan.RecordScheduledRenewalSeats(s.db.WithContext(ctx), target, s.now()); err != nil {
 		return result, fmt.Errorf("record scheduled renewal seats: %w", err)
 	}
@@ -172,8 +189,10 @@ func (s *Scheduler) loadLocalState(ctx context.Context, orgID uuid.UUID) (Result
 		}
 		result.Target = seats.RenewalQuantity
 
-		// The purchase replaces any scheduled count when it settles and
-		// schedules the renewal quantity again after it.
+		// A purchase inside its confirmation window owns the next seat
+		// change: it replaces any scheduled count when it settles and
+		// schedules the renewal quantity again after it. Schedule already
+		// reconciled an older purchase, so only a recent one still skips.
 		inFlight, err := models.FindInFlightSeatPurchase(tx, orgID)
 		if err != nil {
 			return err
@@ -184,6 +203,12 @@ func (s *Scheduler) loadLocalState(ctx context.Context, orgID uuid.UUID) (Result
 		return nil
 	})
 	return result, plan, err
+}
+
+// scheduledRecordMatches reports that the plan already records a send of the
+// target. Only then does a matching Polar count prove nothing is left to do.
+func scheduledRecordMatches(plan *models.OrganizationBillingPlan, target int) bool {
+	return plan.RenewalSeatsScheduled != nil && *plan.RenewalSeatsScheduled == target
 }
 
 func planSkipReason(plan *models.OrganizationBillingPlan) string {

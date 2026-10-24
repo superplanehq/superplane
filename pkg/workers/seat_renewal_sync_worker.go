@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
@@ -30,6 +31,10 @@ type SeatRenewalSyncWorker struct {
 	scheduler *seatrenewal.Scheduler
 	now       func() time.Time
 	logger    *log.Entry
+	// resumeAfter is the organization where a rate limit stopped the last
+	// run. The next run continues there instead of spending the whole Polar
+	// request budget on the same organizations that renew first.
+	resumeAfter uuid.UUID
 }
 
 func NewSeatRenewalSyncWorker() *SeatRenewalSyncWorker {
@@ -68,7 +73,7 @@ func (w *SeatRenewalSyncWorker) tick(ctx context.Context) {
 		w.logger.WithError(err).Error("could not list organizations for the seat renewal sync")
 		return
 	}
-	for _, plan := range plans {
+	for _, plan := range w.resumeFrom(plans) {
 		if ctx.Err() != nil {
 			return
 		}
@@ -76,7 +81,10 @@ func (w *SeatRenewalSyncWorker) tick(ctx context.Context) {
 		if err != nil {
 			w.logFailure(plan, result, err)
 			if polar.IsRateLimited(err) {
-				// The next tick starts again with the organizations that renew first.
+				// The next run continues at this organization, so a request
+				// budget smaller than the list cannot starve the
+				// organizations after it.
+				w.resumeAfter = plan.OrganizationID
 				return
 			}
 			continue
@@ -85,6 +93,24 @@ func (w *SeatRenewalSyncWorker) tick(ctx context.Context) {
 			w.logger.WithFields(result.LogFields()).Warn(seatRenewalMismatchFixedKey)
 		}
 	}
+	// A completed run clears the position, so the next run starts again
+	// with the organizations that renew first.
+	w.resumeAfter = uuid.Nil
+}
+
+// resumeFrom starts the list at the organization where a rate limit stopped
+// the last run. It starts from the top again when that organization left the
+// candidate list, for example after its renewal passed.
+func (w *SeatRenewalSyncWorker) resumeFrom(plans []models.OrganizationBillingPlan) []models.OrganizationBillingPlan {
+	if w.resumeAfter == uuid.Nil {
+		return plans
+	}
+	for i, plan := range plans {
+		if plan.OrganizationID == w.resumeAfter {
+			return plans[i:]
+		}
+	}
+	return plans
 }
 
 func (w *SeatRenewalSyncWorker) logFailure(plan models.OrganizationBillingPlan, result seatrenewal.Result, err error) {
