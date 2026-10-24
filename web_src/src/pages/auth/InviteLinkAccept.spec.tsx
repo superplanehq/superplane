@@ -155,6 +155,7 @@ describe("Email invitation acceptance", () => {
     INVITATION_ALREADY_ACCEPTED:
       "This invitation was already accepted. Ask an organization admin for a new invitation.",
     INVITATION_REPLACED: "A new invitation replaced this link. Open the latest invitation email.",
+    INVITATION_INVITER_REVOKED: "Ask an organization admin to send this invitation again.",
     INVITATION_EMAIL_MISMATCH:
       "This invitation is for j***@example.com. Sign out, then sign in with the invited email address.",
   })) {

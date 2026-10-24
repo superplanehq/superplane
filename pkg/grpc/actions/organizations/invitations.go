@@ -142,6 +142,10 @@ func (s *InvitationService) Resend(ctx context.Context, orgID, actorID, invitati
 	if err != nil {
 		return nil, err
 	}
+	actor, err := uuid.Parse(actorID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "Invalid actor ID.")
+	}
 	var invitation *models.OrganizationInvitation
 	var org *models.Organization
 	var token string
@@ -186,7 +190,17 @@ func (s *InvitationService) Resend(ctx context.Context, orgID, actorID, invitati
 		if err != nil {
 			return err
 		}
-		return invitation.Save(tx)
+		// A resend by another admin makes that admin the inviter.
+		invitation.InvitedBy = actor
+		if err := invitation.Save(tx); err != nil {
+			return err
+		}
+		loaded, err := models.FindOrganizationInvitation(tx, organization, invitation.ID)
+		if err != nil {
+			return err
+		}
+		invitation.InviterName = loaded.InviterName
+		return nil
 	})
 	if err != nil {
 		return nil, invitationActionError(err)

@@ -442,3 +442,55 @@ func TestAcceptInvitationRechecksHistoryAfterOrganizationLock(t *testing.T) {
 	require.NoError(t, <-resent)
 	requireInvitationReason(t, <-accepted, "INVITATION_REPLACED")
 }
+
+func createInvitationAdmin(t *testing.T, r *support.ResourceRegistry, email string) *models.User {
+	t.Helper()
+	account, err := models.CreateAccount("Second Admin", email)
+	require.NoError(t, err)
+	admin, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	require.NoError(t, r.AuthService.AssignRole(admin.ID.String(), models.RoleOrgAdmin, r.Organization.ID.String(), models.DomainTypeOrganization))
+	return admin
+}
+
+func TestAcceptInvitationRequiresInviterToManageMembers(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "no")
+	db := database.Conn()
+	orgID := r.Organization.ID.String()
+	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
+	inviter := createInvitationAdmin(t, r, "inviter@example.com")
+	recipient, err := models.CreateAccount("Recipient", "recipient@example.com")
+	require.NoError(t, err)
+	created, err := s.Create(context.Background(), orgID, inviter.ID.String(), &pb.CreateInvitationRequest{Email: recipient.Email, Role: models.RoleOrgAdmin})
+	require.NoError(t, err)
+	token := strings.TrimPrefix(created.AcceptanceUrl, "https://example.com/invitations/")
+	invitationID := uuid.MustParse(created.Invitation.Id)
+
+	require.NoError(t, r.AuthService.RemoveRole(inviter.ID.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization))
+	require.NoError(t, r.AuthService.AssignRole(inviter.ID.String(), models.RoleOrgOperator, orgID, models.DomainTypeOrganization))
+
+	_, err = s.Accept(context.Background(), recipient.ID.String(), token)
+	requireInvitationReason(t, err, "INVITATION_INVITER_REVOKED")
+	stored, err := models.FindOrganizationInvitation(db, r.Organization.ID, invitationID)
+	require.NoError(t, err)
+	require.Equal(t, models.InvitationStatePending, stored.State)
+	_, err = models.FindActiveUserByEmail(orgID, recipient.Email)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	resent, err := s.Resend(context.Background(), orgID, r.User.String(), created.Invitation.Id)
+	require.NoError(t, err)
+	require.Equal(t, r.User.String(), resent.Invitation.InvitedBy)
+	require.NotEmpty(t, resent.Invitation.InviterName)
+	require.NotEqual(t, inviter.Name, resent.Invitation.InviterName)
+	token = strings.TrimPrefix(resent.AcceptanceUrl, "https://example.com/invitations/")
+
+	_, err = s.Accept(context.Background(), recipient.ID.String(), token)
+	require.NoError(t, err)
+	member, err := models.FindActiveUserByEmail(orgID, recipient.Email)
+	require.NoError(t, err)
+	roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), member.ID.String(), orgID)
+	require.NoError(t, err)
+	require.Contains(t, invitationRoleNames(roles), models.RoleOrgAdmin)
+}
