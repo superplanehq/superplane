@@ -1,8 +1,11 @@
 package entitlements
 
 import (
+	"context"
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -253,6 +256,126 @@ func TestResolveSeatsForPlanUsesLoadedPlan(t *testing.T) {
 	require.Equal(t, 1, current.PendingInvitations)
 	require.Equal(t, seatCount(9), current.Purchased)
 	require.Equal(t, seatCount(7), current.Invitable)
+}
+
+// subscriptionReplay delivers Polar subscription webhooks in order, as they arrive.
+type subscriptionReplay struct {
+	t              *testing.T
+	orgID          uuid.UUID
+	productID      string
+	subscriptionID string
+	modifiedAt     time.Time
+}
+
+func newSubscriptionReplay(t *testing.T, orgID uuid.UUID, catalog *models.BillingPlan) *subscriptionReplay {
+	return &subscriptionReplay{t: t, orgID: orgID, productID: *catalog.PolarProductID, subscriptionID: "sub_" + uuid.NewString(), modifiedAt: time.Now().Add(-time.Hour)}
+}
+
+func (s *subscriptionReplay) apply(status string, seats *int) {
+	s.t.Helper()
+	s.modifiedAt = s.modifiedAt.Add(time.Minute)
+	start := time.Now().Add(-7 * 24 * time.Hour)
+	body, err := json.Marshal(map[string]any{"type": "subscription.updated", "data": map[string]any{
+		"id": s.subscriptionID, "product_id": s.productID, "status": status, "seats": seats,
+		"external_customer_id": s.orgID.String(), "modified_at": s.modifiedAt.UTC().Format(time.RFC3339),
+		"current_period_start": start.UTC().Format(time.RFC3339), "current_period_end": start.AddDate(0, 1, 0).UTC().Format(time.RFC3339),
+	}})
+	require.NoError(s.t, err)
+	var event polar.SubscriptionWebhookEvent
+	require.NoError(s.t, json.Unmarshal(body, &event))
+	require.NoError(s.t, polar.ApplySubscriptionEvent(context.Background(), database.Conn(), &event))
+}
+
+func savePaidCatalog(t *testing.T, perSeat bool) *models.BillingPlan {
+	t.Helper()
+	product := "prod_" + uuid.NewString()
+	catalog := models.BillingPlan{Key: "paid_" + uuid.NewString()[:8], Name: "Paid", Category: "paid", Visibility: "private", PerSeat: perSeat, PriceCents: 2000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	if perSeat {
+		catalog.SeatLimit = seatCount(50)
+	}
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	return &catalog
+}
+
+func TestPastDueLocksSeatsOfSeatBasedSubscription(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	support.CreateUser(t, r, r.Organization.ID)
+	replay := newSubscriptionReplay(t, r.Organization.ID, savePaidCatalog(t, true))
+	resolve := func() *SeatUsage {
+		t.Helper()
+		usage, err := ResolveSeats(db, r.Organization.ID)
+		require.NoError(t, err)
+		return usage
+	}
+
+	replay.apply("active", seatCount(2))
+	active := resolve()
+	require.False(t, active.PaymentBlocked)
+	require.Equal(t, 0, *active.Invitable)
+	require.Equal(t, 48, *active.Purchasable)
+
+	replay.apply("past_due", seatCount(2))
+	blocked := resolve()
+	require.True(t, blocked.PaymentBlocked)
+	require.Equal(t, 2, blocked.Occupied)
+	require.Equal(t, seatCount(2), blocked.Purchased)
+	require.Equal(t, seatCount(2), blocked.JoinLimit())
+	require.Equal(t, seatCount(0), blocked.Invitable)
+	require.Equal(t, seatCount(0), blocked.Purchasable)
+
+	replay.apply("active", seatCount(2))
+	require.Equal(t, *active, *resolve(), "an active snapshot restores the normal seat rules")
+}
+
+func TestPastDueLockIgnoresSubscriptionWithoutSeats(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	replay := newSubscriptionReplay(t, r.Organization.ID, savePaidCatalog(t, false))
+
+	replay.apply("active", nil)
+	replay.apply("past_due", nil)
+	usage, err := ResolveSeats(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.False(t, usage.PaymentBlocked)
+	require.Equal(t, usage.MemberLimit, usage.JoinLimit())
+}
+
+func TestUnpaidAndRevokedSnapshotsEndThePastDueLock(t *testing.T) {
+	for _, status := range []string{"unpaid", "revoked"} {
+		t.Run(status, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			db := database.Conn()
+			support.CreateUser(t, r, r.Organization.ID)
+			replay := newSubscriptionReplay(t, r.Organization.ID, savePaidCatalog(t, true))
+			replay.apply("active", seatCount(2))
+			replay.apply("past_due", seatCount(2))
+			blocked, err := ResolveSeats(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.True(t, blocked.PaymentBlocked)
+			blockedEntitlements, err := Resolve(db, r.Organization.ID)
+			require.NoError(t, err)
+
+			replay.apply(status, seatCount(2))
+			lapsed, err := ResolveSeats(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.False(t, lapsed.PaymentBlocked)
+			require.False(t, lapsed.PerSeat)
+			require.Equal(t, lapsed.MemberLimit, lapsed.JoinLimit())
+			require.Nil(t, lapsed.Invitable)
+
+			// Past due keeps today's plan change, so the lapse changes no entitlement.
+			lapsedEntitlements, err := Resolve(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.Equal(t, lapsedEntitlements, blockedEntitlements)
+		})
+	}
 }
 
 func seatCount(quantity int) *int { return &quantity }

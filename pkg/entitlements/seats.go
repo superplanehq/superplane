@@ -18,9 +18,16 @@ type SeatUsage struct {
 	Purchasable        *int `json:"purchasable"`
 	RenewalQuantity    *int `json:"renewal_quantity"`
 	MemberLimit        *int `json:"member_limit"`
+	// PaymentBlocked is true while a seat-based subscription has a failed
+	// renewal payment. Seats stay locked at the current member count.
+	PaymentBlocked bool `json:"payment_blocked"`
 }
 
 func (s SeatUsage) JoinLimit() *int {
+	if s.PaymentBlocked {
+		occupied := s.Occupied
+		return &occupied
+	}
 	if s.PerSeat {
 		return s.Purchased
 	}
@@ -66,6 +73,12 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBil
 	if err != nil {
 		return nil, err
 	}
+	// A past_due snapshot moves the plan row to None or Trial, which are not
+	// per-seat. The lock must not depend on the catalog.
+	if paymentBlocked(plan) {
+		lockSeatsAtOccupied(usage, plan, maximum)
+		return usage, nil
+	}
 	if !plan.Catalog.PerSeat {
 		usage.MemberLimit = maximum
 		return usage, nil
@@ -89,6 +102,22 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBil
 		usage.Purchasable = &purchasable
 	}
 	return usage, nil
+}
+
+// paymentBlocked reports a seat-based subscription whose renewal payment failed.
+// Stored purchased seats tell a seat-based subscription from one without seats.
+func paymentBlocked(plan *models.OrganizationBillingPlan) bool {
+	return models.PolarSubscriptionIsPastDue(plan.PolarSubscriptionStatus) && plan.PurchasedSeats != nil
+}
+
+func lockSeatsAtOccupied(usage *SeatUsage, plan *models.OrganizationBillingPlan, maximum *int) {
+	none := 0
+	usage.PaymentBlocked = true
+	usage.MemberLimit = maximum
+	usage.Invitable = &none
+	usage.Purchasable = &none
+	purchased := *plan.PurchasedSeats
+	usage.Purchased = &purchased
 }
 
 // SeatMaximumForPlan resolves the purchase maximum for a target catalog plan.
