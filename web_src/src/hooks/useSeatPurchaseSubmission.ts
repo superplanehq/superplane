@@ -109,6 +109,12 @@ async function applyPurchaseResponse(response: OrganizationsPurchaseSeatsRespons
   }
 }
 
+function submissionOutcomeUnknown(status: number | undefined) {
+  // The server answered definite rejections before charging. A lost response
+  // or a server error can have reached Polar, so the outcome stays unknown.
+  return status === undefined || status >= 500;
+}
+
 async function recoverPurchase(error: unknown, submission: Submission) {
   const { state, generation, reloadBilling, input } = submission;
   if (generation !== state.lifecycle.current) return;
@@ -117,14 +123,20 @@ async function recoverPurchase(error: unknown, submission: Submission) {
     "SuperPlane could not complete this purchase. Refresh billing to check its status.",
   );
   state.setMessage(message);
+  let recovered = false;
   try {
     const billing = await reloadBilling();
     if (generation !== state.lifecycle.current) return;
-    if (purchaseChanged(billing.lastSeatPurchase, state.purchase)) state.recordPurchase(billing.lastSeatPurchase);
+    if (purchaseChanged(billing.lastSeatPurchase, state.purchase)) {
+      state.recordPurchase(billing.lastSeatPurchase);
+      recovered = true;
+    }
   } catch {
     // Preserve the purchase error and expose the explicit billing refresh action.
   }
-  if (generation !== state.lifecycle.current || errorStatus(error) !== 409) return;
+  if (generation !== state.lifecycle.current) return;
+  state.setSubmissionUnresolved(!recovered && submissionOutcomeUnknown(errorStatus(error)));
+  if (errorStatus(error) !== 409) return;
   state.setMessage(message);
   input.requestPreview();
 }
@@ -166,7 +178,7 @@ export function useSeatPurchaseSubmission({
     };
     state.setSubmitting(true);
     input.consumePreview();
-    state.setMessage(null);
+    state.clearFeedback();
     try {
       await applyPurchaseResponse(await submitPurchase(organizationId, confirmed), submission);
     } catch (error) {

@@ -29,6 +29,8 @@ const ready: UseSeatPurchaseResult = {
   previewError: null,
   purchase: undefined,
   purchaseMessage: null,
+  attemptSucceeded: false,
+  submissionUnresolved: false,
   timedOut: false,
   refreshing: false,
   refreshBilling: async () => console.log("Refresh billing"),
@@ -111,6 +113,19 @@ export const Succeeded: Story = {
       preview: undefined,
       purchase: { ...pendingPurchase, status: "succeeded" },
       purchaseMessage: "Seats added.",
+      attemptSucceeded: true,
+      canConfirm: false,
+    },
+  },
+};
+
+export const SubmissionUnresolved: Story = {
+  args: {
+    purchase: {
+      ...ready,
+      preview: undefined,
+      purchaseMessage: "SuperPlane could not complete this purchase. Refresh billing to check its status.",
+      submissionUnresolved: true,
       canConfirm: false,
     },
   },

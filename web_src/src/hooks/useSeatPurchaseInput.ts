@@ -9,7 +9,7 @@ export function useSeatPurchaseInput(organizationId: string, state: ReturnType<t
   const [requested, setRequested] = useState(false);
   const [revision, setRevision] = useState(0);
   const request = useRef(0);
-  const { submissionLock, purchase, setMessage } = state;
+  const { submissionLock, purchase, setMessage, clearFeedback } = state;
   const pending = isSeatPurchasePending(purchase);
 
   const invalidate = useCallback(() => {
@@ -41,11 +41,12 @@ export function useSeatPurchaseInput(organizationId: string, state: ReturnType<t
       if (open && !submissionLock.current) {
         setQuantity("1");
         setRequested(true);
-        setMessage(pending ? seatPurchaseMessage(purchase) : null);
+        clearFeedback();
+        if (pending) setMessage(seatPurchaseMessage(purchase));
       }
       setIsOpen(open);
     },
-    [isOpen, invalidate, submissionLock, pending, purchase, setMessage],
+    [isOpen, invalidate, submissionLock, pending, purchase, setMessage, clearFeedback],
   );
 
   const setAdditionalSeats = useCallback(
@@ -53,9 +54,9 @@ export function useSeatPurchaseInput(organizationId: string, state: ReturnType<t
       if (submissionLock.current || pending) return;
       setQuantity(value);
       requestPreview();
-      setMessage(null);
+      clearFeedback();
     },
-    [submissionLock, pending, requestPreview, setMessage],
+    [submissionLock, pending, requestPreview, clearFeedback],
   );
 
   return {

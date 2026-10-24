@@ -259,6 +259,7 @@ describe("useSeatPurchase", () => {
       await act(async () => hook.result.current.confirm());
       expect(hook.result.current.purchase).toEqual(recorded);
       expect(hook.result.current.purchaseMessage).toBe(recorded.message);
+      expect(hook.result.current.submissionUnresolved).toBe(false);
       await advance(10000);
       expect(organizationsPurchaseSeats).toHaveBeenCalledTimes(1);
     },
@@ -329,6 +330,43 @@ describe("useSeatPurchase", () => {
     await openPreview(hook);
     await act(async () => hook.result.current.confirm());
     expect(hook.result.current.purchaseMessage).toBe(message);
+    expect(hook.result.current.attemptSucceeded).toBe(false);
+    expect(hook.result.current.submissionUnresolved).toBe(false);
+    expect(organizationsPurchaseSeats).toHaveBeenCalledTimes(1);
+  });
+
+  it("tracks the successful attempt only until the dialog reopens", async () => {
+    const hook = mountPurchase();
+    await openPreview(hook);
+    await act(async () => hook.result.current.confirm());
+    expect(hook.result.current.attemptSucceeded).toBe(true);
+    expect(hook.result.current.purchaseMessage).toBe("Seats added.");
+    act(() => hook.result.current.setOpen(false));
+    act(() => hook.result.current.setOpen(true));
+    expect(hook.result.current.attemptSucceeded).toBe(false);
+    expect(hook.result.current.purchaseMessage).toBeNull();
+  });
+
+  it("offers a billing refresh when a lost submission response leaves the outcome unknown", async () => {
+    organizationsPurchaseSeats.mockRejectedValue(new TypeError("Failed to fetch"));
+    organizationsSyncOrganizationBilling.mockRejectedValue(new Error("Polar is unavailable."));
+    organizationsDescribeOrganizationBilling.mockRejectedValue(new Error("Billing is unavailable."));
+    const hook = mountPurchase();
+    await openPreview(hook);
+    await act(async () => hook.result.current.confirm());
+    expect(hook.result.current.purchase).toBeUndefined();
+    expect(hook.result.current.purchaseMessage).toBe(
+      "SuperPlane could not complete this purchase. Refresh billing to check its status.",
+    );
+    expect(hook.result.current.submissionUnresolved).toBe(true);
+    expect(hook.result.current.timedOut).toBe(false);
+    organizationsSyncOrganizationBilling.mockResolvedValue({
+      data: { ...initialBilling, purchasedSeats: 5, lastSeatPurchase: purchase("succeeded") },
+    });
+    await act(async () => hook.result.current.refreshBilling());
+    expect(hook.result.current.submissionUnresolved).toBe(false);
+    expect(hook.result.current.attemptSucceeded).toBe(true);
+    expect(hook.result.current.purchaseMessage).toBe("Seats added.");
     expect(organizationsPurchaseSeats).toHaveBeenCalledTimes(1);
   });
 

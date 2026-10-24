@@ -26,6 +26,10 @@ export type UseSeatPurchaseResult = {
   confirm: () => Promise<void>;
   purchase: OrganizationsSeatPurchase | undefined;
   purchaseMessage: string | null;
+  /** True after a purchase settled successfully in this session. The dialog hides the form while it holds. */
+  attemptSucceeded: boolean;
+  /** True when a submission error left the purchase outcome unknown. The UI offers a manual billing refresh. */
+  submissionUnresolved: boolean;
   timedOut: boolean;
   refreshBilling: () => Promise<void>;
   refreshing: boolean;
@@ -94,6 +98,8 @@ export function useSeatPurchase({
     confirm,
     purchase: state.purchase,
     purchaseMessage: state.message,
+    attemptSucceeded: state.attemptSucceeded,
+    submissionUnresolved: state.submissionUnresolved,
     timedOut,
     refreshBilling: recovery.refreshBilling,
     refreshing: recovery.refreshing,

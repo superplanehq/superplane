@@ -15,6 +15,7 @@ export function BillingSeatPurchaseStatus({
   timedOut,
   refreshing,
   paymentPending,
+  submissionUnresolved = false,
   onRefresh,
   onUpdatePaymentMethod,
 }: {
@@ -23,19 +24,23 @@ export function BillingSeatPurchaseStatus({
   timedOut: boolean;
   refreshing: boolean;
   paymentPending: boolean;
+  submissionUnresolved?: boolean;
   onRefresh: () => void | Promise<void>;
   onUpdatePaymentMethod?: () => void;
 }) {
   const paymentFailed = ["failed", "action_required"].includes(purchase?.status ?? "");
   const statusMessage = seatPurchaseStatusMessage(purchase, message);
-  if (!statusMessage && !timedOut) return null;
+  const refreshAvailable = timedOut || submissionUnresolved;
+  if (!statusMessage && !refreshAvailable) return null;
 
   return (
     <div className="space-y-3" aria-live="polite">
       {statusMessage && <p role={paymentFailed ? "alert" : "status"}>{statusMessage}</p>}
-      {timedOut && (
+      {refreshAvailable && (
         <>
-          <p role="status">Polar has not confirmed the payment yet. Seats are added after Polar confirms it.</p>
+          {timedOut && (
+            <p role="status">Polar has not confirmed the payment yet. Seats are added after Polar confirms it.</p>
+          )}
           <Button variant="outline" disabled={refreshing} onClick={() => void onRefresh()}>
             {refreshing ? "Refreshing billing…" : "Refresh billing"}
           </Button>

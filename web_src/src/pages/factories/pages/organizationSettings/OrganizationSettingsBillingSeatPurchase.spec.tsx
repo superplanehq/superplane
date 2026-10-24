@@ -200,4 +200,61 @@ describe("Organization billing seat purchases", () => {
     expect(within(dialog).getByRole("button", { name: "Confirm purchase" })).toBeDisabled();
     expect(purchaseRequests.filter((url) => url.endsWith("/purchase"))).toHaveLength(0);
   });
+
+  it("keeps the purchase form when a new attempt is rejected after an earlier success", async () => {
+    const user = userEvent.setup();
+    const message = "Seat purchases pause while the subscription renews. Try again after renewal.";
+    // The harness deep-clones its fixture, so reject the second attempt at the
+    // transport layer instead of mutating the fixture mid-test.
+    const configuredFetch = client.getConfig().fetch;
+    let purchaseAttempts = 0;
+    client.setConfig({
+      fetch: (input, init) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (url.endsWith("/billing/seats/purchase")) {
+          purchaseAttempts += 1;
+          if (purchaseAttempts > 1) {
+            return Promise.resolve(
+              new Response(JSON.stringify({ message }), {
+                status: 412,
+                headers: { "Content-Type": "application/json" },
+              }),
+            );
+          }
+        }
+        return (configuredFetch ?? window.fetch)(input, init);
+      },
+    });
+    try {
+      renderBilling({ ...TEAM_ORGANIZATION_BILLING }, { newBilling: true, query: "?buySeats=1" });
+      const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
+      await waitFor(() =>
+        expect(within(dialog).getByRole<HTMLButtonElement>("button", { name: "Confirm purchase" }).disabled).toBe(
+          false,
+        ),
+      );
+      await user.click(within(dialog).getByRole("button", { name: "Confirm purchase" }));
+      expect(await within(dialog).findByText("Seats added.")).toBeInTheDocument();
+      expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: "Close" }));
+      const card = screen.getByTestId("billing-seats");
+      await user.click(within(card).getByRole("button", { name: "Buy seats" }));
+      const reopened = await screen.findByRole("dialog", { name: "Buy seats" });
+      expect(within(reopened).getByRole("spinbutton", { name: "Additional seats" })).toBeInTheDocument();
+      await waitFor(() =>
+        expect(within(reopened).getByRole<HTMLButtonElement>("button", { name: "Confirm purchase" }).disabled).toBe(
+          false,
+        ),
+      );
+      await user.click(within(reopened).getByRole("button", { name: "Confirm purchase" }));
+      expect(await within(reopened).findByText(message)).toBeInTheDocument();
+      expect(within(reopened).queryByText("Seats added.")).not.toBeInTheDocument();
+      expect(within(reopened).getByRole("spinbutton", { name: "Additional seats" })).toBeInTheDocument();
+      expect(within(reopened).getByRole("button", { name: "Confirm purchase" })).toBeInTheDocument();
+      expect(within(reopened).queryByRole("button", { name: "Refresh billing" })).not.toBeInTheDocument();
+      expect(purchaseRequests.filter((url) => url.endsWith("/purchase"))).toHaveLength(1);
+    } finally {
+      client.setConfig({ fetch: configuredFetch });
+    }
+  });
 });

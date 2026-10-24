@@ -60,6 +60,7 @@ export function BillingSeatPurchaseDialog({
           timedOut={purchase.timedOut}
           refreshing={purchase.refreshing}
           paymentPending={paymentPending}
+          submissionUnresolved={purchase.submissionUnresolved}
           onRefresh={purchase.refreshBilling}
           onUpdatePaymentMethod={onUpdatePaymentMethod}
         />
@@ -87,8 +88,7 @@ function canShowPurchaseForm({
 }: Pick<BillingSeatPurchaseDialogProps, "purchase" | "purchasableSeats" | "cancelAtPeriodEnd">) {
   if (purchasableSeats === 0 || cancelAtPeriodEnd) return false;
   if (["pending", "awaiting_confirmation"].includes(purchase.purchase?.status ?? "")) return false;
-  const visiblePurchase = recentSeatPurchase(purchase.purchase);
-  return !(visiblePurchase?.status === "succeeded" && purchase.purchaseMessage);
+  return !purchase.attemptSucceeded;
 }
 
 function PurchaseAvailability({
