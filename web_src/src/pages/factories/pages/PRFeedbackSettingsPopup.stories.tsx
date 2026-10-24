@@ -93,14 +93,13 @@ type Story = StoryObj<typeof PRFeedbackSettingsPopup>;
 
 function popup(settings: PRFeedbackDraftSettings, draft: PlanningReviewDraft) {
   return (
-    <MemoryRouter initialEntries={["/?prFeedbackSettings=agent"]}>
+    <MemoryRouter>
       <div className="relative min-h-svh bg-background">
         <PRFeedbackSettingsPopup
           settings={settings}
           onSave={(next) => console.log("save PR feedback settings", next)}
           onClose={() => console.log("close PR feedback settings")}
           fixed={false}
-          initialTab="agent"
           agent={{
             draft,
             organizationId: "org-1",

@@ -163,10 +163,19 @@ export function renderAgentSettingsPopup(
     initialPath = "/",
     initialTab = "general",
     withAgent = true,
+    agentLoading = false,
     probe,
-  }: { initialPath?: string; initialTab?: PRFeedbackSettingsTab; withAgent?: boolean; probe?: ReactNode } = {},
+  }: {
+    initialPath?: string;
+    initialTab?: PRFeedbackSettingsTab;
+    withAgent?: boolean;
+    agentLoading?: boolean;
+    probe?: ReactNode;
+  } = {},
 ) {
-  const onAgentSave = vi.fn();
+  const onAgentSave = vi.fn<(draft: typeof PLANNING_REVIEW_DRAFT) => Promise<void>>(async () => {});
+  const onSave = vi.fn();
+  const onClose = vi.fn();
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter initialEntries={[initialPath]}>
@@ -176,14 +185,15 @@ export function renderAgentSettingsPopup(
           agent={
             withAgent
               ? {
-                  draft: PLANNING_REVIEW_DRAFT,
+                  draft: agentLoading ? undefined : PLANNING_REVIEW_DRAFT,
+                  isLoading: agentLoading,
                   organizationId: "org-1",
                   onSave: onAgentSave,
                 }
               : undefined
           }
-          onSave={vi.fn()}
-          onClose={vi.fn()}
+          onSave={onSave}
+          onClose={onClose}
           initialTab={initialTab}
           fixed={false}
         />
@@ -191,5 +201,5 @@ export function renderAgentSettingsPopup(
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  return { onAgentSave };
+  return { onAgentSave, onSave, onClose };
 }

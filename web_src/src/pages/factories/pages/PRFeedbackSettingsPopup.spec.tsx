@@ -379,52 +379,37 @@ describe("PRFeedbackSettingsPopup automation", () => {
   });
 });
 
-describe("PRFeedbackSettingsPopup agent tab", () => {
+describe("PRFeedbackSettingsPopup model settings", () => {
   const sources = [
     ["discussion", discussionDraft()],
-    ["checks", checksDraft()],
+    ["checks", checksDraft({ checkNames: ["lint"] })],
   ] as const;
 
-  it.each(sources)("shows an Agent tab for %s handlers with an agent", (_source, settings) => {
+  it.each(sources)("shows the model picker in General for %s", (_source, settings) => {
     renderAgentSettingsPopup(settings);
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Runs"]);
-    expect(screen.getByRole("tab", { name: "Agent" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
+    expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveTextContent("Claude Sonnet");
+    expect(screen.queryByText("Concurrency")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("planning-review-editor")).not.toBeInTheDocument();
   });
 
-  it.each(sources)("opens the model editor when the Agent tab is selected for %s", async (_source, settings) => {
-    const user = userEvent.setup();
-    renderAgentSettingsPopup(settings);
-
-    await user.click(screen.getByTestId("pr-feedback-settings-tab-agent"));
-
-    expect(screen.getByTestId("pr-feedback-settings-tab-agent")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
-  });
-
-  it.each(sources)("opens the model editor from the agent deep link for %s", (_source, settings) => {
+  it.each(sources)("opens General for an old agent deep link for %s", (_source, settings) => {
     renderAgentSettingsPopup(settings, { initialPath: "/?prFeedbackSettings=agent", probe: <SearchProbe /> });
 
-    expect(screen.getByTestId("pr-feedback-settings-tab-agent")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
-    expect(screen.getByTestId("location")).toHaveTextContent("prFeedbackSettings=agent");
+    expect(screen.getByTestId("pr-feedback-settings-tab-general")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
   });
 
-  it.each(sources)("opens the model editor from initialTab for %s", (_source, settings) => {
-    renderAgentSettingsPopup(settings, { initialTab: "agent" });
-
-    expect(screen.getByTestId("pr-feedback-settings-tab-agent")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
-  });
-
-  it.each(sources)("saves the selected agent model for %s", async (_source, settings) => {
+  it.each(sources)("saves the model and general settings together for %s", async (_source, settings) => {
     const user = userEvent.setup();
-    const { onAgentSave } = renderAgentSettingsPopup(settings, { initialTab: "agent" });
+    const { onAgentSave, onSave, onClose } = renderAgentSettingsPopup(settings);
 
-    expect(screen.getByRole("combobox")).toHaveTextContent("Claude Sonnet");
     await user.click(screen.getByRole("combobox"));
     await user.click(screen.getByRole("option", { name: "Claude Opus" }));
-    await user.click(screen.getByTestId("planning-review-save"));
+    expect(onAgentSave).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
 
     expect(onAgentSave).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -435,17 +420,36 @@ describe("PRFeedbackSettingsPopup agent tab", () => {
         ],
       }),
     );
+    expect(onSave).toHaveBeenCalledWith(settings);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back to General for an agent deep link when the canvas has no agent", () => {
-    renderAgentSettingsPopup(discussionDraft(), {
-      initialPath: "/?prFeedbackSettings=agent",
-      withAgent: false,
-      probe: <SearchProbe />,
-    });
+  it("keeps settings open and shows an error when the model cannot be saved", async () => {
+    const user = userEvent.setup();
+    const { onAgentSave, onSave, onClose } = renderAgentSettingsPopup(discussionDraft());
+    onAgentSave.mockRejectedValueOnce(new Error("Could not save the model."));
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("option", { name: "Claude Opus" }));
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save the model.");
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("disables Save while the agent settings load", () => {
+    renderAgentSettingsPopup(checksDraft(), { agentLoading: true });
+
+    expect(screen.getByTestId("pr-feedback-settings-save")).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading");
+  });
+
+  it("keeps General available when the canvas has no agent", () => {
+    renderAgentSettingsPopup(discussionDraft(), { initialTab: "agent", withAgent: false });
+
     expect(screen.getByTestId("pr-feedback-settings-tab-general")).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByTestId("planning-review-editor")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Default model" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("pr-feedback-settings-save")).toBeEnabled();
   });
 });

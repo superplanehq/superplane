@@ -11,6 +11,7 @@ export function PRFeedbackSettingsFooter({
   draft,
   confirmDelete,
   savePending,
+  saveDisabled,
   deletePending,
   saveError,
   onSave,
@@ -21,6 +22,7 @@ export function PRFeedbackSettingsFooter({
   draft: PRFeedbackDraftSettings;
   confirmDelete: boolean;
   savePending?: boolean;
+  saveDisabled?: boolean;
   deletePending?: boolean;
   saveError?: string;
   onSave: (next: PRFeedbackDraftSettings) => Promise<void> | void;
@@ -74,7 +76,7 @@ export function PRFeedbackSettingsFooter({
       )}
       <Button
         type="button"
-        disabled={savePending || !prFeedbackDraftIsValid(draft)}
+        disabled={savePending || saveDisabled || !prFeedbackDraftIsValid(draft)}
         onClick={async () => {
           try {
             await onSave(normalizePRFeedbackDraft(draft));
