@@ -103,9 +103,6 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 				return err
 			}
 		}
-		if err := models.SettleSeatPurchase(inner, orgID, data.ID, data.Seats, data.ModifiedAt.TimePtr()); err != nil {
-			return err
-		}
 		return models.SyncIncludedLLMCreditGrant(inner, models.IncludedUsageSync{
 			OrganizationID:   orgID,
 			SubscriptionID:   data.ID,

@@ -750,6 +750,82 @@ func TestSubscriptionSeatSnapshots(t *testing.T) {
 
 func intPointer(quantity int) *int { return &quantity }
 
+// A delayed webhook can report seats that Polar no longer has. The stale
+// snapshot proves nothing about an in-flight purchase, so it must not
+// settle it.
+func Test__ApplySubscriptionStaleSnapshotDoesNotSettleSeatPurchase(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	product := "product_" + uuid.NewString()
+	catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: new(50), PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &catalog))
+	now := time.Now().UTC().Truncate(time.Second)
+	end := now.AddDate(0, 1, 0)
+
+	// Polar went from 5 seats down to 3. The snapshot with 3 seats applies.
+	fresh := subscriptionEvent(org.ID, "sub_seats", "active", now, end)
+	fresh.Data.ProductID, fresh.Data.Seats = product, intPointer(3)
+	fresh.Data.ModifiedAt = polarTime{Time: now}
+	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, fresh))
+
+	// A purchase from 3 to 4 seats lost its response.
+	purchase := models.NewSeatPurchase(org.ID, nil, "sub_seats", 3, 4)
+	purchase.Status = models.SeatPurchaseStatusUnknown
+	require.NoError(t, purchase.Create(db))
+
+	// The delayed snapshot with 5 seats is older, so it is ignored.
+	stale := subscriptionEvent(org.ID, "sub_seats", "active", now, end)
+	stale.Data.ProductID, stale.Data.Seats = product, intPointer(5)
+	stale.Data.ModifiedAt = polarTime{Time: now.Add(-time.Minute)}
+	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, stale))
+
+	inFlight, err := models.FindInFlightSeatPurchase(db, org.ID)
+	require.NoError(t, err)
+	require.NotNil(t, inFlight, "a stale snapshot must not settle the purchase")
+	assert.Equal(t, models.SeatPurchaseStatusUnknown, inFlight.Status)
+
+	saved, err := models.FindOrganizationBillingPlan(db, org.ID)
+	require.NoError(t, err)
+	assert.Equal(t, intPointer(3), saved.PurchasedSeats)
+}
+
+// A snapshot fresh enough to apply proves the outcome of an in-flight
+// purchase, so a webhook settles it.
+func Test__ApplySubscriptionSettlesSeatPurchaseFromFreshSnapshot(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	product := "product_" + uuid.NewString()
+	catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: new(50), PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &catalog))
+	now := time.Now().UTC().Truncate(time.Second)
+	end := now.AddDate(0, 1, 0)
+
+	initial := subscriptionEvent(org.ID, "sub_seats", "active", now, end)
+	initial.Data.ProductID, initial.Data.Seats = product, intPointer(3)
+	initial.Data.ModifiedAt = polarTime{Time: now}
+	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, initial))
+
+	// A purchase from 3 to 4 seats lost its response.
+	purchase := models.NewSeatPurchase(org.ID, nil, "sub_seats", 3, 4)
+	purchase.Status = models.SeatPurchaseStatusUnknown
+	require.NoError(t, purchase.Create(db))
+
+	// A newer snapshot at the target proves that Polar applied the purchase.
+	applied := subscriptionEvent(org.ID, "sub_seats", "active", now, end)
+	applied.Data.ProductID, applied.Data.Seats = product, intPointer(4)
+	applied.Data.ModifiedAt = polarTime{Time: now.Add(time.Minute)}
+	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, applied))
+
+	inFlight, err := models.FindInFlightSeatPurchase(db, org.ID)
+	require.NoError(t, err)
+	assert.Nil(t, inFlight)
+
+	latest, err := models.FindLatestSeatPurchase(db, org.ID)
+	require.NoError(t, err)
+	require.NotNil(t, latest)
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, latest.Status)
+}
+
 func Test__ApplySubscriptionRenewalAdvancesPeriodAndGrantsIncluded(t *testing.T) {
 	for _, eventType := range []string{subscriptionCycledType, subscriptionUpdatedType} {
 		t.Run(eventType, func(t *testing.T) {
