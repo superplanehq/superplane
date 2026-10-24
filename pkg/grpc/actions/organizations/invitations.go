@@ -96,7 +96,7 @@ func (s *InvitationService) Create(ctx context.Context, orgID, inviterID string,
 		return nil, invitationActionError(err)
 	}
 	acceptanceURL := s.acceptanceURL(token)
-	s.sendEmail(invitation, org, acceptanceURL)
+	s.sendEmail(ctx, invitation, org, acceptanceURL)
 	return &pb.CreateInvitationResponse{Invitation: invitationToProto(invitation), AcceptanceUrl: acceptanceURL}, nil
 }
 
@@ -179,6 +179,9 @@ func (s *InvitationService) Resend(ctx context.Context, orgID, actorID, invitati
 		if err := requireInvitationCapacity(tx, organization, invitation.State == models.InvitationStatePending); err != nil {
 			return err
 		}
+		if err := invitation.ArchiveToken(tx); err != nil {
+			return err
+		}
 		token, err = prepareInvitation(tx, invitation, now)
 		if err != nil {
 			return err
@@ -189,7 +192,7 @@ func (s *InvitationService) Resend(ctx context.Context, orgID, actorID, invitati
 		return nil, invitationActionError(err)
 	}
 	acceptanceURL := s.acceptanceURL(token)
-	s.sendEmail(invitation, org, acceptanceURL)
+	s.sendEmail(ctx, invitation, org, acceptanceURL)
 	return &pb.ResendInvitationResponse{Invitation: invitationToProto(invitation), AcceptanceUrl: acceptanceURL}, nil
 }
 
@@ -213,7 +216,6 @@ func (s *InvitationService) Cancel(ctx context.Context, orgID, invitationID stri
 			return nil
 		}
 		invitation.State = models.InvitationStateCanceled
-		invitation.TokenHash = nil
 		return invitation.Save(tx)
 	})
 	if err != nil {
@@ -330,14 +332,36 @@ func (s *InvitationService) acceptanceURL(token string) string {
 	return strings.TrimRight(s.BaseURL, "/") + "/invitations/" + token
 }
 
-func (s *InvitationService) sendEmail(invitation *models.OrganizationInvitation, org *models.Organization, acceptanceURL string) {
+func (s *InvitationService) sendEmail(ctx context.Context, invitation *models.OrganizationInvitation, org *models.Organization, acceptanceURL string) {
 	if s.EmailService == nil {
 		return
 	}
-	err := s.EmailService.SendOrganizationInvitationEmail(invitation.Email, services.OrganizationInvitationTemplateData{OrganizationName: org.Name, InviterName: invitation.InviterName, Role: invitation.Role, ExpiresAt: invitation.ExpiresAt.UTC().Format(time.RFC1123), AcceptanceURL: acceptanceURL})
+	err := s.EmailService.SendOrganizationInvitationEmail(invitation.Email, services.OrganizationInvitationTemplateData{OrganizationName: org.Name, InviterName: invitation.InviterName, Role: s.invitationRoleDisplayName(ctx, invitation), ExpiresAt: invitation.ExpiresAt.UTC().Format(time.RFC1123), AcceptanceURL: acceptanceURL})
 	if err != nil {
 		log.WithError(err).WithField("invitation_id", invitation.ID).Error("Failed to send organization invitation email")
 	}
+}
+
+func (s *InvitationService) invitationRoleDisplayName(ctx context.Context, invitation *models.OrganizationInvitation) string {
+	switch invitation.Role {
+	case models.RoleOrgAdmin:
+		return models.DisplayNameAdmin
+	case models.RoleOrgMaintainer:
+		return models.DisplayNameMaintainer
+	case models.RoleOrgOperator:
+		return models.DisplayNameOperator
+	}
+	role, err := models.FindRoleMetadata(invitation.Role, models.DomainTypeOrganization, invitation.OrganizationID.String())
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.WithContext(ctx).WithError(err).WithField("invitation_id", invitation.ID).Error("Failed to resolve invitation role display name")
+		}
+		return invitation.Role
+	}
+	if role.DisplayName == "" {
+		return invitation.Role
+	}
+	return role.DisplayName
 }
 
 func invitationToProto(invitation *models.OrganizationInvitation) *pb.OrganizationInvitation {

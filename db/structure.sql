@@ -1327,6 +1327,16 @@ CREATE TABLE public.organization_hosted_model_allowlists (
 
 
 --
+-- Name: organization_invitation_replaced_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_invitation_replaced_tokens (
+    token_hash character varying(64) NOT NULL,
+    invitation_id uuid NOT NULL
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2888,6 +2898,14 @@ ALTER TABLE ONLY public.organization_feature_grants
 
 ALTER TABLE ONLY public.organization_hosted_model_allowlists
     ADD CONSTRAINT organization_hosted_model_allowlists_pkey PRIMARY KEY (organization_id, provider);
+
+
+--
+-- Name: organization_invitation_replaced_tokens organization_invitation_replaced_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_replaced_tokens
+    ADD CONSTRAINT organization_invitation_replaced_tokens_pkey PRIMARY KEY (token_hash);
 
 
 --
@@ -4582,6 +4600,13 @@ CREATE INDEX organization_billing_plans_catalog ON public.organization_billing_p
 
 
 --
+-- Name: organization_invitation_replaced_tokens_invitation_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_replaced_tokens_invitation_id_idx ON public.organization_invitation_replaced_tokens USING btree (invitation_id);
+
+
+--
 -- Name: organization_invitations_pending_email_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5568,6 +5593,14 @@ ALTER TABLE ONLY public.organization_hosted_model_allowlists
 
 
 --
+-- Name: organization_invitation_replaced_tokens organization_invitation_replaced_tokens_invitation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_replaced_tokens
+    ADD CONSTRAINT organization_invitation_replaced_tokens_invitation_id_fkey FOREIGN KEY (invitation_id) REFERENCES public.organization_invitations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_invitations organization_invitations_accepted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6143,7 +6176,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261024125707	f
+20261024133316	f
 \.
 
 
