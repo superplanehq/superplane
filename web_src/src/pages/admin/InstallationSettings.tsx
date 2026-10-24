@@ -212,8 +212,8 @@ const SignupAccessSection = ({
           </p>
           <h2 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">Public signups</h2>
           <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Control whether visitors can create new accounts from the signup page. Invite links can still create
-            accounts while public signups are closed.
+            Control whether visitors can create new accounts from the signup page. Invited people can still create an
+            account with the invited email address.
           </Text>
         </div>
 
