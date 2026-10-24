@@ -9,13 +9,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/markbates/goth"
+	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -341,6 +345,55 @@ func TestDeleteAccount_LeavesCreatedOrgWhenOtherOwnerRemains(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, ownerIDs, r.User.String())
 	assert.Contains(t, ownerIDs, otherUser.ID.String())
+}
+
+func TestDeleteAccount_ResolvesSeatsOverCapacityInRemainingOrganization(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	require.NoError(t, db.Model(r.Account).Update("installation_admin", false).Error)
+	otherAccount, err := models.CreateAccount("Other Owner", "seats-other-owner@example.com")
+	require.NoError(t, err)
+	otherUser, err := models.CreateUserInTransaction(db, r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
+	require.NoError(t, err)
+	require.NoError(t, models.SetUserIsOwner(db, otherUser.ID, true))
+
+	product := "prod_team_" + uuid.NewString()
+	team := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: new(50), PriceCents: 2000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &team))
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
+		"plan_id": team.ID, "plan": team.Key, "plan_source": models.BillingPlanSourcePolar,
+		"polar_subscription_id": "sub_" + uuid.NewString(), "polar_subscription_status": models.PolarSubscriptionStatusActive,
+		"purchased_seats": 1, "over_capacity_since": time.Now().Add(-time.Hour),
+	}).Error)
+
+	previousHooks := logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
+	hook := &logtest.Hook{}
+	logrus.AddHook(hook)
+	t.Cleanup(func() { logrus.StandardLogger().ReplaceHooks(previousHooks) })
+
+	server, account, token := setupTestServer(r, t)
+	body, err := json.Marshal(map[string]string{"email": account.Email})
+	require.NoError(t, err)
+	req, _ := http.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+	require.Equal(t, http.StatusNoContent, res.Code)
+
+	var resolved []*logrus.Entry
+	for _, entry := range hook.AllEntries() {
+		if entry.Message == logging.SeatsOverCapacityResolvedMessage {
+			resolved = append(resolved, entry)
+		}
+	}
+	require.Len(t, resolved, 1)
+	assert.Equal(t, logging.ComponentBillingSeats, resolved[0].Data["component"])
+	assert.Equal(t, "account_deletion", resolved[0].Data["cause"])
+	assert.Equal(t, r.Organization.ID.String(), resolved[0].Data["organization_id"])
+	assert.Equal(t, 1, resolved[0].Data["occupied"])
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Nil(t, plan.OverCapacitySince)
 }
 
 func TestDeleteAccount_LeavesOwnedButUncreatedOrg(t *testing.T) {
