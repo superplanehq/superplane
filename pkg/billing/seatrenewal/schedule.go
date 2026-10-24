@@ -99,9 +99,21 @@ func NewScheduler(db *gorm.DB, client Client, now func() time.Time) *Scheduler {
 
 // Schedule compares the next-period Polar seat count with the renewal
 // quantity of the organization and schedules the renewal quantity when they
-// differ. The organization lock is held only to read local state, never
-// during a Polar call.
+// differ. A session advisory lock coordinates schedules across processes. The
+// organization row lock is held only to read local state, never during HTTP.
 func (s *Scheduler) Schedule(ctx context.Context, orgID uuid.UUID) (Result, error) {
+	result := Result{OrganizationID: orgID}
+	err := models.WithSeatRenewalScheduleLock(s.db.WithContext(ctx), orgID, func(conn *gorm.DB) error {
+		locked := *s
+		locked.db = conn
+		var err error
+		result, err = locked.schedule(ctx, orgID)
+		return err
+	})
+	return result, err
+}
+
+func (s *Scheduler) schedule(ctx context.Context, orgID uuid.UUID) (Result, error) {
 	// An abandoned purchase can stay in flight forever when nobody previews
 	// or buys seats again, and the skip rules would keep its organization
 	// unchecked. Settle or expire it from Polar before the skip rules.

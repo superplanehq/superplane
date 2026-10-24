@@ -3,6 +3,7 @@ package seatrenewal
 import (
 	"context"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/polarfake"
+	"gorm.io/gorm"
 )
 
 type scheduleFixture struct {
@@ -85,6 +87,101 @@ func Test__ScheduleSetsTheNextPeriodSeatsToTheMemberCount(t *testing.T) {
 	assert.True(t, plan.RenewalSeatsScheduledAt.Equal(f.now))
 	assert.Equal(t, new(10), plan.PurchasedSeats)
 	assert.True(t, plan.CurrentPeriodEnd.Equal(f.sub.PeriodEnd))
+}
+
+type pausedSubscriptionClient struct {
+	Client
+	once   sync.Once
+	read   chan struct{}
+	resume chan struct{}
+}
+
+func (c *pausedSubscriptionClient) GetSubscription(ctx context.Context, id string) (*polar.SubscriptionData, error) {
+	snapshot, err := c.Client.GetSubscription(ctx, id)
+	c.once.Do(func() {
+		close(c.read)
+		<-c.resume
+	})
+	return snapshot, err
+}
+
+func Test__ConcurrentSchedulesCannotLeaveAnOlderRenewalTarget(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	client := &pausedSubscriptionClient{Client: polar.NewClientFromEnv(), read: make(chan struct{}), resume: make(chan struct{})}
+	first := NewScheduler(database.Conn(), client, time.Now)
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := first.Schedule(t.Context(), f.r.Organization.ID)
+		firstDone <- err
+		close(firstDone)
+	}()
+	<-client.read // A captured nine members and is paused outside the row lock.
+	var resume sync.Once
+	t.Cleanup(func() { resume.Do(func() { close(client.resume) }); require.NoError(t, <-firstDone) })
+
+	// Membership can still change while A is making an external request.
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	require.NoError(t, database.Conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := models.LockOrganization(tx, f.r.Organization.ID); err != nil {
+			return err
+		}
+		return tx.Model(&models.User{}).Where("organization_id = ? AND is_owner = false", f.r.Organization.ID).
+			Where("id = (SELECT id FROM users WHERE organization_id = ? AND is_owner = false LIMIT 1)", f.r.Organization.ID).
+			Update("deleted_at", time.Now()).Error
+	}))
+
+	second := NewScheduler(database.Conn(), polar.NewClientFromEnv(), time.Now)
+	secondDone := make(chan error, 1)
+	go func() {
+		_, err := second.Schedule(t.Context(), f.r.Organization.ID)
+		secondDone <- err
+	}()
+	// Without coordination, B completes with eight before A resumes. With
+	// coordination, B waits in PostgreSQL and reads its target after A ends.
+	completed := false
+	require.Eventually(t, func() bool {
+		select {
+		case err := <-secondDone:
+			require.NoError(t, err)
+			completed = true
+			return true
+		default:
+			var waiting bool
+			require.NoError(t, database.Conn().Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE wait_event = 'advisory' AND query LIKE '%pg_advisory_lock%')").Scan(&waiting).Error)
+			return waiting
+		}
+	}, 5*time.Second, 10*time.Millisecond)
+	resume.Do(func() { close(client.resume) })
+	if !completed {
+		require.NoError(t, <-secondDone)
+	}
+	require.NoError(t, <-firstDone)
+	assert.Equal(t, new(8), f.polar.Subscription(f.sub.ID).PendingSeats)
+	assert.Equal(t, new(8), f.plan().RenewalSeatsScheduled)
+}
+
+func Test__CanceledScheduleReleasesOrganizationCoordination(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	client := &pausedSubscriptionClient{Client: polar.NewClientFromEnv(), read: make(chan struct{}), resume: make(chan struct{})}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := NewScheduler(database.Conn(), client, time.Now).Schedule(ctx, f.r.Organization.ID)
+		done <- err
+	}()
+	<-client.read
+	cancel()
+	close(client.resume)
+	require.ErrorIs(t, <-done, context.Canceled)
+
+	retryCtx, retryCancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer retryCancel()
+	result, err := f.scheduler.Schedule(retryCtx, f.r.Organization.ID)
+	require.NoError(t, err, "a canceled request must release its session lock")
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, new(9), f.polar.Subscription(f.sub.ID).PendingSeats)
 }
 
 func Test__ScheduleRecordsTheCountPolarAlreadyRenews(t *testing.T) {

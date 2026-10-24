@@ -362,7 +362,9 @@ func seatPurchaseResponse(ctx context.Context, orgID uuid.UUID, purchase *models
 func reconcileSeatPurchase(ctx context.Context, db *gorm.DB, orgID uuid.UUID) {
 	if err := polar.ReconcileSeatPurchase(ctx, db, polar.NewClientFromEnv(), orgID); err != nil {
 		log.WithError(err).WithField("organization_id", orgID.String()).Warn("could not reconcile the seat purchase")
+		return
 	}
+	seatrenewal.ScheduleAfterSeatPurchaseAsync(ctx, orgID)
 }
 
 func parseUserID(userID string) *uuid.UUID {

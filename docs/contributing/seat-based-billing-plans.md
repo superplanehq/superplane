@@ -222,8 +222,14 @@ of these conditions is true:
   replaces any scheduled count when it settles, and SuperPlane schedules the
   count again after that.
 
-Schedule reads local state under the organization lock. It calls Polar after
-it releases the lock. After each update, it stores the target in
+Schedule holds a per-organization PostgreSQL session advisory lock across the
+local reads, Polar requests, and record write. API processes and workers use
+the same lock. Each schedule reads its target after it acquires this lock, so
+an older job cannot overwrite a newer scheduled target.
+
+Schedule reads local state under the organization row lock. It releases the
+row lock before it calls Polar. Membership changes do not wait for HTTP.
+After each update, it stores the target in
 `organization_billing_plans.renewal_seats_scheduled` and the send time in
 `renewal_seats_scheduled_at`. Subscription snapshots do not change these
 columns. Outside-change detection can compare them with the Polar count.
@@ -243,6 +249,15 @@ These actions schedule the count after their transaction commits:
 - Accept an invitation with the status `joined`. This includes a former member that the invitation restores.
 - Buy seats (`PurchaseSeats`), after SuperPlane applies the Polar snapshot. An
   `invoice` update replaces the scheduled count, so SuperPlane schedules it again.
+- Recover a successful seat purchase through a subscription webhook, billing
+  sync, or purchase reconciliation. After the settlement commits, SuperPlane
+  schedules the count again. A lost purchase response does not leave the
+  reduction dependent on the next worker pass.
+
+After a successful subscription apply or sync, SuperPlane checks the latest
+purchase. A succeeded purchase starts a background schedule. Duplicate
+snapshots can start another schedule, but an unchanged provider count and
+stored record require no update.
 
 The update runs in the background. The action does not wait for Polar and does
 not fail because of Polar. The update tries 3 times in about 10 seconds when

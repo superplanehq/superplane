@@ -34,6 +34,25 @@ func ScheduleAsync(ctx context.Context, orgID uuid.UUID) {
 	})
 }
 
+// ScheduleAfterSeatPurchaseAsync restores the reduction that an applied
+// purchase clears in Polar. Call it after a subscription webhook, billing
+// sync, or purchase reconciliation commits. Repeated snapshots are safe:
+// Schedule verifies the current target and provider state before any update.
+func ScheduleAfterSeatPurchaseAsync(ctx context.Context, orgID uuid.UUID) {
+	if !models.BillingEnabled() || !polar.Configured() {
+		return
+	}
+	ctx = context.WithoutCancel(ctx)
+	purchase, err := models.FindLatestSeatPurchase(database.DB(ctx), orgID)
+	if err != nil {
+		log.WithError(err).WithField("organization_id", orgID.String()).Warn("could not check the settled seat purchase for renewal scheduling")
+		return
+	}
+	if purchase != nil && purchase.Status == models.SeatPurchaseStatusSucceeded {
+		ScheduleAsync(ctx, orgID)
+	}
+}
+
 // Wait blocks until every schedule that ScheduleAsync started has ended.
 func Wait() {
 	background.Wait()

@@ -106,6 +106,10 @@ func (f *seatPurchaseFixture) serve(w http.ResponseWriter, req *http.Request) {
 		f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
 		return
 	}
+	if req.URL.Path == "/subscriptions/" && req.Method == http.MethodGet {
+		f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{f.snapshot(f.polarSeats)}, "pagination": map[string]int{"max_page": 1}})
+		return
+	}
 	if req.URL.Path != "/subscriptions/"+f.subscriptionID {
 		f.t.Errorf("unexpected Polar request %s %s", req.Method, req.URL.Path)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -559,7 +563,7 @@ func Test__RetryAfterAnUnconfirmedPurchaseDoesNotChargeAgain(t *testing.T) {
 
 	requireGRPCCode(t, codes.Aborted, err)
 	assert.Equal(t, 1, f.patchCount(), "the retry must not send a second update")
-	assert.Equal(t, 3, f.getCount, "each purchase reads the subscription once; the retry reconciles first")
+	assert.Equal(t, new(1), f.pendingRenewalSeats(), "reconciliation restores the reduction without another purchase")
 	assert.Equal(t, 4, f.purchasedSeats())
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
 }

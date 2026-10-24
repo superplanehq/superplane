@@ -48,12 +48,13 @@ type failure struct {
 // seats clears it. Any other seat update applies at once and drops the
 // pending one.
 type Server struct {
-	t        *testing.T
-	mu       sync.Mutex
-	subs     map[string]*Subscription
-	requests []Request
-	failures []failure
-	server   *httptest.Server
+	t                    *testing.T
+	mu                   sync.Mutex
+	subs                 map[string]*Subscription
+	requests             []Request
+	failures             []failure
+	losePurchaseResponse bool
+	server               *httptest.Server
 }
 
 // NewServer starts the fake and points the Polar client at it.
@@ -99,6 +100,14 @@ func (s *Server) FailNext(count, status int, code string) {
 	for range count {
 		s.failures = append(s.failures, failure{status: status, code: code})
 	}
+}
+
+// LoseNextPurchaseResponse applies the next purchase but closes its connection
+// before returning the result, leaving the caller uncertain about the outcome.
+func (s *Server) LoseNextPurchaseResponse() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.losePurchaseResponse = true
 }
 
 func (s *Server) Requests() []Request {
@@ -147,6 +156,13 @@ func (s *Server) serve(w http.ResponseWriter, req *http.Request) {
 	case http.MethodGet:
 	case http.MethodPatch:
 		applySeatUpdate(sub, request.Body)
+		if s.losePurchaseResponse && request.Body["proration_behavior"] == "invoice" {
+			s.losePurchaseResponse = false
+			conn, _, err := w.(http.Hijacker).Hijack()
+			require.NoError(s.t, err)
+			require.NoError(s.t, conn.Close())
+			return
+		}
 	default:
 		s.t.Errorf("unexpected Polar method %s", req.Method)
 		w.WriteHeader(http.StatusMethodNotAllowed)

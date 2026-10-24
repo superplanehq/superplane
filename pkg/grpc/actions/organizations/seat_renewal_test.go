@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -183,6 +184,28 @@ func Test__SeatPurchaseSchedulesTheRenewalSeatCountAgain(t *testing.T) {
 		"the purchase dropped the scheduled reduction, so it is scheduled again")
 	assert.Equal(t, new(1), f.pendingRenewalSeats())
 	assert.Equal(t, 4, f.purchasedSeats())
+}
+
+func Test__BillingSyncRestoresRenewalReductionAfterLostPurchaseResponse(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	f.pendingSeats = new(1)
+	f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
+		f.polarSeats = seats
+		f.pendingSeats = nil
+		conn, _, err := w.(http.Hijacker).Hijack()
+		require.NoError(t, err)
+		require.NoError(t, conn.Close())
+	}
+	response, err := f.purchase(1, 3)
+	require.NoError(t, err)
+	require.Equal(t, seatPurchaseAwaitingConfirmation, response.Purchase.Status)
+	require.Nil(t, f.pendingRenewalSeats(), "the purchase cleared the reduction")
+
+	_, err = SyncOrganizationBilling(t.Context(), f.r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
+	assert.Equal(t, new(1), f.pendingRenewalSeats())
+	assert.Equal(t, new(1), f.plan().RenewalSeatsScheduled)
 }
 
 func Test__NoRenewalScheduleWhileASeatPurchaseIsInFlight(t *testing.T) {
