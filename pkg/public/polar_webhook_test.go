@@ -269,9 +269,19 @@ func Test__HandlePolarWebhook(t *testing.T) {
 			}
 			return entries
 		}
+		genericPermanentEntries := func() []*log.Entry {
+			var entries []*log.Entry
+			for _, entry := range hook.AllEntries() {
+				if entry.Message == "ignored polar webhook that cannot be applied" {
+					entries = append(entries, entry)
+				}
+			}
+			return entries
+		}
 
 		send(uuid.New())
 		assert.Empty(t, deletedOrganizationEntries(), "an organization that never existed is not a deleted organization")
+		assert.Len(t, genericPermanentEntries(), 1, "an organization that never existed still writes the generic log")
 
 		send(deleted.ID)
 		entries := deletedOrganizationEntries()
@@ -281,6 +291,11 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		assert.Equal(t, deleted.ID.String(), entries[0].Data["organization_id"])
 		assert.Equal(t, "sub_deleted", entries[0].Data["polar_subscription_id"])
 		assert.Equal(t, "active", entries[0].Data["polar_subscription_status"])
+		assert.Len(t, genericPermanentEntries(), 1, "the recorded deleted-organization event must not write the generic log again")
+
+		send(deleted.ID)
+		assert.Len(t, deletedOrganizationEntries(), 2, "each webhook writes one deleted-organization log")
+		assert.Len(t, genericPermanentEntries(), 1, "repeat webhooks must not write the generic log")
 	})
 
 	t.Run("refund reverses grant", func(t *testing.T) {
