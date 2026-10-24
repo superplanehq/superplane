@@ -87,7 +87,7 @@ func ParsePlanningSessionToken(signer *jwt.Signer, token string) (*PlanningSessi
 	return &scope, nil
 }
 
-func HasPlanningSessionToken(environment []BrokerEnvironmentVariable) bool {
+func HasPlanningSessionToken(environment []TaskEnvironmentVariable) bool {
 	for _, item := range environment {
 		if item.Name == EnvSuperplanePlanningID && strings.TrimSpace(item.Value) != "" {
 			return true
@@ -96,7 +96,7 @@ func HasPlanningSessionToken(environment []BrokerEnvironmentVariable) bool {
 	return false
 }
 
-func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, timeoutSeconds int) []BrokerEnvironmentVariable {
+func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int) []TaskEnvironmentVariable {
 	if ctx.RunID == uuid.Nil {
 		return environment
 	}
@@ -158,25 +158,25 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	} else if ctx.Logger != nil {
 		ctx.Logger.WithError(err).Warn("planning session env: factory lookup failed, score tools disabled")
 	}
-	environment = append(append(environment, planningSessionEnvVars(baseURL, token)...), BrokerEnvironmentVariable{
+	environment = append(append(environment, planningSessionEnvVars(baseURL, token)...), TaskEnvironmentVariable{
 		Name:  EnvSuperplanePlanningID,
 		Value: session.ID.String(),
-	}, BrokerEnvironmentVariable{
+	}, TaskEnvironmentVariable{
 		Name:  EnvSuperplanePlanningSessionKind,
 		Value: session.Kind,
-	}, BrokerEnvironmentVariable{
+	}, TaskEnvironmentVariable{
 		Name:  EnvSuperplanePlanningClarity,
 		Value: planningScoreEnvValue(planning.Clarity),
-	}, BrokerEnvironmentVariable{
+	}, TaskEnvironmentVariable{
 		Name:  EnvSuperplanePlanningConfidence,
 		Value: planningScoreEnvValue(planning.Confidence),
-	}, BrokerEnvironmentVariable{
+	}, TaskEnvironmentVariable{
 		Name:  EnvSuperplanePlanningReview,
 		Value: "true",
-	}, BrokerEnvironmentVariable{
+	}, TaskEnvironmentVariable{
 		Name:  EnvSuperplaneAnalysisSpecFile,
 		Value: "/tmp/intent.md",
-	}, BrokerEnvironmentVariable{
+	}, TaskEnvironmentVariable{
 		Name:  EnvSuperplaneAnalysisScoreFile,
 		Value: "/tmp/intake-analysis.json",
 	})
@@ -190,8 +190,8 @@ func planningScoreEnvValue(enabled bool) string {
 	return "false"
 }
 
-func planningSessionEnvVars(baseURL, token string) []BrokerEnvironmentVariable {
-	return []BrokerEnvironmentVariable{
+func planningSessionEnvVars(baseURL, token string) []TaskEnvironmentVariable {
+	return []TaskEnvironmentVariable{
 		{Name: EnvSuperplaneBaseURL, Value: strings.TrimRight(strings.TrimSpace(baseURL), "/")},
 		{Name: EnvSuperplaneRunToken, Value: token},
 	}
@@ -213,14 +213,18 @@ func PublicSuperplaneBaseURL(fallback string) string {
 	return ""
 }
 
-// RunnerSuperplaneBaseURL is the SuperPlane origin the runner process can
-// reach. A local Docker broker talks to the compose app on the host, even
-// when BASE_URL is a public tunnel for GitHub.
+// RunnerSuperplaneBaseURL is the SuperPlane origin reachable by runners.
 func RunnerSuperplaneBaseURL(fallback string) string {
-	if isLocalTaskBrokerURL(os.Getenv("TASK_BROKER_BASE_URL")) {
-		return localComposeSuperplaneBaseURL(fallback)
+	if base := strings.TrimRight(strings.TrimSpace(os.Getenv("RUNNER_API_BASE_URL")), "/"); base != "" {
+		if isLoopbackBaseURL(base) {
+			return rewriteLoopbackHostForDocker(base)
+		}
+		return base
 	}
-	return PublicSuperplaneBaseURL(fallback)
+	if base := PublicSuperplaneBaseURL(fallback); base != "" {
+		return base
+	}
+	return localComposeSuperplaneBaseURL(fallback)
 }
 
 func localComposeSuperplaneBaseURL(fallback string) string {

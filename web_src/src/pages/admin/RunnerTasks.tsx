@@ -3,7 +3,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import React from "react";
 
-import { BrokerTaskSection } from "./BrokerTaskSection";
 import { FleetCapacitySummary, FleetMachineType } from "./FleetCapacitySummary";
 import { RunnerList, TaskList } from "./FleetRecordLists";
 import { REFRESH_INTERVAL_MS } from "./fleetAdmin";
@@ -64,7 +63,7 @@ const FleetLoading = () => (
 
 const RunnerTasks: React.FC = () => {
   const page = useAdminFleets();
-  useReportPageReady(page.fleets !== null && page.brokerLoaded);
+  useReportPageReady(page.fleets !== null);
 
   return (
     <div className="space-y-8">
@@ -75,7 +74,6 @@ const RunnerTasks: React.FC = () => {
         </Text>
       </div>
       {page.fleets === null ? <FleetLoading /> : <FleetBody page={page} />}
-      <BrokerTaskSection configured={page.configured} tasks={page.brokerTasks} />
     </div>
   );
 };

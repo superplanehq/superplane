@@ -217,19 +217,19 @@ func TestParsedSuperPlaneOpenRouterModelsArePriced(t *testing.T) {
 	}
 }
 
-func TestProcessBrokerTaskStatusRecordsUsageWhenExecutionAlreadyFinished(t *testing.T) {
+func TestProcessTaskStatusRecordsUsageWhenExecutionAlreadyFinished(t *testing.T) {
 	t.Parallel()
 
 	recorder := &recordingUsage{}
 	state := &contexts.ExecutionStateContext{Finished: true}
 	exit := 0
-	task := &Task{
-		Status:   "succeeded",
+	task := &core.RunnerTask{
+		State:    "succeeded",
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"usage":{"input_tokens":1200,"output_tokens":80},"model":"claude-sonnet-4-6"}`),
 	}
 
-	require.NoError(t, processBrokerTaskStatus(
+	require.NoError(t, processTaskStatus(
 		state,
 		task,
 		"runnerClaudeCode.finished",

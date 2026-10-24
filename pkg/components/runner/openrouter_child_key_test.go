@@ -94,18 +94,18 @@ func TestRevokeOpenRouterChildKeyKeepsHashWhenDeleteFails(t *testing.T) {
 	assert.Equal(t, "or-hash-1", state.KVs[OpenRouterChildKeyHashKV])
 }
 
-func TestPollBrokerTaskDeletesOpenRouterChildKey(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+func TestPollTaskDeletesOpenRouterChildKey(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "task-1", State: "succeeded"}}
+
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"task-1","status":"succeeded","exit_code":0}`))},
 		openRouterChildKeyDeletedResponse(),
 	}}
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{
 		OpenRouterChildKeyHashKV: "or-hash-1",
 	}}
 
-	err := pollBrokerTask(core.ActionHookContext{
+	err := pollTask(core.ActionHookContext{
+		RunnerTasks:    tasks,
 		Parameters:     map[string]any{"task_id": "task-1"},
 		HTTP:           httpContext,
 		ExecutionState: state,
@@ -116,19 +116,18 @@ func TestPollBrokerTaskDeletesOpenRouterChildKey(t *testing.T) {
 		Requests: &contexts.RequestContext{},
 	}, "runnerSuperPlane.finished")
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 2)
-	assert.Equal(t, "https://broker.example/v1/tasks/task-1", httpContext.Requests[0].URL.String())
-	assert.Equal(t, http.MethodDelete, httpContext.Requests[1].Method)
-	assert.Equal(t, "https://openrouter.ai/api/v1/keys/or-hash-1", httpContext.Requests[1].URL.String())
+	require.Len(t, httpContext.Requests, 1)
+
+	assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+	assert.Equal(t, "https://openrouter.ai/api/v1/keys/or-hash-1", httpContext.Requests[0].URL.String())
 	assert.Empty(t, state.KVs[OpenRouterChildKeyHashKV])
 }
 
-func TestPollBrokerTaskSchedulesRevokeRetryWhenAlreadyFinishedAndDeleteFails(t *testing.T) {
+func TestPollTaskSchedulesRevokeRetryWhenAlreadyFinishedAndDeleteFails(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "task-1", State: "canceled"}}
 	setChildKeyDeleteRetryBackoff(t, 0)
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"task-1","status":"canceled"}`))},
 		openRouterChildKeyDeleteErrorResponse(),
 		openRouterChildKeyDeleteErrorResponse(),
 		openRouterChildKeyDeleteErrorResponse(),
@@ -141,7 +140,8 @@ func TestPollBrokerTaskSchedulesRevokeRetryWhenAlreadyFinishedAndDeleteFails(t *
 	}
 	requests := &contexts.RequestContext{}
 
-	err := pollBrokerTask(core.ActionHookContext{
+	err := pollTask(core.ActionHookContext{
+		RunnerTasks: tasks,
 		Parameters: map[string]any{
 			"task_id":         "task-1",
 			"organization_id": "org-1",
@@ -155,52 +155,17 @@ func TestPollBrokerTaskSchedulesRevokeRetryWhenAlreadyFinishedAndDeleteFails(t *
 		Requests: requests,
 	}, "runnerSuperPlane.finished")
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1+childKeyDeleteMaxAttempts)
-	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+	require.Len(t, httpContext.Requests, childKeyDeleteMaxAttempts)
+
 	assert.Equal(t, hookActionPoll, requests.Action)
 	assert.Equal(t, "task-1", requests.Params["task_id"])
 	assert.Equal(t, "or-hash-1", state.KVs[OpenRouterChildKeyHashKV])
 }
 
-func TestHandleBrokerWebhookDeletesOpenRouterChildKey(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		openRouterChildKeyDeletedResponse(),
-	}}
-	state := &contexts.ExecutionStateContext{KVs: map[string]string{
-		OpenRouterChildKeyHashKV: "or-hash-1",
-	}}
+func TestCancelTaskDeletesOpenRouterChildKey(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "task-1", State: "canceled"}}
 
-	status, _, err := handleBrokerWebhook(core.WebhookRequestContext{
-		Body:   []byte(`{"task_id":"task-1","status":"succeeded","exit_code":0}`),
-		HTTP:   httpContext,
-		Logger: log.NewEntry(log.New()),
-		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
-			assert.Equal(t, "task_id", key)
-			assert.Equal(t, "task-1", value)
-			return &core.ExecutionContext{
-				HTTP:           httpContext,
-				ExecutionState: state,
-				HostedLLM: &contexts.HostedLLMContext{
-					Access: core.HostedLLMAccess{ManagementKey: "sk-or-mgmt"},
-				},
-			}, nil
-		},
-	}, "runnerSuperPlane.finished")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, status)
-	require.Len(t, httpContext.Requests, 1)
-	assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
-	assert.Equal(t, "https://openrouter.ai/api/v1/keys/or-hash-1", httpContext.Requests[0].URL.String())
-}
-
-func TestCancelBrokerTaskDeletesOpenRouterChildKey(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"task-1","status":"canceled"}`))},
 		openRouterChildKeyDeletedResponse(),
 	}}
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{
@@ -208,7 +173,8 @@ func TestCancelBrokerTaskDeletesOpenRouterChildKey(t *testing.T) {
 		"task_id":                "task-1",
 	}}
 
-	err := cancelBrokerTask(core.ExecutionContext{
+	err := cancelTask(core.ExecutionContext{
+		RunnerTasks:    tasks,
 		HTTP:           httpContext,
 		ExecutionState: state,
 		HostedLLM: &contexts.HostedLLMContext{
@@ -217,28 +183,24 @@ func TestCancelBrokerTaskDeletesOpenRouterChildKey(t *testing.T) {
 		Logger: log.NewEntry(log.New()),
 	}, "runnerClaudeCode.finished")
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 3)
-	assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
-	assert.Equal(t, "https://broker.example/v1/tasks/task-1/cancel", httpContext.Requests[0].URL.String())
-	assert.Equal(t, http.MethodGet, httpContext.Requests[1].Method)
-	assert.Equal(t, "https://broker.example/v1/tasks/task-1", httpContext.Requests[1].URL.String())
-	assert.Equal(t, http.MethodDelete, httpContext.Requests[2].Method)
-	assert.Equal(t, "https://openrouter.ai/api/v1/keys/or-hash-1", httpContext.Requests[2].URL.String())
+	require.Len(t, httpContext.Requests, 1)
+
+	assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+	assert.Equal(t, "https://openrouter.ai/api/v1/keys/or-hash-1", httpContext.Requests[0].URL.String())
 	assert.Empty(t, state.KVs[OpenRouterChildKeyHashKV])
 }
 
-func TestCancelBrokerTaskKeepsChildKeyWhenBrokerCancelFails(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`error`))},
-	}}
+func TestCancelTaskKeepsChildKeyWhenTaskCancelFails(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{CancelErr: errors.New("cancel failed")}
+
+	httpContext := &contexts.HTTPContext{}
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{
 		OpenRouterChildKeyHashKV: "or-hash-1",
 		"task_id":                "task-1",
 	}}
 
-	err := cancelBrokerTask(core.ExecutionContext{
+	err := cancelTask(core.ExecutionContext{
+		RunnerTasks:    tasks,
 		HTTP:           httpContext,
 		ExecutionState: state,
 		HostedLLM: &contexts.HostedLLMContext{
@@ -247,19 +209,20 @@ func TestCancelBrokerTaskKeepsChildKeyWhenBrokerCancelFails(t *testing.T) {
 		Logger: log.NewEntry(log.New()),
 	}, "runnerClaudeCode.finished")
 	require.Error(t, err)
-	require.Len(t, httpContext.Requests, 1)
-	assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
-	assert.Equal(t, "https://broker.example/v1/tasks/task-1/cancel", httpContext.Requests[0].URL.String())
+	assert.Empty(t, httpContext.Requests)
+
 	assert.Equal(t, "or-hash-1", state.KVs[OpenRouterChildKeyHashKV])
 }
 
-func TestCancelBrokerTaskDeletesOpenRouterChildKeyWhenAlreadyFinished(t *testing.T) {
+func TestCancelTaskDeletesOpenRouterChildKeyWhenAlreadyFinished(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "task-1", State: "running"}}
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		openRouterChildKeyDeletedResponse(),
 	}}
 
-	err := cancelBrokerTask(core.ExecutionContext{
-		HTTP: httpContext,
+	err := cancelTask(core.ExecutionContext{
+		RunnerTasks: tasks,
+		HTTP:        httpContext,
 		ExecutionState: &contexts.ExecutionStateContext{
 			Finished: true,
 			KVs: map[string]string{
