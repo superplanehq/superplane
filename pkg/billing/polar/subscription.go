@@ -66,14 +66,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 	}
 	if _, err := models.FindOrganizationByIDInTransaction(tx, orgID.String()); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logged, err := logSubscriptionForDeletedOrganization(tx, orgID, data)
-			if err != nil {
-				return err
-			}
-			if logged {
-				return fmt.Errorf("%w: %w", ErrPermanentApply, ErrSubscriptionForDeletedOrganization)
-			}
-			return permanentApplyError("organization not found")
+			return subscriptionOrganizationNotFound(tx, orgID, data)
 		}
 		return err
 	}
@@ -89,7 +82,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 		periodEnd = &end
 	}
 
-	return tx.Transaction(func(inner *gorm.DB) error {
+	err = tx.Transaction(func(inner *gorm.DB) error {
 		plan, grantIncluded, err := models.ApplyPolarSubscription(
 			inner,
 			orgID,
@@ -123,6 +116,29 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 			IsActiveBusiness: plan != nil && plan.IsActiveBusiness(),
 		})
 	})
+	// Deletion can commit after the initial lookup but before the model takes
+	// the organization lock. Classify and log it after this transaction ends.
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		_, lookupErr := models.FindOrganizationByIDInTransaction(tx, orgID.String())
+		if errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+			return subscriptionOrganizationNotFound(tx, orgID, data)
+		}
+		if lookupErr != nil {
+			return lookupErr
+		}
+	}
+	return err
+}
+
+func subscriptionOrganizationNotFound(tx *gorm.DB, orgID uuid.UUID, data SubscriptionData) error {
+	logged, err := logSubscriptionForDeletedOrganization(tx, orgID, data)
+	if err != nil {
+		return err
+	}
+	if logged {
+		return fmt.Errorf("%w: %w", ErrPermanentApply, ErrSubscriptionForDeletedOrganization)
+	}
+	return permanentApplyError("organization not found")
 }
 
 // subscriptionForDeletedOrganizationEvent is the stable log key for a

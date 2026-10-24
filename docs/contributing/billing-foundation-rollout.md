@@ -111,8 +111,12 @@ is live. A subscription is live when its status is `active`, `trialing`,
 still open. Admin-assigned plans and organizations without a Polar subscription
 are not blocked.
 
-An organization can still be deleted while Polar has a subscription for it, for
-example when the subscription started after the deletion check. Polar then
+Account deletion uses the same protection for organizations with no other owner.
+The subscription check and deletion share the organization lock and transaction
+with subscription updates. Polar HTTP requests run outside these row locks.
+
+Polar can still have a subscription for an organization deleted by an older
+release, or a subscription that starts in Polar after deletion commits. Polar then
 keeps charging. SuperPlane does not apply the webhooks for that organization.
 It writes one error log for each webhook and answers Polar with 202.
 

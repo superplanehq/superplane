@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -10,12 +11,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"gorm.io/gorm"
 )
 
-const (
-	liveSubscriptionDeleteMessage = "Cancel the subscription in Billing before you delete the organization. You can delete it after the paid period ends."
-	liveSubscriptionDeleteReason  = "ORGANIZATION_SUBSCRIPTION_LIVE"
-)
+const liveSubscriptionDeleteReason = "ORGANIZATION_SUBSCRIPTION_LIVE"
 
 func DeleteOrganization(ctx context.Context, authService authorization.Authorization, orgID string) (*pb.DeleteOrganizationResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
@@ -28,33 +27,20 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
 
-	hasLiveSubscription, err := models.OrganizationHasLivePolarSubscription(database.Conn(), organization.ID)
-	if err != nil {
-		log.Errorf("Error checking the subscription of organization %s before deletion: %v", orgID, err)
-		return nil, grpcerrors.Internal(err, "failed to check the organization subscription")
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := organization.SoftDelete(tx); err != nil {
+			return err
+		}
+		return authService.DestroyOrganization(tx, organization.ID.String())
+	})
+	if errors.Is(err, models.ErrOrganizationSubscriptionLive) {
+		return nil, grpcerrors.FailedPreconditionWithReason(models.ErrOrganizationSubscriptionLive.Error(), liveSubscriptionDeleteReason)
 	}
-	if hasLiveSubscription {
-		return nil, grpcerrors.FailedPreconditionWithReason(liveSubscriptionDeleteMessage, liveSubscriptionDeleteReason)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
-
-	tx := database.Conn().Begin()
-	err = models.SoftDeleteOrganizationInTransaction(tx, organization.ID.String())
 	if err != nil {
-		tx.Rollback()
 		log.Errorf("Error deleting organization %s: %v", orgID, err)
-		return nil, err
-	}
-
-	err = authService.DestroyOrganization(tx, organization.ID.String())
-	if err != nil {
-		tx.Rollback()
-		log.Errorf("Error deleting organization roles for %s: %v", orgID, err)
-		return nil, err
-	}
-
-	err = tx.Commit().Error
-	if err != nil {
-		log.Errorf("Error committing transaction for organization %s (%s) deletion: %v", organization.Name, organization.ID.String(), err)
 		return nil, err
 	}
 

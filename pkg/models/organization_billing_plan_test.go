@@ -1273,6 +1273,7 @@ func Test__OrganizationBillingPlanHasLivePolarSubscription(t *testing.T) {
 		{name: "incomplete", plan: polarPlan(&subscriptionID, "incomplete", false, nil)},
 		{name: "empty status", plan: polarPlan(&subscriptionID, "", false, nil)},
 		{name: "scheduled cancellation with period still open", plan: polarPlan(&subscriptionID, "active", true, &future), live: true},
+		{name: "canceled with paid period still open", plan: polarPlan(&subscriptionID, "canceled", true, &future), live: true},
 		{name: "scheduled cancellation with period ended", plan: polarPlan(&subscriptionID, "active", true, &past)},
 		{name: "scheduled cancellation without period end", plan: polarPlan(&subscriptionID, "active", true, nil)},
 		{name: "missing subscription ID", plan: polarPlan(nil, "active", false, nil)},
