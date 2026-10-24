@@ -88,6 +88,9 @@ func (s *InvitationService) Accept(ctx context.Context, accountID, token string)
 			if err != nil {
 				return err
 			}
+			if seats.PaymentBlocked {
+				return grpcerrors.FailedPreconditionWithReason("This organization cannot add members until its payment is updated. Ask an organization admin.", "PAYMENT_PAST_DUE")
+			}
 			if limit := seats.JoinLimit(); limit != nil && seats.Occupied >= *limit {
 				if seats.PerSeat {
 					return grpcerrors.FailedPreconditionWithReason("No seat is available. Ask an organization admin to free or buy a seat.", "NO_SEAT_AVAILABLE")
