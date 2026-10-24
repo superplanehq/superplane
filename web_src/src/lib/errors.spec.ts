@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getApiErrorMessage, getResponseErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getResponseErrorMessage, isBrowserNetworkError } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts nested api error messages", () => {
@@ -91,5 +91,21 @@ describe("errors", () => {
     const response = new Response("", { status: 500 });
 
     await expect(getResponseErrorMessage(response, "fallback")).resolves.toBe("fallback");
+  });
+
+  it.each([
+    "NetworkError when attempting to fetch resource.",
+    "NetworkError when attempting to fetch resource",
+    "Failed to fetch",
+    "Load failed",
+    "network request failed",
+  ])("matches the browser transport failure %s", (message) => {
+    expect(isBrowserNetworkError(message)).toBe(true);
+    expect(isBrowserNetworkError(new TypeError(message))).toBe(true);
+  });
+
+  it("does not match a server error", () => {
+    expect(isBrowserNetworkError(new Error("Internal Server Error"))).toBe(false);
+    expect(isBrowserNetworkError("network down")).toBe(false);
   });
 });

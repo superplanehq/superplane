@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderSummary } from "@/api-client";
 import { factoriesDescribeWorkOrder } from "@/api-client";
+import { isBrowserNetworkError } from "@/lib/errors";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { isNotFoundError } from "@/pages/app/workflowPageHelpers";
@@ -158,6 +159,14 @@ function isMissingWorkOrderError(error: unknown): boolean {
 
 function isExpiredSessionError(error: unknown): boolean {
   return error instanceof Error && error.message === "Unauthorized";
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function isQuietWorkOrderRefreshError(error: unknown): boolean {
+  return isExpiredSessionError(error) || isAbortError(error) || isBrowserNetworkError(error);
 }
 
 function dropMissingWorkOrder(
@@ -454,7 +463,7 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       refreshVersion.current.set(orderId, version);
       const isCurrent = () => refreshVersion.current.get(orderId) === version;
       void refreshUpdatedWorkOrder(queryClient, organizationId, factoryId, orderId, isCurrent).catch((error) => {
-        if (isExpiredSessionError(error)) {
+        if (isQuietWorkOrderRefreshError(error)) {
           return;
         }
         if (!isMissingWorkOrderError(error)) {

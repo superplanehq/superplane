@@ -90,6 +90,14 @@ function looksLikeSanitizedInternalError(value: string): boolean {
   return value.trim().toLowerCase() === "internal error";
 }
 
+export function isBrowserNetworkError(error: unknown): boolean {
+  if (typeof error === "string") {
+    return looksLikeBrowserNetworkError(error);
+  }
+
+  return error instanceof Error && looksLikeBrowserNetworkError(error.message);
+}
+
 function looksLikeBrowserNetworkError(value: string): boolean {
   const normalized = value.trim().toLowerCase();
 
