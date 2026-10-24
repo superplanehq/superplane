@@ -43,6 +43,8 @@ export type BillingSeatSummary = {
   purchased?: number;
   occupied?: number;
   available?: number;
+  pendingInvitations?: number;
+  invitable?: number;
   planMaximum?: number;
   purchasable?: number;
   expectedRenewalSeats?: number;
@@ -118,6 +120,8 @@ function billingSeats(billing: OrganizationsDescribeOrganizationBillingResponse)
     purchased: billing.purchasedSeats,
     occupied: billing.occupiedSeats,
     available: billing.availableSeats,
+    pendingInvitations: billing.pendingInvitationSeats,
+    invitable: billing.invitableSeats,
     planMaximum: billing.planMaximumSeats,
     purchasable: billing.purchasableSeats,
     expectedRenewalSeats: billing.expectedRenewalSeats,
@@ -153,7 +157,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   const [searchParams] = useSearchParams();
   const creditAdded = searchParams.get("credit") === "added";
   const subscribed = searchParams.get("subscribed") === "1";
-  const { canAct } = usePermissions();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canManageBilling = canAct("org", "update");
   const { data: organization } = useOrganization(organizationId);
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -219,7 +223,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     billing,
     creditRefreshStatus,
     billingContactMessage,
-    isLoading: spend.isLoading || grantsQuery.isLoading || orgBilling.isLoading,
+    isLoading: permissionsLoading || spend.isLoading || grantsQuery.isLoading || orgBilling.isLoading,
     error: spend.error ?? grantsQuery.error ?? orgBilling.error,
     billed: metrics.billed,
     purchased: metrics.purchased,

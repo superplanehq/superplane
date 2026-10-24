@@ -20,10 +20,13 @@ vi.mock("@/contexts/usePermissions", () => ({
   }),
 }));
 
-function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse) {
+function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse, newBilling = false) {
   return render(
     <FactoriesHarness
-      pathSuffix={"workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing"}
+      experimentalFeatures={newBilling ? ["new_billing"] : []}
+      pathSuffix={
+        "workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing" + (newBilling ? "?buySeats=1" : "")
+      }
       factoriesFixture={{ ...defaultFactoriesFixture, organizationBilling: billing }}
     />,
   );
@@ -48,6 +51,8 @@ describe("Organization billing seats", () => {
     const date = new Date(ACTIVE_BILLING_PERIOD_ENDS_AT).toLocaleDateString();
     expect(card).toHaveTextContent("9 of 10 seats used");
     expect(detail(card, "Available seats")).toHaveTextContent("1");
+    expect(detail(card, "Pending invitations")).toHaveTextContent("2");
+    expect(detail(card, "Seats available for new invitations")).toHaveTextContent("0");
     expect(detail(card, "Plan maximum")).toHaveTextContent("80");
     expect(detail(card, "Current monthly total")).toHaveTextContent("$290.00");
     expect(detail(card, "Next renewal")).toHaveTextContent(date);
@@ -56,9 +61,10 @@ describe("Organization billing seats", () => {
     );
     expect(card).toHaveTextContent("Estimates exclude taxes and discounts.");
     expect(card).toHaveTextContent(
-      "Unused seats are removed at renewal. Pending invitations are not renewed and expire at renewal.",
+      "Pending invitations do not count at renewal. After renewal, an invitation needs a free seat.",
     );
     expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+    expect(card).toHaveTextContent("Ask an organization admin to buy seats.");
     expect(
       screen.getByTestId("billing-plans").compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -74,6 +80,8 @@ describe("Organization billing seats", () => {
     renderBilling({
       ...TEAM_ORGANIZATION_BILLING,
       purchasedSeats: 0,
+      pendingInvitationSeats: 0,
+      invitableSeats: 0,
       occupiedSeats: occupied,
       availableSeats: 0,
       expectedRenewalSeats: Math.max(occupied, 1),
@@ -84,6 +92,8 @@ describe("Organization billing seats", () => {
     const card = await screen.findByTestId("billing-seats");
     expect(card).toHaveTextContent(occupied + " of 0 seats used");
     expect(detail(card, "Available seats")).toHaveTextContent("0");
+    expect(detail(card, "Pending invitations")).toHaveTextContent("0");
+    expect(detail(card, "Seats available for new invitations")).toHaveTextContent("0");
     expect(detail(card, "Plan maximum")).toHaveTextContent("0");
     expect(detail(card, "Current monthly total")).toHaveTextContent("$0.00");
     expect(detail(card, "Expected renewal")).toHaveTextContent(
@@ -127,22 +137,27 @@ describe("Organization billing seats", () => {
     { name: "past due during the grace period", status: "past_due", planPerSeat: true },
     { name: "paused", status: "paused", planPerSeat: true },
   ])("keeps a seats summary and blocks new members while $name", async ({ status, planPerSeat }) => {
-    renderBilling({
-      ...TEAM_ORGANIZATION_BILLING,
-      polarSubscriptionStatus: status,
-      planPerSeat,
-      availableSeats: undefined,
-      planMaximumSeats: undefined,
-      purchasableSeats: undefined,
-      expectedRenewalSeats: undefined,
-      currentMonthlyTotalCents: undefined,
-      expectedRenewalCents: undefined,
-    });
+    renderBilling(
+      {
+        ...TEAM_ORGANIZATION_BILLING,
+        polarSubscriptionStatus: status,
+        planPerSeat,
+        availableSeats: undefined,
+        planMaximumSeats: undefined,
+        purchasableSeats: undefined,
+        expectedRenewalSeats: undefined,
+        currentMonthlyTotalCents: undefined,
+        expectedRenewalCents: undefined,
+      },
+      true,
+    );
     const card = await screen.findByTestId("billing-seats");
     expect(card).toHaveTextContent("9 of 10 seats used");
     expect(card).toHaveTextContent("No one can join until the payment is updated.");
     expect(within(card).queryByText("Expected renewal")).not.toBeInTheDocument();
     expect(within(card).queryByText("Not available", { selector: "dd" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Buy seats" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument();
   });
 
   it("shows a conditional estimate after cancellation and normal copy after resuming", async () => {
