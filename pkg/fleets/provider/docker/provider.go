@@ -25,6 +25,9 @@ type Config struct {
 	Network      string
 	Volumes      []string
 	ExtraHosts   []string
+	Init         bool
+	User         string
+	Entrypoint   []string
 }
 
 type commandRunner interface {
@@ -60,8 +63,12 @@ func newProvider(
 	config.Network = strings.TrimSpace(config.Network)
 	config.Volumes = nonEmpty(config.Volumes)
 	config.ExtraHosts = nonEmpty(config.ExtraHosts)
+	config.User = strings.TrimSpace(config.User)
 	if config.Image == "" {
 		return nil, fmt.Errorf("Docker runner image is required")
+	}
+	if len(config.Entrypoint) > 0 && strings.TrimSpace(config.Entrypoint[0]) == "" {
+		return nil, fmt.Errorf("Docker runner entrypoint executable is required")
 	}
 	if docker == nil {
 		return nil, fmt.Errorf("Docker command runner is required")
@@ -181,9 +188,21 @@ func (p *Provider) Create(
 	if tags != "" {
 		args = append(args, "--env", "RUNNER_TAGS="+tags)
 	}
+	if p.config.Init {
+		args = append(args, "--init")
+	}
+	if p.config.User != "" {
+		args = append(args, "--user", p.config.User)
+	}
+	if len(p.config.Entrypoint) > 0 {
+		args = append(args, "--entrypoint", p.config.Entrypoint[0])
+	}
+	args = append(args, p.config.Image)
+	if len(p.config.Entrypoint) > 1 {
+		args = append(args, p.config.Entrypoint[1:]...)
+	}
 	args = append(
 		args,
-		p.config.Image,
 		"--url", boot.RunnerAPIURL,
 		"--registration-token", boot.RegistrationToken,
 	)

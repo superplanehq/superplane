@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// invitationIgnoreLine tells a recipient who does not know the organization to
+// ignore the email. Both the text and the HTML body must carry it.
+const invitationIgnoreLine = "If you do not know this organization, you can ignore this email."
+
 func TestSMTPOrganizationInvitationContent(t *testing.T) {
 	client := &fakeSMTPClient{}
 	original := smtpDial
@@ -22,7 +26,7 @@ func TestSMTPOrganizationInvitationContent(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"recipient@example.com"}, client.rcpt)
 	message := client.message.String()
-	for _, content := range []string{"Content-Type: text/plain", "Content-Type: text/html", "Engineering <Team>", "Engineering &lt;Team&gt;", "Ana & Bo", "Ana &amp; Bo", "Operator", "Tomorrow at noon UTC", "https://example.com/invitations/token?x=a&y=b", `href="https://example.com/invitations/token?x=a&amp;y=b"`} {
+	for _, content := range []string{"Content-Type: text/plain", "Content-Type: text/html", "Engineering <Team>", "Engineering &lt;Team&gt;", "Ana & Bo", "Ana &amp; Bo", "Operator", "Tomorrow at noon UTC", invitationIgnoreLine, "https://example.com/invitations/token?x=a&y=b", `href="https://example.com/invitations/token?x=a&amp;y=b"`} {
 		require.Contains(t, message, content)
 	}
 }
@@ -47,7 +51,7 @@ func TestResendOrganizationInvitationContent(t *testing.T) {
 	require.Equal(t, []string{"recipient@example.com"}, payload.To)
 	require.Equal(t, "Invitation to Engineering on SuperPlane", payload.Subject)
 	for _, body := range []string{payload.Text, payload.Html} {
-		for _, content := range []string{"Engineering", "Ana", "Operator", "Tomorrow at noon UTC", "https://example.com/invitations/token"} {
+		for _, content := range []string{"Engineering", "Ana", "Operator", "Tomorrow at noon UTC", invitationIgnoreLine, "https://example.com/invitations/token"} {
 			require.Contains(t, body, content)
 		}
 	}
