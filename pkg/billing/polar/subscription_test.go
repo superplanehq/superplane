@@ -1005,6 +1005,10 @@ func Test__ApplySubscriptionSettlesSeatPurchaseOnIgnoredForeignSnapshot(t *testi
 		{name: "replacement ended and target reached", endReplacement: true, foreignSeats: 4, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusSucceeded},
 		{name: "target never applied", foreignSeats: 3, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusFailed, wantErrorCode: models.SeatPurchaseErrorNotApplied},
 		{name: "snapshot proves nothing", foreignSeats: 3, foreignModified: now.Add(-time.Hour), wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "old above-target snapshot with live replacement", foreignSeats: 5, foreignModified: now.Add(-time.Hour), wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "old above-target snapshot with ended replacement", endReplacement: true, foreignSeats: 5, foreignModified: now.Add(-time.Hour), wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "above-target snapshot without timestamp", foreignSeats: 5, wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "above-target snapshot at purchase creation", foreignSeats: 5, foreignModified: now, wantStatus: models.SeatPurchaseStatusUnknown},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			org := setupBillingOrganization(t)
@@ -1023,6 +1027,7 @@ func Test__ApplySubscriptionSettlesSeatPurchaseOnIgnoredForeignSnapshot(t *testi
 			}
 			purchase := models.NewSeatPurchase(org.ID, nil, oldID, 3, 4)
 			purchase.Status = models.SeatPurchaseStatusUnknown
+			purchase.CreatedAt = now
 			require.NoError(t, purchase.Create(db))
 			before := captureSubscriptionState(t, db, org.ID)
 			hook := logtest.NewGlobal()
@@ -1040,6 +1045,14 @@ func Test__ApplySubscriptionSettlesSeatPurchaseOnIgnoredForeignSnapshot(t *testi
 			require.NotNil(t, after.purchase)
 			assert.Equal(t, tc.wantStatus, after.purchase.Status)
 			assert.Equal(t, tc.wantErrorCode, after.purchase.ErrorCode)
+			inFlight, err := models.FindInFlightSeatPurchase(db, org.ID)
+			require.NoError(t, err)
+			if tc.wantStatus == models.SeatPurchaseStatusUnknown {
+				require.NotNil(t, inFlight)
+				assert.Equal(t, purchase.ID, inFlight.ID)
+			} else {
+				assert.Nil(t, inFlight)
+			}
 			storedStatus := "active"
 			if tc.endReplacement {
 				storedStatus = "canceled"
@@ -1282,6 +1295,141 @@ func Test__ApplySubscriptionVerifiesForeignSubscriptionAfterRefreshEndsStored(t 
 	assert.Equal(t, storedID, *after.plan.PolarSubscriptionID)
 	assert.False(t, after.plan.IsActiveBusiness())
 	requireSubscriptionLog(t, hook, log.WarnLevel, "billing.foreign_subscription_snapshot_ignored", org.ID, storedID, delayedID, "canceled", "canceled")
+}
+
+func Test__ApplySubscriptionReleasesLocksDuringPolarReads(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		storedEnded   bool
+		changeStored  bool
+		adoptIncoming bool
+	}{
+		{name: "refresh stored subscription"},
+		{name: "verify foreign subscription", storedEnded: true},
+		{name: "identity changes during refresh", changeStored: true},
+		{name: "identity changes during verification", storedEnded: true, changeStored: true},
+		{name: "incoming identity adopted and ended during verification", storedEnded: true, changeStored: true, adoptIncoming: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			org := setupBillingOrganization(t)
+			db := database.Conn()
+			storedID, incomingID, concurrentID := "sub_stored_"+uuid.NewString(), "sub_incoming_"+uuid.NewString(), "sub_concurrent_"+uuid.NewString()
+			if tc.adoptIncoming {
+				concurrentID = incomingID
+			}
+			require.NoError(t, models.BindLegacyBillingProduct(db, "prod_business"))
+			now := time.Now().UTC().Truncate(time.Second)
+			end := now.AddDate(0, 1, 0)
+			stored := subscriptionEvent(org.ID, storedID, "active", now, end)
+			stored.Data.ModifiedAt = polarTime{Time: now}
+			require.NoError(t, ApplySubscriptionEvent(t.Context(), db, stored))
+			if tc.storedEnded {
+				stored.Data.Status = "canceled"
+				stored.Data.ModifiedAt = polarTime{Time: now.Add(time.Second)}
+				require.NoError(t, ApplySubscriptionEvent(t.Context(), db, stored))
+			}
+
+			var requests []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				requests = append(requests, req.URL.Path)
+				// A separate transaction must acquire the same row immediately,
+				// while the subscription apply path waits for this HTTP response.
+				err := db.Transaction(func(tx *gorm.DB) error {
+					if err := tx.Exec("SELECT id FROM organizations WHERE id = ? FOR UPDATE NOWAIT", org.ID).Error; err != nil {
+						return err
+					}
+					if !tc.changeStored || len(requests) != 1 {
+						return nil
+					}
+					stored.Data.Status = "canceled"
+					stored.Data.ModifiedAt = polarTime{Time: now.Add(2 * time.Second)}
+					if err := ApplyOrganizationSubscription(req.Context(), tx, org.ID, stored.Data); err != nil {
+						return err
+					}
+					concurrent := subscriptionEvent(org.ID, concurrentID, "active", now, end)
+					concurrent.Data.ModifiedAt = polarTime{Time: now.Add(3 * time.Second)}
+					if err := ApplyOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data); err != nil {
+						return err
+					}
+					if tc.adoptIncoming {
+						concurrent.Data.Status = "canceled"
+						concurrent.Data.ModifiedAt = polarTime{Time: now.Add(4 * time.Second)}
+						return ApplyOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data)
+					}
+					return nil
+				})
+				if !assert.NoError(t, err, "Polar reads must not hold the organization lock") {
+					http.Error(w, "organization locked", http.StatusInternalServerError)
+					return
+				}
+				id := strings.TrimPrefix(req.URL.Path, "/subscriptions/")
+				status := "active"
+				if id == storedID || tc.adoptIncoming {
+					status = "canceled"
+				}
+				w.Header().Set(apiVersionHeader, APIVersion())
+				snapshot := polarSubscriptionJSON(id, status, org.ID.String(), now, end)
+				snapshot["modified_at"] = now.Add(time.Minute).Format(time.RFC3339)
+				assert.NoError(t, json.NewEncoder(w).Encode(snapshot))
+			}))
+			t.Cleanup(server.Close)
+			t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+			t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+			t.Setenv("POLAR_API_BASE_URL", server.URL)
+
+			incoming := subscriptionEvent(org.ID, incomingID, "active", now, end)
+			require.NoError(t, ApplySubscriptionEvent(t.Context(), db, incoming))
+			plan, err := models.FindOrganizationBillingPlan(db, org.ID)
+			require.NoError(t, err)
+			require.NotNil(t, plan.PolarSubscriptionID)
+			if tc.changeStored {
+				assert.Equal(t, concurrentID, *plan.PolarSubscriptionID)
+				if tc.adoptIncoming {
+					assert.False(t, plan.IsActiveBusiness(), "the original webhook must not override the verified ended snapshot")
+					return
+				}
+				assert.Equal(t, "/subscriptions/"+concurrentID, requests[len(requests)-1], "recheck the new stored identity before applying")
+				return
+			}
+			assert.Equal(t, incomingID, *plan.PolarSubscriptionID)
+			want := []string{"/subscriptions/" + incomingID}
+			if !tc.storedEnded {
+				want = append([]string{"/subscriptions/" + storedID}, want...)
+			}
+			assert.Equal(t, want, requests)
+		})
+	}
+}
+
+func Test__ApplySubscriptionRequiresReadsOutsideCallerTransaction(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	require.NoError(t, models.BindLegacyBillingProduct(db, "prod_business"))
+	now := time.Now().UTC().Truncate(time.Second)
+	end := now.AddDate(0, 1, 0)
+	stored := subscriptionEvent(org.ID, "sub_stored_"+uuid.NewString(), "active", now, end)
+	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, stored))
+	before := captureSubscriptionState(t, db, org.ID)
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		requests++
+		w.Header().Set(apiVersionHeader, APIVersion())
+		assert.NoError(t, json.NewEncoder(w).Encode(polarSubscriptionJSON(stored.Data.ID, "active", org.ID.String(), now, end)))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if _, err := models.LockOrganization(tx, org.ID); err != nil {
+			return err
+		}
+		incoming := subscriptionEvent(org.ID, "sub_foreign_"+uuid.NewString(), "active", now, end)
+		return ApplyOrganizationSubscription(t.Context(), tx, org.ID, incoming.Data)
+	})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrPermanentApply)
+	assert.Zero(t, requests)
+	assert.Equal(t, before, captureSubscriptionState(t, db, org.ID))
 }
 
 func Test__ApplySubscriptionResolvesTwoLiveSubscriptions(t *testing.T) {

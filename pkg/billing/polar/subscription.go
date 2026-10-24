@@ -58,73 +58,119 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 // applySubscription applies a subscription snapshot. Snapshots that a direct
 // Polar API call returned are verified; webhook payloads are not, because a
 // delayed event can claim access that Polar already ended.
-func applySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData, verified bool) error {
+func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, verified bool) error {
 	orgID, err := parseSubscriptionOrganizationID(data)
 	if err != nil {
 		return err
 	}
-	err = tx.WithContext(ctx).Transaction(func(inner *gorm.DB) error {
-		if _, err := models.LockOrganization(inner, orgID); err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return permanentApplyError("organization not found")
-			}
+	incoming := subscriptionSnapshot(data)
+	incoming.Verified = verified
+	var refreshedStored, verifiedIncoming *SubscriptionData
+	needsSnapshot := errors.New("Polar subscription snapshot required")
+	for {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if err := models.BindLegacyBillingProduct(inner, BusinessProductID()); err != nil {
-			return err
-		}
-		incoming := subscriptionSnapshot(data)
-		incoming.Verified = verified
-		result, err := models.ApplyPolarSubscription(inner, orgID, incoming, nil)
-		if err != nil {
-			return err
-		}
-		if result.Disposition == models.PolarSubscriptionRefreshRequired {
-			storedID := polarSubscriptionID(result.Plan)
-			refreshCtx, cancel := context.WithTimeout(ctx, httpTimeout)
-			defer cancel()
-			refreshed, err := NewClientFromEnv().GetSubscription(refreshCtx, storedID)
-			if err != nil {
-				return fmt.Errorf("refresh stored Polar subscription %q: %w", storedID, err)
+		var readID, readReason string
+		err = db.WithContext(ctx).Transaction(func(inner *gorm.DB) error {
+			if _, err := models.LockOrganization(inner, orgID); err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return permanentApplyError("organization not found")
+				}
+				return err
 			}
-			if externalID := refreshed.organizationExternalID(); externalID != "" && externalID != orgID.String() {
-				return fmt.Errorf("refreshed Polar subscription customer does not match organization")
+			if err := models.BindLegacyBillingProduct(inner, BusinessProductID()); err != nil {
+				return err
 			}
-			stored := subscriptionSnapshot(*refreshed)
-			result, err = models.ApplyPolarSubscription(inner, orgID, incoming, &stored)
+			attemptIncoming, appliedData := incoming, data
+			if verifiedIncoming != nil {
+				current, err := models.FindOrganizationBillingPlan(inner, orgID)
+				if err != nil {
+					return err
+				}
+				// Another apply can adopt this identity during verification.
+				// Use the verified snapshot even when it is no longer foreign.
+				if polarSubscriptionID(current) == incoming.ID {
+					attemptIncoming = subscriptionSnapshot(*verifiedIncoming)
+					attemptIncoming.Verified = true
+					appliedData = *verifiedIncoming
+				}
+			}
+			result, err := models.ApplyPolarSubscription(inner, orgID, attemptIncoming, nil)
 			if err != nil {
 				return err
 			}
-			if result.RefreshedStored != nil {
-				if err := syncSubscriptionSideEffects(inner, orgID, *refreshed, result.RefreshedStored); err != nil {
+			if result.Disposition == models.PolarSubscriptionRefreshRequired {
+				storedID := polarSubscriptionID(result.Plan)
+				if refreshedStored == nil || refreshedStored.ID != storedID {
+					readID, readReason = storedID, "refresh stored"
+					return needsSnapshot
+				}
+				stored := subscriptionSnapshot(*refreshedStored)
+				result, err = models.ApplyPolarSubscription(inner, orgID, attemptIncoming, &stored)
+				if err != nil {
 					return err
 				}
 			}
+			refreshedResult := result.RefreshedStored
+			if result.Disposition == models.PolarSubscriptionVerificationRequired {
+				if verifiedIncoming == nil {
+					readID, readReason = incoming.ID, "verify"
+					return needsSnapshot
+				}
+				verifiedSnapshot := subscriptionSnapshot(*verifiedIncoming)
+				verifiedSnapshot.Verified = true
+				result, err = models.ApplyPolarSubscription(inner, orgID, verifiedSnapshot, nil)
+				if err != nil {
+					return err
+				}
+				appliedData = *verifiedIncoming
+			}
+			if refreshedResult != nil {
+				if err := syncSubscriptionSideEffects(inner, orgID, *refreshedStored, refreshedResult); err != nil {
+					return err
+				}
+			}
+			return syncSubscriptionSideEffects(inner, orgID, appliedData, result)
+		})
+		if !errors.Is(err, needsSnapshot) {
+			if errors.Is(err, models.ErrInvalidPurchasedSeats) && !errors.Is(err, models.ErrPolarSubscriptionRefreshFailed) {
+				return permanentApplyError(err.Error())
+			}
+			return err
 		}
-		if result.Disposition == models.PolarSubscriptionVerificationRequired {
-			refreshCtx, cancel := context.WithTimeout(ctx, httpTimeout)
-			defer cancel()
-			refreshed, err := NewClientFromEnv().GetSubscription(refreshCtx, incoming.ID)
-			if err != nil {
-				return fmt.Errorf("verify Polar subscription %q: %w", incoming.ID, err)
-			}
-			if externalID := refreshed.organizationExternalID(); externalID != "" && externalID != orgID.String() {
-				return fmt.Errorf("verified Polar subscription customer does not match organization")
-			}
-			data = *refreshed
-			incoming = subscriptionSnapshot(*refreshed)
-			incoming.Verified = true
-			result, err = models.ApplyPolarSubscription(inner, orgID, incoming, nil)
-			if err != nil {
-				return err
-			}
+		// Roll back every tentative write before HTTP. A new transaction
+		// rechecks identity and ordering under the lock after the response.
+		// An outer transaction belongs to the caller and cannot be released here.
+		if _, inTransaction := db.Statement.ConnPool.(gorm.TxCommitter); inTransaction {
+			return fmt.Errorf("%w: %s Polar subscription %q outside the caller transaction", models.ErrPolarSubscriptionRefreshFailed, readReason, readID)
 		}
-		return syncSubscriptionSideEffects(inner, orgID, data, result)
-	})
-	if errors.Is(err, models.ErrInvalidPurchasedSeats) && !errors.Is(err, models.ErrPolarSubscriptionRefreshFailed) {
-		return permanentApplyError(err.Error())
+		refreshed, err := readOrganizationSubscription(ctx, orgID, readID, readReason)
+		if err != nil {
+			return err
+		}
+		if readReason == "verify" {
+			verifiedIncoming = refreshed
+			continue
+		}
+		refreshedStored = refreshed
 	}
-	return err
+}
+
+func readOrganizationSubscription(ctx context.Context, orgID uuid.UUID, subscriptionID, reason string) (*SubscriptionData, error) {
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+	snapshot, err := NewClientFromEnv().GetSubscription(ctx, subscriptionID)
+	if err != nil {
+		return nil, fmt.Errorf("%s Polar subscription %q: %w", reason, subscriptionID, err)
+	}
+	if snapshot.ID != subscriptionID {
+		return nil, fmt.Errorf("%s Polar subscription does not match requested identity", reason)
+	}
+	if externalID := snapshot.organizationExternalID(); externalID != "" && externalID != orgID.String() {
+		return nil, fmt.Errorf("%s Polar subscription customer does not match organization", reason)
+	}
+	return snapshot, nil
 }
 
 func subscriptionSnapshot(data SubscriptionData) models.PolarSubscriptionApply {

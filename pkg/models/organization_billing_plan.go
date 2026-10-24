@@ -486,9 +486,16 @@ func samePolarSubscription(existing *OrganizationBillingPlan, subscriptionID str
 
 // settleIgnoredForeignSeatPurchase settles the in-flight purchase of a
 // subscription whose snapshot cannot replace the stored one. The snapshot
-// still proves the outcome of a purchase on its own subscription, and an
-// unsettled purchase on a replaced subscription blocks new purchases forever.
+// must be newer than the purchase: an old seat count does not prove success.
+// Fresh snapshots unblock purchases without changing the replacement's state.
 func settleIgnoredForeignSeatPurchase(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionApply) error {
+	if sub.ModifiedAt == nil {
+		return nil
+	}
+	purchase, err := FindInFlightSeatPurchase(tx, orgID)
+	if err != nil || purchase == nil || !sub.ModifiedAt.After(purchase.CreatedAt) {
+		return err
+	}
 	return SettleSeatPurchase(tx, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt)
 }
 
