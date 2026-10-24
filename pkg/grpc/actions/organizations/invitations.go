@@ -346,7 +346,7 @@ func (s *InvitationService) invitationRoleDisplayName(ctx context.Context, invit
 	case models.RoleOrgOperator:
 		return models.DisplayNameOperator
 	}
-	role, err := models.FindRoleMetadata(invitation.Role, models.DomainTypeOrganization, invitation.OrganizationID.String())
+	role, err := models.FindRoleMetadata(database.DB(ctx), invitation.Role, models.DomainTypeOrganization, invitation.OrganizationID.String())
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.WithContext(ctx).WithError(err).WithField("invitation_id", invitation.ID).Error("Failed to resolve invitation role display name")
