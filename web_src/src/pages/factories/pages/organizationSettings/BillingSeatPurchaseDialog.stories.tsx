@@ -38,7 +38,6 @@ const ready: UseSeatPurchaseResult = {
   submitting: false,
   canConfirm: true,
   confirm: async () => console.log("Confirm purchase"),
-  dialogResetCount: { current: 0 },
 };
 
 const pendingPurchase: OrganizationsSeatPurchase = {
