@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
@@ -191,6 +192,49 @@ func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, r.Account.ID.String(), "http://localhost")
 	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	require.Equal(t, 1, checkoutCalls)
+}
+
+func TestSelectBillingPlanBlocksPausedSubscription(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	free := models.BillingPlan{Key: "free_" + uuid.NewString()[:8], Name: "Free", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &free))
+	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		t.Errorf("a paused subscription must not contact Polar: %s", req.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	usePolarTestServer(t, server)
+
+	product := "prod_paused_" + uuid.NewString()
+	paid := models.BillingPlan{Key: "paid_" + uuid.NewString()[:8], Name: "Paid", Category: "paid", Visibility: "public", PriceCents: 25000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &paid))
+	start := time.Now().UTC().Truncate(time.Second)
+	end := start.AddDate(0, 1, 0)
+	payload, err := json.Marshal(map[string]any{"id": "sub_" + uuid.NewString(), "product_id": product, "status": "paused", "external_customer_id": r.Organization.ID.String(), "current_period_start": start, "current_period_end": end, "modified_at": start})
+	require.NoError(t, err)
+	var snapshot polar.SubscriptionData
+	require.NoError(t, json.Unmarshal(payload, &snapshot))
+	require.NoError(t, polar.ApplySubscription(t.Context(), db, snapshot))
+
+	// A local plan change would clear the stored subscription state, so a
+	// paused subscription must block it the same way a paid one does.
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: free.Key}, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	require.Contains(t, err.Error(), "Manage your current subscription in the billing portal before selecting another plan.")
+
+	// The blocked selection preserves the subscription state, so the deletion
+	// guard still sees a live subscription.
+	current, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.BillingPlanSourcePolar, current.PlanSource)
+	require.NotNil(t, current.PolarSubscriptionID)
+	require.Equal(t, models.PolarSubscriptionStatusPaused, current.PolarSubscriptionStatus)
+	require.True(t, current.HasLivePolarSubscription(time.Now()))
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	_, err = DeleteOrganization(ctx, r.AuthService, r.Organization.ID.String())
+	requireInvitationReason(t, err, "ORGANIZATION_SUBSCRIPTION_LIVE")
 }
 
 func TestPaymentMethodSetupCreatesCustomerWithoutCheckout(t *testing.T) {

@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { organizationsCreateBillingPortalSession } from "../../../api-client";
 import type { OrganizationsOrganization } from "../../../api-client/types.gen";
 import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
 import { Heading } from "../../../components/Heading/heading";
@@ -13,9 +14,17 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
-import { getApiErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getApiErrorReason } from "@/lib/errors";
 import { organizationSlugValidationMessage, validateOrganizationSlug } from "@/lib/organizationSlug";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { settingsCardClassName } from "./settingsPageStyles";
+
+const SUBSCRIPTION_LIVE_REASON = "ORGANIZATION_SUBSCRIPTION_LIVE";
+
+interface DeleteError {
+  message: string;
+  subscriptionLive?: boolean;
+}
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -33,8 +42,10 @@ export function General({ organization }: GeneralProps) {
   const [slug, setSlug] = useState(organization.metadata?.slug || "");
   const [slugError, setSlugError] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<DeleteError | null>(null);
   const [showDeleteForm, setShowDeleteForm] = useState(false);
+  const [billingPortalPending, setBillingPortalPending] = useState(false);
+  const [billingPortalError, setBillingPortalError] = useState<string | null>(null);
 
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
   const deleteOrganizationMutation = useDeleteOrganization(organizationId || "");
@@ -94,7 +105,7 @@ export function General({ organization }: GeneralProps) {
       return;
     }
     if (deleteConfirmation !== (organization.metadata?.name || "")) {
-      setDeleteError("Confirmation text does not match the organization name.");
+      setDeleteError({ message: "Confirmation text does not match the organization name." });
       return;
     }
 
@@ -102,8 +113,33 @@ export function General({ organization }: GeneralProps) {
       setDeleteError(null);
       await deleteOrganizationMutation.mutateAsync();
       window.location.href = "/";
-    } catch {
-      setDeleteError("Failed to delete organization. Please try again.");
+    } catch (error) {
+      setDeleteError({
+        message: getApiErrorMessage(error, "Failed to delete organization. Please try again."),
+        subscriptionLive: getApiErrorReason(error) === SUBSCRIPTION_LIVE_REASON,
+      });
+    }
+  };
+
+  // The billing portal session is organization-scoped, so canceling the
+  // subscription also works when the organization has no workspace left.
+  const openBillingPortal = async () => {
+    if (!organizationId) return;
+    setBillingPortalError(null);
+    setBillingPortalPending(true);
+    try {
+      const response = await organizationsCreateBillingPortalSession(
+        withOrganizationHeader({ organizationId, path: { id: organizationId }, body: {} }),
+      );
+      const portalUrl = response.data?.portalUrl;
+      if (!portalUrl) {
+        throw new Error("The billing portal did not return a URL.");
+      }
+      window.location.assign(portalUrl);
+    } catch (error) {
+      setBillingPortalError(getApiErrorMessage(error, "Could not open the billing portal. Please try again."));
+    } finally {
+      setBillingPortalPending(false);
     }
   };
 
@@ -245,8 +281,28 @@ export function General({ organization }: GeneralProps) {
                   Delete Organization
                 </LoadingButton>
               </PermissionTooltip>
-              {deleteError && <span className="text-sm text-red-600 dark:text-red-400">{deleteError}</span>}
             </div>
+            {deleteError && (
+              <div role="alert" className="text-sm text-red-600 dark:text-red-400">
+                <p>
+                  {deleteError.message}
+                  {deleteError.subscriptionLive && organizationId && (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        onClick={openBillingPortal}
+                        disabled={billingPortalPending}
+                        className="font-medium underline underline-offset-2 disabled:opacity-60"
+                      >
+                        Open Billing
+                      </button>
+                    </>
+                  )}
+                </p>
+                {billingPortalError && <p className="mt-1">{billingPortalError}</p>}
+              </div>
+            )}
           </>
         )}
       </Fieldset>
