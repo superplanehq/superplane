@@ -122,6 +122,29 @@ describe("Organization billing seats", () => {
     expect(screen.queryByTestId("billing-seats")).not.toBeInTheDocument();
   });
 
+  it.each([
+    { name: "past due after the grace period", status: "past_due", planPerSeat: false },
+    { name: "past due during the grace period", status: "past_due", planPerSeat: true },
+    { name: "paused", status: "paused", planPerSeat: true },
+  ])("keeps a seats summary and blocks new members while $name", async ({ status, planPerSeat }) => {
+    renderBilling({
+      ...TEAM_ORGANIZATION_BILLING,
+      polarSubscriptionStatus: status,
+      planPerSeat,
+      availableSeats: undefined,
+      planMaximumSeats: undefined,
+      purchasableSeats: undefined,
+      expectedRenewalSeats: undefined,
+      currentMonthlyTotalCents: undefined,
+      expectedRenewalCents: undefined,
+    });
+    const card = await screen.findByTestId("billing-seats");
+    expect(card).toHaveTextContent("9 of 10 seats used");
+    expect(card).toHaveTextContent("No one can join until the payment is updated.");
+    expect(within(card).queryByText("Expected renewal")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Not available", { selector: "dd" })).not.toBeInTheDocument();
+  });
+
   it("shows a conditional estimate after cancellation and normal copy after resuming", async () => {
     const user = userEvent.setup();
     renderBilling({ ...TEAM_ORGANIZATION_BILLING });

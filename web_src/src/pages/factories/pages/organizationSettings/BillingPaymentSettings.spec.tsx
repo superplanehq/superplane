@@ -30,6 +30,9 @@ vi.mock("@/hooks/useOrganizationBilling", () => ({
 }));
 
 beforeEach(() => {
+  delete billing.polarSubscriptionStatus;
+  delete billing.paymentFailedAt;
+  delete billing.paidAccessEndsAt;
   billing.hasPaymentMethod = false;
   billing.occupiedSeats = 2;
   billing.availablePlans![1].seatMaximum = 5;
@@ -203,3 +206,69 @@ it.each(["missing usage", "maximum below occupancy"])(
     expect(selectPlan).not.toHaveBeenCalled();
   },
 );
+
+const FAILED_AT = "2026-10-20T10:00:00Z";
+const ACCESS_ENDS_AT = "2026-10-27T10:00:00Z";
+const failedOn = new Date(FAILED_AT).toLocaleDateString();
+const accessEndsOn = new Date(ACCESS_ENDS_AT).toLocaleDateString();
+
+it("shows the failure and the date Team features end while a grace period is open", () => {
+  Object.assign(billing, {
+    polarSubscriptionStatus: "past_due",
+    paymentFailedAt: FAILED_AT,
+    paidAccessEndsAt: ACCESS_ENDS_AT,
+  });
+  renderSettings();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    `The renewal payment failed on ${failedOn}. Update the payment method by ${accessEndsOn} to keep Team features.`,
+  );
+});
+
+it("says Team features are off when no grace period applies", () => {
+  Object.assign(billing, { polarSubscriptionStatus: "past_due", paymentFailedAt: FAILED_AT });
+  renderSettings();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    `The renewal payment failed on ${failedOn}. Team features are off until you update the payment method.`,
+  );
+});
+
+it("opens the Polar payment method page from the banner", async () => {
+  Object.assign(billing, { polarSubscriptionStatus: "past_due", paymentFailedAt: FAILED_AT });
+  const assign = vi.fn();
+  const previousAssign = window.location.assign.bind(window.location);
+  window.location.assign = assign;
+  try {
+    const user = renderSettings();
+    await user.click(screen.getByRole("button", { name: "Update payment method" }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://polar.example/portal/settings?token=test"));
+    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(selectPlan).not.toHaveBeenCalled();
+  } finally {
+    window.location.assign = previousAssign;
+  }
+});
+
+it("shows a failed portal call on the banner and lets the owner retry", async () => {
+  Object.assign(billing, { polarSubscriptionStatus: "past_due", paymentFailedAt: FAILED_AT });
+  createSession.mockRejectedValueOnce(new Error("Polar is unavailable"));
+  const user = renderSettings();
+  await user.click(screen.getByRole("button", { name: "Update payment method" }));
+  await waitFor(() => expect(screen.getAllByRole("alert").at(-1)).toHaveTextContent("Polar is unavailable"));
+  expect(screen.getByRole("button", { name: "Update payment method" })).toBeEnabled();
+});
+
+it.each(["past_due", "paused"])("hides plan checkout while the subscription is %s", (status) => {
+  Object.assign(billing, { polarSubscriptionStatus: status, paymentFailedAt: FAILED_AT });
+  renderSettings();
+  expect(screen.queryByRole("spinbutton", { name: "Team seats" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Subscribe to / })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Select / })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
+});
+
+it("keeps the banner text but removes the action for members without billing permission", () => {
+  Object.assign(billing, { polarSubscriptionStatus: "past_due", paymentFailedAt: FAILED_AT });
+  renderSettings(false);
+  expect(screen.getByRole("alert")).toHaveTextContent("The renewal payment failed on");
+  expect(screen.queryByRole("button", { name: "Update payment method" })).not.toBeInTheDocument();
+});

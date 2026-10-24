@@ -24,6 +24,14 @@ describe("workOrderCreditFailureCopy", () => {
     });
   });
 
+  it("maps a failed renewal payment to Payment failed and Update payment method", () => {
+    expect(workOrderCreditFailureCopy("payment_past_due")).toEqual({
+      label: "Payment failed",
+      message: "This agent run is blocked. The renewal payment failed.",
+      actionLabel: "Update payment method",
+    });
+  });
+
   it("maps an empty workspace budget to No workspace budget", () => {
     expect(workOrderCreditFailureCopy("workspace_budget_empty")).toEqual({
       label: "No workspace budget",
@@ -41,6 +49,9 @@ describe("workOrderCreditFailureCopy", () => {
     expect(workOrderCreditFailureFromMessage("  Subscribe to Business to keep SuperPlane-hosted runs.  ")?.label).toBe(
       "No plan",
     );
+    expect(
+      workOrderCreditFailureFromMessage("The renewal payment failed. Update the payment method to run agents.")?.label,
+    ).toBe("Payment failed");
     expect(workOrderCreditFailureFromMessage("This workspace has no remaining hosted credit.")?.label).toBe(
       "No workspace budget",
     );

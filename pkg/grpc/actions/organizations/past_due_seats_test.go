@@ -24,6 +24,9 @@ func (f *seatPurchaseFixture) replay(status string, seats int) {
 	f.replays++
 	data := f.snapshot(seats)
 	data["status"] = status
+	if f.pastDueAt != nil {
+		data["past_due_at"] = f.pastDueAt.UTC().Format(time.RFC3339)
+	}
 	data["modified_at"] = time.Now().Add(time.Duration(f.replays) * time.Minute).UTC().Format(time.RFC3339)
 	body, err := json.Marshal(map[string]any{"type": "subscription.updated", "data": data})
 	require.NoError(f.t, err)
@@ -113,4 +116,64 @@ func TestPastDueRenewalLocksMembershipUntilPaymentRecovers(t *testing.T) {
 	_, err = service.Accept(context.Background(), invitee.ID.String(), token)
 	require.NoError(t, err)
 	require.EqualValues(t, 3, occupied())
+}
+
+func TestPastDueGraceKeepsTeamOnButAdmitsNoMembers(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	db := database.Conn()
+	orgID := f.r.Organization.ID
+	support.CreateUser(t, f.r, orgID)
+	require.NoError(t, models.ApplyInstallationMetadata(db, func(metadata *models.InstallationMetadata) {
+		metadata.PastDueGraceDays = 7
+	}))
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", orgID).
+		Update("trial_ends_at", time.Now().Add(-time.Hour)).Error)
+	service := InvitationService{AuthService: f.r.AuthService, EmailService: services.NewNoopEmailService(), BaseURL: "https://example.com"}
+	invitee, err := models.CreateAccount("Invitee", uuid.NewString()+"@example.com")
+	require.NoError(t, err)
+	pending, err := service.Create(context.Background(), orgID.String(), f.r.User.String(), &pb.CreateInvitationRequest{Email: invitee.Email})
+	require.NoError(t, err)
+	token := strings.TrimPrefix(pending.AcceptanceUrl, "https://example.com/invitations/")
+	describe := func() *pb.DescribeOrganizationBillingResponse {
+		response, err := DescribeOrganizationBilling(context.Background(), orgID.String(), &pb.DescribeOrganizationBillingRequest{})
+		require.NoError(t, err)
+		return response
+	}
+	requireNobodyJoins := func() {
+		_, err := service.Create(context.Background(), orgID.String(), f.r.User.String(), &pb.CreateInvitationRequest{Email: "late@example.com"})
+		requireInvitationReason(t, err, "PAYMENT_PAST_DUE")
+		_, err = service.Accept(context.Background(), invitee.ID.String(), token)
+		requireGRPCCode(t, codes.FailedPrecondition, err)
+	}
+
+	failure := time.Now().Add(-24 * time.Hour).Truncate(time.Second)
+	f.pastDueAt = &failure
+	f.replay(models.PolarSubscriptionStatusPastDue, 3)
+
+	inGrace := describe()
+	require.True(t, inGrace.HostedExecutionAllowed, "Team features stay on during the grace period")
+	require.True(t, inGrace.PlanPerSeat)
+	require.True(t, inGrace.PaymentFailedAt.AsTime().Equal(failure))
+	require.True(t, inGrace.PaidAccessEndsAt.AsTime().Equal(failure.Add(7*24*time.Hour)))
+	require.EqualValues(t, 3, *inGrace.PurchasedSeats)
+	require.EqualValues(t, 2, *inGrace.OccupiedSeats)
+	requireNobodyJoins()
+
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", orgID).
+		Update("past_due_since", time.Now().Add(-8*24*time.Hour)).Error)
+
+	afterGrace := describe()
+	require.False(t, afterGrace.HostedExecutionAllowed)
+	require.False(t, afterGrace.PlanPerSeat)
+	require.NotNil(t, afterGrace.PaymentFailedAt)
+	require.Nil(t, afterGrace.PaidAccessEndsAt, "no access end date after the grace period")
+	require.EqualValues(t, 3, *afterGrace.PurchasedSeats, "the seats summary stays while payment is blocked")
+	require.EqualValues(t, 2, *afterGrace.OccupiedSeats)
+	requireNobodyJoins()
+
+	f.replay(models.PolarSubscriptionStatusActive, 3)
+	recovered := describe()
+	require.True(t, recovered.HostedExecutionAllowed)
+	require.Nil(t, recovered.PaymentFailedAt)
+	require.Nil(t, recovered.PaidAccessEndsAt)
 }
