@@ -264,7 +264,7 @@ func (s *FactoryService) DispatchWorkOrder(ctx context.Context, req *pb.Dispatch
 
 func (s *FactoryService) CloseWorkOrder(ctx context.Context, req *pb.CloseWorkOrderRequest) (*pb.CloseWorkOrderResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.CloseWorkOrder(ctx, organizationID, req)
+	return actions.CloseWorkOrder(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) UpdateWorkOrderStatus(ctx context.Context, req *pb.UpdateWorkOrderStatusRequest) (*pb.UpdateWorkOrderStatusResponse, error) {

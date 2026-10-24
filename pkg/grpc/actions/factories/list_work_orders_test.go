@@ -25,7 +25,7 @@ func Test__WorkOrderVisibility_ArchivesStayHiddenAndRejectionsStayVisible(t *tes
 	for _, result := range []pb.WorkOrder_Result{pb.WorkOrder_RESULT_ARCHIVED, pb.WorkOrder_RESULT_REJECTED} {
 		order, err := factory.CreateWorkOrder(db, result.String(), "", &r.User, nil, nil)
 		require.NoError(t, err)
-		closed, err := CloseWorkOrder(ctx, r.Organization.ID.String(), &pb.CloseWorkOrderRequest{
+		closed, err := CloseWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.CloseWorkOrderRequest{
 			FactoryId: factory.ID.String(), OrderId: order.ID.String(), Result: result,
 		})
 		require.NoError(t, err)

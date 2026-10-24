@@ -173,7 +173,7 @@ func dispatchWorkOrderOnLineTx(
 	if err != nil {
 		return nil, err
 	}
-	if err := order.LockForUpdate(tx); err != nil {
+	if err := order.LockForStatusChange(tx); err != nil {
 		return nil, err
 	}
 

@@ -130,8 +130,24 @@ func applyGitHubPullRequestClosed(
 ) (*factoryPullRequestCloseResult, error) {
 	var outcome *factoryPullRequestCloseResult
 	err := db.Transaction(func(tx *gorm.DB) error {
+		order, err := factory.FindWorkOrder(tx, pullRequest.WorkOrderID)
+		if err != nil {
+			return err
+		}
+		if err := order.LockForStatusChange(tx); err != nil {
+			return err
+		}
+		if err := pullRequest.LockForUpdate(tx); err != nil {
+			return err
+		}
+		// A reject or archive already recorded this close. A later reopen must
+		// survive the webhook for that same close.
+		alreadyClosed := !merged && pullRequest.State == models.FactoryPullRequestStateClosed
 		if err := stampFactoryPullRequestClosed(tx, pullRequest, merged, mergedAt, closedAt); err != nil {
 			return err
+		}
+		if alreadyClosed {
+			return nil
 		}
 		closed, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, merged, automation)
 		if err != nil {
@@ -141,6 +157,93 @@ func applyGitHubPullRequestClosed(
 		return nil
 	})
 	return outcome, err
+}
+
+func reopenFactoryPullRequestsFromGitHub(
+	db *gorm.DB,
+	integration *models.Integration,
+	payload githubMergeabilityWebhookPayload,
+) []models.FactoryPullRequest {
+	if payload.PullRequest == nil || payload.PullRequest.Number <= 0 {
+		return nil
+	}
+
+	pullRequests, err := models.ListGitHubFactoryPullRequestsForWebhook(
+		db,
+		integration.OrganizationID,
+		payload.Repository.FullName,
+		[]int64{payload.PullRequest.Number},
+	)
+	if err != nil {
+		log.WithError(err).Warn("factory mergeability: failed to list pull requests for reopened GitHub event")
+		return nil
+	}
+
+	var reopened []models.FactoryPullRequest
+	factoriesByID := map[string]*models.Factory{}
+	for i := range pullRequests {
+		pullRequest := &pullRequests[i]
+		if pullRequest.State != models.FactoryPullRequestStateClosed {
+			continue
+		}
+		factory := factoriesByID[pullRequest.FactoryID.String()]
+		if factory == nil {
+			loaded, findErr := models.FindFactory(db, pullRequest.OrganizationID, pullRequest.FactoryID)
+			if findErr != nil {
+				log.WithError(findErr).Warnf("factory mergeability: factory %s not found", pullRequest.FactoryID)
+				continue
+			}
+			factory = loaded
+			factoriesByID[factory.ID.String()] = factory
+		}
+		changed, err := reopenFactoryPullRequest(db, factory, pullRequest, payload.PullRequest.Draft)
+		if err != nil {
+			log.WithError(err).Warnf("factory mergeability: failed to reopen pull request %s", pullRequest.ID)
+			continue
+		}
+		if !changed {
+			continue
+		}
+		reopened = append(reopened, *pullRequest)
+	}
+	return reopened
+}
+
+func reopenFactoryPullRequest(
+	db *gorm.DB,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+	draft bool,
+) (bool, error) {
+	changed := false
+	err := db.Transaction(func(tx *gorm.DB) error {
+		order, err := factory.FindWorkOrder(tx, pullRequest.WorkOrderID)
+		if err != nil {
+			return err
+		}
+		if err := order.LockForStatusChange(tx); err != nil {
+			return err
+		}
+		if err := pullRequest.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if pullRequest.State != models.FactoryPullRequestStateClosed {
+			return nil
+		}
+		state := models.FactoryPullRequestStateOpen
+		if draft {
+			state = models.FactoryPullRequestStateDraft
+		}
+		if err := pullRequest.Update(tx, models.FactoryPullRequestPatch{State: &state}); err != nil {
+			return err
+		}
+		changed = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return changed, nil
 }
 
 func stampFactoryPullRequestClosed(
@@ -180,7 +283,7 @@ func closeFactoryWorkOrderForPullRequest(
 	if err != nil {
 		return nil, err
 	}
-	if err := order.LockForUpdate(tx); err != nil {
+	if err := order.LockForStatusChange(tx); err != nil {
 		return nil, err
 	}
 
