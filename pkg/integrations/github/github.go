@@ -1357,7 +1357,7 @@ func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, insta
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
 	}
 
-	return github.NewClient(&http.Client{Transport: itr}), nil
+	return github.NewClient(&http.Client{Transport: common.WrapInstallationTransport(itr)}), nil
 }
 
 func findAppPrivateKey(ctx core.IntegrationContext) (string, error) {

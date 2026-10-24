@@ -757,7 +757,7 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 		authMethod: AuthMethodApp,
 		ownerType:  determineLegacyOwnerType(ctx),
 		owner:      owner,
-		underlying: github.NewClient(&http.Client{Transport: itr}),
+		underlying: github.NewClient(&http.Client{Transport: WrapInstallationTransport(itr)}),
 	}, nil
 }
 
@@ -863,7 +863,7 @@ func newGitHubAppClient(owner string, ownerType string, httpCtx core.HTTPContext
 		authMethod: AuthMethodApp,
 		ownerType:  ownerType,
 		owner:      owner,
-		underlying: github.NewClient(&http.Client{Transport: itr}),
+		underlying: github.NewClient(&http.Client{Transport: WrapInstallationTransport(itr)}),
 	}, nil
 }
 
