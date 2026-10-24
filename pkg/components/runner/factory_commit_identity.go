@@ -32,9 +32,9 @@ const (
 // A canvas that is not a factory app is left unchanged.
 func AttachFactoryCommitIdentity(
 	ctx core.ExecutionContext,
-	environment []BrokerEnvironmentVariable,
-	files []BrokerTaskFile,
-) ([]BrokerEnvironmentVariable, []BrokerTaskFile) {
+	environment []TaskEnvironmentVariable,
+	files []TaskFile,
+) ([]TaskEnvironmentVariable, []TaskFile) {
 	if !canvasBelongsToFactory(ctx) {
 		return environment, files
 	}
@@ -43,12 +43,12 @@ func AttachFactoryCommitIdentity(
 	environment = upsertEnvironment(environment, EnvGitAuthorEmail, FactoryAgentEmail)
 	environment = upsertEnvironment(environment, EnvGitCommitterName, FactoryAgentName)
 	environment = upsertEnvironment(environment, EnvGitCommitterEmail, FactoryAgentEmail)
-	files = upsertTaskFile(files, BrokerTaskFile{
+	files = upsertTaskFile(files, TaskFile{
 		Path:    FactoryGitWrapperPath,
 		Content: FactoryGitWrapperScript(),
 		Mode:    "0755",
 	})
-	files = upsertTaskFile(files, BrokerTaskFile{
+	files = upsertTaskFile(files, TaskFile{
 		Path:    FactoryGitHookPath,
 		Content: FactoryPrepareCommitMessageHook(),
 		Mode:    "0755",
@@ -72,17 +72,17 @@ func canvasBelongsToFactory(ctx core.ExecutionContext) bool {
 	return true
 }
 
-func upsertEnvironment(environment []BrokerEnvironmentVariable, name, value string) []BrokerEnvironmentVariable {
+func upsertEnvironment(environment []TaskEnvironmentVariable, name, value string) []TaskEnvironmentVariable {
 	for i := range environment {
 		if environment[i].Name == name {
 			environment[i].Value = value
 			return environment
 		}
 	}
-	return append(environment, BrokerEnvironmentVariable{Name: name, Value: value})
+	return append(environment, TaskEnvironmentVariable{Name: name, Value: value})
 }
 
-func upsertTaskFile(files []BrokerTaskFile, file BrokerTaskFile) []BrokerTaskFile {
+func upsertTaskFile(files []TaskFile, file TaskFile) []TaskFile {
 	for i := range files {
 		if files[i].Path == file.Path {
 			files[i] = file

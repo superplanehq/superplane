@@ -966,6 +966,12 @@ message DescribeOrganizationBillingResponse {
   SeatPurchase last_seat_purchase = 36;
   optional int32 pending_invitation_seats = 37;
   optional int32 invitable_seats = 38;
+  // When the current renewal payment failure started. Set only while the
+  // subscription is past due.
+  google.protobuf.Timestamp payment_failed_at = 39;
+  // When Team features end after a failed renewal payment. Set only while a
+  // grace period keeps them on.
+  google.protobuf.Timestamp paid_access_ends_at = 40;
 }
 
 message SeatPurchase {

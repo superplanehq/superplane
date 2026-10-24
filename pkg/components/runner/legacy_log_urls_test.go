@@ -6,17 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsLocalTaskBrokerURL(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, isLocalTaskBrokerURL("http://host.docker.internal:8091"))
-	assert.True(t, isLocalTaskBrokerURL("http://localhost:8091"))
-	assert.True(t, isLocalTaskBrokerURL("http://127.0.0.1:8091"))
-	assert.True(t, isLocalTaskBrokerURL("http://task-broker:8081"))
-	assert.False(t, isLocalTaskBrokerURL("https://broker.example"))
-	assert.False(t, isLocalTaskBrokerURL(""))
-}
-
 func TestBrowserTaskBrokerBaseURL(t *testing.T) {
 	t.Setenv("TASK_BROKER_HOST_PORT", "")
 

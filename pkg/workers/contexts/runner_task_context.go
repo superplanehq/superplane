@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/encryption"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
@@ -34,17 +33,6 @@ func NewRunnerTaskContext(
 		encryptor:      encryption.ForDB(tx, encryptor),
 		organizationID: organizationID,
 	}
-}
-
-func (c *RunnerTaskContext) IntegratedBackendEnabled() (bool, error) {
-	organization, err := models.FindOrganizationByIDInTransaction(
-		c.tx,
-		c.organizationID.String(),
-	)
-	if err != nil {
-		return false, err
-	}
-	return organization.HasExperimentalFeature(features.FeatureNewRunners), nil
 }
 
 func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error {
