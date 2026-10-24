@@ -48,3 +48,28 @@ func TestAgentUsageRequiresPlanPaymentMethod(t *testing.T) {
 	require.ErrorIs(t, err, models.ErrPaymentMethodRequired)
 	require.Empty(t, provider.defineSessions)
 }
+
+func TestAgentUsageRequiresActivePlan(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	provider := &fakeProvider{}
+	service := newService(t, r, provider)
+	canvas := setupCanvasForUser(t, r)
+	session, err := service.EnsureSession(t.Context(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	db := database.DB(t.Context())
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, nil)
+	require.NoError(t, err)
+	credit, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Greater(t, credit.RemainingMicros, int64(0), "the org must keep leftover credit")
+
+	_, err = service.EnsureSession(t.Context(), r.Organization.ID, r.User, canvas.ID)
+	require.ErrorIs(t, err, models.ErrHostedSubscriptionRequired)
+	_, err = service.SendMessage(t.Context(), r.Organization.ID, r.User, session.ID, "Start work", nil)
+	require.ErrorIs(t, err, models.ErrHostedSubscriptionRequired)
+	require.Zero(t, provider.sendCalled)
+	err = service.DefineOutcome(t.Context(), r.Organization.ID, r.User, session.ID, "Build it", "Works", 1)
+	require.ErrorIs(t, err, models.ErrHostedSubscriptionRequired)
+	require.Empty(t, provider.defineSessions)
+}

@@ -29,6 +29,7 @@ import { AnalysisPopupHeader, LoadingWorkOrderPopup } from "./workOrderPopupHead
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled } from "../planningSettingsModel";
 import { PopupShell } from "../work-order-popup-redesign/popupShared";
+import { useWorkOrderStartFooter } from "./useWorkOrderStartFooter";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -129,15 +130,18 @@ function AnalysisWorkOrderPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
+  const { sourceOnly, viewFixture: originalViewFixture } = analysisPopupView(fixture, factory);
+  const footer = useWorkOrderStartFooter(originalViewFixture.footer, organizationId, factoryId, fixture.lineName);
+  const viewFixture = { ...originalViewFixture, footer };
+  const startAllowed = canDispatch && !footer.actions.some((action) => action.kind === "start" && action.disabled);
   const draftStart = draftStartAction(
     fixture.footer.kind,
-    onDispatch,
+    startAllowed ? onDispatch : undefined,
     draftModel,
     factoryPlanningEnabled(factory) ? draftThinking : undefined,
   );
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
-  const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
   const unified = refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
     factory,
@@ -153,7 +157,7 @@ function AnalysisWorkOrderPopup({
       setDraftModel(model);
       setDraftThinking(thinkingLevel);
     },
-    disabled: isDispatching || !canDispatch,
+    disabled: isDispatching || !startAllowed,
   });
   const reviewArgs = analysisReviewArgs({
     viewFixture,
@@ -168,7 +172,7 @@ function AnalysisWorkOrderPopup({
     mutations,
     isDispatching,
     footerBusy: footerActions.busy,
-    canDispatch,
+    canDispatch: startAllowed,
     compact: analysisReviewCompact(showSidebarNote, viewFixture.footer.kind, sourceOnly),
     modelSelect: draftChrome.footerModelSelect,
     factory,

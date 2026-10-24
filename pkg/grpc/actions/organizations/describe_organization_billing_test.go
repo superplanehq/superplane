@@ -23,6 +23,46 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+func Test__DescribeOrganizationBillingHostedCreditAvailableUsesExactBalance(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	// A sub-cent remainder rounds down to zero cents, but the run gate stays open.
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+		OrganizationID: r.Organization.ID,
+		Bucket:         models.CreditBalanceBucketTrial,
+		TargetMicros:   5000,
+		ExpectedMicros: before.WelcomeRemainingMicros,
+		Note:           "support",
+		ActorAccountID: &r.Account.ID,
+	})
+	require.NoError(t, err)
+
+	resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.Zero(t, resp.RemainingCreditCents)
+	assert.True(t, resp.HostedCreditAvailable)
+	require.NoError(t, models.AssertHostedCreditAvailable(db, r.Organization.ID))
+
+	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+		OrganizationID: r.Organization.ID,
+		Bucket:         models.CreditBalanceBucketTrial,
+		TargetMicros:   0,
+		ExpectedMicros: 5000,
+		Note:           "support",
+		ActorAccountID: &r.Account.ID,
+	})
+	require.NoError(t, err)
+
+	resp, err = DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.Zero(t, resp.RemainingCreditCents)
+	assert.False(t, resp.HostedCreditAvailable)
+	assert.ErrorIs(t, models.AssertHostedCreditAvailable(db, r.Organization.ID), models.ErrHostedCreditEmpty)
+}
+
 func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -131,6 +171,20 @@ func Test__DescribeOrganizationBillingOccupiedOnNonPerSeatPlans(t *testing.T) {
 	}
 }
 
+func Test__DescribeOrganizationBillingNonePlanWithCreditDoesNotAllowRuns(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("POLAR_ACCESS_TOKEN", "")
+	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanNone, nil)
+	require.NoError(t, err)
+
+	resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, "none", resp.PlanCategory)
+	assert.Greater(t, resp.WelcomeRemainingCents, int64(0))
+	assert.False(t, resp.HostedExecutionAllowed)
+	assert.ErrorIs(t, models.AssertHostedRunAllowed(database.Conn(), r.Organization.ID, nil), models.ErrHostedSubscriptionRequired)
+}
+
 func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
@@ -142,6 +196,8 @@ func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, resp.BillingEnabled)
 	assert.False(t, resp.SubscriptionCheckoutEnabled)
+	assert.True(t, resp.HostedExecutionAllowed)
+	assert.True(t, resp.HostedCreditAvailable)
 	assertBillingSeatJSON(t, resp, nil)
 
 	_, err = SyncOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})

@@ -919,6 +919,9 @@ message DescribeOrganizationBillingResponse {
   optional int32 expected_renewal_seats = 32;
   optional int64 current_monthly_total_cents = 33;
   optional int64 expected_renewal_cents = 34;
+  // Exact hosted credit gate for new runs. Whole-cent balances round down,
+  // so clients must use this flag instead of remaining_credit_cents.
+  bool hosted_credit_available = 35;
 }
 
 message BillingPlanOption {
