@@ -226,13 +226,14 @@ func FindOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBil
 }
 
 // UpdateSeatCapacityState records when a per-seat plan starts or stops having
-// more members than purchased seats. It locks the billing plan row, so call it
-// after the member count is final in tx. It does not log. The caller logs the
+// more members than purchased seats. It counts the active members while it
+// holds the billing plan row lock, so a concurrent membership change commits
+// before the count or waits for it. It does not log. The caller logs the
 // returned transition after commit.
 //
 // A plan that is not an active per-seat plan has no over-capacity state. The
 // record clears without a transition, so a later recovery alerts again.
-func UpdateSeatCapacityState(tx *gorm.DB, orgID uuid.UUID, occupied int, now time.Time) (SeatCapacityTransition, error) {
+func UpdateSeatCapacityState(tx *gorm.DB, orgID uuid.UUID, now time.Time) (SeatCapacityTransition, error) {
 	transition := SeatCapacityTransition{Change: SeatCapacityUnchanged}
 	err := tx.Transaction(func(inner *gorm.DB) error {
 		plan, err := lockOrganizationBillingPlan(inner, orgID)
@@ -242,6 +243,12 @@ func UpdateSeatCapacityState(tx *gorm.DB, orgID uuid.UUID, occupied int, now tim
 		if !plan.IsPaidPerSeat() {
 			return plan.setOverCapacitySince(inner, nil)
 		}
+
+		count, err := CountActiveHumanUsersByOrganization(inner, orgID.String())
+		if err != nil {
+			return err
+		}
+		occupied := int(count)
 
 		purchased := 0
 		if plan.PurchasedSeats != nil {

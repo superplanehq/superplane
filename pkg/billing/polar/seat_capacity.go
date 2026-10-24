@@ -29,10 +29,12 @@ type SeatCapacityCheck struct {
 	Transition     models.SeatCapacityTransition
 }
 
-// RecheckSeatCapacity counts the active members of the organization and
-// updates its over-capacity record. Call it inside the transaction that
-// changed membership or the plan, and call Log after that transaction commits.
-// It does nothing when billing is off.
+// RecheckSeatCapacity updates the over-capacity record of the organization
+// from its current member count. Call it inside the transaction that changed
+// membership or the plan, and call Log after that transaction commits. The
+// count runs under the billing plan lock, so a concurrent membership change
+// cannot make a check miss the final count. It does nothing when billing is
+// off.
 func RecheckSeatCapacity(tx *gorm.DB, orgID uuid.UUID, cause SeatCapacityCause) (SeatCapacityCheck, error) {
 	check := SeatCapacityCheck{
 		OrganizationID: orgID,
@@ -42,11 +44,8 @@ func RecheckSeatCapacity(tx *gorm.DB, orgID uuid.UUID, cause SeatCapacityCause) 
 	if !models.BillingEnabled() {
 		return check, nil
 	}
-	occupied, err := models.CountActiveHumanUsersByOrganization(tx, orgID.String())
-	if err != nil {
-		return check, err
-	}
-	check.Transition, err = models.UpdateSeatCapacityState(tx, orgID, int(occupied), time.Now())
+	var err error
+	check.Transition, err = models.UpdateSeatCapacityState(tx, orgID, time.Now())
 	return check, err
 }
 
