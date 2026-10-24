@@ -1401,9 +1401,9 @@ func Test__OrganizationHasLivePolarSubscription(t *testing.T) {
 	t.Run("stored active subscription", func(t *testing.T) {
 		now := time.Now()
 		end := now.AddDate(0, 1, 0)
-		_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+		_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
 			ID: "sub_stored", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive, PeriodStart: &now, PeriodEnd: &end,
-		})
+		}, nil)
 		require.NoError(t, err)
 
 		live, err := models.OrganizationHasLivePolarSubscription(db, r.Organization.ID)

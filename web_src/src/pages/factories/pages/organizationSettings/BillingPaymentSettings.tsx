@@ -59,7 +59,7 @@ export function BillingPaymentSettings({
           />
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">
-            Contact an organization owner to set up payment or change plans.
+            Ask an organization admin to set up payment or change plans.
           </p>
         )}
       </FactorySettingsCard>

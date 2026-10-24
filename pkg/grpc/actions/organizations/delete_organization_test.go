@@ -89,10 +89,10 @@ func Test__DeleteOrganization_LivePolarSubscription(t *testing.T) {
 	applySubscription := func(t *testing.T, orgID uuid.UUID, status string, cancelAtPeriodEnd bool, periodEnd time.Time) {
 		t.Helper()
 		start := periodEnd.AddDate(0, -1, 0)
-		_, _, err := models.ApplyPolarSubscription(database.Conn(), orgID, models.PolarSubscriptionApply{
+		_, err := models.ApplyPolarSubscription(database.Conn(), orgID, models.PolarSubscriptionApply{
 			ID: "sub_delete_guard", ProductID: "prod_business", Status: status,
 			PeriodStart: &start, PeriodEnd: &periodEnd, CancelAtPeriodEnd: cancelAtPeriodEnd,
-		})
+		}, nil)
 		require.NoError(t, err)
 	}
 

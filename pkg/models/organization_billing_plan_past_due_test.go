@@ -72,7 +72,7 @@ func (p *pastDueReplay) apply(status string, mutate ...func(*models.PolarSubscri
 	for _, change := range mutate {
 		change(&sub)
 	}
-	_, _, err := models.ApplyPolarSubscription(p.db, p.orgID, sub)
+	_, err := models.ApplyPolarSubscription(p.db, p.orgID, sub, nil)
 	require.NoError(p.t, err)
 	return p.resolve()
 }
