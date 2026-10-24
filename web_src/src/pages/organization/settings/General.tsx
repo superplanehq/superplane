@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { OrganizationsOrganization } from "../../../api-client/types.gen";
@@ -13,9 +13,17 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
-import { getApiErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getApiErrorReason } from "@/lib/errors";
 import { organizationSlugValidationMessage, validateOrganizationSlug } from "@/lib/organizationSlug";
+import { organizationSettingsSectionPath } from "@/pages/factories/lib/factoryPagePaths";
 import { settingsCardClassName } from "./settingsPageStyles";
+
+const SUBSCRIPTION_LIVE_REASON = "ORGANIZATION_SUBSCRIPTION_LIVE";
+
+interface DeleteError {
+  message: string;
+  subscriptionLive?: boolean;
+}
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -33,7 +41,7 @@ export function General({ organization }: GeneralProps) {
   const [slug, setSlug] = useState(organization.metadata?.slug || "");
   const [slugError, setSlugError] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<DeleteError | null>(null);
   const [showDeleteForm, setShowDeleteForm] = useState(false);
 
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
@@ -94,7 +102,7 @@ export function General({ organization }: GeneralProps) {
       return;
     }
     if (deleteConfirmation !== (organization.metadata?.name || "")) {
-      setDeleteError("Confirmation text does not match the organization name.");
+      setDeleteError({ message: "Confirmation text does not match the organization name." });
       return;
     }
 
@@ -102,8 +110,11 @@ export function General({ organization }: GeneralProps) {
       setDeleteError(null);
       await deleteOrganizationMutation.mutateAsync();
       window.location.href = "/";
-    } catch {
-      setDeleteError("Failed to delete organization. Please try again.");
+    } catch (error) {
+      setDeleteError({
+        message: getApiErrorMessage(error, "Failed to delete organization. Please try again."),
+        subscriptionLive: getApiErrorReason(error) === SUBSCRIPTION_LIVE_REASON,
+      });
     }
   };
 
@@ -245,8 +256,23 @@ export function General({ organization }: GeneralProps) {
                   Delete Organization
                 </LoadingButton>
               </PermissionTooltip>
-              {deleteError && <span className="text-sm text-red-600 dark:text-red-400">{deleteError}</span>}
             </div>
+            {deleteError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {deleteError.message}
+                {deleteError.subscriptionLive && organizationId && (
+                  <>
+                    {" "}
+                    <Link
+                      to={organizationSettingsSectionPath(organizationId, "billing")}
+                      className="font-medium underline underline-offset-2"
+                    >
+                      Open Billing
+                    </Link>
+                  </>
+                )}
+              </p>
+            )}
           </>
         )}
       </Fieldset>
