@@ -65,6 +65,12 @@ type OrganizationBillingPlan struct {
 	TrialStartedAt          *time.Time
 	TrialEndsAt             *time.Time
 	UpdatedAt               time.Time
+
+	// RenewalSeatsScheduled is the last next-period seat count that SuperPlane
+	// scheduled in Polar, and RenewalSeatsScheduledAt is when it was sent.
+	// Subscription snapshots do not change them.
+	RenewalSeatsScheduled   *int
+	RenewalSeatsScheduledAt *time.Time
 }
 
 // PolarSubscriptionApply is the Polar subscription snapshot to persist.
@@ -243,6 +249,48 @@ func FindOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBil
 		return nil, err
 	}
 	return &plan, nil
+}
+
+// ListSeatRenewalSyncPlans returns the per-seat plans on an active Polar
+// subscription that is not set to cancel. The plan that renews first comes
+// first.
+func ListSeatRenewalSyncPlans(tx *gorm.DB) ([]OrganizationBillingPlan, error) {
+	var plans []OrganizationBillingPlan
+	err := tx.
+		Joins("JOIN billing_plans ON billing_plans.id = organization_billing_plans.plan_id").
+		Joins("JOIN organizations ON organizations.id = organization_billing_plans.organization_id").
+		Where("organizations.deleted_at IS NULL").
+		Where("billing_plans.per_seat = ?", true).
+		Where("organization_billing_plans.plan_source = ?", BillingPlanSourcePolar).
+		Where("organization_billing_plans.polar_subscription_id IS NOT NULL AND organization_billing_plans.polar_subscription_id <> ''").
+		Where("organization_billing_plans.polar_subscription_status = ?", PolarSubscriptionStatusActive).
+		Where("organization_billing_plans.cancel_at_period_end = ?", false).
+		Order("organization_billing_plans.current_period_end ASC NULLS LAST").
+		Order("organization_billing_plans.organization_id").
+		Find(&plans).Error
+	if err != nil {
+		return nil, err
+	}
+	return plans, nil
+}
+
+// RecordScheduledRenewalSeats stores the next-period seat count that
+// SuperPlane sent to Polar. It changes no other column, so the plan version
+// in updated_at stays the same.
+func (p *OrganizationBillingPlan) RecordScheduledRenewalSeats(tx *gorm.DB, seats int, sentAt time.Time) error {
+	sentAt = sentAt.UTC()
+	err := tx.Model(&OrganizationBillingPlan{}).
+		Where("organization_id = ?", p.OrganizationID).
+		UpdateColumns(map[string]any{
+			"renewal_seats_scheduled":    seats,
+			"renewal_seats_scheduled_at": sentAt,
+		}).Error
+	if err != nil {
+		return err
+	}
+	p.RenewalSeatsScheduled = &seats
+	p.RenewalSeatsScheduledAt = &sentAt
+	return nil
 }
 
 func lockOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {

@@ -59,7 +59,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 // Polar API call returned are verified; webhook payloads are not, because a
 // delayed event can claim access that Polar already ended.
 func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, verified bool) error {
-	orgID, err := parseSubscriptionOrganizationID(data)
+	orgID, err := data.OrganizationID()
 	if err != nil {
 		return err
 	}
@@ -306,7 +306,8 @@ func selectBusinessSubscription(items []SubscriptionData, storedID string, now t
 	return stored
 }
 
-func parseSubscriptionOrganizationID(data SubscriptionData) (uuid.UUID, error) {
+// OrganizationID identifies the organization in a subscription snapshot.
+func (data SubscriptionData) OrganizationID() (uuid.UUID, error) {
 	orgID, err := uuid.Parse(data.organizationExternalID())
 	if err != nil {
 		return uuid.Nil, permanentApplyError("subscription customer external id is not an organization id")

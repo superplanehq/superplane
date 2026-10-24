@@ -62,10 +62,13 @@ func TestInvitationGatewayReportsPastDuePayment(t *testing.T) {
 	server.InitRouter()
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 	t.Setenv(models.BillingEnabledEnv, "yes")
-	db := database.Conn()
-	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
+	db := database.DB(t.Context())
+	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+		ID: "sub_" + uuid.NewString(), ProductID: *plan.PolarProductID,
+		Status: models.PolarSubscriptionStatusActive, PurchasedSeats: new(3),
+	}, nil)
 	require.NoError(t, err)
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
 		"purchased_seats":           3,
