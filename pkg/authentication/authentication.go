@@ -901,7 +901,6 @@ func errorStatusForCodeError(err error) int {
 }
 
 var errSignupDisabled = fmt.Errorf(SignupDisabledError)
-var errInviteLinkInvalid = fmt.Errorf("invite link not found or disabled")
 var errAccountError = fmt.Errorf("Internal server error")
 
 // checkSignupPolicy verifies account access and whether a new-user signup
@@ -962,7 +961,7 @@ func (a *Handler) findOrCreateAccountForMagicCode(email string, r *http.Request)
 
 func errorStatusForAccountError(err error) int {
 	switch err {
-	case errSignupDisabled, errInviteLinkInvalid, models.ErrAccountBlocked:
+	case errSignupDisabled, models.ErrAccountBlocked:
 		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
