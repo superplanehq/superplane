@@ -360,10 +360,6 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		Error
 
 	if err == nil {
-		_, inviteErr := CreateInviteLink(tx, organization.ID)
-		if inviteErr != nil {
-			return nil, inviteErr
-		}
 		if BillingEnabled() {
 			if _, planErr := EnsureOrganizationBillingPlan(tx, organization.ID); planErr != nil {
 				return nil, planErr

@@ -135,7 +135,7 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   entry("organization", "general", "General", undefined, ["name", "organization slug", "slug", "workspace url"]),
 
   // Organization · Members
-  entry("organization", "members", "Members", undefined, ["invite", "invite link", "people", "team", "role"]),
+  entry("organization", "members", "Members", undefined, ["invite", "people", "team", "role"]),
 
   // Organization · Integrations (page-level; providers are added dynamically)
   entry("organization", "integrations", "Integrations", undefined, ["connect", "filter integrations", "integration"]),
