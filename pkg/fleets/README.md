@@ -143,6 +143,42 @@ Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich
 `superplane-runner-local:dev` image.
 
+Docker fleets can also configure the container process:
+
+| Field | Behavior |
+| --- | --- |
+| `docker.init` | Set `true` to add Docker's init process for signal forwarding and child process cleanup. |
+| `docker.user` | Override the image user with a username, UID, or `UID:GID`. An empty value keeps the image user. |
+| `docker.entrypoint` | Override the entrypoint with an executable and its arguments. An empty list keeps the image entrypoint. |
+
+Fleet Manager passes each entrypoint item as a separate argument. It appends
+the runner's `--url` and `--registration-token` arguments after the configured
+entrypoint arguments. It does not interpret shell expressions or remove
+empty arguments.
+
+For example, keep Docker's init process as root and run the released runner
+as `node` through `setpriv`:
+
+```yaml
+docker:
+  image: ghcr.io/superplanehq/runner:v0.2.1
+  architecture: amd64
+  network: superplane_default
+  runnerApiUrl: http://app:8000
+  init: true
+  user: "0:0"
+  entrypoint:
+    - /usr/bin/setpriv
+    - --reuid=node
+    - --regid=node
+    - --init-groups
+    - /usr/local/bin/runner
+```
+
+The init process runs as root. The runner and task commands use the image's
+`node` user. This configuration uses the released runner image without
+building another image.
+
 The runner sends OS, architecture, and hostname as registration fields. The
 server records the registration request's IP in the runner's `ip` field when available.
 It uses the rightmost `X-Forwarded-For` address from the ingress proxy, or the
