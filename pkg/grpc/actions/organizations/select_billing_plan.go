@@ -80,6 +80,12 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "Could not load the current plan.")
 	}
+	// While Polar retries a failed renewal, any selection would clear the
+	// stored subscription state and release the payment lock. Recovery comes
+	// from an updated payment method or a cancellation in the billing portal.
+	if models.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) {
+		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
+	}
 	if strings.TrimSpace(req.GetPlanKey()) == models.BillingPlanNone {
 		if req.Seats != nil {
 			return nil, grpcerrors.InvalidArgument(nil, "Seats are only available for per-seat plans.")
