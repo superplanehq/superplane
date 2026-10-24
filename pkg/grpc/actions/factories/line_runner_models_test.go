@@ -281,6 +281,34 @@ func Test__SerializeLineRunnerModels__NamesHostedSelectableKeys(t *testing.T) {
 	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetName())
 }
 
+func Test__ListHandOffLineModels__ReturnsSerializedRunnerModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6")
+	seedHostedModels(t, db, models.UsageProviderOpenRouter, "x-ai/grok-4.6")
+
+	app := createLineAppWithRunner(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	listed, err := ListHandOffLineModels(t.Context(), r.Organization.ID.String(), factoryModel.ID.String(), "")
+	require.NoError(t, err)
+	assert.Equal(t, []HandOffLineModel{
+		{
+			ID:   models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderAnthropic, "claude-sonnet-4-6"),
+			Name: "anthropic/claude-sonnet-4-6",
+		},
+		{
+			ID:   models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenRouter, "x-ai/grok-4.6"),
+			Name: "x-ai/grok-4.6",
+		},
+	}, listed)
+}
+
 func Test__ListLineRunnerModels__NoRunnerNodesReturnsEmpty(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

@@ -59,14 +59,22 @@ func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName stri
 		return nil, false, err
 	}
 
+	appIDs := make([]uuid.UUID, 0, len(line.Steps))
+	for _, step := range line.Steps {
+		appIDs = append(appIDs, step.AppID)
+	}
+	return listRunnerModelsForApps(tx, orgID, factoryID, appIDs)
+}
+
+func listRunnerModelsForApps(tx *gorm.DB, orgID, factoryID uuid.UUID, appIDs []uuid.UUID) ([]string, error) {
 	seen := map[string]struct{}{}
 	usesHostedFunding := false
 	var out []string
-	for _, step := range line.Steps {
-		if step.AppID == uuid.Nil {
+	for _, appID := range appIDs {
+		if appID == uuid.Nil {
 			continue
 		}
-		version, err := models.FindLiveCanvasVersionInTransaction(tx, step.AppID)
+		version, err := models.FindLiveCanvasVersionInTransaction(tx, appID)
 		if err != nil {
 			return nil, false, err
 		}
