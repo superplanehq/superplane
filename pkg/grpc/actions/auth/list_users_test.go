@@ -62,10 +62,14 @@ func TestListUsersSeatMetadata(t *testing.T) {
 	require.Nil(t, resp.SeatLimit)
 
 	maximum := 50
-	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, CreditFrequency: "none", CreditExpiration: "never"}
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
 	db := database.Conn()
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{"plan_id": plan.ID, "plan": plan.Key, "plan_source": "admin", "purchased_seats": 3}).Error)
+	_, err = models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+		ID: "sub_" + uuid.NewString(), ProductID: *plan.PolarProductID,
+		Status: models.PolarSubscriptionStatusActive, PurchasedSeats: new(3),
+	}, nil)
+	require.NoError(t, err)
 	for _, quantity := range []*int{&limit, nil} {
 		require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", quantity).Error)
 		for _, disabled := range []bool{false, true} {

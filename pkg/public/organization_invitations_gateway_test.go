@@ -24,9 +24,12 @@ func TestInvitationGatewayPermissionsAndCapacityDetails(t *testing.T) {
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	db := database.Conn()
-	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
+	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+		ID: "sub_" + uuid.NewString(), ProductID: *plan.PolarProductID,
+		Status: models.PolarSubscriptionStatusActive, PurchasedSeats: new(1),
+	}, nil)
 	require.NoError(t, err)
 	path := "/api/v1/organizations/" + r.Organization.ID.String() + "/invitations"
 	response := execRequest(server, requestParams{method: http.MethodPost, path: path, authCookie: token, headers: map[string]string{"x-organization-id": r.Organization.ID.String()}, contentType: "application/json", body: []byte(`{"email":"recipient@example.com"}`)})
