@@ -128,7 +128,16 @@ func (s *InvitationService) List(ctx context.Context, orgID string) (*pb.ListInv
 		for i := range invitations {
 			response.Invitations = append(response.Invitations, invitationToProto(&invitations[i]))
 		}
-		response.Seats = &pb.InvitationSeatSummary{PerSeat: seats.PerSeat, Purchased: seatCountToProto(seats.Purchased), Occupied: int64(seats.Occupied), PendingInvitations: int64(seats.PendingInvitations), Invitable: seatCountToProto(seats.Invitable), Purchasable: seatCountToProto(seats.Purchasable), MemberLimit: seatCountToProto(seats.MemberLimit)}
+		response.Seats = &pb.InvitationSeatSummary{
+			PerSeat:            seats.PerSeat,
+			Purchased:          seatCountToProto(seats.Purchased),
+			Occupied:           int64(seats.Occupied),
+			PendingInvitations: int64(seats.PendingInvitations),
+			Invitable:          seatCountToProto(seats.Invitable),
+			Purchasable:        seatCountToProto(seats.Purchasable),
+			MemberLimit:        seatCountToProto(seats.MemberLimit),
+			PaymentBlocked:     seats.PaymentBlocked,
+		}
 		return nil
 	})
 	if err != nil {

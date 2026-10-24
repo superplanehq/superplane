@@ -151,6 +151,32 @@ func TestAcceptInvitationRejectsInvalidRecipientOrState(t *testing.T) {
 	}
 }
 
+func TestAcceptInvitationForExistingMemberWhilePaymentBlocked(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(2))
+	account, err := models.CreateAccount("Invitee", "invitee@example.com")
+	require.NoError(t, err)
+	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
+	created, err := s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.CreateInvitationRequest{Email: account.Email})
+	require.NoError(t, err)
+	// The invitee joins through another path before accepting this invitation.
+	_, err = models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("polar_subscription_status", models.PolarSubscriptionStatusPastDue).Error)
+	token := strings.TrimPrefix(created.AcceptanceUrl, "https://example.com/invitations/")
+	for range 2 {
+		response, err := s.Accept(context.Background(), account.ID.String(), token)
+		require.NoError(t, err)
+		require.Equal(t, "already_member", response.Fields["status"].GetStringValue())
+	}
+	occupied, err := models.CountActiveHumanUsersByOrganization(db, r.Organization.ID.String())
+	require.NoError(t, err)
+	require.EqualValues(t, 2, occupied)
+}
+
 func TestAcceptInvitationConcurrentRetries(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
