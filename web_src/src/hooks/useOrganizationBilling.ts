@@ -7,6 +7,7 @@ import {
   organizationsDescribeOrganizationBilling,
   organizationsResumeOrganizationSubscription,
   organizationsSyncOrganizationBilling,
+  type OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -16,17 +17,36 @@ export function organizationBillingQueryKey(organizationId: string) {
   return ["organizations", organizationId, "billing"] as const;
 }
 
-export async function syncOrganizationBilling(organizationId: string, queryClient: QueryClient) {
-  const response = await organizationsSyncOrganizationBilling(
-    withOrganizationHeader({
-      organizationId,
-      path: { id: organizationId },
-      body: {},
-    }),
-  );
-  if (!response.data) throw new Error("SuperPlane could not synchronize billing. Try again.");
-  queryClient.setQueryData(organizationBillingQueryKey(organizationId), response.data);
-  await invalidateOrganizationModelAccess(queryClient, organizationId);
+const billingSynchronizations = new WeakMap<
+  QueryClient,
+  Map<string, Promise<OrganizationsDescribeOrganizationBillingResponse>>
+>();
+
+export function syncOrganizationBilling(organizationId: string, queryClient: QueryClient) {
+  let synchronizations = billingSynchronizations.get(queryClient);
+  if (!synchronizations) {
+    synchronizations = new Map();
+    billingSynchronizations.set(queryClient, synchronizations);
+  }
+  const pending = synchronizations.get(organizationId);
+  if (pending) return pending;
+
+  const synchronize = async () => {
+    const response = await organizationsSyncOrganizationBilling(
+      withOrganizationHeader({
+        organizationId,
+        path: { id: organizationId },
+        body: {},
+      }),
+    );
+    if (!response.data) throw new Error("SuperPlane could not synchronize billing. Try again.");
+    queryClient.setQueryData(organizationBillingQueryKey(organizationId), response.data);
+    await invalidateOrganizationModelAccess(queryClient, organizationId);
+    return response.data;
+  };
+  const synchronization = synchronize().finally(() => synchronizations.delete(organizationId));
+  synchronizations.set(organizationId, synchronization);
+  return synchronization;
 }
 
 export function invalidateOrganizationModelAccess(queryClient: QueryClient, organizationId: string) {
@@ -119,7 +139,7 @@ export function useOrganizationSubscriptionActions(organizationId: string) {
     try {
       await cancelSubscription.mutateAsync();
     } catch (cancelError) {
-      showErrorToast(getApiErrorMessage(cancelError, "Unable to cancel Business."));
+      showErrorToast(getApiErrorMessage(cancelError, "Unable to cancel subscription."));
       throw cancelError;
     }
   }, [cancelSubscription]);
@@ -128,7 +148,7 @@ export function useOrganizationSubscriptionActions(organizationId: string) {
     try {
       await resumeSubscription.mutateAsync();
     } catch (keepError) {
-      showErrorToast(getApiErrorMessage(keepError, "Unable to keep Business."));
+      showErrorToast(getApiErrorMessage(keepError, "Unable to keep subscription."));
       throw keepError;
     }
   }, [resumeSubscription]);

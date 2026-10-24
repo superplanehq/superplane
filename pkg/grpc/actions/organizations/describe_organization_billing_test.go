@@ -100,6 +100,7 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	}
 	expected := map[string]any{
 		"purchasedSeats": float64(10), "occupiedSeats": float64(9), "availableSeats": float64(1),
+		"pendingInvitationSeats": float64(0), "invitableSeats": float64(1),
 		"planMaximumSeats": float64(50), "purchasableSeats": float64(40), "expectedRenewalSeats": float64(9),
 		"currentMonthlyTotalCents": "29000", "expectedRenewalCents": "26100",
 	}
@@ -111,17 +112,28 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	}
 	check()
 
+	now := time.Now()
+	invitation := models.OrganizationInvitation{
+		OrganizationID: r.Organization.ID, Email: "pending@example.com", Role: models.RoleOrgOperator,
+		InvitedBy: r.User, State: models.InvitationStatePending, SentAt: now, ExpiresAt: now.Add(time.Hour),
+	}
+	require.NoError(t, invitation.Save(db))
+	expected["pendingInvitationSeats"], expected["invitableSeats"] = float64(1), float64(0)
+	check()
+
 	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, new(80)))
 	expected["planMaximumSeats"], expected["purchasableSeats"] = float64(80), float64(70)
 	check()
 
 	require.NoError(t, db.Delete(&models.User{}, "id = ?", r.User).Error)
 	expected["occupiedSeats"], expected["availableSeats"], expected["expectedRenewalSeats"] = float64(8), float64(2), float64(8)
+	expected["invitableSeats"] = float64(1)
 	expected["expectedRenewalCents"] = "23200"
 	check()
 
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", nil).Error)
 	expected["purchasedSeats"], expected["availableSeats"], expected["purchasableSeats"] = float64(0), float64(0), float64(80)
+	expected["invitableSeats"] = float64(0)
 	expected["currentMonthlyTotalCents"] = "0"
 	check()
 
@@ -144,7 +156,7 @@ func assertBillingSeatJSON(t *testing.T, resp *pb.DescribeOrganizationBillingRes
 	require.NoError(t, err)
 	var fields map[string]any
 	require.NoError(t, json.Unmarshal(body, &fields))
-	for _, key := range []string{"purchasedSeats", "occupiedSeats", "availableSeats", "planMaximumSeats", "purchasableSeats", "expectedRenewalSeats", "currentMonthlyTotalCents", "expectedRenewalCents"} {
+	for _, key := range []string{"purchasedSeats", "occupiedSeats", "availableSeats", "pendingInvitationSeats", "invitableSeats", "planMaximumSeats", "purchasableSeats", "expectedRenewalSeats", "currentMonthlyTotalCents", "expectedRenewalCents"} {
 		value, present := expected[key]
 		if !present {
 			assert.NotContains(t, fields, key)
@@ -155,7 +167,7 @@ func assertBillingSeatJSON(t *testing.T, resp *pb.DescribeOrganizationBillingRes
 	}
 }
 
-func Test__DescribeOrganizationBillingOccupiedOnNonPerSeatPlans(t *testing.T) {
+func Test__DescribeOrganizationBillingSeatUsageOnNonPerSeatPlans(t *testing.T) {
 	for _, key := range []string{"business_legacy", "trial", "none"} {
 		t.Run(key, func(t *testing.T) {
 			r := support.Setup(t)
@@ -169,10 +181,16 @@ func Test__DescribeOrganizationBillingOccupiedOnNonPerSeatPlans(t *testing.T) {
 				"trial_ends_at": time.Now().Add(time.Hour), "purchased_seats": 99,
 			}).Error)
 			support.CreateUser(t, r, r.Organization.ID)
+			now := time.Now()
+			invitation := models.OrganizationInvitation{
+				OrganizationID: r.Organization.ID, Email: "pending@example.com", Role: models.RoleOrgOperator,
+				InvitedBy: r.User, State: models.InvitationStatePending, SentAt: now, ExpiresAt: now.Add(time.Hour),
+			}
+			require.NoError(t, invitation.Save(db))
 			resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
 			require.NoError(t, err)
 			assert.False(t, resp.PlanPerSeat)
-			assertBillingSeatJSON(t, resp, map[string]any{"occupiedSeats": float64(2)})
+			assertBillingSeatJSON(t, resp, map[string]any{"occupiedSeats": float64(2), "pendingInvitationSeats": float64(1)})
 		})
 	}
 }
