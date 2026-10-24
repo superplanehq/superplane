@@ -77,11 +77,17 @@ func (s *InvitationService) Create(ctx context.Context, orgID, inviterID string,
 		if err := requireInvitationCapacity(tx, organization, false); err != nil {
 			return err
 		}
+		if err := requireInvitationSendAllowed(tx, organization, email, now); err != nil {
+			return err
+		}
 		token, err = prepareInvitation(tx, invitation, now)
 		if err != nil {
 			return err
 		}
 		if err := invitation.Save(tx); err != nil {
+			return err
+		}
+		if err := models.RecordOrganizationInvitationSend(tx, organization, email, now); err != nil {
 			return err
 		}
 		// Load the inviter name in the same transaction as the invitation.
@@ -179,6 +185,9 @@ func (s *InvitationService) Resend(ctx context.Context, orgID, actorID, invitati
 		if err := requireInvitationCapacity(tx, organization, invitation.State == models.InvitationStatePending); err != nil {
 			return err
 		}
+		if err := requireInvitationSendAllowed(tx, organization, invitation.Email, now); err != nil {
+			return err
+		}
 		if err := invitation.ArchiveToken(tx); err != nil {
 			return err
 		}
@@ -186,7 +195,10 @@ func (s *InvitationService) Resend(ctx context.Context, orgID, actorID, invitati
 		if err != nil {
 			return err
 		}
-		return invitation.Save(tx)
+		if err := invitation.Save(tx); err != nil {
+			return err
+		}
+		return models.RecordOrganizationInvitationSend(tx, organization, invitation.Email, now)
 	})
 	if err != nil {
 		return nil, invitationActionError(err)
@@ -304,6 +316,43 @@ func requireInvitationCapacity(tx *gorm.DB, orgID uuid.UUID, alreadyPending bool
 	}
 	if seats.MemberLimit != nil && seats.Occupied >= *seats.MemberLimit {
 		return grpcerrors.FailedPreconditionWithReason("This organization has reached its member limit.", "MEMBER_LIMIT_REACHED")
+	}
+	if seats.MemberLimit == nil && !alreadyPending {
+		return requirePendingInvitationRoom(tx, orgID)
+	}
+	return nil
+}
+
+// requirePendingInvitationRoom caps pending invitations for organizations
+// that no seat or member limit bounds. ResolveSeats reports no pending
+// invitations when billing is off, so this counts them directly.
+func requirePendingInvitationRoom(tx *gorm.DB, orgID uuid.UUID) error {
+	pending, err := models.CountPendingOrganizationInvitations(tx, orgID)
+	if err != nil {
+		return err
+	}
+	if pending >= loadInvitationLimits().pending {
+		return grpcerrors.FailedPreconditionWithReason("This organization has too many pending invitations. Cancel some before you send more.", "PENDING_INVITATION_LIMIT_REACHED")
+	}
+	return nil
+}
+
+// requireInvitationSendAllowed limits invitation emails per organization and
+// per recipient address of that organization. It reads counts from the
+// database, so the limits hold across server replicas. The caller holds the
+// organization lock, which serializes the check and the send record.
+func requireInvitationSendAllowed(tx *gorm.DB, orgID uuid.UUID, email string, now time.Time) error {
+	limits := loadInvitationLimits()
+	orgSends, err := models.CountOrganizationInvitationSendsSince(tx, orgID, now.Add(-invitationOrgWindow))
+	if err != nil {
+		return err
+	}
+	recipientSends, err := models.CountRecipientInvitationSendsSince(tx, orgID, email, now.Add(-invitationRecipientWindow))
+	if err != nil {
+		return err
+	}
+	if orgSends >= limits.orgHourly || recipientSends >= limits.recipientDaily {
+		return grpcerrors.ResourceExhaustedWithReason("Too many invitations were sent. Try again later.", "INVITATION_RATE_LIMITED")
 	}
 	return nil
 }
