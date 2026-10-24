@@ -1,6 +1,9 @@
 package checks
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,13 +63,87 @@ func Test__NormalizePullRequestChecks(t *testing.T) {
 	assert.Equal(t, "check-run:dco:DCO", checks[0].Key)
 	assert.Equal(t, "failure", checks[0].Conclusion)
 	assert.Equal(t, "DCO required", checks[0].Description)
-	assert.Equal(t, "The DCO check failed.", checks[0].Summary)
+	assert.Equal(t, "\n\nThe DCO check failed.\nSee the log.", checks[0].Summary)
 	assert.Equal(t, "check-run:github-actions:lint", checks[1].Key)
 	assert.Equal(t, checkStatusPending, checks[1].Status)
 	assert.Equal(t, "status:ci/semaphore", checks[2].Key)
 	assert.Equal(t, "success", checks[2].Conclusion)
 	assert.Equal(t, "CI", checks[2].Summary)
 	assert.Equal(t, "https://example.com/ci-later", checks[2].DetailsURL)
+}
+
+func Test__NormalizePullRequestChecks_KeepsCheckRunHTMLBody(t *testing.T) {
+	t.Parallel()
+
+	previewTable := strings.Join([]string{
+		"<table>",
+		"<tr><td><strong>Preview URL:</strong></td>",
+		`<td><a href="https://preview.pages.dev">Visit Preview</a></td></tr>`,
+		"</table>",
+	}, "\n")
+	details := "Last deploy finished in 12s."
+
+	checks := normalizePullRequestChecks(&github.ListCheckRunsResults{
+		CheckRuns: []*github.CheckRun{
+			{
+				Name:       github.Ptr("Cloudflare Pages"),
+				Status:     github.Ptr("completed"),
+				Conclusion: github.Ptr("success"),
+				DetailsURL: github.Ptr("https://example.com/pages"),
+				App:        &github.App{Slug: github.Ptr("cloudflare-pages")},
+				Output: &github.CheckRunOutput{
+					Title:   github.Ptr("Deploy successful"),
+					Summary: github.Ptr(previewTable),
+					Text:    github.Ptr(details),
+				},
+			},
+		},
+	}, nil)
+
+	require.Len(t, checks, 1)
+	assert.Equal(t, "success", checks[0].Conclusion)
+	assert.Equal(t, "Deploy successful", checks[0].Description)
+	assert.Equal(t, "\n\n"+previewTable+"\n\n"+details, checks[0].Summary)
+	assert.Contains(t, checks[0].Summary, "https://preview.pages.dev")
+}
+
+func Test__NormalizePullRequestChecks_SkipsDuplicateCheckRunText(t *testing.T) {
+	t.Parallel()
+
+	body := "<p>Deploy successful.</p>"
+	checks := normalizePullRequestChecks(&github.ListCheckRunsResults{
+		CheckRuns: []*github.CheckRun{
+			{
+				Name:   github.Ptr("Cloudflare Pages"),
+				Status: github.Ptr("completed"),
+				App:    &github.App{Slug: github.Ptr("cloudflare-pages")},
+				Output: &github.CheckRunOutput{
+					Summary: github.Ptr(body),
+					Text:    github.Ptr(body),
+				},
+			},
+		},
+	}, nil)
+
+	require.Len(t, checks, 1)
+	assert.Equal(t, "\n\n"+body, checks[0].Summary)
+}
+
+func Test__NormalizePullRequestChecks_LeavesCommitStatusDescription(t *testing.T) {
+	t.Parallel()
+
+	checks := normalizePullRequestChecks(nil, &github.CombinedStatus{
+		Statuses: []*github.RepoStatus{
+			{
+				Context:     github.Ptr("ci/semaphore"),
+				State:       github.Ptr("success"),
+				Description: github.Ptr("CI passed"),
+			},
+		},
+	})
+
+	require.Len(t, checks, 1)
+	assert.Equal(t, "CI passed", checks[0].Summary)
 }
 
 func Test__EvaluatePullRequestChecks(t *testing.T) {
@@ -142,6 +219,105 @@ func Test__EvaluatePullRequestChecks(t *testing.T) {
 		assert.Equal(t, waitChecksOutcomeTimedOut, evaluation.Outcome)
 		assert.True(t, evaluation.AllTerminal)
 	})
+}
+
+func Test__StoredCheckLists_OmitBodiesFromAllChecks(t *testing.T) {
+	t.Parallel()
+
+	body := "\n\n" + strings.Repeat("a", 1024)
+	check := PullRequestCheck{Key: "check-run:ci:build", Name: "build", Summary: body}
+	stored, selected, failed := storedCheckLists(waitChecksEvaluation{
+		Checks:         []PullRequestCheck{check, {Key: "status:lint", Name: "lint", Summary: "ok"}},
+		SelectedChecks: []PullRequestCheck{check},
+		FailedChecks:   []PullRequestCheck{check},
+	})
+
+	require.Len(t, stored, 2)
+	assert.Empty(t, stored[0].Summary)
+	assert.Empty(t, stored[1].Summary)
+	require.Len(t, selected, 1)
+	assert.Equal(t, body, selected[0].Summary)
+	require.Len(t, failed, 1)
+	assert.Equal(t, body, failed[0].Summary)
+}
+
+func Test__LimitCheckSummaries_CapsLongBodies(t *testing.T) {
+	t.Parallel()
+
+	body := "\n\n" + strings.Repeat("a", maxCheckSummaryBytes+2048)
+	limited := limitCheckSummaries([]PullRequestCheck{{Name: "build", Summary: body}})
+	require.Len(t, limited, 1)
+	assert.LessOrEqual(t, len(limited[0].Summary), maxCheckSummaryBytes)
+	assert.True(t, strings.HasPrefix(limited[0].Summary, "\n\n"))
+	assert.True(t, strings.HasSuffix(limited[0].Summary, "\n..."))
+}
+
+func Test__LimitCheckSummaries_KeepsHTMLTableWhenBodyExceedsCap(t *testing.T) {
+	t.Parallel()
+
+	table := strings.Join([]string{
+		"<table>",
+		"<tr><td><strong>Preview URL:</strong></td>",
+		`<td><a href="https://preview.pages.dev">Visit Preview</a></td></tr>`,
+		"</table>",
+	}, "\n")
+	body := "\n\n" + strings.Repeat("log line\n", 2500) + table
+	require.Greater(t, len(body), maxCheckSummaryBytes)
+
+	limited := limitCheckSummaries([]PullRequestCheck{{Name: "Cloudflare Pages", Summary: body}})
+	require.Len(t, limited, 1)
+	assert.LessOrEqual(t, len(limited[0].Summary), maxCheckSummaryBytes)
+	assert.Contains(t, limited[0].Summary, table)
+	assert.Contains(t, limited[0].Summary, "https://preview.pages.dev")
+	assert.True(t, strings.HasSuffix(limited[0].Summary, "\n..."))
+}
+
+func Test__LimitCheckSummary_DoesNotSplitHTMLTags(t *testing.T) {
+	t.Parallel()
+
+	body := "\n\n" + strings.Repeat("a", maxCheckSummaryBytes-8) + "<p>hello</p>"
+	limited := limitCheckSummary(body, maxCheckSummaryBytes)
+	assert.LessOrEqual(t, len(limited), maxCheckSummaryBytes)
+	assert.NotRegexp(t, `<[^>]*$`, strings.TrimSuffix(limited, "\n..."))
+	assert.NotContains(t, limited, "<p")
+}
+
+func Test__StoredCheckLists_StayUnderEventPayloadLimit(t *testing.T) {
+	t.Parallel()
+
+	body := "\n\n" + strings.Repeat("a", 60*1024)
+	checks := make([]PullRequestCheck, 5)
+	for i := range checks {
+		checks[i] = PullRequestCheck{
+			Key:        fmt.Sprintf("check-run:ci:check-%d", i),
+			Name:       fmt.Sprintf("check-%d", i),
+			Kind:       checkKindCheckRun,
+			Status:     checkStatusCompleted,
+			Conclusion: "failure",
+			Summary:    body,
+		}
+	}
+
+	stored, selected, failed := storedCheckLists(waitChecksEvaluation{
+		Checks:         checks,
+		SelectedChecks: checks,
+		FailedChecks:   checks,
+	})
+	event, err := json.Marshal(map[string]any{
+		"type":      waitChecksPayloadType,
+		"timestamp": time.Now(),
+		"data": WaitForPullRequestChecksOutput{
+			Repository:     "acme/app",
+			SHA:            strings.Repeat("b", 40),
+			Checks:         stored,
+			SelectedChecks: selected,
+			FailedChecks:   failed,
+			StartedAt:      time.Now(),
+			CompletedAt:    time.Now(),
+		},
+	})
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(event), 512*1024)
 }
 
 func Test__NextEvaluateDelay(t *testing.T) {
