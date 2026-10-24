@@ -12,6 +12,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   cursor: "Cursor",
   pagerduty: "PagerDuty",
   productive: "Productive",
+  notion: "Notion",
   slack: "Slack",
   digitalocean: "DigitalOcean",
   discord: "Discord",

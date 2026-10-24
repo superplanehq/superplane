@@ -1,0 +1,185 @@
+---
+title: "Notion"
+---
+
+Search Notion and create pages
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Page" href="#create-page" description="Create a page under a Notion page or data source" />
+  <LinkCard title="Search" href="#search" description="Search shared Notion pages and data sources by title" />
+</CardGrid>
+
+## Instructions
+
+Connect an internal Notion integration to search shared content and create pages.
+
+1. Create an internal integration in [Notion integrations](https://www.notion.so/my-integrations).
+2. Enable **Read content** and **Insert content**.
+3. Open each parent page or database in Notion. Use **Connections** to share it with the integration.
+4. Copy the internal integration secret and enter it below.
+
+The connection can only access content shared with it. A successful connection does not grant access to every page.
+
+For database entries, use a **data source ID**, not the database ID.
+In Notion, open the database settings, select **Manage data sources**, and copy the data source ID.
+
+<a id="create-page"></a>
+
+## Create Page
+
+**Component key:** `notion.createPage`
+
+Create Page creates one Notion page under an existing page or data source.
+
+### Configuration
+
+- **Parent type**: Select Page for a child page or Data Source for a database entry.
+- **Parent ID**: Enter the page ID or data source ID. Expressions can supply the ID at execution time.
+- **Title**: Enter the page title. The maximum length is 2,000 characters.
+- **Properties**: For a data source, optionally enter a JSON object with additional page properties.
+- **Children**: Optionally enter a JSON array of Notion blocks for the page content.
+
+Use a data source ID, not a database ID. In Notion, open **Manage data sources** and copy the data source ID.
+The component reads the current data source schema to find its title property. It supports custom title property names.
+Set the title with the Title field. Do not include the title property in Properties.
+
+Properties must match the selected data source schema. For example: &lbrace;"Status":&lbrace;"select":&lbrace;"name":"Open"&rbrace;&rbrace;&rbrace;.
+Properties and Children also accept expressions that return an object or array, such as &lbrace;&lbrace; previous().data.children &rbrace;&rbrace;.
+Children must use the [Notion block format](https://developers.notion.com/reference/block).
+For example: [&lbrace;"object":"block","type":"paragraph","paragraph":&lbrace;"rich_text":[&lbrace;"type":"text","text":&lbrace;"content":"Runbook steps"&rbrace;&rbrace;]&rbrace;&rbrace;].
+Requests can contain at most 100 top-level blocks and 500 KB of JSON. Notion validates other content and schema limits.
+
+### Permissions and output
+
+Share the parent with the connection. Enable Insert content. Data source schema reads also need Read content.
+The output contains the native page in data, including id, url, parent, and properties.
+
+The component does not retry creation automatically. After a network or server error, the page may already exist.
+Check Notion before you try again. A repeated run can create another page.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_time": "2026-10-24T12:00:00Z",
+    "id": "a158c234-9cc1-4a4c-8afc-016575941f45",
+    "last_edited_time": "2026-10-24T12:00:00Z",
+    "object": "page",
+    "parent": {
+      "data_source_id": "6fbebdc7-2032-43a6-91d7-65b966258954",
+      "type": "data_source_id"
+    },
+    "properties": {
+      "Runbook name": {
+        "id": "title",
+        "title": [
+          {
+            "plain_text": "Incident runbook",
+            "text": {
+              "content": "Incident runbook"
+            },
+            "type": "text"
+          }
+        ],
+        "type": "title"
+      },
+      "Status": {
+        "id": "status",
+        "select": {
+          "color": "blue",
+          "name": "Open"
+        },
+        "type": "select"
+      }
+    },
+    "url": "https://www.notion.so/a158c2349cc14a4c8afc016575941f45"
+  },
+  "timestamp": "2026-10-24T12:00:00Z",
+  "type": "notion.page"
+}
+```
+
+<a id="search"></a>
+
+## Search
+
+**Component key:** `notion.search`
+
+Search returns one page of Notion results from content shared with the connection.
+
+### Configuration
+
+- **Query**: Match text in page and data source titles. Leave empty to list accessible objects.
+- **Object type**: Select pages, data sources, or both.
+- **Page size**: Return between 1 and 100 results. The default is 100.
+- **Start cursor**: Use the previous output's next_cursor to request the next page. Keep the query and filters unchanged.
+- **Sort direction**: Optionally sort by the last edit time.
+
+### Output
+
+One event contains the native response in data, including results, has_more, and next_cursor.
+An empty results list is a successful search.
+
+Search matches titles, not page content. Data sources contain database entries and their property schema.
+Search does not query the entries in a data source. Newly shared or created content may take time to appear.
+The connection needs Read content access. Requests are not retried automatically.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "has_more": true,
+    "next_cursor": "example-opaque-cursor",
+    "object": "list",
+    "results": [
+      {
+        "id": "a158c234-9cc1-4a4c-8afc-016575941f45",
+        "object": "page",
+        "properties": {
+          "title": {
+            "id": "title",
+            "title": [
+              {
+                "plain_text": "Incident runbook",
+                "text": {
+                  "content": "Incident runbook"
+                },
+                "type": "text"
+              }
+            ],
+            "type": "title"
+          }
+        },
+        "url": "https://www.notion.so/a158c2349cc14a4c8afc016575941f45"
+      },
+      {
+        "id": "6fbebdc7-2032-43a6-91d7-65b966258954",
+        "object": "data_source",
+        "parent": {
+          "database_id": "54d3907f-adc9-46fe-aee7-c4d4967d0611",
+          "type": "database_id"
+        },
+        "title": [
+          {
+            "plain_text": "Runbooks",
+            "text": {
+              "content": "Runbooks"
+            },
+            "type": "text"
+          }
+        ],
+        "url": "https://www.notion.so/6fbebdc7203243a691d765b966258954"
+      }
+    ]
+  },
+  "timestamp": "2026-10-24T12:00:00Z",
+  "type": "notion.search"
+}
+```
+
