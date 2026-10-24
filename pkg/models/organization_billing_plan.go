@@ -363,7 +363,11 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 		if err := SettleSeatPurchase(inner, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
 			return err
 		}
-		catalog, catalogErr := FindBillingPlanByProduct(inner, sub.ProductID)
+		// Lock the plan row before reading its fields and keep the lock through
+		// the plan_id write. SaveBillingPlan takes the same lock, so a
+		// concurrent admin save cannot unlink or re-link the plan between this
+		// lookup and the assignment.
+		catalog, catalogErr := LockBillingPlanByProduct(inner, sub.ProductID)
 		if catalogErr != nil && !errors.Is(catalogErr, gorm.ErrRecordNotFound) {
 			return catalogErr
 		}
