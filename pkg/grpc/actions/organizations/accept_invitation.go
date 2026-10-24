@@ -81,6 +81,9 @@ func (s *InvitationService) Accept(ctx context.Context, accountID, token string)
 		if activeMember {
 			statusValue = "already_member"
 		} else {
+			if err := s.requireActiveInviter(ctx, tx, invitation); err != nil {
+				return err
+			}
 			seats, err := entitlements.ResolveSeats(tx, org.ID)
 			if err != nil {
 				return err
@@ -115,6 +118,31 @@ func (s *InvitationService) Accept(ctx context.Context, accountID, token string)
 		return nil, invitationActionError(err)
 	}
 	return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
+}
+
+// Elevated invitations are valid only while the inviter can still grant them.
+func (s *InvitationService) requireActiveInviter(ctx context.Context, tx *gorm.DB, invitation *models.OrganizationInvitation) error {
+	if invitation.Role == models.RoleOrgOperator {
+		return nil
+	}
+	orgID := invitation.OrganizationID.String()
+	inviterID := invitation.InvitedBy.String()
+	revoked := grpcerrors.FailedPreconditionWithReason("Ask an organization admin to send this invitation again.", "INVITATION_INVITER_REVOKED")
+	inviter, err := models.FindActiveUserByIDInTransaction(tx, orgID, inviterID)
+	if errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && inviter.DeletedAt.Valid) {
+		return revoked
+	}
+	if err != nil {
+		return err
+	}
+	allowed, err := s.AuthService.CheckOrganizationPermission(ctx, inviterID, orgID, "members", "update")
+	if err != nil {
+		return grpcerrors.Internal(err, "Failed to check the inviter permissions.")
+	}
+	if !allowed {
+		return revoked
+	}
+	return nil
 }
 
 // Only acceptance consults history. A replaced token cannot authorize signup.

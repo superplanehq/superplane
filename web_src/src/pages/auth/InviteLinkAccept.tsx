@@ -135,6 +135,7 @@ const invitationReasonMessages: Record<string, string> = {
   INVITATION_CANCELED: "This invitation was canceled. Ask an organization admin for a new invitation.",
   INVITATION_ALREADY_ACCEPTED: "This invitation was already accepted. Ask an organization admin for a new invitation.",
   INVITATION_REPLACED: "A new invitation replaced this link. Open the latest invitation email.",
+  INVITATION_INVITER_REVOKED: "Ask an organization admin to send this invitation again.",
 };
 
 async function readInvitationAcceptance(response: Response): Promise<InvitationAcceptance> {
