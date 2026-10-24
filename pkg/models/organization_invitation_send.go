@@ -7,6 +7,11 @@ import (
 	"gorm.io/gorm"
 )
 
+// OrganizationInvitationSendRetention is how long a send row is kept. It
+// matches the longest invitation rate limit window, so cleanup never removes
+// a row that a limit check can still count.
+const OrganizationInvitationSendRetention = 24 * time.Hour
+
 // OrganizationInvitationSend records one invitation email that an
 // organization sent. Rate limits count these rows.
 type OrganizationInvitationSend struct {
@@ -31,4 +36,11 @@ func CountRecipientInvitationSendsSince(tx *gorm.DB, orgID uuid.UUID, email stri
 	var count int64
 	err := tx.Model(&OrganizationInvitationSend{}).Where("organization_id = ? AND email = ? AND sent_at > ?", orgID, email, since).Count(&count).Error
 	return count, err
+}
+
+// DeleteExpiredOrganizationInvitationSends removes send rows older than
+// olderThan. It deletes at most limit rows so one pass cannot scan the whole
+// table.
+func DeleteExpiredOrganizationInvitationSends(tx *gorm.DB, olderThan time.Time, limit int) (int64, error) {
+	return deleteRowsLimited(tx, &OrganizationInvitationSend{}, limit, "sent_at < ?", olderThan)
 }
