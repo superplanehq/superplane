@@ -233,6 +233,16 @@ func (t *RunnerTask) Start(tx *gorm.DB, runner *Runner, activeLogStore string, n
 		return ErrRunnerTaskLogStoreRequired
 	}
 
+	// Keep the same runner-before-task lock order as cancellation and termination.
+	currentRunner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
+	if err != nil {
+		return err
+	}
+	*runner = *currentRunner
+	if runner.State != RunnerStateIdle {
+		return ErrRunnerTaskNotStartable
+	}
+
 	taskResult := tx.Model(t).
 		Where("runner_id = ? AND state = ?", runner.ID, RunnerTaskStateReserved).
 		Updates(map[string]any{
@@ -287,6 +297,13 @@ func (t *RunnerTask) Complete(
 	canceled bool,
 	now time.Time,
 ) (bool, error) {
+	// Lock the runner before the task so completion cannot deadlock with cancellation.
+	currentRunner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
+	if err != nil {
+		return false, err
+	}
+	*runner = *currentRunner
+
 	var current RunnerTask
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ? AND runner_id = ?", t.ID, runner.ID).

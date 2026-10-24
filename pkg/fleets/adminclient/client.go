@@ -149,12 +149,13 @@ func (c *Client) DescribeRunner(ctx context.Context, fleetID, runnerID string) (
 	return response.Runner, err
 }
 
-func (c *Client) DeleteRunner(ctx context.Context, fleetID, runnerID string) (Runner, error) {
+func (c *Client) DeleteRunner(ctx context.Context, fleetID, runnerID string, states []string) (Runner, error) {
 	var response struct {
 		Runner Runner `json:"runner"`
 	}
 	path := fleetPath(fleetID) + "/runners/" + url.PathEscape(strings.TrimSpace(runnerID))
-	err := c.do(ctx, http.MethodDelete, path, nil, nil, &response)
+	query := listQuery(states, 0)
+	err := c.do(ctx, http.MethodDelete, path, query, nil, &response)
 	return response.Runner, err
 }
 
