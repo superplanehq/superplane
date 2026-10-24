@@ -185,3 +185,95 @@ fewer seats than the target after an outside change.
 The table `organization_seat_purchases` is the marker for seat changes that
 SuperPlane started. Use `models.FindExpectedSeatCount` to tell them from outside
 changes in Polar.
+
+## Renew only occupied seats
+
+Polar renews a subscription with the seat count of the subscription.
+SuperPlane schedules the next-period seat count so that Polar renews only
+occupied seats. The target is `RenewalQuantity` from
+`entitlements.ResolveSeats`: the number of active human members, owner
+included, with a minimum of 1. Pending invitations, removed members, and
+service accounts do not count.
+
+SuperPlane sends `PATCH /subscriptions/{id}` with
+`{"seats": <target>, "proration_behavior": "next_period"}`. Polar does not
+change the current period. It charges and credits nothing now, and `seats`
+keeps the current count. The subscription shows the scheduled count in
+`pending_update.seats`. The next-period count is `pending_update.seats`, or
+`seats` when no seat change is pending. SuperPlane never sends a target above
+the current `seats`, and never uses `invoice`, `prorate`, or `reset` for this
+request.
+
+Example: an organization has 10 seats, and the period ends on December 1.
+An admin removes a member on November 10. SuperPlane schedules 9 seats for
+December 1. The freed seat stays usable until December 1. When a member joins
+before December 1, SuperPlane schedules 10 seats again.
+
+`seatrenewal.Schedule` in `pkg/billing/seatrenewal` does the work. It does
+nothing when one of these conditions is true:
+
+- The plan is not per seat, or `RenewalQuantity` is not set (for example, the renewal is past due).
+- An admin assigned the plan.
+- The plan has no Polar subscription, the subscription is not `active`, or it is set to cancel.
+- A seat purchase is pending or unconfirmed. The purchase replaces any
+  scheduled count when it settles. The worker schedules the count after that.
+
+Schedule reads local state under the organization lock. It calls Polar after
+it releases the lock. It sends the update only when the next-period count
+differs from the target. After each update, it stores the target in
+`organization_billing_plans.renewal_seats_scheduled` and the send time in
+`renewal_seats_scheduled_at`. Subscription snapshots do not change these
+columns. Outside-change detection can compare them with the Polar count.
+
+### Live updates
+
+These actions schedule the count after their transaction commits:
+
+- Remove a member (`RemoveUser`).
+- Accept an invitation with the status `joined`. This includes a former member that the invitation restores.
+- Buy seats (`PurchaseSeats`), after SuperPlane applies the Polar snapshot. An
+  `invoice` update replaces the scheduled count, so SuperPlane schedules it again.
+
+The update runs in the background. The action does not wait for Polar and does
+not fail because of Polar. The update tries 3 times in about 10 seconds when
+Polar rate-limits the request, reports `SubscriptionLocked`, or does not answer.
+The worker fixes other failures.
+
+### Reconciliation worker
+
+`SeatRenewalSyncWorker` runs when `START_SEAT_RENEWAL_SYNC_WORKER=yes`. Every 5
+minutes it checks each organization on an active per-seat Polar subscription
+that is not set to cancel. Organizations with the earliest `current_period_end`
+go first. The worker uses `seatrenewal.Schedule`, so the same rules apply. It
+fixes counts after a Polar outage, a lost update, a race between a purchase and
+a removal, and membership changes without a live update, such as account
+deletion.
+
+The worker writes these log entries. Each entry has `organization_id`,
+`polar_subscription_id`, `renewal_target_seats`, `next_period_seats`, and
+`current_seats` when they are known.
+
+- `billing.seat_renewal_mismatch_fixed` (warning): the worker found a different next-period count and scheduled the target.
+- `billing.seat_renewal_sync_failed` (error): a fix failed, and the period ends in 24 hours or less.
+
+### Sandbox checks (run before merge)
+
+A person must do these checks in the Polar sandbox before merge. Record each
+observed result here. Until then, each result is pending. To watch a renewal
+soon, move the period end a few minutes ahead with `PATCH /v1/subscriptions/{id}`
+and `{"current_billing_period_end": "<time>"}`.
+
+1. Update back to the current count.
+   - Step: on a subscription with 10 seats, schedule 9 seats with `next_period`.
+     Then send `{"seats": 10, "proration_behavior": "next_period"}`.
+   - Expected result: Polar accepts the update, and `pending_update` is `null`.
+     If Polar rejects the update or keeps `pending_update`, find the request that clears a pending seat change.
+   - Observed result: pending.
+2. Shape of `pending_update`.
+   - Step: schedule a reduction. Read the PATCH response, `GET /v1/subscriptions/{id}`, and the `subscription.updated` webhook.
+   - Expected result: each one has `pending_update` with `seats` (integer) and `applies_at` (date-time), as `SubscriptionPendingUpdate` parses it.
+   - Observed result: pending.
+3. Renewal after a scheduled reduction.
+   - Step: schedule a reduction from 10 to 9 seats. Move the period end a few minutes ahead and wait for `subscription.cycled`.
+   - Expected result: `seats` is 9 in `subscription.cycled`, the renewal invoice charges 9 seats, and Polar issues no credit.
+   - Observed result: pending.

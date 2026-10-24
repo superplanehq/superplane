@@ -626,6 +626,53 @@ func Test__UpdateSubscriptionSeatsInvoicesTheProratedChange(t *testing.T) {
 	assert.Equal(t, map[string]any{"seats": float64(5), "proration_behavior": "invoice"}, body)
 }
 
+func Test__ScheduleSubscriptionSeatsChangesOnlyTheNextPeriod(t *testing.T) {
+	appliesAt := time.Now().Add(10 * 24 * time.Hour).UTC().Truncate(time.Second)
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/subscriptions/sub_team", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id": "sub_team", "status": "active", "seats": 10,
+			"pending_update": map[string]any{"seats": 9, "applies_at": appliesAt.Format(time.RFC3339)},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	updated, err := client.ScheduleSubscriptionSeats(context.Background(), " sub_team ", 9)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"seats": float64(9), "proration_behavior": "next_period"}, body)
+	assert.Equal(t, 10, *updated.Seats, "the current period keeps its seats")
+	require.NotNil(t, updated.PendingUpdate)
+	assert.True(t, updated.PendingUpdate.AppliesAt.Time.Equal(appliesAt))
+	assert.Equal(t, 9, *updated.NextPeriodSeats())
+
+	_, err = client.ScheduleSubscriptionSeats(context.Background(), " ", 9)
+	require.ErrorContains(t, err, "subscription id is required")
+}
+
+func Test__NextPeriodSeatsPrefersTheScheduledSeatCount(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want *int
+	}{
+		{name: "no pending update", body: `{"id":"sub","seats":10}`, want: new(10)},
+		{name: "null pending update", body: `{"id":"sub","seats":10,"pending_update":null}`, want: new(10)},
+		{name: "pending update without seats", body: `{"id":"sub","seats":10,"pending_update":{"seats":null,"applies_at":"2026-12-01T00:00:00Z"}}`, want: new(10)},
+		{name: "no seats", body: `{"id":"sub"}`, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var data SubscriptionData
+			require.NoError(t, json.Unmarshal([]byte(tt.body), &data))
+			assert.Equal(t, tt.want, data.NextPeriodSeats())
+		})
+	}
+}
+
 func Test__UpdateSubscriptionSeatsRequiresIDInRequestAndResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"status": "active"}))

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -102,6 +103,10 @@ func (s *InvitationService) Accept(ctx context.Context, accountID, token string)
 	})
 	if err != nil {
 		return nil, invitationActionError(err)
+	}
+	// A new or restored member occupies a seat, so Polar must renew it.
+	if statusValue == "joined" {
+		seatrenewal.ScheduleAsync(ctx, org.ID)
 	}
 	return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
 }
