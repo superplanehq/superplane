@@ -3,6 +3,7 @@ import type { OrganizationsDescribeOrganizationBillingResponse } from "@/api-cli
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
+import { StrictMode } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { TEAM_ORGANIZATION_BILLING } from "../../__fixtures__/usageReportFixtures";
 
@@ -107,6 +108,23 @@ beforeEach(() => {
 });
 
 describe("billing purchase deep-link readiness", () => {
+  it("opens the dialog when cached billing is ready on mount under StrictMode", async () => {
+    render(
+      <StrictMode>
+        <BillingRoute client={new QueryClient()} />
+      </StrictMode>,
+    );
+
+    expect(await screen.findByRole("dialog", { name: "Buy seats" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Current billing URL")).toHaveTextContent(
+        "/org-1/workspaces/WS/settings/organization/billing?tab=seats&tag=one&tag=two",
+      ),
+    );
+    expect(screen.getByRole("dialog", { name: "Buy seats" })).toBeInTheDocument();
+    expect(purchaseSeats).not.toHaveBeenCalled();
+  });
+
   it.each(["permissions", "feature registry", "organization features"])(
     "retains the link while %s loads, then consumes only buySeats",
     async (pending) => {

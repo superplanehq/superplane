@@ -9,6 +9,7 @@ export function useSeatPurchaseInput(organizationId: string, state: ReturnType<t
   const [requested, setRequested] = useState(false);
   const [revision, setRevision] = useState(0);
   const request = useRef(0);
+  const dialogResetCount = useRef(0);
   const { submissionLock, purchase, setMessage, clearFeedback } = state;
   const pending = isSeatPurchasePending(purchase);
 
@@ -22,6 +23,7 @@ export function useSeatPurchaseInput(organizationId: string, state: ReturnType<t
     setQuantity("1");
     setRequested(false);
     invalidate();
+    dialogResetCount.current += 1;
   }, [organizationId, invalidate]);
 
   const requestPreview = useCallback(() => {
@@ -69,5 +71,6 @@ export function useSeatPurchaseInput(organizationId: string, state: ReturnType<t
     request,
     requestPreview,
     consumePreview,
+    dialogResetCount,
   };
 }
