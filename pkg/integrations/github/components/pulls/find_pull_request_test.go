@@ -298,4 +298,79 @@ func Test__FindPullRequest__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "failed to list pull requests")
 		require.ErrorContains(t, err, "Validation Failed")
 	})
+
+	t.Run("fails when token minting fails and surfaces status code and body", func(t *testing.T) {
+		body := `{"message":"This installation has been suspended.","documentation_url":"https://docs.github.com/rest/apps/apps#create-an-installation-access-token-for-an-app"}`
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusForbidden, body),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForLegacySetupFlow(testRSAPEM(t)),
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"head":       "feature",
+			},
+		})
+
+		require.ErrorContains(t, err, "failed to list pull requests")
+		require.ErrorContains(t, err, "status 403 Forbidden")
+		require.ErrorContains(t, err, "This installation has been suspended.")
+		require.ErrorContains(t, err, "hint: the GitHub App installation is suspended")
+		require.ErrorContains(t, err, body)
+	})
+
+	t.Run("fails when token minting fails due to IP allow list", func(t *testing.T) {
+		body := `{"message":"You must be on the organization's IP allow list to perform this action."}`
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusForbidden, body),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForLegacySetupFlow(testRSAPEM(t)),
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"head":       "feature",
+			},
+		})
+
+		require.ErrorContains(t, err, "failed to list pull requests")
+		require.ErrorContains(t, err, "status 403 Forbidden")
+		require.ErrorContains(t, err, "You must be on the organization's IP allow list to perform this action.")
+		require.ErrorContains(t, err, "hint: organization IP allow list policy blocked token request")
+		require.ErrorContains(t, err, body)
+	})
+
+	t.Run("fails when token minting fails due to uninstalled or deleted app", func(t *testing.T) {
+		body := `{"message":"Not Found"}`
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNotFound, body),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForLegacySetupFlow(testRSAPEM(t)),
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"head":       "feature",
+			},
+		})
+
+		require.ErrorContains(t, err, "failed to list pull requests")
+		require.ErrorContains(t, err, "status 404 Not Found")
+		require.ErrorContains(t, err, "Not Found")
+		require.ErrorContains(t, err, "hint: the GitHub App installation was not found or has been uninstalled")
+		require.ErrorContains(t, err, body)
+	})
 }
