@@ -63,6 +63,7 @@ func applySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData, 
 	if err != nil {
 		return err
 	}
+	var capacity SeatCapacityCheck
 	err = tx.WithContext(ctx).Transaction(func(inner *gorm.DB) error {
 		if _, err := models.LockOrganization(inner, orgID); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -71,6 +72,10 @@ func applySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData, 
 			return err
 		}
 		if err := models.BindLegacyBillingProduct(inner, BusinessProductID()); err != nil {
+			return err
+		}
+		previous, err := models.FindOrganizationBillingPlan(inner, orgID)
+		if err != nil {
 			return err
 		}
 		incoming := subscriptionSnapshot(data)
@@ -119,12 +124,22 @@ func applySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData, 
 				return err
 			}
 		}
-		return syncSubscriptionSideEffects(inner, orgID, data, result)
+		if err := syncSubscriptionSideEffects(inner, orgID, data, result); err != nil {
+			return err
+		}
+		capacity, err = RecheckSeatCapacity(inner, orgID, snapshotSeatCapacityCause(previous, result.Plan))
+		return err
 	})
 	if errors.Is(err, models.ErrInvalidPurchasedSeats) && !errors.Is(err, models.ErrPolarSubscriptionRefreshFailed) {
 		return permanentApplyError(err.Error())
 	}
-	return err
+	if err != nil {
+		return err
+	}
+
+	// When tx is itself a transaction, this runs before the outer commit.
+	capacity.Log()
+	return nil
 }
 
 func subscriptionSnapshot(data SubscriptionData) models.PolarSubscriptionApply {

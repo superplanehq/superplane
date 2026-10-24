@@ -226,7 +226,12 @@ function BillingPageBody({
         onKeep={onKeepSubscription}
       />
       {seats ? (
-        <BillingSeatsCard seats={seats} currentPeriodEnd={currentPeriodEnd} cancelAtPeriodEnd={cancelAtPeriodEnd} />
+        <BillingSeatsCard
+          seats={seats}
+          currentPeriodEnd={currentPeriodEnd}
+          cancelAtPeriodEnd={cancelAtPeriodEnd}
+          canManageBilling={canManageBilling}
+        />
       ) : null}
       <HostedCreditRemainingCard
         organizationId={organizationId}

@@ -11,6 +11,9 @@ import (
 )
 
 const (
+	// ComponentBillingSeats is the Cloud Logging component for seat-based
+	// billing. Filter: jsonPayload.component="billing.seats"
+	ComponentBillingSeats = "billing.seats"
 	// ComponentWebhookProductive is the Cloud Logging component for a
 	// Productive task webhook failure. Filter:
 	// jsonPayload.component="webhook.productive"
@@ -25,6 +28,12 @@ const (
 	// DatadogIntegration is the Cloud Logging integration for a Datadog webhook.
 	// Filter: jsonPayload.integration="datadog"
 	DatadogIntegration = "datadog"
+
+	// SeatsOverCapacityMessage is the stable key of the alert for an
+	// organization that has more members than paid seats.
+	SeatsOverCapacityMessage = "billing.seats_over_capacity"
+	// SeatsOverCapacityResolvedMessage is the stable key that ends that alert.
+	SeatsOverCapacityResolvedMessage = "billing.seats_over_capacity_resolved"
 
 	productiveWebhookFailureMessage = "error handling webhook"
 	webhookTypeUnknown              = "unknown"
@@ -424,4 +433,25 @@ func productiveWebhookEntry(event string, fields log.Fields, err error) *log.Ent
 		entry = entry.WithError(err)
 	}
 	return entry
+}
+
+func billingSeatsEntry(fields log.Fields) *log.Entry {
+	entry := log.NewEntry(log.StandardLogger())
+	if len(fields) > 0 {
+		entry = entry.WithFields(fields)
+	}
+	return entry.WithField("component", ComponentBillingSeats)
+}
+
+// LogSeatsOverCapacity writes the error line for an organization that has
+// more members than paid seats. component stays set when fields repeat it.
+func LogSeatsOverCapacity(fields log.Fields) {
+	billingSeatsEntry(fields).Error(SeatsOverCapacityMessage)
+}
+
+// LogSeatsOverCapacityResolved writes the info line for an organization that
+// no longer has more members than paid seats. component stays set when fields
+// repeat it.
+func LogSeatsOverCapacityResolved(fields log.Fields) {
+	billingSeatsEntry(fields).Info(SeatsOverCapacityResolvedMessage)
 }
