@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
@@ -143,10 +144,15 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 			credits, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 			require.NoError(t, err)
 
-			var calls atomic.Int32
+			// Removal and acceptance schedule the renewal seat count in the
+			// background. Polar is down, so that schedule fails and changes
+			// nothing. Seat reuse must not wait for it.
+			var seatUpdates atomic.Int32
 			release := make(chan struct{})
 			polar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				calls.Add(1)
+				if req.Method != http.MethodGet {
+					seatUpdates.Add(1)
+				}
 				if mode == "stalled response" {
 					select {
 					case <-req.Context().Done():
@@ -158,8 +164,9 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 			}))
 			t.Cleanup(func() {
 				close(release)
+				seatrenewal.Wait()
 				polar.Close()
-				assert.Zero(t, calls.Load(), "seat reuse must not contact Polar")
+				assert.Zero(t, seatUpdates.Load(), "seat reuse must not change the Polar subscription")
 			})
 			usePolarTestServer(t, polar)
 
@@ -180,7 +187,7 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 				savedCredits, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 				require.NoError(t, err, stage)
 				assert.Equal(t, credits, savedCredits, "credit and refund records must not change: %s", stage)
-				assert.Zero(t, calls.Load(), stage)
+				assert.Zero(t, seatUpdates.Load(), stage)
 			}
 
 			assertState("before removal", 4, 0, 0, 0)
