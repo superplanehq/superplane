@@ -873,6 +873,8 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 			_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: "active", PeriodStart: &now, PeriodEnd: &end, CancelAtPeriodEnd: storedStatus == "active"}, nil)
 			require.NoError(t, err)
 			if storedStatus == "paused" {
+				require.NoError(t, database.Conn().Model(&models.OrganizationBillingPlan{}).
+					Where("organization_id = ?", r.Organization.ID).Update("trial_ends_at", now.Add(-time.Hour)).Error)
 				_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: storedStatus, PeriodStart: &now, PeriodEnd: &end}, nil)
 				require.NoError(t, err)
 			}

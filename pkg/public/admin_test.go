@@ -658,6 +658,29 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		require.Equal(t, float64(14), result["invitation_duration_days"])
 	})
 
+	t.Run("admin can configure past due grace", func(t *testing.T) {
+		for _, days := range []int{-1, 22, 0, 21, 7} {
+			body, err := json.Marshal(map[string]int{"past_due_grace_days": days})
+			require.NoError(t, err)
+			response := execRequest(server, requestParams{
+				method: "PATCH", path: "/admin/api/installation/network-settings",
+				body: body, authCookie: token, contentType: "application/json",
+			})
+			if days < 0 || days > 21 {
+				require.Equal(t, http.StatusBadRequest, response.Code)
+				continue
+			}
+			require.Equal(t, http.StatusOK, response.Code)
+		}
+		response := execRequest(server, requestParams{
+			method: "GET", path: "/admin/api/installation/network-settings", authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		var result map[string]any
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		require.Equal(t, float64(7), result["past_due_grace_days"])
+	})
+
 	t.Run("admin can update installation network settings", func(t *testing.T) {
 		body, err := json.Marshal(map[string]bool{
 			"allow_private_network_access": true,

@@ -1,6 +1,6 @@
+import { BILLING_PAYMENT_BLOCKED_SEATS_COPY, billingPeriodEndLabel } from "../../lib/billingPlans";
 import { Button } from "@/components/ui/button";
 import { BillingSeatPurchaseLimit } from "./BillingSeatPurchaseStatus";
-import { billingPeriodEndLabel } from "../../lib/billingPlans";
 import { formatUsdCents } from "../../lib/workOrderUsage";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
 import type { BillingSeatSummary } from "./useOrganizationBillingPageModel";
@@ -22,6 +22,9 @@ export function BillingSeatsCard({
   canBuySeats,
   onBuySeats,
 }: BillingSeatsCardProps) {
+  if (seats.paymentBlocked) {
+    return <BlockedSeatsSummary seats={seats} />;
+  }
   const date = billingPeriodEndLabel(currentPeriodEnd);
   const estimate = renewalEstimate(seats, date);
 
@@ -76,6 +79,20 @@ export function BillingSeatsCard({
             <Button onClick={onBuySeats}>Buy seats</Button>
           ))}
       </div>
+    </FactorySettingsCard>
+  );
+}
+
+// While payment is blocked, the server sends only the stored and used seats.
+function BlockedSeatsSummary({ seats }: { seats: BillingSeatSummary }) {
+  return (
+    <FactorySettingsCard title="Seats" data-testid="billing-seats">
+      <p className="text-xl font-semibold tracking-[-0.02em] tabular-nums">
+        {seats.occupied ?? "Not available"} of {seats.purchased ?? "Not available"} seats used
+      </p>
+      <p className="mt-3 text-sm text-muted-foreground" data-testid="billing-seats-blocked">
+        {BILLING_PAYMENT_BLOCKED_SEATS_COPY}
+      </p>
     </FactorySettingsCard>
   );
 }
