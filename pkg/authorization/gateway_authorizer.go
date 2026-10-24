@@ -73,7 +73,7 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 		return nil, status.Error(codes.NotFound, "Not found")
 	}
 
-	if !hasRequiredScopedTokenPermissionForScopes(firstHTTPHeader(r, "x-token-scopes"), pathParams, rule) {
+	if !HasRequiredScopedTokenPermissionForScopes(firstHTTPHeader(r, "x-token-scopes"), pathParams, rule) {
 		log.Warnf(
 			"Scoped token for user %s is missing required permission %s:%s",
 			userID,

@@ -21,6 +21,18 @@ common_args=(
   --set telemetry.secretName=test-telemetry
 )
 
+email_manifest="${TMP_DIR}/api-email.yaml"
+helm template superplane "${CHART_DIR}" \
+  "${common_args[@]}" \
+  --show-only templates/api.yaml \
+  --set api.ownerSetupEnabled=false \
+  --set email.secretName=test-email \
+  --set email.fromName="Invitation Sender" \
+  --set email.fromAddress=invites@example.com >"${email_manifest}"
+grep -q 'name: test-email' "${email_manifest}"
+grep -A1 'name: EMAIL_FROM_NAME' "${email_manifest}" | grep -q 'value: "Invitation Sender"'
+grep -A1 'name: EMAIL_FROM_ADDRESS' "${email_manifest}" | grep -q 'value: "invites@example.com"'
+
 helm template superplane "${CHART_DIR}" \
   "${common_args[@]}" \
   --set fleetManagerSetup.managerId=test-cluster >"${manifest}"

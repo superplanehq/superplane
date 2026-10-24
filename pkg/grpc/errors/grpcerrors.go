@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -173,4 +174,13 @@ func StatusMessage(err error) string {
 	}
 
 	return status.Convert(err).Message()
+}
+
+// FailedPreconditionWithReason preserves a machine-readable capacity reason.
+func FailedPreconditionWithReason(message, reason string) error {
+	s, err := status.New(codes.FailedPrecondition, message).WithDetails(&errdetails.ErrorInfo{Reason: reason, Domain: "superplane.com"})
+	if err != nil {
+		return status.Error(codes.Internal, "Failed to create capacity error.")
+	}
+	return s.Err()
 }

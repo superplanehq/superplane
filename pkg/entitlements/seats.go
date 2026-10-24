@@ -8,14 +8,16 @@ import (
 
 // SeatUsage separates purchased capacity from the maximum allowed purchase.
 type SeatUsage struct {
-	PerSeat         bool `json:"per_seat"`
-	Purchased       *int `json:"purchased"`
-	Occupied        int  `json:"occupied"`
-	Available       *int `json:"available"`
-	PlanMaximum     *int `json:"plan_maximum"`
-	Purchasable     *int `json:"purchasable"`
-	RenewalQuantity *int `json:"renewal_quantity"`
-	MemberLimit     *int `json:"member_limit"`
+	PendingInvitations int  `json:"pending_invitations"`
+	Invitable          *int `json:"invitable"`
+	PerSeat            bool `json:"per_seat"`
+	Purchased          *int `json:"purchased"`
+	Occupied           int  `json:"occupied"`
+	Available          *int `json:"available"`
+	PlanMaximum        *int `json:"plan_maximum"`
+	Purchasable        *int `json:"purchasable"`
+	RenewalQuantity    *int `json:"renewal_quantity"`
+	MemberLimit        *int `json:"member_limit"`
 }
 
 func (s SeatUsage) JoinLimit() *int {
@@ -55,6 +57,11 @@ func ResolveSeatsForPlan(tx *gorm.DB, orgID uuid.UUID, plan *models.Organization
 
 func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBillingPlan, occupied int) (*SeatUsage, error) {
 	usage := &SeatUsage{Occupied: occupied}
+	pending, err := models.CountPendingOrganizationInvitations(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	usage.PendingInvitations = int(pending)
 	maximum, err := SeatMaximumForPlan(tx, orgID, &plan.Catalog)
 	if err != nil {
 		return nil, err
@@ -70,6 +77,8 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBil
 	}
 	available := max(purchased-usage.Occupied, 0)
 	renewal := max(usage.Occupied, 1)
+	invitable := max(purchased-usage.Occupied-usage.PendingInvitations, 0)
+	usage.Invitable = &invitable
 	usage.PerSeat = true
 	usage.Purchased = &purchased
 	usage.Available = &available
