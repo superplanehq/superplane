@@ -80,6 +80,12 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "Could not load the current plan.")
 	}
+	// While Polar retries a failed renewal, any selection would clear the
+	// stored subscription state and release the payment lock. Recovery comes
+	// from an updated payment method or a cancellation in the billing portal.
+	if models.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) {
+		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
+	}
 	if strings.TrimSpace(req.GetPlanKey()) == models.BillingPlanNone {
 		if req.Seats != nil {
 			return nil, grpcerrors.InvalidArgument(nil, "Seats are only available for per-seat plans.")
@@ -92,9 +98,6 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 	catalog, err := models.FindBillingPlan(db, strings.TrimSpace(req.GetPlanKey()))
 	if err != nil || catalog.Category != "paid" || catalog.Visibility != "public" {
 		return nil, grpcerrors.InvalidArgument(nil, "Select an available paid plan.")
-	}
-	if models.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) && billingPlanNeedsPayment(catalog) {
-		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
 	}
 	if models.OrganizationBillingIsPolarManaged(current) {
 		return nil, grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
@@ -143,10 +146,6 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		return nil, grpcerrors.FailedPrecondition(err, "Could not select this plan.")
 	}
 	return &pb.CreateBusinessCheckoutResponse{}, nil
-}
-
-func billingPlanNeedsPayment(catalog *models.BillingPlan) bool {
-	return catalog.PolarProductID != nil || catalog.RequirePaymentMethod
 }
 
 func requireNewBilling(ctx context.Context, orgID uuid.UUID) error {

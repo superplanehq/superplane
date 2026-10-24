@@ -41,6 +41,14 @@ func saveBusinessPlan(t *testing.T) *models.BillingPlan {
 	return &catalog
 }
 
+// saveFreePlan adds a public paid plan that needs no checkout and no card.
+func saveFreePlan(t *testing.T) *models.BillingPlan {
+	t.Helper()
+	catalog := models.BillingPlan{Key: "free_" + uuid.NewString()[:8], Name: "Free", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
+	return &catalog
+}
+
 func TestPastDueRenewalLocksMembershipUntilPaymentRecovers(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 3, new(50))
 	db := database.Conn()
@@ -84,11 +92,19 @@ func TestPastDueRenewalLocksMembershipUntilPaymentRecovers(t *testing.T) {
 	for name, request := range map[string]*pb.SelectBillingPlanRequest{
 		"Team":     {PlanKey: f.catalog.Key, Seats: new(int32(3))},
 		"Business": {PlanKey: saveBusinessPlan(t).Key},
+		"Free":     {PlanKey: saveFreePlan(t).Key},
+		"None":     {PlanKey: models.BillingPlanNone},
 	} {
 		_, err = SelectBillingPlan(context.Background(), orgID.String(), request, f.r.Account.ID.String(), "http://localhost")
 		requireGRPCCode(t, codes.FailedPrecondition, err)
 		require.Contains(t, err.Error(), "The last renewal payment failed.", name)
 	}
+
+	// A blocked selection must not clear the stored subscription state.
+	locked, err := models.FindOrganizationBillingPlan(db, orgID)
+	require.NoError(t, err)
+	require.Equal(t, models.PolarSubscriptionStatusPastDue, locked.PolarSubscriptionStatus)
+	require.Equal(t, models.BillingPlanSourcePolar, locked.PlanSource)
 
 	f.replay(models.PolarSubscriptionStatusActive, 3)
 
