@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import type { RefObject } from "react";
 
 import type {
   OrganizationsDescribeOrganizationBillingResponse,
@@ -34,6 +35,7 @@ export type UseSeatPurchaseResult = {
   timedOut: boolean;
   refreshBilling: () => Promise<void>;
   refreshing: boolean;
+  dialogResetCount: RefObject<number>;
 };
 
 export function useSeatPurchase({
@@ -105,5 +107,6 @@ export function useSeatPurchase({
     timedOut,
     refreshBilling: recovery.refreshBilling,
     refreshing: recovery.refreshing,
+    dialogResetCount: input.dialogResetCount,
   };
 }
