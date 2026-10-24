@@ -97,6 +97,7 @@ func TestCodexExecArgsAddsMergeConfidenceMCP(t *testing.T) {
 	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
 	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/merge_confidence_mcp.js"]`)
+	assert.NotContains(t, joined, "approval_mode")
 }
 
 func TestCodexSuperplaneMCPScriptUsesMergeConfidence(t *testing.T) {
@@ -117,21 +118,34 @@ func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
 	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/task_artifact_mcp.js"]`)
+	assert.NotContains(t, joined, "approval_mode")
 }
 
 func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
-	args := codexExecArgsFromScript(t, map[string]string{
-		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
-		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
-	}, "gpt-5", "/task/planning_session_mcp.js")
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))
+	for _, session := range []string{"", "thread-1"} {
+		t.Run("session="+session, func(t *testing.T) {
+			args := codexExecArgsFromScriptWithSession(t, map[string]string{
+				"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+				"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+				"SUPERPLANE_WORKSPACE_MCP_CONFIG":  configPath,
+			}, "gpt-5", "/task/planning_session_mcp.js", session)
 
-	assert.NotContains(t, args, "--dangerously-bypass-approvals-and-sandbox")
-	joined := strings.Join(args, " ")
-	assert.Contains(t, joined, `sandbox_mode="read-only"`)
-	assert.Contains(t, joined, `approval_policy="never"`)
-	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
-	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/planning_session_mcp.js"]`)
-	assert.Contains(t, joined, "developer_instructions")
+			assert.NotContains(t, args, "--dangerously-bypass-approvals-and-sandbox")
+			joined := strings.Join(args, " ")
+			assert.Contains(t, joined, `sandbox_mode="read-only"`)
+			assert.Contains(t, joined, `approval_policy="never"`)
+			assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
+			assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/planning_session_mcp.js"]`)
+			assert.Contains(t, joined, "developer_instructions")
+			assert.Contains(t, args, `mcp_servers.superplane.tools.propose_update.approval_mode="approve"`)
+			assert.Contains(t, args, `mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"`)
+			assert.Contains(t, args, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
+			assert.Equal(t, 2, strings.Count(joined, "approval_mode="))
+			assert.NotContains(t, joined, "default_tools_approval_mode")
+		})
+	}
 }
 
 func TestCodexExecArgsMergesWorkspaceMCP(t *testing.T) {
@@ -397,6 +411,7 @@ func TestFormatCodexJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"reasoning-1","type":"reasoning","text":%q}}`, token),
 		fmt.Sprintf(`{"type":"item.started","item":{"id":"item-1","type":"command_execution","command":%q}}`, "git clone https://x-access-token:"+token+"@github.com/acme/app.git"),
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"item-1","type":"command_execution","command":"true","aggregated_output":%q,"exit_code":0}}`, imageResult),
+		fmt.Sprintf(`{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_update","status":"failed","error":{"message":%q}}}`, token),
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"answer-1","type":"agent_message","text":%q}}`, token),
 	})
 
@@ -420,6 +435,59 @@ func TestFormatCodexJsonLinesPairsAnonymousItemIDs(t *testing.T) {
 	assert.Equal(t, "tool_end", records[1]["type"])
 	assert.Equal(t, "passed", records[1]["status"])
 	assert.Equal(t, 1, strings.Count(output, `"type":"tool_start"`))
+}
+
+func TestCodexFormatterReportsPlanningToolFailures(t *testing.T) {
+	for _, status := range []string{"failed", "cancelled", "declined", "completed"} {
+		for _, withActivity := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/activity=%t", status, withActivity), func(t *testing.T) {
+				item := map[string]any{
+					"id": "publish-1", "type": "mcp_tool_call", "server": "superplane",
+					"tool": "propose_update", "status": status,
+				}
+				failed := status != "completed"
+				if failed {
+					item["error"] = map[string]any{"message": "MCP tool approval was cancelled"}
+				}
+				event, err := json.Marshal(map[string]any{"type": "item.completed", "item": item})
+				require.NoError(t, err)
+				format := runCodexFormatter
+				if withActivity {
+					format = runCodexFormatterWithActivity
+				}
+				output := format(t, []string{string(event)})
+				records := liveLogRecords(t, output)
+				require.Len(t, records, 2)
+				assert.Contains(t, records[0]["text"], "propose_update")
+				expectedStatus := "passed"
+				if failed {
+					expectedStatus = "failed"
+					assert.Contains(t, output, "MCP tool approval was cancelled")
+				}
+				assert.Equal(t, expectedStatus, records[1]["status"])
+				if !withActivity {
+					return
+				}
+				var ended bool
+				var errorOutput bool
+				for _, record := range activityRecords(t, output) {
+					if record["type"] == "activity_tool_end" {
+						ended = true
+						activityStatus := expectedStatus
+						if status == "cancelled" {
+							activityStatus = "cancelled"
+						}
+						assert.Equal(t, activityStatus, record["status"])
+					}
+					if record["channel"] == "tool_output" && record["output_stream"] == "stderr" {
+						errorOutput = true
+					}
+				}
+				assert.True(t, ended)
+				assert.Equal(t, failed, errorOutput)
+			})
+		}
+	}
 }
 
 func TestFormatTurnResultWritesClaudeStyleDoneLine(t *testing.T) {
