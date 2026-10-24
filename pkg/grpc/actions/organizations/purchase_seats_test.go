@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -734,4 +735,64 @@ func Test__DescribeBillingShowsTheLatestSeatPurchase(t *testing.T) {
 	assert.Equal(t, models.SeatPurchaseStatusFailed, after.LastSeatPurchase.Status)
 	assert.Equal(t, "The payment failed. No seats were added.", after.LastSeatPurchase.Message)
 	assert.EqualValues(t, 4, after.LastSeatPurchase.ToSeats)
+}
+
+func Test__SyncBillingReconcilesExpiredUnknownSeatPurchases(t *testing.T) {
+	for _, polarAvailable := range []bool{true, false} {
+		name := "unchanged subscription fails the expired purchase"
+		if !polarAvailable {
+			name = "unavailable Polar preserves the unconfirmed purchase"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := newSeatPurchaseFixture(t, 3, new(50))
+			purchase := models.NewSeatPurchase(f.r.Organization.ID, &f.r.User, f.subscriptionID, 3, 4)
+			purchase.Status = models.SeatPurchaseStatusUnknown
+			purchase.CreatedAt = time.Now().Add(-2 * polar.SeatPurchaseConfirmationWindow)
+			require.NoError(t, purchase.Create(database.DB(t.Context())))
+			unchanged := f.snapshot(3)
+			unchanged["modified_at"] = purchase.CreatedAt.Add(-time.Minute).UTC().Format(time.RFC3339)
+			var purchaseUpdates atomic.Int32
+			server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+				if req.Method == http.MethodPatch {
+					purchaseUpdates.Add(1)
+					http.Error(w, "sync must not buy seats", http.StatusInternalServerError)
+					return
+				}
+				if !polarAvailable {
+					http.Error(w, "Polar unavailable", http.StatusServiceUnavailable)
+					return
+				}
+				switch req.URL.Path {
+				case "/subscriptions/":
+					f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{unchanged}, "pagination": map[string]int{"max_page": 1}})
+				case "/subscriptions/" + f.subscriptionID:
+					f.writeJSON(w, http.StatusOK, unchanged)
+				case "/customers/external/" + f.r.Organization.ID.String() + "/payment-methods":
+					f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
+				default:
+					t.Errorf("unexpected Polar request %s %s", req.Method, req.URL.Path)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+			})
+			usePolarTestServer(t, server)
+
+			billing, err := SyncOrganizationBilling(t.Context(), f.r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
+
+			require.NoError(t, err)
+			require.NotNil(t, billing.LastSeatPurchase)
+			assert.EqualValues(t, 3, billing.GetPurchasedSeats())
+			assert.Equal(t, 3, f.purchasedSeats())
+			assert.Zero(t, purchaseUpdates.Load(), "refreshing billing cannot submit a purchase")
+			stored := f.latestPurchase()
+			if !polarAvailable {
+				assert.Equal(t, models.SeatPurchaseStatusUnknown, stored.Status)
+				assert.Equal(t, seatPurchaseAwaitingConfirmation, billing.LastSeatPurchase.Status)
+				return
+			}
+			assert.Equal(t, models.SeatPurchaseStatusFailed, stored.Status)
+			assert.Equal(t, models.SeatPurchaseErrorNotApplied, stored.ErrorCode)
+			assert.Equal(t, models.SeatPurchaseStatusFailed, billing.LastSeatPurchase.Status)
+			assert.Equal(t, "Polar did not apply the seat purchase. No seats were added.", billing.LastSeatPurchase.Message)
+		})
+	}
 }

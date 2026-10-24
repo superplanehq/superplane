@@ -970,6 +970,8 @@ message DescribeOrganizationBillingResponse {
   // When Team features end after a failed renewal payment. Set only while a
   // grace period keeps them on.
   google.protobuf.Timestamp paid_access_ends_at = 38;
+  optional int32 pending_invitation_seats = 39;
+  optional int32 invitable_seats = 40;
 }
 
 message SeatPurchase {

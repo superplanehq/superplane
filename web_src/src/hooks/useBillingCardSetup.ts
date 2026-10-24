@@ -12,27 +12,31 @@ export function polarPortalSettingsUrl(portalUrl: string): string {
   return portal.toString();
 }
 
+interface CardSetupPopup {
+  opened: Window;
+  hadPaymentMethod: boolean;
+}
+
 export function useBillingCardSetup(organizationId: string) {
   const [error, setError] = useState("");
-  const [popup, setPopup] = useState<Window | null>(null);
+  const [popup, setPopup] = useState<CardSetupPopup | null>(null);
   const activeWindow = useRef<Window | null>(null);
   const onCardSaved = useRef<(() => void) | undefined>(undefined);
-  const { refetch } = useOrganizationBilling(organizationId);
+  const { data: billing, refetch } = useOrganizationBilling(organizationId);
   const session = useMutation({
-    mutationFn: async (opened: Window) => {
+    retry: false,
+    mutationFn: async (popup: CardSetupPopup) => {
       setError("");
       const response = await organizationsCreatePaymentMethodSession(
         withOrganizationHeader({ organizationId, path: { id: organizationId }, body: {} }),
       );
       if (!response.data?.portalUrl) throw new Error("Could not open card setup. Try again.");
-      if (!opened.closed) opened.location.replace(polarPortalSettingsUrl(response.data.portalUrl));
-      return opened;
+      if (!popup.opened.closed) popup.opened.location.replace(polarPortalSettingsUrl(response.data.portalUrl));
+      return popup;
     },
-    onSuccess: (opened) => {
-      if (!opened.closed) setPopup(opened);
-    },
-    onError: (cause, opened) => {
-      opened.close();
+    onSuccess: setPopup,
+    onError: (cause, popup) => {
+      popup.opened.close();
       onCardSaved.current = undefined;
       setError(getApiErrorMessage(cause, "Could not open card setup. Try again."));
     },
@@ -46,6 +50,10 @@ export function useBillingCardSetup(organizationId: string) {
     let timer: ReturnType<typeof setTimeout>;
     const check = async () => {
       if (cancelled) return;
+      if (popup.hadPaymentMethod && !popup.opened.closed) {
+        timer = setTimeout(() => void check(), 2000);
+        return;
+      }
       const result = await refetch();
       if (cancelled) return;
       if (result.data?.hasPaymentMethod) {
@@ -56,7 +64,7 @@ export function useBillingCardSetup(organizationId: string) {
         return;
       }
       if (result.error) setError("Could not verify the card. Close the Polar window and try again.");
-      if (popup.closed) {
+      if (popup.opened.closed) {
         onCardSaved.current = undefined;
         setPopup(null);
         return;
@@ -67,7 +75,7 @@ export function useBillingCardSetup(organizationId: string) {
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      popup.close();
+      popup.opened.close();
       window.focus();
     };
   }, [popup, refetch]);
@@ -90,7 +98,7 @@ export function useBillingCardSetup(organizationId: string) {
     onCardSaved.current = onSaved;
     opened.opener = null;
     activeWindow.current = opened;
-    session.mutate(opened);
+    session.mutate({ opened, hadPaymentMethod: Boolean(billing?.hasPaymentMethod) });
   };
 
   return {
