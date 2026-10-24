@@ -61,6 +61,9 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 	}
 	if _, err := models.FindOrganizationByIDInTransaction(tx, orgID.String()); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := logSubscriptionForDeletedOrganization(tx, orgID, data); err != nil {
+				return err
+			}
 			return permanentApplyError("organization not found")
 		}
 		return err
@@ -111,6 +114,32 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 			IsActiveBusiness: plan != nil && plan.IsActiveBusiness(),
 		})
 	})
+}
+
+// subscriptionForDeletedOrganizationEvent is the stable log key for a
+// subscription webhook that targets a soft-deleted organization. Polar can
+// still charge for that subscription, so an operator must cancel it in Polar.
+const subscriptionForDeletedOrganizationEvent = "billing.subscription_for_deleted_organization"
+
+func logSubscriptionForDeletedOrganization(tx *gorm.DB, orgID uuid.UUID, data SubscriptionData) error {
+	organization, err := models.FindOrganizationByIDIncludingDeleted(tx, orgID.String())
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !organization.DeletedAt.Valid {
+		return nil
+	}
+
+	log.WithFields(log.Fields{
+		"event":                     subscriptionForDeletedOrganizationEvent,
+		"organization_id":           orgID.String(),
+		"polar_subscription_id":     data.ID,
+		"polar_subscription_status": strings.ToLower(strings.TrimSpace(data.Status)),
+	}).Error(subscriptionForDeletedOrganizationEvent)
+	return nil
 }
 
 // ApplyOrganizationSubscription applies a snapshot that a direct Polar API call

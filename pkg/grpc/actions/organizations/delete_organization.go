@@ -12,6 +12,11 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 )
 
+const (
+	liveSubscriptionDeleteMessage = "Cancel the subscription in Billing before you delete the organization. You can delete it after the paid period ends."
+	liveSubscriptionDeleteReason  = "ORGANIZATION_SUBSCRIPTION_LIVE"
+)
+
 func DeleteOrganization(ctx context.Context, authService authorization.Authorization, orgID string) (*pb.DeleteOrganizationResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
@@ -21,6 +26,15 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 	organization, err := models.FindOrganizationByID(orgID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "organization not found")
+	}
+
+	hasLiveSubscription, err := models.OrganizationHasLivePolarSubscription(database.Conn(), organization.ID)
+	if err != nil {
+		log.Errorf("Error checking the subscription of organization %s before deletion: %v", orgID, err)
+		return nil, grpcerrors.Internal(err, "failed to check the organization subscription")
+	}
+	if hasLiveSubscription {
+		return nil, grpcerrors.FailedPreconditionWithReason(liveSubscriptionDeleteMessage, liveSubscriptionDeleteReason)
 	}
 
 	tx := database.Conn().Begin()
