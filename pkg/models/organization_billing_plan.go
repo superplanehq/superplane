@@ -411,6 +411,9 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 			}
 			if PolarSubscriptionIsLive(existing.PolarSubscriptionStatus, existing.CancelAtPeriodEnd, existing.CurrentPeriodEnd, now) {
 				if !PolarSubscriptionIsLive(sub.Status, sub.CancelAtPeriodEnd, sub.PeriodEnd, now) {
+					if err := settleIgnoredForeignSeatPurchase(inner, orgID, sub); err != nil {
+						return err
+					}
 					log.WithFields(fields).Warn("billing.foreign_subscription_snapshot_ignored")
 					result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}
 					return nil
@@ -451,6 +454,9 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 			// the caller verifies it against the Polar API, and only while the
 			// verified subscription is live.
 			if !PolarSubscriptionIsLive(sub.Status, sub.CancelAtPeriodEnd, sub.PeriodEnd, now) {
+				if err := settleIgnoredForeignSeatPurchase(inner, orgID, sub); err != nil {
+					return err
+				}
 				log.WithFields(fields).Warn("billing.foreign_subscription_snapshot_ignored")
 				result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored, RefreshedStored: refreshedResult}
 				return nil
@@ -476,6 +482,14 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 
 func samePolarSubscription(existing *OrganizationBillingPlan, subscriptionID string) bool {
 	return existing.PolarSubscriptionID != nil && strings.TrimSpace(*existing.PolarSubscriptionID) == strings.TrimSpace(subscriptionID)
+}
+
+// settleIgnoredForeignSeatPurchase settles the in-flight purchase of a
+// subscription whose snapshot cannot replace the stored one. The snapshot
+// still proves the outcome of a purchase on its own subscription, and an
+// unsettled purchase on a replaced subscription blocks new purchases forever.
+func settleIgnoredForeignSeatPurchase(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionApply) error {
+	return SettleSeatPurchase(tx, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt)
 }
 
 func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPlan, sub PolarSubscriptionApply) (*PolarSubscriptionApplyResult, error) {

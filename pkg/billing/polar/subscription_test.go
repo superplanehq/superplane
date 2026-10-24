@@ -977,8 +977,121 @@ func Test__ApplySubscriptionIgnoresForeignCancellation(t *testing.T) {
 	foreign.Data.ModifiedAt = polarTime{Time: now.Add(time.Minute)}
 	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, foreign))
 
-	assert.Equal(t, before, captureSubscriptionState(t, db, org.ID))
+	after := captureSubscriptionState(t, db, org.ID)
+	assert.Equal(t, before.plan, after.plan)
+	assert.Equal(t, before.settings, after.settings)
+	assert.Equal(t, before.grants, after.grants)
+	require.NotNil(t, after.purchase)
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, after.purchase.Status,
+		"the ignored snapshot still proves the outcome of a purchase on its own subscription")
 	requireSubscriptionLog(t, hook, log.WarnLevel, "billing.foreign_subscription_snapshot_ignored", org.ID, storedID, foreignID, "active", "canceled")
+}
+
+// An ended snapshot of a replaced subscription cannot take the replacement
+// back, but it still proves the outcome of the replaced subscription's
+// in-flight seat purchase. The purchase must settle, or it stays unknown and
+// blocks purchases on the replacement forever.
+func Test__ApplySubscriptionSettlesSeatPurchaseOnIgnoredForeignSnapshot(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	for _, tc := range []struct {
+		name            string
+		endReplacement  bool
+		foreignSeats    int
+		foreignModified time.Time
+		wantStatus      string
+		wantErrorCode   string
+	}{
+		{name: "replacement live and target reached", foreignSeats: 4, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusSucceeded},
+		{name: "replacement ended and target reached", endReplacement: true, foreignSeats: 4, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusSucceeded},
+		{name: "target never applied", foreignSeats: 3, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusFailed, wantErrorCode: models.SeatPurchaseErrorNotApplied},
+		{name: "snapshot proves nothing", foreignSeats: 3, foreignModified: now.Add(-time.Hour), wantStatus: models.SeatPurchaseStatusUnknown},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			org := setupBillingOrganization(t)
+			db := database.Conn()
+			oldID, newID := "sub_old_"+uuid.NewString(), "sub_new_"+uuid.NewString()
+			product := createSeatSubscriptionProduct(t, db)
+			end := now.AddDate(0, 1, 0)
+			replacement := subscriptionEvent(org.ID, newID, "active", now, end)
+			replacement.Data.ProductID, replacement.Data.Seats = product, intPointer(5)
+			replacement.Data.ModifiedAt = polarTime{Time: now}
+			require.NoError(t, ApplySubscriptionEvent(t.Context(), db, replacement))
+			if tc.endReplacement {
+				replacement.Data.Status = "canceled"
+				replacement.Data.ModifiedAt = polarTime{Time: now.Add(time.Second)}
+				require.NoError(t, ApplySubscriptionEvent(t.Context(), db, replacement))
+			}
+			purchase := models.NewSeatPurchase(org.ID, nil, oldID, 3, 4)
+			purchase.Status = models.SeatPurchaseStatusUnknown
+			require.NoError(t, purchase.Create(db))
+			before := captureSubscriptionState(t, db, org.ID)
+			hook := logtest.NewGlobal()
+			t.Cleanup(hook.Reset)
+
+			foreign := subscriptionEvent(org.ID, oldID, "canceled", now, end)
+			foreign.Data.ProductID, foreign.Data.Seats = product, intPointer(tc.foreignSeats)
+			foreign.Data.ModifiedAt = polarTime{Time: tc.foreignModified}
+			require.NoError(t, ApplySubscriptionEvent(t.Context(), db, foreign))
+
+			after := captureSubscriptionState(t, db, org.ID)
+			assert.Equal(t, before.plan, after.plan, "the ended snapshot must not replace the stored state")
+			assert.Equal(t, before.settings, after.settings)
+			assert.Equal(t, before.grants, after.grants)
+			require.NotNil(t, after.purchase)
+			assert.Equal(t, tc.wantStatus, after.purchase.Status)
+			assert.Equal(t, tc.wantErrorCode, after.purchase.ErrorCode)
+			storedStatus := "active"
+			if tc.endReplacement {
+				storedStatus = "canceled"
+			}
+			requireSubscriptionLog(t, hook, log.WarnLevel, "billing.foreign_subscription_snapshot_ignored", org.ID, newID, oldID, storedStatus, "canceled")
+		})
+	}
+}
+
+// Reconciliation reads the subscription of an in-flight purchase from Polar.
+// When that subscription was replaced and has ended, its snapshot cannot take
+// the replacement back, but it settles the purchase so it stops blocking new
+// purchases on the replacement.
+func Test__ReconcileSeatPurchaseSettlesPurchaseOnReplacedSubscription(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	oldID, newID := "sub_old_"+uuid.NewString(), "sub_new_"+uuid.NewString()
+	product := createSeatSubscriptionProduct(t, db)
+	now := time.Now().UTC().Truncate(time.Second)
+	end := now.AddDate(0, 1, 0)
+	replacement := subscriptionEvent(org.ID, newID, "active", now, end)
+	replacement.Data.ProductID, replacement.Data.Seats = product, intPointer(5)
+	replacement.Data.ModifiedAt = polarTime{Time: now}
+	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, replacement))
+	purchase := models.NewSeatPurchase(org.ID, nil, oldID, 3, 4)
+	purchase.Status = models.SeatPurchaseStatusUnknown
+	require.NoError(t, purchase.Create(db))
+	before := captureSubscriptionState(t, db, org.ID)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		assert.Equal(t, http.MethodGet, req.Method)
+		assert.Equal(t, "/subscriptions/"+oldID, req.URL.Path)
+		w.Header().Set(apiVersionHeader, APIVersion())
+		snapshot := polarSubscriptionJSON(oldID, "canceled", org.ID.String(), now, end)
+		snapshot["product_id"] = product
+		snapshot["seats"] = 4
+		snapshot["modified_at"] = now.Add(time.Minute).Format(time.RFC3339)
+		require.NoError(t, json.NewEncoder(w).Encode(snapshot))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+
+	require.NoError(t, ReconcileSeatPurchase(t.Context(), db, NewClientFromEnv(), org.ID))
+
+	after := captureSubscriptionState(t, db, org.ID)
+	assert.Equal(t, before.plan, after.plan, "the ended snapshot must not replace the stored state")
+	require.NotNil(t, after.purchase)
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, after.purchase.Status)
+	inFlight, err := models.FindInFlightSeatPurchase(db, org.ID)
+	require.NoError(t, err)
+	assert.Nil(t, inFlight, "the settled purchase no longer blocks purchases on the replacement")
 }
 
 func Test__ApplySubscriptionReplacesCanceledSubscription(t *testing.T) {
