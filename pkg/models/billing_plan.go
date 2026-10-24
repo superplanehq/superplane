@@ -131,8 +131,8 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 		if current.Key != plan.Key {
 			return fmt.Errorf("%w: plan keys cannot change", ErrCatalogPlan)
 		}
-		if current.PolarProductID != nil && (plan.PolarProductID == nil || *current.PolarProductID != *plan.PolarProductID || current.PriceCents != plan.PriceCents || current.PerSeat != plan.PerSeat) {
-			return fmt.Errorf("%w: create a new plan and Polar product to change linked prices", ErrCatalogPlan)
+		if err := checkLinkedPlanChange(inner, &current, plan); err != nil {
+			return err
 		}
 		if current.IsSystem() && current.Category != plan.Category {
 			return fmt.Errorf("%w: system plan categories cannot change", ErrCatalogPlan)
@@ -140,6 +140,32 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 		plan.CreatedAt = current.CreatedAt
 		return inner.Save(plan).Error
 	})
+}
+
+// checkLinkedPlanChange rejects product, price, or seat changes on a
+// Polar-linked plan that an organization uses. The caller holds a FOR UPDATE
+// lock on the plan row. That lock conflicts with the KEY SHARE lock that the
+// organization_billing_plans.plan_id foreign key takes, so a concurrent
+// assignment waits until the save finishes.
+func checkLinkedPlanChange(tx *gorm.DB, current, next *BillingPlan) error {
+	if current.PolarProductID == nil {
+		return nil
+	}
+	changed := next.PolarProductID == nil ||
+		*current.PolarProductID != *next.PolarProductID ||
+		current.PriceCents != next.PriceCents ||
+		current.PerSeat != next.PerSeat
+	if !changed {
+		return nil
+	}
+	assigned, err := ListAssignedBillingPlanIDs(tx, []uuid.UUID{current.ID})
+	if err != nil {
+		return err
+	}
+	if assigned.Contains(current.ID) {
+		return fmt.Errorf("%w: create a new plan and Polar product to change linked prices", ErrCatalogPlan)
+	}
+	return nil
 }
 
 // DeleteBillingPlan removes a plan when no deletion rule blocks it. The row
