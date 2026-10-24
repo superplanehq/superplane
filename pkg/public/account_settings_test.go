@@ -317,6 +317,11 @@ func TestDeleteAccount_LeavesCreatedOrgWhenOtherOwnerRemains(t *testing.T) {
 	otherUser, err := models.CreateUserInTransaction(database.Conn(), r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
 	require.NoError(t, err)
 	require.NoError(t, models.SetUserIsOwner(database.Conn(), otherUser.ID, true))
+	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
+		ID: "sub_other_owner", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive,
+	}, nil)
+	require.NoError(t, err)
 
 	server, account, token := setupTestServer(r, t)
 	body, err := json.Marshal(map[string]string{"email": account.Email})
@@ -341,6 +346,79 @@ func TestDeleteAccount_LeavesCreatedOrgWhenOtherOwnerRemains(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, ownerIDs, r.User.String())
 	assert.Contains(t, ownerIDs, otherUser.ID.String())
+}
+
+func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) {
+	for _, status := range []string{models.PolarSubscriptionStatusActive, models.PolarSubscriptionStatusPaused} {
+		t.Run(status, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			require.NoError(t, db.Model(r.Account).Update("installation_admin", false).Error)
+			second := support.CreateOrganization(t, r, r.User)
+			// Place the subscribed organization last so rejection must also roll
+			// back deletion of an earlier organization in the same account.
+			protected := r.Organization
+			if second.ID.String() > protected.ID.String() {
+				protected = second
+			}
+			require.NoError(t, models.BindLegacyBillingProduct(db, "prod_business"))
+			_, err := models.ApplyPolarSubscription(db, protected.ID, models.PolarSubscriptionApply{
+				ID: "sub_account_delete", ProductID: "prod_business", Status: status,
+			}, nil)
+			require.NoError(t, err)
+			server, account, token := setupTestServer(r, t)
+			beforeAccount, err := models.FindAccountByID(account.ID.String())
+			require.NoError(t, err)
+			beforeUsers, err := models.ListActiveHumanUsersForAccount(db, account.ID)
+			require.NoError(t, err)
+			beforeProviders, err := account.GetAccountProviders(db)
+			require.NoError(t, err)
+			beforePlan, err := models.FindOrganizationBillingPlan(db, protected.ID)
+			require.NoError(t, err)
+			body, err := json.Marshal(map[string]string{"email": account.Email})
+			require.NoError(t, err)
+			deleteAccount := func() *httptest.ResponseRecorder {
+				req := httptest.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+				req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+				res := httptest.NewRecorder()
+				server.Router.ServeHTTP(res, req)
+				return res
+			}
+
+			res := deleteAccount()
+			require.Equal(t, http.StatusConflict, res.Code)
+			assert.Contains(t, res.Body.String(), "Cancel the subscription in Billing")
+			afterAccount, err := models.FindAccountByID(account.ID.String())
+			require.NoError(t, err)
+			assert.Equal(t, beforeAccount, afterAccount)
+			afterUsers, err := models.ListActiveHumanUsersForAccount(db, account.ID)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, beforeUsers, afterUsers)
+			afterProviders, err := account.GetAccountProviders(db)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, beforeProviders, afterProviders)
+			afterPlan, err := models.FindOrganizationBillingPlan(db, protected.ID)
+			require.NoError(t, err)
+			assert.Equal(t, beforePlan, afterPlan)
+			for _, organization := range []*models.Organization{r.Organization, second} {
+				stored, err := models.FindOrganizationByID(organization.ID.String())
+				require.NoError(t, err)
+				assert.False(t, stored.DeletedAt.Valid)
+			}
+
+			_, err = models.ApplyPolarSubscription(db, protected.ID, models.PolarSubscriptionApply{
+				ID: "sub_account_delete", ProductID: "prod_business", Status: models.PolarSubscriptionStatusCanceled,
+			}, nil)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusNoContent, deleteAccount().Code)
+			_, err = models.FindAccountByID(account.ID.String())
+			require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			for _, organization := range []*models.Organization{r.Organization, second} {
+				_, err := models.FindOrganizationByID(organization.ID.String())
+				require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			}
+		})
+	}
 }
 
 func TestDeleteAccount_LeavesOwnedButUncreatedOrg(t *testing.T) {

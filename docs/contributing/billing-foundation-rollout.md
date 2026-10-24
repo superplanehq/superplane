@@ -103,6 +103,43 @@ included-credit bucket arrives in the admin branch. Use a SuperPlane grant to
 restore missing spendable credit in the meantime. An excess included balance
 needs a database repair or the admin branch; do not toggle plans to alter it.
 
+## Cancel the subscription of a deleted organization
+
+SuperPlane blocks the deletion of an organization while its Polar subscription
+is live. A subscription is live when its status is `active`, `trialing`,
+`past_due`, or `paused`, or when it is set to cancel and the paid period is
+still open. Admin-assigned plans and organizations without a Polar subscription
+are not blocked.
+
+Account deletion uses the same protection for organizations with no other owner.
+The subscription check and deletion share the organization lock and transaction
+with subscription updates. Polar HTTP requests run outside these row locks.
+
+Polar can still have a subscription for an organization deleted by an older
+release, or a subscription that starts in Polar after deletion commits. Polar then
+keeps charging. SuperPlane does not apply the webhooks for that organization.
+It writes one error log for each webhook and answers Polar with 202.
+
+1. Search the application logs for `billing.subscription_for_deleted_organization`.
+   The entry has the `organization_id`, `polar_subscription_id`, and
+   `polar_subscription_status` fields.
+2. In Polar, open **Customers** and find the customer with the same external ID
+   as the `organization_id`. Open its subscription. Confirm that the ID matches
+   `polar_subscription_id`.
+3. Cancel or revoke the subscription in Polar. Cancel it to end it at the period
+   end. Revoke it to end it now. Refunds are a separate decision. Do not refund
+   from this procedure.
+4. Wait for the `subscription.canceled` or `subscription.revoked` webhook. The log
+   entry appears once more with the new status. Confirm that the status is
+   `canceled` or `revoked`.
+5. Confirm that Polar shows no later charge for the customer.
+
+A webhook for a deleted organization only writes a log. It does not change data.
+
+To delete a live organization, the Admin cancels the subscription in
+**Billing** first. The Admin can delete the organization after the paid period
+ends.
+
 ## Recovery limits
 
 Use a foundation-compatible image for application recovery after migration.

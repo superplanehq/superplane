@@ -1333,3 +1333,92 @@ func expireOrganizationTrial(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
 			"trial_ends_at": time.Now().Add(-time.Hour),
 		}).Error)
 }
+
+func Test__OrganizationBillingPlanHasLivePolarSubscription(t *testing.T) {
+	now := time.Now()
+	future := now.Add(time.Hour)
+	past := now.Add(-time.Hour)
+	subscriptionID := "sub_live"
+	blank := "  "
+
+	for _, tc := range []struct {
+		name string
+		plan models.OrganizationBillingPlan
+		live bool
+	}{
+		{name: "active", plan: polarPlan(&subscriptionID, "active", false, nil), live: true},
+		{name: "trialing", plan: polarPlan(&subscriptionID, "trialing", false, nil), live: true},
+		{name: "past due", plan: polarPlan(&subscriptionID, "past_due", false, nil), live: true},
+		{name: "paused", plan: polarPlan(&subscriptionID, "paused", false, nil), live: true},
+		{name: "status with different case and spaces", plan: polarPlan(&subscriptionID, " Active ", false, nil), live: true},
+		{name: "canceled", plan: polarPlan(&subscriptionID, "canceled", false, nil)},
+		{name: "revoked", plan: polarPlan(&subscriptionID, "revoked", false, nil)},
+		{name: "unpaid", plan: polarPlan(&subscriptionID, "unpaid", false, nil)},
+		{name: "incomplete", plan: polarPlan(&subscriptionID, "incomplete", false, nil)},
+		{name: "empty status", plan: polarPlan(&subscriptionID, "", false, nil)},
+		{name: "scheduled cancellation with period still open", plan: polarPlan(&subscriptionID, "active", true, &future), live: true},
+		{name: "canceled with paid period still open", plan: polarPlan(&subscriptionID, "canceled", true, &future), live: true},
+		{name: "scheduled cancellation with period ended", plan: polarPlan(&subscriptionID, "active", true, &past)},
+		{name: "scheduled cancellation without period end", plan: polarPlan(&subscriptionID, "active", true, nil)},
+		{name: "missing subscription ID", plan: polarPlan(nil, "active", false, nil)},
+		{name: "blank subscription ID", plan: polarPlan(&blank, "active", false, nil)},
+		{
+			name: "admin plan with active status",
+			plan: models.OrganizationBillingPlan{
+				PlanSource: models.BillingPlanSourceAdmin, PolarSubscriptionID: &subscriptionID, PolarSubscriptionStatus: "active",
+			},
+		},
+		{
+			name: "system plan with active status",
+			plan: models.OrganizationBillingPlan{
+				PlanSource: models.BillingPlanSourceSystem, PolarSubscriptionID: &subscriptionID, PolarSubscriptionStatus: "active",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.live, tc.plan.HasLivePolarSubscription(now))
+		})
+	}
+
+	t.Run("nil plan", func(t *testing.T) {
+		var plan *models.OrganizationBillingPlan
+		assert.False(t, plan.HasLivePolarSubscription(now))
+	})
+}
+
+func Test__OrganizationHasLivePolarSubscription(t *testing.T) {
+	r := support.Setup(t)
+	setLegacyBillingPlanTestProduct(t)
+	db := database.Conn()
+
+	t.Run("organization without a billing row", func(t *testing.T) {
+		require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBillingPlan{}).Error)
+
+		live, err := models.OrganizationHasLivePolarSubscription(db, r.Organization.ID)
+		require.NoError(t, err)
+		assert.False(t, live)
+	})
+
+	t.Run("stored active subscription", func(t *testing.T) {
+		now := time.Now()
+		end := now.AddDate(0, 1, 0)
+		_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+			ID: "sub_stored", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive, PeriodStart: &now, PeriodEnd: &end,
+		}, nil)
+		require.NoError(t, err)
+
+		live, err := models.OrganizationHasLivePolarSubscription(db, r.Organization.ID)
+		require.NoError(t, err)
+		assert.True(t, live)
+	})
+}
+
+func polarPlan(subscriptionID *string, status string, cancelAtPeriodEnd bool, periodEnd *time.Time) models.OrganizationBillingPlan {
+	return models.OrganizationBillingPlan{
+		PlanSource:              models.BillingPlanSourcePolar,
+		PolarSubscriptionID:     subscriptionID,
+		PolarSubscriptionStatus: status,
+		CancelAtPeriodEnd:       cancelAtPeriodEnd,
+		CurrentPeriodEnd:        periodEnd,
+	}
+}
