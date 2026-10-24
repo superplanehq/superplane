@@ -81,7 +81,7 @@ describe("AgentStepMarkers", () => {
     }
   });
 
-  it("keeps the step duration on one line and shows it on hover", () => {
+  it("shows the recorded duration beside a completed step", () => {
     render(
       <AgentStepMarkers
         stage={stageWithStep({
@@ -98,10 +98,8 @@ describe("AgentStepMarkers", () => {
     );
 
     const duration = screen.getByText("23m 34s");
-    expect(duration).toHaveClass("whitespace-nowrap");
-    expect(duration).toHaveClass("opacity-0");
-    expect(duration).toHaveClass("group-hover/step:opacity-100");
-    expect(duration).not.toHaveClass("w-12");
+    expect(duration).toBeVisible();
+    expect(duration).toHaveTextContent("Duration 23m 34s");
   });
 
   it("keeps a long prompt subtitle on one truncated line", () => {
