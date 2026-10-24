@@ -309,6 +309,23 @@ func FindOrganizationByIDInTransaction(tx *gorm.DB, id string) (*Organization, e
 	return &organization, nil
 }
 
+// FindOrganizationByIDIncludingDeleted finds an organization that can be soft-deleted.
+func FindOrganizationByIDIncludingDeleted(tx *gorm.DB, id string) (*Organization, error) {
+	organization := Organization{}
+
+	err := tx.
+		Unscoped().
+		Where("id = ?", id).
+		First(&organization).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &organization, nil
+}
+
 func LockOrganization(tx *gorm.DB, orgID uuid.UUID) (*Organization, error) {
 	return FindOrganizationByIDInTransaction(
 		tx.Clauses(clause.Locking{Strength: "UPDATE"}),

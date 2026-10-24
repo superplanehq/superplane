@@ -225,6 +225,44 @@ func PolarSubscriptionKeepsAccess(status string, cancelAtPeriodEnd bool, periodE
 	return cancelAtPeriodEnd && periodStillOpen(periodEnd, now)
 }
 
+// HasLivePolarSubscription reports whether Polar can still charge for this
+// plan. A live subscription has an ID, a status that Polar still bills, and
+// no scheduled cancellation that already ended. Admin and system plans have no
+// Polar subscription, so they are never live.
+func (p *OrganizationBillingPlan) HasLivePolarSubscription(now time.Time) bool {
+	if p == nil || p.PlanSource != BillingPlanSourcePolar {
+		return false
+	}
+	if p.PolarSubscriptionID == nil || strings.TrimSpace(*p.PolarSubscriptionID) == "" {
+		return false
+	}
+	if !polarSubscriptionIsBilled(p.PolarSubscriptionStatus) {
+		return false
+	}
+	return !polarScheduledCancelEnded(p, now)
+}
+
+// OrganizationHasLivePolarSubscription reports whether the organization has a
+// Polar subscription that can still charge. An organization without a billing
+// row has none.
+func OrganizationHasLivePolarSubscription(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	plan, err := FindOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return false, err
+	}
+	return plan.HasLivePolarSubscription(time.Now()), nil
+}
+
+func polarSubscriptionIsBilled(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case PolarSubscriptionStatusActive, PolarSubscriptionStatusTrialing,
+		PolarSubscriptionStatusPastDue, PolarSubscriptionStatusPaused:
+		return true
+	default:
+		return false
+	}
+}
+
 // PolarSubscriptionIsPastDue is true while Polar retries a failed renewal payment.
 func PolarSubscriptionIsPastDue(status string) bool {
 	return strings.ToLower(strings.TrimSpace(status)) == PolarSubscriptionStatusPastDue
