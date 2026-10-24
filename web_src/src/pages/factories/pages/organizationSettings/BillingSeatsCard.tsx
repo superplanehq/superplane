@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { BillingSeatPurchaseLimit } from "./BillingSeatPurchaseStatus";
 import { billingPeriodEndLabel } from "../../lib/billingPlans";
 import { formatUsdCents } from "../../lib/workOrderUsage";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
@@ -7,16 +10,23 @@ type BillingSeatsCardProps = {
   seats: BillingSeatSummary;
   currentPeriodEnd?: string;
   cancelAtPeriodEnd: boolean;
+  canManageBilling: boolean;
+  canBuySeats: boolean;
+  onBuySeats: () => void;
+  purchaseFeedback?: ReactNode;
 };
 
-export function BillingSeatsCard({ seats, currentPeriodEnd, cancelAtPeriodEnd }: BillingSeatsCardProps) {
+export function BillingSeatsCard({
+  seats,
+  currentPeriodEnd,
+  cancelAtPeriodEnd,
+  canManageBilling,
+  canBuySeats,
+  onBuySeats,
+  purchaseFeedback,
+}: BillingSeatsCardProps) {
   const date = billingPeriodEndLabel(currentPeriodEnd);
-  const renewalSeats = seats.expectedRenewalSeats;
-  const renewalQuantity = renewalSeats === undefined ? "Not available" : String(renewalSeats);
-  const renewalAmount = seatAmountLabel(seats.expectedRenewalCents);
-  const seatLabel = renewalSeats === 1 ? "seat" : "seats";
-  const renewalDate = date ? ` on ${date}` : "";
-  const estimate = `${renewalQuantity} ${seatLabel}, ${renewalAmount}${renewalDate}, based on current members.`;
+  const estimate = renewalEstimate(seats, date);
 
   return (
     <FactorySettingsCard title="Seats" data-testid="billing-seats">
@@ -27,6 +37,14 @@ export function BillingSeatsCard({ seats, currentPeriodEnd, cancelAtPeriodEnd }:
         <div>
           <dt className="text-xs text-muted-foreground">Available seats</dt>
           <dd className="mt-1 tabular-nums">{seats.available ?? "Not available"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Pending invitations</dt>
+          <dd className="mt-1 tabular-nums">{seats.pendingInvitations ?? "Not available"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Seats available for new invitations</dt>
+          <dd className="mt-1 tabular-nums">{seats.invitable ?? "Unlimited"}</dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Plan maximum</dt>
@@ -49,10 +67,30 @@ export function BillingSeatsCard({ seats, currentPeriodEnd, cancelAtPeriodEnd }:
       </dl>
       <p className="mt-3 text-xs text-muted-foreground">Estimates exclude taxes and discounts.</p>
       <p className="mt-2 text-xs text-muted-foreground">
-        Unused seats are removed at renewal. Pending invitations are not renewed and expire at renewal.
+        Pending invitations do not count at renewal. After renewal, an invitation needs a free seat.
       </p>
+      <div className="mt-4 space-y-3">
+        {!canManageBilling && <p className="text-sm text-muted-foreground">Ask an organization admin to buy seats.</p>}
+        {canBuySeats &&
+          !cancelAtPeriodEnd &&
+          (seats.purchasable === 0 ? (
+            <BillingSeatPurchaseLimit maximum={seats.planMaximum} />
+          ) : (
+            <Button onClick={onBuySeats}>Buy seats</Button>
+          ))}
+        {purchaseFeedback}
+      </div>
     </FactorySettingsCard>
   );
+}
+
+function renewalEstimate(seats: BillingSeatSummary, date: string | null) {
+  const renewalSeats = seats.expectedRenewalSeats;
+  const renewalQuantity = renewalSeats === undefined ? "Not available" : String(renewalSeats);
+  const renewalAmount = seatAmountLabel(seats.expectedRenewalCents);
+  const seatLabel = renewalSeats === 1 ? "seat" : "seats";
+  const renewalDate = date ? ` on ${date}` : "";
+  return `${renewalQuantity} ${seatLabel}, ${renewalAmount}${renewalDate}, based on current members.`;
 }
 
 function seatAmountLabel(cents: string | undefined) {

@@ -964,6 +964,8 @@ message DescribeOrganizationBillingResponse {
   // so clients must use this flag instead of remaining_credit_cents.
   bool hosted_credit_available = 35;
   SeatPurchase last_seat_purchase = 36;
+  optional int32 pending_invitation_seats = 37;
+  optional int32 invitable_seats = 38;
 }
 
 message SeatPurchase {

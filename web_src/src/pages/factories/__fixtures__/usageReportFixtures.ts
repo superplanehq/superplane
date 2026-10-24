@@ -181,6 +181,8 @@ export const TEAM_ORGANIZATION_BILLING = {
   purchasedSeats: 10,
   occupiedSeats: 9,
   availableSeats: 1,
+  pendingInvitationSeats: 2,
+  invitableSeats: 0,
   planMaximumSeats: 50,
   purchasableSeats: 40,
   expectedRenewalSeats: 9,
