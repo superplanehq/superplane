@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -58,7 +60,7 @@ func Test__HandlePolarWebhook(t *testing.T) {
 
 	t.Run("subscription cycled advances the billing period", func(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
-		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+		setAdminBillingTestProduct(t, "prod_business")
 		firstEnd := time.Now().UTC().Truncate(time.Second).AddDate(0, 1, 0)
 		renewedEnd := firstEnd.AddDate(0, 1, 0)
 		subscriptionBody := func(eventType string, start, end time.Time) []byte {
@@ -104,16 +106,18 @@ func Test__HandlePolarWebhook(t *testing.T) {
 	t.Run("subscription updated stores purchased seats", func(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
 		db := database.Conn()
+		organization, err := models.CreateOrganization("webhook-seats-"+uuid.NewString(), "")
+		require.NoError(t, err)
 		product := "product_" + uuid.NewString()
 		catalog := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: new(50), PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
 		require.NoError(t, models.SaveBillingPlan(db, &catalog))
-		body := []byte(fmt.Sprintf(`{"type":"subscription.updated","data":{"id":"sub_seats","status":"active","product_id":%q,"seats":3,"customer":{"external_id":%q}}}`, product, r.Organization.ID.String()))
+		body := []byte(fmt.Sprintf(`{"type":"subscription.updated","data":{"id":"sub_seats","status":"active","product_id":%q,"seats":3,"customer":{"external_id":%q}}}`, product, organization.ID.String()))
 		for range 2 {
 			rec := signedPolarWebhook(t, secret, body)
 			server.handlePolarWebhook(rec.recorder, rec.request)
 			require.Equal(t, http.StatusAccepted, rec.recorder.Code)
 		}
-		stored, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+		stored, err := models.FindOrganizationBillingPlan(db, organization.ID)
 		require.NoError(t, err)
 		require.NotNil(t, stored.PurchasedSeats)
 		require.Equal(t, 3, *stored.PurchasedSeats)
@@ -242,6 +246,58 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		rec := signedPolarWebhook(t, secret, body)
 		server.handlePolarWebhook(rec.recorder, rec.request)
 		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
+	})
+
+	t.Run("subscription for a soft-deleted organization is logged and accepted", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+		deleted := support.CreateOrganization(t, r, r.User)
+		require.NoError(t, models.SoftDeleteOrganization(deleted.ID.String()))
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { log.StandardLogger().ReplaceHooks(make(log.LevelHooks)) })
+
+		send := func(organizationID uuid.UUID) {
+			body := []byte(fmt.Sprintf(`{"type":"subscription.updated","data":{"id":"sub_deleted","status":"active","product_id":"prod_business","customer":{"id":"cust_1","external_id":%q}}}`, organizationID.String()))
+			rec := signedPolarWebhook(t, secret, body)
+			server.handlePolarWebhook(rec.recorder, rec.request)
+			require.Equal(t, http.StatusAccepted, rec.recorder.Code)
+		}
+		deletedOrganizationEntries := func() []*log.Entry {
+			var entries []*log.Entry
+			for _, entry := range hook.AllEntries() {
+				if entry.Message == "billing.subscription_for_deleted_organization" {
+					entries = append(entries, entry)
+				}
+			}
+			return entries
+		}
+		genericPermanentEntries := func() []*log.Entry {
+			var entries []*log.Entry
+			for _, entry := range hook.AllEntries() {
+				if entry.Message == "ignored polar webhook that cannot be applied" {
+					entries = append(entries, entry)
+				}
+			}
+			return entries
+		}
+
+		send(uuid.New())
+		assert.Empty(t, deletedOrganizationEntries(), "an organization that never existed is not a deleted organization")
+		assert.Len(t, genericPermanentEntries(), 1, "an organization that never existed still writes the generic log")
+
+		send(deleted.ID)
+		entries := deletedOrganizationEntries()
+		require.Len(t, entries, 1)
+		assert.Equal(t, log.ErrorLevel, entries[0].Level)
+		assert.Equal(t, "billing.subscription_for_deleted_organization", entries[0].Data["event"])
+		assert.Equal(t, deleted.ID.String(), entries[0].Data["organization_id"])
+		assert.Equal(t, "sub_deleted", entries[0].Data["polar_subscription_id"])
+		assert.Equal(t, "active", entries[0].Data["polar_subscription_status"])
+		assert.Len(t, genericPermanentEntries(), 1, "the recorded deleted-organization event must not write the generic log again")
+
+		send(deleted.ID)
+		assert.Len(t, deletedOrganizationEntries(), 2, "each webhook writes one deleted-organization log")
+		assert.Len(t, genericPermanentEntries(), 1, "repeat webhooks must not write the generic log")
 	})
 
 	t.Run("refund reverses grant", func(t *testing.T) {

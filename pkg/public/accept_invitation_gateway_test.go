@@ -63,13 +63,15 @@ func TestInvitationGatewayReportsPastDuePayment(t *testing.T) {
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	db := database.Conn()
-	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
+	product := "prod_" + uuid.NewString()
+	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+		ID: "sub_" + uuid.NewString(), ProductID: product,
+		Status: models.PolarSubscriptionStatusActive, PurchasedSeats: gatewaySeatCount(3),
+	}, nil)
+	require.NoError(t, err)
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
-		"plan_id":                   plan.ID,
-		"plan":                      plan.Key,
-		"plan_source":               models.BillingPlanSourceAdmin,
-		"purchased_seats":           3,
 		"polar_subscription_status": models.PolarSubscriptionStatusPastDue,
 	}).Error)
 

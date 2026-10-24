@@ -57,7 +57,12 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 	if event.Subscription != nil {
 		if err := polar.ApplySubscriptionEvent(r.Context(), database.DB(r.Context()), event.Subscription); err != nil {
 			if polar.IsPermanentApplyError(err) {
-				polar.LogPermanentApply(nil, err)
+				// A webhook for a deleted organization already wrote its own
+				// error log with the subscription details. The generic
+				// permanent-apply log would only duplicate it.
+				if !errors.Is(err, polar.ErrSubscriptionForDeletedOrganization) {
+					polar.LogPermanentApply(nil, err)
+				}
 				acceptPolarWebhook(w)
 				return
 			}

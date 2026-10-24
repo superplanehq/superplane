@@ -138,6 +138,10 @@ func DescribeOrganizationBilling(
 		return nil, grpcerrors.Internal(err, "Could not load seat usage.")
 	}
 	response.OccupiedSeats = new(int32(seats.Occupied))
+	response.PendingInvitationSeats = new(int32(seats.PendingInvitations))
+	if seats.Invitable != nil {
+		response.InvitableSeats = new(int32(*seats.Invitable))
+	}
 	if !seats.PerSeat {
 		return response, nil
 	}
@@ -173,6 +177,7 @@ func SyncOrganizationBilling(
 	if err := polar.SyncOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
 		log.WithError(err).WithField("organization_id", organizationID.String()).Warn("failed to sync Polar subscription")
 	}
+	reconcileSeatPurchase(ctx, database.DB(ctx), organizationID)
 
 	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
 }
@@ -197,6 +202,24 @@ func CreateBusinessCheckout(
 	}
 	if productID == "" {
 		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
+	}
+
+	current, err := models.FindOrganizationBillingPlan(database.DB(ctx), organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load the current plan.")
+	}
+	if current != nil && models.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) {
+		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
+	}
+	newBilling, err := models.OrganizationHasExperimentalFeatures(database.DB(ctx), organizationID, features.FeatureNewBilling)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
+	}
+	if newBilling {
+		return nil, grpcerrors.FailedPrecondition(nil, "Select a plan in Billing.")
+	}
+	if models.OrganizationBillingIsPolarManaged(current) {
+		return nil, grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
 	}
 
 	email := actingUserEmail(ctx, organizationID.String(), accountID)
@@ -258,10 +281,10 @@ func CancelOrganizationSubscription(
 		return nil, err
 	}
 	if !models.BillingEnabled() {
-		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
+		return nil, grpcerrors.FailedPrecondition(nil, "Subscription checkout is not configured.")
 	}
 	if err := polar.CancelOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
-		return nil, subscriptionCancelError(err, "failed to cancel Business")
+		return nil, subscriptionCancelError(err, "Could not cancel the subscription.")
 	}
 	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
 }
@@ -276,10 +299,10 @@ func ResumeOrganizationSubscription(
 		return nil, err
 	}
 	if !models.BillingEnabled() {
-		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
+		return nil, grpcerrors.FailedPrecondition(nil, "Subscription checkout is not configured.")
 	}
 	if err := polar.ResumeOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
-		return nil, subscriptionCancelError(err, "failed to keep Business")
+		return nil, subscriptionCancelError(err, "Could not resume the subscription.")
 	}
 	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
 }
@@ -287,15 +310,15 @@ func ResumeOrganizationSubscription(
 func subscriptionCancelError(err error, fallback string) error {
 	switch {
 	case errors.Is(err, polar.ErrSubscriptionCheckoutDisabled):
-		return grpcerrors.FailedPrecondition(err, "Business checkout is not configured")
+		return grpcerrors.FailedPrecondition(err, "Subscription checkout is not configured.")
 	case errors.Is(err, polar.ErrAdminPlanCannotCancel):
 		return grpcerrors.FailedPrecondition(err, "An admin plan cannot be canceled from Billing.")
 	case errors.Is(err, polar.ErrSubscriptionNotCancelable), polar.IsNotFound(err):
-		return grpcerrors.FailedPrecondition(err, "This organization has no Business subscription to cancel.")
+		return grpcerrors.FailedPrecondition(err, "This organization has no subscription to cancel.")
 	case errors.Is(err, polar.ErrSubscriptionAlreadyCanceling):
-		return grpcerrors.FailedPrecondition(err, "Business is already set to end at the period end.")
+		return grpcerrors.FailedPrecondition(err, "The subscription is already set to end at the period end.")
 	case errors.Is(err, polar.ErrSubscriptionNotCanceling):
-		return grpcerrors.FailedPrecondition(err, "Business is not set to end at the period end.")
+		return grpcerrors.FailedPrecondition(err, "The subscription is not set to end at the period end.")
 	default:
 		return polarBillingError(err, fallback)
 	}
