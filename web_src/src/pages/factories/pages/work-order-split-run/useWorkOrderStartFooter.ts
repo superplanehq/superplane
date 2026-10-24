@@ -7,6 +7,7 @@ import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
 import { useFactoryUsage } from "@/hooks/useFactoryUsage";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 
+import { billingPaymentBlocked } from "../../lib/billingPlans";
 import { workOrderCreditFailureCopy, type WorkOrderCreditFailureReason } from "../../lib/workOrderFailureReason";
 import type { SplitRunFooter, SplitRunFooterNote } from "./splitRunFooter";
 
@@ -47,6 +48,9 @@ function runStartBlock(
         text: "Add a payment method in Billing to start this task.",
         cta: { label: "View billing", destination: "billing" },
       };
+    }
+    if (billingPaymentBlocked(billing.polarSubscriptionStatus)) {
+      return creditStartBlock("payment_past_due");
     }
     return creditStartBlock("hosted_subscription_required");
   }
