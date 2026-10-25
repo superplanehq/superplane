@@ -332,44 +332,121 @@ describe("seat purchase HTTP recovery", () => {
     expect(server.charges).toBe(1);
   });
 
-  it.each(["all storage", "writes only"])("reuses the key when the browser blocks %s", async (blocked) => {
+  it("merges another tab's unresolved key with failed writes and keeps retired keys out of later saves", async () => {
+    const organizationId = "org-cross-tab-storage";
+    const storageKey = `superplane:seat-purchase-operation:${organizationId}`;
     const storage = Object.getOwnPropertyDescriptor(window, "localStorage");
     const localStorage = window.localStorage;
+    let writesBlocked = true;
     Object.defineProperty(window, "localStorage", {
       configurable: true,
-      get: () => {
-        if (blocked === "writes only")
-          return {
-            getItem: localStorage.getItem.bind(localStorage),
-            removeItem: localStorage.removeItem.bind(localStorage),
-            setItem: () => {
-              throw new DOMException("Storage is full.", "QuotaExceededError");
-            },
-          };
-        throw new DOMException("Storage is blocked.", "SecurityError");
+      value: {
+        getItem: localStorage.getItem.bind(localStorage),
+        removeItem: localStorage.removeItem.bind(localStorage),
+        setItem: (key: string, value: string) => {
+          if (writesBlocked) throw new DOMException("Storage is full.", "QuotaExceededError");
+          localStorage.setItem(key, value);
+        },
       },
     });
     try {
-      const page = await loadPage();
-      server.billingUnavailable = true;
+      const page = await loadPage(organizationId);
+      server.failNextPurchase("lost request");
+      await previewAndConfirm(page);
+      const first = server.purchaseRequests[0];
+
+      // Another tab has independent memory and writes this shared storage record
+      // before sending its purchase through the same HTTP contract.
+      const other = { additionalSeats: 2, expectedPurchasedSeats: 4, operationKey: crypto.randomUUID() };
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify([{ version: 1, organizationId, confirmedAt: new Date().toISOString(), ...other }]),
+      );
       server.failNextPurchase("lost response");
-      await previewAndConfirm(page);
-      server.renew();
-      server.billingUnavailable = false;
-      await act(async () => page.result.current.refreshBilling());
-      await previewAndConfirm(page);
-      expect(server.purchaseRequests[1]).toEqual(server.purchaseRequests[0]);
+      await expect(
+        server.fetch(
+          new Request(`http://localhost/api/v1/organizations/${organizationId}/billing/seats/purchase`, {
+            method: "POST",
+            body: JSON.stringify(other),
+          }),
+        ),
+      ).rejects.toThrow("Failed to fetch");
       expect(server.charges).toBe(1);
-      // A terminal result must retire the fallback key as well.
       server.renew();
       await act(async () => page.result.current.refreshBilling());
+
+      act(() => page.result.current.setAdditionalSeats("2"));
       await previewAndConfirm(page);
-      expect(server.purchaseRequests[2].operationKey).not.toBe(server.purchaseRequests[0].operationKey);
+      expect(server.purchaseRequests[2]).toEqual(other);
+      expect(server.charges).toBe(1);
+
+      // Retirement also fails to persist. A later successful save must preserve
+      // the first tab's key without restoring the retired key from storage.
+      writesBlocked = false;
+      act(() => page.result.current.setAdditionalSeats("3"));
+      server.failNextPurchase("lost request");
+      await previewAndConfirm(page);
+      act(() => page.result.current.setAdditionalSeats("1"));
+      await previewAndConfirm(page);
+      expect(server.purchaseRequests[4]).toEqual(first);
       expect(server.charges).toBe(2);
+
+      server.renew();
+      await act(async () => page.result.current.refreshBilling());
+      act(() => page.result.current.setAdditionalSeats("2"));
+      await previewAndConfirm(page);
+      expect(server.purchaseRequests[5].operationKey).not.toBe(other.operationKey);
+      expect(server.charges).toBe(3);
     } finally {
       if (storage) Object.defineProperty(window, "localStorage", storage);
     }
   });
+
+  it.each(["all storage", "writes only", "removals only"])(
+    "reuses the key when the browser blocks %s",
+    async (blocked) => {
+      const storage = Object.getOwnPropertyDescriptor(window, "localStorage");
+      const localStorage = window.localStorage;
+      Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        get: () => {
+          if (blocked !== "all storage")
+            return {
+              getItem: localStorage.getItem.bind(localStorage),
+              removeItem: (key: string) => {
+                if (blocked === "removals only") throw new DOMException("Storage is blocked.", "SecurityError");
+                localStorage.removeItem(key);
+              },
+              setItem: (key: string, value: string) => {
+                if (blocked === "writes only") throw new DOMException("Storage is full.", "QuotaExceededError");
+                localStorage.setItem(key, value);
+              },
+            };
+          throw new DOMException("Storage is blocked.", "SecurityError");
+        },
+      });
+      try {
+        const page = await loadPage();
+        server.billingUnavailable = true;
+        server.failNextPurchase("lost response");
+        await previewAndConfirm(page);
+        server.renew();
+        server.billingUnavailable = false;
+        await act(async () => page.result.current.refreshBilling());
+        await previewAndConfirm(page);
+        expect(server.purchaseRequests[1]).toEqual(server.purchaseRequests[0]);
+        expect(server.charges).toBe(1);
+        // A terminal result must retire the fallback key as well.
+        server.renew();
+        await act(async () => page.result.current.refreshBilling());
+        await previewAndConfirm(page);
+        expect(server.purchaseRequests[2].operationKey).not.toBe(server.purchaseRequests[0].operationKey);
+        expect(server.charges).toBe(2);
+      } finally {
+        if (storage) Object.defineProperty(window, "localStorage", storage);
+      }
+    },
+  );
 
   it("requires a new preview after the billing period renews", async () => {
     const page = await loadPage();

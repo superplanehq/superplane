@@ -198,6 +198,10 @@ it shows a preview. The browser keeps the key in `localStorage` for the
 organization, with the request and its billing period. All tabs of the
 organization use the same key.
 
+If a storage write fails, the tab keeps unresolved keys in memory. It merges
+them with current storage records from other tabs. It excludes keys that
+the tab retired, even when storage still contains those keys.
+
 - A new confirmation of the same `additional_seats` and
   `expected_purchased_seats` sends the stored key again. This applies after a
   lost response, an HTTP 5xx error, a page refresh, and a renewal.

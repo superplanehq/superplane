@@ -26,9 +26,10 @@ export type SeatPurchaseOperation = SeatPurchaseRequest &
 
 type StoredSeatPurchaseOperation = SeatPurchaseOperation & { version: number };
 
-// Holds the current collection when a storage write fails. It takes precedence
-// over storage reads, which can still return an older collection.
+// Preserve failed writes while continuing to read keys saved by other tabs.
 const memoryOperations = new Map<string, SeatPurchaseOperation[]>();
+// A stale storage collection must not restore a key retired in this tab.
+const retiredOperationKeys = new Map<string, Set<string>>();
 
 function storageKey(organizationId: string) {
   return `${STORAGE_PREFIX}${organizationId}`;
@@ -71,13 +72,17 @@ function parseOperations(raw: string | null, organizationId: string): SeatPurcha
 /** Returns all unresolved purchase operations of the organization. */
 export function loadSeatPurchaseOperations(organizationId: string): SeatPurchaseOperation[] {
   if (!organizationId) return [];
-  const fallback = memoryOperations.get(organizationId);
-  if (fallback) return fallback;
+  const operations = new Map(
+    (memoryOperations.get(organizationId) ?? []).map((operation) => [operation.operationKey, operation]),
+  );
   try {
-    return parseOperations(window.localStorage.getItem(storageKey(organizationId)), organizationId);
+    const stored = parseOperations(window.localStorage.getItem(storageKey(organizationId)), organizationId);
+    for (const operation of stored) operations.set(operation.operationKey, operation);
   } catch {
-    return [];
+    // Storage can be unavailable while this tab still holds unresolved keys.
   }
+  const retired = retiredOperationKeys.get(organizationId);
+  return [...operations.values()].filter((operation) => !retired?.has(operation.operationKey));
 }
 
 function saveSeatPurchaseOperations(organizationId: string, operations: SeatPurchaseOperation[]) {
@@ -136,6 +141,9 @@ export function retireSeatPurchaseOperation({
   operationKey,
 }: Pick<SeatPurchaseOperation, "organizationId" | "operationKey">) {
   const operations = loadSeatPurchaseOperations(organizationId);
+  const retired = retiredOperationKeys.get(organizationId) ?? new Set<string>();
+  retired.add(operationKey);
+  retiredOperationKeys.set(organizationId, retired);
   const remaining = operations.filter((operation) => operation.operationKey !== operationKey);
   if (remaining.length === operations.length) return;
   saveSeatPurchaseOperations(organizationId, remaining);
