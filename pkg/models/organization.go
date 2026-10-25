@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -17,6 +18,11 @@ import (
 )
 
 const OrganizationSortRemainingCreditCents = "remaining_credit_cents"
+
+// Preserve the instruction used by both deletion APIs.
+//
+//revive:disable-next-line:error-strings
+var ErrOrganizationSubscriptionLive = errors.New("Cancel the subscription in Billing before you delete the organization. You can delete it after the paid period ends.")
 
 type Organization struct {
 	ID uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
@@ -309,6 +315,23 @@ func FindOrganizationByIDInTransaction(tx *gorm.DB, id string) (*Organization, e
 	return &organization, nil
 }
 
+// FindOrganizationByIDIncludingDeleted finds an organization that can be soft-deleted.
+func FindOrganizationByIDIncludingDeleted(tx *gorm.DB, id string) (*Organization, error) {
+	organization := Organization{}
+
+	err := tx.
+		Unscoped().
+		Where("id = ?", id).
+		First(&organization).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &organization, nil
+}
+
 func LockOrganization(tx *gorm.DB, orgID uuid.UUID) (*Organization, error) {
 	return FindOrganizationByIDInTransaction(
 		tx.Clauses(clause.Locking{Strength: "UPDATE"}),
@@ -349,7 +372,6 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub},
 		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{
 			features.FeatureFactories,
-			features.FeatureWorkspaceAgent,
 		},
 		CreatedAt: &now,
 		UpdatedAt: &now,
@@ -361,10 +383,6 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		Error
 
 	if err == nil {
-		_, inviteErr := CreateInviteLink(tx, organization.ID)
-		if inviteErr != nil {
-			return nil, inviteErr
-		}
 		if BillingEnabled() {
 			if _, planErr := EnsureOrganizationBillingPlan(tx, organization.ID); planErr != nil {
 				return nil, planErr
@@ -411,6 +429,24 @@ func SoftDeleteOrganizationInTransaction(tx *gorm.DB, id string) error {
 		Where("id = ?", id).
 		Delete(&Organization{}).
 		Error
+}
+
+// SoftDelete checks the subscription and deletes under the same organization
+// lock as subscription updates. It also works within an account transaction.
+func (o *Organization) SoftDelete(tx *gorm.DB) error {
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if _, err := LockOrganization(inner, o.ID); err != nil {
+			return err
+		}
+		live, err := OrganizationHasLivePolarSubscription(inner, o.ID)
+		if err != nil {
+			return err
+		}
+		if live {
+			return ErrOrganizationSubscriptionLive
+		}
+		return inner.Delete(o).Error
+	})
 }
 
 func HardDeleteOrganization(id string) error {

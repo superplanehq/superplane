@@ -1,10 +1,8 @@
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
-import { useOrganizationInviteLink } from "@/hooks/useOrganizationData";
 import { useAPIKeys } from "@/hooks/useApiKeys";
 import { appPath } from "@/lib/appPaths";
 import { Key, Palette, Plug } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { DOCS_URL } from "./constants";
 import type { CommandPaletteModel } from "./model";
 import type { CommandPalettePageProps, IntegrationItem, IntegrationStatus } from "./pages";
@@ -15,7 +13,6 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   const organizationId = model.canvasListProps.organizationId ?? "";
   const goTo = model.canvasListProps.goTo;
   const canFetchIntegrations = canFetchPaletteData(organizationId, model.canReadIntegrations);
-  const canFetchInviteLink = canFetchPaletteData(organizationId, model.canManageInviteLink);
   const canFetchAPIKeys = canFetchPaletteData(organizationId, model.canReadAPIKeys);
 
   const { data: connectedIntegrations = [], isLoading: integrationsLoading } = useConnectedIntegrations(
@@ -24,14 +21,9 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
       enabled: canFetchIntegrations,
     },
   );
-  const { data: inviteLink, isLoading: inviteLinkLoading } = useOrganizationInviteLink(
-    organizationId,
-    canFetchInviteLink,
-  );
   const { data: apiKeys = [], isLoading: apiKeysLoading } = useAPIKeys(organizationId, {
     enabled: canFetchAPIKeys,
   });
-  const inviteLinkToken = inviteLink?.enabled ? inviteLink.token : undefined;
 
   const integrations = useMemo<IntegrationItem[]>(
     () =>
@@ -55,21 +47,6 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
     [model, integrations, apiKeys, organizationId, goTo],
   );
 
-  const handleCopyInviteLink = useCallback(() => {
-    if (!inviteLinkToken) {
-      toast.error("Invite link not available");
-      return;
-    }
-    const url = `${window.location.origin}/invite/${inviteLinkToken}`;
-    void navigator.clipboard.writeText(url).then(
-      () => {
-        toast.success("Invite link copied");
-        closePalette();
-      },
-      () => toast.error("Failed to copy invite link"),
-    );
-  }, [inviteLinkToken, closePalette]);
-
   const handleSetSearch = useCallback(
     (value: string) => {
       model.setSearch(value);
@@ -85,9 +62,8 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
       const createAction = model.rootActions.find((a) => a.id === "new-canvas");
       createAction?.onSelect?.();
     },
-    onCopyInviteLink: handleCopyInviteLink,
-    showCopyInviteLink: model.canManageInviteLink,
-    copyInviteLinkDisabled: inviteLinkLoading || !inviteLinkToken,
+    onInviteMember: () => goTo(`/${organizationId}/settings/members`),
+    showInviteMember: model.canInviteMembers,
     onExpandApps: () => setExpandedSection("apps"),
     onExpandIntegrations: () => setExpandedSection("integrations"),
     onCollapse: () => setExpandedSection(null),

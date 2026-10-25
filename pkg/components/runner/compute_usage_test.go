@@ -50,7 +50,7 @@ func (r *recordingComputeUsage) RecordCompute(record core.ComputeUsageRecord) er
 	return nil
 }
 
-func TestRecordRunnerComputeUsageFromFinishedTask(t *testing.T) {
+func TestRecordRunnerComputeUsageFromReservationWhenStartMissing(t *testing.T) {
 	t.Parallel()
 
 	claimed := time.Now().Add(-3 * time.Second)
@@ -60,10 +60,10 @@ func TestRecordRunnerComputeUsageFromFinishedTask(t *testing.T) {
 		executionKVFleetID:     "local",
 	}}
 	recorder := &recordingComputeUsage{}
-	RecordRunnerComputeUsage(recorder, nil, state, map[string]any{"machine_type": MachineTypeE1TinyAMD64}, &Task{
+	RecordRunnerComputeUsage(recorder, nil, state, map[string]any{"machine_type": MachineTypeE1TinyAMD64}, &core.RunnerTask{
 		ID:         "task-1",
-		Status:     "succeeded",
-		ClaimedAt:  &claimed,
+		State:      "succeeded",
+		ReservedAt: &claimed,
 		FinishedAt: &finished,
 	})
 	require.Len(t, recorder.computes, 1)
@@ -77,9 +77,9 @@ func TestRecordRunnerComputeUsageSkipsMissingTimestamps(t *testing.T) {
 	t.Parallel()
 
 	recorder := &recordingComputeUsage{}
-	RecordRunnerComputeUsage(recorder, nil, &kvState{}, map[string]any{"machine_type": MachineTypeE1LargeAMD64}, &Task{
-		ID:     "task-2",
-		Status: "failed",
+	RecordRunnerComputeUsage(recorder, nil, &kvState{}, map[string]any{"machine_type": MachineTypeE1LargeAMD64}, &core.RunnerTask{
+		ID:    "task-2",
+		State: "failed",
 	})
 	assert.Empty(t, recorder.computes)
 }
@@ -89,10 +89,10 @@ func TestRecordRunnerComputeUsageRecordsZeroDuration(t *testing.T) {
 
 	now := time.Now()
 	recorder := &recordingComputeUsage{}
-	RecordRunnerComputeUsage(recorder, nil, &kvState{}, map[string]any{"machineType": MachineTypeE1TinyARM64}, &Task{
-		TaskID:     "task-3",
-		Status:     "canceled",
-		ClaimedAt:  &now,
+	RecordRunnerComputeUsage(recorder, nil, &kvState{}, map[string]any{"machineType": MachineTypeE1TinyARM64}, &core.RunnerTask{
+		ID:         "task-3",
+		State:      "canceled",
+		StartedAt:  &now,
 		FinishedAt: &now,
 	})
 	require.Len(t, recorder.computes, 1)
@@ -107,32 +107,15 @@ func TestRecordRunnerComputeUsageResolvesFleetWhenKVMissing(t *testing.T) {
 	claimed := time.Now()
 	finished := claimed.Add(time.Second)
 	recorder := &recordingComputeUsage{}
-	RecordRunnerComputeUsage(recorder, nil, &kvState{}, map[string]any{"machine_type": MachineTypeE1LargeAMD64}, &Task{
+	RecordRunnerComputeUsage(recorder, nil, &kvState{}, map[string]any{"machine_type": MachineTypeE1LargeAMD64}, &core.RunnerTask{
 		ID:         "task-4",
-		Status:     "succeeded",
-		ClaimedAt:  &claimed,
+		State:      "succeeded",
+		StartedAt:  &claimed,
 		FinishedAt: &finished,
 	})
 	require.Len(t, recorder.computes, 1)
 	assert.Equal(t, MachineTypeE1LargeAMD64, recorder.computes[0].MachineType)
-	assert.Equal(t, "local", recorder.computes[0].FleetID)
-}
-
-func TestRecordRunnerComputeUsageResolvesLocalComposeFleetWhenKVMissing(t *testing.T) {
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
-	t.Setenv("TASK_BROKER_BASE_URL", "http://localhost:8091")
-
-	claimed := time.Now()
-	finished := claimed.Add(time.Second)
-	recorder := &recordingComputeUsage{}
-	RecordRunnerComputeUsage(recorder, nil, &kvState{}, map[string]any{"machine_type": MachineTypeE1LargeAMD64}, &Task{
-		ID:         "task-5",
-		Status:     "succeeded",
-		ClaimedAt:  &claimed,
-		FinishedAt: &finished,
-	})
-	require.Len(t, recorder.computes, 1)
-	assert.Equal(t, "local", recorder.computes[0].FleetID)
+	assert.Equal(t, MachineTypeE1LargeAMD64, recorder.computes[0].FleetID)
 }
 
 func TestRecordRunnerComputeUsagePrefersStoredFleetKV(t *testing.T) {
@@ -146,10 +129,10 @@ func TestRecordRunnerComputeUsagePrefersStoredFleetKV(t *testing.T) {
 		executionKVFleetID:     MachineTypeE1LargeAMD64,
 	}}
 	recorder := &recordingComputeUsage{}
-	RecordRunnerComputeUsage(recorder, nil, state, map[string]any{"machine_type": MachineTypeE1TinyAMD64}, &Task{
+	RecordRunnerComputeUsage(recorder, nil, state, map[string]any{"machine_type": MachineTypeE1TinyAMD64}, &core.RunnerTask{
 		ID:         "task-6",
-		Status:     "succeeded",
-		ClaimedAt:  &claimed,
+		State:      "succeeded",
+		StartedAt:  &claimed,
 		FinishedAt: &finished,
 	})
 	require.Len(t, recorder.computes, 1)
@@ -162,16 +145,14 @@ func TestRecordRunnerComputeUsageUsesIntegratedFleetWhenKVMissing(t *testing.T) 
 
 	claimed := time.Now()
 	finished := claimed.Add(time.Second)
-	state := &kvState{kv: map[string]string{
-		executionKVTaskBackend: core.RunnerTaskBackendIntegrated,
-	}}
+	state := &kvState{kv: map[string]string{}}
 	recorder := &recordingComputeUsage{}
 	RecordRunnerComputeUsage(recorder, nil, state, map[string]any{
 		"machine_type": "aws-large-amd64",
-	}, &Task{
+	}, &core.RunnerTask{
 		ID:         "task-7",
-		Status:     "succeeded",
-		ClaimedAt:  &claimed,
+		State:      "succeeded",
+		StartedAt:  &claimed,
 		FinishedAt: &finished,
 	})
 

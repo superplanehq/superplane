@@ -88,6 +88,7 @@ export function PlanningSessionSurveyForm({
                 key={option}
                 badge={String.fromCharCode(65 + index)}
                 option={option}
+                recommended={question.recommendedOption === option}
                 selected={answers[currentIndex] === option}
                 onSelect={() => selectAnswer(option)}
               />
@@ -189,11 +190,13 @@ function SurveyAnswerComposer({
 function SurveyOptionButton({
   badge,
   option,
+  recommended = false,
   selected,
   onSelect,
 }: {
   badge: string;
   option: string;
+  recommended?: boolean;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -211,7 +214,12 @@ function SurveyOptionButton({
     >
       <span className="flex min-w-0 items-center gap-2.5">
         <SurveyChoiceBadge label={badge} />
-        <span>{option}</span>
+        <span>
+          {option}
+          {recommended ? (
+            <span className="ml-2 text-xs text-muted-foreground">{CREATE_WITH_AGENT_COPY.recommendedOption}</span>
+          ) : null}
+        </span>
       </span>
       {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
     </Button>

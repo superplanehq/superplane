@@ -212,7 +212,7 @@ func parseMergeConfidenceChecksClaim(raw string) []string {
 	return enabled
 }
 
-func HasMergeConfidenceToken(environment []BrokerEnvironmentVariable) bool {
+func HasMergeConfidenceToken(environment []TaskEnvironmentVariable) bool {
 	value, ok := environmentValue(environment, EnvSuperplaneMergeConfidenceToken)
 	return ok && value != ""
 }
@@ -220,7 +220,7 @@ func HasMergeConfidenceToken(environment []BrokerEnvironmentVariable) bool {
 // AttachMergeConfidenceEnv mints a runner token when the node carries a work
 // order id. Other agent runs are unchanged. The work order id is removed from
 // the task environment after the token is minted.
-func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, steps []AgentStep, timeoutSeconds int) ([]BrokerEnvironmentVariable, error) {
+func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, steps []AgentStep, timeoutSeconds int) ([]TaskEnvironmentVariable, error) {
 	orderID, ok := environmentValue(environment, EnvSuperplaneMergeConfidenceOrderID)
 	if !ok {
 		return environment, nil
@@ -275,12 +275,12 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	}
 
 	if _, exists := environmentValue(environment, EnvSuperplaneBaseURL); !exists {
-		environment = append(environment, BrokerEnvironmentVariable{
+		environment = append(environment, TaskEnvironmentVariable{
 			Name:  EnvSuperplaneBaseURL,
 			Value: baseURL,
 		})
 	}
-	return append(environment, BrokerEnvironmentVariable{
+	return append(environment, TaskEnvironmentVariable{
 		Name:  EnvSuperplaneMergeConfidenceToken,
 		Value: token,
 	}), nil
@@ -297,7 +297,7 @@ func agentStepPrompts(steps []AgentStep) []string {
 	return prompts
 }
 
-func environmentValue(environment []BrokerEnvironmentVariable, name string) (string, bool) {
+func environmentValue(environment []TaskEnvironmentVariable, name string) (string, bool) {
 	for _, item := range environment {
 		if item.Name != name {
 			continue
@@ -307,8 +307,8 @@ func environmentValue(environment []BrokerEnvironmentVariable, name string) (str
 	return "", false
 }
 
-func withoutEnvironmentName(environment []BrokerEnvironmentVariable, name string) []BrokerEnvironmentVariable {
-	filtered := make([]BrokerEnvironmentVariable, 0, len(environment))
+func withoutEnvironmentName(environment []TaskEnvironmentVariable, name string) []TaskEnvironmentVariable {
+	filtered := make([]TaskEnvironmentVariable, 0, len(environment))
 	for _, item := range environment {
 		if item.Name == name {
 			continue

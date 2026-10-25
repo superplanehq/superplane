@@ -9,13 +9,21 @@ fi
 
 ACTION="$1"
 SOURCE="$3"
-NAME="$(basename "${SOURCE}")"
-STORED_PATH="${ARTIFACT_TEST_STORE:?}/${NAME}"
+# Semaphore keeps the path argument as the artifact name. Prepare and
+# publish run on different machines, so an absolute temp path cannot be
+# pulled later.
+case "${SOURCE}" in
+  /* | *..* | */*)
+    echo "Error: artifact name must be a stable relative file name: ${SOURCE}" >&2
+    exit 1
+    ;;
+esac
+STORED_PATH="${ARTIFACT_TEST_STORE:?}/${SOURCE}"
 
 case "${ACTION}" in
   push)
     if [ -e "${STORED_PATH}" ]; then
-      echo "Error: ${NAME} already exists" >&2
+      echo "Error: ${SOURCE} already exists" >&2
       exit 1
     fi
     mkdir -p "${ARTIFACT_TEST_STORE}"

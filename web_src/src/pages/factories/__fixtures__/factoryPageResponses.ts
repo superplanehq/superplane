@@ -1,6 +1,8 @@
 import type {
-  OrganizationsDescribeOrganizationBillingResponse,
   FactoriesDescribeFactoryVelocityResponse,
+  OrganizationsDescribeOrganizationBillingResponse,
+  OrganizationsPreviewSeatPurchaseResponse,
+  OrganizationsPurchaseSeatsResponse,
   FactoriesFactory,
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
@@ -351,6 +353,12 @@ export interface FactoriesFixture {
   billingSyncCalls?: number;
   /** Plan returned from Polar sync; applied to organizationBilling after the first sync. */
   billingAfterSync?: FactoriesFixture["organizationBilling"];
+  seatPurchasePreview?: OrganizationsPreviewSeatPurchaseResponse;
+  seatPurchaseResponse?: OrganizationsPurchaseSeatsResponse;
+  seatPurchasePreviewCalls?: number;
+  seatPurchaseCalls?: number;
+  seatPurchasePreviewError?: { status: number; message: string };
+  seatPurchaseError?: { status: number; message: string };
   /**
    * Ready BYOK providers (`anthropic`, `openai`, `openrouter`).
    * Omit to treat every provider with a catalog as connected.
@@ -435,7 +443,28 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   organizationSpendingReport: DEFAULT_ORG_SPENDING_REPORT,
   organizationCreditGrants: DEFAULT_CREDIT_GRANTS,
   organizationBilling: {
+    productFeatures: { byo_key: true },
     plan: "trial",
+    catalogKey: "trial",
+    hasPaymentMethod: false,
+    availablePlans: [
+      { key: "pay_as_you_go", name: "Pay-as-you-go", priceCents: "0", requirePaymentMethod: true },
+      {
+        key: "starter",
+        name: "Starter",
+        priceCents: "2000",
+        requirePaymentMethod: true,
+        subscriptionRequired: true,
+      },
+      {
+        key: "team",
+        name: "Team",
+        priceCents: "3000",
+        perSeat: true,
+        requirePaymentMethod: true,
+        subscriptionRequired: true,
+      },
+    ],
     planSource: "system",
     trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
     remainingCreditCents: "4124",

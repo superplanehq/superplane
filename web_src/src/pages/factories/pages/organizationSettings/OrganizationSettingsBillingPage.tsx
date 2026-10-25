@@ -1,9 +1,12 @@
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
 import { type ReactNode } from "react";
 import { Navigate, useParams } from "react-router";
 
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 
 import type {
+  OrganizationsCreateHostedCreditCheckoutBody,
   OrganizationsHostedCreditInvoice,
   OrganizationsHostedCreditProduct,
   OrganizationsOrganizationCreditGrant,
@@ -30,6 +33,8 @@ import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { BillingCreditHistoryCard } from "./BillingCreditHistoryCard";
 import { BillingInvoicesCard } from "./BillingInvoicesCard";
+import { BillingSeatPurchaseFlow } from "./BillingSeatPurchaseFlow";
+import { BillingPaymentSettings } from "./BillingPaymentSettings";
 import { BillingPlansSection } from "./BillingPlansSection";
 import { HostedCreditTopUpBanner } from "./HostedCreditTopUpBanner";
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
@@ -41,6 +46,7 @@ const HOSTED_CREDIT_REMAINING_CAPTION = "Remaining hosted credit";
 export function OrganizationSettingsBillingPage() {
   const { organizationId = "", factoryKey = "" } = useParams<{ organizationId: string; factoryKey: string }>();
   const billingProductEnabled = useBillingProductEnabled();
+  const newBilling = useExperimentalFeature(organizationId).has(FEATURE_NEW_BILLING);
   const model = useOrganizationBillingPageModel(organizationId);
   const packs = model.billing.products;
 
@@ -53,49 +59,72 @@ export function OrganizationSettingsBillingPage() {
 
   return (
     <FactorySettingsPageFrame title="Billing">
-      <BillingPageBody
-        billingContactMessage={model.billingContactMessage}
-        billingEnabled={model.billingEnabled}
-        businessCheckoutPending={model.billing.businessCheckoutPending}
+      <BillingSeatPurchaseFlow
+        organizationId={organizationId}
+        newBilling={newBilling}
         canManageBilling={model.canManageBilling}
-        checkoutPending={model.billing.checkoutPending}
-        creditPurchaseAllowed={model.creditPurchaseAllowed}
-        creditRefreshStatus={model.creditRefreshStatus}
-        error={model.error}
-        grants={model.grants}
-        hasBillingCustomer={model.hasBillingCustomer}
-        invoices={model.invoices}
-        isLoading={model.isLoading}
-        packs={packs}
-        plan={model.plan}
-        planCategory={model.planCategory}
-        planName={model.planName}
-        planPriceCents={model.planPriceCents}
-        planPerSeat={model.planPerSeat}
-        planSource={model.planSource}
-        cancelAtPeriodEnd={model.cancelAtPeriodEnd}
-        subscriptionPending={model.cancelPending || model.keepPending}
-        portalPending={model.billing.portalPending}
-        purchased={model.purchased}
-        remaining={model.remaining}
-        includedRemaining={model.includedRemaining}
-        purchasedRemaining={model.purchasedRemaining}
-        welcomeRemaining={model.welcomeRemaining}
-        adminRemaining={model.adminRemaining}
+        seats={model.seats}
         currentPeriodEnd={model.currentPeriodEnd}
-        trialEndsAt={model.trialEndsAt}
-        welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
-        onAddCredit={model.billing.startCheckout}
-        onSubscribe={model.billing.startBusinessCheckout}
-        onCancelSubscription={model.onCancelSubscription}
-        onKeepSubscription={model.onKeepSubscription}
-        onManageInvoices={model.billing.openInvoices}
-      />
+        cancelAtPeriodEnd={model.cancelAtPeriodEnd}
+        loading={model.isLoading}
+      >
+        {(seatsCard, dialog) => (
+          <>
+            {newBilling && !model.isLoading && !model.error && (
+              <BillingPaymentSettings organizationId={organizationId} canManageBilling={model.canManageBilling} />
+            )}
+            <BillingPageBody
+              organizationId={organizationId}
+              newBilling={newBilling}
+              billingContactMessage={model.billingContactMessage}
+              billingEnabled={model.billingEnabled}
+              businessCheckoutPending={model.billing.businessCheckoutPending}
+              canManageBilling={model.canManageBilling}
+              checkoutPending={model.billing.checkoutPending}
+              creditPurchaseAllowed={model.creditPurchaseAllowed}
+              creditRefreshStatus={model.creditRefreshStatus}
+              error={model.error}
+              grants={model.grants}
+              hasBillingCustomer={model.hasBillingCustomer}
+              invoices={model.invoices}
+              isLoading={model.isLoading}
+              packs={packs}
+              plan={model.plan}
+              planCategory={model.planCategory}
+              planName={model.planName}
+              planPriceCents={model.planPriceCents}
+              planPerSeat={model.planPerSeat}
+              seatsCard={seatsCard}
+              planSource={model.planSource}
+              cancelAtPeriodEnd={model.cancelAtPeriodEnd}
+              subscriptionPending={model.cancelPending || model.keepPending}
+              portalPending={model.billing.portalPending}
+              purchased={model.purchased}
+              remaining={model.remaining}
+              includedRemaining={model.includedRemaining}
+              purchasedRemaining={model.purchasedRemaining}
+              welcomeRemaining={model.welcomeRemaining}
+              adminRemaining={model.adminRemaining}
+              currentPeriodEnd={model.currentPeriodEnd}
+              trialEndsAt={model.trialEndsAt}
+              welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
+              onAddCredit={model.billing.startCheckout}
+              onSubscribe={model.billing.startBusinessCheckout}
+              onCancelSubscription={model.onCancelSubscription}
+              onKeepSubscription={model.onKeepSubscription}
+              onManageInvoices={model.billing.openInvoices}
+            />
+            {dialog}
+          </>
+        )}
+      </BillingSeatPurchaseFlow>
     </FactorySettingsPageFrame>
   );
 }
 
 type BillingPageBodyProps = {
+  organizationId: string;
+  newBilling: boolean;
   billingContactMessage?: string;
   billingEnabled: boolean;
   businessCheckoutPending: boolean;
@@ -114,6 +143,7 @@ type BillingPageBodyProps = {
   planName?: string;
   planPriceCents?: string;
   planPerSeat?: boolean;
+  seatsCard?: ReactNode;
   planSource?: string;
   cancelAtPeriodEnd: boolean;
   subscriptionPending: boolean;
@@ -127,7 +157,7 @@ type BillingPageBodyProps = {
   currentPeriodEnd?: string;
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
-  onAddCredit: (productId: string) => void | Promise<void>;
+  onAddCredit: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
   onSubscribe: () => void | Promise<void>;
   onCancelSubscription: () => void | Promise<void>;
   onKeepSubscription: () => void | Promise<void>;
@@ -135,6 +165,8 @@ type BillingPageBodyProps = {
 };
 
 function BillingPageBody({
+  organizationId,
+  newBilling,
   billingContactMessage,
   billingEnabled,
   businessCheckoutPending,
@@ -153,6 +185,7 @@ function BillingPageBody({
   planName,
   planPriceCents,
   planPerSeat,
+  seatsCard,
   planSource,
   cancelAtPeriodEnd,
   subscriptionPending,
@@ -193,6 +226,7 @@ function BillingPageBody({
   return (
     <>
       <BillingPlansSection
+        showUpgrade={!newBilling}
         planName={planName}
         planPriceCents={planPriceCents}
         planPerSeat={planPerSeat}
@@ -206,7 +240,9 @@ function BillingPageBody({
         onCancel={onCancelSubscription}
         onKeep={onKeepSubscription}
       />
+      {seatsCard}
       <HostedCreditRemainingCard
+        organizationId={organizationId}
         billingContactMessage={billingContactMessage}
         billingEnabled={billingEnabled}
         canManageBilling={canManageBilling}
@@ -239,6 +275,7 @@ function BillingPageBody({
 }
 
 type HostedCreditRemainingCardProps = {
+  organizationId: string;
   billingContactMessage?: string;
   billingEnabled: boolean;
   canManageBilling: boolean;
@@ -260,10 +297,11 @@ type HostedCreditRemainingCardProps = {
   welcomeRemaining: number;
   adminRemaining: number;
   grants: OrganizationsOrganizationCreditGrant[];
-  onAddCredit: (productId: string) => void | Promise<void>;
+  onAddCredit: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
 };
 
 function HostedCreditRemainingCard({
+  organizationId,
   billingContactMessage,
   billingEnabled,
   canManageBilling,
@@ -347,7 +385,12 @@ function HostedCreditRemainingCard({
             bucket={bucket}
             action={
               bucket.key === "topup" && showBuyMore ? (
-                <HostedCreditTopUpBanner checkoutPending={checkoutPending} packs={packs} onAddCredit={onAddCredit} />
+                <HostedCreditTopUpBanner
+                  organizationId={organizationId}
+                  checkoutPending={checkoutPending}
+                  packs={packs}
+                  onAddCredit={onAddCredit}
+                />
               ) : undefined
             }
           />

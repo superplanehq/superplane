@@ -47,7 +47,7 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 	if productID := event.Data.productID(); productID != "" {
 		_, err := models.FindBillingPlanByProduct(tx, productID)
 		if err == nil {
-			return nil
+			return resyncSubscriptionAfterCycle(ctx, tx, event.Data)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
@@ -76,6 +76,13 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 	}
 
 	amountCents := purchasedFaceValueCents(event.Data)
+	quote, err := creditPurchaseFromOrder(event.Data)
+	if err != nil {
+		return err
+	}
+	if quote != nil {
+		amountCents = quote.CreditAmountCents
+	}
 	if amountCents <= 0 {
 		return permanentApplyError("credit pack face value is missing")
 	}
@@ -91,6 +98,20 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 		}
 		return nil
 	})
+}
+
+// resyncSubscriptionAfterCycle refreshes the subscription from Polar when a
+// plan renewal order is paid. It recovers the period and the Included grant
+// when a subscription event was skipped as stale or could not be parsed.
+func resyncSubscriptionAfterCycle(ctx context.Context, tx *gorm.DB, data OrderData) error {
+	if strings.TrimSpace(data.BillingReason) != billingReasonSubscriptionCycle {
+		return nil
+	}
+	orgID, err := parseOrganizationID(data)
+	if err != nil {
+		return err
+	}
+	return SyncOrganizationSubscription(ctx, tx, orgID)
 }
 
 func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, lookup CreditPackLookup) error {
@@ -111,9 +132,34 @@ func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEve
 		return err
 	}
 
-	reverseMicros := refundReverseMicros(grant.AmountMicros, event.Data)
+	reverseMicros, err := creditPurchaseRefundMicros(grant.AmountMicros, event.Data)
+	if err != nil {
+		return err
+	}
 	refundID := polarRefundID(event.Data, reverseMicros)
 	return models.ReversePolarOrderCredit(tx, orgID, event.Data.ID, reverseMicros, refundID)
+}
+
+func creditPurchaseRefundMicros(grantMicros int64, order OrderData) (int64, error) {
+	quote, err := creditPurchaseFromOrder(order)
+	if err != nil {
+		return 0, err
+	}
+	if quote == nil {
+		return refundReverseMicros(grantMicros, order), nil
+	}
+	if models.CentsToMicros(quote.CreditAmountCents) != grantMicros {
+		return 0, permanentApplyError("credit purchase metadata does not match the recorded grant")
+	}
+	if strings.EqualFold(strings.TrimSpace(order.Status), "refunded") {
+		return grantMicros, nil
+	}
+	if order.RefundedAmount <= 0 {
+		return 0, nil
+	}
+	refunded := min(order.RefundedAmount, quote.SubtotalCents)
+	// Split division before multiplication to avoid overflowing large purchases.
+	return grantMicros/quote.SubtotalCents*refunded + grantMicros%quote.SubtotalCents*refunded/quote.SubtotalCents, nil
 }
 
 func parseOrganizationID(data OrderData) (uuid.UUID, error) {
@@ -125,6 +171,15 @@ func parseOrganizationID(data OrderData) (uuid.UUID, error) {
 }
 
 func orderIsCreditPack(ctx context.Context, data OrderData, lookup CreditPackLookup) (bool, error) {
+	// Checkout metadata is a snapshot. It remains valid after the admin edits
+	// or deletes the pack, and does not require metadata on the Polar product.
+	quote, err := creditPurchaseFromOrder(data)
+	if err != nil {
+		return false, err
+	}
+	if quote != nil {
+		return true, nil
+	}
 	if data.Product.IsCreditPack() {
 		return true, nil
 	}

@@ -1,14 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useByokRunnerModelDefault } from "@/hooks/useByokRunnerModelDefault";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
 import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { useComponent } from "@/hooks/useComponentData";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
-import { cn } from "@/lib/utils";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 
 import { factoryAgentSkillEditorPath } from "../lib/factoryPagePaths";
@@ -37,7 +35,6 @@ export function PlanningReviewForm({
   organizationId,
   factoryId,
   factoryKey,
-  showVisualEvidenceSetting = false,
   showResources = true,
   showConcurrency = true,
   appearance = "card",
@@ -54,12 +51,11 @@ export function PlanningReviewForm({
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
-  showVisualEvidenceSetting?: boolean;
   showResources?: boolean;
   showConcurrency?: boolean;
   /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
   appearance?: "card" | "fields";
-  view?: "full" | "implementation" | "planning";
+  view?: "full" | "implementation" | "planning" | "pr-feedback";
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled?: boolean;
   restoreError?: string;
@@ -85,7 +81,6 @@ export function PlanningReviewForm({
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
-          showVisualEvidenceSetting={showVisualEvidenceSetting}
           showResources={showResources}
           showConcurrency={showConcurrency}
           onRestoreDefaultPrompt={onRestoreDefaultPrompt}
@@ -108,7 +103,6 @@ function AgentPanel({
   organizationId,
   factoryId,
   factoryKey,
-  showVisualEvidenceSetting,
   showResources,
   showConcurrency,
   onRestoreDefaultPrompt,
@@ -120,12 +114,11 @@ function AgentPanel({
   onChange,
 }: {
   appearance: "card" | "fields";
-  view: "full" | "implementation" | "planning";
+  view: "full" | "implementation" | "planning" | "pr-feedback";
   component: PlanningReviewComponent;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
-  showVisualEvidenceSetting: boolean;
   showResources: boolean;
   showConcurrency: boolean;
   onRestoreDefaultPrompt?: () => void;
@@ -243,10 +236,7 @@ function AgentPanel({
             ? view !== "full"
               ? "flex flex-col gap-8"
               : "flex flex-col gap-6"
-            : cn(
-                "grid gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm",
-                showVisualEvidenceSetting ? "grid-cols-3" : "grid-cols-2",
-              )
+            : "grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm"
         }
         data-testid="planning-review-settings"
       >
@@ -254,7 +244,13 @@ function AgentPanel({
           <div role="group" aria-label="Default model">
             <ImplementSettingRow
               label="Default model"
-              description={view === "planning" ? "The model used to plan tasks." : "The model used to implement tasks."}
+              description={
+                view === "planning"
+                  ? "The model used to plan tasks."
+                  : view === "pr-feedback"
+                    ? "The model used to address pull request comments or failing checks."
+                    : "The model used to implement tasks."
+              }
             >
               <div className="w-full min-w-0">{modelControl}</div>
             </ImplementSettingRow>
@@ -289,18 +285,6 @@ function AgentPanel({
           <div className={appearance === "fields" ? "flex flex-col gap-2" : undefined}>
             {appearance === "fields" ? <h3 className="workspace-section-title">Model</h3> : null}
             {modelControl}
-          </div>
-        ) : null}
-        {showVisualEvidenceSetting ? (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`planning-review-visual-evidence-${component.id}`}>Include visual evidence</Label>
-            <div className="flex h-9 items-center">
-              <Switch
-                id={`planning-review-visual-evidence-${component.id}`}
-                checked={component.configuration.includeVisualEvidence === true}
-                onCheckedChange={(checked) => setConfigurationField("includeVisualEvidence", checked)}
-              />
-            </div>
           </div>
         ) : null}
       </section>

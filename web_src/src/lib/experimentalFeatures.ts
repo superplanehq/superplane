@@ -13,12 +13,6 @@ export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 /** Organization experimental feature: Datadog Error Tracking intake from the Backlog column menu. */
 export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 
-/** Organization experimental feature: SuperPlane Agent page. */
-export const FEATURE_WORKSPACE_AGENT = "workspace_agent";
-
-/** Organization experimental feature: workspace MCP servers. */
-export const FEATURE_WORKSPACE_MCP = "workspace_mcp";
-
 /** Organization experimental feature: workspace skills. */
 export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 
@@ -40,5 +34,5 @@ export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
 /** Organization experimental feature: scheduled task proposals in Backlog. */
 export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
 
-/** Organization experimental feature: new Implement run history and details. */
-export const FEATURE_FACTORY_RUN_HISTORY = "factory_run_history";
+/** Organization experimental feature: catalog billing and payment setup. */
+export const FEATURE_NEW_BILLING = "new_billing";

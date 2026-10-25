@@ -5,6 +5,33 @@ import { implementationRuns } from "./fixtures";
 import type { RunActivity } from "./types";
 
 describe("AutomationRunDetails live activity", () => {
+  it("opens event data for a source activity and keeps agent logs and outputs accessible", async () => {
+    const original = implementationRuns[2];
+    const run = {
+      ...original,
+      activities: original.activities.map((activity) =>
+        activity.id === "start"
+          ? {
+              ...activity,
+              logs: undefined,
+              defaultTab: "outputs" as const,
+              outputsLabel: "Event data",
+            }
+          : activity,
+      ),
+    };
+    render(<AutomationRunDetails run={run} onBack={() => {}} onRetryLogs={() => {}} />);
+    expect(screen.getByRole("tab", { name: "Event data", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveTextContent(original.task!.title);
+    expect(screen.queryByRole("tab", { name: "Logs" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Implement task/ }));
+    expect(screen.getByRole("tab", { name: "Logs", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Changes committed and pushed.");
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Outputs" }), { button: 0, ctrlKey: false });
+    });
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("completed");
+  });
   it("shows the recorded instructions for the selected activity", async () => {
     const run = implementationRuns[0];
     const instructions = "Avoid new dependencies.\nInclude API examples in the PR.";
@@ -63,7 +90,8 @@ describe("AutomationRunDetails live activity", () => {
     expect(screen.getByText(`Logs for ${execution.id}`)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Run started/ }));
     rerender(view([start, { ...execution, status: "Failed" }]));
-    expect(screen.getByText(`Logs for ${start.id}`)).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Logs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveTextContent(implementationRuns[0].task!.title);
   });
 
   it("selects activity when an initially empty run receives it", () => {

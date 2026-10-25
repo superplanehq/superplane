@@ -8,15 +8,26 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"gorm.io/gorm"
 	"net/http"
-	"slices"
+	"strings"
 )
+
+const (
+	billingPlanUpdateErrorMessage = "Could not update billing plans. Try again."
+	billingPlanLoadErrorMessage   = "Could not load billing plans. Try again."
+)
+
+// billingPlanErrorResponse is the JSON body for billing-plan route failures.
+type billingPlanErrorResponse struct {
+	Message string `json:"message"`
+}
 
 func (s *Server) adminSaveBillingPlan(w http.ResponseWriter, r *http.Request) {
 	var plan models.BillingPlan
 	if err := json.NewDecoder(r.Body).Decode(&plan); err != nil {
-		http.Error(w, "Invalid billing plan", 400)
+		writeBillingPlanJSONError(w, http.StatusBadRequest, "Invalid billing plan.")
 		return
 	}
 	id := mux.Vars(r)["planId"]
@@ -24,24 +35,17 @@ func (s *Server) adminSaveBillingPlan(w http.ResponseWriter, r *http.Request) {
 	if id != "" {
 		parsed, err := uuid.Parse(id)
 		if err != nil {
-			http.Error(w, "Invalid plan ID", 400)
+			writeBillingPlanJSONError(w, http.StatusBadRequest, "Invalid billing plan ID.")
 			return
 		}
 		plan.ID = parsed
 	}
-	definitions, err := models.ListPlanFeatureDefinitions(database.DB(r.Context()))
-	if err != nil {
-		writeCatalogError(w, err)
+	if status, err := validateSeatPlanProduct(r.Context(), &plan); err != nil {
+		writeBillingPlanJSONError(w, status, err.Error())
 		return
 	}
-	for _, key := range plan.Features {
-		if !slices.ContainsFunc(definitions, func(feature models.PlanFeatureDefinition) bool { return feature.Key == key }) {
-			http.Error(w, "Unknown feature", 400)
-			return
-		}
-	}
 	if err := models.SaveBillingPlan(database.DB(r.Context()), &plan); err != nil {
-		writeCatalogError(w, err)
+		writeBillingPlanError(w, r, err)
 		return
 	}
 	respondJSON(w, plan)
@@ -50,14 +54,39 @@ func (s *Server) adminSaveBillingPlan(w http.ResponseWriter, r *http.Request) {
 func (s *Server) adminDeleteBillingPlan(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(mux.Vars(r)["planId"])
 	if err != nil {
-		http.Error(w, "Invalid plan ID", 400)
+		writeBillingPlanJSONError(w, http.StatusBadRequest, "Invalid billing plan ID.")
 		return
 	}
 	if err := models.DeleteBillingPlan(database.DB(r.Context()), id); err != nil {
-		writeCatalogError(w, err)
+		writeBillingPlanError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// writeBillingPlanError maps a model error from a billing-plan write to a JSON
+// response. Unexpected errors keep their cause for error reports only.
+func writeBillingPlanError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		writeBillingPlanJSONError(w, http.StatusNotFound, "Billing plan not found.")
+	case errors.Is(err, models.ErrCatalogPlan):
+		writeBillingPlanJSONError(w, http.StatusBadRequest, strings.TrimPrefix(err.Error(), models.ErrCatalogPlan.Error()+": "))
+	default:
+		writeBillingPlanServerError(w, r, err, billingPlanUpdateErrorMessage)
+	}
+}
+
+// writeBillingPlanServerError reports the cause and returns a safe JSON message.
+func writeBillingPlanServerError(w http.ResponseWriter, r *http.Request, err error, message string) {
+	middleware.SetServerError(r.Context(), err, nil)
+	writeBillingPlanJSONError(w, http.StatusInternalServerError, message)
+}
+
+func writeBillingPlanJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(billingPlanErrorResponse{Message: message})
 }
 
 func (s *Server) adminListFeatureDefinitions(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +119,14 @@ func (s *Server) adminSaveFeatureDefinition(w http.ResponseWriter, r *http.Reque
 	respondJSON(w, feature)
 }
 
+func (s *Server) adminDeleteFeatureDefinition(w http.ResponseWriter, r *http.Request) {
+	if err := models.DeletePlanFeatureDefinition(database.DB(r.Context()), mux.Vars(r)["featureKey"]); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) adminOrganizationFeatures(w http.ResponseWriter, r *http.Request) {
 	orgID, ok := parseAdminOrgID(w, r)
 	if !ok {
@@ -100,15 +137,6 @@ func (s *Server) adminOrganizationFeatures(w http.ResponseWriter, r *http.Reques
 		var grant models.OrganizationFeatureGrant
 		if err := json.NewDecoder(r.Body).Decode(&grant); err != nil {
 			http.Error(w, "Invalid feature grant", 400)
-			return
-		}
-		definitions, err := models.ListPlanFeatureDefinitions(db)
-		if err != nil {
-			writeCatalogError(w, err)
-			return
-		}
-		if !slices.ContainsFunc(definitions, func(feature models.PlanFeatureDefinition) bool { return feature.Key == grant.FeatureKey }) {
-			http.Error(w, "Unknown feature", 400)
 			return
 		}
 		grant.OrganizationID = orgID

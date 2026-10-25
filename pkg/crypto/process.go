@@ -1,6 +1,9 @@
 package crypto
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
 var processEncryptor struct {
 	sync.RWMutex
@@ -22,5 +25,5 @@ func ProcessEncryptor() (Encryptor, error) {
 	if encryptor != nil {
 		return encryptor, nil
 	}
-	return FromEnv()
+	return nil, errors.New("process encryptor is not initialized")
 }

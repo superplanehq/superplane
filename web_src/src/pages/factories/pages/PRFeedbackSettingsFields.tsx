@@ -1,5 +1,4 @@
 import { Link } from "@/components/Link/link";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
@@ -24,26 +23,6 @@ import {
   type DiscussionBotMode,
 } from "./useDiscussionPRFeedbackSetup";
 import { StatusCheckPicker } from "./StatusCheckPicker";
-
-export function PRFeedbackHealthSection({ healthy, checks }: { healthy: boolean; checks: boolean }) {
-  const helper = healthy
-    ? checks
-      ? PR_FEEDBACK_SETTINGS_COPY.healthChecksReadyHelper
-      : PR_FEEDBACK_SETTINGS_COPY.healthReadyHelper
-    : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepairHelper;
-
-  return (
-    <section>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">Health</h3>
-        <Badge variant="outline" data-testid="pr-feedback-health">
-          {healthy ? PR_FEEDBACK_SETTINGS_COPY.healthReady : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepair}
-        </Badge>
-      </div>
-      <p className="workspace-body-text mt-1 text-muted-foreground">{helper}</p>
-    </section>
-  );
-}
 
 export function PRFeedbackTextField({
   id,
@@ -150,7 +129,6 @@ export function PRFeedbackDiscussionFields({
   const supportsReviewBots = factoryVCSProvider(vcsProvider) !== "bitbucket";
   const mentionRequired = draft.mention.trim().length > 0;
   const [botMode, setBotMode] = useState<DiscussionBotMode>(() => discussionBotModeFromDraft(draft));
-  const [showAddressAllBots] = useState(() => draft.addressAllBots);
   const catalogEnabled = Boolean(organizationId && githubIntegrationId) && supportsReviewBots;
   const catalogParameters = draft.repository.trim() ? { repository: draft.repository.trim() } : undefined;
   const catalogQuery = useIntegrationResources(
@@ -209,11 +187,7 @@ export function PRFeedbackDiscussionFields({
           role="radiogroup"
           aria-label={PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments}
         >
-          <DiscussionBotChoices
-            botMode={botMode}
-            showAddressAllBots={showAddressAllBots}
-            onChange={setBotModeAndDraft}
-          />
+          <DiscussionBotChoices botMode={botMode} onChange={setBotModeAndDraft} />
         </div>
         {botMode === "address" ? (
           <ReviewBotPicker
@@ -243,24 +217,21 @@ export function PRFeedbackDiscussionFields({
 
 function DiscussionBotChoices({
   botMode,
-  showAddressAllBots,
   onChange,
 }: {
   botMode: DiscussionBotMode;
-  showAddressAllBots: boolean;
   onChange: (mode: DiscussionBotMode) => void;
 }) {
   return (
     <>
-      {showAddressAllBots ? (
-        <IntakeSettingsRadioOption
-          name="pr-feedback-bot-mode"
-          value="all"
-          checked={botMode === "all"}
-          title={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsLabel}
-          onChange={() => onChange("all")}
-        />
-      ) : null}
+      <IntakeSettingsRadioOption
+        name="pr-feedback-bot-mode"
+        value="all"
+        checked={botMode === "all"}
+        title={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsLabel}
+        helper={PR_FEEDBACK_SETTINGS_COPY.addressAllBotsHelper}
+        onChange={() => onChange("all")}
+      />
       <IntakeSettingsRadioOption
         name="pr-feedback-bot-mode"
         value="ignore"

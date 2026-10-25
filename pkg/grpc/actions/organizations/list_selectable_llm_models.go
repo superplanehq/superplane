@@ -35,7 +35,11 @@ func ListSelectableLLMModels(
 		}
 	}
 
-	if reg != nil {
+	byokAllowed, err := models.OrganizationBYOKAccess(tx, organization.ID, "")
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load model access")
+	}
+	if reg != nil && byokAllowed {
 		enableAllConnectedBYOKModelsByDefault(tx, reg, organization.ID)
 	}
 

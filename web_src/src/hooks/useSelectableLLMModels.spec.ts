@@ -1,15 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { organizationsListSelectableLlmModels } = vi.hoisted(() => ({
+const { organizationsListSelectableLlmModels, organizationsSyncOrganizationBilling } = vi.hoisted(() => ({
   organizationsListSelectableLlmModels: vi.fn(),
+  organizationsSyncOrganizationBilling: vi.fn(),
 }));
 
 vi.mock("@/api-client", () => ({
   organizationsListSelectableLlmModels,
+  organizationsSyncOrganizationBilling,
 }));
+
+import { syncOrganizationBilling, organizationBillingQueryKey } from "./useOrganizationBilling";
 
 import { useSelectableLLMModels } from "./useSelectableLLMModels";
 
@@ -67,5 +71,28 @@ describe("useSelectableLLMModels", () => {
         query: { factoryId: "factory-1" },
       }),
     );
+  });
+});
+
+it("refreshes an active model catalog when billing synchronization removes BYOK access", async () => {
+  const byok = {
+    source: { id: "byok", name: "Your keys" },
+    provider: { id: "openai", name: "OpenAI" },
+    model: { id: "gpt-5", name: "gpt-5" },
+    key: "byok::openai::gpt-5",
+    label: "openai/gpt-5",
+  };
+  organizationsListSelectableLlmModels.mockResolvedValue({ data: { models: [byok] } });
+  organizationsSyncOrganizationBilling.mockImplementation(async () => {
+    organizationsListSelectableLlmModels.mockResolvedValue({ data: { models: [] } });
+    return { data: { productFeatures: { byo_key: false } } };
+  });
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { result } = renderHook(() => useSelectableLLMModels("org-1"), { wrapper: createWrapper(queryClient) });
+  await waitFor(() => expect(result.current.data).toHaveLength(1));
+  await act(async () => syncOrganizationBilling("org-1", queryClient));
+  await waitFor(() => expect(result.current.data).toEqual([]));
+  expect(queryClient.getQueryData(organizationBillingQueryKey("org-1"))).toEqual({
+    productFeatures: { byo_key: false },
   });
 });

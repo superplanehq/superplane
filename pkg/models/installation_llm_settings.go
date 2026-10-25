@@ -21,14 +21,16 @@ const (
 
 // InstallationLLMSettings is the singleton hosted-LLM catalog policy.
 type InstallationLLMSettings struct {
-	ID                    int `gorm:"primary_key"`
-	WelcomeGrantCents     int64
-	MarkupBPS             int
-	WarningThresholdBPS   int
-	DefaultHostedProvider *string
-	DefaultHostedModel    *string
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	ID                          int `gorm:"primary_key"`
+	WelcomeGrantCents           int64
+	MarkupBPS                   int
+	WarningThresholdBPS         int
+	CreditPurchaseFeeBPS        int
+	CreditPurchaseFixedFeeCents int64
+	DefaultHostedProvider       *string
+	DefaultHostedModel          *string
+	CreatedAt                   time.Time
+	UpdatedAt                   time.Time
 }
 
 func (InstallationLLMSettings) TableName() string {
@@ -54,6 +56,12 @@ func UpdateInstallationLLMSettings(tx *gorm.DB, settings InstallationLLMSettings
 	if settings.WarningThresholdBPS < 0 || settings.WarningThresholdBPS > MarkupBaseBPS {
 		return nil, errors.New("warning threshold must be between 0 and 10000 basis points")
 	}
+	if settings.CreditPurchaseFeeBPS < 0 || settings.CreditPurchaseFeeBPS >= MarkupBaseBPS {
+		return nil, errors.New("credit purchase fee must be between 0 and 9999 basis points")
+	}
+	if settings.CreditPurchaseFixedFeeCents < 0 {
+		return nil, errors.New("credit purchase fixed fee cannot be negative")
+	}
 
 	defaultModel, err := NormalizeDefaultHostedLLMModel(
 		stringValue(settings.DefaultHostedProvider),
@@ -75,17 +83,21 @@ func UpdateInstallationLLMSettings(tx *gorm.DB, settings InstallationLLMSettings
 			"welcome_grant_cents",
 			"markup_bps",
 			"warning_threshold_bps",
+			"credit_purchase_fee_bps",
+			"credit_purchase_fixed_fee_cents",
 			"default_hosted_provider",
 			"default_hosted_model",
 			"updated_at",
 		).
 		Updates(map[string]any{
-			"welcome_grant_cents":     settings.WelcomeGrantCents,
-			"markup_bps":              settings.MarkupBPS,
-			"warning_threshold_bps":   settings.WarningThresholdBPS,
-			"default_hosted_provider": provider,
-			"default_hosted_model":    model,
-			"updated_at":              now,
+			"welcome_grant_cents":             settings.WelcomeGrantCents,
+			"markup_bps":                      settings.MarkupBPS,
+			"warning_threshold_bps":           settings.WarningThresholdBPS,
+			"credit_purchase_fee_bps":         settings.CreditPurchaseFeeBPS,
+			"credit_purchase_fixed_fee_cents": settings.CreditPurchaseFixedFeeCents,
+			"default_hosted_provider":         provider,
+			"default_hosted_model":            model,
+			"updated_at":                      now,
 		}).Error
 	if err != nil {
 		return nil, err
@@ -94,6 +106,8 @@ func UpdateInstallationLLMSettings(tx *gorm.DB, settings InstallationLLMSettings
 	current.WelcomeGrantCents = settings.WelcomeGrantCents
 	current.MarkupBPS = settings.MarkupBPS
 	current.WarningThresholdBPS = settings.WarningThresholdBPS
+	current.CreditPurchaseFeeBPS = settings.CreditPurchaseFeeBPS
+	current.CreditPurchaseFixedFeeCents = settings.CreditPurchaseFixedFeeCents
 	current.DefaultHostedProvider = provider
 	current.DefaultHostedModel = model
 	current.UpdatedAt = now

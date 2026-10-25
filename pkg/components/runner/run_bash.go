@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -271,12 +272,7 @@ func (c *RunBash) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if err := validateRunBashSpec(spec); err != nil {
-		return err
-	}
-
-	_, err = ctx.Webhook.Setup()
-	return err
+	return validateRunBashSpec(spec)
 }
 
 func (c *RunBash) Execute(ctx core.ExecutionContext) error {
@@ -295,19 +291,9 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 	}
 	environment := resolved.Variables
 
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("webhook setup: %w", err)
-	}
-
 	messageChain, err := messageChainJSON(ctx.Expressions)
 	if err != nil {
 		return err
-	}
-
-	client, backend, err := NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
-	if err != nil {
-		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
@@ -322,20 +308,18 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		Script:         spec.Script,
 		MessageChain:   messageChain,
 		SetupCommands:  setupCommands,
-		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  mode,
 		DockerImage:    resolvedRunBashDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
-		Labels:         OriginLabelsForTask(ctx),
 	}
 
-	taskID, err := client.CreateTask(params)
+	taskID, err := CreateTask(ctx.RunnerTasks, params)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return afterRunnerTaskCreated(ctx, taskID, backend)
+	return afterRunnerTaskCreated(ctx, taskID)
 }
 
 func (c *RunBash) Hooks() []core.Hook {
@@ -345,18 +329,18 @@ func (c *RunBash) Hooks() []core.Hook {
 func (c *RunBash) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case hookActionPoll:
-		return pollBrokerTask(ctx, RunBashFinishedEventType)
+		return pollTask(ctx, RunBashFinishedEventType)
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
 func (c *RunBash) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return handleBrokerWebhook(ctx, RunBashFinishedEventType)
+	return http.StatusNotFound, nil, nil
 }
 
 func (c *RunBash) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx, RunBashFinishedEventType)
+	return cancelTask(ctx, RunBashFinishedEventType)
 }
 
 func (c *RunBash) Cleanup(ctx core.SetupContext) error { return nil }

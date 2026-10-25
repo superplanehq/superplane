@@ -9,11 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/ui/switch";
 import React, { useCallback, useEffect, useState } from "react";
 import { HostedLLMSettings } from "./HostedLLMSettings";
+import { InvitationSettingsSection } from "./InvitationSettingsSection";
+import { PastDueGraceSettingsSection } from "./PastDueGraceSettingsSection";
 import { ResetBuiltInAutomation } from "./ResetBuiltInAutomation";
 
 type InstallationSettingsResponse = {
   allow_private_network_access: boolean;
   signups_enabled: boolean;
+  invitation_duration_days: number;
+  past_due_grace_days: number;
   signups_blocked_by_environment: boolean;
   effective_blocked_http_hosts: string[];
   effective_private_ip_ranges: string[];
@@ -210,8 +214,8 @@ const SignupAccessSection = ({
           </p>
           <h2 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">Public signups</h2>
           <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Control whether visitors can create new accounts from the signup page. Invite links can still create
-            accounts while public signups are closed.
+            Control whether visitors can create new accounts from the signup page. Invited people can still create an
+            account with the invited email address.
           </Text>
         </div>
 
@@ -480,6 +484,29 @@ const SMTPSection = ({ form, hasChanges, passwordConfigured, saving, onFieldChan
   </section>
 );
 
+const useInvitationSettingsSave = (
+  invitationDuration: string,
+  patchSettings: (body: Record<string, unknown>, successMessage: string, fallbackError: string) => Promise<void>,
+) => {
+  const [savingInvitations, setSavingInvitations] = useState(false);
+  const saveInvitationSettings = useCallback(async () => {
+    setSavingInvitations(true);
+    try {
+      await patchSettings(
+        { invitation_duration_days: Number(invitationDuration) },
+        "Invitation settings updated",
+        "Could not save invitation settings. Try again.",
+      );
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "Could not save invitation settings. Try again.");
+    } finally {
+      setSavingInvitations(false);
+    }
+  }, [invitationDuration, patchSettings]);
+
+  return { savingInvitations, saveInvitationSettings };
+};
+
 const useInstallationSettingsState = () => {
   const [settings, setSettings] = useState<InstallationSettingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -487,6 +514,7 @@ const useInstallationSettingsState = () => {
   const [savingNetwork, setSavingNetwork] = useState(false);
   const [signupsEnabled, setSignupsEnabled] = useState(true);
   const [savingSignups, setSavingSignups] = useState(false);
+  const [invitationDuration, setInvitationDuration] = useState("7");
   const [smtpForm, setSMTPForm] = useState<SMTPFormState>(emptySMTPForm);
   const [savingSMTP, setSavingSMTP] = useState(false);
 
@@ -494,6 +522,7 @@ const useInstallationSettingsState = () => {
     setSettings(data);
     setAllowPrivateNetworkAccess(data.allow_private_network_access);
     setSignupsEnabled(data.signups_enabled);
+    setInvitationDuration(String(data.invitation_duration_days ?? 7));
     setSMTPForm(toSMTPFormState(data));
   }, []);
 
@@ -519,23 +548,20 @@ const useInstallationSettingsState = () => {
 
   const patchSettings = useCallback(
     async (body: Record<string, unknown>, successMessage: string, fallbackError: string) => {
-      const response = await fetch("/admin/api/installation/network-settings", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        throw new Error(await getErrorMessage(response, fallbackError));
+      const data = await patchInstallationSettings(body, fallbackError);
+      setSettings(data);
+      if (body.allow_private_network_access !== undefined)
+        setAllowPrivateNetworkAccess(data.allow_private_network_access);
+      if (body.signups_enabled !== undefined) setSignupsEnabled(data.signups_enabled);
+      if (body.invitation_duration_days !== undefined) {
+        setInvitationDuration((current) =>
+          current === String(body.invitation_duration_days) ? String(data.invitation_duration_days) : current,
+        );
       }
-
-      applySettings(await response.json());
+      if (body.smtp_enabled !== undefined) setSMTPForm(toSMTPFormState(data));
       showSuccessToast(successMessage);
     },
-    [applySettings],
+    [],
   );
 
   const saveNetworkSettings = useCallback(async () => {
@@ -568,6 +594,8 @@ const useInstallationSettingsState = () => {
     }
   }, [patchSettings, signupsEnabled]);
 
+  const { savingInvitations, saveInvitationSettings } = useInvitationSettingsSave(invitationDuration, patchSettings);
+
   const saveSMTPSettings = useCallback(async () => {
     setSavingSMTP(true);
     try {
@@ -593,6 +621,11 @@ const useInstallationSettingsState = () => {
     savingNetwork,
     signupsEnabled,
     savingSignups,
+    invitationDuration,
+    savingInvitations,
+    setInvitationDuration,
+    saveInvitationSettings,
+    patchSettings,
     smtpForm,
     savingSMTP,
     setAllowPrivateNetworkAccess,
@@ -604,6 +637,22 @@ const useInstallationSettingsState = () => {
   };
 };
 
+const patchInstallationSettings = async (
+  body: Record<string, unknown>,
+  fallbackError: string,
+): Promise<InstallationSettingsResponse> => {
+  const response = await fetch("/admin/api/installation/network-settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, fallbackError));
+  }
+  return response.json();
+};
+
 const InstallationSettings: React.FC = () => {
   const {
     settings,
@@ -612,6 +661,11 @@ const InstallationSettings: React.FC = () => {
     savingNetwork,
     signupsEnabled,
     savingSignups,
+    invitationDuration,
+    savingInvitations,
+    setInvitationDuration,
+    saveInvitationSettings,
+    patchSettings,
     smtpForm,
     savingSMTP,
     setAllowPrivateNetworkAccess,
@@ -644,6 +698,7 @@ const InstallationSettings: React.FC = () => {
         <TabsList aria-label="Installation settings">
           <TabsTrigger value="automations">Automations</TabsTrigger>
           <TabsTrigger value="email">Email</TabsTrigger>
+          <TabsTrigger value="invitations">Invitations</TabsTrigger>
           <TabsTrigger value="hosted-llm">Hosted LLM</TabsTrigger>
           <TabsTrigger value="network">Network</TabsTrigger>
           {showSignupAccessSection ? <TabsTrigger value="signups">Signups</TabsTrigger> : null}
@@ -686,6 +741,17 @@ const InstallationSettings: React.FC = () => {
               onFieldChange={setSMTPField}
               onSave={saveSMTPSettings}
             />
+          </TabsContent>
+
+          <TabsContent value="invitations">
+            <InvitationSettingsSection
+              duration={invitationDuration}
+              savedDuration={settings ? settings.invitation_duration_days : 7}
+              saving={savingInvitations}
+              onChange={setInvitationDuration}
+              onSave={saveInvitationSettings}
+            />
+            <PastDueGraceSettingsSection settings={settings} patchSettings={patchSettings} />
           </TabsContent>
 
           <TabsContent value="hosted-llm">

@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -269,12 +270,7 @@ func (c *RunJS) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if err := validateRunJSSpec(spec); err != nil {
-		return err
-	}
-
-	_, err = ctx.Webhook.Setup()
-	return err
+	return validateRunJSSpec(spec)
 }
 
 func (c *RunJS) Execute(ctx core.ExecutionContext) error {
@@ -293,19 +289,9 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 	}
 	environment := resolved.Variables
 
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("webhook setup: %w", err)
-	}
-
 	messageChain, err := messageChainJSON(ctx.Expressions)
 	if err != nil {
 		return err
-	}
-
-	client, backend, err := NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
-	if err != nil {
-		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
@@ -320,20 +306,18 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 		Script:         spec.Script,
 		MessageChain:   messageChain,
 		SetupCommands:  setupCommands,
-		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  mode,
 		DockerImage:    resolvedRunJSDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
-		Labels:         OriginLabelsForTask(ctx),
 	}
 
-	taskID, err := client.CreateTask(params)
+	taskID, err := CreateTask(ctx.RunnerTasks, params)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return afterRunnerTaskCreated(ctx, taskID, backend)
+	return afterRunnerTaskCreated(ctx, taskID)
 }
 
 func (c *RunJS) Hooks() []core.Hook {
@@ -343,18 +327,18 @@ func (c *RunJS) Hooks() []core.Hook {
 func (c *RunJS) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case hookActionPoll:
-		return pollBrokerTask(ctx, RunJSFinishedEventType)
+		return pollTask(ctx, RunJSFinishedEventType)
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
 func (c *RunJS) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return handleBrokerWebhook(ctx, RunJSFinishedEventType)
+	return http.StatusNotFound, nil, nil
 }
 
 func (c *RunJS) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx, RunJSFinishedEventType)
+	return cancelTask(ctx, RunJSFinishedEventType)
 }
 
 func (c *RunJS) Cleanup(ctx core.SetupContext) error { return nil }

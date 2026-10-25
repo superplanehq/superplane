@@ -62,6 +62,50 @@ func TestAdminRunnersGatewaySupportsCookieAndPersonalTokenAuthentication(t *test
 	})
 }
 
+func TestAdminRunnersGatewayAcceptsSingleHostFleetManagerToken(t *testing.T) {
+	t.Setenv("SUPERPLANE_INSTALLATION_TYPE", "single-host")
+	t.Setenv("FLEET_MANAGER_API_TOKEN", "fleet-manager-token")
+	server, resource, _ := setupAdminTestServer(t)
+	registerTestGRPCGateway(
+		t,
+		server,
+		resource.AuthService,
+		resource.Registry,
+		resource.Encryptor,
+		support.NewOIDCProvider(),
+	)
+
+	response := execRequest(server, requestParams{
+		method:    http.MethodGet,
+		path:      "/admin/api/installation/fleets",
+		authToken: "fleet-manager-token",
+	})
+
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+}
+
+func TestAdminRunnersGatewayRejectsFleetManagerTokenOnCloud(t *testing.T) {
+	t.Setenv("SUPERPLANE_INSTALLATION_TYPE", "kubernetes")
+	t.Setenv("FLEET_MANAGER_API_TOKEN", "fleet-manager-token")
+	server, resource, _ := setupAdminTestServer(t)
+	registerTestGRPCGateway(
+		t,
+		server,
+		resource.AuthService,
+		resource.Registry,
+		resource.Encryptor,
+		support.NewOIDCProvider(),
+	)
+
+	response := execRequest(server, requestParams{
+		method:    http.MethodGet,
+		path:      "/admin/api/installation/fleets",
+		authToken: "fleet-manager-token",
+	})
+
+	assert.Equal(t, http.StatusUnauthorized, response.Code)
+}
+
 func TestAdminRunnersGatewayCreatesInstallationFleet(t *testing.T) {
 	server, resource, accountToken := setupAdminTestServer(t)
 	registerTestGRPCGateway(

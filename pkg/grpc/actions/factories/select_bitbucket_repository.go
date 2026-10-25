@@ -61,6 +61,10 @@ func selectBitbucketFactoryRepository(
 		integrationID := integration.ID.String()
 		provider := models.ProviderBitbucket
 		repositoryID := int64(0)
+		backlogRepositoryID := &repositoryID
+		if config := factory.OnboardingConfigValue(); config.BacklogRepository != "" && config.BacklogRepository != config.AppRepository {
+			backlogRepositoryID = nil
+		}
 		fullName := match.FullName
 		externalID := match.UUID
 		branch := match.DefaultBranch
@@ -70,8 +74,8 @@ func selectBitbucketFactoryRepository(
 			AppRepository:           &fullName,
 			AppRepositoryID:         &repositoryID,
 			AppRepositoryExternalID: &externalID,
-			BacklogRepository:       &fullName,
-			BacklogRepositoryID:     &repositoryID,
+			BacklogRepository:       onboardingBacklogRepository(factory, fullName),
+			BacklogRepositoryID:     backlogRepositoryID,
 			DefaultBranch:           &branch,
 		})
 	})

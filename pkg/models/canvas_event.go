@@ -29,6 +29,13 @@ type CanvasEvent struct {
 	CreatedAt   *time.Time
 }
 
+// ExecutionOutputChannel is a compact projection for run lists. It does not load
+// event payloads, which can be large for agent and integration outputs.
+type ExecutionOutputChannel struct {
+	ExecutionID uuid.UUID
+	Channel     string
+}
+
 func (e *CanvasEvent) TableName() string {
 	return "workflow_events"
 }
@@ -308,4 +315,15 @@ func FindLastEventPerNode(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasEvent, error
 	}
 
 	return events, nil
+}
+
+func ListExecutionOutputChannels(tx *gorm.DB, canvasID uuid.UUID, executionIDs []uuid.UUID) ([]ExecutionOutputChannel, error) {
+	channels := []ExecutionOutputChannel{}
+	if len(executionIDs) == 0 {
+		return channels, nil
+	}
+	err := tx.Model(&CanvasEvent{}).Distinct("execution_id", "channel").
+		Where("workflow_id = ? AND execution_id IN ?", canvasID, executionIDs).
+		Scan(&channels).Error
+	return channels, err
 }

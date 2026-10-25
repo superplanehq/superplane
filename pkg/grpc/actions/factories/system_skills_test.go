@@ -21,7 +21,7 @@ import (
 
 func TestSystemSkillResourceProtection(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -78,7 +78,7 @@ func TestSystemSkillResourceProtection(t *testing.T) {
 
 func TestSystemSkillRestoreAndState(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	template, ok := runner.SystemSkillTemplateByID("refine-task")
 	require.True(t, ok)
@@ -163,7 +163,7 @@ func TestSystemSkillRestoreAndState(t *testing.T) {
 
 func TestRestoreSystemSkillRejectsInvalidTargetsAndDisabledFeature(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

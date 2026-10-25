@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -30,6 +31,8 @@ const (
 	CreditBalanceBucketGrant    = "grant"
 
 	canceledIncludedGrantPrefix = "canceled:"
+
+	initialPlanTrialCreditNote = "Initial billing plan trial credit"
 )
 
 var (
@@ -852,7 +855,7 @@ func AssertFactoryHostedBudgetAvailable(tx *gorm.DB, factory *Factory) error {
 }
 
 // AssertHostedRunAllowed rejects a new hosted start when the organization has
-// no open trial or active Business plan, remaining credit is empty, or the
+// no open trial or active paid plan, remaining credit is empty, or the
 // factory hosted budget is exhausted. Pass a committed connection so remaining
 // credit includes billed spend from other runs.
 func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) error {
@@ -862,14 +865,8 @@ func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) 
 	if orgID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
-	if HostedPlanGatesEnabled() {
-		plan, err := ResolveOrganizationBillingPlan(tx, orgID)
-		if err != nil {
-			return err
-		}
-		if !plan.AllowsHostedExecution(time.Now()) {
-			return ErrHostedSubscriptionRequired
-		}
+	if err := AssertOrganizationPlanAllowsRuns(tx, orgID); err != nil {
+		return err
 	}
 	if err := AssertHostedCreditAvailable(tx, orgID); err != nil {
 		return err
@@ -1032,4 +1029,51 @@ func includedCreditDeltaForTarget(tx *gorm.DB, orgID uuid.UUID, target int64, no
 		return 0, errors.New("included balance is too large")
 	}
 	return needed - included, nil
+}
+
+func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingPlan) error {
+	if previous == nil || previous.PlanSource == BillingPlanSourceAdmin || previous.Catalog.Category != "trial" ||
+		next.Catalog.Category != "paid" || next.Catalog.Visibility != "public" || next.Catalog.TrialCreditCents == 0 {
+		return nil
+	}
+	enabled, err := OrganizationHasExperimentalFeatures(tx, next.OrganizationID, features.FeatureNewBilling)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return nil
+	}
+
+	granted, err := initialPlanTrialCreditGranted(tx, next.OrganizationID)
+	if err != nil {
+		return err
+	}
+	if granted {
+		return nil
+	}
+
+	welcome, err := findWelcomeGrant(tx, next.OrganizationID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	if !welcomeExpiryIsLive(welcome, now) {
+		return nil
+	}
+	_, err = insertCreditAdjustment(tx, CreditBalanceAdjustment{
+		OrganizationID: next.OrganizationID,
+		Note:           initialPlanTrialCreditNote,
+	}, LLMCreditGrantKindTrialAdjustment, CentsToMicros(next.Catalog.TrialCreditCents), welcome.ExpiresAt, now)
+	return err
+}
+
+// initialPlanTrialCreditGranted reports whether the initial paid plan trial
+// credit was already added. A canceled subscription can restore an unexpired
+// trial, and a later reactivation must not grant the credit again.
+func initialPlanTrialCreditGranted(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	var count int64
+	err := tx.Model(&OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ? AND note = ?", orgID, LLMCreditGrantKindTrialAdjustment, initialPlanTrialCreditNote).
+		Count(&count).Error
+	return count > 0, err
 }

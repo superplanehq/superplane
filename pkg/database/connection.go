@@ -201,6 +201,8 @@ func TruncateTables() error {
 
 	return Conn().Exec(`
 		truncate table
+			credit_packs,
+			datadog_webhook_receipts,
 			bitbucket_forge_installations,
 			runner_task_log_lifecycles,
 			runner_registrations,

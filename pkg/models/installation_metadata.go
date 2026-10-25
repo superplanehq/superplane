@@ -23,11 +23,20 @@ const (
 	OwnerSetupStepFleetDocker   = "fleet-docker"
 )
 
+// MaxPastDueGraceDays is the longest grace period an installation can set.
+// Polar cancels a past-due subscription after its last retry on day 21.
+const MaxPastDueGraceDays = 21
+
+// InstallationMetadata holds installation settings. PastDueGraceDays is how
+// long Team features stay on after a failed renewal payment. Zero turns them
+// off at once.
 type InstallationMetadata struct {
 	ID                        int    `gorm:"primary_key"`
 	InstallationID            string `gorm:"type:varchar(64)"`
 	AllowPrivateNetworkAccess bool
 	SignupsEnabled            bool
+	InvitationDurationDays    int     `gorm:"default:7"`
+	PastDueGraceDays          int     `gorm:"default:0"`
 	OwnerSetupStep            *string `gorm:"type:text"`
 	ShareOwnerIdentity        bool
 	CreatedAt                 time.Time
@@ -153,6 +162,22 @@ func SetShareOwnerIdentity(tx *gorm.DB, share bool) error {
 }
 
 func UpdateInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) error {
+	return writeInstallationMetadata(tx, metadata)
+}
+
+// ApplyInstallationMetadata updates installation settings while the row is locked.
+// The callback sees the current values, so one save cannot restore fields from an older read.
+func ApplyInstallationMetadata(tx *gorm.DB, apply func(*InstallationMetadata)) error {
+	metadata, err := lockInstallationMetadata(tx)
+	if err != nil {
+		return err
+	}
+
+	apply(metadata)
+	return writeInstallationMetadata(tx, metadata)
+}
+
+func writeInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) error {
 	if _, err := findOrCreateInstallationMetadata(tx); err != nil {
 		return err
 	}
@@ -162,9 +187,27 @@ func UpdateInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) err
 		Updates(map[string]any{
 			"allow_private_network_access": metadata.AllowPrivateNetworkAccess,
 			"signups_enabled":              metadata.SignupsEnabled,
+			"invitation_duration_days":     metadata.InvitationDurationDays,
+			"past_due_grace_days":          metadata.PastDueGraceDays,
 			"updated_at":                   metadata.UpdatedAt,
 		}).
 		Error
+}
+
+func lockInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error) {
+	if _, err := findOrCreateInstallationMetadata(tx); err != nil {
+		return nil, err
+	}
+
+	var metadata InstallationMetadata
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", installationMetadataID).
+		First(&metadata).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &metadata, nil
 }
 
 func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error) {
@@ -178,9 +221,11 @@ func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error
 	}
 
 	metadata = InstallationMetadata{
-		ID:             installationMetadataID,
-		InstallationID: uuid.NewString(),
-		SignupsEnabled: true,
+		ID:                     installationMetadataID,
+		InstallationID:         uuid.NewString(),
+		SignupsEnabled:         true,
+		InvitationDurationDays: 7,
+		PastDueGraceDays:       0,
 	}
 
 	if err := tx.Clauses(clause.OnConflict{

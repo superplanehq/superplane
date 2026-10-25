@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -21,7 +23,13 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
 	}
 
+	var capacity polar.SeatCapacityCheck
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		// Serialize with invitation acceptance, which takes the same lock.
+		if _, err := models.LockOrganization(tx, orgUUID); err != nil {
+			return err
+		}
+
 		user, err := models.FindActiveUserByIDInTransaction(tx, orgID, userID)
 		if err != nil {
 			return err
@@ -33,6 +41,11 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 			}
 		}
 
+		// Operator invitations grant no member management, so they stay valid.
+		if err := models.CancelPendingOrganizationInvitationsByInviter(tx, orgUUID, user.ID, models.RoleOrgOperator); err != nil {
+			return err
+		}
+
 		roles, err := authService.GetUserRolesForOrg(ctx, user.ID.String(), orgID)
 		if err != nil {
 			log.Errorf("Error determing user roles for %s: %v", user.ID.String(), err)
@@ -40,14 +53,19 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		}
 
 		for _, role := range roles {
-			err = authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
+			err = authService.RemoveRoleInTransaction(tx, user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
 			if err != nil {
 				log.Errorf("Error removing role %s for %s: %v", role.Name, user.ID.String(), err)
 				return grpcerrors.Internal(err, "error removing role")
 			}
 		}
 
-		return user.SoftDelete(tx, time.Now(), "")
+		if err := user.SoftDelete(tx, time.Now(), ""); err != nil {
+			return err
+		}
+
+		capacity, err = polar.RecheckSeatCapacity(tx, orgUUID, polar.SeatCapacityCauseRemoval)
+		return err
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -63,5 +81,8 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, grpcerrors.Internal(err, "error deleting user")
 	}
 
+	capacity.Log()
+	// The freed seat stays usable until renewal. Polar renews one seat less.
+	seatrenewal.ScheduleAsync(ctx, orgUUID)
 	return &pb.RemoveUserResponse{}, nil
 }

@@ -115,9 +115,13 @@ func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Invalid activity provider", http.StatusBadRequest)
 		return
 	}
-	if err := session.UpsertActivity(database.DB(r.Context()), activity); err != nil {
+	written, err := session.UpsertActivity(database.DB(r.Context()), activity)
+	if err != nil {
 		writeRunnerPlanningError(w, r, session, err)
 		return
+	}
+	if written {
+		messages.PublishPlanningBoardStatus(session)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "stored"})
 }

@@ -1,5 +1,3 @@
-import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
-import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 
 import { IntakeAutomaticIntakeSetting } from "./IntakeAutomaticIntakeSetting";
@@ -9,7 +7,6 @@ import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
 import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
 import { NodeConfigRepositoryLine } from "./NodeConfigPanel";
 import {
-  INTAKE_SETTINGS_COPY,
   intakeSettingsContentKey,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
@@ -23,7 +20,6 @@ import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import { SettingsAutomationCanvasEdit, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import { PopupShell } from "./work-order-popup-redesign/popupShared";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
@@ -50,9 +46,7 @@ interface IntakeSourceSettingsPopupProps {
   deletePending?: boolean;
   deleteError?: string;
   onDelete?: () => Promise<void> | void;
-  editAutomationHref?: string;
   canvasId?: string;
-  runHrefFor?: RunsSidebarHrefForRun;
   agent?: PlanningReviewAgentSlot;
   onClose: () => void;
   fixed?: boolean;
@@ -82,9 +76,7 @@ export function IntakeSourceSettingsPopup({
   deletePending = false,
   deleteError,
   onDelete,
-  editAutomationHref,
   canvasId,
-  runHrefFor,
   agent,
   onClose,
   fixed = true,
@@ -100,7 +92,6 @@ export function IntakeSourceSettingsPopup({
     parameter: "settings",
     initialTab,
     hasAgent: Boolean(agent),
-    eligible: ["github-issues", "sentry-exceptions", "dependabot-alerts"].includes(sourceId),
   });
 
   const content = (
@@ -117,6 +108,7 @@ export function IntakeSourceSettingsPopup({
           organizationId={history.organizationId}
           factoryId={history.factoryId}
           canvasId={canvasId}
+          intakeSource={sourceId}
           selectedRunId={history.selectedRunId}
           onSelectRun={history.setSelectedRunId}
           loading={automationLoading}
@@ -144,13 +136,6 @@ export function IntakeSourceSettingsPopup({
           labelOptionsLoading={labelOptionsLoading}
           draft={draft}
           agent={agent}
-          automationGraph={automationGraph}
-          automationLoading={automationLoading}
-          automationError={automationError}
-          onRetryAutomation={onRetryAutomation}
-          canvasId={canvasId}
-          runHrefFor={runHrefFor}
-          editAutomationHref={editAutomationHref}
           savePending={savePending}
           saveError={saveError}
           deletePending={deletePending}
@@ -227,13 +212,6 @@ function IntakeSettingsTabPanel({
   labelOptionsLoading,
   draft,
   agent,
-  automationGraph,
-  automationLoading,
-  automationError,
-  onRetryAutomation,
-  canvasId,
-  runHrefFor,
-  editAutomationHref,
   savePending,
   saveError,
   deletePending,
@@ -255,13 +233,6 @@ function IntakeSettingsTabPanel({
   labelOptionsLoading?: boolean;
   draft: IntakeSourceSettings;
   agent?: PlanningReviewAgentSlot;
-  automationGraph?: IntakeAutomationGraph;
-  automationLoading: boolean;
-  automationError: boolean;
-  onRetryAutomation?: () => void;
-  canvasId?: string;
-  runHrefFor?: RunsSidebarHrefForRun;
-  editAutomationHref?: string;
   savePending?: boolean;
   saveError?: string;
   deletePending: boolean;
@@ -272,19 +243,6 @@ function IntakeSettingsTabPanel({
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
 }) {
-  if (tab === "automation") {
-    return (
-      <IntakeAutomationTab
-        graph={automationGraph}
-        canvasId={canvasId}
-        runHrefFor={runHrefFor}
-        editHref={editAutomationHref}
-        loading={automationLoading}
-        error={automationError}
-        onRetry={onRetryAutomation}
-      />
-    );
-  }
   if (tab === "agent" && agent) {
     return (
       <PlanningReviewEditor
@@ -432,84 +390,5 @@ function IntakeGeneralTab({
         onClose={onClose}
       />
     </>
-  );
-}
-
-function IntakeAutomationTab({
-  graph,
-  canvasId,
-  runHrefFor,
-  editHref,
-  loading,
-  error,
-  onRetry,
-}: {
-  graph?: IntakeAutomationGraph;
-  canvasId?: string;
-  runHrefFor?: RunsSidebarHrefForRun;
-  editHref?: string;
-  loading: boolean;
-  error: boolean;
-  onRetry?: () => void;
-}) {
-  if (!graph || graph.nodes.length === 0) {
-    return (
-      <IntakeAutomationEmpty
-        message={automationEmptyMessage(loading, error)}
-        onRetry={error ? onRetry : undefined}
-        editHref={editHref}
-      />
-    );
-  }
-
-  return (
-    <SettingsAutomationWorkspace
-      graph={graph}
-      testId="intake-source-automation"
-      canvasId={canvasId}
-      runHrefFor={runHrefFor}
-      workflowNodes={graph.specNodes}
-      editHref={editHref}
-      editLabel={INTAKE_SETTINGS_COPY.editAutomation}
-    />
-  );
-}
-
-function automationEmptyMessage(loading: boolean, error: boolean): string {
-  if (loading) {
-    return INTAKE_SETTINGS_COPY.automationLoading;
-  }
-  return error ? INTAKE_SETTINGS_COPY.automationError : INTAKE_SETTINGS_COPY.automationEmpty;
-}
-
-function IntakeAutomationEmpty({
-  message,
-  onRetry,
-  editHref,
-}: {
-  message: string;
-  onRetry?: () => void;
-  editHref?: string;
-}) {
-  return (
-    <section
-      className="relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
-      aria-label="Automation"
-      data-testid="intake-source-automation"
-    >
-      <p className="workspace-body-text text-muted-foreground">{message}</p>
-      {onRetry ? (
-        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-          {INTAKE_SETTINGS_COPY.retryAutomation}
-        </Button>
-      ) : null}
-      {editHref ? (
-        <SettingsAutomationCanvasEdit
-          href={editHref}
-          label={INTAKE_SETTINGS_COPY.editAutomation}
-          testId="settings-automation-edit"
-        />
-      ) : null}
-    </section>
   );
 }

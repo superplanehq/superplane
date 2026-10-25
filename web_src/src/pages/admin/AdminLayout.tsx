@@ -5,7 +5,18 @@ import { useAccount } from "@/contexts/useAccount";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, BookOpen, Building, KeyRound, Network, Shield, Terminal, Users, Webhook } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  Building,
+  CreditCard,
+  KeyRound,
+  Network,
+  Shield,
+  Terminal,
+  Users,
+  Webhook,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, Navigate, NavLink, Outlet } from "react-router";
 
@@ -23,6 +34,7 @@ const adminPageLinks: AdminPageLink[] = [
   { label: "Encryption", to: "/admin/encryption", icon: KeyRound },
   { label: "License", to: "/admin/license", icon: KeyRound },
   { label: "Billing plans", to: "/admin/billing-plans", icon: BookOpen },
+  { label: "Credits", to: "/admin/credits", icon: CreditCard },
   { label: "Features", to: "/admin/features", icon: BookOpen },
   { label: "Price Books", to: "/admin/price-books", icon: BookOpen },
   { label: "Fleets", to: "/admin/runner-tasks", icon: Terminal },

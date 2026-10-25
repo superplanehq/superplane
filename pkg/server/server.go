@@ -382,6 +382,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_SEAT_RENEWAL_SYNC_WORKER") == "yes" {
+		log.Println("Starting Seat Renewal Sync Worker")
+
+		w := workers.NewSeatRenewalSyncWorker()
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_PLANNING_SESSION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Planning Session Cleanup Worker")
 
@@ -414,13 +421,7 @@ func startWorkers(
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
-	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
-		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
-		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
-		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
-		FromName:          os.Getenv("EMAIL_FROM_NAME"),
-		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
-	})
+	emailService := buildEmailService(encryptor)
 	discord := services.NewDiscordWebhookClient(os.Getenv("DISCORD_FEEDBACK_WEBHOOK_URL"))
 
 	if emailService == nil && !discord.Enabled() {
@@ -483,25 +484,24 @@ func buildGRPCServices(
 	jwtSigner *jwt.Signer,
 	licenseService *licensing.Service,
 	keyStore *encryption.Store,
-	migrationsEnabled bool,
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
 
 	return grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:                     baseURL,
-		WebhooksBaseURL:             webhooksBaseURL,
-		RunnerAPIBaseURL:            runnerAPIBaseURL,
-		Encryptor:                   encryptor,
-		EncryptionStore:             keyStore,
-		EncryptionMigrationsEnabled: migrationsEnabled,
-		AuthService:                 authService,
-		Registry:                    registry,
-		OIDCProvider:                oidcProvider,
-		AgentService:                agentService,
-		JWTSigner:                   jwtSigner,
-		Entitlements:                licenseService,
-		Enterprise:                  features,
+		EmailService:     buildEmailService(encryptor),
+		BaseURL:          baseURL,
+		WebhooksBaseURL:  webhooksBaseURL,
+		RunnerAPIBaseURL: runnerAPIBaseURL,
+		Encryptor:        encryptor,
+		EncryptionStore:  keyStore,
+		AuthService:      authService,
+		Registry:         registry,
+		OIDCProvider:     oidcProvider,
+		AgentService:     agentService,
+		JWTSigner:        jwtSigner,
+		Entitlements:     licenseService,
+		Enterprise:       features,
 	})
 }
 
@@ -883,16 +883,13 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
-	migrationsEnabled := keyStore != nil && !encryptionConfig.legacyWrites
-	if migrationsEnabled {
-		if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
-			rabbitMQURL, err := config.RabbitMQURL()
-			if err != nil {
-				panic(err)
-			}
-			worker := workers.NewApplicationEncryptionMigrationWorker(rabbitMQURL, encryptorInstance, registry, models.ApplicationEncryptedStorage())
-			go worker.Start(context.Background())
+	if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
+		rabbitMQURL, err := config.RabbitMQURL()
+		if err != nil {
+			panic(err)
 		}
+		worker := workers.NewApplicationEncryptionMigrationWorker(rabbitMQURL, encryptorInstance, registry, models.ApplicationEncryptedStorage())
+		go worker.Start(context.Background())
 	}
 
 	agentProvider, agentService := buildAgentService(authService)
@@ -912,7 +909,6 @@ func Start() {
 			jwtSigner,
 			licenseService,
 			keyStore,
-			migrationsEnabled,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)
@@ -1051,3 +1047,13 @@ func newRunnerActiveLogStore() (runnerlogs.Store, error) {
  * and also from emitting large events.
  */
 var DefaultMaxHTTPResponseBytes int64 = 8 * 1024 * 1024
+
+func buildEmailService(encryptor crypto.Encryptor) services.EmailService {
+	return services.BuildEmailService(encryptor, services.EmailServiceConfig{
+		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
+		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
+		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+		FromName:          os.Getenv("EMAIL_FROM_NAME"),
+		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
+	})
+}

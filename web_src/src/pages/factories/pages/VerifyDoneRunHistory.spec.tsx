@@ -8,17 +8,9 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
-import { resetHostMocks, useCanvas } from "./IntakeSettingsHost.spec.fixtures";
+import { resetHostMocks, useCanvas, useInfiniteCanvasRuns } from "./IntakeSettingsHost.spec.fixtures";
 import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 
-let enabled = true;
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (id: string) => enabled && id === "factory_run_history",
-    isLoading: false,
-    organizationReady: true,
-  }),
-}));
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => ({
     data: [{ id: "task", key: "SP-123", title: "Linked task", sourceRunId: "run-intake-1" }],
@@ -59,7 +51,6 @@ function FeedbackPage() {
       factoryId="factory"
       canvasId="canvas"
       settings={{ ...settings, source: "checks" }}
-      healthy
       onSave={() => {}}
       onClose={() => {}}
     />
@@ -84,15 +75,22 @@ function renderPage(view: React.ReactNode, path = "/") {
 describe("Verify and Done run history", () => {
   beforeEach(() => {
     resetHostMocks();
-    enabled = true;
+    const runs = useInfiniteCanvasRuns();
+    useInfiniteCanvasRuns.mockReturnValue({
+      ...runs,
+      data: {
+        ...runs.data,
+        pages: runs.data.pages.map((page: { runs: Array<{ id?: string }> }) => ({
+          ...page,
+          runs: page.runs.map((run) =>
+            run.id === "run-intake-1" ? { ...run, task: { id: "task", key: "SP-123", title: "Linked task" } } : run,
+          ),
+        })),
+      },
+    });
   });
 
-  it.each(
-    ["on-pr-risk", "on-pr-visual-evidence", "on-pr-closed"].flatMap((nodeId) =>
-      [true, false].map((historyEnabled) => ({ nodeId, historyEnabled })),
-    ),
-  )("gates $nodeId history with factory_run_history=$historyEnabled", ({ nodeId, historyEnabled }) => {
-    enabled = historyEnabled;
+  it.each(["on-pr-risk", "on-pr-visual-evidence", "on-pr-closed"])("shows %s history by default", (nodeId) => {
     renderPage(
       <MergeConfidenceConfigModal
         title="Automation"
@@ -110,13 +108,34 @@ describe("Verify and Done run history", () => {
       />,
       "/?automationTab=runs",
     );
-    if (!historyEnabled) {
-      expect(screen.getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
-      expect(screen.queryByRole("table")).not.toBeInTheDocument();
-      return;
-    }
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getByText("SP-123")).toBeInTheDocument();
+    expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
+  });
+
+  it("opens pull request closure on runs without the automation tab", () => {
+    renderPage(
+      <MergeConfidenceConfigModal
+        title="PR Closure"
+        canvasId="canvas"
+        factoryId="factory"
+        graph={{
+          organizationId: "org",
+          factoryId: "factory",
+          nodes: [],
+          edges: [],
+          specNodes: [{ id: "on-pr-closed", type: "TYPE_TRIGGER" }],
+        }}
+        onClose={() => {}}
+        onSaveNode={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "PR Closure" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
     expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
   });
 
@@ -126,7 +145,6 @@ describe("Verify and Done run history", () => {
       <PRFeedbackSettingsPopup
         organizationId="org"
         settings={{ ...settings, source }}
-        healthy
         automationGraph={{ organizationId: "org", factoryId: "factory", nodes: [], edges: [] }}
         canvasId="canvas"
         onSave={() => {}}
@@ -145,50 +163,110 @@ describe("Verify and Done run history", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 
-  it.each(
-    ["verify", "done"].flatMap((columnKey) => [true, false].map((historyEnabled) => ({ columnKey, historyEnabled }))),
-  )(
-    "gates custom $columnKey history with factory_run_history=$historyEnabled",
-    async ({ columnKey, historyEnabled }) => {
-      enabled = historyEnabled;
-      useCanvas.mockReturnValue({
-        data: {
-          metadata: { id: "custom", factoryId: "factory" },
-          spec: {
-            nodes: [{ id: "agent", type: "TYPE_ACTION", component: "runnerSuperPlane", configuration: { steps: [] } }],
-            edges: [],
-          },
+  it.each(["verify", "done"])("shows custom %s history by default", async (columnKey) => {
+    useCanvas.mockReturnValue({
+      data: {
+        metadata: { id: "custom", factoryId: "factory" },
+        spec: {
+          nodes: [{ id: "agent", type: "TYPE_ACTION", component: "runnerSuperPlane", configuration: { steps: [] } }],
+          edges: [],
         },
-        isPending: false,
-        isError: false,
-        refetch: vi.fn(),
-      });
-      renderPage(
-        <ColumnAutomationViewHost
-          organizationId="org"
-          factoryId="factory"
-          factoryKey="SP"
-          canvasId="custom"
-          columnKey={columnKey}
-          title="Custom automation"
-          onClose={() => {}}
-        />,
-      );
-      if (!historyEnabled) {
-        expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
-        await userEvent.click(screen.getByTestId("column-automation-view-tab-automation"));
-        expect(screen.getByTestId("column-automation-view-canvas")).toBeInTheDocument();
-        expect(screen.queryByRole("table")).not.toBeInTheDocument();
-        return;
-      }
-      expect(screen.getByRole("table")).toBeInTheDocument();
-      expect(screen.getByTestId("column-automation-view-edit")).toHaveAttribute(
-        "href",
-        "/org/workspaces/sp/automations/custom?configure=1&agent=1&from=lines",
-      );
-      expect(screen.queryByTestId("column-automation-view-canvas")).not.toBeInTheDocument();
-    },
-  );
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    renderPage(
+      <ColumnAutomationViewHost
+        organizationId="org"
+        factoryId="factory"
+        factoryKey="SP"
+        canvasId="custom"
+        columnKey={columnKey}
+        title="Custom automation"
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-view-edit")).toHaveAttribute(
+      "href",
+      "/org/workspaces/sp/automations/custom?configure=1&agent=1&from=lines",
+    );
+    expect(screen.queryByTestId("column-automation-view-canvas")).not.toBeInTheDocument();
+  });
+
+  it("shows scheduled Backlog history by default", () => {
+    useCanvas.mockReturnValue({
+      data: {
+        metadata: { id: "scheduled", factoryId: "factory" },
+        spec: {
+          nodes: [
+            {
+              id: "schedule",
+              type: "TYPE_TRIGGER",
+              component: "schedule",
+              configuration: { type: "days", hour: 9, minute: 0 },
+            },
+            { id: "scheduled-agent", type: "TYPE_ACTION", component: "runnerSuperPlane", configuration: { steps: [] } },
+            {
+              id: "has-proposal",
+              type: "TYPE_ACTION",
+              component: "if",
+              configuration: { expression: '{{ $["Agent"].data.result.title != nil }}' },
+            },
+          ],
+          edges: [],
+        },
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    useInfiniteCanvasRuns.mockReturnValue({
+      data: {
+        pages: [
+          {
+            runs: [
+              {
+                id: "scheduled-run",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                rootEvent: { id: "tick", data: { type: "schedule.tick", data: {} } },
+                executions: [
+                  {
+                    id: "proposal",
+                    nodeId: "has-proposal",
+                    componentName: "if",
+                    result: "RESULT_PASSED",
+                    outputChannels: ["false"],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      hasNextPage: false,
+    });
+    renderPage(
+      <ColumnAutomationViewHost
+        organizationId="org"
+        factoryId="factory"
+        factoryKey="SP"
+        canvasId="scheduled"
+        columnKey="backlog"
+        title="Scheduled intake"
+        initialTab="runs"
+        onClose={() => {}}
+      />,
+      "/?automationTab=runs",
+    );
+    expect(screen.getByRole("table", { name: "Runs" })).toBeInTheDocument();
+    expect(screen.getByText("No task proposed")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-canvas")).not.toBeInTheDocument();
+  });
 
   it("keeps the full editor available for custom automations without an Agent form", async () => {
     useCanvas.mockReturnValue({
@@ -234,23 +312,6 @@ describe("Verify and Done run history", () => {
     );
     expect(screen.getByTestId("column-automation-view-canvas")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-  });
-
-  it("keeps PR feedback's canvas when the flag is off", async () => {
-    enabled = false;
-    renderPage(
-      <PRFeedbackSettingsPopup
-        organizationId="org"
-        settings={settings}
-        healthy
-        canvasId="canvas"
-        onSave={() => {}}
-        onClose={() => {}}
-      />,
-    );
-    await userEvent.click(screen.getByRole("tab", { name: "Automation" }));
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
   });
 
   it("preserves unsaved PR feedback settings while changing URL tabs", async () => {

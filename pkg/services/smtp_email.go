@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/smtp"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -130,9 +132,28 @@ func (c *smtpClientAdapter) Close() error {
 	return c.client.Close()
 }
 
+// smtpConversationTimeout bounds the SMTP connection and the later commands.
+// A server that accepts the connection and then stops replying cannot hold the API request open.
+var smtpConversationTimeout = 30 * time.Second
+
 var smtpDial smtpDialer = func(addr string) (smtpClient, error) {
-	client, err := smtp.Dial(addr)
+	dialer := net.Dialer{Timeout: smtpConversationTimeout}
+	conn, err := dialer.Dial("tcp", addr)
 	if err != nil {
+		return nil, err
+	}
+	if err := conn.SetDeadline(time.Now().Add(smtpConversationTimeout)); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		conn.Close()
 		return nil, err
 	}
 	return &smtpClientAdapter{client: client}, nil
@@ -414,4 +435,20 @@ func randomBoundary() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
+}
+
+func (s *SMTPEmailService) SendOrganizationInvitationEmail(toEmail string, data OrganizationInvitationTemplateData) error {
+	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
+	if err != nil {
+		return err
+	}
+	text, err := s.renderTemplate("organization_invitation.txt", data)
+	if err != nil {
+		return fmt.Errorf("render invitation text: %w", err)
+	}
+	html, err := s.renderTemplate("organization_invitation.html", data)
+	if err != nil {
+		return fmt.Errorf("render invitation HTML: %w", err)
+	}
+	return s.sendEmail(settings, outgoingMail{to: []string{toEmail}, subject: "Invitation to " + data.OrganizationName + " on SuperPlane", textBody: text, htmlBody: html})
 }

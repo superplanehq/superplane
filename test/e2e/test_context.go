@@ -57,8 +57,6 @@ func (s *TestContext) Start() {
 	os.Setenv("START_WEBHOOK_PROVISIONER", "yes")
 	os.Setenv("START_WEBHOOK_CLEANUP_WORKER", "yes")
 	os.Setenv("ENCRYPTION_MASTER_KEYS", "env://e2e-v1:MTIzNDU2Nzg5MGFiY2RlZmdoaWprbG1ub3BxcnN0dXY=")
-	os.Setenv("ENCRYPTION_LEGACY_FORMAT", "plaintext")
-	os.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
 	os.Setenv("JWT_SECRET", "test-jwt-secret")
 	os.Setenv("OIDC_KEYS_PATH", "../../test/fixtures/oidc-keys")
 	os.Setenv("PUBLIC_API_PORT", "8001")
