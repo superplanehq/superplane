@@ -62,14 +62,14 @@ func testHookProbeLastConfiguration() any {
 Internal component hooks for workflow-level nodes must receive execution.Configuration (resolved snapshot),
 not node.Configuration (raw canvas templates). Regression for issue #4441 (HTTP retries saw raw URLs).
 */
-func Test_NodeRequestWorker_InternalHookUsesExecutionSnapshotConfiguration(t *testing.T) {
+func Test_NodeRequestExecutor_InternalHookUsesExecutionSnapshotConfiguration(t *testing.T) {
 	resetTestHookProbeCapture()
 
 	r := support.Setup(t)
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionStartedRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -93,6 +93,7 @@ func Test_NodeRequestWorker_InternalHookUsesExecutionSnapshotConfiguration(t *te
 	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, "probe-node", rootEvent.ID, rootEvent.ID,
 		map[string]any{"url": resolvedURL},
 	)
+	require.NoError(t, database.Conn().Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
 
 	req := models.CanvasNodeRequest{
 		ID:          uuid.New(),
@@ -110,13 +111,13 @@ func Test_NodeRequestWorker_InternalHookUsesExecutionSnapshotConfiguration(t *te
 	}
 	require.NoError(t, database.Conn().Create(&req).Error)
 
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
-	err := worker.LockAndProcessRequest(req)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
+	err := executor.Execute(req)
 	require.NoError(t, err)
 
 	cfg, ok := testHookProbeLastConfiguration().(map[string]any)
 	require.True(t, ok, "hook should receive configuration map")
 	assert.Equal(t, resolvedURL, cfg["url"], "internal hooks must receive resolved execution snapshot, not raw canvas templates")
 
-	assert.False(t, executionConsumer.HasReceivedMessage())
+	assert.True(t, executionConsumer.HasReceivedMessage(), "the shared executor must publish execution state for synchronous callers")
 }

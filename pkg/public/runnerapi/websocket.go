@@ -492,6 +492,7 @@ func (s *Server) completeRunnerTask(
 	}
 
 	var completedTask *models.RunnerTask
+	var completedNow bool
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		currentRunner, err := models.FindRunner(tx, runner.ID)
 		if err != nil {
@@ -505,7 +506,7 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		completedNow, err := task.Complete(
+		completedNow, err = task.Complete(
 			tx,
 			currentRunner,
 			hash,
@@ -518,16 +519,38 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		if completedNow {
-			completedTask = task
-		}
+		completedTask = task
 		*runner = *currentRunner
 		return nil
 	})
-	if err == nil && completedTask != nil {
+	if err != nil {
+		return err
+	}
+	if completedNow {
 		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask, fleetSlug, fleetScope)
 	}
-	return err
+	// The task result must be committed before its execution request reads it.
+	// Failures leave the scheduled request available as a fallback.
+	if s.nodeRequestExecutor == nil {
+		return nil
+	}
+	if err := s.runTaskExecutionRequest(ctx, completedTask); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.WithError(err).WithField("task", taskID).Error("Failed to process runner task completion request")
+	}
+	return nil
+}
+
+func (s *Server) runTaskExecutionRequest(ctx context.Context, task *models.RunnerTask) error {
+	db := database.DB(ctx)
+	execution, err := task.FindExecution(db)
+	if err != nil {
+		return fmt.Errorf("find task execution: %w", err)
+	}
+	request, err := execution.FindPendingRequest(db)
+	if err != nil {
+		return fmt.Errorf("find pending execution request: %w", err)
+	}
+	return s.nodeRequestExecutor.RunNow(*request)
 }
 
 func completionHash(complete completeMessage) (string, error) {

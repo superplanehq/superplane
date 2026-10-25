@@ -17,13 +17,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
+	"github.com/superplanehq/superplane/pkg/workers"
 )
 
 type Server struct {
-	router             *mux.Router
-	signer             *jwt.Signer
-	encryptor          crypto.Encryptor
-	activeLogStoreName string
+	router              *mux.Router
+	signer              *jwt.Signer
+	encryptor           crypto.Encryptor
+	activeLogStoreName  string
+	nodeRequestExecutor *workers.NodeRequestExecutor
 
 	mu          sync.Mutex
 	httpServer  *http.Server
@@ -34,6 +36,7 @@ func NewServer(
 	signer *jwt.Signer,
 	encryptor crypto.Encryptor,
 	activeLogStoreName string,
+	nodeRequestExecutor *workers.NodeRequestExecutor,
 ) (*Server, error) {
 	if signer == nil {
 		return nil, fmt.Errorf("JWT signer is required")
@@ -47,11 +50,12 @@ func NewServer(
 	}
 
 	server := &Server{
-		router:             mux.NewRouter(),
-		signer:             signer,
-		encryptor:          encryptor,
-		activeLogStoreName: activeLogStoreName,
-		connections:        map[uuid.UUID]*runnerConnection{},
+		router:              mux.NewRouter(),
+		signer:              signer,
+		encryptor:           encryptor,
+		activeLogStoreName:  activeLogStoreName,
+		nodeRequestExecutor: nodeRequestExecutor,
+		connections:         map[uuid.UUID]*runnerConnection{},
 	}
 	server.registerRoutes()
 	return server, nil
