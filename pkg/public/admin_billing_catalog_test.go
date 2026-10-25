@@ -415,6 +415,34 @@ func TestAdminBillingPlanListDeleteDisabledReasonPriority(t *testing.T) {
 	require.Nil(t, reasons[free.Key])
 }
 
+func TestAdminBillingPlanListReportsAssignment(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	request := newAdminCatalogRequest(server, token)
+	orgPath := "organizations/" + r.Organization.ID.String()
+	assigned := createAdminTestPlan(t, request, `{"key":"flag_assigned","name":"Assigned","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never"}`)
+	unassigned := createAdminTestPlan(t, request, `{"key":"flag_unassigned","name":"Unassigned","category":"paid","visibility":"private","credit_frequency":"none","credit_expiration":"never"}`)
+	cleanupFeatureReferences(t, r.Organization.ID, []uuid.UUID{assigned.ID, unassigned.ID}, nil)
+
+	response := request("PUT", orgPath+"/billing-plan", `{"plan":"`+assigned.Key+`"}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	response = request("GET", "billing-plans", "")
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	var items []struct {
+		Key      string `json:"key"`
+		Assigned *bool  `json:"assigned"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &items))
+	flags := map[string]*bool{}
+	for _, item := range items {
+		flags[item.Key] = item.Assigned
+	}
+	require.NotNil(t, flags[assigned.Key])
+	require.True(t, *flags[assigned.Key])
+	require.NotNil(t, flags[unassigned.Key])
+	require.False(t, *flags[unassigned.Key])
+}
+
 func TestAdminBillingPlanListLooksUpAssignmentsOnce(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	request := newAdminCatalogRequest(server, token)
