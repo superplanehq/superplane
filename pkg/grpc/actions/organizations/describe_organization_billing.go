@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
+	"gorm.io/gorm"
 )
 
 func DescribeOrganizationBilling(
@@ -126,6 +127,9 @@ func DescribeOrganizationBilling(
 	if !models.BillingEnabled() {
 		return response, nil
 	}
+	if err := describePastDue(db, plan, response); err != nil {
+		return nil, err
+	}
 
 	lastSeatPurchase, err := models.FindLatestSeatPurchase(db, organizationID)
 	if err != nil {
@@ -141,6 +145,12 @@ func DescribeOrganizationBilling(
 	response.PendingInvitationSeats = new(int32(seats.PendingInvitations))
 	if seats.Invitable != nil {
 		response.InvitableSeats = new(int32(*seats.Invitable))
+	}
+	if seats.PaymentBlocked {
+		// The plan row can already be off per-seat, but the stored seats still
+		// describe who can use the workspace.
+		response.PurchasedSeats = new(int32(*seats.Purchased))
+		return response, nil
 	}
 	if !seats.PerSeat {
 		return response, nil
@@ -158,6 +168,24 @@ func DescribeOrganizationBilling(
 		response.PurchasableSeats = new(int32(*seats.Purchasable))
 	}
 	return response, nil
+}
+
+// describePastDue reports when a failed renewal payment started and, while a
+// grace period keeps Team features on, when they end.
+func describePastDue(db *gorm.DB, plan *models.OrganizationBillingPlan, response *pb.DescribeOrganizationBillingResponse) error {
+	if !models.PolarSubscriptionIsPastDue(plan.PolarSubscriptionStatus) || plan.PastDueSince == nil {
+		return nil
+	}
+	response.PaymentFailedAt = protoTimestamp(plan.PastDueSince)
+	if !plan.IsActiveBusiness() {
+		return nil
+	}
+	metadata, err := models.GetInstallationMetadata(db)
+	if err != nil {
+		return grpcerrors.Internal(err, "Could not load billing settings.")
+	}
+	response.PaidAccessEndsAt = protoTimestamp(plan.PastDueAccessEndsAt(metadata.PastDueGraceDays))
+	return nil
 }
 
 func SyncOrganizationBilling(

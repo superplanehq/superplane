@@ -7,6 +7,7 @@ import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
 import { useFactoryUsage } from "@/hooks/useFactoryUsage";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 
+import { billingIsPastDue } from "../../lib/billingPlans";
 import { workOrderCreditFailureCopy, type WorkOrderCreditFailureReason } from "../../lib/workOrderFailureReason";
 import type { SplitRunFooter, SplitRunFooterNote } from "./splitRunFooter";
 
@@ -41,12 +42,18 @@ function runStartBlock(
   usesHostedFunding: boolean | undefined,
 ): SplitRunFooterNote | undefined {
   if (billing?.hostedExecutionAllowed === false) {
+    if (billing.polarSubscriptionStatus === "paused") {
+      return creditStartBlock("subscription_paused");
+    }
     if (billing.requirePaymentMethod && !billing.hasPaymentMethod) {
       return {
         headline: "Payment method required",
         text: "Add a payment method in Billing to start this task.",
         cta: { label: "View billing", destination: "billing" },
       };
+    }
+    if (billingIsPastDue(billing.polarSubscriptionStatus)) {
+      return creditStartBlock("payment_past_due");
     }
     return creditStartBlock("hosted_subscription_required");
   }

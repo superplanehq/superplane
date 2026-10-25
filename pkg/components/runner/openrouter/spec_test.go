@@ -107,42 +107,42 @@ func TestValidateRunOpenRouterSpecIgnoresLegacyMaxTurns(t *testing.T) {
 	require.NoError(t, validateRunOpenRouterSpec(spec))
 }
 
-func TestBuildOpenRouterBrokerTaskOmitsMaxTurnsArgv(t *testing.T) {
+func TestBuildOpenRouterTaskOmitsMaxTurnsArgv(t *testing.T) {
 	t.Parallel()
 
 	prompt := "fix tests"
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 64
-	task := buildOpenRouterBrokerTask(spec, "", nil, nil, nil, false)
+	task := buildOpenRouterTask(spec, "", nil, nil, nil, false)
 	require.GreaterOrEqual(t, len(task.Commands), 2)
 	require.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6'`)
 	require.NotContains(t, task.Commands[1].Command, " 64")
 	require.Equal(t, "fix tests", requireTaskFile(t, task.Files, "prompts/01-prompt.txt").Content)
 }
 
-func TestBuildOpenRouterBrokerTaskPassesThinking(t *testing.T) {
+func TestBuildOpenRouterTaskPassesThinking(t *testing.T) {
 	t.Parallel()
 
 	spec := validOpenRouterSpec("fix tests")
 	spec.ThinkingLevel = "low"
-	task := buildOpenRouterBrokerTask(spec, "", nil, nil, nil, false)
+	task := buildOpenRouterTask(spec, "", nil, nil, nil, false)
 	require.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6' 'low'`)
 }
 
-func TestBuildOpenRouterBrokerTaskRequiresOpenCode(t *testing.T) {
+func TestBuildOpenRouterTaskRequiresOpenCode(t *testing.T) {
 	t.Parallel()
 
-	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil, nil, nil, false)
+	task := buildOpenRouterTask(validOpenRouterSpec("fix tests"), "", nil, nil, nil, false)
 	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
 	require.Contains(t, prepare, "opencode CLI not found on PATH; install OpenCode on the runner")
 	require.Contains(t, prepare, "command -v opencode")
 	require.Contains(t, prepare, "command -v node")
 }
 
-func TestBuildOpenRouterBrokerTaskOmitsFallbackModelsFile(t *testing.T) {
+func TestBuildOpenRouterTaskOmitsFallbackModelsFile(t *testing.T) {
 	t.Parallel()
 
-	task := buildOpenRouterBrokerTask(validOpenRouterSpec("fix tests"), "", nil, nil, nil, false)
+	task := buildOpenRouterTask(validOpenRouterSpec("fix tests"), "", nil, nil, nil, false)
 	for _, file := range task.Files {
 		assert.NotEqual(t, "openrouter_models.json", file.Path)
 	}
@@ -152,7 +152,7 @@ func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 	t.Parallel()
 
 	spec := validOpenRouterSpec("fix tests")
-	base := buildOpenRouterBrokerTask(spec, "", nil, nil, nil, false)
+	base := buildOpenRouterTask(spec, "", nil, nil, nil, false)
 	got := applyPlanningFollowUp(base, nil, spec)
 	require.Len(t, got.Commands, len(base.Commands))
 	require.Len(t, got.Files, len(base.Files))
@@ -165,8 +165,8 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 32
 	spec.Steps[0].WorkingDirectory = "repo"
-	base := buildOpenRouterBrokerTask(spec, "", nil, nil, nil, false)
-	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
+	base := buildOpenRouterTask(spec, "", nil, nil, nil, false)
+	got := applyPlanningFollowUp(base, []runner.TaskEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
 	}}, spec)
@@ -196,8 +196,8 @@ func TestAttachPlanningSessionFilesShipsMCP(t *testing.T) {
 	t.Parallel()
 
 	spec := validOpenRouterSpec("greet")
-	base := buildOpenRouterBrokerTask(spec, "", nil, nil, nil, false)
-	got := attachPlanningSessionFiles(base, []runner.BrokerEnvironmentVariable{{
+	base := buildOpenRouterTask(spec, "", nil, nil, nil, false)
+	got := attachPlanningSessionFiles(base, []runner.TaskEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
 	}})
@@ -270,7 +270,7 @@ func TestConfigurationOmitsMaxTurns(t *testing.T) {
 	}
 }
 
-func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {
+func requireTaskFile(t *testing.T, files []runner.TaskFile, path string) runner.TaskFile {
 	t.Helper()
 	for _, file := range files {
 		if file.Path == path {
@@ -278,5 +278,5 @@ func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) r
 		}
 	}
 	t.Fatalf("missing task file %q", path)
-	return runner.BrokerTaskFile{}
+	return runner.TaskFile{}
 }

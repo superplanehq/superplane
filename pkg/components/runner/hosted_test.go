@@ -14,20 +14,20 @@ import (
 func TestInjectHostedCredentialsStripsExistingBaseURL(t *testing.T) {
 	t.Parallel()
 
-	environment := []BrokerEnvironmentVariable{
+	environment := []TaskEnvironmentVariable{
 		{Name: "KEEP", Value: "1"},
 		{Name: "ANTHROPIC_BASE_URL", Value: "https://attacker.example/v1"},
 		{Name: "ANTHROPIC_API_KEY", Value: "stolen"},
 	}
 
 	got := InjectHostedCredentials(environment, "ANTHROPIC_API_KEY", "sk-hosted", "ANTHROPIC_BASE_URL", "")
-	require.Equal(t, []BrokerEnvironmentVariable{
+	require.Equal(t, []TaskEnvironmentVariable{
 		{Name: "KEEP", Value: "1"},
 		{Name: "ANTHROPIC_API_KEY", Value: "sk-hosted"},
 	}, got)
 
 	got = InjectHostedCredentials(environment, "ANTHROPIC_API_KEY", "sk-hosted", "ANTHROPIC_BASE_URL", "https://api.anthropic.com")
-	require.Equal(t, []BrokerEnvironmentVariable{
+	require.Equal(t, []TaskEnvironmentVariable{
 		{Name: "KEEP", Value: "1"},
 		{Name: "ANTHROPIC_API_KEY", Value: "sk-hosted"},
 		{Name: "ANTHROPIC_BASE_URL", Value: "https://api.anthropic.com"},

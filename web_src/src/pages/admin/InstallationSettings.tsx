@@ -10,12 +10,14 @@ import { Switch } from "@/ui/switch";
 import React, { useCallback, useEffect, useState } from "react";
 import { HostedLLMSettings } from "./HostedLLMSettings";
 import { InvitationSettingsSection } from "./InvitationSettingsSection";
+import { PastDueGraceSettingsSection } from "./PastDueGraceSettingsSection";
 import { ResetBuiltInAutomation } from "./ResetBuiltInAutomation";
 
 type InstallationSettingsResponse = {
   allow_private_network_access: boolean;
   signups_enabled: boolean;
   invitation_duration_days: number;
+  past_due_grace_days: number;
   signups_blocked_by_environment: boolean;
   effective_blocked_http_hosts: string[];
   effective_private_ip_ranges: string[];
@@ -546,23 +548,20 @@ const useInstallationSettingsState = () => {
 
   const patchSettings = useCallback(
     async (body: Record<string, unknown>, successMessage: string, fallbackError: string) => {
-      const response = await fetch("/admin/api/installation/network-settings", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        throw new Error(await getErrorMessage(response, fallbackError));
+      const data = await patchInstallationSettings(body, fallbackError);
+      setSettings(data);
+      if (body.allow_private_network_access !== undefined)
+        setAllowPrivateNetworkAccess(data.allow_private_network_access);
+      if (body.signups_enabled !== undefined) setSignupsEnabled(data.signups_enabled);
+      if (body.invitation_duration_days !== undefined) {
+        setInvitationDuration((current) =>
+          current === String(body.invitation_duration_days) ? String(data.invitation_duration_days) : current,
+        );
       }
-
-      applySettings(await response.json());
+      if (body.smtp_enabled !== undefined) setSMTPForm(toSMTPFormState(data));
       showSuccessToast(successMessage);
     },
-    [applySettings],
+    [],
   );
 
   const saveNetworkSettings = useCallback(async () => {
@@ -626,6 +625,7 @@ const useInstallationSettingsState = () => {
     savingInvitations,
     setInvitationDuration,
     saveInvitationSettings,
+    patchSettings,
     smtpForm,
     savingSMTP,
     setAllowPrivateNetworkAccess,
@@ -635,6 +635,22 @@ const useInstallationSettingsState = () => {
     saveSignupSettings,
     saveSMTPSettings,
   };
+};
+
+const patchInstallationSettings = async (
+  body: Record<string, unknown>,
+  fallbackError: string,
+): Promise<InstallationSettingsResponse> => {
+  const response = await fetch("/admin/api/installation/network-settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, fallbackError));
+  }
+  return response.json();
 };
 
 const InstallationSettings: React.FC = () => {
@@ -649,6 +665,7 @@ const InstallationSettings: React.FC = () => {
     savingInvitations,
     setInvitationDuration,
     saveInvitationSettings,
+    patchSettings,
     smtpForm,
     savingSMTP,
     setAllowPrivateNetworkAccess,
@@ -734,6 +751,7 @@ const InstallationSettings: React.FC = () => {
               onChange={setInvitationDuration}
               onSave={saveInvitationSettings}
             />
+            <PastDueGraceSettingsSection settings={settings} patchSettings={patchSettings} />
           </TabsContent>
 
           <TabsContent value="hosted-llm">

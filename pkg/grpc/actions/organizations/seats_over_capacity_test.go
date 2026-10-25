@@ -230,25 +230,38 @@ func findMemberByAccount(t *testing.T, orgID, accountID uuid.UUID) *models.User 
 }
 
 func TestSeatsOverCapacityAlertsAgainWhenPaymentRecovers(t *testing.T) {
-	f := newSeatPurchaseFixture(t, 2, new(50))
-	logs := captureSeatLogs(t)
-	f.addMembers(2)
+	for _, tc := range []struct {
+		name      string
+		graceDays int
+	}{
+		{name: "without grace"},
+		{name: "during grace", graceDays: 7},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newSeatPurchaseFixture(t, 2, new(50))
+			require.NoError(t, models.ApplyInstallationMetadata(database.Conn(), func(metadata *models.InstallationMetadata) {
+				metadata.PastDueGraceDays = tc.graceDays
+			}))
+			logs := captureSeatLogs(t)
+			f.addMembers(2)
 
-	f.replay(models.PolarSubscriptionStatusActive, 2)
-	alerts := logs.overCapacity()
-	require.Len(t, alerts, 1)
-	requireOverCapacityEntry(t, alerts[0], f, "update", 2, 3)
+			f.replay(models.PolarSubscriptionStatusActive, 2)
+			alerts := logs.overCapacity()
+			require.Len(t, alerts, 1)
+			requireOverCapacityEntry(t, alerts[0], f, "update", 2, 3)
 
-	// Past due is not a per-seat state, so it ends the record without a line.
-	f.replay(models.PolarSubscriptionStatusPastDue, 2)
-	require.Len(t, logs.overCapacity(), 1)
-	require.Empty(t, logs.resolved())
-	require.Nil(t, f.overCapacitySince())
+			// Past due is not a per-seat state, so it ends the record without a line.
+			f.replay(models.PolarSubscriptionStatusPastDue, 2)
+			require.Len(t, logs.overCapacity(), 1)
+			require.Empty(t, logs.resolved())
+			require.Nil(t, f.overCapacitySince())
 
-	f.replay(models.PolarSubscriptionStatusActive, 2)
-	alerts = logs.overCapacity()
-	require.Len(t, alerts, 2)
-	requireOverCapacityEntry(t, alerts[1], f, "recovery", 2, 3)
+			f.replay(models.PolarSubscriptionStatusActive, 2)
+			alerts = logs.overCapacity()
+			require.Len(t, alerts, 2)
+			requireOverCapacityEntry(t, alerts[1], f, "recovery", 2, 3)
+		})
+	}
 }
 
 func TestSeatsOverCapacityAfterRenewalNeverChangesPolar(t *testing.T) {

@@ -186,6 +186,10 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = s.softDeleteAccount(r.Context(), account)
+	if errors.Is(err, models.ErrOrganizationSubscriptionLive) {
+		http.Error(w, models.ErrOrganizationSubscriptionLive.Error(), http.StatusConflict)
+		return
+	}
 	if errors.Is(err, models.ErrAccountDeleteLastInstallationAdmin) {
 		http.Error(w, "Promote another installation admin before you delete this account.", http.StatusConflict)
 		return
