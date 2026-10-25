@@ -95,6 +95,7 @@ describe("useSeatPurchase", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    window.localStorage.clear();
     organizationsPreviewSeatPurchase.mockResolvedValue({ data: estimate });
     organizationsPurchaseSeats.mockResolvedValue({
       data: { purchase: purchase("succeeded"), billing: { ...initialBilling, purchasedSeats: 5 } },
@@ -309,6 +310,26 @@ describe("useSeatPurchase", () => {
     expect(first).toEqual(expect.any(String));
     expect(second).toEqual(expect.any(String));
     expect(second).not.toBe(first);
+  });
+
+  it.each([
+    { status: "unknown", reused: true },
+    { status: "succeeded", reused: false },
+    { status: "failed", reused: false },
+    { status: "action_required", reused: false },
+  ])("reuses the operation key after a $status purchase only while the outcome is unknown", async (outcome) => {
+    organizationsPurchaseSeats.mockResolvedValueOnce({
+      data: { purchase: purchase(outcome.status), billing: initialBilling },
+    });
+    const hook = mountPurchase();
+    await openPreview(hook);
+    await act(async () => hook.result.current.confirm());
+    act(() => hook.result.current.setOpen(false));
+    await openPreview(hook);
+    await act(async () => hook.result.current.confirm());
+    const [first, retry] = organizationsPurchaseSeats.mock.calls.map((call) => call[0].body);
+    expect({ ...retry, operationKey: undefined }).toEqual({ ...first, operationKey: undefined });
+    expect(retry.operationKey === first.operationKey).toBe(outcome.reused);
   });
 
   it("shows server renewal freeze messages without retrying the purchase", async () => {
