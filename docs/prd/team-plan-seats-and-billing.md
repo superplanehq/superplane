@@ -574,8 +574,9 @@ affects 11 and 05.
 invitations?
 
 **Context.** Plans that are not per-seat need no seat for an invitation.
-Invitations sent before Team therefore hold no seat. After checkout,
-acceptance admits no one until an Admin buys seats.
+Invitations sent before Team therefore hold no seat. When the Admin keeps the
+default seat count at checkout, pending invitations cannot be accepted until
+an Admin buys seats.
 
 **Shipped today.**
 
@@ -600,10 +601,10 @@ acceptance admits no one until an Admin buys seats.
    - Tradeoff: Invitees lose a link they already received. The Admin must send
      the invitations again.
 4. Keep the shipped behavior.
-   - Tradeoff: The first charge covers current members only, and no
-     invitation changes.
-   - Tradeoff: Pending invitations cannot be accepted until an Admin buys
-     seats.
+   - Tradeoff: When the Admin keeps the default seat count, the first charge
+     covers current members only. No invitation changes.
+   - Tradeoff: When the Admin keeps the default seat count, pending invitations
+     cannot be accepted until an Admin buys seats.
 
 **Blocks.** 19.
 
