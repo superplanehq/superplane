@@ -1477,8 +1477,14 @@ CREATE TABLE public.organization_seat_purchases (
     error_code text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    operation_key text,
+    request_fingerprint text,
+    period_start timestamp with time zone,
+    period_end timestamp with time zone,
     CONSTRAINT organization_seat_purchases_adds_seats CHECK ((to_seats > from_seats)),
     CONSTRAINT organization_seat_purchases_from_seats_check CHECK ((from_seats >= 0)),
+    CONSTRAINT organization_seat_purchases_operation_complete CHECK ((((operation_key IS NULL) AND (request_fingerprint IS NULL) AND (period_start IS NULL) AND (period_end IS NULL)) OR ((operation_key IS NOT NULL) AND (request_fingerprint IS NOT NULL) AND (period_start IS NOT NULL) AND (period_end IS NOT NULL)))),
+    CONSTRAINT organization_seat_purchases_operation_key_length CHECK (((operation_key IS NULL) OR ((char_length(operation_key) >= 1) AND (char_length(operation_key) <= 128)))),
     CONSTRAINT organization_seat_purchases_status CHECK ((status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'action_required'::text, 'unknown'::text])))
 );
 
@@ -4823,6 +4829,13 @@ CREATE UNIQUE INDEX uq_organization_seat_purchases_in_flight ON public.organizat
 
 
 --
+-- Name: uq_organization_seat_purchases_operation_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_seat_purchases_operation_key ON public.organization_seat_purchases USING btree (organization_id, operation_key) WHERE (operation_key IS NOT NULL);
+
+
+--
 -- Name: usage_price_books_one_current; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6296,7 +6309,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261025134112	f
+20261025145014	f
 \.
 
 
