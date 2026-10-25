@@ -24,6 +24,7 @@ const (
 	SeatPurchaseErrorSubscriptionInactive  = "subscription_inactive"
 	SeatPurchaseErrorRejected              = "rejected"
 	SeatPurchaseErrorNotApplied            = "not_applied"
+	SeatPurchaseErrorRenewalBoundary       = "renewal_boundary"
 )
 
 // SeatPurchase records one attempt to buy seats on a Polar subscription.

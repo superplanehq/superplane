@@ -196,6 +196,31 @@ func (f *seatPurchaseFixture) preview(additional int32) (*pb.PreviewSeatPurchase
 	return PreviewSeatPurchase(context.Background(), f.r.Organization.ID.String(), &pb.PreviewSeatPurchaseRequest{AdditionalSeats: additional})
 }
 
+// purchaseAt runs a purchase with a controlled clock.
+func (f *seatPurchaseFixture) purchaseAt(clock seatPurchaseClock, additional, expected int32) (*pb.PurchaseSeatsResponse, error) {
+	return purchaseSeats(context.Background(), f.r.Organization.ID.String(),
+		&pb.PurchaseSeatsRequest{AdditionalSeats: additional, ExpectedPurchasedSeats: expected}, f.r.User.String(), clock)
+}
+
+// setPeriodEnd moves the end of the billing period, both locally and in Polar.
+func (f *seatPurchaseFixture) setPeriodEnd(periodEnd time.Time) {
+	f.t.Helper()
+	f.mu.Lock()
+	f.periodEnd = periodEnd
+	f.mu.Unlock()
+	f.updateBillingPlan(map[string]any{"current_period_end": periodEnd})
+}
+
+func (f *seatPurchaseFixture) scheduleCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.schedules)
+}
+
+func fixedSeatPurchaseClock(now time.Time) seatPurchaseClock {
+	return func() time.Time { return now }
+}
+
 func (f *seatPurchaseFixture) plan() *models.OrganizationBillingPlan {
 	f.t.Helper()
 	plan, err := models.FindOrganizationBillingPlan(database.Conn(), f.r.Organization.ID)
@@ -834,4 +859,157 @@ func Test__SyncBillingReconcilesExpiredUnknownSeatPurchases(t *testing.T) {
 			assert.Equal(t, "Polar did not apply the seat purchase. No seats were added.", billing.LastSeatPurchase.Message)
 		})
 	}
+}
+
+func Test__PurchaseSeatsInsideTheRenewalWindowNeverReachesPolar(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	f.setPeriodEnd(time.Now().Add(seatPurchaseBoundaryWindow - time.Minute))
+
+	_, err := f.purchase(1, 3)
+
+	requireGRPCCode(t, codes.FailedPrecondition, err)
+	assert.ErrorContains(t, err, "The billing period renews soon. Buy seats after the renewal.")
+	assert.Zero(t, f.patchCount())
+	assert.Zero(t, f.scheduleCount())
+	assert.Equal(t, 3, f.purchasedSeats())
+	assert.Equal(t, 0, f.getCount, "the local check rejects the request before the Polar refresh")
+	latest, findErr := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, findErr)
+	assert.Nil(t, latest)
+}
+
+func Test__PreviewSeatPurchaseInsideTheRenewalWindowReturnsTheSameError(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	f.setPeriodEnd(time.Now().Add(seatPurchaseBoundaryWindow - time.Minute))
+
+	_, err := f.preview(1)
+
+	requireGRPCCode(t, codes.FailedPrecondition, err)
+	assert.ErrorContains(t, err, "The billing period renews soon. Buy seats after the renewal.")
+}
+
+func Test__PurchaseSeatsEdgeOfTheRenewalWindow(t *testing.T) {
+	tests := []struct {
+		name         string
+		untilRenewal time.Duration
+		wantErr      bool
+	}{
+		{name: "just outside the window", untilRenewal: seatPurchaseBoundaryWindow + time.Second},
+		{name: "exactly at the window edge", untilRenewal: seatPurchaseBoundaryWindow, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newSeatPurchaseFixture(t, 3, new(50))
+			now := time.Now().UTC().Truncate(time.Second)
+			f.setPeriodEnd(now.Add(tt.untilRenewal))
+
+			_, err := f.purchaseAt(fixedSeatPurchaseClock(now), 1, 3)
+
+			if tt.wantErr {
+				requireGRPCCode(t, codes.FailedPrecondition, err)
+				assert.Zero(t, f.patchCount())
+				assert.Equal(t, 3, f.purchasedSeats())
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, 1, f.patchCount())
+			assert.Equal(t, 4, f.purchasedSeats())
+		})
+	}
+}
+
+func Test__PurchaseSeatsAfterTheRenewalAppliedAScheduledReductionIsRejected(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 10, new(50))
+	// The server reads 10 seats. Polar renews to 7 before the refresh.
+	renewedStart := f.periodEnd
+	f.mu.Lock()
+	f.periodStart = renewedStart
+	f.periodEnd = renewedStart.Add(30 * 24 * time.Hour)
+	f.polarSeats = 7
+	f.mu.Unlock()
+
+	_, err := f.purchase(1, 10)
+
+	requireGRPCCode(t, codes.Aborted, err)
+	assert.ErrorContains(t, err, "The billing period changed. Refresh and try again.")
+	assert.Zero(t, f.patchCount(), "no update can buy 11 seats")
+	assert.Equal(t, 7, f.purchasedSeats(), "the refresh records the renewed seats")
+	latest, findErr := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, findErr)
+	assert.Nil(t, latest, "no attempt is recorded")
+}
+
+func Test__PurchaseSeatsRejectsAPeriodThatChangedAfterTheFirstCheck(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	// The seat count stays the same, so only the period differs.
+	f.mu.Lock()
+	f.periodStart = f.periodEnd
+	f.periodEnd = f.periodEnd.Add(30 * 24 * time.Hour)
+	f.mu.Unlock()
+
+	_, err := f.purchase(1, 3)
+
+	requireGRPCCode(t, codes.Aborted, err)
+	assert.ErrorContains(t, err, "The billing period changed. Refresh and try again.")
+	assert.Zero(t, f.patchCount())
+	assert.Equal(t, 3, f.purchasedSeats())
+	latest, findErr := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, findErr)
+	assert.Nil(t, latest, "no attempt stays in flight")
+
+	// A new request works from the refreshed period.
+	_, err = f.purchase(1, 3)
+	require.NoError(t, err)
+	assert.Equal(t, 1, f.patchCount())
+	assert.Equal(t, 4, f.purchasedSeats())
+}
+
+func Test__PurchaseSeatsStopsAtTheFinalCheckWhenTheClockEntersTheRenewalWindow(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 10, new(50))
+	f.pendingSeats = new(7)
+
+	// Time is normal until the purchase is recorded. Then the clock reaches
+	// the renewal window, as when the request waited for a slow dependency.
+	var recorded atomic.Bool
+	clock := func() time.Time {
+		if !recorded.Load() {
+			var count int64
+			require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("organization_id = ?", f.r.Organization.ID).Count(&count).Error)
+			recorded.Store(count > 0)
+		}
+		if recorded.Load() {
+			return f.periodEnd.Add(-time.Minute)
+		}
+		return time.Now()
+	}
+
+	_, err := f.purchaseAt(clock, 1, 10)
+
+	requireGRPCCode(t, codes.FailedPrecondition, err)
+	assert.ErrorContains(t, err, "The billing period renews soon. Buy seats after the renewal.")
+	assert.Zero(t, f.patchCount(), "no update can buy 11 seats")
+	assert.Zero(t, f.scheduleCount(), "the scheduled reduction stays as it is")
+	assert.Equal(t, 10, f.purchasedSeats())
+
+	failed := f.latestPurchase()
+	assert.Equal(t, models.SeatPurchaseStatusFailed, failed.Status)
+	assert.Equal(t, models.SeatPurchaseErrorRenewalBoundary, failed.ErrorCode)
+	assert.Contains(t, seatPurchaseMessage(failed), "No seats were added.")
+	inFlight, err := models.FindInFlightSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	assert.Nil(t, inFlight, "the stopped attempt does not block a later purchase")
+
+	// After the renewal, a new purchase starts from the renewed period.
+	f.mu.Lock()
+	f.periodStart = f.periodEnd
+	f.periodEnd = f.periodEnd.Add(30 * 24 * time.Hour)
+	f.polarSeats = 7
+	f.pendingSeats = nil
+	f.mu.Unlock()
+	_, err = f.purchase(1, 10)
+	requireGRPCCode(t, codes.Aborted, err)
+	_, err = f.purchase(1, 7)
+	require.NoError(t, err)
+	require.Equal(t, 1, f.patchCount())
+	assert.Equal(t, float64(8), f.patchBodies[0]["seats"])
 }

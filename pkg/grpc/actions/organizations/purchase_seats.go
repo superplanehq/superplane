@@ -43,6 +43,10 @@ type seatPurchaseState struct {
 // PreviewSeatPurchase estimates the prorated charge for additional seats.
 // It calls Polar only to settle an earlier unconfirmed purchase.
 func PreviewSeatPurchase(ctx context.Context, orgID string, req *pb.PreviewSeatPurchaseRequest) (*pb.PreviewSeatPurchaseResponse, error) {
+	return previewSeatPurchase(ctx, orgID, req, time.Now)
+}
+
+func previewSeatPurchase(ctx context.Context, orgID string, req *pb.PreviewSeatPurchaseRequest, clock seatPurchaseClock) (*pb.PreviewSeatPurchaseResponse, error) {
 	organizationID, err := requireSeatPurchaseAvailable(ctx, orgID)
 	if err != nil {
 		return nil, err
@@ -50,7 +54,7 @@ func PreviewSeatPurchase(ctx context.Context, orgID string, req *pb.PreviewSeatP
 	db := database.DB(ctx)
 	reconcileSeatPurchase(ctx, db, organizationID)
 
-	now := time.Now()
+	now := clock()
 	state, err := checkSeatPurchase(db, organizationID, req.GetAdditionalSeats(), now)
 	if err != nil {
 		return nil, err
@@ -77,7 +81,14 @@ func PreviewSeatPurchase(ctx context.Context, orgID string, req *pb.PreviewSeatP
 // PurchaseSeats buys additional seats on the Polar subscription. Polar charges
 // the prorated amount at once and applies the change only when the payment
 // succeeds. Capacity changes only from the Polar snapshot.
+//
+// The purchase never reaches Polar near the end of the billing period, or after
+// the period changed. See seatPurchaseBoundaryWindow.
 func PurchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsRequest, userID string) (*pb.PurchaseSeatsResponse, error) {
+	return purchaseSeats(ctx, orgID, req, userID, time.Now)
+}
+
+func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsRequest, userID string, clock seatPurchaseClock) (*pb.PurchaseSeatsResponse, error) {
 	organizationID, err := requireSeatPurchaseAvailable(ctx, orgID)
 	if err != nil {
 		return nil, err
@@ -93,7 +104,7 @@ func PurchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 	// seats Polar reports now. A stale local count could remove seats that
 	// were added elsewhere. Requests that cannot take seats are rejected
 	// before the Polar read.
-	state, err := checkSeatPurchase(db, organizationID, req.GetAdditionalSeats(), time.Now())
+	state, err := checkSeatPurchase(db, organizationID, req.GetAdditionalSeats(), clock())
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +112,22 @@ func PurchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 		return nil, polarBillingError(err, "Could not confirm the seat count with Polar. Try again.")
 	}
 
-	purchase, err := beginSeatPurchase(ctx, organizationID, req, userID)
+	// The refresh can apply a renewal. Such a purchase was previewed for
+	// another period, and its absolute seat count can be wrong.
+	purchase, locked, err := beginSeatPurchase(ctx, organizationID, req, userID, state, clock)
 	if err != nil {
+		return nil, err
+	}
+
+	// Last check before the charge. Time passed since the locked check.
+	// A purchase that cannot start safely never reaches Polar. Nothing was
+	// sent, so the recorded attempt ends as failed and does not block the
+	// next purchase.
+	if err := checkSeatPurchaseBoundary(locked.periodEnd, clock()); err != nil {
+		settleCtx := context.WithoutCancel(ctx)
+		if recordErr := recordSeatPurchaseStatus(settleCtx, purchase, models.SeatPurchaseStatusFailed, models.SeatPurchaseErrorRenewalBoundary); recordErr != nil {
+			return nil, recordErr
+		}
 		return nil, err
 	}
 
@@ -160,6 +185,9 @@ func checkSeatPurchase(tx *gorm.DB, orgID uuid.UUID, additionalSeats int32, now 
 	if plan.CurrentPeriodStart == nil || plan.CurrentPeriodEnd == nil || !plan.CurrentPeriodEnd.After(now) {
 		return nil, grpcerrors.FailedPrecondition(nil, "The billing period is not known. Sync billing and try again.")
 	}
+	if err := checkSeatPurchaseBoundary(*plan.CurrentPeriodEnd, now); err != nil {
+		return nil, err
+	}
 	if additionalSeats < 1 {
 		return nil, grpcerrors.InvalidArgument(nil, "Select at least 1 seat to buy.")
 	}
@@ -204,15 +232,22 @@ func proratedChargeCents(additionalSeats int, seatPriceCents int64, periodStart,
 }
 
 // beginSeatPurchase checks the request and records a pending purchase under the
-// organization lock. The lock is not held during the Polar call.
-func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSeatsRequest, userID string) (*models.SeatPurchase, error) {
+// organization lock. The lock is not held during the Polar call. It returns the
+// locked state that the purchase works from. The billing period must be the
+// period that the caller saw before the Polar refresh.
+func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSeatsRequest, userID string, seen *seatPurchaseState, clock seatPurchaseClock) (*models.SeatPurchase, *seatPurchaseState, error) {
 	var purchase *models.SeatPurchase
+	var state *seatPurchaseState
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if _, err := models.LockOrganization(tx, orgID); err != nil {
 			return grpcerrors.Internal(err, "Could not buy seats.")
 		}
-		state, err := checkSeatPurchase(tx, orgID, req.GetAdditionalSeats(), time.Now())
+		var err error
+		state, err = checkSeatPurchase(tx, orgID, req.GetAdditionalSeats(), clock())
 		if err != nil {
+			return err
+		}
+		if err := checkSeatPurchasePeriodUnchanged(seen, state); err != nil {
 			return err
 		}
 		if int(req.GetExpectedPurchasedSeats()) != state.purchased {
@@ -232,7 +267,10 @@ func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSea
 		}
 		return nil
 	})
-	return purchase, err
+	if err != nil {
+		return nil, nil, err
+	}
+	return purchase, state, nil
 }
 
 // recordAppliedSeatPurchase applies the snapshot of a confirmed update. Polar has
@@ -316,6 +354,8 @@ func seatPurchaseMessage(purchase *models.SeatPurchase) string {
 		return "Polar did not accept the seat purchase. No seats were added."
 	case models.SeatPurchaseErrorNotApplied:
 		return "Polar did not apply the seat purchase. No seats were added."
+	case models.SeatPurchaseErrorRenewalBoundary:
+		return "The billing period renews soon. No seats were added."
 	}
 	switch purchase.Status {
 	case models.SeatPurchaseStatusPending:
