@@ -191,8 +191,31 @@ The API has two routes. Both need `org:update` and **New Billing**:
 
 The `operation_key` identifies one purchase in the organization. It is
 required and has 1 to 128 printable ASCII characters without spaces. A request
-without a valid key gets HTTP 400 and does not reach Polar. The buy seats dialog
-makes one key for each confirmed preview.
+without a valid key gets HTTP 400 and does not reach Polar.
+
+The buy seats dialog makes the key when the user confirms a purchase, not when
+it shows a preview. The browser keeps the key in `localStorage` for the
+organization, with the request and its billing period. All tabs of the
+organization use the same key.
+
+If a storage write fails, the tab keeps unresolved keys in memory. It merges
+them with current storage records from other tabs. It excludes keys that
+the tab retired, even when storage still contains those keys.
+
+- A new confirmation of the same `additional_seats` and
+  `expected_purchased_seats` sends the stored key again. This applies after a
+  lost response, an HTTP 5xx error, a page refresh, and a renewal.
+- A confirmation of a different request gets a new key. Earlier unresolved
+  requests keep their own keys, even if the quantity or seat baseline changes.
+- The browser forgets the key when the server answers for that key with a
+  known outcome: a `succeeded`, `failed`, or `action_required` purchase, or an
+  HTTP 4xx error.
+- A lost response, an HTTP 5xx error, or a purchase with the status `pending`,
+  `awaiting_confirmation`, or `unknown` keeps the key.
+  A billing refresh does not forget the key, because the billing purchase has
+  no key.
+- The dialog never sends the stored request again by itself. A changed period
+  or a stale preview needs a new preview and a new confirmation.
 
 - A repeat with the same key and the same request returns the stored purchase.
   It does not call Polar, also after a renewal.
