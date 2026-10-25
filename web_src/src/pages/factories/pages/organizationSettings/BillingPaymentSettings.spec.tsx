@@ -36,6 +36,7 @@ beforeEach(() => {
   delete billing.paidAccessEndsAt;
   billing.hasPaymentMethod = false;
   billing.occupiedSeats = 2;
+  billing.pendingInvitationSeats = 0;
   billing.availablePlans![1].seatMaximum = 5;
   selectPlan.mockReset().mockResolvedValue({ data: {} });
   createSession.mockReset().mockResolvedValue({ data: { portalUrl: "https://polar.example/portal?token=test" } });
@@ -190,6 +191,46 @@ it("supports an unlimited maximum and a zero-member minimum of one", async () =>
   expect(screen.getByRole("button", { name: "Subscribe to Team" })).toBeEnabled();
 });
 
+it("defaults Team seats to members plus pending invitations", async () => {
+  billing.occupiedSeats = 1;
+  billing.pendingInvitationSeats = 2;
+  const user = renderSettings();
+  const seats = screen.getByRole("spinbutton", { name: "Team seats" });
+  expect(seats).toHaveValue(3);
+  expect(seats).toHaveAttribute("min", "1");
+  expect(screen.getByText(/adds 2 seats for pending invitations/)).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Subscribe to Team" }));
+  await waitFor(() =>
+    expect(selectPlan).toHaveBeenCalledWith(expect.objectContaining({ body: { planKey: "team", seats: 3 } })),
+  );
+});
+
+it.each([0, undefined])("defaults Team seats to members with no pending invitations: %s", (pending) => {
+  billing.pendingInvitationSeats = pending;
+  renderSettings();
+  expect(screen.getByRole("spinbutton", { name: "Team seats" })).toHaveValue(2);
+  expect(screen.queryByText(/pending invitation/)).not.toBeInTheDocument();
+});
+
+it("caps the pending default at the plan maximum and lets the admin pay for members only", async () => {
+  billing.pendingInvitationSeats = 5;
+  const user = renderSettings();
+  const seats = screen.getByRole("spinbutton", { name: "Team seats" });
+  expect(seats).toHaveValue(5);
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "The plan maximum is 5 seats. 2 pending invitations cannot get a seat.",
+  );
+  const subscribe = screen.getByRole("button", { name: "Subscribe to Team" });
+  expect(subscribe).toBeEnabled();
+  await user.clear(seats);
+  await user.type(seats, "2");
+  expect(subscribe).toBeEnabled();
+  await user.click(subscribe);
+  await waitFor(() =>
+    expect(selectPlan).toHaveBeenCalledWith(expect.objectContaining({ body: { planKey: "team", seats: 2 } })),
+  );
+});
+
 it("hides checkout controls from members without billing permission", () => {
   renderSettings(false);
   expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
@@ -200,6 +241,7 @@ it("hides checkout controls from members without billing permission", () => {
 it.each(["missing usage", "maximum below occupancy"])(
   "blocks checkout when bounds cannot cover members: %s",
   (condition) => {
+    billing.pendingInvitationSeats = 3;
     if (condition === "missing usage") delete billing.occupiedSeats;
     else billing.availablePlans![1].seatMaximum = 1;
     renderSettings();

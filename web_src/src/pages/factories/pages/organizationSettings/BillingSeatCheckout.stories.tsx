@@ -7,6 +7,7 @@ const meta = {
   args: {
     plan: { key: "team", name: "Team", perSeat: true, priceCents: "2000", seatMaximum: 50 },
     occupied: 2,
+    pending: 0,
     disabled: false,
     onSubscribe: (seats: number) => console.log("Subscribe to Team", { seats }),
   },
@@ -29,5 +30,9 @@ export const Unlimited: Story = {
 };
 export const BelowOccupiedMaximum: Story = {
   args: { plan: { ...meta.args.plan, seatMaximum: 1 } },
+};
+export const PendingInvitations: Story = { args: { pending: 3 } };
+export const PendingInvitationsOverMaximum: Story = {
+  args: { plan: { ...meta.args.plan, seatMaximum: 5 }, pending: 5 },
 };
 export const MissingSeatUsage: Story = { args: { occupied: undefined } };

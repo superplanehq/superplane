@@ -108,3 +108,32 @@ export function billingPaymentFailedCopy(failedAt?: string, accessEndsAt?: strin
   }
   return `${failure} Team features are off until you update the payment method.`;
 }
+
+export type CheckoutSeatBounds = {
+  minimum: number;
+  defaultSeats: number;
+  coveredInvitations: number;
+  invitationsWithoutSeat: number;
+};
+
+// Decision D13: the default covers members plus pending invitations, capped at
+// the plan maximum. Only current members set the minimum.
+export function checkoutSeatBounds(
+  occupied: number | undefined,
+  pending: number | undefined,
+  maximum: number | undefined,
+): CheckoutSeatBounds {
+  const members = occupied ?? 0;
+  const invitations = Math.max(pending ?? 0, 0);
+  const minimum = Math.max(members, 1);
+  const requested = Math.max(minimum, members + invitations);
+  if (maximum == null) {
+    return { minimum, defaultSeats: requested, coveredInvitations: invitations, invitationsWithoutSeat: 0 };
+  }
+  if (maximum < minimum) {
+    return { minimum, defaultSeats: minimum, coveredInvitations: 0, invitationsWithoutSeat: 0 };
+  }
+  const defaultSeats = Math.min(maximum, requested);
+  const coveredInvitations = Math.min(invitations, Math.max(defaultSeats - members, 0));
+  return { minimum, defaultSeats, coveredInvitations, invitationsWithoutSeat: invitations - coveredInvitations };
+}

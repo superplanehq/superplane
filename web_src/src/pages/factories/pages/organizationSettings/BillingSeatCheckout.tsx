@@ -3,24 +3,29 @@ import type { OrganizationsBillingPlanOption } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { checkoutSeatBounds, type CheckoutSeatBounds } from "../../lib/billingPlans";
 import { formatUsdCents } from "../../lib/workOrderUsage";
 
 export function BillingSeatCheckout({
   plan,
   occupied,
+  pending,
   disabled,
   onSubscribe,
 }: {
   plan: OrganizationsBillingPlanOption;
   occupied: number | undefined;
+  pending: number | undefined;
   disabled: boolean;
   onSubscribe: (seats: number) => void;
 }) {
   const inputId = useId();
-  const minimum = Math.max(occupied ?? 0, 1);
   const maximum = plan.seatMaximum;
+  const bounds = checkoutSeatBounds(occupied, pending, maximum);
+  const minimum = bounds.minimum;
   const upperBound = maximum ?? Infinity;
-  const [value, setValue] = useState(String(minimum));
+  // Seed once at mount. A background refresh must not overwrite the selection.
+  const [value, setValue] = useState(() => String(bounds.defaultSeats));
   const seats = Number(value);
   const valid = occupied != null && value !== "" && Number.isInteger(seats) && seats >= minimum && seats <= upperBound;
   const total = valid ? formatUsdCents(seats * Number(plan.priceCents ?? 0)) : "—";
@@ -57,7 +62,7 @@ export function BillingSeatCheckout({
           +
         </Button>
       </div>
-      <BillingSeatBounds occupied={occupied} minimum={minimum} maximum={maximum} />
+      <BillingSeatBounds occupied={occupied} bounds={bounds} maximum={maximum} />
       <div className="text-sm">
         <p>Initial payment estimate: {total}</p>
         <p>Monthly total: {total}</p>
@@ -72,13 +77,14 @@ export function BillingSeatCheckout({
 
 function BillingSeatBounds({
   occupied,
-  minimum,
+  bounds,
   maximum,
 }: {
   occupied: number | undefined;
-  minimum: number;
+  bounds: CheckoutSeatBounds;
   maximum: number | undefined;
 }) {
+  const { minimum, coveredInvitations, invitationsWithoutSeat } = bounds;
   if (occupied == null) {
     return <p role="alert">Could not load seat usage. Refresh billing settings and try again.</p>;
   }
@@ -86,8 +92,26 @@ function BillingSeatBounds({
     return <p role="alert">Current members exceed this plan's seat maximum. Contact an organization admin.</p>;
   }
   return (
-    <p className="text-sm text-muted-foreground">
-      {maximum == null ? `Select at least ${minimum} seats.` : `Select ${minimum} to ${maximum} seats.`}
-    </p>
+    <div className="space-y-1 text-sm">
+      <p className="text-muted-foreground">
+        {maximum == null ? `Select at least ${minimum} seats.` : `Select ${minimum} to ${maximum} seats.`}
+      </p>
+      {coveredInvitations > 0 && (
+        <p className="text-muted-foreground">
+          Current members need at least {countOf(minimum, "seat")}. The default adds{" "}
+          {countOf(coveredInvitations, "seat")} for pending invitations. You can remove these seats.
+        </p>
+      )}
+      {maximum != null && invitationsWithoutSeat > 0 && (
+        <p role="status">
+          The plan maximum is {countOf(maximum, "seat")}. {countOf(invitationsWithoutSeat, "pending invitation")} cannot
+          get a seat.
+        </p>
+      )}
+    </div>
   );
+}
+
+function countOf(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }

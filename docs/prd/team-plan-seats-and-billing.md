@@ -133,6 +133,8 @@ Seat values at any moment:
 - Show the monthly price per seat and the selected seat count before payment.
 - The initial purchase must cover the owner and all existing members.
 - The selected count must not exceed the plan maximum.
+- The default count also covers pending invitations, up to the plan maximum
+  ([D13](#d13-checkout-default-with-pending-invitations)).
 - Show the initial payment and the recurring monthly total.
 - Successful activation establishes the organization's billing cycle.
 - All seats follow that cycle, including seats purchased later.
@@ -414,7 +416,9 @@ billing state.
 
 This section is the single list of unresolved decisions. Each entry states
 the question, the shipped behavior, the options with their tradeoffs, and what
-the question blocks. This section does not choose an option.
+the question blocks. This section does not choose an option. A decided entry
+stays in place as a decision record so that links to it still resolve. The
+table lists only unresolved decisions.
 
 Task IDs (11, 05, 13b, 17, 19, 26, 27b, 32) come from the outside backlog and
 appear as written there.
@@ -424,7 +428,6 @@ appear as written there.
 | [D7](#d7-grace-after-a-failed-renewal-payment) | Grace after a failed renewal payment | Launch |
 | [D8](#d8-accepting-invitations-near-renewal) | Accepting invitations near renewal | 13b |
 | [D11](#d11-outside-seat-reduction-below-the-member-count) | Outside seat reduction below the member count | Launch. Also decides whether 17 stays dropped. Affects 11 and 05. |
-| [D13](#d13-checkout-default-with-pending-invitations) | Checkout default with pending invitations | 19 |
 | [D14](#d14-renewal-quantity-when-over-capacity) | Renewal quantity when over capacity | 27b and 32 |
 | [D15](#d15-signup-without-email-delivery) | Signup without email delivery | 26 |
 | [09-a](#09-a-seat-purchase-while-a-cancellation-is-scheduled) | Seat purchase while a cancellation is scheduled | No task is named |
@@ -570,6 +573,8 @@ affects 11 and 05.
 
 ### D13. Checkout default with pending invitations
 
+**Decided.** 2026-10-25. Option 1, with a cap at the plan maximum.
+
 **Question.** Does the default seat count at Team checkout include pending
 invitations?
 
@@ -577,35 +582,25 @@ invitations?
 Invitations sent before Team therefore hold no seat. After checkout,
 acceptance admits no one until an Admin buys seats.
 
-**Shipped today.**
+**Decision.**
 
-- The default and the minimum are `max(occupied, 1)`. Pending invitations do
-  not count (`validateCheckoutSeats` in `select_billing_plan.go`, and
-  `web_src/src/pages/factories/pages/organizationSettings/BillingSeatCheckout.tsx`).
-- An Admin can choose a higher count at checkout.
+- The default seat count is `min(maximum, members + pending)`. With no plan
+  maximum, the default is `members + pending`.
+- The minimum stays `max(members, 1)`. Pending invitations do not raise the
+  minimum. The Admin can remove the seats for pending invitations before
+  payment.
+- When the plan maximum cannot cover all pending invitations, checkout tells
+  the Admin how many pending invitations cannot get a seat.
+- When members already exceed the plan maximum, checkout is rejected.
+- SuperPlane does not expire pending invitations when Team starts.
 
-**Options.**
+**Implementation.** `BillingSeatCheckout.tsx` in
+`web_src/src/pages/factories/pages/organizationSettings/` applies the default
+and the copy. `validateCheckoutSeats` in `select_billing_plan.go` enforces the
+minimum and the maximum on the server. The decision does not change the
+checkout lifetime race; 33a and 33b own that work.
 
-1. Set the default to members plus pending invitations.
-   - Tradeoff: Pending invitees can accept after checkout with no extra
-     purchase.
-   - Tradeoff: The first charge includes seats for people who have not joined.
-     They can decline or let the invitation expire.
-2. Require seats for those invitations. The minimum includes them.
-   - Tradeoff: Every pending invitation has a seat from the start.
-   - Tradeoff: The minimum can be higher than the number of members, and the
-     Admin cannot pay for fewer seats.
-3. Expire those invitations when Team starts.
-   - Tradeoff: The first charge covers current members only.
-   - Tradeoff: Invitees lose a link they already received. The Admin must send
-     the invitations again.
-4. Keep the shipped behavior.
-   - Tradeoff: The first charge covers current members only, and no
-     invitation changes.
-   - Tradeoff: Pending invitations cannot be accepted until an Admin buys
-     seats.
-
-**Blocks.** 19.
+**Unblocks.** 19.
 
 ### D14. Renewal quantity when over capacity
 
