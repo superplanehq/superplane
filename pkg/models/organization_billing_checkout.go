@@ -96,9 +96,9 @@ func (c *OrganizationBillingCheckout) Unresolved() bool {
 }
 
 // MatchesSelection reports whether the intent was created for the same plan,
-// Polar product, and seat count.
+// Polar product, and seat count. The legacy Business key is an alias of business.
 func (c *OrganizationBillingCheckout) MatchesSelection(planKey, productID string, seats *int) bool {
-	if c.PlanKey != planKey || c.PolarProductID != productID {
+	if checkoutPlanKey(c.PlanKey) != checkoutPlanKey(planKey) || c.PolarProductID != productID {
 		return false
 	}
 	if c.Seats == nil || seats == nil {
@@ -314,6 +314,13 @@ func polarSnapshotColumns(snapshot PolarCheckoutSnapshot) map[string]any {
 		columns["expires_at"] = *snapshot.ExpiresAt
 	}
 	return columns
+}
+
+func checkoutPlanKey(key string) string {
+	if key == "business_legacy" {
+		return BillingPlanBusiness
+	}
+	return key
 }
 
 func optionalString(value string) *string {

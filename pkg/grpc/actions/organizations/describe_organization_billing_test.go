@@ -506,25 +506,42 @@ func TestLegacyBusinessCheckoutRemainsAvailable(t *testing.T) {
 }
 
 func TestLegacyBusinessCheckoutReusesThePendingCheckout(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-	setLegacyBusinessProduct(t, new("prod_business"))
-	t.Setenv(models.BillingEnabledEnv, "yes")
-	polarCheckouts := newFakePolarCheckouts(t, r.Organization.ID)
-	polarCheckouts.serve(nil)
+	for _, preexisting := range []bool{false, true} {
+		name := "new checkout"
+		if preexisting {
+			name = "adopted checkout"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			setLegacyBusinessProduct(t, new("prod_business"))
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			polarCheckouts := newFakePolarCheckouts(t, r.Organization.ID)
+			var existing *fakePolarCheckout
+			if preexisting {
+				existing = polarCheckouts.seed("prod_business", nil, nil)
+			}
+			polarCheckouts.serve(nil)
 
-	first, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
-	require.NoError(t, err)
-	second, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
-	require.NoError(t, err)
+			first, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
+			second, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
 
-	require.Equal(t, first.CheckoutUrl, second.CheckoutUrl)
-	require.Equal(t, 1, polarCheckouts.createCalls())
-	intent, err := models.FindUnresolvedOrganizationBillingCheckout(database.DB(t.Context()), r.Organization.ID)
-	require.NoError(t, err)
-	require.Equal(t, models.BillingPlanBusiness, intent.PlanKey)
-	require.Equal(t, "prod_business", intent.PolarProductID)
-	require.Nil(t, intent.Seats)
+			require.Equal(t, first.CheckoutUrl, second.CheckoutUrl)
+			if preexisting {
+				require.Equal(t, "https://polar.sh/checkout/"+existing.ID, first.CheckoutUrl)
+				require.Zero(t, polarCheckouts.createCalls())
+			} else {
+				require.Equal(t, 1, polarCheckouts.createCalls())
+			}
+			intent, err := models.FindUnresolvedOrganizationBillingCheckout(database.DB(t.Context()), r.Organization.ID)
+			require.NoError(t, err)
+			require.NotNil(t, intent)
+			require.Equal(t, "prod_business", intent.PolarProductID)
+			require.Nil(t, intent.Seats)
+		})
+	}
 }
 
 func TestLegacyBusinessCheckoutRejectsUnsafeBillingStateBeforePolar(t *testing.T) {
