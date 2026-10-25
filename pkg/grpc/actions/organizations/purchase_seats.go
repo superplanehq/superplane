@@ -134,10 +134,10 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 	// before the Polar read.
 	state, err := checkSeatPurchase(db, organizationID, req.GetAdditionalSeats(), clock())
 	if err != nil {
-		return nil, err
+		return replaySeatPurchaseBeforeError(ctx, organizationID, operation, err)
 	}
 	if err := polar.RefreshSeatPurchaseState(ctx, db, polar.NewClientFromEnv(), organizationID, state.subscriptionID); err != nil {
-		return nil, polarBillingError(err, "Could not confirm the seat count with Polar. Try again.")
+		return replaySeatPurchaseBeforeError(ctx, organizationID, operation, polarBillingError(err, "Could not confirm the seat count with Polar. Try again."))
 	}
 
 	// The refresh can apply a renewal. Such a purchase was previewed for
@@ -235,6 +235,19 @@ func findSeatPurchaseOperation(tx *gorm.DB, orgID uuid.UUID, operation seatPurch
 		return nil, grpcerrors.FailedPrecondition(nil, messageSeatPurchaseKeyReused)
 	}
 	return stored, nil
+}
+
+// A concurrent request can record the operation after the initial lookup.
+// Return that purchase instead of a pre-lock error caused by its new state.
+func replaySeatPurchaseBeforeError(ctx context.Context, orgID uuid.UUID, operation seatPurchaseOperation, purchaseErr error) (*pb.PurchaseSeatsResponse, error) {
+	stored, err := findSeatPurchaseOperation(database.DB(ctx), orgID, operation)
+	if err != nil {
+		return nil, err
+	}
+	if stored != nil {
+		return seatPurchaseResponse(ctx, orgID, stored), nil
+	}
+	return nil, purchaseErr
 }
 
 func requireSeatPurchaseAvailable(ctx context.Context, orgID string) (uuid.UUID, error) {

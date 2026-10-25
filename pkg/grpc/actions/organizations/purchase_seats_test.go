@@ -738,6 +738,72 @@ func Test__ConcurrentIdenticalPurchasesRecordOnePurchase(t *testing.T) {
 	assert.LessOrEqual(t, f.patchCount(), 1)
 }
 
+func Test__ConcurrentIdenticalPurchaseReplaysBeforeReturningPreLockErrors(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		seatLimit     int
+		rejectRefresh bool
+	}{
+		{name: "purchase reaches the seat limit", seatLimit: 5},
+		{name: "Polar refresh fails", seatLimit: 50, rejectRefresh: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newSeatPurchaseFixture(t, 3, new(test.seatLimit))
+			var rejectRefresh atomic.Bool
+			server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+				if rejectRefresh.Load() && req.Method == http.MethodGet && req.URL.Path == "/subscriptions/"+f.subscriptionID {
+					http.Error(w, "Polar unavailable", http.StatusServiceUnavailable)
+					return
+				}
+				f.serve(w, req)
+			})
+			usePolarTestServer(t, server)
+			// This server must remain available until background schedules end.
+			t.Cleanup(seatrenewal.Wait)
+			key := uuid.NewString()
+
+			// Pause after the initial operation lookup, before the local check.
+			checking := make(chan struct{})
+			resume := make(chan struct{})
+			var release sync.Once
+			var pause sync.Once
+			done := make(chan struct{})
+			t.Cleanup(func() {
+				release.Do(func() { close(resume) })
+				<-done
+			})
+			var replay *pb.PurchaseSeatsResponse
+			var replayErr error
+			go func() {
+				defer close(done)
+				replay, replayErr = purchaseSeats(t.Context(), f.r.Organization.ID.String(),
+					&pb.PurchaseSeatsRequest{AdditionalSeats: 2, ExpectedPurchasedSeats: 3, OperationKey: key}, f.r.User.String(), func() time.Time {
+						pause.Do(func() {
+							close(checking)
+							<-resume
+						})
+						return time.Now()
+					})
+			}()
+			<-checking
+
+			first, err := f.purchaseWithKey(key, 2, 3)
+			require.NoError(t, err)
+			seatrenewal.Wait()
+			rejectRefresh.Store(test.rejectRefresh)
+			release.Do(func() { close(resume) })
+			<-done
+
+			require.NoError(t, replayErr)
+			require.NotNil(t, replay)
+			assert.Equal(t, first.Purchase.Id, replay.Purchase.Id)
+			assert.Equal(t, models.SeatPurchaseStatusSucceeded, replay.Purchase.Status)
+			assert.Equal(t, 1, f.patchCount(), "the replay must not send a second purchase")
+			assert.Equal(t, 5, f.purchasedSeats())
+		})
+	}
+}
+
 func Test__ReplayAfterALostResponseAndARenewalReductionDoesNotChargeAgain(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 3, new(50))
 	// Polar applies and charges the purchase, but the response is lost.
