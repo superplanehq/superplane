@@ -172,6 +172,8 @@ func TestPastDueGraceKeepsTeamOnButAdmitsNoMembers(t *testing.T) {
 	require.True(t, inGrace.PaidAccessEndsAt.AsTime().Equal(failure.Add(7*24*time.Hour)))
 	require.EqualValues(t, 3, *inGrace.PurchasedSeats)
 	require.EqualValues(t, 2, *inGrace.OccupiedSeats)
+	requireRenewalEstimate(t, inGrace, 2, new(int64(2*seatPriceCents)))
+	require.True(t, inGrace.CurrentPeriodEnd.AsTime().Equal(f.periodEnd), "the renewal date stays visible")
 	requireNobodyJoins()
 
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", orgID).
@@ -184,11 +186,52 @@ func TestPastDueGraceKeepsTeamOnButAdmitsNoMembers(t *testing.T) {
 	require.Nil(t, afterGrace.PaidAccessEndsAt, "no access end date after the grace period")
 	require.EqualValues(t, 3, *afterGrace.PurchasedSeats, "the seats summary stays while payment is blocked")
 	require.EqualValues(t, 2, *afterGrace.OccupiedSeats)
+	requireRenewalEstimate(t, afterGrace, 2, new(int64(2*seatPriceCents)))
+	require.NotEqual(t, 2*afterGrace.PlanPriceCents, *afterGrace.ExpectedRenewalCents, "the access plan price is never the renewal price")
+	require.True(t, afterGrace.CurrentPeriodEnd.AsTime().Equal(f.periodEnd), "the renewal date stays visible")
 	requireNobodyJoins()
+
+	// A product that SuperPlane cannot match to a paid seat plan gives no
+	// verified price. The seat count stays, and the amount is not available.
+	f.mu.Lock()
+	f.product = "prod_unknown_" + uuid.NewString()
+	f.mu.Unlock()
+	unverified := describe()
+	requireRenewalEstimate(t, unverified, 2, nil)
+	requireNobodyJoins()
+	f.mu.Lock()
+	f.product = *f.catalog.PolarProductID
+	f.mu.Unlock()
 
 	f.replay(models.PolarSubscriptionStatusActive, 3)
 	recovered := describe()
 	require.True(t, recovered.HostedExecutionAllowed)
 	require.Nil(t, recovered.PaymentFailedAt)
 	require.Nil(t, recovered.PaidAccessEndsAt)
+}
+
+func TestPausedSubscriptionShowsRenewalButAdmitsNoMembers(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	orgID := f.r.Organization.ID
+	support.CreateUser(t, f.r, orgID)
+	service := InvitationService{AuthService: f.r.AuthService, EmailService: services.NewNoopEmailService(), BaseURL: "https://example.com"}
+
+	f.replay(models.PolarSubscriptionStatusPaused, 3)
+
+	billing, err := DescribeOrganizationBilling(context.Background(), orgID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	require.False(t, billing.PlanPerSeat, "a paused subscription moves the row to the access plan")
+	require.EqualValues(t, 3, *billing.PurchasedSeats)
+	requireRenewalEstimate(t, billing, 2, new(int64(2*seatPriceCents)))
+	_, err = service.Create(context.Background(), orgID.String(), f.r.User.String(), &pb.CreateInvitationRequest{Email: "late@example.com"})
+	requireInvitationReason(t, err, "PAYMENT_PAST_DUE")
+}
+
+// requireRenewalEstimate checks the renewal seats and amount. A nil amount
+// means that the price is not verified, so the response has no amount.
+func requireRenewalEstimate(t *testing.T, billing *pb.DescribeOrganizationBillingResponse, seats int32, cents *int64) {
+	t.Helper()
+	require.NotNil(t, billing.ExpectedRenewalSeats)
+	require.Equal(t, seats, *billing.ExpectedRenewalSeats)
+	require.Equal(t, cents, billing.ExpectedRenewalCents)
 }

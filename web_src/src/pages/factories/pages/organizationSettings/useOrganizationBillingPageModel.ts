@@ -25,7 +25,7 @@ import { useOrganizationCreditGrants } from "@/hooks/useOrganizationCreditGrants
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import type { HostedCreditRefreshStatus } from "@/lib/hostedCredit";
-import { billingPaymentBlocked } from "@/pages/factories/lib/billingPlans";
+import { billingIsPastDue, billingPaymentBlocked } from "@/pages/factories/lib/billingPlans";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 
 type HostedCreditBillingActions = {
@@ -50,9 +50,12 @@ export type BillingSeatSummary = {
   expectedRenewalSeats?: number;
   currentMonthlyTotalCents?: string;
   expectedRenewalCents?: string;
-  /** True while a failed or paused payment stops new members. */
-  paymentBlocked?: boolean;
+  /** Set while a failed or paused payment stops new members. */
+  paymentBlock?: BillingPaymentBlock;
 };
+
+/** Why payment stops new members: a failed renewal payment or a paused subscription. */
+export type BillingPaymentBlock = "past_due" | "paused";
 
 export type OrganizationBillingPageModel = {
   seats?: BillingSeatSummary;
@@ -112,8 +115,8 @@ function creditMetricsFromSpend(spend: OrganizationsDescribeOrganizationWorkspac
 
 function billingSeats(billing: OrganizationsDescribeOrganizationBillingResponse): BillingSeatSummary | undefined {
   // The server sends stored seats for a seat-based plan while payment is blocked, even after the plan row changes.
-  const paymentBlocked = billingPaymentBlocked(billing.polarSubscriptionStatus) && billing.purchasedSeats !== undefined;
-  if (!billing.billingEnabled || !(billing.planPerSeat || paymentBlocked)) {
+  const paymentBlock = billingSeatPaymentBlock(billing);
+  if (!billing.billingEnabled || !(billing.planPerSeat || paymentBlock)) {
     return undefined;
   }
   return {
@@ -127,8 +130,20 @@ function billingSeats(billing: OrganizationsDescribeOrganizationBillingResponse)
     expectedRenewalSeats: billing.expectedRenewalSeats,
     currentMonthlyTotalCents: billing.currentMonthlyTotalCents,
     expectedRenewalCents: billing.expectedRenewalCents,
-    paymentBlocked,
+    paymentBlock,
   };
+}
+
+function billingSeatPaymentBlock(
+  billing: OrganizationsDescribeOrganizationBillingResponse,
+): BillingPaymentBlock | undefined {
+  if (billing.purchasedSeats === undefined) {
+    return undefined;
+  }
+  if (billingIsPastDue(billing.polarSubscriptionStatus)) {
+    return "past_due";
+  }
+  return billingPaymentBlocked(billing.polarSubscriptionStatus) ? "paused" : undefined;
 }
 
 function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse = {}) {

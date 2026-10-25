@@ -60,6 +60,7 @@ func TestPastDueLapseKeepsRenewalSeatsButLocksAdmission(t *testing.T) {
 	usage, err := ResolveSeatsForPlan(db, r.Organization.ID, plan)
 	require.NoError(t, err)
 	require.True(t, usage.PaymentBlocked)
+	require.Equal(t, renewal, usage.RenewalQuantity, "the seat summary shows the renewal count while payment is blocked")
 	require.Equal(t, seatCount(0), usage.Invitable)
 	require.Equal(t, seatCount(0), usage.Purchasable)
 	require.Equal(t, seatCount(2), usage.JoinLimit())

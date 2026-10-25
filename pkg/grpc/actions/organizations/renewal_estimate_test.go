@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -49,41 +50,90 @@ func Test__RenewalEstimateMatchesTheScheduledSeatCount(t *testing.T) {
 			state.storeInvalidPaidSeats(t, nil)
 		}},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			state := newRenewalEstimateState(t, tt.paidSeats, tt.members, tt.pendingInvitations)
-			if tt.change != nil {
-				tt.change(t, state)
-			}
+	for _, payment := range renewalPaymentStates {
+		for _, tt := range tests {
+			t.Run(payment.name+"/"+tt.name, func(t *testing.T) {
+				state := newRenewalEstimateState(t, tt.paidSeats, tt.members, tt.pendingInvitations)
+				if payment.failedFor > 0 {
+					state.failRenewalPayment(t, time.Now().Add(-payment.failedFor))
+				}
+				if tt.change != nil {
+					tt.change(t, state)
+				}
 
-			scheduler := seatrenewal.NewScheduler(database.Conn(), polar.NewClientFromEnv(), time.Now)
-			_, scheduleErr := scheduler.Schedule(context.Background(), state.r.Organization.ID)
-			billing, err := DescribeOrganizationBilling(context.Background(), state.r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
-			require.NoError(t, err)
-			require.True(t, billing.PlanPerSeat)
+				scheduler := seatrenewal.NewScheduler(database.Conn(), polar.NewClientFromEnv(), time.Now)
+				_, scheduleErr := scheduler.Schedule(context.Background(), state.r.Organization.ID)
+				billing, err := DescribeOrganizationBilling(context.Background(), state.r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+				require.NoError(t, err)
+				require.Equal(t, !payment.fallback, billing.PlanPerSeat)
 
-			if tt.expected == nil {
-				require.ErrorIs(t, scheduleErr, entitlements.ErrInvalidPaidSeats)
-				assert.Empty(t, state.polar.Patches(), "invalid paid seats get no scheduled count")
-				assert.Nil(t, billing.ExpectedRenewalSeats, "invalid paid seats get no estimate")
-				assert.Nil(t, billing.ExpectedRenewalCents)
-				assert.Equal(t, int32(0), billing.GetPurchasedSeats(), "no paid seats are invented")
-				return
-			}
+				if tt.expected == nil {
+					// After the fallback, a plan without stored paid seats is no
+					// longer seat-based, so the scheduler skips it without an error.
+					if scheduleErr != nil || !payment.fallback {
+						require.ErrorIs(t, scheduleErr, entitlements.ErrInvalidPaidSeats)
+					}
+					assert.Empty(t, state.polar.Patches(), "invalid paid seats get no scheduled count")
+					assert.Nil(t, billing.ExpectedRenewalSeats, "invalid paid seats get no estimate")
+					assert.Nil(t, billing.ExpectedRenewalCents)
+					assert.Equal(t, int32(0), billing.GetPurchasedSeats(), "no paid seats are invented")
+					return
+				}
 
-			require.NoError(t, scheduleErr)
-			patches := state.polar.Patches()
-			require.Len(t, patches, 1)
-			assert.Equal(t, scheduledRenewal(*tt.expected), patches[0].Body)
-			require.NotNil(t, billing.ExpectedRenewalSeats)
-			assert.Equal(t, int(*billing.ExpectedRenewalSeats), int(patches[0].Body["seats"].(float64)),
-				"the estimate is the scheduled seat count")
-			require.NotNil(t, billing.ExpectedRenewalCents)
-			assert.Equal(t, int64(*tt.expected)*billing.PlanPriceCents, *billing.ExpectedRenewalCents)
-			assert.Equal(t, int32(tt.paidSeats), billing.GetPurchasedSeats(), "the paid seats do not change")
-			assert.Equal(t, int32(tt.pendingInvitations), billing.GetPendingInvitationSeats())
-		})
+				require.NoError(t, scheduleErr)
+				patches := state.polar.Patches()
+				require.Len(t, patches, 1)
+				assert.Equal(t, scheduledRenewal(*tt.expected), patches[0].Body)
+				require.NotNil(t, billing.ExpectedRenewalSeats)
+				assert.Equal(t, int(*billing.ExpectedRenewalSeats), int(patches[0].Body["seats"].(float64)),
+					"the estimate is the scheduled seat count")
+				require.NotNil(t, billing.ExpectedRenewalCents)
+				assert.Equal(t, int64(*tt.expected)*state.paidSeatPriceCents(t), *billing.ExpectedRenewalCents,
+					"the estimate uses the paid seat price")
+				if payment.fallback {
+					assert.NotEqual(t, int64(*tt.expected)*billing.PlanPriceCents, *billing.ExpectedRenewalCents,
+						"the estimate never uses the access plan price")
+				}
+				assert.Equal(t, int32(tt.paidSeats), billing.GetPurchasedSeats(), "the paid seats do not change")
+				assert.Equal(t, int32(tt.pendingInvitations), billing.GetPendingInvitationSeats())
+			})
+		}
 	}
+}
+
+// renewalEstimateGraceDays is the past-due grace period of the renewal
+// estimate tests.
+const renewalEstimateGraceDays = 7
+
+// renewalPaymentStates are the payment states in which a subscription renews.
+var renewalPaymentStates = []struct {
+	name string
+	// failedFor is how long ago the renewal payment failed. Zero keeps the
+	// payment current.
+	failedFor time.Duration
+	// fallback is true when the failure has moved the plan row to the access
+	// plan.
+	fallback bool
+}{
+	{name: "active"},
+	{name: "past due in grace", failedFor: 24 * time.Hour},
+	{name: "past due after grace", failedFor: (renewalEstimateGraceDays + 1) * 24 * time.Hour, fallback: true},
+}
+
+// Test__BlockedRenewalAmountIsUnavailableWhenPolarFails checks that a Polar
+// failure after the fallback hides only the amount. The billing page still
+// loads, and the amount is not zero.
+func Test__BlockedRenewalAmountIsUnavailableWhenPolarFails(t *testing.T) {
+	state := newRenewalEstimateState(t, 5, 3, 0)
+	state.failRenewalPayment(t, time.Now().Add(-(renewalEstimateGraceDays+1)*24*time.Hour))
+	state.polar.FailNext(1, http.StatusTooManyRequests, "rate_limited")
+
+	billing, err := DescribeOrganizationBilling(context.Background(), state.r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	require.False(t, billing.PlanPerSeat, "the row is on the access plan")
+	require.NotNil(t, billing.ExpectedRenewalSeats)
+	assert.Equal(t, int32(3), *billing.ExpectedRenewalSeats)
+	assert.Nil(t, billing.ExpectedRenewalCents, "an unverified price is not available")
 }
 
 type renewalEstimateState struct {
@@ -112,6 +162,31 @@ func newRenewalEstimateState(t *testing.T, paidSeats, members, pendingInvitation
 		require.NoError(t, invitation.Save(database.Conn()))
 	}
 	return state
+}
+
+// failRenewalPayment marks the subscription past due since the given time,
+// in SuperPlane and in Polar.
+func (s renewalEstimateState) failRenewalPayment(t *testing.T, since time.Time) {
+	t.Helper()
+	require.NoError(t, models.ApplyInstallationMetadata(database.Conn(), func(metadata *models.InstallationMetadata) {
+		metadata.PastDueGraceDays = renewalEstimateGraceDays
+	}))
+	require.NoError(t, database.Conn().Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", s.r.Organization.ID).
+		Updates(map[string]any{
+			"polar_subscription_status": models.PolarSubscriptionStatusPastDue,
+			"past_due_since":            since.UTC(),
+		}).Error)
+	s.polar.Update(s.sub.ID, func(sub *polarfake.Subscription) { sub.Status = models.PolarSubscriptionStatusPastDue })
+}
+
+// paidSeatPriceCents is the catalog price of the paid product of the
+// subscription.
+func (s renewalEstimateState) paidSeatPriceCents(t *testing.T) int64 {
+	t.Helper()
+	catalog, err := models.FindBillingPlanByProduct(database.Conn(), s.sub.ProductID)
+	require.NoError(t, err)
+	return catalog.PriceCents
 }
 
 // storeInvalidPaidSeats stores paid seats that need repair. Polar answers
