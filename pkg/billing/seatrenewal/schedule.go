@@ -1,5 +1,8 @@
 // Package seatrenewal keeps the next-period Polar seat count equal to the
-// member count, so that Polar renews only occupied seats.
+// member count, so that Polar renews only occupied seats. An active and a
+// past-due subscription both renew, so both get the scheduled count. A
+// past-due subscription keeps its payment block: the scheduled count changes
+// only the next period and grants no access.
 //
 // Requests from this package only schedule a seat count for the next period
 // (proration_behavior next_period). They never add seats, never charge or
@@ -8,6 +11,7 @@ package seatrenewal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -47,6 +51,7 @@ const (
 	SkipAdminPlan                  = "admin_plan"
 	SkipNoSubscription             = "no_subscription"
 	SkipSubscriptionNotActive      = "subscription_not_active"
+	SkipSubscriptionPaused         = "subscription_paused"
 	SkipSubscriptionCanceling      = "subscription_canceling"
 	SkipSeatPurchaseInFlight       = "seat_purchase_in_flight"
 	SkipPolarSubscriptionNotActive = "polar_subscription_not_active"
@@ -155,10 +160,10 @@ func (s *Scheduler) schedule(ctx context.Context, orgID uuid.UUID) (Result, erro
 	}
 	result.CurrentSeats = snapshot.Seats
 	result.NextPeriodSeats = snapshot.NextPeriodSeats()
-	if !strings.EqualFold(strings.TrimSpace(snapshot.Status), models.PolarSubscriptionStatusActive) || snapshot.CancelAtPeriodEnd {
-		// The stored plan is active, but the snapshot says that the
-		// subscription ends. The apply ignored it as older than the stored
-		// plan. The next run reads Polar again.
+	if !renewsWithScheduledSeats(snapshot.Status, snapshot.CancelAtPeriodEnd) {
+		// The stored plan renews, but the snapshot says that the
+		// subscription ends or stops. The apply ignored it as older than
+		// the stored plan. The next run reads Polar again.
 		return skipped(result, SkipPolarSubscriptionNotActive), nil
 	}
 	if snapshot.Seats == nil || *snapshot.Seats < 1 {
@@ -182,7 +187,9 @@ func (s *Scheduler) schedule(ctx context.Context, orgID uuid.UUID) (Result, erro
 	// when this write fails.
 	updated, err := s.client.ScheduleSubscriptionSeats(ctx, result.SubscriptionID, target)
 	if err != nil {
-		return result, err
+		// A rejection leaves the record unchanged, so the next run sends
+		// the target again.
+		return result, fmt.Errorf("schedule %d seats on polar subscription %s: %w", target, result.SubscriptionID, err)
 	}
 	result.Action = ActionFixed
 	if inSync {
@@ -256,15 +263,18 @@ func (s *Scheduler) loadLocalState(ctx context.Context, orgID uuid.UUID) (Result
 			return nil
 		}
 
-		seats, err := entitlements.ResolveSeatsForPlan(tx, orgID, plan)
+		target, err := entitlements.ResolveRenewalSeats(tx, orgID, plan)
+		if errors.Is(err, entitlements.ErrInvalidPaidSeats) {
+			return fmt.Errorf("plan of polar subscription %s reports no paid seats: %w", result.SubscriptionID, err)
+		}
 		if err != nil {
 			return err
 		}
-		if seats.RenewalQuantity == nil {
+		if target == nil {
 			result = skipped(result, SkipNoRenewalQuantity)
 			return nil
 		}
-		result.Target = seats.RenewalQuantity
+		result.Target = target
 
 		// A purchase inside its confirmation window owns the next seat
 		// change: it replaces any scheduled count when it settles and
@@ -288,20 +298,45 @@ func scheduledRecordMatches(plan *models.OrganizationBillingPlan, target int) bo
 	return plan.RenewalSeatsScheduled != nil && *plan.RenewalSeatsScheduled == target
 }
 
+// planSkipReason names why a plan gets no scheduled count. Only a seat-based
+// Polar subscription that renews gets one: an active subscription, or a
+// past-due one that Polar still retries. The skip does not depend on the
+// catalog, because a payment failure can move the row to a fallback catalog
+// that is not per seat.
 func planSkipReason(plan *models.OrganizationBillingPlan) string {
 	switch {
-	case !plan.Catalog.PerSeat:
+	case !entitlements.IsSeatBased(plan):
 		return SkipNotPerSeat
 	case plan.PlanSource == models.BillingPlanSourceAdmin:
 		return SkipAdminPlan
-	case plan.PolarSubscriptionID == nil || strings.TrimSpace(*plan.PolarSubscriptionID) == "":
+	case plan.PlanSource != models.BillingPlanSourcePolar || plan.PolarSubscriptionID == nil || strings.TrimSpace(*plan.PolarSubscriptionID) == "":
 		return SkipNoSubscription
-	case plan.PolarSubscriptionStatus != models.PolarSubscriptionStatusActive:
+	case strings.EqualFold(strings.TrimSpace(plan.PolarSubscriptionStatus), models.PolarSubscriptionStatusPaused):
+		return SkipSubscriptionPaused
+	case !renewingStatus(plan.PolarSubscriptionStatus):
 		return SkipSubscriptionNotActive
 	case plan.CancelAtPeriodEnd:
 		return SkipSubscriptionCanceling
 	default:
 		return ""
+	}
+}
+
+// renewsWithScheduledSeats reports a Polar subscription that renews at the
+// period end and is not set to cancel.
+func renewsWithScheduledSeats(status string, cancelAtPeriodEnd bool) bool {
+	return renewingStatus(status) && !cancelAtPeriodEnd
+}
+
+// renewingStatus is true for an active subscription and for a past-due one,
+// because Polar keeps a past-due subscription and renews it while it retries
+// the payment.
+func renewingStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case models.PolarSubscriptionStatusActive, models.PolarSubscriptionStatusPastDue:
+		return true
+	default:
+		return false
 	}
 }
 

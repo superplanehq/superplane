@@ -263,7 +263,7 @@ func Test__SeatRenewalSyncRepairsDroppedFailureAndRecoveryEvents(t *testing.T) {
 	assert.True(t, seatUsage().PaymentBlocked)
 	_, err := f.invitations().Accept(context.Background(), invitee.ID.String(), token)
 	requireInvitationReason(t, err, "PAYMENT_PAST_DUE")
-	assert.Empty(t, f.polar.Patches(), "a payment-blocked plan gets no scheduled seat count")
+	assert.Equal(t, []string{sub.ID}, f.patchedSubscriptions(), "a past-due plan keeps its renewal seat count")
 
 	f.polar.Update(sub.ID, func(s *polarfake.Subscription) { s.Status = models.PolarSubscriptionStatusActive })
 	f.worker.tick(context.Background())
@@ -272,5 +272,5 @@ func Test__SeatRenewalSyncRepairsDroppedFailureAndRecoveryEvents(t *testing.T) {
 	assert.Equal(t, models.PolarSubscriptionStatusActive, plan.PolarSubscriptionStatus)
 	assert.True(t, plan.Catalog.PerSeat, "the plan returns to the per-seat catalog plan")
 	assert.False(t, seatUsage().PaymentBlocked)
-	assert.Equal(t, []string{sub.ID}, f.patchedSubscriptions(), "the recovered plan gets its renewal seat count again")
+	assert.Equal(t, []string{sub.ID}, f.patchedSubscriptions(), "the recovered plan already renews with its seat count")
 }

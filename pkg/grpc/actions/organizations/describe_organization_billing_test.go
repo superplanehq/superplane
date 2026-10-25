@@ -135,6 +135,9 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	expected["purchasedSeats"], expected["availableSeats"], expected["purchasableSeats"] = float64(0), float64(0), float64(80)
 	expected["invitableSeats"] = float64(0)
 	expected["currentMonthlyTotalCents"] = "0"
+	// A plan without paid seats needs repair, so it has no renewal estimate.
+	delete(expected, "expectedRenewalSeats")
+	delete(expected, "expectedRenewalCents")
 	check()
 
 	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, nil))
@@ -143,8 +146,9 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	check()
 
 	require.NoError(t, db.Delete(&models.User{}, "organization_id = ?", r.Organization.ID).Error)
-	expected["occupiedSeats"], expected["expectedRenewalSeats"] = float64(0), float64(1)
-	expected["expectedRenewalCents"] = "2900"
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 10).Error)
+	expected["occupiedSeats"], expected["purchasedSeats"], expected["availableSeats"], expected["invitableSeats"] = float64(0), float64(10), float64(10), float64(9)
+	expected["currentMonthlyTotalCents"], expected["expectedRenewalSeats"], expected["expectedRenewalCents"] = "29000", float64(1), "2900"
 	check()
 }
 

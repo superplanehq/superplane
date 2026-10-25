@@ -1,6 +1,8 @@
 package entitlements
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -89,14 +91,18 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBil
 		purchased = *plan.PurchasedSeats
 	}
 	available := max(purchased-usage.Occupied, 0)
-	renewal := max(usage.Occupied, 1)
 	invitable := max(purchased-usage.Occupied-usage.PendingInvitations, 0)
 	usage.Invitable = &invitable
 	usage.PerSeat = true
 	usage.Purchased = &purchased
 	usage.Available = &available
 	usage.PlanMaximum = maximum
-	usage.RenewalQuantity = &renewal
+	// A plan without paid seats needs repair and has no renewal count.
+	renewal, err := RenewalSeats(plan, usage.Occupied)
+	if err != nil && !errors.Is(err, ErrInvalidPaidSeats) {
+		return nil, err
+	}
+	usage.RenewalQuantity = renewal
 	if maximum != nil {
 		purchasable := max(*maximum-purchased, 0)
 		usage.Purchasable = &purchasable
