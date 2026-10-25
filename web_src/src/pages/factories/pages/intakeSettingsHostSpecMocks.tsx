@@ -66,5 +66,13 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
 
 vi.mock("@/hooks/useOrganizationData", () => ({
   ...unmockedSrc<typeof OrganizationDataModule>("hooks/useOrganizationData"),
-  useOrganizationUsers: () => ({ data: [], isLoading: false, isError: false }),
+  useOrganizationUsers: () => ({
+    data: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ currentUserId: "alice", canAct: () => false }),
 }));

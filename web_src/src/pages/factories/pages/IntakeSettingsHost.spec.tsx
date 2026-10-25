@@ -267,10 +267,29 @@ describe("IntakeSettingsHost", () => {
   it("opens Dependabot filters alongside shared run history", async () => {
     useCanvas.mockReturnValue({ data: DEPENDABOT_INTAKE_CANVAS, isPending: false, isError: false, refetch: vi.fn() });
     renderHost({ intake: DEPENDABOT_INTAKE, repository: "superplanehq/superplane" });
-    expect(screen.getByRole("checkbox", { name: "Critical" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Low" })).toBeChecked();
-    await userEvent.click(screen.getByRole("tab", { name: "Runs" }));
-    expect(screen.getByRole("table")).toBeInTheDocument();
+    const dialog = screen.getByTestId("merge-confidence-config");
+    expect(screen.queryByTestId("intake-source-settings")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Dependabot alerts" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
+    expect(within(dialog).getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+    expect(
+      within(dialog)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["Automation", "Runs"]);
+    const form = within(dialog).getByTestId("merge-confidence-config-form");
+    expect(within(form).getByRole("heading", { name: "On Dependabot Alert" })).toBeInTheDocument();
+    expect(within(form).getByText("Repository")).toBeInTheDocument();
+    expect(within(form).getByText("superplanehq/superplane")).toBeInTheDocument();
+    expect(within(form).getByText("Create a task for these severities:")).toBeInTheDocument();
+    expect(within(form).queryByRole("button", { name: "Default task owner" })).not.toBeInTheDocument();
+    expect(within(form).getByRole("checkbox", { name: "Critical" })).toBeChecked();
+    expect(within(form).getByRole("checkbox", { name: "Low" })).toBeChecked();
+    expect(within(dialog).queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByTestId("merge-confidence-config-tab-runs"));
+
+    expect(within(dialog).getByTestId("factory-automation-runs-sidebar")).toBeInTheDocument();
   });
 
   it("keeps Dependabot severity settings when the intake has no canvas", async () => {
