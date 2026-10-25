@@ -620,20 +620,29 @@ renewal estimate and the scheduled count could differ. Example: 3 members and
   the next period. The billing page shows the billed seat count and a
   separate over-capacity warning. See
   [D11](#d11-outside-seat-reduction-below-the-member-count).
-- Zero or missing paid seats are an invalid state that needs repair. That
+- Zero or missing stored paid seats are an invalid state that needs repair. That
   state has no renewal estimate, and the scheduler sends no count. The
   scheduler returns an error, and the sync worker tries again.
-- The renewal estimate on the billing page and the count that the scheduler
-  sends always use the same quantity.
+- The billing estimate and the scheduler use the same quantity from the stored
+  plan. Before sending, the scheduler also caps that quantity at the paid seats
+  in the Polar response. The estimate and scheduled count match when the stored
+  plan and the Polar response report the same valid paid seat count.
+- An older Polar response does not replace the newer stored plan, but its paid
+  seat count still caps the scheduled count. For example, 9 members and 10
+  stored paid seats give an estimate of 9. An older Polar response with 4 paid
+  seats caps the scheduled count at 4. The next scheduler run reads Polar again.
 
 **Implementation.** `RenewalSeats` and `ResolveRenewalSeats` in
-`pkg/entitlements/seat_renewal.go` are the only quantity rule. They return
-`ErrInvalidPaidSeats` for zero or missing paid seats. `resolvePlanSeats` in
-`pkg/entitlements/seats.go` uses the rule for the estimate, and
+`pkg/entitlements/seat_renewal.go` define the quantity from the stored plan.
+They return `ErrInvalidPaidSeats` for zero or missing paid seats.
+`resolvePlanSeats` in `pkg/entitlements/seats.go` uses the rule for the estimate, and
 `describe_organization_billing.go` in `pkg/grpc/actions/organizations/` omits
 `expected_renewal_seats` and `expected_renewal_cents` when the rule returns no
 count. `loadLocalState` in `pkg/billing/seatrenewal/schedule.go` uses the same
-rule for the scheduled count. `BillingSeatsCard.tsx` in
+rule for the initial scheduler target. `Scheduler.schedule` then applies
+`min(*result.Target, *snapshot.Seats)` before sending the count to Polar. This
+extra cap prevents renewal from adding seats above the Polar response count.
+`BillingSeatsCard.tsx` in
 `web_src/src/pages/factories/pages/organizationSettings/` shows the estimate,
 the over-capacity explanation, and the unavailable estimate.
 
