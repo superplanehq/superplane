@@ -18,7 +18,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/services"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 // seatLogs captures the process logger for one test.
@@ -97,21 +96,6 @@ func (f *seatPurchaseFixture) replayCycled(seats int) {
 	data["current_period_start"] = f.periodEnd.Format(time.RFC3339)
 	data["current_period_end"] = f.periodEnd.AddDate(0, 1, 0).Format(time.RFC3339)
 	f.deliver("subscription.cycled", data)
-}
-
-func (f *seatPurchaseFixture) addMembers(count int) []*models.User {
-	f.t.Helper()
-	users := make([]*models.User, 0, count)
-	for range count {
-		users = append(users, support.CreateUser(f.t, f.r, f.r.Organization.ID))
-	}
-	return users
-}
-
-func (f *seatPurchaseFixture) removeMember(user *models.User) {
-	f.t.Helper()
-	_, err := RemoveUser(context.Background(), f.r.AuthService, f.r.Organization.ID.String(), user.ID.String())
-	require.NoError(f.t, err)
 }
 
 func (f *seatPurchaseFixture) overCapacitySince() *time.Time {
