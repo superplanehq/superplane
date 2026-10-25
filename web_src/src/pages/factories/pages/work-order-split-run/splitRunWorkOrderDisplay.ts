@@ -26,6 +26,9 @@ export function lineStatusForDisplay(status: WorkOrderDisplayStatus): SplitRunPh
   if (status === "completed") return "passed";
   if (status === "waiting") return "waiting";
   if (status === "failed") return "failed";
+  if (status === "cancelled") return "cancelled";
+  if (status === "closed" || status === "rejected") return "failed";
+  if (status === "draft") return "pending";
   return "pending";
 }
 

@@ -3,7 +3,9 @@ import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { findClosureAutomationApp } from "../../../lib/linePhaseRuns";
 import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
+import { getWorkOrderDisplayStatusMeta } from "../../../lib/workOrderProgress";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
+import { isClosedWorkOrderDisplayStatus } from "../splitRunFooter";
 import { groupSplitRunActivities, type PullRequestActivityGroup } from "../splitRunActivityGroups";
 import { groupClaudeSteps, groupSplitRunStream, type ClaudeStepGroup, type StreamNodeGroup } from "../phaseLogStream";
 import { agentStepStatusFromSection } from "../streamNotesFromLiveLog";
@@ -135,6 +137,14 @@ export interface AutomationStageGroups {
 
 const CHECK_PASS_LEVELS = new Set(["positive", "neutral"]);
 
+function consoleOutcomeStatusLabel(fixture: SplitRunFixture): string {
+  const footerStatus = fixture.footer.status;
+  if (footerStatus && isClosedWorkOrderDisplayStatus(footerStatus)) {
+    return getWorkOrderDisplayStatusMeta(footerStatus).label;
+  }
+  return splitRunStatusLabel(fixture.lineStatus);
+}
+
 export function outcomeSummary(fixture: SplitRunFixture): AutomationOutcome {
   const pullRequests = uniquePullRequests(
     fixture.phases.flatMap((phase) =>
@@ -144,7 +154,7 @@ export function outcomeSummary(fixture: SplitRunFixture): AutomationOutcome {
   const models = uniqueModels(fixture);
   const checksPassed = fixture.checks.filter((check) => CHECK_PASS_LEVELS.has(check.level)).length;
   return {
-    statusLabel: splitRunStatusLabel(fixture.lineStatus),
+    statusLabel: consoleOutcomeStatusLabel(fixture),
     status: fixture.lineStatus,
     duration: fixture.elapsed,
     startedLabel: fixture.startedLabel,

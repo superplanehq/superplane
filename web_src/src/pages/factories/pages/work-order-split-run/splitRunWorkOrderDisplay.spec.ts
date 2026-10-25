@@ -2,11 +2,24 @@ import { describe, expect, it } from "bun:test";
 
 import { formatDuration, formatMinutesSecondsDuration } from "@/lib/duration";
 
-import { displayStatusForLineStatus, durationForExecution, elapsedForDisplay } from "./splitRunWorkOrderDisplay";
+import {
+  displayStatusForLineStatus,
+  durationForExecution,
+  elapsedForDisplay,
+  lineStatusForDisplay,
+} from "./splitRunWorkOrderDisplay";
 
 const START = "2026-08-21T12:00:00.000Z";
 const FOUR_MINUTES = 4 * 60 * 1000;
 const LONG_RUN = 5 * 24 * 60 * 60 * 1000 + 8 * 60 * 60 * 1000 + 12 * 60 * 1000 + 18 * 1000;
+
+describe("lineStatusForDisplay", () => {
+  it("maps closed and rejected tasks to a terminal line status", () => {
+    expect(lineStatusForDisplay("closed")).toBe("failed");
+    expect(lineStatusForDisplay("rejected")).toBe("failed");
+    expect(lineStatusForDisplay("cancelled")).toBe("cancelled");
+  });
+});
 
 describe("displayStatusForLineStatus", () => {
   it("maps line status to the card icon status", () => {
