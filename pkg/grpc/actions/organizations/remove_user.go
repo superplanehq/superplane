@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -81,5 +82,7 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 	}
 
 	capacity.Log()
+	// The freed seat stays usable until renewal. Polar renews one seat less.
+	seatrenewal.ScheduleAsync(ctx, orgUUID)
 	return &pb.RemoveUserResponse{}, nil
 }

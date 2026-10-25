@@ -154,6 +154,26 @@ type SubscriptionData struct {
 	CustomerID         string        `json:"customer_id"`
 	ExternalCustomerID string        `json:"external_customer_id"`
 	Customer           OrderCustomer `json:"customer"`
+
+	// PendingUpdate is a change that Polar applies at the next period, for
+	// example a seat count scheduled with proration_behavior next_period.
+	PendingUpdate *SubscriptionPendingUpdate `json:"pending_update"`
+}
+
+// SubscriptionPendingUpdate is a scheduled subscription change. Polar applies
+// it at AppliesAt, the start of the next billing period.
+type SubscriptionPendingUpdate struct {
+	Seats     *int      `json:"seats"`
+	AppliesAt polarTime `json:"applies_at"`
+}
+
+// NextPeriodSeats is the seat count that Polar renews with: the scheduled
+// seat count, or the current seats when no seat change is scheduled.
+func (d SubscriptionData) NextPeriodSeats() *int {
+	if d.PendingUpdate != nil && d.PendingUpdate.Seats != nil {
+		return d.PendingUpdate.Seats
+	}
+	return d.Seats
 }
 
 func (d SubscriptionData) organizationExternalID() string {

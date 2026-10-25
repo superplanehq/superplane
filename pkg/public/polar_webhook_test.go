@@ -19,10 +19,72 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/polarfake"
 )
+
+func Test__WebhookRestoresRenewalReductionAfterLostPurchaseResponse(t *testing.T) {
+	r := support.Setup(t)
+	t.Cleanup(r.Close)
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv("POLAR_WEBHOOK_SECRET", "whsec_test-secret")
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	provider := polarfake.NewServer(t)
+	t.Cleanup(seatrenewal.Wait)
+	sub := provider.AddSeatPlan(db, r.Organization.ID, 3, time.Now().AddDate(0, 1, 0))
+	provider.Update(sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(1) })
+	provider.LoseNextPurchaseResponse()
+	response, err := organizations.PurchaseSeats(t.Context(), r.Organization.ID.String(), &pb.PurchaseSeatsRequest{
+		AdditionalSeats: 1, ExpectedPurchasedSeats: 3,
+	}, r.User.String())
+	require.NoError(t, err)
+	require.Equal(t, "awaiting_confirmation", response.Purchase.Status)
+	require.Nil(t, provider.Subscription(sub.ID).PendingSeats, "the applied purchase cleared the reduction")
+
+	snapshot, err := polar.NewClientFromEnv().GetSubscription(t.Context(), sub.ID)
+	require.NoError(t, err)
+	stale := *snapshot
+	stale.ModifiedAt.Time = time.Now().Add(-time.Hour)
+	staleBody, err := json.Marshal(map[string]any{"type": "subscription.updated", "data": stale})
+	require.NoError(t, err)
+	staleWebhook := signedPolarWebhook(t, "whsec_test-secret", staleBody)
+	(&Server{}).handlePolarWebhook(staleWebhook.recorder, staleWebhook.request)
+	require.Equal(t, http.StatusAccepted, staleWebhook.recorder.Code)
+	seatrenewal.Wait()
+	purchase, err := models.FindLatestSeatPurchase(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.SeatPurchaseStatusUnknown, purchase.Status, "a stale snapshot cannot settle the purchase")
+	require.Nil(t, provider.Subscription(sub.ID).PendingSeats)
+
+	body, err := json.Marshal(map[string]any{"type": "subscription.updated", "data": snapshot})
+	require.NoError(t, err)
+	webhook := signedPolarWebhook(t, "whsec_test-secret", body)
+	(&Server{}).handlePolarWebhook(webhook.recorder, webhook.request)
+	require.Equal(t, http.StatusAccepted, webhook.recorder.Code)
+	seatrenewal.Wait()
+	purchase, err = models.FindLatestSeatPurchase(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, purchase.Status)
+	assert.Equal(t, new(1), provider.Subscription(sub.ID).PendingSeats)
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, new(1), plan.RenewalSeatsScheduled)
+	// A duplicate delivery checks the state again without sending a new update.
+	patchCount := len(provider.Patches())
+	replay := signedPolarWebhook(t, "whsec_test-secret", body)
+	(&Server{}).handlePolarWebhook(replay.recorder, replay.request)
+	require.Equal(t, http.StatusAccepted, replay.recorder.Code)
+	seatrenewal.Wait()
+	assert.Len(t, provider.Patches(), patchCount)
+}
 
 func Test__HandlePolarWebhook(t *testing.T) {
 	r := support.Setup(t)

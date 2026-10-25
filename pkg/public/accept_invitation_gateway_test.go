@@ -62,7 +62,7 @@ func TestInvitationGatewayReportsPastDuePayment(t *testing.T) {
 	server.InitRouter()
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 	t.Setenv(models.BillingEnabledEnv, "yes")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	productID := "prod_invite_" + uuid.NewString()
 	subscriptionID := "sub_" + uuid.NewString()
 	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: &productID, CreditFrequency: "none", CreditExpiration: "never"}

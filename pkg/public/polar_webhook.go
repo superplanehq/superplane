@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -69,6 +70,9 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 			log.WithError(err).Error("failed to apply polar subscription")
 			http.Error(w, "unable to apply subscription", http.StatusInternalServerError)
 			return
+		}
+		if orgID, err := event.Subscription.Data.OrganizationID(); err == nil {
+			seatrenewal.ScheduleAfterSeatPurchaseAsync(r.Context(), orgID)
 		}
 		acceptPolarWebhook(w)
 		return
