@@ -2,7 +2,10 @@ package organizations
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -190,31 +193,22 @@ func Test__DeleteOrganization_TransactionRollback(t *testing.T) {
 func Test__DeleteOrganization_LivePolarSubscription(t *testing.T) {
 	const message = "Cancel the subscription in Billing before you delete the organization. You can delete it after the paid period ends."
 
-	applySubscription := func(t *testing.T, orgID uuid.UUID, status string, cancelAtPeriodEnd bool, periodEnd time.Time) {
-		t.Helper()
-		start := periodEnd.AddDate(0, -1, 0)
-		_, err := models.ApplyPolarSubscription(database.Conn(), orgID, models.PolarSubscriptionApply{
-			ID: "sub_delete_guard", ProductID: "prod_business", Status: status,
-			PeriodStart: &start, PeriodEnd: &periodEnd, CancelAtPeriodEnd: cancelAtPeriodEnd,
-		}, nil)
-		require.NoError(t, err)
-	}
-
 	t.Run("live subscription blocks deletion until it ends", func(t *testing.T) {
 		r := support.Setup(t)
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 		orgID := r.Organization.ID
-		applySubscription(t, orgID, models.PolarSubscriptionStatusActive, false, time.Now().AddDate(0, 1, 0))
+		provider := useDeletionPolar(t, orgID)
+		periodEnd := time.Now().AddDate(0, 1, 0)
+		applyDeletionSubscription(t, orgID, models.PolarSubscriptionStatusActive, false, periodEnd)
+		provider.respond(deletionProviderSubscription(orgID, models.PolarSubscriptionStatusActive, false, periodEnd))
 
 		_, err := DeleteOrganization(ctx, r.AuthService, orgID.String())
 		requireInvitationReason(t, err, "ORGANIZATION_SUBSCRIPTION_LIVE")
 		assert.Equal(t, message, grpcerrors.StatusMessage(err))
-		organization, err := models.FindOrganizationByID(orgID.String())
-		require.NoError(t, err)
-		assert.False(t, organization.DeletedAt.Valid)
+		requireOrganizationKept(t, orgID)
 
-		applySubscription(t, orgID, models.PolarSubscriptionStatusCanceled, false, time.Now().AddDate(0, 1, 0))
+		applyDeletionSubscription(t, orgID, models.PolarSubscriptionStatusCanceled, false, time.Now().AddDate(0, 1, 0))
 
 		_, err = DeleteOrganization(ctx, r.AuthService, orgID.String())
 		require.NoError(t, err)
@@ -222,22 +216,78 @@ func Test__DeleteOrganization_LivePolarSubscription(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("scheduled cancellation blocks deletion until the period ends", func(t *testing.T) {
+	t.Run("scheduled cancellation blocks deletion until Polar confirms termination", func(t *testing.T) {
 		r := support.Setup(t)
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 		orgID := r.Organization.ID
-		applySubscription(t, orgID, models.PolarSubscriptionStatusActive, true, time.Now().AddDate(0, 0, 10))
+		provider := useDeletionPolar(t, orgID)
+		applyDeletionSubscription(t, orgID, models.PolarSubscriptionStatusActive, true, time.Now().AddDate(0, 0, 10))
+		provider.respond(deletionProviderSubscription(orgID, models.PolarSubscriptionStatusActive, true, time.Now().AddDate(0, 0, 10)))
 
 		_, err := DeleteOrganization(ctx, r.AuthService, orgID.String())
 		requireInvitationReason(t, err, "ORGANIZATION_SUBSCRIPTION_LIVE")
 
+		// The local period elapsed, but Polar resumed the subscription and
+		// its event did not arrive yet.
+		elapsed := time.Now().Add(-time.Hour)
 		require.NoError(t, database.Conn().Model(&models.OrganizationBillingPlan{}).
 			Where("organization_id = ?", orgID).
-			Update("current_period_end", time.Now().Add(-time.Hour)).Error)
+			Update("current_period_end", elapsed).Error)
+		provider.respond(deletionProviderSubscription(orgID, models.PolarSubscriptionStatusActive, false, elapsed.AddDate(0, 1, 0)))
+
+		_, err = DeleteOrganization(ctx, r.AuthService, orgID.String())
+		requireInvitationReason(t, err, "ORGANIZATION_SUBSCRIPTION_LIVE")
+		requireOrganizationKept(t, orgID)
+
+		provider.respond(deletionProviderSubscription(orgID, models.PolarSubscriptionStatusCanceled, true, elapsed))
 
 		_, err = DeleteOrganization(ctx, r.AuthService, orgID.String())
 		require.NoError(t, err)
+		_, err = models.FindOrganizationByID(orgID.String())
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("Polar failure keeps the organization", func(t *testing.T) {
+		r := support.Setup(t)
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+		orgID := r.Organization.ID
+		provider := useDeletionPolar(t, orgID)
+		applyDeletionSubscription(t, orgID, models.PolarSubscriptionStatusActive, true, time.Now().Add(-time.Hour))
+		provider.fail(http.StatusInternalServerError)
+
+		_, err := DeleteOrganization(ctx, r.AuthService, orgID.String())
+
+		requireInvitationErrorReason(t, err, codes.Unavailable, "ORGANIZATION_SUBSCRIPTION_UNVERIFIED")
+		assert.Equal(t, models.ErrOrganizationSubscriptionUnverified.Error(), grpcerrors.StatusMessage(err))
+		requireOrganizationKept(t, orgID)
+	})
+
+	t.Run("subscription change during verification stops deletion", func(t *testing.T) {
+		r := support.Setup(t)
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+		orgID := r.Organization.ID
+		provider := useDeletionPolar(t, orgID)
+		elapsed := time.Now().Add(-time.Hour)
+		applyDeletionSubscription(t, orgID, models.PolarSubscriptionStatusActive, true, elapsed)
+		provider.respond(deletionProviderSubscription(orgID, models.PolarSubscriptionStatusCanceled, true, elapsed))
+		// A webhook commits while Polar answers. The verification holds no
+		// organization lock, so the webhook does not wait for it.
+		provider.beforeResponse = func() {
+			modifiedAt := time.Now()
+			_, err := models.ApplyPolarSubscription(database.Conn(), orgID, models.PolarSubscriptionApply{
+				ID: deletionSubscriptionID, ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive,
+				ModifiedAt: &modifiedAt,
+			}, nil)
+			assert.NoError(t, err)
+		}
+
+		_, err := DeleteOrganization(ctx, r.AuthService, orgID.String())
+
+		require.Equal(t, codes.Aborted, grpcerrors.Code(err))
+		requireOrganizationKept(t, orgID)
 	})
 
 	t.Run("admin-assigned plan is deleted", func(t *testing.T) {
@@ -246,6 +296,7 @@ func Test__DeleteOrganization_LivePolarSubscription(t *testing.T) {
 		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
 		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness, nil)
 		require.NoError(t, err)
+		useDeletionPolar(t, r.Organization.ID).fail(http.StatusInternalServerError)
 
 		_, err = DeleteOrganization(ctx, r.AuthService, r.Organization.ID.String())
 		require.NoError(t, err)
@@ -255,8 +306,88 @@ func Test__DeleteOrganization_LivePolarSubscription(t *testing.T) {
 		r := support.Setup(t)
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		require.NoError(t, database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBillingPlan{}).Error)
+		useDeletionPolar(t, r.Organization.ID).fail(http.StatusInternalServerError)
 
 		_, err := DeleteOrganization(ctx, r.AuthService, r.Organization.ID.String())
 		require.NoError(t, err)
 	})
+}
+
+const deletionSubscriptionID = "sub_delete_guard"
+
+func applyDeletionSubscription(t *testing.T, orgID uuid.UUID, status string, cancelAtPeriodEnd bool, periodEnd time.Time) {
+	t.Helper()
+	start := periodEnd.AddDate(0, -1, 0)
+	_, err := models.ApplyPolarSubscription(database.Conn(), orgID, models.PolarSubscriptionApply{
+		ID: deletionSubscriptionID, ProductID: "prod_business", Status: status,
+		PeriodStart: &start, PeriodEnd: &periodEnd, CancelAtPeriodEnd: cancelAtPeriodEnd,
+	}, nil)
+	require.NoError(t, err)
+}
+
+func requireOrganizationKept(t *testing.T, orgID uuid.UUID) {
+	t.Helper()
+	organization, err := models.FindOrganizationByID(orgID.String())
+	require.NoError(t, err)
+	assert.False(t, organization.DeletedAt.Valid)
+}
+
+func deletionProviderSubscription(orgID uuid.UUID, status string, cancelAtPeriodEnd bool, periodEnd time.Time) map[string]any {
+	return map[string]any{
+		"id": deletionSubscriptionID, "status": status, "cancel_at_period_end": cancelAtPeriodEnd,
+		"current_period_end":   periodEnd.UTC().Format(time.RFC3339),
+		"external_customer_id": orgID.String(),
+	}
+}
+
+// deletionPolar answers the subscription list that deletion verification
+// reads. A test without a response fails on any Polar request.
+type deletionPolar struct {
+	t              *testing.T
+	mu             sync.Mutex
+	items          []map[string]any
+	failure        int
+	beforeResponse func()
+}
+
+func useDeletionPolar(t *testing.T, orgID uuid.UUID) *deletionPolar {
+	t.Helper()
+	provider := &deletionPolar{t: t}
+	usePolarTestServer(t, polarAPIServer(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/subscriptions/", r.URL.Path)
+		assert.Equal(t, orgID.String(), r.URL.Query().Get("external_customer_id"))
+		provider.serve(w)
+	}))
+	return provider
+}
+
+func (p *deletionPolar) respond(items ...map[string]any) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.items, p.failure = items, 0
+}
+
+func (p *deletionPolar) fail(status int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.items, p.failure = nil, status
+}
+
+func (p *deletionPolar) serve(w http.ResponseWriter) {
+	p.mu.Lock()
+	items, failure, before := p.items, p.failure, p.beforeResponse
+	p.mu.Unlock()
+	if before != nil {
+		before()
+	}
+	if failure != 0 {
+		w.WriteHeader(failure)
+		return
+	}
+	if items == nil {
+		p.t.Error("unexpected Polar request")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	assert.NoError(p.t, json.NewEncoder(w).Encode(map[string]any{"items": items, "pagination": map[string]any{"max_page": 1}}))
 }

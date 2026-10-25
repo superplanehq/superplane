@@ -194,6 +194,15 @@ func ResourceExhaustedWithReason(message, reason string) error {
 	return s.Err()
 }
 
+// UnavailableWithReason preserves a machine-readable reason.
+func UnavailableWithReason(message, reason string) error {
+	s, err := status.New(codes.Unavailable, message).WithDetails(&errdetails.ErrorInfo{Reason: reason, Domain: "superplane.com"})
+	if err != nil {
+		return status.Error(codes.Internal, "Failed to create unavailable error.")
+	}
+	return s.Err()
+}
+
 // PermissionDeniedWithReason preserves a machine-readable reason and metadata.
 func PermissionDeniedWithReason(message, reason string, metadata map[string]string) error {
 	s, err := status.New(codes.PermissionDenied, message).WithDetails(&errdetails.ErrorInfo{

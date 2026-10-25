@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
@@ -243,9 +242,38 @@ func TestSelectBillingPlanBlocksPausedSubscription(t *testing.T) {
 	require.NotNil(t, current.PolarSubscriptionID)
 	require.Equal(t, models.PolarSubscriptionStatusPaused, current.PolarSubscriptionStatus)
 	require.True(t, current.HasLivePolarSubscription(time.Now()))
-	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
-	_, err = DeleteOrganization(ctx, r.AuthService, r.Organization.ID.String())
-	requireInvitationReason(t, err, "ORGANIZATION_SUBSCRIPTION_LIVE")
+	require.True(t, current.MayBeBillable(time.Now()))
+}
+
+func TestSelectBillingPlanBlocksElapsedScheduledCancellation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	usePolarTestServer(t, polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		t.Errorf("an elapsed scheduled cancellation must not start checkout: %s", req.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+
+	product := "prod_elapsed_" + uuid.NewString()
+	paid := models.BillingPlan{Key: "paid_" + uuid.NewString()[:8], Name: "Paid", Category: "paid", Visibility: "public", PriceCents: 25000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &paid))
+	end := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	start := end.AddDate(0, -1, 0)
+	payload, err := json.Marshal(map[string]any{
+		"id": "sub_" + uuid.NewString(), "product_id": product, "status": "active", "cancel_at_period_end": true,
+		"external_customer_id": r.Organization.ID.String(), "current_period_start": start, "current_period_end": end, "modified_at": start,
+	})
+	require.NoError(t, err)
+	var snapshot polar.SubscriptionData
+	require.NoError(t, json.Unmarshal(payload, &snapshot))
+	require.NoError(t, polar.ApplySubscription(t.Context(), db, snapshot))
+
+	// The period elapsed, but Polar can resume the subscription. Only a
+	// terminal status proves that a replacement checkout cannot double bill.
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: paid.Key}, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	require.Contains(t, err.Error(), "Manage your current subscription in the billing portal before selecting another plan.")
 }
 
 func TestPaymentMethodSetupCreatesCustomerWithoutCheckout(t *testing.T) {

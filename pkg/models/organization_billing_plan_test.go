@@ -1527,8 +1527,9 @@ func Test__OrganizationBillingPlanHasLivePolarSubscription(t *testing.T) {
 		{name: "empty status", plan: polarPlan(&subscriptionID, "", false, nil)},
 		{name: "scheduled cancellation with period still open", plan: polarPlan(&subscriptionID, "active", true, &future), live: true},
 		{name: "canceled with paid period still open", plan: polarPlan(&subscriptionID, "canceled", true, &future), live: true},
-		{name: "scheduled cancellation with period ended", plan: polarPlan(&subscriptionID, "active", true, &past)},
-		{name: "scheduled cancellation without period end", plan: polarPlan(&subscriptionID, "active", true, nil)},
+		{name: "active scheduled cancellation with period ended", plan: polarPlan(&subscriptionID, "active", true, &past), live: true},
+		{name: "active scheduled cancellation without period end", plan: polarPlan(&subscriptionID, "active", true, nil), live: true},
+		{name: "canceled after scheduled cancellation ended", plan: polarPlan(&subscriptionID, "canceled", true, &past)},
 		{name: "missing subscription ID", plan: polarPlan(nil, "active", false, nil)},
 		{name: "blank subscription ID", plan: polarPlan(&blank, "active", false, nil)},
 		{
@@ -1555,30 +1556,49 @@ func Test__OrganizationBillingPlanHasLivePolarSubscription(t *testing.T) {
 	})
 }
 
-func Test__OrganizationHasLivePolarSubscription(t *testing.T) {
-	r := support.Setup(t)
-	setLegacyBillingPlanTestProduct(t)
-	db := database.Conn()
+func Test__OrganizationBillingPlanMayBeBillable(t *testing.T) {
+	now := time.Now()
+	future := now.Add(time.Hour)
+	past := now.Add(-time.Hour)
+	subscriptionID := "sub_billable"
+	blank := "  "
 
-	t.Run("organization without a billing row", func(t *testing.T) {
-		require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBillingPlan{}).Error)
+	for _, tc := range []struct {
+		name     string
+		plan     models.OrganizationBillingPlan
+		billable bool
+	}{
+		{name: "active", plan: polarPlan(&subscriptionID, "active", false, nil), billable: true},
+		{name: "trialing", plan: polarPlan(&subscriptionID, "trialing", false, nil), billable: true},
+		{name: "past due", plan: polarPlan(&subscriptionID, "past_due", false, nil), billable: true},
+		{name: "paused", plan: polarPlan(&subscriptionID, "paused", false, nil), billable: true},
+		{name: "unpaid", plan: polarPlan(&subscriptionID, "unpaid", false, nil), billable: true},
+		{name: "incomplete", plan: polarPlan(&subscriptionID, "incomplete", false, nil), billable: true},
+		{name: "empty status", plan: polarPlan(&subscriptionID, "", false, nil), billable: true},
+		{name: "unknown status", plan: polarPlan(&subscriptionID, "suspended", false, nil), billable: true},
+		{name: "active scheduled cancellation with period ended", plan: polarPlan(&subscriptionID, "active", true, &past), billable: true},
+		{name: "canceled with paid period still open", plan: polarPlan(&subscriptionID, "canceled", true, &future), billable: true},
+		{name: "canceled", plan: polarPlan(&subscriptionID, "canceled", false, nil)},
+		{name: "canceled after scheduled cancellation ended", plan: polarPlan(&subscriptionID, "canceled", true, &past)},
+		{name: "revoked", plan: polarPlan(&subscriptionID, " Revoked ", false, nil)},
+		{name: "incomplete expired", plan: polarPlan(&subscriptionID, "incomplete_expired", false, nil)},
+		{name: "missing subscription ID", plan: polarPlan(nil, "active", false, nil)},
+		{name: "blank subscription ID", plan: polarPlan(&blank, "active", false, nil)},
+		{
+			name: "admin plan with active status",
+			plan: models.OrganizationBillingPlan{
+				PlanSource: models.BillingPlanSourceAdmin, PolarSubscriptionID: &subscriptionID, PolarSubscriptionStatus: "active",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.billable, tc.plan.MayBeBillable(now))
+		})
+	}
 
-		live, err := models.OrganizationHasLivePolarSubscription(db, r.Organization.ID)
-		require.NoError(t, err)
-		assert.False(t, live)
-	})
-
-	t.Run("stored active subscription", func(t *testing.T) {
-		now := time.Now()
-		end := now.AddDate(0, 1, 0)
-		_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
-			ID: "sub_stored", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive, PeriodStart: &now, PeriodEnd: &end,
-		}, nil)
-		require.NoError(t, err)
-
-		live, err := models.OrganizationHasLivePolarSubscription(db, r.Organization.ID)
-		require.NoError(t, err)
-		assert.True(t, live)
+	t.Run("nil plan", func(t *testing.T) {
+		var plan *models.OrganizationBillingPlan
+		assert.False(t, plan.MayBeBillable(now))
 	})
 }
 
@@ -1674,4 +1694,53 @@ func Test__ListSeatRenewalSyncPlansFindsSeatBasedPlansWithAChangeableSubscriptio
 	assert.Equal(t, []string{
 		"canceling", "past due", "unpaid", "active", "paused", "lapsed with purchased", "per seat without purchase", "lapsed without renewal",
 	}, listed)
+}
+
+func Test__OrganizationSoftDeleteRequiresTerminationProof(t *testing.T) {
+	applySubscription := func(t *testing.T, orgID uuid.UUID, cancelAtPeriodEnd bool, periodEnd time.Time) {
+		t.Helper()
+		start := periodEnd.AddDate(0, -1, 0)
+		_, err := models.ApplyPolarSubscription(database.Conn(), orgID, models.PolarSubscriptionApply{
+			ID: "sub_soft_delete", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive,
+			PeriodStart: &start, PeriodEnd: &periodEnd, CancelAtPeriodEnd: cancelAtPeriodEnd,
+		}, nil)
+		require.NoError(t, err)
+	}
+	requireOrganizationKept := func(t *testing.T, orgID uuid.UUID) {
+		t.Helper()
+		organization, err := models.FindOrganizationByID(orgID.String())
+		require.NoError(t, err)
+		assert.False(t, organization.DeletedAt.Valid)
+	}
+
+	for _, tc := range []struct {
+		name              string
+		cancelAtPeriodEnd bool
+		periodEnd         time.Time
+	}{
+		{name: "live subscription", periodEnd: time.Now().AddDate(0, 1, 0)},
+		{name: "elapsed scheduled cancellation", cancelAtPeriodEnd: true, periodEnd: time.Now().Add(-time.Hour)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			setLegacyBillingPlanTestProduct(t)
+			db := database.DB(t.Context())
+			applySubscription(t, r.Organization.ID, tc.cancelAtPeriodEnd, tc.periodEnd)
+
+			require.ErrorIs(t, r.Organization.SoftDelete(db, nil), models.ErrOrganizationSubscriptionUnverified)
+			require.ErrorIs(t, models.SoftDeleteOrganizationInTransaction(db, r.Organization.ID.String()), models.ErrOrganizationSubscriptionLive)
+
+			requireOrganizationKept(t, r.Organization.ID)
+		})
+	}
+
+	t.Run("organization without a subscription is deleted", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.DB(t.Context())
+
+		require.NoError(t, models.SoftDeleteOrganizationInTransaction(db, r.Organization.ID.String()))
+
+		_, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
 }

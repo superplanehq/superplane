@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -187,7 +189,18 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 
 	_, err = s.softDeleteAccount(r.Context(), account)
 	if errors.Is(err, models.ErrOrganizationSubscriptionLive) {
+		log.WithError(err).WithField("account_id", account.ID.String()).Info("account deletion blocked by a live subscription")
 		http.Error(w, models.ErrOrganizationSubscriptionLive.Error(), http.StatusConflict)
+		return
+	}
+	if errors.Is(err, models.ErrOrganizationSubscriptionUnverified) {
+		log.WithError(err).WithField("account_id", account.ID.String()).Warn("account deletion could not verify subscription termination")
+		http.Error(w, models.ErrOrganizationSubscriptionUnverified.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	if errors.Is(err, models.ErrBillingPlanChanged) {
+		log.WithField("account_id", account.ID.String()).Info("account deletion stopped by a billing change")
+		http.Error(w, "The billing record changed during deletion. Try again.", http.StatusConflict)
 		return
 	}
 	if errors.Is(err, models.ErrAccountDeleteLastInstallationAdmin) {
@@ -207,10 +220,18 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 // softDeleteAccount deletes the account and every organization where it is
 // the only owner. It returns the organizations that were deleted.
 func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account) ([]models.Organization, error) {
+	// Ask Polar before the transaction: the requests must not hold the
+	// organization locks. An organization that becomes sole-owner after this
+	// point has no clearance, so the deletion stops.
+	clearances, err := verifyAccountOrganizationDeletions(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+
 	var users []models.User
 	var deletedOrganizations []models.Organization
 	var capacityChecks []polar.SeatCapacityCheck
-	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(account, "id = ?", account.ID).Error; err != nil {
 			return err
 		}
@@ -226,7 +247,7 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 		if err != nil {
 			return err
 		}
-		if err := account.SoftDelete(tx, time.Now()); err != nil {
+		if err := account.SoftDelete(tx, time.Now(), clearances); err != nil {
 			return err
 		}
 		capacityChecks, err = recheckSeatCapacityAfterAccountDeletion(tx, users, deletedOrganizations)
@@ -244,6 +265,22 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 	}
 
 	return deletedOrganizations, nil
+}
+
+func verifyAccountOrganizationDeletions(ctx context.Context, account *models.Account) (map[uuid.UUID]*models.OrganizationDeletionClearance, error) {
+	pending, err := models.ListOrganizationsPendingAccountDeletion(database.DB(ctx), account.ID)
+	if err != nil {
+		return nil, err
+	}
+	clearances := make(map[uuid.UUID]*models.OrganizationDeletionClearance, len(pending))
+	for _, organization := range pending {
+		clearance, err := polar.VerifyOrganizationDeletion(ctx, organization.ID)
+		if err != nil {
+			return nil, fmt.Errorf("organization %s: %w", organization.ID, err)
+		}
+		clearances[organization.ID] = clearance
+	}
+	return clearances, nil
 }
 
 // recheckSeatCapacityAfterAccountDeletion updates the over-capacity record of
