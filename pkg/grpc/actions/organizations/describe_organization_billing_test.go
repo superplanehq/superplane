@@ -483,21 +483,11 @@ func TestLegacyBusinessCheckoutRemainsAvailable(t *testing.T) {
 			setLegacyBusinessProduct(t, catalogProduct)
 			t.Setenv(models.BillingEnabledEnv, "yes")
 			t.Setenv("POLAR_BUSINESS_PRODUCT_ID", tc.envProduct)
-			server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
-				switch req.URL.Path {
-				case "/customers/external/" + r.Organization.ID.String():
-					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_legacy", "external_id": r.Organization.ID.String()}))
-				case "/checkouts/":
-					var body map[string]any
-					require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
-					require.Equal(t, []any{tc.wantProduct}, body["products"])
-					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"url": "https://polar.sh/checkout/legacy"}))
-				default:
-					t.Errorf("unexpected Polar request %s", req.URL.Path)
-					w.WriteHeader(http.StatusInternalServerError)
-				}
-			})
-			usePolarTestServer(t, server)
+			polarCheckouts := newFakePolarCheckouts(t, r.Organization.ID)
+			polarCheckouts.onCreate = func(body map[string]any) {
+				require.Equal(t, []any{tc.wantProduct}, body["products"])
+			}
+			polarCheckouts.serve(nil)
 			response, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
 			require.NoError(t, err)
 			require.True(t, response.BillingEnabled)
@@ -508,7 +498,48 @@ func TestLegacyBusinessCheckoutRemainsAvailable(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, "https://polar.sh/checkout/legacy", checkout.CheckoutUrl)
+			created := polarCheckouts.checkouts()
+			require.Len(t, created, 1)
+			require.Equal(t, "https://polar.sh/checkout/"+created[0].ID, checkout.CheckoutUrl)
+		})
+	}
+}
+
+func TestLegacyBusinessCheckoutReusesThePendingCheckout(t *testing.T) {
+	for _, preexisting := range []bool{false, true} {
+		name := "new checkout"
+		if preexisting {
+			name = "adopted checkout"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			setLegacyBusinessProduct(t, new("prod_business"))
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			polarCheckouts := newFakePolarCheckouts(t, r.Organization.ID)
+			var existing *fakePolarCheckout
+			if preexisting {
+				existing = polarCheckouts.seed("prod_business", nil, nil)
+			}
+			polarCheckouts.serve(nil)
+
+			first, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
+			second, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
+
+			require.Equal(t, first.CheckoutUrl, second.CheckoutUrl)
+			if preexisting {
+				require.Equal(t, "https://polar.sh/checkout/"+existing.ID, first.CheckoutUrl)
+				require.Zero(t, polarCheckouts.createCalls())
+			} else {
+				require.Equal(t, 1, polarCheckouts.createCalls())
+			}
+			intent, err := models.FindUnresolvedOrganizationBillingCheckout(database.DB(t.Context()), r.Organization.ID)
+			require.NoError(t, err)
+			require.NotNil(t, intent)
+			require.Equal(t, "prod_business", intent.PolarProductID)
+			require.Nil(t, intent.Seats)
 		})
 	}
 }

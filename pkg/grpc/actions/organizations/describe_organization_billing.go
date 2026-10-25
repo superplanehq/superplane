@@ -278,12 +278,15 @@ func CreateBusinessCheckout(
 		return nil, grpcerrors.Internal(err, "failed to create Business checkout")
 	}
 
-	session, err := client.CreateCheckout(
-		ctx,
-		polar.CheckoutInput{ProductID: productID, ExternalCustomerID: organizationID.String(), SuccessURL: businessCheckoutSuccessURL(baseURL, organizationID), CustomerIP: clientIPFromContext(ctx)},
-	)
+	session, err := startSubscriptionCheckout(ctx, subscriptionCheckoutRequest{
+		OrganizationID: organizationID,
+		PlanKey:        models.BillingPlanBusiness,
+		ProductID:      productID,
+		SuccessURL:     businessCheckoutSuccessURL(baseURL, organizationID),
+		CustomerIP:     clientIPFromContext(ctx),
+	})
 	if err != nil {
-		return nil, polarBillingError(err, "failed to create Business checkout")
+		return nil, err
 	}
 	if session.CustomerID != "" {
 		if err := models.SetOrganizationPolarCustomerID(database.DB(ctx), organizationID, session.CustomerID); err != nil {
