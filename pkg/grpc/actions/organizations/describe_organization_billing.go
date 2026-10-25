@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -209,6 +210,9 @@ func SyncOrganizationBilling(
 		log.WithError(err).WithField("organization_id", organizationID.String()).Warn("failed to sync Polar subscription")
 	}
 	reconcileSeatPurchase(ctx, database.DB(ctx), organizationID)
+	// Sync can apply an activation or a payment recovery that no webhook
+	// delivered. Either one can change the renewal seat count.
+	seatrenewal.ScheduleAsync(ctx, organizationID)
 
 	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
 }
@@ -340,6 +344,9 @@ func ResumeOrganizationSubscription(
 	if err := polar.ResumeOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
 		return nil, subscriptionCancelError(err, "Could not resume the subscription.")
 	}
+	// The resumed subscription renews again, so schedule the next-period
+	// seat count. A Polar failure here does not fail the resume.
+	seatrenewal.ScheduleAsync(ctx, organizationID)
 	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
 }
 

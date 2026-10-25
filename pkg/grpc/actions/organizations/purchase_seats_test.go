@@ -58,6 +58,16 @@ type seatPurchaseFixture struct {
 	replays int
 	// pastDueAt is sent as past_due_at in a past_due replay when set.
 	pastDueAt *time.Time
+	// cancelAtPeriodEnd is the cancel_at_period_end that snapshots report.
+	cancelAtPeriodEnd bool
+	// scheduleRejection, when set, answers every next_period update with
+	// this Polar error.
+	scheduleRejection *polarRejection
+}
+
+type polarRejection struct {
+	status int
+	code   string
 }
 
 func newSeatPurchaseFixture(t *testing.T, purchased int, seatLimit *int) *seatPurchaseFixture {
@@ -127,10 +137,19 @@ func (f *seatPurchaseFixture) serve(w http.ResponseWriter, req *http.Request) {
 	case http.MethodPatch:
 		var body map[string]any
 		require.NoError(f.t, json.NewDecoder(req.Body).Decode(&body))
+		if cancelAtPeriodEnd, ok := body["cancel_at_period_end"].(bool); ok {
+			f.cancelAtPeriodEnd = cancelAtPeriodEnd
+			f.writeJSON(w, http.StatusOK, f.snapshot(f.polarSeats))
+			return
+		}
 		seats := int(body["seats"].(float64))
 		if body["proration_behavior"] == "next_period" {
-			// Like Polar, an update back to the current seats clears the scheduled one.
 			f.schedules = append(f.schedules, body)
+			if f.scheduleRejection != nil {
+				f.writeJSON(w, f.scheduleRejection.status, map[string]any{"error": f.scheduleRejection.code, "detail": "details"})
+				return
+			}
+			// Like Polar, an update back to the current seats clears the scheduled one.
 			f.pendingSeats = &seats
 			if seats == f.polarSeats {
 				f.pendingSeats = nil
@@ -152,7 +171,7 @@ func (f *seatPurchaseFixture) snapshot(seats int) map[string]any {
 	}
 	snapshot := map[string]any{
 		"id": f.subscriptionID, "product_id": f.product, "status": "active", "seats": seats,
-		"cancel_at_period_end": false, "modified_at": modifiedAt.UTC().Format(time.RFC3339),
+		"cancel_at_period_end": f.cancelAtPeriodEnd, "modified_at": modifiedAt.UTC().Format(time.RFC3339),
 		"current_period_start": f.periodStart.Format(time.RFC3339), "current_period_end": f.periodEnd.Format(time.RFC3339),
 		"customer_id": "cust_1", "external_customer_id": f.r.Organization.ID.String(),
 		"pending_update": nil,

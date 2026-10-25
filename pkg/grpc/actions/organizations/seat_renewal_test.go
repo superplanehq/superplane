@@ -225,3 +225,51 @@ func Test__NoRenewalScheduleWhileASeatPurchaseIsInFlight(t *testing.T) {
 	assert.Equal(t, models.SeatPurchaseStatusUnknown, f.latestPurchase().Status,
 		"nothing proves the outcome yet, so the purchase stays in flight")
 }
+
+// setToCancel marks the subscription to end at the period end, locally and
+// in Polar.
+func (f *seatPurchaseFixture) setToCancel() {
+	f.t.Helper()
+	f.mu.Lock()
+	f.cancelAtPeriodEnd = true
+	f.mu.Unlock()
+	f.updateBillingPlan(map[string]any{"cancel_at_period_end": true})
+}
+
+func (f *seatPurchaseFixture) resume() *pb.DescribeOrganizationBillingResponse {
+	f.t.Helper()
+	response, err := ResumeOrganizationSubscription(context.Background(), f.r.Organization.ID.String(), &pb.ResumeOrganizationSubscriptionRequest{})
+	require.NoError(f.t, err)
+	return response
+}
+
+func Test__ResumeShortlyBeforeRenewalSchedulesTheMemberCount(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 5, new(50))
+	f.addMembers(1)
+	f.setPeriodEnd(time.Now().Add(time.Hour).UTC().Truncate(time.Second))
+	f.setToCancel()
+
+	response := f.resume()
+
+	assert.False(t, response.CancelAtPeriodEnd)
+	assert.Equal(t, []map[string]any{scheduledRenewal(2)}, f.renewalSchedules())
+	assert.Equal(t, new(2), f.pendingRenewalSeats())
+	assert.Equal(t, new(2), f.plan().RenewalSeatsScheduled)
+	assert.Equal(t, 5, f.purchasedSeats(), "the current period keeps every paid seat")
+}
+
+func Test__ResumeSucceedsWhenPolarRejectsTheRenewalSchedule(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 5, new(50))
+	f.addMembers(1)
+	f.setPeriodEnd(time.Now().Add(time.Hour).UTC().Truncate(time.Second))
+	f.setToCancel()
+	f.scheduleRejection = &polarRejection{status: http.StatusUnprocessableEntity, code: "PolarRequestValidationError"}
+
+	response := f.resume()
+
+	assert.False(t, response.CancelAtPeriodEnd)
+	assert.Len(t, f.renewalSchedules(), 1, "the schedule was sent once and is left to the sync worker")
+	assert.False(t, f.plan().CancelAtPeriodEnd, "the resume stays applied")
+	assert.Nil(t, f.pendingRenewalSeats())
+	assert.Nil(t, f.plan().RenewalSeatsScheduled)
+}
