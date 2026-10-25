@@ -1005,6 +1005,10 @@ message PurchaseSeatsRequest {
   string id = 1;
   int32 additional_seats = 2;
   int32 expected_purchased_seats = 3;
+  // operation_key identifies one purchase within the organization. A repeat
+  // with the same key and request returns the stored purchase and does not
+  // charge again. A repeat with the same key and another request is rejected.
+  string operation_key = 4;
 }
 
 message PurchaseSeatsResponse {

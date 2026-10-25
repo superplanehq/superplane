@@ -8,6 +8,8 @@ export type CompletedSeatPurchasePreview = {
   estimate: OrganizationsPreviewSeatPurchaseResponse;
   additionalSeats: number;
   billingBaseline: number | undefined;
+  /** The billing period end when the preview ran. A renewal makes the preview stale. */
+  billingPeriodEnd: string | undefined;
   request: number;
 };
 
@@ -15,6 +17,7 @@ export function useSeatPurchaseEstimate({
   organizationId,
   count,
   baseline,
+  periodEnd,
   enabled,
   revision,
   request,
@@ -23,6 +26,7 @@ export function useSeatPurchaseEstimate({
   organizationId: string;
   count: number | undefined;
   baseline: number | undefined;
+  periodEnd: string | undefined;
   enabled: boolean;
   revision: number;
   request: RefObject<number>;
@@ -48,7 +52,13 @@ export function useSeatPurchaseEstimate({
         if (!isCurrent()) return;
         if (response.data?.purchasedSeats === undefined)
           throw new Error("SuperPlane could not estimate this purchase. Try again.");
-        setCompleted({ estimate: response.data, additionalSeats: count, billingBaseline: baseline, request: revision });
+        setCompleted({
+          estimate: response.data,
+          additionalSeats: count,
+          billingBaseline: baseline,
+          billingPeriodEnd: periodEnd,
+          request: revision,
+        });
       } catch (previewError) {
         if (isCurrent())
           setError(getApiErrorMessage(previewError, "SuperPlane could not estimate this purchase. Try again."));
@@ -60,9 +70,14 @@ export function useSeatPurchaseEstimate({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [organizationId, count, baseline, enabled, revision, request, lifecycle]);
+  }, [organizationId, count, baseline, periodEnd, enabled, revision, request, lifecycle]);
 
   const current =
-    enabled && completed?.request === revision && completed?.billingBaseline === baseline ? completed : undefined;
+    enabled &&
+    completed?.request === revision &&
+    completed?.billingBaseline === baseline &&
+    completed?.billingPeriodEnd === periodEnd
+      ? completed
+      : undefined;
   return { completed: current, preview: current?.estimate, pending, error, canConfirm: Boolean(current && !pending) };
 }

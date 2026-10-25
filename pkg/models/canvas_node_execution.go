@@ -761,6 +761,16 @@ func ListCanvasEventsForExecutionsInTransaction(tx *gorm.DB, executionIDs []uuid
 	return events, nil
 }
 
+func (e *CanvasNodeExecution) FindPendingRequest(tx *gorm.DB) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
+	err := tx.Where("workflow_id = ? AND execution_id = ? AND state = ?", e.WorkflowID, e.ID, NodeExecutionRequestStatePending).
+		Order("created_at ASC").First(&request).Error
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
 func (e *CanvasNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
 	return tx.Create(&CanvasNodeRequest{
 		WorkflowID:  e.WorkflowID,

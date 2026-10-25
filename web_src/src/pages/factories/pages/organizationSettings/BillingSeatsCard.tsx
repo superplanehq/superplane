@@ -33,6 +33,7 @@ export function BillingSeatsCard({
       <p className="text-xl font-semibold tracking-[-0.02em] tabular-nums">
         {seats.occupied ?? "Not available"} of {seats.purchased ?? "Not available"} seats used
       </p>
+      <OverCapacityNotice seats={seats} canManageBilling={canManageBilling} />
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-xs text-muted-foreground">Available seats</dt>
@@ -83,6 +84,42 @@ export function BillingSeatsCard({
   );
 }
 
+function OverCapacityNotice({ seats, canManageBilling }: { seats: BillingSeatSummary; canManageBilling: boolean }) {
+  const { occupied, purchased } = seats;
+  if (occupied === undefined || purchased === undefined || occupied <= purchased) {
+    return null;
+  }
+
+  const message = canManageBilling
+    ? `${pluralize(occupied, "member")}, ${pluralize(purchased, "paid seat")}. Buy seats or remove members to invite again.`
+    : "Ask an organization admin to buy seats or remove members.";
+  return (
+    <>
+      <p role="status" className="mt-3 text-sm text-destructive">
+        {message}
+      </p>
+      <RenewalCapExplanation renewalSeats={seats.expectedRenewalSeats} />
+    </>
+  );
+}
+
+// Renewal never adds seats, so members above the paid seats are not billed.
+// Without a renewal count, the estimate already asks for a repair.
+function RenewalCapExplanation({ renewalSeats }: { renewalSeats?: number }) {
+  if (renewalSeats === undefined) {
+    return null;
+  }
+  return (
+    <p className="mt-1 text-sm text-muted-foreground" data-testid="billing-seats-renewal-cap">
+      Renewal bills {pluralize(renewalSeats, "paid seat")}. Renewal does not add seats.
+    </p>
+  );
+}
+
+function pluralize(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
 // While payment is blocked, the server sends only the stored and used seats.
 function BlockedSeatsSummary({ seats }: { seats: BillingSeatSummary }) {
   return (
@@ -97,13 +134,18 @@ function BlockedSeatsSummary({ seats }: { seats: BillingSeatSummary }) {
   );
 }
 
+// The server omits the renewal count when the paid seat count is zero or
+// missing. That state needs repair, so the card shows no invented estimate.
+const INVALID_PAID_SEATS_ESTIMATE = "Not available. The paid seat count needs repair. Contact support.";
+
 function renewalEstimate(seats: BillingSeatSummary, date: string | null) {
   const renewalSeats = seats.expectedRenewalSeats;
-  const renewalQuantity = renewalSeats === undefined ? "Not available" : String(renewalSeats);
+  if (renewalSeats === undefined) {
+    return INVALID_PAID_SEATS_ESTIMATE;
+  }
   const renewalAmount = seatAmountLabel(seats.expectedRenewalCents);
-  const seatLabel = renewalSeats === 1 ? "seat" : "seats";
   const renewalDate = date ? ` on ${date}` : "";
-  return `${renewalQuantity} ${seatLabel}, ${renewalAmount}${renewalDate}, based on current members.`;
+  return `${pluralize(renewalSeats, "seat")}, ${renewalAmount}${renewalDate}, based on current members.`;
 }
 
 function seatAmountLabel(cents: string | undefined) {

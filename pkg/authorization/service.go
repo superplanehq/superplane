@@ -560,25 +560,29 @@ func (a *AuthService) assignRoleWithEnforcer(enforcer casbin.IEnforcer, userID, 
 
 func (a *AuthService) RemoveRole(userID, role, domainID string, domainType string) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		enforcer, err := a.newFilteredEnforcer(tx, policyFiltersForDomain(domainType, domainID))
-		if err != nil {
-			return err
-		}
-		enforcer.EnableAutoSave(true)
-
-		domain := prefixDomain(domainType, domainID)
-		prefixedRole := prefixRoleName(role)
-		prefixedUserID := prefixUserID(userID)
-		ruleRemoved, err := enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedRole, domain)
-		if err != nil {
-			return fmt.Errorf("failed to remove role: %w", err)
-		}
-		if !ruleRemoved {
-			log.Infof("role %s not found for user %s", role, userID)
-		}
-
-		return nil
+		return a.RemoveRoleInTransaction(tx, userID, role, domainID, domainType)
 	})
+}
+
+func (a *AuthService) RemoveRoleInTransaction(tx *gorm.DB, userID, role, domainID, domainType string) error {
+	enforcer, err := a.newFilteredEnforcer(tx, policyFiltersForDomain(domainType, domainID))
+	if err != nil {
+		return err
+	}
+	enforcer.EnableAutoSave(true)
+
+	domain := prefixDomain(domainType, domainID)
+	prefixedRole := prefixRoleName(role)
+	prefixedUserID := prefixUserID(userID)
+	ruleRemoved, err := enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedRole, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove role: %w", err)
+	}
+	if !ruleRemoved {
+		log.Infof("role %s not found for user %s", role, userID)
+	}
+
+	return nil
 }
 
 func (a *AuthService) GetOrgUsersForRole(ctx context.Context, role string, orgID string) ([]string, error) {

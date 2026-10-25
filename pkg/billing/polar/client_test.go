@@ -212,13 +212,15 @@ func Test__GetCreditPackKeepsFixedPriceOnMixedProducts(t *testing.T) {
 
 func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		seats *int
+		name     string
+		seats    *int
+		metadata map[string]string
 	}{
 		{name: "Business"},
-		{name: "Team", seats: new(5)},
+		{name: "Team", seats: new(5), metadata: map[string]string{CheckoutIntentMetadataKey: "intent-1"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			expiresAt := time.Now().Add(time.Hour).UTC()
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/checkouts/", r.URL.Path)
 				var body map[string]any
@@ -226,8 +228,12 @@ func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
 				assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
 				assert.Equal(t, "org-1", body["external_customer_id"])
 				assert.NotContains(t, body, "prices")
-				assert.NotContains(t, body, "metadata")
 				assert.NotContains(t, body, "customer_email")
+				if tc.metadata == nil {
+					assert.NotContains(t, body, "metadata")
+				} else {
+					assert.Equal(t, map[string]any{CheckoutIntentMetadataKey: "intent-1"}, body["metadata"])
+				}
 				if tc.seats == nil {
 					assert.NotContains(t, body, "allow_discount_codes")
 					assert.NotContains(t, body, "seats")
@@ -242,17 +248,29 @@ func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
 					}
 				}
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"id":          "chk_1",
 					"url":         "https://buy.polar.sh/polar_c_test",
 					"customer_id": "cust_1",
+					"status":      "open",
+					"expires_at":  expiresAt.Format(time.RFC3339Nano),
+					"seats":       tc.seats,
+					"metadata":    map[string]any{CheckoutIntentMetadataKey: "intent-1", "attempt": 2},
 				}))
 			}))
 			t.Cleanup(server.Close)
 
 			client := NewClient(server.URL, "oat_test", server.Client())
-			session, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost:8000/return", CustomerIP: "203.0.113.10", Seats: tc.seats})
+			session, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost:8000/return", CustomerIP: "203.0.113.10", Seats: tc.seats, Metadata: tc.metadata})
 			require.NoError(t, err)
+			assert.Equal(t, "chk_1", session.ID)
 			assert.Equal(t, "https://buy.polar.sh/polar_c_test", session.URL)
 			assert.Equal(t, "cust_1", session.CustomerID)
+			assert.Equal(t, CheckoutStatusOpen, session.Status)
+			require.NotNil(t, session.ExpiresAt)
+			assert.True(t, session.ExpiresAt.Equal(expiresAt))
+			assert.Equal(t, tc.seats, session.Seats)
+			assert.Equal(t, "intent-1", session.IntentID())
+			assert.Equal(t, "2", session.Metadata["attempt"], "numeric metadata is read as text")
 		})
 	}
 }
@@ -445,6 +463,42 @@ func Test__EnsureCustomerDoesNotTreatValidationAsConflict(t *testing.T) {
 	require.Error(t, err)
 	assert.False(t, IsConflict(err))
 	assert.Contains(t, err.Error(), "not a valid email address")
+}
+
+func Test__CreateCheckoutClassifiesUncertainOutcomes(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		handler http.HandlerFunc
+		unknown bool
+	}{
+		{"server error", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "boom", http.StatusBadGateway) }, true},
+		{"dropped connection", func(w http.ResponseWriter, _ *http.Request) {
+			conn, _, err := w.(http.Hijacker).Hijack()
+			require.NoError(t, err)
+			require.NoError(t, conn.Close())
+		}, true},
+		{"created without id", func(w http.ResponseWriter, _ *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{"url": "https://buy.polar.sh/c"})
+		}, true},
+		{"created without url", func(w http.ResponseWriter, _ *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "chk_1"})
+		}, true},
+		{"validation rejection", func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "invalid", http.StatusUnprocessableEntity)
+		}, false},
+		{"bad request", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "bad", http.StatusBadRequest) }, false},
+		{"unauthorized", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "no", http.StatusUnauthorized) }, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(tc.handler)
+			t.Cleanup(server.Close)
+
+			client := NewClient(server.URL, "oat_test", server.Client())
+			_, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost/return"})
+			require.Error(t, err)
+			assert.Equal(t, tc.unknown, IsOutcomeUnknown(err))
+		})
+	}
 }
 
 func Test__CreateCheckoutReportsRateLimit(t *testing.T) {
@@ -646,6 +700,53 @@ func Test__UpdateSubscriptionSeatsInvoicesTheProratedChange(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 5, *updated.Seats)
 	assert.Equal(t, map[string]any{"seats": float64(5), "proration_behavior": "invoice"}, body)
+}
+
+func Test__ScheduleSubscriptionSeatsChangesOnlyTheNextPeriod(t *testing.T) {
+	appliesAt := time.Now().Add(10 * 24 * time.Hour).UTC().Truncate(time.Second)
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/subscriptions/sub_team", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id": "sub_team", "status": "active", "seats": 10,
+			"pending_update": map[string]any{"seats": 9, "applies_at": appliesAt.Format(time.RFC3339)},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	updated, err := client.ScheduleSubscriptionSeats(context.Background(), " sub_team ", 9)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"seats": float64(9), "proration_behavior": "next_period"}, body)
+	assert.Equal(t, 10, *updated.Seats, "the current period keeps its seats")
+	require.NotNil(t, updated.PendingUpdate)
+	assert.True(t, updated.PendingUpdate.AppliesAt.Time.Equal(appliesAt))
+	assert.Equal(t, 9, *updated.NextPeriodSeats())
+
+	_, err = client.ScheduleSubscriptionSeats(context.Background(), " ", 9)
+	require.ErrorContains(t, err, "subscription id is required")
+}
+
+func Test__NextPeriodSeatsPrefersTheScheduledSeatCount(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want *int
+	}{
+		{name: "no pending update", body: `{"id":"sub","seats":10}`, want: new(10)},
+		{name: "null pending update", body: `{"id":"sub","seats":10,"pending_update":null}`, want: new(10)},
+		{name: "pending update without seats", body: `{"id":"sub","seats":10,"pending_update":{"seats":null,"applies_at":"2026-12-01T00:00:00Z"}}`, want: new(10)},
+		{name: "no seats", body: `{"id":"sub"}`, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var data SubscriptionData
+			require.NoError(t, json.Unmarshal([]byte(tt.body), &data))
+			assert.Equal(t, tt.want, data.NextPeriodSeats())
+		})
+	}
 }
 
 func Test__UpdateSubscriptionSeatsRequiresIDInRequestAndResponse(t *testing.T) {

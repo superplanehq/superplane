@@ -48,7 +48,7 @@ export function useSeatPurchase({
   pollingEnabled?: boolean;
 }): UseSeatPurchaseResult {
   const queryClient = useQueryClient();
-  const { lastSeatPurchase, purchasedSeats, purchasableSeats, cancelAtPeriodEnd } = billing ?? {};
+  const { lastSeatPurchase, purchasedSeats, purchasableSeats, cancelAtPeriodEnd, currentPeriodEnd } = billing ?? {};
   const state = useSeatPurchaseState(organizationId, lastSeatPurchase);
   const input = useSeatPurchaseInput(organizationId, state);
   const count = validAdditionalSeats(input.additionalSeats, purchasableSeats);
@@ -57,6 +57,7 @@ export function useSeatPurchase({
     organizationId,
     count,
     baseline: purchasedSeats,
+    periodEnd: currentPeriodEnd,
     enabled:
       allowed &&
       input.isOpen &&

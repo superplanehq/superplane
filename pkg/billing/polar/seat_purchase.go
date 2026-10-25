@@ -14,6 +14,12 @@ import (
 // It is longer than the Polar request timeout.
 const SeatPurchaseConfirmationWindow = 5 * time.Minute
 
+// SubscriptionReader is the part of the Polar API that purchase
+// reconciliation uses.
+type SubscriptionReader interface {
+	GetSubscription(ctx context.Context, subscriptionID string) (*SubscriptionData, error)
+}
+
 // ReconcileSeatPurchase settles the in-flight seat purchase of an organization
 // from the Polar subscription. It makes no write call to Polar, so it never
 // buys seats. Capacity changes only through the applied snapshot.
@@ -22,10 +28,10 @@ const SeatPurchaseConfirmationWindow = 5 * time.Minute
 // passes. Polar can still be processing an unknown purchase inside the window,
 // so only an applied or clearly rejected update settles it before then.
 //
-// A snapshot that proves the outcome is applied, so the plan, the period, and
-// the purchase match what Polar reports. A retry after a renewal then works
-// from the refreshed plan.
-func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client *Client, orgID uuid.UUID) error {
+// Only a snapshot from the billing period in which the purchase started is
+// evidence for it. A snapshot that proves the outcome is applied, so the plan,
+// the period, and the purchase match what Polar reports.
+func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client SubscriptionReader, orgID uuid.UUID) error {
 	purchase, err := models.FindInFlightSeatPurchase(db, orgID)
 	if err != nil || purchase == nil || !seatPurchaseNeedsReconciliation(purchase, time.Now()) {
 		return err
@@ -46,10 +52,10 @@ func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client *Client, org
 
 		// A snapshot that proves the outcome is applied. SettleSeatPurchase,
 		// inside ApplyOrganizationSubscription, records the proved status.
-		if _, settled := current.SettlementFor(snapshot.Seats, snapshot.ModifiedAt.TimePtr()); settled {
+		if _, settled := current.SettlementFor(snapshot.CurrentPeriodStart.TimePtr(), snapshot.Seats, snapshot.ModifiedAt.TimePtr()); settled {
 			return ApplyOrganizationSubscription(ctx, tx, orgID, *snapshot)
 		}
-		return failExpiredSeatPurchase(tx, current, snapshot.Seats, time.Now())
+		return failExpiredSeatPurchase(tx, current, *snapshot, time.Now())
 	})
 }
 
@@ -76,7 +82,7 @@ func RefreshSeatPurchaseState(ctx context.Context, db *gorm.DB, client *Client, 
 		if err != nil || purchase == nil {
 			return err
 		}
-		return failExpiredSeatPurchase(tx, purchase, snapshot.Seats, time.Now())
+		return failExpiredSeatPurchase(tx, purchase, *snapshot, time.Now())
 	})
 }
 
@@ -84,7 +90,20 @@ func RefreshSeatPurchaseState(ctx context.Context, db *gorm.DB, client *Client, 
 // window passed while Polar still reports fewer seats than the target. The
 // purchase can no longer reach its target, so it must not block new
 // purchases. Counts between the original and the target clear here too.
-func failExpiredSeatPurchase(tx *gorm.DB, purchase *models.SeatPurchase, seats *int, now time.Time) error {
+//
+// Only a snapshot from the billing period in which the purchase started can
+// fail it. After a renewal, the seat count of the new period proves nothing:
+// Polar can have charged the purchase and then renewed with a scheduled
+// reduction back to the original count.
+func failExpiredSeatPurchase(tx *gorm.DB, purchase *models.SeatPurchase, snapshot SubscriptionData, now time.Time) error {
+	if !purchase.StartedInPeriod(snapshot.CurrentPeriodStart.TimePtr()) {
+		// No snapshot can settle this purchase any more, so it stays in
+		// flight and keeps blocking new purchases for the organization.
+		// SuperPlane never guesses the outcome of a possible charge: a
+		// person must check the purchase in Polar and resolve it by hand.
+		return nil
+	}
+	seats := snapshot.Seats
 	if seats == nil || *seats >= purchase.ToSeats || !seatPurchaseWindowPassed(purchase, now) {
 		return nil
 	}

@@ -64,7 +64,7 @@ func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) 
 // Polar API call returned are verified; webhook payloads are not, because a
 // delayed event can claim access that Polar already ended.
 func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, verified bool) error {
-	orgID, err := parseSubscriptionOrganizationID(data)
+	orgID, err := data.OrganizationID()
 	if err != nil {
 		return err
 	}
@@ -76,6 +76,7 @@ func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, 
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		var capacity SeatCapacityCheck
 		var readID, readReason string
 		err = db.WithContext(ctx).Transaction(func(inner *gorm.DB) error {
 			if _, err := models.LockOrganization(inner, orgID); err != nil {
@@ -84,15 +85,15 @@ func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, 
 			if err := models.BindLegacyBillingProduct(inner, BusinessProductID()); err != nil {
 				return err
 			}
+			previous, err := models.FindOrganizationBillingPlan(inner, orgID)
+			if err != nil {
+				return err
+			}
 			attemptIncoming, appliedData := incoming, data
 			if verifiedIncoming != nil {
-				current, err := models.FindOrganizationBillingPlan(inner, orgID)
-				if err != nil {
-					return err
-				}
 				// Another apply can adopt this identity during verification.
 				// Use the verified snapshot even when it is no longer foreign.
-				if polarSubscriptionID(current) == incoming.ID {
+				if polarSubscriptionID(previous) == incoming.ID {
 					attemptIncoming = subscriptionSnapshot(*verifiedIncoming)
 					attemptIncoming.Verified = true
 					appliedData = *verifiedIncoming
@@ -133,7 +134,15 @@ func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, 
 					return err
 				}
 			}
-			return syncSubscriptionSideEffects(inner, orgID, appliedData, result)
+			if err := syncSubscriptionSideEffects(inner, orgID, appliedData, result); err != nil {
+				return err
+			}
+			if result.Disposition != models.PolarSubscriptionApplied && refreshedResult == nil {
+				return nil
+			}
+			// Check the final plan once, after an atomic subscription replacement.
+			capacity, err = RecheckSeatCapacity(inner, orgID, snapshotSeatCapacityCause(previous, result.Plan))
+			return err
 		})
 		if !errors.Is(err, needsSnapshot) {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -148,7 +157,12 @@ func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, 
 			if errors.Is(err, models.ErrInvalidPurchasedSeats) && !errors.Is(err, models.ErrPolarSubscriptionRefreshFailed) {
 				return permanentApplyError(err.Error())
 			}
-			return err
+			if err != nil {
+				return err
+			}
+			// When db is itself a transaction, this runs before the outer commit.
+			capacity.Log()
+			return nil
 		}
 		// Roll back every tentative write before HTTP. A new transaction
 		// rechecks identity and ordering under the lock after the response.
@@ -204,6 +218,12 @@ func syncSubscriptionSideEffects(tx *gorm.DB, orgID uuid.UUID, data Subscription
 	}
 	if customerID := firstNonEmpty(data.Customer.ID, data.CustomerID); customerID != "" {
 		if err := models.SetOrganizationPolarCustomerID(tx, orgID, customerID); err != nil {
+			return err
+		}
+	}
+	// A live subscription ends the pending checkout for its product.
+	if models.PolarSubscriptionIsLive(data.Status, data.CancelAtPeriodEnd, data.CurrentPeriodEnd.TimePtr(), time.Now()) {
+		if err := models.ResolveOrganizationBillingCheckoutForSubscription(tx, orgID, data.ProductID); err != nil {
 			return err
 		}
 	}
@@ -357,7 +377,8 @@ func selectBusinessSubscription(items []SubscriptionData, storedID string, now t
 	return stored
 }
 
-func parseSubscriptionOrganizationID(data SubscriptionData) (uuid.UUID, error) {
+// OrganizationID identifies the organization in a subscription snapshot.
+func (data SubscriptionData) OrganizationID() (uuid.UUID, error) {
 	orgID, err := uuid.Parse(data.organizationExternalID())
 	if err != nil {
 		return uuid.Nil, permanentApplyError("subscription customer external id is not an organization id")

@@ -65,9 +65,13 @@ type InvokeAction struct {
 }
 
 func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
-	var request CanvasNodeRequest
+	return LockNodeRequestNow(tx.Where("workflow_node_requests.run_at <= ?", time.Now()), id)
+}
 
-	now := time.Now()
+// LockNodeRequestNow locks a pending request regardless of its scheduled time.
+// Requests locked by another worker are skipped.
+func LockNodeRequestNow(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
 	query := tx.
 		Table("workflow_node_requests").
 		Select("workflow_node_requests.*").
@@ -78,7 +82,6 @@ func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 		}).
 		Where("workflow_node_requests.id = ?", id).
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
-		Where("workflow_node_requests.run_at <= ?", now).
 		Where("workflow_node_requests.type <> ?", NodeRequestTypePullRequestChecksStart)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").

@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
@@ -143,10 +146,15 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 			credits, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 			require.NoError(t, err)
 
-			var calls atomic.Int32
+			// Removal and acceptance schedule the renewal seat count in the
+			// background. Polar is down, so that schedule fails and changes
+			// nothing. Seat reuse must not wait for it.
+			var seatUpdates atomic.Int32
 			release := make(chan struct{})
 			polar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				calls.Add(1)
+				if req.Method != http.MethodGet {
+					seatUpdates.Add(1)
+				}
 				if mode == "stalled response" {
 					select {
 					case <-req.Context().Done():
@@ -158,8 +166,9 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 			}))
 			t.Cleanup(func() {
 				close(release)
+				seatrenewal.Wait()
 				polar.Close()
-				assert.Zero(t, calls.Load(), "seat reuse must not contact Polar")
+				assert.Zero(t, seatUpdates.Load(), "seat reuse must not change the Polar subscription")
 			})
 			usePolarTestServer(t, polar)
 
@@ -180,7 +189,7 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 				savedCredits, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 				require.NoError(t, err, stage)
 				assert.Equal(t, credits, savedCredits, "credit and refund records must not change: %s", stage)
-				assert.Zero(t, calls.Load(), stage)
+				assert.Zero(t, seatUpdates.Load(), stage)
 			}
 
 			assertState("before removal", 4, 0, 0, 0)
@@ -250,4 +259,43 @@ func TestRemoveUserHandlesPendingInvitationsOfInviter(t *testing.T) {
 			require.Equal(t, []string{models.RoleOrgOperator}, invitationRoleNames(roles))
 		})
 	}
+}
+
+type failingRoleRemovalAuthorization struct {
+	authorization.Authorization
+}
+
+func (a failingRoleRemovalAuthorization) RemoveRoleInTransaction(tx *gorm.DB, userID, role, domainID, domainType string) error {
+	if err := a.Authorization.RemoveRoleInTransaction(tx, userID, role, domainID, domainType); err != nil {
+		return err
+	}
+	return errors.New("role removal interrupted")
+}
+
+func TestRemoveUserRollsBackRolesMembershipAndInvitations(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "no")
+	orgID := r.Organization.ID.String()
+	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
+	member := createInvitationAdmin(t, r, "member@example.com")
+	recipient, err := models.CreateAccount("Recipient", "recipient@example.com")
+	require.NoError(t, err)
+	created, err := s.Create(context.Background(), orgID, member.ID.String(), &pb.CreateInvitationRequest{Email: recipient.Email, Role: models.RoleOrgAdmin})
+	require.NoError(t, err)
+	rolesBefore, err := r.AuthService.GetUserRolesForOrg(context.Background(), member.ID.String(), orgID)
+	require.NoError(t, err)
+	require.NotEmpty(t, rolesBefore)
+
+	_, err = RemoveUser(context.Background(), failingRoleRemovalAuthorization{r.AuthService}, orgID, member.ID.String())
+
+	require.Equal(t, codes.Internal, grpcerrors.Code(err))
+	_, err = models.FindActiveUserByID(orgID, member.ID.String())
+	require.NoError(t, err)
+	rolesAfter, err := r.AuthService.GetUserRolesForOrg(context.Background(), member.ID.String(), orgID)
+	require.NoError(t, err)
+	require.ElementsMatch(t, invitationRoleNames(rolesBefore), invitationRoleNames(rolesAfter))
+	stored, err := models.FindOrganizationInvitation(database.Conn(), r.Organization.ID, uuid.MustParse(created.Invitation.Id))
+	require.NoError(t, err)
+	require.Equal(t, models.InvitationStatePending, stored.State)
 }

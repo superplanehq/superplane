@@ -125,16 +125,21 @@ func ListOrganizationsPendingAccountDeletion(tx *gorm.DB, accountID uuid.UUID) (
 	return pending, err
 }
 
-func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
+// SoftDelete deletes the account and every organization where it is the only
+// owner. Each of those organizations needs a deletion clearance in
+// clearances. The caller makes them before the transaction, because Polar
+// verification must not hold the organization lock. An organization without a
+// clearance stops the deletion.
+func (a *Account) SoftDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]*OrganizationDeletionClearance) error {
 	if a == nil {
 		return errors.New("account is required")
 	}
 	return tx.Transaction(func(inner *gorm.DB) error {
-		return a.softDelete(inner, now)
+		return a.softDelete(inner, now, clearances)
 	})
 }
 
-func (a *Account) softDelete(tx *gorm.DB, now time.Time) error {
+func (a *Account) softDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]*OrganizationDeletionClearance) error {
 	candidates, err := listOrganizationsForAccountDeletion(tx, a.ID)
 	if err != nil {
 		return err
@@ -153,7 +158,7 @@ func (a *Account) softDelete(tx *gorm.DB, now time.Time) error {
 		if organizationHasOtherHumanOwner(owners, a.ID) {
 			continue
 		}
-		if err := organization.SoftDelete(tx); err != nil {
+		if err := organization.SoftDelete(tx, clearances[organization.ID]); err != nil {
 			return err
 		}
 		if err := SoftDeleteOrganizationFactories(tx, organization.ID); err != nil {

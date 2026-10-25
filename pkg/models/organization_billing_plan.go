@@ -33,6 +33,8 @@ const (
 	PolarSubscriptionStatusPaused     = "paused"
 	PolarSubscriptionStatusIncomplete = "incomplete"
 
+	PolarSubscriptionStatusIncompleteExpired = "incomplete_expired"
+
 	DefaultIncludedGrantCents  int64 = 5000
 	DefaultIncludedGrantMonths       = 1
 	DefaultTopupGrantMonths          = 12
@@ -74,6 +76,36 @@ type OrganizationBillingPlan struct {
 	TrialStartedAt          *time.Time
 	TrialEndsAt             *time.Time
 	UpdatedAt               time.Time
+
+	// RenewalSeatsScheduled is the last next-period seat count that SuperPlane
+	// scheduled in Polar, and RenewalSeatsScheduledAt is when it was sent.
+	// Subscription snapshots do not change them.
+	RenewalSeatsScheduled   *int
+	RenewalSeatsScheduledAt *time.Time
+
+	// OverCapacitySince is when a per-seat plan first had more members than
+	// purchased seats. A Polar snapshot never writes it.
+	// UpdateSeatCapacityState owns it.
+	OverCapacitySince *time.Time
+}
+
+// SeatCapacityChange tells whether a capacity check started or ended the
+// over-capacity state.
+type SeatCapacityChange string
+
+const (
+	SeatCapacityUnchanged SeatCapacityChange = "unchanged"
+	SeatCapacityStarted   SeatCapacityChange = "started"
+	SeatCapacityResolved  SeatCapacityChange = "resolved"
+)
+
+// SeatCapacityTransition is the result of UpdateSeatCapacityState. The caller
+// logs it after its transaction commits.
+type SeatCapacityTransition struct {
+	Change         SeatCapacityChange
+	SubscriptionID string
+	Purchased      int
+	Occupied       int
 }
 
 // PolarSubscriptionApply is the Polar subscription snapshot to persist.
@@ -157,6 +189,11 @@ func (p *OrganizationBillingPlan) IsActiveBusiness() bool {
 	return p.holdsPastDueGraceRow()
 }
 
+// IsPaidPerSeat is true for an active paid plan that sells seats.
+func (p *OrganizationBillingPlan) IsPaidPerSeat() bool {
+	return p != nil && p.Catalog.PerSeat && p.IsActiveBusiness()
+}
+
 func (p *OrganizationBillingPlan) IsOpenTrial(now time.Time) bool {
 	if p == nil || (p.Catalog.ID != uuid.Nil && p.Catalog.Category != "trial" || p.Catalog.ID == uuid.Nil && p.Plan != BillingPlanTrial) {
 		return false
@@ -200,32 +237,40 @@ func PolarSubscriptionKeepsAccess(status string, cancelAtPeriodEnd bool, periodE
 }
 
 // HasLivePolarSubscription reports whether Polar can still charge for this
-// plan. Scheduled cancellation stays live until the paid period ends.
+// plan. An elapsed scheduled cancellation does not end a subscription: Polar
+// can resume it, and only a terminal status from Polar proves the end.
 // Admin and system plans do not have a live Polar subscription.
 func (p *OrganizationBillingPlan) HasLivePolarSubscription(now time.Time) bool {
-	if p == nil || p.PlanSource != BillingPlanSourcePolar {
-		return false
-	}
-	if p.PolarSubscriptionID == nil || strings.TrimSpace(*p.PolarSubscriptionID) == "" {
-		return false
-	}
-	// Deletion is available after scheduled cancellation ends. Identity guards
-	// still require a provider snapshot before replacing the subscription.
-	if p.CancelAtPeriodEnd && !periodStillOpen(p.CurrentPeriodEnd, now) {
+	if !p.hasStoredPolarSubscription() {
 		return false
 	}
 	return PolarSubscriptionIsLive(p.PolarSubscriptionStatus, p.CancelAtPeriodEnd, p.CurrentPeriodEnd, now)
 }
 
-// OrganizationHasLivePolarSubscription reports whether the organization has a
-// Polar subscription that can still charge. An organization without a billing
-// row has none.
-func OrganizationHasLivePolarSubscription(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
-	plan, err := FindOrganizationBillingPlan(tx, orgID)
-	if err != nil {
-		return false, err
+// MayBeBillable reports whether the stored row cannot prove that Polar
+// stopped billing. Only a terminal status proves the end. An empty or unknown
+// status, and a scheduled cancellation whose period elapsed while the status
+// stays non-terminal, can still bill. Deletion needs Polar to confirm the end
+// of such a subscription.
+func (p *OrganizationBillingPlan) MayBeBillable(now time.Time) bool {
+	if !p.hasStoredPolarSubscription() {
+		return false
 	}
-	return plan.HasLivePolarSubscription(time.Now()), nil
+	return !PolarSubscriptionIsTerminal(p.PolarSubscriptionStatus, p.CancelAtPeriodEnd, p.CurrentPeriodEnd, now)
+}
+
+// PolarSubscriptionIsTerminal reports whether Polar ended the subscription
+// and cannot bill it again. A canceled subscription that keeps its paid
+// period open is not terminal yet.
+func PolarSubscriptionIsTerminal(status string, cancelAtPeriodEnd bool, periodEnd *time.Time, now time.Time) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case PolarSubscriptionStatusCanceled:
+		return !cancelAtPeriodEnd || !periodStillOpen(periodEnd, now)
+	case PolarSubscriptionStatusRevoked, PolarSubscriptionStatusIncompleteExpired:
+		return true
+	default:
+		return false
+	}
 }
 
 // PolarSubscriptionIsPastDue is true while Polar retries a failed renewal payment.
@@ -259,7 +304,7 @@ func PolarSubscriptionStatusIsKnown(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case PolarSubscriptionStatusActive, PolarSubscriptionStatusTrialing, PolarSubscriptionStatusCanceled,
 		PolarSubscriptionStatusUnpaid, PolarSubscriptionStatusRevoked, PolarSubscriptionStatusPastDue,
-		PolarSubscriptionStatusIncomplete, "incomplete_expired", PolarSubscriptionStatusPaused:
+		PolarSubscriptionStatusIncomplete, PolarSubscriptionStatusIncompleteExpired, PolarSubscriptionStatusPaused:
 		return true
 	default:
 		return false
@@ -324,6 +369,121 @@ func FindOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBil
 		return nil, err
 	}
 	return &plan, nil
+}
+
+// ListSeatRenewalSyncPlans returns the seat-based plans whose stored Polar
+// subscription can still change, so that the seat renewal sync can reconcile
+// them with Polar. The plan that renews first comes first.
+//
+// A plan is seat-based when its catalog plan is per seat or when it keeps
+// purchased seats. A past-due, unpaid, or paused subscription lapses to a
+// catalog plan that is not per seat but keeps its purchased seats, so it stays
+// in the list. A canceling subscription stays too. Only a canceled or revoked
+// subscription is final and leaves the list.
+//
+// This list decides which plans the sync reads from Polar. It does not decide
+// which plans get a scheduled seat count. The scheduler decides that after it
+// applies the Polar state.
+func ListSeatRenewalSyncPlans(tx *gorm.DB) ([]OrganizationBillingPlan, error) {
+	var plans []OrganizationBillingPlan
+	err := tx.
+		Joins("JOIN billing_plans ON billing_plans.id = organization_billing_plans.plan_id").
+		Joins("JOIN organizations ON organizations.id = organization_billing_plans.organization_id").
+		Where("organizations.deleted_at IS NULL").
+		Where("organization_billing_plans.plan_source = ?", BillingPlanSourcePolar).
+		Where("organization_billing_plans.polar_subscription_id IS NOT NULL AND organization_billing_plans.polar_subscription_id <> ''").
+		Where("lower(organization_billing_plans.polar_subscription_status) NOT IN ?", []string{PolarSubscriptionStatusCanceled, PolarSubscriptionStatusRevoked}).
+		Where("billing_plans.per_seat = ? OR organization_billing_plans.purchased_seats IS NOT NULL", true).
+		Order("organization_billing_plans.current_period_end ASC NULLS LAST").
+		Order("organization_billing_plans.organization_id").
+		Find(&plans).Error
+	if err != nil {
+		return nil, err
+	}
+	return plans, nil
+}
+
+// RecordScheduledRenewalSeats stores the next-period seat count that
+// SuperPlane sent to Polar. It changes no other column, so the plan version
+// in updated_at stays the same.
+func (p *OrganizationBillingPlan) RecordScheduledRenewalSeats(tx *gorm.DB, seats int, sentAt time.Time) error {
+	sentAt = sentAt.UTC()
+	err := tx.Model(&OrganizationBillingPlan{}).
+		Where("organization_id = ?", p.OrganizationID).
+		UpdateColumns(map[string]any{
+			"renewal_seats_scheduled":    seats,
+			"renewal_seats_scheduled_at": sentAt,
+		}).Error
+	if err != nil {
+		return err
+	}
+	p.RenewalSeatsScheduled = &seats
+	p.RenewalSeatsScheduledAt = &sentAt
+	return nil
+}
+
+// UpdateSeatCapacityState records when a per-seat plan starts or stops having
+// more members than purchased seats. It counts the active members while it
+// holds the billing plan row lock, so a concurrent membership change commits
+// before the count or waits for it. It does not log. The caller logs the
+// returned transition after commit.
+//
+// A plan that is not an active per-seat plan has no over-capacity state. The
+// record clears without a transition, so a later recovery alerts again.
+func UpdateSeatCapacityState(tx *gorm.DB, orgID uuid.UUID, now time.Time) (SeatCapacityTransition, error) {
+	transition := SeatCapacityTransition{Change: SeatCapacityUnchanged}
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		plan, err := lockOrganizationBillingPlan(inner, orgID)
+		if err != nil || plan == nil {
+			return err
+		}
+		// A payment grace period keeps Team features, but admission stays
+		// blocked. Recovery must start a fresh capacity alert.
+		if !plan.IsPaidPerSeat() || PolarSubscriptionIsPaymentBlocked(plan.PolarSubscriptionStatus) {
+			return plan.setOverCapacitySince(inner, nil)
+		}
+
+		count, err := CountActiveHumanUsersByOrganization(inner, orgID.String())
+		if err != nil {
+			return err
+		}
+		occupied := int(count)
+
+		purchased := 0
+		if plan.PurchasedSeats != nil {
+			purchased = *plan.PurchasedSeats
+		}
+		transition.Purchased = purchased
+		transition.Occupied = occupied
+		if plan.PolarSubscriptionID != nil {
+			transition.SubscriptionID = *plan.PolarSubscriptionID
+		}
+
+		overCapacity := occupied > purchased
+		switch {
+		case overCapacity && plan.OverCapacitySince == nil:
+			transition.Change = SeatCapacityStarted
+			return plan.setOverCapacitySince(inner, &now)
+		case !overCapacity && plan.OverCapacitySince != nil:
+			transition.Change = SeatCapacityResolved
+			return plan.setOverCapacitySince(inner, nil)
+		default:
+			return nil
+		}
+	})
+	return transition, err
+}
+
+// setOverCapacitySince writes only that column. It keeps updated_at, which
+// other flows use to detect a changed billing record.
+func (p *OrganizationBillingPlan) setOverCapacitySince(tx *gorm.DB, since *time.Time) error {
+	if p.OverCapacitySince == nil && since == nil {
+		return nil
+	}
+	return tx.Model(&OrganizationBillingPlan{}).
+		Where("organization_id = ?", p.OrganizationID).
+		UpdateColumn("over_capacity_since", since).
+		Error
 }
 
 func lockOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
@@ -443,25 +603,61 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 	if planName == "business_legacy" {
 		return nil, ErrInvalidBillingPlan
 	}
-	catalog, err := FindBillingPlan(tx, planName)
-	if err != nil {
-		return nil, ErrInvalidBillingPlan
-	}
-	if catalog.PerSeat {
-		// Preserve the billing API's required override guidance.
-		//revive:disable-next-line:error-strings
-		return nil, errors.New("Per-seat plans need a Polar subscription. Use a seat limit override instead.")
-	}
-	if catalog.RequirePaymentMethod {
-		return nil, errors.New("Plans that require a payment method cannot be assigned by an admin")
-	}
-	return setOrganizationBillingPlan(tx, orgID, catalog, BillingPlanSourceAdmin, trialEndsAt)
+	var saved *OrganizationBillingPlan
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		// Match the subscription path's lock order: organization billing row,
+		// then catalog row. Keep both locks through validation and assignment.
+		if _, err := lockOrganizationBillingPlan(inner, orgID); err != nil {
+			return err
+		}
+		catalog, err := FindBillingPlan(inner.Clauses(clause.Locking{Strength: "UPDATE"}), planName)
+		if err != nil {
+			return ErrInvalidBillingPlan
+		}
+		if catalog.PerSeat {
+			// Preserve the billing API's required override guidance.
+			//revive:disable-next-line:error-strings
+			return errors.New("Per-seat plans need a Polar subscription. Use a seat limit override instead.")
+		}
+		if catalog.RequirePaymentMethod {
+			return errors.New("Plans that require a payment method cannot be assigned by an admin")
+		}
+		saved, err = setOrganizationBillingPlan(inner, orgID, catalog, BillingPlanSourceAdmin, trialEndsAt)
+		return err
+	})
+	return saved, err
 }
 
 // ActivateOrganizationBillingPlan assigns a public plan after the caller verifies its payment requirements.
 // It assigns None when no public paid plans are available.
 // Subscription plans must be activated by a Polar subscription event instead.
 func ActivateOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, planKey string) (*OrganizationBillingPlan, error) {
+	var saved *OrganizationBillingPlan
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if _, err := LockOrganization(inner, orgID); err != nil {
+			return err
+		}
+		pending, err := FindUnresolvedOrganizationBillingCheckout(inner, orgID)
+		if err != nil {
+			return err
+		}
+		if pending != nil {
+			return errors.New("a checkout is already in progress")
+		}
+		current, err := FindOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
+		}
+		if current.HasLivePolarSubscription(time.Now()) {
+			return ErrBillingCheckoutLiveSubscription
+		}
+		saved, err = activateOrganizationBillingPlan(inner, orgID, planKey)
+		return err
+	})
+	return saved, err
+}
+
+func activateOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, planKey string) (*OrganizationBillingPlan, error) {
 	catalog, err := FindBillingPlan(tx, planKey)
 	if err != nil {
 		return nil, ErrInvalidBillingPlan
@@ -588,6 +784,13 @@ func samePolarSubscription(existing *OrganizationBillingPlan, subscriptionID str
 	return existing.PolarSubscriptionID != nil && strings.TrimSpace(*existing.PolarSubscriptionID) == strings.TrimSpace(subscriptionID)
 }
 
+// hasStoredPolarSubscription is true for a Polar-managed row that names a
+// subscription. Admin and system rows keep an old ID only for history.
+func (p *OrganizationBillingPlan) hasStoredPolarSubscription() bool {
+	return p != nil && p.PlanSource == BillingPlanSourcePolar &&
+		p.PolarSubscriptionID != nil && strings.TrimSpace(*p.PolarSubscriptionID) != ""
+}
+
 // settleIgnoredForeignSeatPurchase settles the in-flight purchase of a
 // subscription whose snapshot cannot replace the stored one. The snapshot
 // must be newer than the purchase: an old seat count does not prove success.
@@ -600,7 +803,7 @@ func settleIgnoredForeignSeatPurchase(tx *gorm.DB, orgID uuid.UUID, sub PolarSub
 	if err != nil || purchase == nil || !sub.ModifiedAt.After(purchase.CreatedAt) {
 		return err
 	}
-	return SettleSeatPurchase(tx, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt)
+	return SettleSeatPurchase(tx, orgID, sub.ID, sub.PeriodStart, sub.PurchasedSeats, sub.ModifiedAt)
 }
 
 func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPlan, sub PolarSubscriptionApply) (*PolarSubscriptionApplyResult, error) {
@@ -615,11 +818,16 @@ func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPl
 	}
 	// Only a snapshot fresh enough to apply can prove the outcome of an
 	// in-flight seat purchase. A stale snapshot can report seats that
-	// Polar no longer has, so it must not settle a purchase.
-	if err := SettleSeatPurchase(tx, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
+	// Polar no longer has, so it must not settle a purchase. The settlement
+	// also ignores a snapshot from another billing period.
+	if err := SettleSeatPurchase(tx, orgID, sub.ID, sub.PeriodStart, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
 		return nil, err
 	}
-	catalog, catalogErr := FindBillingPlanByProduct(tx, sub.ProductID)
+	// Lock the plan row before reading its fields and keep the lock through
+	// the plan_id write. SaveBillingPlan takes the same lock, so a
+	// concurrent admin save cannot unlink or re-link the plan between this
+	// lookup and the assignment.
+	catalog, catalogErr := LockBillingPlanByProduct(tx, sub.ProductID)
 	if catalogErr != nil && !errors.Is(catalogErr, gorm.ErrRecordNotFound) {
 		return nil, catalogErr
 	}

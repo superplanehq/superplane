@@ -73,32 +73,98 @@ describe("Organization billing seats", () => {
     ).toBeTruthy();
   });
 
-  it.each([
-    { name: "legacy zero capacity", occupied: 9 },
-    { name: "no current members", occupied: 0 },
-  ])("preserves zero values with $name", async ({ occupied }) => {
+  it("shows the members, minimum one, as the renewal estimate", async () => {
     renderBilling({
       ...TEAM_ORGANIZATION_BILLING,
-      purchasedSeats: 0,
       pendingInvitationSeats: 0,
-      invitableSeats: 0,
-      occupiedSeats: occupied,
-      availableSeats: 0,
-      expectedRenewalSeats: Math.max(occupied, 1),
-      currentMonthlyTotalCents: "0",
-      expectedRenewalCents: String(Math.max(occupied, 1) * 2900),
-      planMaximumSeats: 0,
+      occupiedSeats: 0,
+      availableSeats: 10,
+      invitableSeats: 10,
+      expectedRenewalSeats: 1,
+      expectedRenewalCents: "2900",
     });
     const card = await screen.findByTestId("billing-seats");
-    expect(card).toHaveTextContent(occupied + " of 0 seats used");
-    expect(detail(card, "Available seats")).toHaveTextContent("0");
+    expect(card).toHaveTextContent("0 of 10 seats used");
     expect(detail(card, "Pending invitations")).toHaveTextContent("0");
-    expect(detail(card, "Seats available for new invitations")).toHaveTextContent("0");
-    expect(detail(card, "Plan maximum")).toHaveTextContent("0");
+    expect(detail(card, "Expected renewal")).toHaveTextContent("1 seat, $29.00 on ");
+    expect(within(card).queryByRole("status")).not.toBeInTheDocument();
+    expect(within(card).queryByTestId("billing-seats-renewal-cap")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { name: "zero paid seats", purchased: 0 },
+    { name: "missing paid seats", purchased: undefined },
+  ])("shows an unavailable renewal estimate with $name", async ({ purchased }) => {
+    renderBilling({
+      ...TEAM_ORGANIZATION_BILLING,
+      purchasedSeats: purchased,
+      pendingInvitationSeats: 0,
+      invitableSeats: 0,
+      availableSeats: 0,
+      expectedRenewalSeats: undefined,
+      currentMonthlyTotalCents: "0",
+      expectedRenewalCents: undefined,
+    });
+    const card = await screen.findByTestId("billing-seats");
     expect(detail(card, "Current monthly total")).toHaveTextContent("$0.00");
     expect(detail(card, "Expected renewal")).toHaveTextContent(
-      Math.max(occupied, 1) + (occupied === 0 ? " seat, $29.00" : " seats, $261.00"),
+      "Not available. The paid seat count needs repair. Contact support.",
     );
+    expect(detail(card, "Expected renewal")).not.toHaveTextContent("seats,");
+    expect(within(card).queryByTestId("billing-seats-renewal-cap")).not.toBeInTheDocument();
+  });
+
+  describe("when members exceed paid seats", () => {
+    const overCapacity = { ...TEAM_ORGANIZATION_BILLING, purchasedSeats: 8, occupiedSeats: 9, availableSeats: 0 };
+
+    it("tells admins to buy seats or remove members", async () => {
+      renderBilling(overCapacity);
+      const card = await screen.findByTestId("billing-seats");
+      expect(card).toHaveTextContent("9 members, 8 paid seats. Buy seats or remove members to invite again.");
+      expect(card).not.toHaveTextContent("Ask an organization admin");
+    });
+
+    it("uses singular forms for one member and one paid seat", async () => {
+      renderBilling({ ...overCapacity, purchasedSeats: 1, occupiedSeats: 2 });
+      expect(await screen.findByTestId("billing-seats")).toHaveTextContent("2 members, 1 paid seat. Buy seats");
+    });
+
+    it.each([true, false])(
+      "bills only the paid seats at renewal and explains the cap (can manage billing: %s)",
+      async (canManage) => {
+        canManageBilling = canManage;
+        renderBilling({
+          ...overCapacity,
+          purchasedSeats: 1,
+          occupiedSeats: 3,
+          expectedRenewalSeats: 1,
+          currentMonthlyTotalCents: "2900",
+          expectedRenewalCents: "2900",
+        });
+        const card = await screen.findByTestId("billing-seats");
+        expect(detail(card, "Expected renewal")).toHaveTextContent("1 seat, $29.00 on ");
+        expect(within(card).getByRole("status")).toHaveTextContent(
+          canManage ? "3 members, 1 paid seat." : "Ask an organization admin to buy seats or remove members.",
+        );
+        expect(within(card).getByTestId("billing-seats-renewal-cap")).toHaveTextContent(
+          "Renewal bills 1 paid seat. Renewal does not add seats.",
+        );
+      },
+    );
+
+    it("tells other users to ask an admin", async () => {
+      canManageBilling = false;
+      renderBilling(overCapacity);
+      const card = await screen.findByTestId("billing-seats");
+      expect(card).toHaveTextContent("Ask an organization admin to buy seats or remove members.");
+      expect(card).not.toHaveTextContent("Buy seats or remove members to invite again.");
+    });
+
+    it.each([8, 7])("shows no notice when occupied seats do not exceed %s purchased seats", async (occupied) => {
+      renderBilling({ ...overCapacity, occupiedSeats: occupied });
+      const card = await screen.findByTestId("billing-seats");
+      expect(within(card).queryByRole("status")).not.toBeInTheDocument();
+    });
   });
 
   it.each([undefined, "", "invalid-date"])(
@@ -142,6 +208,7 @@ describe("Organization billing seats", () => {
         ...TEAM_ORGANIZATION_BILLING,
         polarSubscriptionStatus: status,
         planPerSeat,
+        purchasedSeats: 8,
         availableSeats: undefined,
         planMaximumSeats: undefined,
         purchasableSeats: undefined,
@@ -152,8 +219,9 @@ describe("Organization billing seats", () => {
       true,
     );
     const card = await screen.findByTestId("billing-seats");
-    expect(card).toHaveTextContent("9 of 10 seats used");
+    expect(card).toHaveTextContent("9 of 8 seats used");
     expect(card).toHaveTextContent("No one can join until the payment is updated.");
+    expect(within(card).queryByRole("status")).not.toBeInTheDocument();
     expect(within(card).queryByText("Expected renewal")).not.toBeInTheDocument();
     expect(within(card).queryByText("Not available", { selector: "dd" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Buy seats" })).not.toBeInTheDocument();

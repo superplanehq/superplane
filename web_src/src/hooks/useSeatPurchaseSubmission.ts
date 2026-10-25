@@ -8,6 +8,11 @@ import {
   type OrganizationsSeatPurchase,
 } from "@/api-client";
 import { getApiErrorMessage } from "@/lib/errors";
+import {
+  confirmSeatPurchaseOperation,
+  retireSeatPurchaseOperation,
+  type SeatPurchaseOperation,
+} from "@/lib/seatPurchaseOperations";
 import { validAdditionalSeats } from "@/lib/seatPurchases";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { organizationBillingQueryKey } from "./useOrganizationBilling";
@@ -25,6 +30,7 @@ type Submission = {
   state: PurchaseState;
   input: PreviewInput;
   generation: number;
+  operation: SeatPurchaseOperation;
   reloadBilling: ReturnType<typeof useSeatPurchaseBilling>["reloadBilling"];
 };
 
@@ -39,6 +45,7 @@ function billingMatchesPreview(preview: CompletedSeatPurchasePreview, billing: B
   if (!billing) return true;
   return (
     billing.purchasedSeats === preview.billingBaseline &&
+    billing.currentPeriodEnd === preview.billingPeriodEnd &&
     !billing.cancelAtPeriodEnd &&
     validAdditionalSeats(String(preview.additionalSeats), billing.purchasableSeats) !== undefined
   );
@@ -75,13 +82,27 @@ function purchaseChanged(
   );
 }
 
-async function submitPurchase(organizationId: string, preview: CompletedSeatPurchasePreview) {
+function confirmOperation(organizationId: string, preview: CompletedSeatPurchasePreview, billing: Billing | undefined) {
+  const { estimate, additionalSeats } = preview;
+  if (estimate.purchasedSeats === undefined) return undefined;
+  return confirmSeatPurchaseOperation(
+    organizationId,
+    { additionalSeats, expectedPurchasedSeats: estimate.purchasedSeats },
+    {
+      periodStart: estimate.periodStart ?? billing?.currentPeriodStart,
+      periodEnd: estimate.periodEnd ?? billing?.currentPeriodEnd,
+    },
+  );
+}
+
+async function submitPurchase(operation: SeatPurchaseOperation) {
   // Direct submission has no automatic retries. Recovery only reads billing.
+  const { organizationId, additionalSeats, expectedPurchasedSeats, operationKey } = operation;
   const response = await organizationsPurchaseSeats<false>({
     ...withOrganizationHeader({
       organizationId,
       path: { id: organizationId },
-      body: { additionalSeats: preview.additionalSeats, expectedPurchasedSeats: preview.estimate.purchasedSeats },
+      body: { additionalSeats, expectedPurchasedSeats, operationKey },
     }),
     throwOnError: false,
   });
@@ -93,8 +114,22 @@ async function submitPurchase(organizationId: string, preview: CompletedSeatPurc
   return response.data;
 }
 
+function purchaseSettled(purchase: OrganizationsSeatPurchase | undefined) {
+  return ["succeeded", "failed", "action_required"].includes(purchase?.status ?? "");
+}
+
+function submissionOutcomeUnknown(status: number | undefined) {
+  // The server answered definite rejections before charging. A lost response
+  // or a server error can have reached Polar, so the outcome stays unknown.
+  return status === undefined || status >= 500;
+}
+
 async function applyPurchaseResponse(response: OrganizationsPurchaseSeatsResponse | undefined, submission: Submission) {
   const { state, generation, organizationId, queryClient, reloadBilling } = submission;
+  // The key stays stored until a server answer for it gives a known outcome.
+  // Billing reconciliation does not retire it, because the billing purchase
+  // carries no key. The next matching confirmation replays and retires it.
+  if (purchaseSettled(response?.purchase)) retireSeatPurchaseOperation(submission.operation);
   if (generation !== state.lifecycle.current) return;
   state.recordPurchase(response?.purchase ?? response?.billing?.lastSeatPurchase);
   if (response?.billing) {
@@ -109,14 +144,9 @@ async function applyPurchaseResponse(response: OrganizationsPurchaseSeatsRespons
   }
 }
 
-function submissionOutcomeUnknown(status: number | undefined) {
-  // The server answered definite rejections before charging. A lost response
-  // or a server error can have reached Polar, so the outcome stays unknown.
-  return status === undefined || status >= 500;
-}
-
 async function recoverPurchase(error: unknown, submission: Submission) {
   const { state, generation, reloadBilling, input } = submission;
+  if (!submissionOutcomeUnknown(errorStatus(error))) retireSeatPurchaseOperation(submission.operation);
   if (generation !== state.lifecycle.current) return;
   const message = getApiErrorMessage(
     error,
@@ -167,6 +197,8 @@ export function useSeatPurchaseSubmission({
       return;
     const billing = queryClient.getQueryData<Billing>(organizationBillingQueryKey(organizationId));
     if (!billingMatchesPreview(confirmed, billing)) return;
+    const operation = confirmOperation(organizationId, confirmed, billing);
+    if (!operation) return;
     state.submissionLock.current = true;
     const submission = {
       organizationId,
@@ -174,13 +206,14 @@ export function useSeatPurchaseSubmission({
       state,
       input,
       reloadBilling,
+      operation,
       generation: state.lifecycle.current,
     };
     state.setSubmitting(true);
     input.consumePreview();
     state.clearFeedback();
     try {
-      await applyPurchaseResponse(await submitPurchase(organizationId, confirmed), submission);
+      await applyPurchaseResponse(await submitPurchase(operation), submission);
     } catch (error) {
       await recoverPurchase(error, submission);
     } finally {

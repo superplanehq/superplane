@@ -841,3 +841,61 @@ func memberIndex(t *testing.T, members []any, email string) int {
 	t.Fatalf("member %s not found", email)
 	return -1
 }
+
+func TestListWorkspacesReturnsGrantedWorkspaces(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+	first, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "ALP")
+	require.NoError(t, err)
+	second, err := models.CreateFactory(db, r.Organization.ID, "Beta", "", "BET")
+	require.NoError(t, err)
+	_, err = models.CreateFactory(db, r.Organization.ID, "Hidden", "", "HID")
+	require.NoError(t, err)
+
+	claims := toolClaims(r, first.ID)
+	claims.FactoryIDs = []uuid.UUID{second.ID, first.ID}
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, claims, "list_workspaces", nil)
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	rows, ok := payload["workspaces"].([]any)
+	require.True(t, ok)
+	require.Len(t, rows, 2)
+	names := map[string]string{}
+	for _, row := range rows {
+		item, ok := row.(map[string]any)
+		require.True(t, ok)
+		names[item["id"].(string)] = item["name"].(string)
+	}
+	assert.Equal(t, "Alpha", names[first.ID.String()])
+	assert.Equal(t, "Beta", names[second.ID.String()])
+	assert.NotContains(t, names, "Hidden")
+}
+
+func TestWorkspaceArgumentSelectsGrantedWorkspace(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+	first, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "ALP")
+	require.NoError(t, err)
+	second, err := models.CreateFactory(db, r.Organization.ID, "Beta", "", "BET")
+	require.NoError(t, err)
+	runtime := &Runtime{Auth: r.AuthService}
+	claims := toolClaims(r, first.ID)
+	claims.FactoryIDs = []uuid.UUID{first.ID, second.ID}
+
+	_, err = runtime.CallTool(ctx, claims, "list_tasks", map[string]any{})
+	require.EqualError(t, err, "This connection can use more than one workspace. Pass workspace.")
+	_, err = runtime.CallTool(ctx, claims, "get_task_report", map[string]any{"task": "1"})
+	require.EqualError(t, err, "This connection can use more than one workspace. Pass workspace.")
+
+	result, err := runtime.CallTool(ctx, claims, "list_tasks", map[string]any{"workspace": second.ID.String()})
+	require.NoError(t, err)
+	assert.False(t, result.IsError)
+
+	_, err = runtime.CallTool(ctx, claims, "list_tasks", map[string]any{"workspace": uuid.NewString()})
+	require.EqualError(t, err, "Not found")
+}

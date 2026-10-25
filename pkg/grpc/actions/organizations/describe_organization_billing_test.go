@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -135,6 +137,9 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	expected["purchasedSeats"], expected["availableSeats"], expected["purchasableSeats"] = float64(0), float64(0), float64(80)
 	expected["invitableSeats"] = float64(0)
 	expected["currentMonthlyTotalCents"] = "0"
+	// A plan without paid seats needs repair, so it has no renewal estimate.
+	delete(expected, "expectedRenewalSeats")
+	delete(expected, "expectedRenewalCents")
 	check()
 
 	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, nil))
@@ -143,8 +148,9 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	check()
 
 	require.NoError(t, db.Delete(&models.User{}, "organization_id = ?", r.Organization.ID).Error)
-	expected["occupiedSeats"], expected["expectedRenewalSeats"] = float64(0), float64(1)
-	expected["expectedRenewalCents"] = "2900"
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 10).Error)
+	expected["occupiedSeats"], expected["purchasedSeats"], expected["availableSeats"], expected["invitableSeats"] = float64(0), float64(10), float64(10), float64(9)
+	expected["currentMonthlyTotalCents"], expected["expectedRenewalSeats"], expected["expectedRenewalCents"] = "29000", float64(1), "2900"
 	check()
 }
 
@@ -264,29 +270,35 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
 				return
 			}
+			subscription := map[string]any{
+				"id":                   "sub_grpc_sync",
+				"status":               "active",
+				"product_id":           "prod_business",
+				"current_period_start": periodStart.Format(time.RFC3339),
+				"current_period_end":   periodEnd.Format(time.RFC3339),
+				"customer_id":          "cust_polar_1",
+				"external_customer_id": r.Organization.ID.String(),
+				"customer": map[string]any{
+					"id":          "cust_polar_1",
+					"external_id": r.Organization.ID.String(),
+				},
+			}
+			if req.URL.Path == "/subscriptions/sub_grpc_sync" {
+				// The renewal schedule after the sync reads the subscription.
+				assert.Equal(t, http.MethodGet, req.Method)
+				require.NoError(t, json.NewEncoder(w).Encode(subscription))
+				return
+			}
 			assert.Equal(t, "/subscriptions/", req.URL.Path)
 			assert.Equal(t, r.Organization.ID.String(), req.URL.Query().Get("external_customer_id"))
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
-				"items": []map[string]any{
-					{
-						"id":                   "sub_grpc_sync",
-						"status":               "active",
-						"product_id":           "prod_business",
-						"current_period_start": periodStart.Format(time.RFC3339),
-						"current_period_end":   periodEnd.Format(time.RFC3339),
-						"customer_id":          "cust_polar_1",
-						"external_customer_id": r.Organization.ID.String(),
-						"customer": map[string]any{
-							"id":          "cust_polar_1",
-							"external_id": r.Organization.ID.String(),
-						},
-					},
-				},
+				"items":      []map[string]any{subscription},
 				"pagination": map[string]any{"max_page": 1},
 			}))
 		})
 		usePolarTestServer(t, server)
 		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+		t.Cleanup(seatrenewal.Wait)
 
 		resp, err := SyncOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
 		require.NoError(t, err)
@@ -411,13 +423,17 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("keeps Business", func(t *testing.T) {
+		var patches atomic.Int32
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 			if strings.HasSuffix(req.URL.Path, "/payment-methods") {
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
 				return
 			}
-			assert.Equal(t, http.MethodPatch, req.Method)
 			assert.Equal(t, "/subscriptions/sub_grpc_resume", req.URL.Path)
+			if req.Method == http.MethodPatch {
+				patches.Add(1)
+			}
+			// The renewal schedule after the resume reads the subscription.
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"id":                   "sub_grpc_resume",
 				"status":               "active",
@@ -435,11 +451,15 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 		usePolarTestServer(t, server)
 		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
 
+		t.Cleanup(seatrenewal.Wait)
+
 		resp, err := ResumeOrganizationSubscription(context.Background(), r.Organization.ID.String(), &pb.ResumeOrganizationSubscriptionRequest{})
 		require.NoError(t, err)
 		assert.Equal(t, models.BillingPlanBusiness, resp.Plan)
 		assert.True(t, resp.CreditPurchaseAllowed)
 		assert.False(t, resp.CancelAtPeriodEnd)
+		seatrenewal.Wait()
+		assert.Equal(t, int32(1), patches.Load(), "only the resume updates the subscription")
 	})
 }
 
@@ -483,21 +503,11 @@ func TestLegacyBusinessCheckoutRemainsAvailable(t *testing.T) {
 			setLegacyBusinessProduct(t, catalogProduct)
 			t.Setenv(models.BillingEnabledEnv, "yes")
 			t.Setenv("POLAR_BUSINESS_PRODUCT_ID", tc.envProduct)
-			server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
-				switch req.URL.Path {
-				case "/customers/external/" + r.Organization.ID.String():
-					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_legacy", "external_id": r.Organization.ID.String()}))
-				case "/checkouts/":
-					var body map[string]any
-					require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
-					require.Equal(t, []any{tc.wantProduct}, body["products"])
-					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"url": "https://polar.sh/checkout/legacy"}))
-				default:
-					t.Errorf("unexpected Polar request %s", req.URL.Path)
-					w.WriteHeader(http.StatusInternalServerError)
-				}
-			})
-			usePolarTestServer(t, server)
+			polarCheckouts := newFakePolarCheckouts(t, r.Organization.ID)
+			polarCheckouts.onCreate = func(body map[string]any) {
+				require.Equal(t, []any{tc.wantProduct}, body["products"])
+			}
+			polarCheckouts.serve(nil)
 			response, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
 			require.NoError(t, err)
 			require.True(t, response.BillingEnabled)
@@ -508,7 +518,48 @@ func TestLegacyBusinessCheckoutRemainsAvailable(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, "https://polar.sh/checkout/legacy", checkout.CheckoutUrl)
+			created := polarCheckouts.checkouts()
+			require.Len(t, created, 1)
+			require.Equal(t, "https://polar.sh/checkout/"+created[0].ID, checkout.CheckoutUrl)
+		})
+	}
+}
+
+func TestLegacyBusinessCheckoutReusesThePendingCheckout(t *testing.T) {
+	for _, preexisting := range []bool{false, true} {
+		name := "new checkout"
+		if preexisting {
+			name = "adopted checkout"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			setLegacyBusinessProduct(t, new("prod_business"))
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			polarCheckouts := newFakePolarCheckouts(t, r.Organization.ID)
+			var existing *fakePolarCheckout
+			if preexisting {
+				existing = polarCheckouts.seed("prod_business", nil, nil)
+			}
+			polarCheckouts.serve(nil)
+
+			first, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
+			second, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
+
+			require.Equal(t, first.CheckoutUrl, second.CheckoutUrl)
+			if preexisting {
+				require.Equal(t, "https://polar.sh/checkout/"+existing.ID, first.CheckoutUrl)
+				require.Zero(t, polarCheckouts.createCalls())
+			} else {
+				require.Equal(t, 1, polarCheckouts.createCalls())
+			}
+			intent, err := models.FindUnresolvedOrganizationBillingCheckout(database.DB(t.Context()), r.Organization.ID)
+			require.NoError(t, err)
+			require.NotNil(t, intent)
+			require.Equal(t, "prod_business", intent.PolarProductID)
+			require.Nil(t, intent.Seats)
 		})
 	}
 }
@@ -527,6 +578,8 @@ func TestLegacyBusinessCheckoutRejectsUnsafeBillingStateBeforePolar(t *testing.T
 		{name: "active subscription", subscriptionStatus: models.PolarSubscriptionStatusActive, wantMessage: manageSubscription},
 		{name: "trialing subscription", subscriptionStatus: models.PolarSubscriptionStatusTrialing, wantMessage: manageSubscription},
 		{name: "scheduled cancellation", subscriptionStatus: models.PolarSubscriptionStatusCanceled, scheduledCancellation: true, wantMessage: manageSubscription},
+		{name: "paused subscription", subscriptionStatus: models.PolarSubscriptionStatusPaused, wantMessage: manageSubscription},
+		{name: "paused with scheduled cancellation", subscriptionStatus: models.PolarSubscriptionStatusPaused, scheduledCancellation: true, wantMessage: manageSubscription},
 		{name: "billing disabled before billing guards", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, configuration: "disabled", wantMessage: "Business checkout is not configured"},
 		{name: "missing token before billing guards", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, configuration: "missing token", wantMessage: "Business checkout is not configured"},
 		{name: "missing product before billing guards", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, configuration: "missing product", wantMessage: "Business checkout is not configured"},
