@@ -2,13 +2,18 @@ package authorization_test
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func Test__AuthService_BasicPermissions(t *testing.T) {
@@ -178,6 +183,50 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 		err := r.AuthService.AssignRole(userID, "invalid_role", orgID, models.DomainTypeOrganization)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid role")
+	})
+}
+
+func Test__AuthService_RemoveRoleInTransaction(t *testing.T) {
+	r := support.Setup(t)
+	orgID := r.Organization.ID.String()
+
+	assignAdmin := func(t *testing.T) string {
+		t.Helper()
+		userID := uuid.NewString()
+		require.NoError(t, r.AuthService.AssignRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization))
+		return userID
+	}
+	hasAdminRole := func(t *testing.T, userID string) bool {
+		t.Helper()
+		roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), userID, orgID)
+		require.NoError(t, err)
+		return slices.ContainsFunc(roles, func(role *authorization.RoleDefinition) bool {
+			return role.Name == models.RoleOrgAdmin
+		})
+	}
+
+	t.Run("rolled back transaction keeps the role", func(t *testing.T) {
+		userID := assignAdmin(t)
+		rollback := errors.New("rollback")
+
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			require.NoError(t, r.AuthService.RemoveRoleInTransaction(tx, userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization))
+			return rollback
+		})
+
+		require.ErrorIs(t, err, rollback)
+		assert.True(t, hasAdminRole(t, userID))
+	})
+
+	t.Run("committed transaction removes the role", func(t *testing.T) {
+		userID := assignAdmin(t)
+
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			return r.AuthService.RemoveRoleInTransaction(tx, userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		})
+
+		require.NoError(t, err)
+		assert.False(t, hasAdminRole(t, userID))
 	})
 }
 
