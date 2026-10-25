@@ -56,6 +56,10 @@ func Test__WebhookRestoresRenewalReductionAfterLostPurchaseResponse(t *testing.T
 	staleBody, err := json.Marshal(map[string]any{"type": "subscription.updated", "data": stale})
 	require.NoError(t, err)
 	staleWebhook := signedPolarWebhook(t, "whsec_test-secret", staleBody)
+	// Every applied webhook starts a renewal schedule, and its verified
+	// Polar read can settle the purchase. Fail that read to check that the
+	// stale snapshot alone settles nothing.
+	provider.FailNext(1, http.StatusUnprocessableEntity, "PolarRequestValidationError")
 	(&Server{}).handlePolarWebhook(staleWebhook.recorder, staleWebhook.request)
 	require.Equal(t, http.StatusAccepted, staleWebhook.recorder.Code)
 	seatrenewal.Wait()
@@ -449,5 +453,85 @@ func signedPolarWebhook(t *testing.T, secret string, body []byte) signedPolarWeb
 	return signedPolarWebhookCall{
 		request:  req,
 		recorder: httptest.NewRecorder(),
+	}
+}
+
+func Test__SubscriptionWebhookSchedulesRenewalWithoutSeatPurchase(t *testing.T) {
+	const secret = "whsec_test-secret"
+	cases := []struct {
+		name       string
+		eventType  string
+		localState map[string]any
+	}{
+		{
+			name:      "activation",
+			eventType: "subscription.active",
+			localState: map[string]any{
+				"plan_source": "", "polar_subscription_id": nil, "polar_subscription_status": "",
+			},
+		},
+		{
+			name:      "recovery from past due",
+			eventType: "subscription.updated",
+			localState: map[string]any{
+				"polar_subscription_status": models.PolarSubscriptionStatusPastDue,
+				"past_due_since":            time.Now().Add(-24 * time.Hour),
+			},
+		},
+		{
+			name:       "active subscription update",
+			eventType:  "subscription.updated",
+			localState: map[string]any{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			t.Cleanup(r.Close)
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+			db := database.DB(t.Context())
+			require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+			member, err := models.CreateAccount("Member", uuid.NewString()+"@example.com")
+			require.NoError(t, err)
+			_, err = models.CreateUser(r.Organization.ID, member.ID, member.Email, member.Name)
+			require.NoError(t, err)
+			provider := polarfake.NewServer(t)
+			t.Cleanup(seatrenewal.Wait)
+			sub := provider.AddSeatPlan(db, r.Organization.ID, 4, time.Now().Add(time.Hour))
+			if len(tc.localState) > 0 {
+				require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+					Where("organization_id = ?", r.Organization.ID).Updates(tc.localState).Error)
+			}
+			purchase, err := models.FindLatestSeatPurchase(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.Nil(t, purchase, "the organization has no seat purchase")
+
+			snapshot, err := polar.NewClientFromEnv().GetSubscription(t.Context(), sub.ID)
+			require.NoError(t, err)
+			body, err := json.Marshal(map[string]any{"type": tc.eventType, "data": snapshot})
+			require.NoError(t, err)
+			deliver := func() {
+				webhook := signedPolarWebhook(t, secret, body)
+				(&Server{}).handlePolarWebhook(webhook.recorder, webhook.request)
+				require.Equal(t, http.StatusAccepted, webhook.recorder.Code)
+				seatrenewal.Wait()
+			}
+
+			deliver()
+
+			assert.Equal(t, []polarfake.Request{{
+				Method: http.MethodPatch, SubscriptionID: sub.ID,
+				Body: map[string]any{"seats": float64(2), "proration_behavior": "next_period"},
+			}}, provider.Patches())
+			plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.PolarSubscriptionStatusActive, plan.PolarSubscriptionStatus)
+			assert.Equal(t, new(2), plan.RenewalSeatsScheduled)
+
+			deliver()
+
+			assert.Len(t, provider.Patches(), 1, "a replay finds the schedule in sync")
+		})
 	}
 }

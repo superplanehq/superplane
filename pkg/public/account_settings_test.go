@@ -16,12 +16,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/polarfake"
 	"gorm.io/gorm"
 )
 
@@ -777,4 +780,125 @@ func testGothUser(provider, providerID, email string) goth.User {
 		Name:     "Linked",
 		NickName: "linked",
 	}
+}
+
+// accountDeletionRenewalFixture is a seat-plan organization that keeps
+// running after the test account is deleted, because another owner remains.
+type accountDeletionRenewalFixture struct {
+	r        *support.ResourceRegistry
+	provider *polarfake.Server
+	sub      polarfake.Subscription
+}
+
+func newAccountDeletionRenewalFixture(t *testing.T) *accountDeletionRenewalFixture {
+	t.Helper()
+	r := support.Setup(t)
+	t.Cleanup(r.Close)
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	require.NoError(t, db.Model(r.Account).Update("installation_admin", false).Error)
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	addOrganizationMember(t, r.Organization.ID, true)
+	addOrganizationMember(t, r.Organization.ID, false)
+
+	provider := polarfake.NewServer(t)
+	t.Cleanup(seatrenewal.Wait)
+	// Five paid seats, three members, and a renewal in one hour.
+	sub := provider.AddSeatPlan(db, r.Organization.ID, 5, time.Now().Add(time.Hour))
+	return &accountDeletionRenewalFixture{r: r, provider: provider, sub: sub}
+}
+
+func addOrganizationMember(t *testing.T, organizationID uuid.UUID, owner bool) {
+	t.Helper()
+	account, err := models.CreateAccount("Member", uuid.NewString()+"@example.com")
+	require.NoError(t, err)
+	user, err := models.CreateUserInTransaction(database.Conn(), organizationID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	require.NoError(t, models.SetUserIsOwner(database.Conn(), user.ID, owner))
+}
+
+func (f *accountDeletionRenewalFixture) deleteAccount(t *testing.T) *httptest.ResponseRecorder {
+	t.Helper()
+	server, account, token := setupTestServer(f.r, t)
+	body, err := json.Marshal(map[string]string{"email": account.Email})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+	seatrenewal.Wait()
+	return res
+}
+
+func (f *accountDeletionRenewalFixture) plan(t *testing.T) *models.OrganizationBillingPlan {
+	t.Helper()
+	plan, err := models.FindOrganizationBillingPlan(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	return plan
+}
+
+func requestsFor(requests []polarfake.Request, subscriptionID string) []polarfake.Request {
+	var matching []polarfake.Request
+	for _, request := range requests {
+		if request.SubscriptionID == subscriptionID {
+			matching = append(matching, request)
+		}
+	}
+	return matching
+}
+
+func TestDeleteAccount_SchedulesRenewalForSurvivingOrganization(t *testing.T) {
+	f := newAccountDeletionRenewalFixture(t)
+
+	res := f.deleteAccount(t)
+
+	require.Equal(t, http.StatusNoContent, res.Code)
+	assert.Equal(t, []polarfake.Request{{
+		Method: http.MethodPatch, SubscriptionID: f.sub.ID,
+		Body: map[string]any{"seats": float64(2), "proration_behavior": "next_period"},
+	}}, f.provider.Patches())
+	assert.Equal(t, new(2), f.provider.Subscription(f.sub.ID).PendingSeats)
+	assert.Equal(t, 5, f.provider.Subscription(f.sub.ID).Seats, "the current period keeps every paid seat")
+	assert.Equal(t, new(2), f.plan(t).RenewalSeatsScheduled)
+}
+
+func TestDeleteAccount_DoesNotScheduleRenewalForDeletedOrganization(t *testing.T) {
+	f := newAccountDeletionRenewalFixture(t)
+	db := database.Conn()
+	deleted, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), "")
+	require.NoError(t, err)
+	require.NoError(t, models.SetOrganizationCreatedByAccount(db, deleted.ID, f.r.Account.ID))
+	user, err := models.CreateUserInTransaction(db, deleted.ID, f.r.Account.ID, f.r.Account.Email, f.r.Account.Name)
+	require.NoError(t, err)
+	require.NoError(t, models.SetUserIsOwner(db, user.ID, true))
+	// The subscription of the deleted organization ended, so deletion needs
+	// no Polar check. A schedule for it would still read it from Polar.
+	ended := f.provider.AddSeatPlan(db, deleted.ID, 2, time.Now().Add(time.Hour))
+	f.provider.Update(ended.ID, func(sub *polarfake.Subscription) { sub.Status = models.PolarSubscriptionStatusCanceled })
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", deleted.ID).
+		Update("polar_subscription_status", models.PolarSubscriptionStatusCanceled).Error)
+
+	res := f.deleteAccount(t)
+
+	require.Equal(t, http.StatusNoContent, res.Code)
+	_, err = models.FindOrganizationByID(deleted.ID.String())
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	assert.Empty(t, requestsFor(f.provider.Requests(), ended.ID))
+	assert.Len(t, requestsFor(f.provider.Patches(), f.sub.ID), 1, "the surviving organization still gets its schedule")
+}
+
+func TestDeleteAccount_SucceedsWhenPolarRejectsTheRenewalSchedule(t *testing.T) {
+	f := newAccountDeletionRenewalFixture(t)
+	f.provider.FailNext(1, http.StatusUnprocessableEntity, "PolarRequestValidationError")
+
+	res := f.deleteAccount(t)
+
+	require.Equal(t, http.StatusNoContent, res.Code)
+	_, err := models.FindAccountByID(f.r.Account.ID.String())
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	_, err = models.FindActiveHumanUserByAccountAndOrganization(database.Conn(), f.r.Organization.ID, f.r.Account.ID)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	assert.Empty(t, f.provider.Patches())
+	assert.Nil(t, f.provider.Subscription(f.sub.ID).PendingSeats)
+	assert.Nil(t, f.plan(t).RenewalSeatsScheduled, "the seat renewal sync worker schedules it later")
 }

@@ -200,12 +200,18 @@ func Test__BillingSyncRestoresRenewalReductionAfterLostPurchaseResponse(t *testi
 	require.NoError(t, err)
 	require.Equal(t, seatPurchaseAwaitingConfirmation, response.Purchase.Status)
 	require.Nil(t, f.pendingRenewalSeats(), "the purchase cleared the reduction")
+	f.mu.Lock()
+	readsBeforeSync := f.getCount
+	f.mu.Unlock()
 
 	_, err = SyncOrganizationBilling(t.Context(), f.r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
 	require.NoError(t, err)
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
 	assert.Equal(t, new(1), f.pendingRenewalSeats())
 	assert.Equal(t, new(1), f.plan().RenewalSeatsScheduled)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	assert.Equal(t, 1, f.getCount-readsBeforeSync, "billing sync reads Polar for only one renewal schedule")
 }
 
 func Test__NoRenewalScheduleWhileASeatPurchaseIsInFlight(t *testing.T) {
@@ -224,4 +230,52 @@ func Test__NoRenewalScheduleWhileASeatPurchaseIsInFlight(t *testing.T) {
 	assert.Empty(t, f.renewalSchedules(), "the purchase replaces any scheduled count when it settles")
 	assert.Equal(t, models.SeatPurchaseStatusUnknown, f.latestPurchase().Status,
 		"nothing proves the outcome yet, so the purchase stays in flight")
+}
+
+// setToCancel marks the subscription to end at the period end, locally and
+// in Polar.
+func (f *seatPurchaseFixture) setToCancel() {
+	f.t.Helper()
+	f.mu.Lock()
+	f.cancelAtPeriodEnd = true
+	f.mu.Unlock()
+	f.updateBillingPlan(map[string]any{"cancel_at_period_end": true})
+}
+
+func (f *seatPurchaseFixture) resume() *pb.DescribeOrganizationBillingResponse {
+	f.t.Helper()
+	response, err := ResumeOrganizationSubscription(context.Background(), f.r.Organization.ID.String(), &pb.ResumeOrganizationSubscriptionRequest{})
+	require.NoError(f.t, err)
+	return response
+}
+
+func Test__ResumeShortlyBeforeRenewalSchedulesTheMemberCount(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 5, new(50))
+	f.addMembers(1)
+	f.setPeriodEnd(time.Now().Add(time.Hour).UTC().Truncate(time.Second))
+	f.setToCancel()
+
+	response := f.resume()
+
+	assert.False(t, response.CancelAtPeriodEnd)
+	assert.Equal(t, []map[string]any{scheduledRenewal(2)}, f.renewalSchedules())
+	assert.Equal(t, new(2), f.pendingRenewalSeats())
+	assert.Equal(t, new(2), f.plan().RenewalSeatsScheduled)
+	assert.Equal(t, 5, f.purchasedSeats(), "the current period keeps every paid seat")
+}
+
+func Test__ResumeSucceedsWhenPolarRejectsTheRenewalSchedule(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 5, new(50))
+	f.addMembers(1)
+	f.setPeriodEnd(time.Now().Add(time.Hour).UTC().Truncate(time.Second))
+	f.setToCancel()
+	f.scheduleRejection = &polarRejection{status: http.StatusUnprocessableEntity, code: "PolarRequestValidationError"}
+
+	response := f.resume()
+
+	assert.False(t, response.CancelAtPeriodEnd)
+	assert.Len(t, f.renewalSchedules(), 1, "the schedule was sent once and is left to the sync worker")
+	assert.False(t, f.plan().CancelAtPeriodEnd, "the resume stays applied")
+	assert.Nil(t, f.pendingRenewalSeats())
+	assert.Nil(t, f.plan().RenewalSeatsScheduled)
 }
