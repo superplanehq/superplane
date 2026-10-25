@@ -20,10 +20,75 @@ import (
 	"gorm.io/datatypes"
 )
 
-func Test__NodeRequestWorker_InvokeTriggerAction_DefersRunTitleResolutionUntilEventEmit(t *testing.T) {
+func Test__NodeRequestExecutor_RunNow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	db := database.DB(t.Context())
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "schedule", Type: models.NodeTypeTrigger,
+		Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{
+			"type": "days", "daysInterval": 1, "hour": 12, "minute": 0,
+		}),
+	}}, nil)
+
+	for _, name := range []string{"future request", "locked request", "completed request", "failed hook"} {
+		t.Run(name, func(t *testing.T) {
+			request := models.CanvasNodeRequest{
+				ID: uuid.New(), WorkflowID: canvas.ID, NodeID: "schedule",
+				Type: models.NodeRequestTypeInvokeAction, State: models.NodeExecutionRequestStatePending,
+				RunAt: time.Now().Add(time.Hour),
+				Spec:  datatypes.NewJSONType(models.NodeExecutionRequestSpec{InvokeAction: &models.InvokeAction{ActionName: "emitEvent"}}),
+			}
+			if name == "completed request" {
+				request.State = models.NodeExecutionRequestStateCompleted
+			}
+			if name == "failed hook" {
+				request.Spec = datatypes.NewJSONType(models.NodeExecutionRequestSpec{InvokeAction: &models.InvokeAction{ActionName: "missing"}})
+			}
+			require.NoError(t, db.Create(&request).Error)
+			if name == "locked request" {
+				tx := db.Begin()
+				require.NoError(t, tx.Error)
+				defer tx.Rollback()
+				_, err := models.LockNodeRequestNow(tx, request.ID)
+				require.NoError(t, err)
+			}
+			var before int64
+			require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&before).Error)
+			done := make(chan error, 1)
+			go func() { done <- executor.RunNow(request) }()
+			select {
+			case err := <-done:
+				if name == "failed hook" {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("RunNow must skip requests held by another executor")
+			}
+			updated, err := models.FindCanvasNodeRequest(db, request.ID)
+			require.NoError(t, err)
+			var after int64
+			require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&after).Error)
+			if name == "future request" {
+				assert.Equal(t, models.NodeExecutionRequestStateCompleted, updated.State)
+				assert.Equal(t, before+1, after)
+				return
+			}
+			assert.Equal(t, request.State, updated.State)
+			assert.WithinDuration(t, request.RunAt, updated.RunAt, time.Microsecond)
+			assert.Equal(t, before, after)
+		})
+	}
+}
+
+func Test__NodeRequestExecutor_InvokeTriggerAction_DefersRunTitleResolutionUntilEventEmit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -67,7 +132,7 @@ func Test__NodeRequestWorker_InvokeTriggerAction_DefersRunTitleResolutionUntilEv
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.NoError(t, err)
 
 	var event models.CanvasEvent
@@ -82,10 +147,10 @@ func Test__NodeRequestWorker_InvokeTriggerAction_DefersRunTitleResolutionUntilEv
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testing.T) {
+func Test__NodeRequestExecutor_InvokeNodeComponentActionWithoutExecution(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -122,14 +187,14 @@ func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testin
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "hook non-existent-action not found for action noop")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
+func Test__NodeRequestExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -181,8 +246,8 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	require.NoError(t, database.Conn().Create(&request).Error)
 
 	//
-	// Have two workers call LockAndProcessRequest concurrently on the same request.
-	// LockAndProcessRequest uses a transaction with locking, so only one should actually process.
+	// Have two workers call Execute concurrently on the same request.
+	// Execute uses a transaction with locking, so only one should actually process.
 	//
 	results := make(chan error, 2)
 
@@ -190,17 +255,17 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the request concurrently.
 	//
 	go func() {
-		worker1 := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
-		results <- worker1.LockAndProcessRequest(request)
+		executor1 := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
+		results <- executor1.Execute(request)
 	}()
 
 	go func() {
-		worker2 := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
-		results <- worker2.LockAndProcessRequest(request)
+		executor2 := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
+		results <- executor2.Execute(request)
 	}()
 
 	// Collect results - both should succeed (return nil)
-	// because LockAndProcessRequest returns nil when it can't acquire the lock
+	// because Execute returns nil when it can't acquire the lock
 	result1 := <-results
 	result2 := <-results
 	assert.NoError(t, result1)
@@ -215,7 +280,7 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
 
 	//
-	// Verify that exactly one workflow event was emitted (proving only one worker processed it).
+	// Verify that exactly one workflow event was emitted (proving only one executor processed it).
 	//
 	eventCount, err := models.CountCanvasEvents(database.Conn(), canvas.ID, triggerNode)
 	require.NoError(t, err)
@@ -224,10 +289,10 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
+func Test__NodeRequestExecutor_UnsupportedRequestType(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -274,17 +339,17 @@ func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	//
 	// Process the request and verify it returns an error.
 	//
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported node execution request type")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
+func Test__NodeRequestExecutor_MissingInvokeActionSpec(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -331,17 +396,17 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	//
 	// Process the request and verify it returns an error.
 	//
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec is not specified")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
+func Test__NodeRequestExecutor_NonExistentTrigger(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -387,17 +452,17 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	//
 	// Process the request and verify it returns an error.
 	//
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "trigger non-existent-trigger not registered")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
+func Test__NodeRequestExecutor_NonExistentAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -449,17 +514,17 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	//
 	// Process the request and verify it returns an error.
 	//
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "hook non-existent-action not found for trigger schedule")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_CompletesDeletedNodeRequests(t *testing.T) {
+func Test__NodeRequestExecutor_CompletesDeletedNodeRequests(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -516,7 +581,7 @@ func Test__NodeRequestWorker_CompletesDeletedNodeRequests(t *testing.T) {
 	}
 	assert.True(t, found, "Request for deleted node should be returned by ListNodeRequests")
 
-	err = worker.LockAndProcessRequest(request)
+	err = executor.Execute(request)
 	require.NoError(t, err)
 
 	var updatedRequest models.CanvasNodeRequest
@@ -531,10 +596,10 @@ func Test__NodeRequestWorker_CompletesDeletedNodeRequests(t *testing.T) {
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeRequests(t *testing.T) {
+func Test__NodeRequestExecutor_CancelsExecutionForDeletedNodeRequests(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentNode := "component-1"
 	canvas, canvasNodes := support.CreateCanvas(
@@ -575,7 +640,7 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeRequests(t *testing.T
 
 	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
 
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.NoError(t, err)
 
 	var updatedExecution models.CanvasNodeExecution
@@ -597,7 +662,7 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeRequests(t *testing.T
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
 }
 
-func Test__NodeRequestWorker_CompletesRequestForFinishedExecutionWithoutInvokingHook(t *testing.T) {
+func Test__NodeRequestExecutor_CompletesRequestForFinishedExecutionWithoutInvokingHook(t *testing.T) {
 	hookCalled := false
 	componentName := "finished_execution_request_" + uuid.New().String()
 	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
@@ -611,7 +676,7 @@ func Test__NodeRequestWorker_CompletesRequestForFinishedExecutionWithoutInvoking
 
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentNode := "component-1"
 	canvas, _ := support.CreateCanvas(
@@ -654,7 +719,7 @@ func Test__NodeRequestWorker_CompletesRequestForFinishedExecutionWithoutInvoking
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.NoError(t, err)
 
 	assert.False(t, hookCalled)
@@ -669,7 +734,7 @@ func Test__NodeRequestWorker_CompletesRequestForFinishedExecutionWithoutInvoking
 	assert.WithinDuration(t, finishedAt, *updatedExecution.UpdatedAt, time.Second)
 }
 
-func Test__NodeRequestWorker_CompletesRequestForCancellingExecutionWithoutInvokingHook(t *testing.T) {
+func Test__NodeRequestExecutor_CompletesRequestForCancellingExecutionWithoutInvokingHook(t *testing.T) {
 	hookCalled := false
 	componentName := "cancelling_execution_request_" + uuid.New().String()
 	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
@@ -683,7 +748,7 @@ func Test__NodeRequestWorker_CompletesRequestForCancellingExecutionWithoutInvoki
 
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentNode := "component-1"
 	canvas, _ := support.CreateCanvas(
@@ -725,7 +790,7 @@ func Test__NodeRequestWorker_CompletesRequestForCancellingExecutionWithoutInvoki
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.NoError(t, err)
 
 	assert.False(t, hookCalled)
@@ -741,10 +806,10 @@ func Test__NodeRequestWorker_CompletesRequestForCancellingExecutionWithoutInvoki
 	assert.WithinDuration(t, cancellingAt, *updatedExecution.UpdatedAt, time.Second)
 }
 
-func Test__NodeRequestWorker_DoesNotSaveStaleExecutionAfterHookFindsPersistedExecutionFinished(t *testing.T) {
+func Test__NodeRequestExecutor_DoesNotSaveStaleExecutionAfterHookFindsPersistedExecutionFinished(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentName := "stale_execution_after_hook_" + uuid.New().String()
 	var executionID uuid.UUID
@@ -802,7 +867,7 @@ func Test__NodeRequestWorker_DoesNotSaveStaleExecutionAfterHookFindsPersistedExe
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.NoError(t, err)
 
 	var updatedExecution models.CanvasNodeExecution
@@ -817,7 +882,7 @@ func Test__NodeRequestWorker_DoesNotSaveStaleExecutionAfterHookFindsPersistedExe
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
 }
 
-func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFails(t *testing.T) {
+func Test__NodeRequestExecutor_CancelsExecutionForDeletedNodeWhenComponentCancelFails(t *testing.T) {
 	cancelCalled := false
 	componentName := "cancel_failing_" + uuid.New().String()
 
@@ -831,7 +896,7 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFa
 
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 
 	componentNode := "component-1"
 	canvas, canvasNodes := support.CreateCanvas(
@@ -872,10 +937,10 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFa
 
 	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
 
-	err := worker.LockAndProcessRequest(request)
+	err := executor.Execute(request)
 	require.NoError(t, err)
 
-	assert.False(t, cancelCalled, "NodeRequestWorker should not invoke component Cancel directly")
+	assert.False(t, cancelCalled, "NodeRequestExecutor should not invoke component Cancel directly")
 
 	var updatedExecution models.CanvasNodeExecution
 	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
@@ -898,7 +963,7 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFa
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
 }
 
-func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T) {
+func Test__NodeRequestExecutor_DoesNotProcessDeletedWorkflowRequests(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -973,7 +1038,7 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T)
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *testing.T) {
+func Test__NodeRequestExecutor_DoesNotProcessSoftDeletedOrganizationRequests(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -982,7 +1047,7 @@ func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *te
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
 	triggerNode := "trigger-1"
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -1027,7 +1092,7 @@ func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *te
 		assert.NotEqual(t, request.ID, pending.ID)
 	}
 
-	require.NoError(t, worker.LockAndProcessRequest(request))
+	require.NoError(t, executor.Execute(request))
 
 	var updatedRequest models.CanvasNodeRequest
 	require.NoError(t, database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error)
