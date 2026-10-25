@@ -21,6 +21,7 @@ func TestRenewalSeatsKeepsOccupiedSeatsWithinPaidSeats(t *testing.T) {
 		{name: "members below paid seats", plan: models.OrganizationBillingPlan{Catalog: perSeat, PurchasedSeats: seatCount(10)}, occupied: 9, expected: seatCount(9)},
 		{name: "members equal paid seats", plan: models.OrganizationBillingPlan{Catalog: perSeat, PurchasedSeats: seatCount(10)}, occupied: 10, expected: seatCount(10)},
 		{name: "members above paid seats never add seats", plan: models.OrganizationBillingPlan{Catalog: perSeat, PurchasedSeats: seatCount(10)}, occupied: 12, expected: seatCount(10)},
+		{name: "three members and one paid seat renew one seat", plan: models.OrganizationBillingPlan{Catalog: perSeat, PurchasedSeats: seatCount(1)}, occupied: 3, expected: seatCount(1)},
 		{name: "no members keep one seat", plan: models.OrganizationBillingPlan{Catalog: perSeat, PurchasedSeats: seatCount(10)}, occupied: 0, expected: seatCount(1)},
 		{name: "fallback catalog keeps the paid seats", plan: models.OrganizationBillingPlan{PurchasedSeats: seatCount(5)}, occupied: 3, expected: seatCount(3)},
 		{name: "missing paid seats", plan: models.OrganizationBillingPlan{Catalog: perSeat}, occupied: 3, err: ErrInvalidPaidSeats},
