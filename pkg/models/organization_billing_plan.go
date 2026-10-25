@@ -33,6 +33,8 @@ const (
 	PolarSubscriptionStatusPaused     = "paused"
 	PolarSubscriptionStatusIncomplete = "incomplete"
 
+	PolarSubscriptionStatusIncompleteExpired = "incomplete_expired"
+
 	DefaultIncludedGrantCents  int64 = 5000
 	DefaultIncludedGrantMonths       = 1
 	DefaultTopupGrantMonths          = 12
@@ -235,32 +237,40 @@ func PolarSubscriptionKeepsAccess(status string, cancelAtPeriodEnd bool, periodE
 }
 
 // HasLivePolarSubscription reports whether Polar can still charge for this
-// plan. Scheduled cancellation stays live until the paid period ends.
+// plan. An elapsed scheduled cancellation does not end a subscription: Polar
+// can resume it, and only a terminal status from Polar proves the end.
 // Admin and system plans do not have a live Polar subscription.
 func (p *OrganizationBillingPlan) HasLivePolarSubscription(now time.Time) bool {
-	if p == nil || p.PlanSource != BillingPlanSourcePolar {
-		return false
-	}
-	if p.PolarSubscriptionID == nil || strings.TrimSpace(*p.PolarSubscriptionID) == "" {
-		return false
-	}
-	// Deletion is available after scheduled cancellation ends. Identity guards
-	// still require a provider snapshot before replacing the subscription.
-	if p.CancelAtPeriodEnd && !periodStillOpen(p.CurrentPeriodEnd, now) {
+	if !p.hasStoredPolarSubscription() {
 		return false
 	}
 	return PolarSubscriptionIsLive(p.PolarSubscriptionStatus, p.CancelAtPeriodEnd, p.CurrentPeriodEnd, now)
 }
 
-// OrganizationHasLivePolarSubscription reports whether the organization has a
-// Polar subscription that can still charge. An organization without a billing
-// row has none.
-func OrganizationHasLivePolarSubscription(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
-	plan, err := FindOrganizationBillingPlan(tx, orgID)
-	if err != nil {
-		return false, err
+// MayBeBillable reports whether the stored row cannot prove that Polar
+// stopped billing. Only a terminal status proves the end. An empty or unknown
+// status, and a scheduled cancellation whose period elapsed while the status
+// stays non-terminal, can still bill. Deletion needs Polar to confirm the end
+// of such a subscription.
+func (p *OrganizationBillingPlan) MayBeBillable(now time.Time) bool {
+	if !p.hasStoredPolarSubscription() {
+		return false
 	}
-	return plan.HasLivePolarSubscription(time.Now()), nil
+	return !PolarSubscriptionIsTerminal(p.PolarSubscriptionStatus, p.CancelAtPeriodEnd, p.CurrentPeriodEnd, now)
+}
+
+// PolarSubscriptionIsTerminal reports whether Polar ended the subscription
+// and cannot bill it again. A canceled subscription that keeps its paid
+// period open is not terminal yet.
+func PolarSubscriptionIsTerminal(status string, cancelAtPeriodEnd bool, periodEnd *time.Time, now time.Time) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case PolarSubscriptionStatusCanceled:
+		return !cancelAtPeriodEnd || !periodStillOpen(periodEnd, now)
+	case PolarSubscriptionStatusRevoked, PolarSubscriptionStatusIncompleteExpired:
+		return true
+	default:
+		return false
+	}
 }
 
 // PolarSubscriptionIsPastDue is true while Polar retries a failed renewal payment.
@@ -294,7 +304,7 @@ func PolarSubscriptionStatusIsKnown(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case PolarSubscriptionStatusActive, PolarSubscriptionStatusTrialing, PolarSubscriptionStatusCanceled,
 		PolarSubscriptionStatusUnpaid, PolarSubscriptionStatusRevoked, PolarSubscriptionStatusPastDue,
-		PolarSubscriptionStatusIncomplete, "incomplete_expired", PolarSubscriptionStatusPaused:
+		PolarSubscriptionStatusIncomplete, PolarSubscriptionStatusIncompleteExpired, PolarSubscriptionStatusPaused:
 		return true
 	default:
 		return false
@@ -772,6 +782,13 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 
 func samePolarSubscription(existing *OrganizationBillingPlan, subscriptionID string) bool {
 	return existing.PolarSubscriptionID != nil && strings.TrimSpace(*existing.PolarSubscriptionID) == strings.TrimSpace(subscriptionID)
+}
+
+// hasStoredPolarSubscription is true for a Polar-managed row that names a
+// subscription. Admin and system rows keep an old ID only for history.
+func (p *OrganizationBillingPlan) hasStoredPolarSubscription() bool {
+	return p != nil && p.PlanSource == BillingPlanSourcePolar &&
+		p.PolarSubscriptionID != nil && strings.TrimSpace(*p.PolarSubscriptionID) != ""
 }
 
 // settleIgnoredForeignSeatPurchase settles the in-flight purchase of a

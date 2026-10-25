@@ -419,6 +419,10 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 				ID: "sub_account_delete", ProductID: "prod_business", Status: status,
 			}, nil)
 			require.NoError(t, err)
+			useAccountDeletionPolar(t, func(w http.ResponseWriter, orgID string) {
+				require.Equal(t, protected.ID.String(), orgID)
+				writePolarSubscriptions(t, w, map[string]any{"id": "sub_account_delete", "status": status, "external_customer_id": orgID})
+			})
 			server, account, token := setupTestServer(r, t)
 			beforeAccount, err := models.FindAccountByID(account.ID.String())
 			require.NoError(t, err)
@@ -472,6 +476,97 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 			}
 		})
 	}
+}
+
+func TestDeleteAccount_AsksPolarAboutElapsedScheduledCancellation(t *testing.T) {
+	setup := func(t *testing.T) (*support.ResourceRegistry, func() *httptest.ResponseRecorder) {
+		t.Helper()
+		r := support.Setup(t)
+		db := database.DB(t.Context())
+		require.NoError(t, db.Model(r.Account).Update("installation_admin", false).Error)
+		require.NoError(t, models.BindLegacyBillingProduct(db, "prod_business"))
+		end := time.Now().Add(-time.Hour)
+		start := end.AddDate(0, -1, 0)
+		_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+			ID: "sub_elapsed", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive,
+			PeriodStart: &start, PeriodEnd: &end, CancelAtPeriodEnd: true,
+		}, nil)
+		require.NoError(t, err)
+		server, account, token := setupTestServer(r, t)
+		body, err := json.Marshal(map[string]string{"email": account.Email})
+		require.NoError(t, err)
+		return r, func() *httptest.ResponseRecorder {
+			req := httptest.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+			req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+			res := httptest.NewRecorder()
+			server.Router.ServeHTTP(res, req)
+			return res
+		}
+	}
+	requireAccountAndOrganizationKept := func(t *testing.T, r *support.ResourceRegistry) {
+		t.Helper()
+		_, err := models.FindAccountByID(r.Account.ID.String())
+		require.NoError(t, err)
+		_, err = models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+	}
+
+	t.Run("provider resumed the subscription", func(t *testing.T) {
+		r, deleteAccount := setup(t)
+		useAccountDeletionPolar(t, func(w http.ResponseWriter, orgID string) {
+			writePolarSubscriptions(t, w, map[string]any{"id": "sub_elapsed", "status": "active", "external_customer_id": orgID})
+		})
+
+		res := deleteAccount()
+
+		require.Equal(t, http.StatusConflict, res.Code)
+		assert.Contains(t, res.Body.String(), "Cancel the subscription in Billing")
+		requireAccountAndOrganizationKept(t, r)
+	})
+
+	t.Run("provider failure", func(t *testing.T) {
+		r, deleteAccount := setup(t)
+		useAccountDeletionPolar(t, func(w http.ResponseWriter, _ string) {
+			w.WriteHeader(http.StatusInternalServerError)
+		})
+
+		res := deleteAccount()
+
+		require.Equal(t, http.StatusServiceUnavailable, res.Code)
+		assert.Contains(t, res.Body.String(), models.ErrOrganizationSubscriptionUnverified.Error())
+		requireAccountAndOrganizationKept(t, r)
+	})
+
+	t.Run("provider confirmed termination", func(t *testing.T) {
+		r, deleteAccount := setup(t)
+		useAccountDeletionPolar(t, func(w http.ResponseWriter, orgID string) {
+			writePolarSubscriptions(t, w, map[string]any{"id": "sub_elapsed", "status": "canceled", "external_customer_id": orgID})
+		})
+
+		res := deleteAccount()
+
+		require.Equal(t, http.StatusNoContent, res.Code)
+		_, err := models.FindAccountByID(r.Account.ID.String())
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindOrganizationByID(r.Organization.ID.String())
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+}
+
+func useAccountDeletionPolar(t *testing.T, respond func(w http.ResponseWriter, orgID string)) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/subscriptions/", r.URL.Path)
+		respond(w, r.URL.Query().Get("external_customer_id"))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+}
+
+func writePolarSubscriptions(t *testing.T, w http.ResponseWriter, items ...map[string]any) {
+	t.Helper()
+	assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": items, "pagination": map[string]any{"max_page": 1}}))
 }
 
 func TestDeleteAccount_LeavesOwnedButUncreatedOrg(t *testing.T) {
