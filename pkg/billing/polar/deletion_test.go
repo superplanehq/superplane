@@ -76,6 +76,38 @@ func TestVerifyOrganizationDeletionAsksPolarAboutStaleCancellation(t *testing.T)
 			err: models.ErrOrganizationSubscriptionLive,
 		},
 		{
+			name: "another subscription is unpaid",
+			providers: func(orgID uuid.UUID) []map[string]any {
+				return []map[string]any{
+					providerSubscription(orgID, deletionSubscriptionID, "canceled", false),
+					providerSubscription(orgID, "sub_other", "unpaid", false),
+				}
+			},
+			err: models.ErrOrganizationSubscriptionUnverified,
+		},
+		{
+			name: "another subscription is incomplete",
+			providers: func(orgID uuid.UUID) []map[string]any {
+				return []map[string]any{
+					providerSubscription(orgID, deletionSubscriptionID, "canceled", false),
+					providerSubscription(orgID, "sub_other", "incomplete", false),
+				}
+			},
+			err: models.ErrOrganizationSubscriptionUnverified,
+		},
+		{
+			name: "another subscription has an ended timestamp but a non-terminal status",
+			providers: func(orgID uuid.UUID) []map[string]any {
+				other := providerSubscription(orgID, "sub_other", "active", false)
+				other["ended_at"] = time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+				return []map[string]any{
+					providerSubscription(orgID, deletionSubscriptionID, "canceled", false),
+					other,
+				}
+			},
+			err: models.ErrOrganizationSubscriptionLive,
+		},
+		{
 			name: "provider does not return the stored subscription",
 			providers: func(orgID uuid.UUID) []map[string]any {
 				return []map[string]any{providerSubscription(orgID, "sub_other", "canceled", false)}
@@ -111,12 +143,13 @@ func TestVerifyOrganizationDeletionAsksPolarAboutStaleCancellation(t *testing.T)
 }
 
 func TestVerifyOrganizationDeletionClearsProviderTermination(t *testing.T) {
-	for _, status := range []string{"canceled", "revoked"} {
+	for _, status := range []string{"canceled", "revoked", "incomplete_expired"} {
 		t.Run(status, func(t *testing.T) {
 			org := setupBillingOrganization(t)
 			storeElapsedScheduledCancellation(t, org.ID)
 			usePolarSubscriptionServer(t, org.ID.String(), []map[string]any{
 				providerSubscription(org.ID, deletionSubscriptionID, status, true),
+				providerSubscription(org.ID, "sub_other", "canceled", false),
 			})
 
 			clearance, err := VerifyOrganizationDeletion(context.Background(), org.ID)

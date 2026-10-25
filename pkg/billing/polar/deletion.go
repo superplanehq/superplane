@@ -18,7 +18,7 @@ import (
 //
 // A billing row that cannot bill gets a local clearance without a Polar
 // request. A row that may still bill needs Polar to return the stored
-// subscription in a terminal state and no other live subscription. A live
+// subscription and every other subscription in a terminal state. A live
 // subscription returns models.ErrOrganizationSubscriptionLive. A Polar
 // failure or an unclear answer returns
 // models.ErrOrganizationSubscriptionUnverified that wraps the cause.
@@ -61,24 +61,22 @@ func confirmSubscriptionEnded(ctx context.Context, orgID uuid.UUID, storedID str
 			return unverifiedDeletion("Polar subscription %q has unexpected status %q", item.ID, item.Status)
 		}
 		periodEnd := item.CurrentPeriodEnd.TimePtr()
+		terminal := models.PolarSubscriptionIsTerminal(status, item.CancelAtPeriodEnd, periodEnd, now)
 		if item.ID == storedID {
-			storedEnded = models.PolarSubscriptionIsTerminal(status, item.CancelAtPeriodEnd, periodEnd, now)
+			storedEnded = terminal
 		}
-		if subscriptionEndedAt(item, now) {
+		if terminal {
 			continue
 		}
 		if models.PolarSubscriptionIsLive(status, item.CancelAtPeriodEnd, periodEnd, now) {
 			return fmt.Errorf("%w: Polar subscription %q is %s", models.ErrOrganizationSubscriptionLive, item.ID, status)
 		}
+		return unverifiedDeletion("Polar subscription %q is not in a terminal state: %s", item.ID, status)
 	}
 	if !storedEnded {
 		return unverifiedDeletion("Polar did not return stored subscription %q in a terminal state", storedID)
 	}
 	return nil
-}
-
-func subscriptionEndedAt(item SubscriptionData, now time.Time) bool {
-	return !item.EndedAt.Time.IsZero() && !item.EndedAt.Time.After(now)
 }
 
 func unverifiedDeletion(format string, args ...any) error {
