@@ -170,7 +170,7 @@ func Test__SeatRenewalSyncFixesTheCountAfterAPolarOutage(t *testing.T) {
 func Test__SeatRenewalSyncWaitsUntilTheSeatPurchaseSettles(t *testing.T) {
 	f := newSeatRenewalSyncFixture(t)
 	orgID, sub := f.addOrganization(3, 12*time.Hour)
-	purchase := models.NewSeatPurchase(orgID, nil, sub.ID, 3, 4)
+	purchase := models.NewSeatPurchase(orgID, nil, sub.ID, 3, 4, nil)
 	require.NoError(t, purchase.Create(database.Conn()))
 
 	f.worker.tick(context.Background())

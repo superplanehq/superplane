@@ -9,6 +9,8 @@ export type CompletedSeatPurchasePreview = {
   additionalSeats: number;
   billingBaseline: number | undefined;
   request: number;
+  /** Identifies the purchase of this preview. A retry of the same preview sends the same key, so the server cannot charge twice. */
+  operationKey: string;
 };
 
 export function useSeatPurchaseEstimate({
@@ -48,7 +50,13 @@ export function useSeatPurchaseEstimate({
         if (!isCurrent()) return;
         if (response.data?.purchasedSeats === undefined)
           throw new Error("SuperPlane could not estimate this purchase. Try again.");
-        setCompleted({ estimate: response.data, additionalSeats: count, billingBaseline: baseline, request: revision });
+        setCompleted({
+          estimate: response.data,
+          additionalSeats: count,
+          billingBaseline: baseline,
+          request: revision,
+          operationKey: crypto.randomUUID(),
+        });
       } catch (previewError) {
         if (isCurrent())
           setError(getApiErrorMessage(previewError, "SuperPlane could not estimate this purchase. Try again."));

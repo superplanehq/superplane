@@ -803,7 +803,7 @@ func settleIgnoredForeignSeatPurchase(tx *gorm.DB, orgID uuid.UUID, sub PolarSub
 	if err != nil || purchase == nil || !sub.ModifiedAt.After(purchase.CreatedAt) {
 		return err
 	}
-	return SettleSeatPurchase(tx, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt)
+	return SettleSeatPurchase(tx, orgID, sub.ID, sub.PeriodStart, sub.PurchasedSeats, sub.ModifiedAt)
 }
 
 func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPlan, sub PolarSubscriptionApply) (*PolarSubscriptionApplyResult, error) {
@@ -818,8 +818,9 @@ func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPl
 	}
 	// Only a snapshot fresh enough to apply can prove the outcome of an
 	// in-flight seat purchase. A stale snapshot can report seats that
-	// Polar no longer has, so it must not settle a purchase.
-	if err := SettleSeatPurchase(tx, orgID, sub.ID, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
+	// Polar no longer has, so it must not settle a purchase. The settlement
+	// also ignores a snapshot from another billing period.
+	if err := SettleSeatPurchase(tx, orgID, sub.ID, sub.PeriodStart, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
 		return nil, err
 	}
 	// Lock the plan row before reading its fields and keep the lock through

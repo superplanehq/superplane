@@ -185,8 +185,25 @@ The API has two routes. Both need `org:update` and **New Billing**:
 - `POST /api/v1/organizations/{id}/billing/seats/preview` with `additional_seats`.
   It estimates the charge and makes no change.
 - `POST /api/v1/organizations/{id}/billing/seats/purchase` with
-  `additional_seats` and `expected_purchased_seats`. The second field must equal
-  the current `purchased_seats`. A repeated or stale request gets HTTP 409.
+  `additional_seats`, `expected_purchased_seats`, and `operation_key`. The
+  second field must equal the current `purchased_seats`. A stale request gets
+  HTTP 409.
+
+The `operation_key` identifies one purchase in the organization. It is
+required and has 1 to 128 printable ASCII characters without spaces. A request
+without a valid key gets HTTP 400 and does not reach Polar. The buy seats dialog
+makes one key for each confirmed preview.
+
+- A repeat with the same key and the same request returns the stored purchase.
+  It does not call Polar, also after a renewal.
+- A repeat with the same key and a different request gets HTTP 412. It does
+  not call Polar.
+- The purchase row stores the key, a fingerprint of `additional_seats` and
+  `expected_purchased_seats`, the subscription, and the billing period.
+
+Release the server and the web client together. A server with this rule
+rejects a purchase from an older cached client until the page reloads. No
+purchase path charges without a key.
 
 SuperPlane sends `PATCH /subscriptions/{id}` with the absolute seat count and
 `proration_behavior` set to `invoice`. It does not use any other value. A
@@ -204,7 +221,9 @@ does not remove seats that were added elsewhere.
 7. In the Polar sandbox dashboard, confirm that Polar created an order for the prorated amount at once.
 8. Confirm that `purchased_seats` grew by one, `last_seat_purchase.status` is `succeeded`,
    and `current_period_end` did not change.
-9. Send the same purchase request again. Confirm HTTP 409 and no second Polar order.
+9. Send the same purchase request again with the same `operation_key`. Confirm
+   that the response has the same purchase ID and that Polar has no second order.
+   Send it with a new key. Confirm HTTP 409 and no second Polar order.
 10. Set a sandbox payment method that Polar declines. Buy one seat. Confirm that the
     request fails with the payment failed message and `purchased_seats` does not change.
 11. Set a sandbox payment method that needs bank confirmation. Confirm the distinct
@@ -219,9 +238,18 @@ A purchase that Polar never applied fails five minutes after it started, when th
 next preview, purchase, or renewal seat schedule checks Polar. The same rule
 applies when Polar reports fewer seats than the target after an outside change.
 
+Only a Polar snapshot from the billing period in which the purchase started can
+settle it. After a renewal, the seat count can return to the original count
+because of a scheduled reduction, so it proves nothing. An unconfirmed purchase
+that crosses a renewal stays `awaiting_confirmation` and blocks new purchases
+for the organization. SuperPlane does not retry the charge. A person must check
+the Polar orders of the subscription and set the purchase status by hand.
+A purchase from before operation keys has no stored period. Only a snapshot
+whose period started before the purchase can settle it.
+
 The table `organization_seat_purchases` is the marker for seat changes that
-SuperPlane started. Use `models.FindExpectedSeatCount` to tell them from outside
-changes in Polar.
+SuperPlane started. Use `models.FindExpectedSeatCount` with the current period
+start to tell them from outside changes in Polar.
 
 ## Renew only occupied seats
 

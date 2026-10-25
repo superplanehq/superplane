@@ -65,7 +65,9 @@ describe("seat purchase HTTP recovery", () => {
     expect(result.current.preview?.purchasedSeats).toBe(4);
     await act(async () => result.current.confirm());
     expect(result.current.preview).toBeUndefined();
-    expect(purchaseRequests).toEqual([{ additionalSeats: 1, expectedPurchasedSeats: 4 }]);
+    expect(purchaseRequests).toEqual([
+      { additionalSeats: 1, expectedPurchasedSeats: 4, operationKey: expect.stringMatching(/^[0-9a-f-]{36}$/) },
+    ]);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(300);
     });
