@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { useState, type ChangeEvent, type FocusEvent, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,11 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/errors";
+import { organizationSettingsSectionPath } from "@/pages/factories/lib/factoryPagePaths";
 import type { AssignableRoleOption } from "./MemberRowControls";
 import { settingsErrorClassName } from "./settingsPageStyles";
-import type { InvitationManager } from "./useOrganizationInvitationManager";
+import type { InvitationCapacity, InvitationManager } from "./useOrganizationInvitationManager";
 
 interface InviteMemberDialogProps {
+  organizationId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   manager: InvitationManager;
@@ -27,6 +30,7 @@ interface InviteMemberDialogProps {
 }
 
 export function InviteMemberDialog({
+  organizationId,
   open,
   onOpenChange,
   manager,
@@ -96,7 +100,7 @@ export function InviteMemberDialog({
           <p className="text-sm text-muted-foreground">
             Invitations expire after {duration} {duration === 1 ? "day" : "days"}.
           </p>
-          <InvitationCapacityNotice manager={manager} />
+          <InvitationCapacityNotice manager={manager} organizationId={organizationId} />
           <InvitationErrors manager={manager} />
           <DialogFooter>
             <DialogClose asChild>
@@ -131,16 +135,77 @@ export function InvitationErrors({ manager }: { manager: InvitationManager }) {
   );
 }
 
-export function InvitationCapacityNotice({ manager }: { manager: InvitationManager }) {
-  const seats = manager.invitations.data?.seats;
-  if (!seats || !manager.canInvite || !manager.capacityFull) return null;
+type InvitationCapacityNoticeManager = Pick<
+  InvitationManager,
+  "capacity" | "canInvite" | "canManageBilling" | "canPurchaseSeats"
+>;
+
+export function InvitationCapacityNotice({
+  manager,
+  organizationId,
+}: {
+  manager: InvitationCapacityNoticeManager;
+  organizationId: string;
+}) {
+  const capacity = manager.capacity;
+  if (!capacity || !manager.canInvite) return null;
+  const message = capacityMessage(capacity, manager);
+  if (!message) return null;
+  const billingPath = organizationSettingsSectionPath(organizationId, "billing");
+  const action = capacityAction(capacity, manager, billingPath);
   return (
-    <p className="text-sm text-amber-700 dark:text-amber-400">
-      {seats.perSeat
-        ? "All purchased seats are assigned or reserved. Purchase seats in Billing to invite another member."
-        : "The member limit is reached. Remove a member or contact a site admin to increase the limit."}
-    </p>
+    <div role="status" aria-label="Invitation capacity" className="text-sm text-amber-700 dark:text-amber-400">
+      {message}
+      {action && (
+        <>
+          {" "}
+          <Link to={action.to} className="font-medium underline underline-offset-2">
+            {action.label}
+          </Link>
+        </>
+      )}
+    </div>
   );
+}
+
+function capacityMessage(capacity: InvitationCapacity, manager: InvitationCapacityNoticeManager): string | null {
+  const { canManageBilling, canPurchaseSeats } = manager;
+  switch (capacity.state) {
+    case "paymentBlocked":
+      return canManageBilling
+        ? "Invitations are paused until the payment method is updated."
+        : "Invitations are paused until the payment method is updated. Ask a billing manager to update it.";
+    case "overCapacity":
+      return `${capacity.members} members use ${capacity.paidSeats} paid seats. ${
+        canPurchaseSeats ? "Purchase seats to invite another member." : "Remove a member to invite another member."
+      }`;
+    case "purchaseRequired":
+      return canManageBilling
+        ? "All purchased seats are assigned or reserved. Purchase seats to invite another member."
+        : "All purchased seats are assigned or reserved. Ask a billing manager to purchase seats.";
+    case "planMaximum":
+      return "Remove a member or cancel a pending invitation to free a seat.";
+    case "memberLimit":
+      return "The member limit is reached. Remove a member or contact a site admin to increase the limit.";
+    case "available":
+    case "unlimited":
+      return null;
+  }
+}
+
+function capacityAction(
+  capacity: InvitationCapacity,
+  manager: InvitationCapacityNoticeManager,
+  billingPath: string,
+): { label: string; to: string } | null {
+  if (capacity.state === "paymentBlocked" && manager.canManageBilling) {
+    return { label: "Open Billing", to: billingPath };
+  }
+  const purchasable = capacity.state === "purchaseRequired" || capacity.state === "overCapacity";
+  if (purchasable && manager.canPurchaseSeats) {
+    return { label: "Purchase seats", to: `${billingPath}?buySeats=1` };
+  }
+  return null;
 }
 
 export function InvitationLinkDialog({
