@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -257,4 +259,43 @@ func TestRemoveUserHandlesPendingInvitationsOfInviter(t *testing.T) {
 			require.Equal(t, []string{models.RoleOrgOperator}, invitationRoleNames(roles))
 		})
 	}
+}
+
+type failingRoleRemovalAuthorization struct {
+	authorization.Authorization
+}
+
+func (a failingRoleRemovalAuthorization) RemoveRoleInTransaction(tx *gorm.DB, userID, role, domainID, domainType string) error {
+	if err := a.Authorization.RemoveRoleInTransaction(tx, userID, role, domainID, domainType); err != nil {
+		return err
+	}
+	return errors.New("role removal interrupted")
+}
+
+func TestRemoveUserRollsBackRolesMembershipAndInvitations(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "no")
+	orgID := r.Organization.ID.String()
+	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
+	member := createInvitationAdmin(t, r, "member@example.com")
+	recipient, err := models.CreateAccount("Recipient", "recipient@example.com")
+	require.NoError(t, err)
+	created, err := s.Create(context.Background(), orgID, member.ID.String(), &pb.CreateInvitationRequest{Email: recipient.Email, Role: models.RoleOrgAdmin})
+	require.NoError(t, err)
+	rolesBefore, err := r.AuthService.GetUserRolesForOrg(context.Background(), member.ID.String(), orgID)
+	require.NoError(t, err)
+	require.NotEmpty(t, rolesBefore)
+
+	_, err = RemoveUser(context.Background(), failingRoleRemovalAuthorization{r.AuthService}, orgID, member.ID.String())
+
+	require.Equal(t, codes.Internal, grpcerrors.Code(err))
+	_, err = models.FindActiveUserByID(orgID, member.ID.String())
+	require.NoError(t, err)
+	rolesAfter, err := r.AuthService.GetUserRolesForOrg(context.Background(), member.ID.String(), orgID)
+	require.NoError(t, err)
+	require.ElementsMatch(t, invitationRoleNames(rolesBefore), invitationRoleNames(rolesAfter))
+	stored, err := models.FindOrganizationInvitation(database.Conn(), r.Organization.ID, uuid.MustParse(created.Invitation.Id))
+	require.NoError(t, err)
+	require.Equal(t, models.InvitationStatePending, stored.State)
 }
