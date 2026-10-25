@@ -54,6 +54,9 @@ func startSubscriptionCheckout(ctx context.Context, request subscriptionCheckout
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "Organization not found.")
 		}
+		if errors.Is(err, models.ErrBillingCheckoutLiveSubscription) {
+			return nil, liveSubscriptionSelectionError()
+		}
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "Could not start subscription checkout.")
 		}
@@ -179,12 +182,14 @@ func applyPolarCheckout(ctx context.Context, intent *models.OrganizationBillingC
 		return &polar.CheckoutSession{ID: checkout.ID, URL: intent.CheckoutURLValue(), Status: checkout.Status}, nil
 	}
 
+	if checkout.Status == polar.CheckoutStatusSucceeded {
+		if err := requireNoLiveSubscription(ctx, request.OrganizationID); err != nil {
+			return nil, err
+		}
+	}
 	state, _ := checkout.Status.IntentState()
 	if err := intent.Resolve(db, state, &snapshot); err != nil {
 		return nil, ignoreCheckoutConflict(err)
-	}
-	if checkout.Status == polar.CheckoutStatusSucceeded {
-		return nil, requireNoLiveSubscription(ctx, request.OrganizationID)
 	}
 	return nil, nil
 }
@@ -194,15 +199,24 @@ func applyPolarCheckout(ctx context.Context, intent *models.OrganizationBillingC
 // before the caller opens another checkout.
 func requireNoLiveSubscription(ctx context.Context, orgID uuid.UUID) error {
 	db := database.DB(ctx)
-	if err := polar.SyncOrganizationSubscription(ctx, db, orgID); err != nil {
-		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription after a paid checkout")
+	status, err := polar.VerifyOrganizationSubscription(ctx, orgID)
+	if err != nil {
+		return polarBillingError(err, "Could not verify the current subscription.")
+	}
+	if status != "none" {
+		if status == "active" {
+			if err := polar.SyncOrganizationSubscription(ctx, db, orgID); err != nil {
+				return polarBillingError(err, "Could not verify the current subscription.")
+			}
+		}
+		return liveSubscriptionSelectionError()
 	}
 	current, err := models.FindOrganizationBillingPlan(db, orgID)
 	if err != nil {
 		return grpcerrors.Internal(err, "Could not load the current plan.")
 	}
 	if current.HasLivePolarSubscription(time.Now()) {
-		return grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
+		return liveSubscriptionSelectionError()
 	}
 	return nil
 }
@@ -220,7 +234,10 @@ func adoptPreexistingCheckout(ctx context.Context, client *polar.Client, request
 	if known {
 		return nil
 	}
-	checkouts, err := client.ListCheckouts(ctx, request.OrganizationID.String(), request.ProductID)
+	if err := models.BindLegacyBillingProduct(db, polar.BusinessProductID()); err != nil {
+		return grpcerrors.Internal(err, "Could not load billing plans.")
+	}
+	checkouts, err := client.ListCheckouts(ctx, request.OrganizationID.String(), "")
 	if err != nil {
 		return polarBillingError(err, "Could not verify existing checkouts.")
 	}
@@ -229,8 +246,15 @@ func adoptPreexistingCheckout(ctx context.Context, client *polar.Client, request
 		if !checkout.Status.Payable() || checkout.IntentID() != "" {
 			continue
 		}
-		_, err := models.AdoptPreexistingOrganizationBillingCheckout(
-			database.DB(context.WithoutCancel(ctx)), request.OrganizationID, request.PlanKey, request.ProductID, checkout.Seats, checkoutSnapshot(checkout),
+		plan, err := models.FindBillingPlanByProduct(db, checkout.ProductID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			continue // Credit purchase products are not subscription plans.
+		}
+		if err != nil {
+			return grpcerrors.Internal(err, "Could not load billing plans.")
+		}
+		_, err = models.AdoptPreexistingOrganizationBillingCheckout(
+			database.DB(context.WithoutCancel(ctx)), request.OrganizationID, plan.Key, checkout.ProductID, checkout.Seats, checkoutSnapshot(checkout),
 		)
 		if err != nil {
 			return grpcerrors.Internal(err, "Could not start subscription checkout.")
@@ -238,6 +262,29 @@ func adoptPreexistingCheckout(ctx context.Context, client *polar.Client, request
 		return nil
 	}
 	return nil
+}
+
+// reconcileCheckoutBeforeLocalSelection verifies pending checkouts before a
+// local plan change. Activation rechecks the guard under the organization lock.
+func reconcileCheckoutBeforeLocalSelection(ctx context.Context, orgID uuid.UUID) error {
+	client := polar.NewClientFromEnv()
+	request := subscriptionCheckoutRequest{OrganizationID: orgID}
+	if err := adoptPreexistingCheckout(ctx, client, request); err != nil {
+		return err
+	}
+	intent, err := models.FindUnresolvedOrganizationBillingCheckout(database.DB(ctx), orgID)
+	if err != nil {
+		return grpcerrors.Internal(err, "Could not verify the pending checkout.")
+	}
+	if intent == nil {
+		return nil
+	}
+	_, err = reconcileUnresolvedCheckout(ctx, client, intent, request)
+	return err
+}
+
+func liveSubscriptionSelectionError() error {
+	return grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
 }
 
 // checkoutCreateIsStale reports a creating intent whose request is gone. The

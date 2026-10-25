@@ -98,6 +98,9 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		if req.Seats != nil {
 			return nil, grpcerrors.InvalidArgument(nil, "Seats are only available for per-seat plans.")
 		}
+		if err := reconcileCheckoutBeforeLocalSelection(ctx, organizationID); err != nil {
+			return nil, err
+		}
 		if _, err := models.ActivateOrganizationBillingPlan(db, organizationID, models.BillingPlanNone); err != nil {
 			return nil, grpcerrors.FailedPrecondition(err, "Could not select this plan.")
 		}
@@ -147,6 +150,9 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 	}
 	if catalog.PriceCents != 0 {
 		return nil, grpcerrors.FailedPrecondition(nil, "Checkout is not available for this plan. Contact an organization admin.")
+	}
+	if err := reconcileCheckoutBeforeLocalSelection(ctx, organizationID); err != nil {
+		return nil, err
 	}
 	if catalog.RequirePaymentMethod {
 		hasCard, err := polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())

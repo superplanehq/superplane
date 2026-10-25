@@ -32,6 +32,10 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	hasCard := false
 	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 		require.Equal(t, http.MethodGet, req.Method, "selecting this plan must not create a charge")
+		if req.URL.Path == "/checkouts/" {
+			writeFakeJSON(t, w, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
+			return
+		}
 		require.Equal(t, "/customers/external/"+r.Organization.ID.String()+"/payment-methods", req.URL.Path)
 		items := []map[string]any{}
 		if hasCard {
@@ -82,8 +86,9 @@ func TestSelectNoneBillingPlanWhenNoPublicPlansExist(t *testing.T) {
 		t.Cleanup(func() { require.NoError(t, models.SaveBillingPlan(cleanupDB, &original)) })
 	}
 	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
-		t.Errorf("selecting None must not contact Polar: %s", req.URL.Path)
-		w.WriteHeader(http.StatusInternalServerError)
+		require.Equal(t, http.MethodGet, req.Method)
+		require.Equal(t, "/checkouts/", req.URL.Path)
+		writeFakeJSON(t, w, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
 	})
 	usePolarTestServer(t, server)
 	plan := models.BillingPlan{Key: "private_" + uuid.NewString()[:8], Name: "Private", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
@@ -692,9 +697,11 @@ func TestPaidTeamCheckoutResolvesAndGuardsAgainstAnUnappliedSubscription(t *test
 	for _, tc := range []struct {
 		name                string
 		subscriptionVisible bool
+		readFails           bool
 	}{
-		{"subscription not visible yet", false},
-		{"subscription visible at Polar", true},
+		{"subscription not visible yet", false, false},
+		{"subscription visible at Polar", true, false},
+		{"subscription read fails", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newTeamCheckoutFixture(t)
@@ -706,6 +713,10 @@ func TestPaidTeamCheckoutResolvesAndGuardsAgainstAnUnappliedSubscription(t *test
 					return
 				}
 				items := []any{}
+				if tc.readFails {
+					w.WriteHeader(http.StatusBadGateway)
+					return
+				}
 				if tc.subscriptionVisible {
 					items = append(items, map[string]any{"id": "sub_" + f.r.Organization.ID.String(), "product_id": f.product, "status": "active", "seats": 3, "external_customer_id": f.r.Organization.ID.String(), "current_period_start": start, "current_period_end": start.AddDate(0, 1, 0), "modified_at": start})
 				}
@@ -717,6 +728,15 @@ func TestPaidTeamCheckoutResolvesAndGuardsAgainstAnUnappliedSubscription(t *test
 
 			_, err = f.selectSeats(3)
 			intents := f.intents()
+			if tc.readFails {
+				require.Error(t, err)
+				require.Equal(t, models.BillingCheckoutStateOpen, intents[0].State)
+				_, err = f.selectSeats(4)
+				require.Error(t, err)
+				require.Len(t, f.intents(), 1)
+				require.Equal(t, 1, f.provider.createCalls())
+				return
+			}
 			require.Equal(t, models.BillingCheckoutStateSucceeded, intents[0].State)
 			if tc.subscriptionVisible {
 				require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
@@ -746,6 +766,38 @@ func TestRejectedTeamCheckoutReleasesTheIntent(t *testing.T) {
 	require.Equal(t, 2, f.provider.createCalls())
 }
 
+func TestPaidCheckoutBlocksClaimsDuringSubscriptionVerification(t *testing.T) {
+	f := newTeamCheckoutFixture(t)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var first sync.Once
+	f.provider.serve(func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, "/subscriptions/", req.URL.Path)
+		first.Do(func() {
+			close(entered)
+			<-release
+		})
+		w.WriteHeader(http.StatusBadGateway)
+	})
+	_, err := f.selectSeats(3)
+	require.NoError(t, err)
+	f.provider.setStatus(f.provider.checkouts()[0], "succeeded")
+	finished := make(chan error, 1)
+	go func() {
+		_, err := f.selectSeats(3)
+		finished <- err
+	}()
+	<-entered
+	// Inspect the guard while the external verification remains in flight.
+	intent, claimed, claimErr := models.ClaimOrganizationBillingCheckout(database.DB(t.Context()), f.r.Organization.ID, f.team.Key, f.product, new(4))
+	close(release)
+	require.Error(t, <-finished)
+	require.NoError(t, claimErr)
+	require.False(t, claimed)
+	require.Equal(t, f.intents()[0].ID, intent.ID)
+	require.Equal(t, 1, f.provider.createCalls())
+}
+
 func TestLiveSubscriptionResolvesThePendingTeamCheckout(t *testing.T) {
 	f := newTeamCheckoutFixture(t)
 	db := database.DB(t.Context())
@@ -767,6 +819,12 @@ func TestLiveSubscriptionResolvesThePendingTeamCheckout(t *testing.T) {
 	intents := f.intents()
 	require.Equal(t, models.BillingCheckoutStateSucceeded, intents[0].State)
 	require.NotNil(t, intents[0].ResolvedAt)
+	// The claim itself must reject a stale request that passed handler checks
+	// before the webhook activated the subscription and resolved its intent.
+	_, claimed, err := models.ClaimOrganizationBillingCheckout(db, f.r.Organization.ID, f.team.Key, f.product, new(4))
+	require.ErrorIs(t, err, models.ErrBillingCheckoutLiveSubscription)
+	require.False(t, claimed)
+	require.Len(t, f.intents(), 1)
 }
 
 func TestPreexistingPolarCheckoutIsAdoptedWithoutAnotherCreate(t *testing.T) {
@@ -792,6 +850,22 @@ func TestPreexistingPolarCheckoutIsAdoptedWithoutAnotherCreate(t *testing.T) {
 		require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 		require.Zero(t, f.provider.createCalls())
 	})
+	t.Run("different subscription product", func(t *testing.T) {
+		f := newTeamCheckoutFixture(t)
+		product := "prod_old_" + uuid.NewString()
+		plan := models.BillingPlan{Key: "old_" + uuid.NewString()[:8], Name: "Old", Category: "paid", Visibility: "private", PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+		require.NoError(t, models.SaveBillingPlan(database.DB(t.Context()), &plan))
+		legacy := f.provider.seed(product, nil, nil)
+
+		_, err := f.selectSeats(3)
+		require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+		require.Zero(t, f.provider.createCalls())
+		intents := f.intents()
+		require.Len(t, intents, 1)
+		require.Equal(t, legacy.ID, intents[0].PolarCheckoutIDValue())
+		require.Equal(t, plan.Key, intents[0].PlanKey)
+		require.Equal(t, product, intents[0].PolarProductID)
+	})
 	t.Run("no payable session", func(t *testing.T) {
 		f := newTeamCheckoutFixture(t)
 		f.provider.setStatus(f.provider.seed(f.product, new(3), nil), "expired")
@@ -801,4 +875,74 @@ func TestPreexistingPolarCheckoutIsAdoptedWithoutAnotherCreate(t *testing.T) {
 		require.Equal(t, 1, f.provider.createCalls())
 		require.Len(t, f.intents(), 1)
 	})
+}
+
+func TestPendingCheckoutBlocksLocalPlanChanges(t *testing.T) {
+	for _, planKey := range []string{models.BillingPlanNone, "local"} {
+		t.Run(planKey, func(t *testing.T) {
+			f := newTeamCheckoutFixture(t)
+			db := database.DB(t.Context())
+			_, err := f.selectSeats(3)
+			require.NoError(t, err)
+			before, err := models.FindOrganizationBillingPlan(db, f.r.Organization.ID)
+			require.NoError(t, err)
+			if planKey == "local" {
+				plan := models.BillingPlan{Key: "local_" + uuid.NewString()[:8], Name: "Local", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
+				require.NoError(t, models.SaveBillingPlan(db, &plan))
+				planKey = plan.Key
+			} else {
+				plans, err := models.ListBillingPlans(db)
+				require.NoError(t, err)
+				for _, plan := range plans {
+					if plan.Category != "paid" || plan.Visibility != "public" {
+						continue
+					}
+					original := plan
+					plan.Visibility = "private"
+					require.NoError(t, models.SaveBillingPlan(db, &plan))
+					t.Cleanup(func() {
+						require.NoError(t, models.SaveBillingPlan(database.DB(context.WithoutCancel(t.Context())), &original))
+					})
+				}
+			}
+			_, err = SelectBillingPlan(t.Context(), f.r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: planKey}, f.r.Account.ID.String(), "http://localhost")
+			require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+			require.Contains(t, err.Error(), "checkout is already in progress")
+			after, err := models.FindOrganizationBillingPlan(db, f.r.Organization.ID)
+			require.NoError(t, err)
+			require.Equal(t, before.PlanID, after.PlanID)
+			require.Equal(t, models.BillingCheckoutStateOpen, f.intents()[0].State)
+			require.Equal(t, 1, f.provider.createCalls())
+			f.provider.setStatus(f.provider.checkouts()[0], "expired")
+			response, err := SelectBillingPlan(t.Context(), f.r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: planKey}, f.r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
+			require.Empty(t, response.CheckoutUrl)
+			after, err = models.FindOrganizationBillingPlan(db, f.r.Organization.ID)
+			require.NoError(t, err)
+			require.Equal(t, planKey, after.Catalog.Key)
+			require.Equal(t, models.BillingCheckoutStateExpired, f.intents()[0].State)
+		})
+	}
+}
+
+func TestLocalSelectionRechecksCheckoutClaimedDuringCardVerification(t *testing.T) {
+	f := newTeamCheckoutFixture(t)
+	db := database.DB(t.Context())
+	plan := models.BillingPlan{Key: "local_" + uuid.NewString()[:8], Name: "Local", Category: "paid", Visibility: "public", RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	before, err := models.FindOrganizationBillingPlan(db, f.r.Organization.ID)
+	require.NoError(t, err)
+	f.provider.serve(func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, "/customers/external/"+f.r.Organization.ID.String()+"/payment-methods", req.URL.Path)
+		_, claimed, err := models.ClaimOrganizationBillingCheckout(db, f.r.Organization.ID, f.team.Key, f.product, new(3))
+		require.NoError(t, err)
+		require.True(t, claimed)
+		writeFakeJSON(t, w, map[string]any{"items": []any{map[string]any{"id": "pm_saved", "type": "card", "method_metadata": map[string]int{"exp_month": 12, "exp_year": time.Now().Year() + 1}}}, "pagination": map[string]int{"max_page": 1}})
+	})
+	_, err = SelectBillingPlan(t.Context(), f.r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, f.r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	after, err := models.FindOrganizationBillingPlan(db, f.r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, before.PlanID, after.PlanID)
+	require.Equal(t, models.BillingCheckoutStateCreating, f.intents()[0].State)
 }

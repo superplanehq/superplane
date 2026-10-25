@@ -220,6 +220,7 @@ func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
 		{name: "Team", seats: new(5), metadata: map[string]string{CheckoutIntentMetadataKey: "intent-1"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			expiresAt := time.Now().Add(time.Hour).UTC()
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/checkouts/", r.URL.Path)
 				var body map[string]any
@@ -251,7 +252,7 @@ func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
 					"url":         "https://buy.polar.sh/polar_c_test",
 					"customer_id": "cust_1",
 					"status":      "open",
-					"expires_at":  "2026-10-25T14:30:00.000000Z",
+					"expires_at":  expiresAt.Format(time.RFC3339Nano),
 					"seats":       tc.seats,
 					"metadata":    map[string]any{CheckoutIntentMetadataKey: "intent-1", "attempt": 2},
 				}))
@@ -266,7 +267,7 @@ func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
 			assert.Equal(t, "cust_1", session.CustomerID)
 			assert.Equal(t, CheckoutStatusOpen, session.Status)
 			require.NotNil(t, session.ExpiresAt)
-			assert.True(t, session.ExpiresAt.Equal(time.Date(2026, 10, 25, 14, 30, 0, 0, time.UTC)))
+			assert.True(t, session.ExpiresAt.Equal(expiresAt))
 			assert.Equal(t, tc.seats, session.Seats)
 			assert.Equal(t, "intent-1", session.IntentID())
 			assert.Equal(t, "2", session.Metadata["attempt"], "numeric metadata is read as text")

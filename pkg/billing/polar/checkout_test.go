@@ -21,17 +21,20 @@ func checkoutPayload(id, status string) map[string]any {
 		"status":     status,
 		"product_id": "prod_team",
 		"seats":      4,
-		"expires_at": "2026-10-25T14:30:00.000000Z",
+		"expires_at": time.Now().Add(time.Hour).UTC().Format(time.RFC3339Nano),
 		"metadata":   map[string]any{CheckoutIntentMetadataKey: "intent-" + id},
 	}
 }
 
 func Test__GetCheckoutReadsLifecycle(t *testing.T) {
+	expiresAt := time.Now().Add(time.Hour).UTC()
 	server := httptest.NewServer(echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/checkouts/chk_1":
 			assert.Equal(t, http.MethodGet, r.Method)
-			require.NoError(t, json.NewEncoder(w).Encode(checkoutPayload("chk_1", "Confirmed")))
+			payload := checkoutPayload("chk_1", "Confirmed")
+			payload["expires_at"] = expiresAt.Format(time.RFC3339Nano)
+			require.NoError(t, json.NewEncoder(w).Encode(payload))
 		case "/checkouts/chk_other":
 			require.NoError(t, json.NewEncoder(w).Encode(checkoutPayload("chk_1", "open")))
 		case "/checkouts/chk_new_status":
@@ -49,7 +52,8 @@ func Test__GetCheckoutReadsLifecycle(t *testing.T) {
 	assert.Equal(t, "https://buy.polar.sh/chk_1", session.URL)
 	assert.Equal(t, CheckoutStatusConfirmed, session.Status)
 	assert.True(t, session.Status.Payable(), "confirmed does not show payment success")
-	assert.True(t, session.ExpiresAt.Equal(time.Date(2026, 10, 25, 14, 30, 0, 0, time.UTC)))
+	require.NotNil(t, session.ExpiresAt)
+	assert.True(t, session.ExpiresAt.Equal(expiresAt))
 	assert.Equal(t, new(4), session.Seats)
 	assert.Equal(t, "intent-chk_1", session.IntentID())
 
@@ -87,7 +91,11 @@ func Test__ListCheckoutsFiltersByCustomerAndProductAcrossPages(t *testing.T) {
 		assert.Equal(t, "/checkouts/", r.URL.Path)
 		query := r.URL.Query()
 		assert.Equal(t, "org-1", query.Get("external_customer_id"))
-		assert.Equal(t, "prod_team", query.Get("product_id"))
+		if len(pages) < 2 {
+			assert.Equal(t, "prod_team", query.Get("product_id"))
+		} else {
+			assert.NotContains(t, query, "product_id")
+		}
 		assert.Equal(t, "100", query.Get("limit"))
 		assert.Empty(t, query.Get("status"), "a lost create can leave a checkout in any status")
 		pages = append(pages, query.Get("page"))
@@ -110,8 +118,9 @@ func Test__ListCheckoutsFiltersByCustomerAndProductAcrossPages(t *testing.T) {
 
 	_, err = client.ListCheckouts(context.Background(), "", "prod_team")
 	require.Error(t, err)
-	_, err = client.ListCheckouts(context.Background(), "org-1", "")
-	require.Error(t, err)
+	sessions, err = client.ListCheckouts(context.Background(), "org-1", "")
+	require.NoError(t, err)
+	require.Len(t, sessions, 2)
 }
 
 func Test__ListCheckoutsRejectsUnverifiableItems(t *testing.T) {

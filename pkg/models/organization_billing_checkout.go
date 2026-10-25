@@ -40,6 +40,8 @@ const (
 // that allows the transition. Another writer changed it first.
 var ErrBillingCheckoutStateConflict = errors.New("billing checkout intent changed state")
 
+var ErrBillingCheckoutLiveSubscription = errors.New("organization has a live subscription")
+
 var unresolvedBillingCheckoutStates = []string{
 	BillingCheckoutStateCreating,
 	BillingCheckoutStateAmbiguous,
@@ -170,6 +172,13 @@ func ClaimOrganizationBillingCheckout(tx *gorm.DB, orgID uuid.UUID, planKey, pro
 	err := tx.Transaction(func(inner *gorm.DB) error {
 		if _, err := LockOrganization(inner, orgID); err != nil {
 			return err
+		}
+		current, err := FindOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
+		}
+		if current.HasLivePolarSubscription(time.Now()) {
+			return ErrBillingCheckoutLiveSubscription
 		}
 		existing, err := FindUnresolvedOrganizationBillingCheckout(inner, orgID)
 		if err != nil {

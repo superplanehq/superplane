@@ -76,23 +76,22 @@ func (c *Client) GetCheckout(ctx context.Context, checkoutID string) (*CheckoutS
 	return session, nil
 }
 
-// ListCheckouts lists the checkout sessions of one customer and product, in
-// any status. Polar returns the newest checkout first.
+// ListCheckouts lists the checkout sessions of one customer in any status.
+// An empty product ID includes all products. Polar returns the newest first.
 func (c *Client) ListCheckouts(ctx context.Context, externalCustomerID, productID string) ([]CheckoutSession, error) {
 	externalID := strings.TrimSpace(externalCustomerID)
 	if externalID == "" {
 		return nil, fmt.Errorf("external customer id is required")
 	}
 	product := strings.TrimSpace(productID)
-	if product == "" {
-		return nil, fmt.Errorf("product id is required")
-	}
 
 	var sessions []CheckoutSession
 	for page := 1; ; page++ {
 		query := url.Values{}
 		query.Set("external_customer_id", externalID)
-		query.Set("product_id", product)
+		if product != "" {
+			query.Set("product_id", product)
+		}
 		query.Set("limit", strconv.Itoa(checkoutListPageSize))
 		query.Set("page", strconv.Itoa(page))
 		var payload listCheckoutsJSON

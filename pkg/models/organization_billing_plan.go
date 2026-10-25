@@ -622,6 +622,32 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, tri
 // It assigns None when no public paid plans are available.
 // Subscription plans must be activated by a Polar subscription event instead.
 func ActivateOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, planKey string) (*OrganizationBillingPlan, error) {
+	var saved *OrganizationBillingPlan
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if _, err := LockOrganization(inner, orgID); err != nil {
+			return err
+		}
+		pending, err := FindUnresolvedOrganizationBillingCheckout(inner, orgID)
+		if err != nil {
+			return err
+		}
+		if pending != nil {
+			return errors.New("a checkout is already in progress")
+		}
+		current, err := FindOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
+		}
+		if current.HasLivePolarSubscription(time.Now()) {
+			return ErrBillingCheckoutLiveSubscription
+		}
+		saved, err = activateOrganizationBillingPlan(inner, orgID, planKey)
+		return err
+	})
+	return saved, err
+}
+
+func activateOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, planKey string) (*OrganizationBillingPlan, error) {
 	catalog, err := FindBillingPlan(tx, planKey)
 	if err != nil {
 		return nil, ErrInvalidBillingPlan
