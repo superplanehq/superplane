@@ -525,6 +525,19 @@ describe("FactorySettingsMCPPage", () => {
     expect(await screen.findByTestId("superplane-mcp-clients-empty")).toBeInTheDocument();
   }, 10000);
 
+  it("warns that revoke ends every workspace on a multi-workspace connection", async () => {
+    const user = userEvent.setup();
+    const clientId = "mcp-client-shared";
+    renderSuperplaneMcpServer([{ ...connectedMcpClient(clientId, "Cursor"), workspaceCount: 2 }]);
+
+    await user.click(await screen.findByTestId(`superplane-mcp-client-revoke-${clientId}`, {}, { timeout: 8000 }));
+    expect(
+      screen.getByText(
+        "This disconnects the client from every workspace on this connection. The client must sign in again.",
+      ),
+    ).toBeInTheDocument();
+  }, 10000);
+
   it("shows the full MCP client name on hover and in the revoke dialog", async () => {
     const longClientId = "mcp-client-long-name";
     const longClientName = "https://example.com/oauth/clients/workspace-example/client-metadata.json";

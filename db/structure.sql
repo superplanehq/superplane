@@ -1245,7 +1245,8 @@ CREATE TABLE public.mcp_oauth_codes (
     factory_id uuid NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     expires_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    factory_ids jsonb
 );
 
 
@@ -1263,7 +1264,8 @@ CREATE TABLE public.mcp_oauth_refresh_tokens (
     resource text NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     expires_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    factory_ids jsonb
 );
 
 

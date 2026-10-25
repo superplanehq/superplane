@@ -211,6 +211,88 @@ func Test__RevokeFactoryMCPClientRejectsInvalidID(t *testing.T) {
 	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }
 
+func Test__ListAndRevokeFactoryMCPClientUsesWorkspaceSet(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	db := database.DB(t.Context())
+	first, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	second, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	other, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	shared := insertFactoryMCPRefreshTokenWithWorkspaces(t, r, []uuid.UUID{first.ID, second.ID}, localMCPClientID, now.Add(time.Hour), now)
+	narrow := insertFactoryMCPRefreshToken(t, r, first.ID, localMCPClientID, now.Add(time.Hour), now.Add(time.Second))
+	outside := insertFactoryMCPRefreshToken(t, r, other.ID, localMCPClientID, now.Add(time.Hour), now)
+
+	for _, factoryID := range []string{first.ID.String(), second.ID.String()} {
+		listed, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{FactoryId: factoryID})
+		require.NoError(t, err)
+		ids := map[string]int32{}
+		for _, client := range listed.GetClients() {
+			ids[client.GetId()] = client.GetWorkspaceCount()
+		}
+		assert.Equal(t, int32(2), ids[shared.ID.String()])
+		if factoryID == first.ID.String() {
+			assert.Equal(t, int32(1), ids[narrow.ID.String()])
+		} else {
+			assert.NotContains(t, ids, narrow.ID.String())
+		}
+		assert.NotContains(t, ids, outside.ID.String())
+	}
+
+	_, err = RevokeFactoryMCPClient(t.Context(), r.Organization.ID.String(), &pb.RevokeFactoryMCPClientRequest{
+		FactoryId: second.ID.String(),
+		ClientId:  shared.ID.String(),
+	})
+	require.NoError(t, err)
+
+	for _, factoryID := range []string{first.ID.String(), second.ID.String()} {
+		listed, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{FactoryId: factoryID})
+		require.NoError(t, err)
+		for _, client := range listed.GetClients() {
+			assert.NotEqual(t, shared.ID.String(), client.GetId())
+		}
+	}
+	remaining, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{FactoryId: first.ID.String()})
+	require.NoError(t, err)
+	require.Len(t, remaining.GetClients(), 1)
+	assert.Equal(t, narrow.ID.String(), remaining.GetClients()[0].GetId())
+	kept, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{FactoryId: other.ID.String()})
+	require.NoError(t, err)
+	require.Len(t, kept.GetClients(), 1)
+	assert.Equal(t, outside.ID.String(), kept.GetClients()[0].GetId())
+}
+
+func insertFactoryMCPRefreshTokenWithWorkspaces(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryIDs []uuid.UUID,
+	clientID string,
+	expiresAt time.Time,
+	createdAt time.Time,
+) *models.MCPOAuthRefreshToken {
+	t.Helper()
+	ids := make([]string, len(factoryIDs))
+	for i, id := range factoryIDs {
+		ids[i] = id.String()
+	}
+	token := &models.MCPOAuthRefreshToken{
+		TokenHash:      uuid.NewString(),
+		ClientID:       clientID,
+		UserID:         r.User,
+		OrganizationID: r.Organization.ID,
+		FactoryIDs:     datatypes.NewJSONSlice(ids),
+		Resource:       "http://localhost:8000/mcp",
+		Scopes:         datatypes.NewJSONSlice([]string{"work_orders:read"}),
+		ExpiresAt:      expiresAt,
+		CreatedAt:      createdAt,
+	}
+	require.NoError(t, models.CreateMCPOAuthRefreshToken(database.DB(t.Context()), token))
+	return token
+}
+
 func insertFactoryMCPRefreshToken(
 	t *testing.T,
 	r *support.ResourceRegistry,
