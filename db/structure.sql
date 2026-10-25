@@ -1287,6 +1287,7 @@ CREATE TABLE public.organization_billing_plans (
     plan_id uuid NOT NULL,
     purchased_seats integer,
     past_due_since timestamp with time zone,
+    over_capacity_since timestamp with time zone,
     CONSTRAINT organization_billing_plans_purchased_seats_check CHECK ((purchased_seats >= 0)),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
@@ -6228,7 +6229,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261024192220	f
+20261025084727	f
 \.
 
 
