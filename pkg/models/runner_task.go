@@ -77,6 +77,23 @@ type RunnerTask struct {
 	CompletionHash *string
 }
 
+// FindExecution resolves the execution that created this task through its KV.
+func (t *RunnerTask) FindExecution(tx *gorm.DB) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+	query := tx.Model(&CanvasNodeExecution{}).
+		Select("workflow_node_executions.*").
+		Joins(`JOIN workflow_node_execution_kvs kv ON kv.execution_id = workflow_node_executions.id
+			AND kv.workflow_id = workflow_node_executions.workflow_id AND kv.node_id = workflow_node_executions.node_id`).
+		Where("kv.key = ? AND kv.value = ?", "task_id", t.ID.String())
+	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+		Where("workflows.organization_id = ?", t.OrganizationID).
+		First(&execution).Error
+	if err != nil {
+		return nil, err
+	}
+	return &execution, nil
+}
+
 func FindRunnerTask(tx *gorm.DB, id uuid.UUID) (*RunnerTask, error) {
 	var task RunnerTask
 	err := tx.Where("id = ?", id).First(&task).Error
