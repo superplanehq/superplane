@@ -50,6 +50,7 @@ const (
 	SkipSubscriptionCanceling      = "subscription_canceling"
 	SkipSeatPurchaseInFlight       = "seat_purchase_in_flight"
 	SkipPolarSubscriptionNotActive = "polar_subscription_not_active"
+	SkipSubscriptionChanged        = "subscription_changed"
 )
 
 // Result describes one Schedule call. Fields that Schedule did not reach are
@@ -121,20 +122,43 @@ func (s *Scheduler) schedule(ctx context.Context, orgID uuid.UUID) (Result, erro
 		return Result{OrganizationID: orgID}, err
 	}
 
+	// Polar is the source of truth for seats, status, and period. A lost
+	// webhook leaves the stored plan behind, and the skip rules and the
+	// target below must not run on that stale plan. Apply the verified
+	// Polar state first, even for a plan that gets no scheduled count.
+	subscriptionID, reason, err := s.reconcilableSubscription(ctx, orgID)
+	if err != nil {
+		return Result{OrganizationID: orgID}, err
+	}
+	if reason != "" {
+		return skipped(Result{OrganizationID: orgID, SubscriptionID: subscriptionID}, reason), nil
+	}
+	snapshot, err := s.client.GetSubscription(ctx, subscriptionID)
+	if err != nil {
+		return Result{OrganizationID: orgID, SubscriptionID: subscriptionID}, err
+	}
+	if err := s.applySnapshot(ctx, orgID, snapshot); err != nil {
+		return Result{OrganizationID: orgID, SubscriptionID: subscriptionID}, fmt.Errorf("apply polar subscription %s: %w", subscriptionID, err)
+	}
+
+	// The skip rules and the target come from the plan after the apply. When
+	// the apply ignored the snapshot because the stored plan is newer, they
+	// come from the stored plan, and the next run reads Polar again.
 	result, plan, err := s.loadLocalState(ctx, orgID)
 	if err != nil || result.Action == ActionSkipped {
 		return result, err
 	}
-
-	snapshot, err := s.client.GetSubscription(ctx, result.SubscriptionID)
-	if err != nil {
-		return result, err
+	if result.SubscriptionID != snapshot.ID {
+		// Another flow replaced the subscription after the read. The snapshot
+		// describes the replaced one.
+		return skipped(result, SkipSubscriptionChanged), nil
 	}
 	result.CurrentSeats = snapshot.Seats
 	result.NextPeriodSeats = snapshot.NextPeriodSeats()
 	if !strings.EqualFold(strings.TrimSpace(snapshot.Status), models.PolarSubscriptionStatusActive) || snapshot.CancelAtPeriodEnd {
-		// The stored plan is behind Polar. The next subscription webhook
-		// updates it.
+		// The stored plan is active, but the snapshot says that the
+		// subscription ends. The apply ignored it as older than the stored
+		// plan. The next run reads Polar again.
 		return skipped(result, SkipPolarSubscriptionNotActive), nil
 	}
 	if snapshot.Seats == nil || *snapshot.Seats < 1 {
@@ -156,17 +180,58 @@ func (s *Scheduler) schedule(ctx context.Context, orgID uuid.UUID) (Result, erro
 	// that SuperPlane sent, so a matching Polar count alone never repairs
 	// it. The send is idempotent, and the next attempt retries the record
 	// when this write fails.
-	if _, err := s.client.ScheduleSubscriptionSeats(ctx, result.SubscriptionID, target); err != nil {
+	updated, err := s.client.ScheduleSubscriptionSeats(ctx, result.SubscriptionID, target)
+	if err != nil {
 		return result, err
 	}
 	result.Action = ActionFixed
 	if inSync {
 		result.Action = ActionInSync
 	}
+	if err := s.applySnapshot(ctx, orgID, updated); err != nil {
+		return result, fmt.Errorf("apply polar subscription %s: %w", result.SubscriptionID, err)
+	}
 	if err := plan.RecordScheduledRenewalSeats(s.db.WithContext(ctx), target, s.now()); err != nil {
 		return result, fmt.Errorf("record scheduled renewal seats: %w", err)
 	}
 	return result, nil
+}
+
+// reconcilableSubscription reads the stored Polar subscription ID without a
+// row lock. Only a plan that Polar manages has a subscription to reconcile.
+// Otherwise, the reason names why not.
+func (s *Scheduler) reconcilableSubscription(ctx context.Context, orgID uuid.UUID) (subscriptionID, skipReason string, err error) {
+	plan, err := models.FindOrganizationBillingPlan(s.db.WithContext(ctx), orgID)
+	if err != nil {
+		return "", "", err
+	}
+	if plan == nil {
+		return "", SkipNoSubscription, nil
+	}
+	if plan.PolarSubscriptionID != nil {
+		subscriptionID = strings.TrimSpace(*plan.PolarSubscriptionID)
+	}
+	switch {
+	case plan.PlanSource == models.BillingPlanSourceAdmin:
+		return subscriptionID, SkipAdminPlan, nil
+	case plan.PlanSource != models.BillingPlanSourcePolar || subscriptionID == "":
+		return subscriptionID, SkipNoSubscription, nil
+	default:
+		return subscriptionID, "", nil
+	}
+}
+
+// applySnapshot applies a Polar response through the subscription apply path
+// of the webhooks. That path checks the identity, rejects a response that is
+// older than the stored plan, and rechecks the seat capacity. The scheduler
+// holds a session connection, not a transaction, so the apply makes its own
+// Polar reads outside any row lock.
+func (s *Scheduler) applySnapshot(ctx context.Context, orgID uuid.UUID, snapshot *polar.SubscriptionData) error {
+	if snapshot == nil || strings.TrimSpace(snapshot.ID) == "" {
+		log.WithField("organization_id", orgID.String()).Debug("polar returned no subscription to apply")
+		return nil
+	}
+	return polar.ApplyOrganizationSubscription(ctx, s.db.WithContext(ctx), orgID, *snapshot)
 }
 
 // loadLocalState reads the plan and the renewal quantity under the

@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,9 +13,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/entitlements"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/polarfake"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/status"
 )
 
 type seatRenewalSyncFixture struct {
@@ -153,7 +160,6 @@ func Test__SeatRenewalSyncFixesTheCountAfterAPolarOutage(t *testing.T) {
 	require.Len(t, failed, 1, "only a failure close to renewal is an error")
 	assert.Equal(t, soonOrg.String(), failed[0].Data["organization_id"])
 	assert.Equal(t, soon.ID, failed[0].Data["polar_subscription_id"])
-	assert.Equal(t, 1, failed[0].Data["renewal_target_seats"])
 
 	f.worker.tick(context.Background())
 
@@ -168,7 +174,7 @@ func Test__SeatRenewalSyncWaitsUntilTheSeatPurchaseSettles(t *testing.T) {
 	require.NoError(t, purchase.Create(database.Conn()))
 
 	f.worker.tick(context.Background())
-	assert.Empty(t, f.polar.Requests())
+	assert.Empty(t, f.polar.Patches(), "a purchase in its confirmation window owns the next seat change")
 
 	f.polar.Update(sub.ID, func(s *polarfake.Subscription) { s.Seats = 4 })
 	require.NoError(t, purchase.UpdateStatus(database.Conn(), models.SeatPurchaseStatusSucceeded, ""))
@@ -176,4 +182,95 @@ func Test__SeatRenewalSyncWaitsUntilTheSeatPurchaseSettles(t *testing.T) {
 	f.worker.tick(context.Background())
 	require.Len(t, f.polar.Patches(), 1)
 	assert.Equal(t, map[string]any{"seats": float64(1), "proration_behavior": "next_period"}, f.polar.Patches()[0].Body)
+}
+
+// addSetupOrganization puts the organization of the test setup on a per-seat
+// subscription with the owner and one more member.
+func (f *seatRenewalSyncFixture) addSetupOrganization(seats int, renewsIn time.Duration) polarfake.Subscription {
+	f.t.Helper()
+	sub := f.polar.AddSeatPlan(database.Conn(), f.r.Organization.ID, seats, f.now.Add(renewsIn))
+	support.CreateUser(f.t, f.r, f.r.Organization.ID)
+	return sub
+}
+
+func (f *seatRenewalSyncFixture) invitations() *organizations.InvitationService {
+	return &organizations.InvitationService{AuthService: f.r.AuthService, EmailService: services.NewNoopEmailService(), BaseURL: "https://example.com"}
+}
+
+// invite creates a pending invitation and returns the accepting account and token.
+func (f *seatRenewalSyncFixture) invite() (*models.Account, string) {
+	f.t.Helper()
+	invitee, err := models.CreateAccount("Invitee", uuid.NewString()+"@example.com")
+	require.NoError(f.t, err)
+	created, err := f.invitations().Create(context.Background(), f.r.Organization.ID.String(), f.r.User.String(), &pb.CreateInvitationRequest{Email: invitee.Email})
+	require.NoError(f.t, err)
+	return invitee, strings.TrimPrefix(created.AcceptanceUrl, "https://example.com/invitations/")
+}
+
+func (f *seatRenewalSyncFixture) plan() *models.OrganizationBillingPlan {
+	f.t.Helper()
+	plan, err := models.FindOrganizationBillingPlan(database.Conn(), f.r.Organization.ID)
+	require.NoError(f.t, err)
+	return plan
+}
+
+func requireInvitationReason(t *testing.T, err error, reason string) {
+	t.Helper()
+	require.Error(t, err)
+	details := status.Convert(err).Details()
+	require.Len(t, details, 1)
+	require.Equal(t, reason, details[0].(*errdetails.ErrorInfo).Reason)
+}
+
+func Test__SeatRenewalSyncRepairsADroppedRenewalEvent(t *testing.T) {
+	f := newSeatRenewalSyncFixture(t)
+	sub := f.addSetupOrganization(3, 12*time.Hour)
+	invitee, token := f.invite()
+
+	// Polar renewed the subscription with fewer seats, and no event arrived.
+	renewedStart := sub.PeriodEnd
+	renewedEnd := renewedStart.AddDate(0, 1, 0)
+	f.polar.Update(sub.ID, func(s *polarfake.Subscription) {
+		s.Seats = 2
+		s.PeriodStart = renewedStart
+		s.PeriodEnd = renewedEnd
+	})
+
+	f.worker.tick(context.Background())
+
+	plan := f.plan()
+	assert.Equal(t, new(2), plan.PurchasedSeats)
+	assert.True(t, plan.CurrentPeriodStart.Equal(renewedStart))
+	assert.True(t, plan.CurrentPeriodEnd.Equal(renewedEnd))
+	_, err := f.invitations().Accept(context.Background(), invitee.ID.String(), token)
+	requireInvitationReason(t, err, "NO_SEAT_AVAILABLE")
+}
+
+func Test__SeatRenewalSyncRepairsDroppedFailureAndRecoveryEvents(t *testing.T) {
+	f := newSeatRenewalSyncFixture(t)
+	sub := f.addSetupOrganization(3, 12*time.Hour)
+	invitee, token := f.invite()
+	seatUsage := func() *entitlements.SeatUsage {
+		usage, err := entitlements.ResolveSeats(database.Conn(), f.r.Organization.ID)
+		require.NoError(t, err)
+		return usage
+	}
+
+	f.polar.Update(sub.ID, func(s *polarfake.Subscription) { s.Status = models.PolarSubscriptionStatusPastDue })
+	f.worker.tick(context.Background())
+
+	assert.Equal(t, models.PolarSubscriptionStatusPastDue, f.plan().PolarSubscriptionStatus)
+	assert.True(t, seatUsage().PaymentBlocked)
+	_, err := f.invitations().Accept(context.Background(), invitee.ID.String(), token)
+	requireInvitationReason(t, err, "PAYMENT_PAST_DUE")
+	assert.Empty(t, f.polar.Patches(), "a payment-blocked plan gets no scheduled seat count")
+
+	f.polar.Update(sub.ID, func(s *polarfake.Subscription) { s.Status = models.PolarSubscriptionStatusActive })
+	f.worker.tick(context.Background())
+
+	plan := f.plan()
+	assert.Equal(t, models.PolarSubscriptionStatusActive, plan.PolarSubscriptionStatus)
+	assert.True(t, plan.Catalog.PerSeat, "the plan returns to the per-seat catalog plan")
+	assert.False(t, seatUsage().PaymentBlocked)
+	assert.Equal(t, []string{sub.ID}, f.patchedSubscriptions(), "the recovered plan gets its renewal seat count again")
 }
