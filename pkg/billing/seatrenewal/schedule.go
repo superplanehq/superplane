@@ -7,6 +7,13 @@
 // Requests from this package only schedule a seat count for the next period
 // (proration_behavior next_period). They never add seats, never charge or
 // credit the current period, and never change the renewal date.
+//
+// An in-flight seat purchase owns the next seat change while it can still
+// reach Polar or while it describes the verified period. A purchase that
+// stays unresolved after a renewal or a subscription replacement no longer
+// blocks the schedule. This package never settles such a purchase: it keeps
+// its identity and its unresolved status until a person repairs it from
+// Polar evidence.
 package seatrenewal
 
 import (
@@ -58,6 +65,11 @@ const (
 	SkipSubscriptionChanged        = "subscription_changed"
 )
 
+// SeatPurchaseReconcileFailedKey is the log key for a purchase on another
+// subscription than the stored plan that Schedule could not reconcile.
+// Schedule continues with the stored plan subscription.
+const SeatPurchaseReconcileFailedKey = "billing.seat_purchase_reconcile_failed"
+
 // Result describes one Schedule call. Fields that Schedule did not reach are
 // nil.
 type Result struct {
@@ -71,13 +83,27 @@ type Result struct {
 	NextPeriodSeats *int
 	// CurrentSeats is the seat count of the current Polar period.
 	CurrentSeats *int
+	// SeatPurchaseID is the in-flight seat purchase that Schedule found. It
+	// blocks the schedule when the skip reason is SkipSeatPurchaseInFlight.
+	// Otherwise, the verified Polar snapshot released it.
+	SeatPurchaseID uuid.UUID
 }
+
+// Renewal impacts of an unresolved seat purchase.
+const (
+	ImpactBlocksRenewalMaintenance    = "blocks_renewal_maintenance"
+	ImpactRenewalMaintenanceContinues = "renewal_maintenance_continues"
+	ImpactNoRenewalMaintenance        = "no_renewal_maintenance"
+)
 
 // LogFields are the stable log fields for a schedule result.
 func (r Result) LogFields() log.Fields {
 	fields := log.Fields{"organization_id": r.OrganizationID.String()}
 	if r.SubscriptionID != "" {
 		fields["polar_subscription_id"] = r.SubscriptionID
+	}
+	if r.SeatPurchaseID != uuid.Nil {
+		fields["seat_purchase_id"] = r.SeatPurchaseID.String()
 	}
 	if r.Target != nil {
 		fields["renewal_target_seats"] = *r.Target
@@ -122,9 +148,13 @@ func (s *Scheduler) Schedule(ctx context.Context, orgID uuid.UUID) (Result, erro
 func (s *Scheduler) schedule(ctx context.Context, orgID uuid.UUID) (Result, error) {
 	// An abandoned purchase can stay in flight forever when nobody previews
 	// or buys seats again, and the skip rules would keep its organization
-	// unchecked. Settle or expire it from Polar before the skip rules.
+	// unchecked. Settle or expire it from Polar before the skip rules. A
+	// failure to read the subscription of a purchase on another
+	// subscription does not stop the maintenance of the current one.
 	if err := polar.ReconcileSeatPurchase(ctx, s.db.WithContext(ctx), s.client, orgID); err != nil {
-		return Result{OrganizationID: orgID}, err
+		if err := s.continueAfterReconcileFailure(ctx, orgID, err); err != nil {
+			return Result{OrganizationID: orgID}, err
+		}
 	}
 
 	// Polar is the source of truth for seats, status, and period. A lost
@@ -149,14 +179,9 @@ func (s *Scheduler) schedule(ctx context.Context, orgID uuid.UUID) (Result, erro
 	// The skip rules and the target come from the plan after the apply. When
 	// the apply ignored the snapshot because the stored plan is newer, they
 	// come from the stored plan, and the next run reads Polar again.
-	result, plan, err := s.loadLocalState(ctx, orgID)
+	result, plan, err := s.loadLocalState(ctx, orgID, snapshot)
 	if err != nil || result.Action == ActionSkipped {
 		return result, err
-	}
-	if result.SubscriptionID != snapshot.ID {
-		// Another flow replaced the subscription after the read. The snapshot
-		// describes the replaced one.
-		return skipped(result, SkipSubscriptionChanged), nil
 	}
 	result.CurrentSeats = snapshot.Seats
 	result.NextPeriodSeats = snapshot.NextPeriodSeats()
@@ -204,6 +229,36 @@ func (s *Scheduler) schedule(ctx context.Context, orgID uuid.UUID) (Result, erro
 	return result, nil
 }
 
+// continueAfterReconcileFailure decides whether a failed purchase
+// reconciliation stops the schedule. A purchase on another subscription than
+// the stored plan cannot change the current subscription, so a failure to
+// read its subscription, for example a replaced one, must not stop the
+// maintenance of the current subscription. It returns nil in that case and
+// the reconciliation error otherwise. The purchase stays unchanged.
+func (s *Scheduler) continueAfterReconcileFailure(ctx context.Context, orgID uuid.UUID, reconcileErr error) error {
+	db := s.db.WithContext(ctx)
+	purchase, err := models.FindInFlightSeatPurchase(db, orgID)
+	if err != nil {
+		return errors.Join(reconcileErr, err)
+	}
+	if purchase == nil {
+		return reconcileErr
+	}
+	plan, err := models.FindOrganizationBillingPlan(db, orgID)
+	if err != nil {
+		return errors.Join(reconcileErr, err)
+	}
+	current := planSubscriptionID(plan)
+	if current == "" || current == purchase.PolarSubscriptionID {
+		return reconcileErr
+	}
+	log.WithError(reconcileErr).
+		WithFields(SeatPurchaseLogFields(purchase)).
+		WithField("current_polar_subscription_id", current).
+		Warn(SeatPurchaseReconcileFailedKey)
+	return nil
+}
+
 // reconcilableSubscription reads the stored Polar subscription ID without a
 // row lock. Only a plan that Polar manages has a subscription to reconcile.
 // Otherwise, the reason names why not.
@@ -242,8 +297,10 @@ func (s *Scheduler) applySnapshot(ctx context.Context, orgID uuid.UUID, snapshot
 }
 
 // loadLocalState reads the plan and the renewal quantity under the
-// organization lock and applies the skip rules.
-func (s *Scheduler) loadLocalState(ctx context.Context, orgID uuid.UUID) (Result, *models.OrganizationBillingPlan, error) {
+// organization lock and applies the skip rules. The snapshot is the Polar
+// subscription that this run read, and it decides whether an in-flight
+// purchase still blocks the schedule.
+func (s *Scheduler) loadLocalState(ctx context.Context, orgID uuid.UUID, snapshot *polar.SubscriptionData) (Result, *models.OrganizationBillingPlan, error) {
 	result := Result{OrganizationID: orgID}
 	var plan *models.OrganizationBillingPlan
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -276,20 +333,80 @@ func (s *Scheduler) loadLocalState(ctx context.Context, orgID uuid.UUID) (Result
 		}
 		result.Target = target
 
-		// A purchase inside its confirmation window owns the next seat
-		// change: it replaces any scheduled count when it settles and
-		// schedules the renewal quantity again after it. Schedule already
-		// reconciled an older purchase, so only a recent one still skips.
+		if result.SubscriptionID != snapshot.ID {
+			// Another flow replaced the subscription after the read. The
+			// snapshot describes the replaced one and verifies nothing.
+			result = skipped(result, SkipSubscriptionChanged)
+			return nil
+		}
+
+		// A purchase that can still reach Polar, or that belongs to the
+		// verified period, owns the next seat change: it replaces any
+		// scheduled count when it settles and schedules the renewal
+		// quantity again after it. Schedule already reconciled the purchase,
+		// so a purchase that is still in flight here has no proved outcome.
+		// It stops blocking only when the verified snapshot proves that it
+		// cannot race this update. The purchase keeps its status.
 		inFlight, err := models.FindInFlightSeatPurchase(tx, orgID)
-		if err != nil {
+		if err != nil || inFlight == nil {
 			return err
 		}
-		if inFlight != nil {
+		result.SeatPurchaseID = inFlight.ID
+		if blocksRenewalMaintenance(inFlight, snapshot.ID, snapshot.CurrentPeriodStart.TimePtr(), s.now()) {
 			result = skipped(result, SkipSeatPurchaseInFlight)
 		}
 		return nil
 	})
 	return result, plan, err
+}
+
+// RenewalImpact names how an unresolved purchase affects the renewal
+// maintenance of the stored plan. A plan that does not renew through a Polar
+// subscription gets no maintenance. Otherwise, the stored plan period stands
+// in for the verified snapshot that Schedule reads.
+func RenewalImpact(purchase *models.SeatPurchase, plan *models.OrganizationBillingPlan, now time.Time) string {
+	subscriptionID := planSubscriptionID(plan)
+	if subscriptionID == "" || plan.PlanSource != models.BillingPlanSourcePolar || !renewsWithScheduledSeats(plan.PolarSubscriptionStatus, plan.CancelAtPeriodEnd) {
+		return ImpactNoRenewalMaintenance
+	}
+	if blocksRenewalMaintenance(purchase, subscriptionID, plan.CurrentPeriodStart, now) {
+		return ImpactBlocksRenewalMaintenance
+	}
+	return ImpactRenewalMaintenanceContinues
+}
+
+// SeatPurchaseLogFields are the stable log fields that identify a purchase.
+func SeatPurchaseLogFields(purchase *models.SeatPurchase) log.Fields {
+	fields := log.Fields{
+		"organization_id":       purchase.OrganizationID.String(),
+		"seat_purchase_id":      purchase.ID.String(),
+		"seat_purchase_status":  purchase.Status,
+		"polar_subscription_id": purchase.PolarSubscriptionID,
+	}
+	if purchase.OperationKey != nil {
+		fields["operation_key"] = *purchase.OperationKey
+	}
+	if purchase.PeriodStart != nil {
+		fields["purchase_period_start"] = purchase.PeriodStart.UTC()
+	}
+	if purchase.PeriodEnd != nil {
+		fields["purchase_period_end"] = purchase.PeriodEnd.UTC()
+	}
+	return fields
+}
+
+// blocksRenewalMaintenance applies the purchase release rule with the
+// confirmation window of Polar purchases. A submission inside the window can
+// still reach Polar.
+func blocksRenewalMaintenance(purchase *models.SeatPurchase, subscriptionID string, periodStart *time.Time, now time.Time) bool {
+	return purchase.BlocksRenewalMaintenance(strings.TrimSpace(subscriptionID), periodStart, now, polar.SeatPurchaseConfirmationWindow)
+}
+
+func planSubscriptionID(plan *models.OrganizationBillingPlan) string {
+	if plan == nil || plan.PolarSubscriptionID == nil {
+		return ""
+	}
+	return strings.TrimSpace(*plan.PolarSubscriptionID)
 }
 
 // scheduledRecordMatches reports that the plan already records a send of the

@@ -21,6 +21,15 @@ const (
 
 	seatRenewalMismatchFixedKey = "billing.seat_renewal_mismatch_fixed"
 	seatRenewalSyncFailedKey    = "billing.seat_renewal_sync_failed"
+
+	// seatPurchaseUnresolvedAfter is how long a purchase can stay pending or
+	// unknown before the worker reports it. It is much longer than the
+	// purchase confirmation window, so only a purchase that no Polar
+	// snapshot can settle any more reaches it.
+	seatPurchaseUnresolvedAfter = 1 * time.Hour
+
+	seatPurchaseUnresolvedKey       = "billing.seat_purchase_unresolved"
+	seatRenewalBlockedByPurchaseKey = "billing.seat_renewal_blocked_by_purchase"
 )
 
 // SeatRenewalSyncWorker reconciles the stored plan of each organization with
@@ -66,11 +75,17 @@ func (w *SeatRenewalSyncWorker) Start(ctx context.Context) {
 	}
 }
 
-// tick reconciles every candidate organization, the one that renews first first.
+// tick reports unresolved seat purchases and then reconciles every candidate
+// organization, the one that renews first first.
 func (w *SeatRenewalSyncWorker) tick(ctx context.Context) {
 	if ctx.Err() != nil || !models.BillingEnabled() || !polar.Configured() {
 		return
 	}
+
+	// The report does not depend on the candidate list or on the schedule
+	// results, so a stuck purchase is visible even for an organization that
+	// the list excludes or that every schedule skips.
+	w.reportUnresolvedSeatPurchases(ctx)
 
 	plans, err := models.ListSeatRenewalSyncPlans(database.Conn().WithContext(ctx))
 	if err != nil {
@@ -93,13 +108,56 @@ func (w *SeatRenewalSyncWorker) tick(ctx context.Context) {
 			}
 			continue
 		}
-		if result.Action == seatrenewal.ActionFixed {
+		switch {
+		case result.Action == seatrenewal.ActionFixed:
 			w.logger.WithFields(result.LogFields()).Warn(seatRenewalMismatchFixedKey)
+		case result.SkipReason == seatrenewal.SkipSeatPurchaseInFlight:
+			w.logger.WithFields(result.LogFields()).Warn(seatRenewalBlockedByPurchaseKey)
 		}
 	}
 	// A completed run clears the position, so the next run starts again
 	// with the organizations that renew first.
 	w.resumeAfter = uuid.Nil
+}
+
+// reportUnresolvedSeatPurchases writes one error line for each purchase that
+// stayed pending or unknown longer than seatPurchaseUnresolvedAfter. The line
+// repeats on every run while the purchase stays unresolved. The alert policy
+// suppresses duplicates, so the worker keeps no state and the signal
+// survives restarts. The report changes no purchase.
+func (w *SeatRenewalSyncWorker) reportUnresolvedSeatPurchases(ctx context.Context) {
+	db := database.Conn().WithContext(ctx)
+	now := w.now()
+	purchases, err := models.ListUnresolvedSeatPurchasesCreatedBefore(db, now.Add(-seatPurchaseUnresolvedAfter))
+	if err != nil {
+		w.logger.WithError(err).Error("could not list unresolved seat purchases")
+		return
+	}
+	for i := range purchases {
+		purchase := &purchases[i]
+		plan, err := models.FindOrganizationBillingPlan(db, purchase.OrganizationID)
+		if err != nil {
+			w.logger.WithError(err).WithFields(seatrenewal.SeatPurchaseLogFields(purchase)).Error("could not read the plan of an unresolved seat purchase")
+			continue
+		}
+		w.logger.WithFields(unresolvedSeatPurchaseFields(purchase, plan, now)).Error(seatPurchaseUnresolvedKey)
+	}
+}
+
+func unresolvedSeatPurchaseFields(purchase *models.SeatPurchase, plan *models.OrganizationBillingPlan, now time.Time) log.Fields {
+	fields := seatrenewal.SeatPurchaseLogFields(purchase)
+	fields["age_seconds"] = int64(now.Sub(purchase.CreatedAt) / time.Second)
+	fields["renewal_impact"] = seatrenewal.RenewalImpact(purchase, plan, now)
+	if plan == nil {
+		return fields
+	}
+	if plan.PolarSubscriptionID != nil {
+		fields["current_polar_subscription_id"] = *plan.PolarSubscriptionID
+	}
+	if plan.CurrentPeriodStart != nil {
+		fields["current_period_start"] = plan.CurrentPeriodStart.UTC()
+	}
+	return fields
 }
 
 // resumeFrom starts the list at the organization where a rate limit stopped
