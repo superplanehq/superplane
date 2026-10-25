@@ -3,6 +3,7 @@ package seatrenewal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/polarfake"
@@ -320,8 +322,11 @@ func Test__ScheduleSkipsOrganizationsWithoutARenewalSeatCountToKeep(t *testing.T
 			product := "prod_flat_" + uuid.NewString()
 			catalog := models.BillingPlan{Key: "flat_" + uuid.NewString()[:8], Name: "Flat", Category: "paid", Visibility: "private", PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
 			require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
-			f.updatePlan(map[string]any{"plan_id": catalog.ID, "plan": catalog.Key})
-			f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.ProductID = product })
+			f.updatePlan(map[string]any{"plan_id": catalog.ID, "plan": catalog.Key, "purchased_seats": nil})
+			f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) {
+				sub.ProductID = product
+				sub.NoSeats = true
+			})
 		}},
 		{name: "admin plan", reason: SkipAdminPlan, change: func(f *scheduleFixture) {
 			f.updatePlan(map[string]any{"plan_source": models.BillingPlanSourceAdmin})
@@ -356,39 +361,269 @@ func Test__ScheduleSkipsOrganizationsWithoutARenewalSeatCountToKeep(t *testing.T
 
 func Test__ScheduleStoresPolarStateOfAPlanThatGetsNoScheduledCount(t *testing.T) {
 	tests := []struct {
-		name        string
-		polarChange func(sub *polarfake.Subscription)
-		reason      string
-		stored      func(plan *models.OrganizationBillingPlan) bool
+		name              string
+		status            string
+		cancelAtPeriodEnd bool
+		reason            string
 	}{
-		{
-			name:        "payment failed",
-			polarChange: func(sub *polarfake.Subscription) { sub.Status = models.PolarSubscriptionStatusPastDue },
-			reason:      SkipNotPerSeat,
-			stored: func(plan *models.OrganizationBillingPlan) bool {
-				return plan.PolarSubscriptionStatus == models.PolarSubscriptionStatusPastDue
-			},
-		},
-		{
-			name:        "set to cancel",
-			polarChange: func(sub *polarfake.Subscription) { sub.CancelAtPeriodEnd = true },
-			reason:      SkipSubscriptionCanceling,
-			stored:      func(plan *models.OrganizationBillingPlan) bool { return plan.CancelAtPeriodEnd },
-		},
+		{name: "paused", status: models.PolarSubscriptionStatusPaused, reason: SkipSubscriptionPaused},
+		{name: "unpaid", status: models.PolarSubscriptionStatusUnpaid, reason: SkipSubscriptionNotActive},
+		{name: "canceled", status: models.PolarSubscriptionStatusCanceled, reason: SkipSubscriptionNotActive},
+		{name: "revoked", status: models.PolarSubscriptionStatusRevoked, reason: SkipSubscriptionNotActive},
+		{name: "set to cancel", status: models.PolarSubscriptionStatusActive, cancelAtPeriodEnd: true, reason: SkipSubscriptionCanceling},
+		{name: "past due and set to cancel", status: models.PolarSubscriptionStatusPastDue, cancelAtPeriodEnd: true, reason: SkipSubscriptionCanceling},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newScheduleFixture(t, 10, 9)
-			f.polar.Update(f.sub.ID, tt.polarChange)
+			f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) {
+				sub.Status = tt.status
+				sub.CancelAtPeriodEnd = tt.cancelAtPeriodEnd
+			})
 
 			result := f.schedule()
 
 			assert.Equal(t, ActionSkipped, result.Action)
 			assert.Equal(t, tt.reason, result.SkipReason)
 			assert.Empty(t, f.polar.Patches())
-			assert.True(t, tt.stored(f.plan()), "the plan stores the Polar state that blocked the schedule")
+			plan := f.plan()
+			assert.Equal(t, tt.status, plan.PolarSubscriptionStatus, "the plan stores the Polar state that blocked the schedule")
+			assert.Equal(t, tt.cancelAtPeriodEnd, plan.CancelAtPeriodEnd)
+			assert.Nil(t, plan.RenewalSeatsScheduled)
 		})
 	}
+}
+
+func Test__ScheduleSkipsAnOlderSnapshotThatDoesNotRenew(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	f.updatePlan(map[string]any{"polar_subscription_status": models.PolarSubscriptionStatusPastDue, "polar_modified_at": f.now})
+	// Polar answers with a snapshot that is older than the stored plan, so
+	// the apply ignores it. Its status still blocks the schedule.
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) {
+		sub.Status = models.PolarSubscriptionStatusPaused
+		sub.ModifiedAt = new(f.now.Add(-time.Hour))
+	})
+
+	result := f.schedule()
+
+	assert.Equal(t, ActionSkipped, result.Action)
+	assert.Equal(t, SkipPolarSubscriptionNotActive, result.SkipReason)
+	assert.Empty(t, f.polar.Patches())
+}
+
+// pastDue puts the subscription in the past-due state of Polar. The grace
+// period is the number of days that Team features stay on.
+func (f *scheduleFixture) pastDue(graceDays int) {
+	f.t.Helper()
+	f.setGraceDays(graceDays)
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.Status = models.PolarSubscriptionStatusPastDue })
+}
+
+func (f *scheduleFixture) setGraceDays(days int) {
+	f.t.Helper()
+	set := func(days int) error {
+		return models.ApplyInstallationMetadata(database.Conn(), func(metadata *models.InstallationMetadata) {
+			metadata.PastDueGraceDays = days
+		})
+	}
+	require.NoError(f.t, set(days))
+	f.t.Cleanup(func() { require.NoError(f.t, set(0)) })
+}
+
+// removeMember removes one member that is not the owner.
+func (f *scheduleFixture) removeMember() {
+	f.t.Helper()
+	require.NoError(f.t, database.Conn().Model(&models.User{}).
+		Where("id = (SELECT id FROM users WHERE organization_id = ? AND is_owner = false AND deleted_at IS NULL LIMIT 1)", f.r.Organization.ID).
+		Update("deleted_at", time.Now()).Error)
+}
+
+// assertOnlyNextPeriodUpdates fails when any request could change the
+// current period or charge now.
+func (f *scheduleFixture) assertOnlyNextPeriodUpdates() {
+	f.t.Helper()
+	for _, patch := range f.polar.Patches() {
+		assert.Equal(f.t, "next_period", patch.Body["proration_behavior"], "a seat update must not charge now")
+	}
+}
+
+func (f *scheduleFixture) assertAdmissionBlocked() {
+	f.t.Helper()
+	usage, err := entitlements.ResolveSeats(database.Conn(), f.r.Organization.ID)
+	require.NoError(f.t, err)
+	assert.True(f.t, usage.PaymentBlocked)
+	assert.Equal(f.t, new(0), usage.Invitable, "no invitations while past due")
+	assert.Equal(f.t, new(0), usage.Purchasable, "no purchases while past due")
+	assert.Equal(f.t, new(usage.Occupied), usage.JoinLimit(), "no acceptance while past due")
+}
+
+func Test__SchedulePastDueSubscriptionReducesTheNextPeriod(t *testing.T) {
+	tests := []struct {
+		name      string
+		graceDays int
+		// pastDueDaysAgo moves the stored start of the failure back.
+		pastDueDaysAgo int
+		teamFeatures   bool
+	}{
+		{name: "within grace", graceDays: 7, teamFeatures: true},
+		{name: "after the grace period ends", graceDays: 7, pastDueDaysAgo: 8},
+		{name: "without grace", graceDays: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newScheduleFixture(t, 10, 9)
+			f.pastDue(tt.graceDays)
+			if tt.pastDueDaysAgo > 0 {
+				f.updatePlan(map[string]any{
+					"polar_subscription_status": models.PolarSubscriptionStatusPastDue,
+					"past_due_since":            time.Now().Add(-time.Duration(tt.pastDueDaysAgo) * 24 * time.Hour),
+				})
+			}
+
+			result := f.schedule()
+
+			assert.Equal(t, ActionFixed, result.Action)
+			assert.Equal(t, new(9), result.Target)
+			assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+			sub := f.polar.Subscription(f.sub.ID)
+			assert.Equal(t, 10, sub.Seats, "the current period keeps its seats")
+			assert.Equal(t, new(9), sub.PendingSeats)
+			plan := f.plan()
+			assert.Equal(t, models.PolarSubscriptionStatusPastDue, plan.PolarSubscriptionStatus)
+			assert.Equal(t, tt.teamFeatures, plan.Catalog.PerSeat, "the plan row is on the expected catalog")
+			assert.Equal(t, new(10), plan.PurchasedSeats)
+			assert.Equal(t, new(9), plan.RenewalSeatsScheduled)
+			f.assertAdmissionBlocked()
+		})
+	}
+}
+
+func Test__SchedulePastDueSubscriptionNeverAddsSeats(t *testing.T) {
+	f := newScheduleFixture(t, 2, 3)
+	f.pastDue(0)
+
+	result := f.schedule()
+
+	assert.Equal(t, new(2), result.Target, "the target is the paid seats, not the member count")
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(2)}}, f.polar.Patches())
+	sub := f.polar.Subscription(f.sub.ID)
+	assert.Equal(t, 2, sub.Seats)
+	assert.Nil(t, sub.PendingSeats)
+	f.assertAdmissionBlocked()
+}
+
+func Test__ScheduleFailsForMissingPaidSeats(t *testing.T) {
+	tests := []struct {
+		name          string
+		storedSeats   int
+		snapshotSeats int
+		// staleSnapshot makes the apply ignore the Polar snapshot, so the
+		// stored plan keeps its seats.
+		staleSnapshot bool
+		// storedInvalid is true when the stored plan has no paid seats
+		// after the apply.
+		storedInvalid bool
+	}{
+		{name: "Polar reports no seats", storedSeats: 10, snapshotSeats: 0, storedInvalid: true},
+		{name: "older Polar snapshot reports no seats", storedSeats: 10, snapshotSeats: 0, staleSnapshot: true},
+		{name: "stored plan reports no seats", storedSeats: 0, snapshotSeats: 10, staleSnapshot: true, storedInvalid: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newScheduleFixture(t, 10, 9)
+			f.pastDue(0)
+			f.updatePlan(map[string]any{
+				"polar_subscription_status": models.PolarSubscriptionStatusPastDue,
+				"purchased_seats":           tt.storedSeats,
+				"polar_modified_at":         f.now,
+			})
+			f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) {
+				sub.Seats = tt.snapshotSeats
+				if tt.staleSnapshot {
+					sub.ModifiedAt = new(f.now.Add(-time.Hour))
+				}
+			})
+
+			result, err := f.scheduler.Schedule(context.Background(), f.r.Organization.ID)
+
+			require.Error(t, err, "missing capacity needs repair and is not a success")
+			assert.Equal(t, tt.storedInvalid, errors.Is(err, entitlements.ErrInvalidPaidSeats))
+			assert.Empty(t, result.Action)
+			assert.Empty(t, f.polar.Patches())
+			assert.Nil(t, f.plan().RenewalSeatsScheduled)
+		})
+	}
+}
+
+func Test__ScheduleReportsAPolarRejectionAndRetriesLater(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	f.pastDue(0)
+	// Polar rejects the seat update of the past-due subscription.
+	client := &observedClient{Client: f.scheduler.client, beforeSchedule: func() {
+		f.polar.FailNext(1, http.StatusForbidden, "InactiveSubscription")
+	}}
+
+	result, err := NewScheduler(database.Conn(), client, func() time.Time { return f.now }).Schedule(context.Background(), f.r.Organization.ID)
+
+	require.Error(t, err)
+	assert.True(t, polar.IsSubscriptionInactive(err), "the caller can identify the rejection")
+	assert.NotEqual(t, ActionFixed, result.Action)
+	assert.Nil(t, f.plan().RenewalSeatsScheduled, "a rejected update is not recorded as sent")
+	assert.Nil(t, f.polar.Subscription(f.sub.ID).PendingSeats)
+
+	result = f.schedule()
+
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, new(9), f.polar.Subscription(f.sub.ID).PendingSeats)
+	assert.Equal(t, new(9), f.plan().RenewalSeatsScheduled)
+	f.assertOnlyNextPeriodUpdates()
+}
+
+func Test__SchedulePastDueReductionSurvivesTheCycleAndRecovery(t *testing.T) {
+	f := newScheduleFixture(t, 10, 10)
+	f.pastDue(0)
+	assert.Equal(t, ActionInSync, f.schedule().Action, "all paid seats are occupied")
+
+	f.removeMember()
+	result := f.schedule()
+
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, new(9), f.polar.Subscription(f.sub.ID).PendingSeats)
+	f.assertAdmissionBlocked()
+
+	// Polar renews the subscription while it still retries the payment.
+	periodEnd := f.sub.PeriodEnd
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) {
+		sub.Seats = *sub.PendingSeats
+		sub.PendingSeats = nil
+		sub.PeriodStart = periodEnd
+		sub.PeriodEnd = periodEnd.AddDate(0, 1, 0)
+	})
+	patches := len(f.polar.Patches())
+
+	result = f.schedule()
+
+	assert.Equal(t, ActionInSync, result.Action)
+	assert.Equal(t, new(9), result.Target)
+	assert.Len(t, f.polar.Patches(), patches, "the renewed period already has the target")
+	plan := f.plan()
+	assert.Equal(t, new(9), plan.PurchasedSeats)
+	assert.True(t, plan.CurrentPeriodStart.Equal(periodEnd))
+	f.assertAdmissionBlocked()
+
+	// The payment recovers.
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.Status = models.PolarSubscriptionStatusActive })
+
+	result = f.schedule()
+
+	assert.Equal(t, ActionInSync, result.Action)
+	assert.Equal(t, new(9), result.Target)
+	assert.Len(t, f.polar.Patches(), patches)
+	plan = f.plan()
+	assert.Equal(t, models.PolarSubscriptionStatusActive, plan.PolarSubscriptionStatus)
+	assert.True(t, plan.Catalog.PerSeat, "recovery restores the Team plan")
+	assert.Equal(t, new(9), plan.RenewalSeatsScheduled)
+	f.assertOnlyNextPeriodUpdates()
 }
 
 // observedClient runs a hook around each Polar call that Schedule makes.
@@ -476,7 +711,8 @@ func Test__ScheduleDoesNotLetAnOlderResponseOverwriteANewerWebhook(t *testing.T)
 	f.scheduleWith(client)
 
 	assert.Equal(t, models.PolarSubscriptionStatusPastDue, f.plan().PolarSubscriptionStatus, "the older active response must not undo the failure")
-	assert.Empty(t, f.polar.Patches())
+	// A past-due subscription still renews, so it gets the scheduled count.
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
 }
 
 func Test__ScheduleMakesNoPolarRequestWhileTheOrganizationRowIsLocked(t *testing.T) {

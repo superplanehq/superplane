@@ -153,15 +153,19 @@ func TestResolvePurchasedSeats(t *testing.T) {
 		require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", quantity).Error)
 		expected.Invitable = seatCount(0)
 		expected.Purchased, expected.Available = quantity, seatCount(0)
-		if quantity == nil {
-			expected.Purchased = seatCount(0)
+		// The renewal never adds seats, and no paid seats give no renewal count.
+		expected.RenewalQuantity = quantity
+		if quantity == nil || *quantity == 0 {
+			expected.Purchased, expected.RenewalQuantity = seatCount(0), nil
 		}
 		expected.Purchasable = seatCount(1 - *expected.Purchased)
 		check()
 	}
 	require.NoError(t, db.Delete(member).Error)
 	require.NoError(t, db.Delete(&models.User{}, "id = ?", r.User).Error)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
 	expected.Occupied, expected.RenewalQuantity = 0, seatCount(1)
+	expected.Purchased, expected.Available, expected.Invitable, expected.Purchasable = seatCount(3), seatCount(3), seatCount(3), seatCount(0)
 	check()
 	t.Setenv(models.BillingEnabledEnv, "no")
 	actual, err := ResolveSeats(db, r.Organization.ID)

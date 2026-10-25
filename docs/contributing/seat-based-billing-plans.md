@@ -227,10 +227,19 @@ changes in Polar.
 
 Polar renews a subscription with the seat count of the subscription.
 SuperPlane schedules the next-period seat count so that Polar renews only
-occupied seats. The target is `RenewalQuantity` from
-`entitlements.ResolveSeats`: the number of active human members, owner
-included, with a minimum of 1. Pending invitations, removed members, and
-service accounts do not count.
+occupied seats. The target comes from `entitlements.ResolveRenewalSeats`:
+the number of active human members, owner included, with a minimum of 1,
+and never more than the paid seats (`purchased_seats`). Pending invitations,
+removed members, and service accounts do not count. SuperPlane never
+increases seats automatically.
+
+The target depends only on the paid seats and the members. It does not use
+the payment lock, the admission limits, or the catalog maximum. A payment
+failure can move the plan row to a fallback catalog (None or Trial) that is
+not per seat. The row keeps `purchased_seats`, so the target stays the same.
+A seat-based plan without paid seats (`purchased_seats` missing or 0) is
+invalid. Schedule returns an error for it and sends nothing. Repair the plan
+from Polar.
 
 SuperPlane sends `PATCH /subscriptions/{id}` with
 `{"seats": <target>, "proration_behavior": "next_period"}`. Polar does not
@@ -251,12 +260,33 @@ settles or expires an old seat purchase from Polar, so an abandoned purchase
 cannot keep its organization unchecked forever. It then does nothing when one
 of these conditions is true:
 
-- The plan is not per seat, or `RenewalQuantity` is not set (for example, the renewal is past due).
+- The plan is not seat-based: the catalog plan is not per seat and the plan has no purchased seats.
+- Billing is off.
 - An admin assigned the plan.
-- The plan has no Polar subscription, the subscription is not `active`, or it is set to cancel.
+- The plan has no Polar subscription.
+- The subscription is `paused` (`subscription_paused`), or it is `unpaid`, `canceled`, `revoked`, or in a different state that does not renew (`subscription_not_active`).
+- The subscription is set to cancel (`subscription_canceling`), also when it is past due.
+- The verified Polar snapshot is not `active` or `past_due`, or it is set to cancel (`polar_subscription_not_active`).
 - A seat purchase is still inside its confirmation window. The purchase
   replaces any scheduled count when it settles, and SuperPlane schedules the
   count again after that.
+
+### Past-due subscriptions
+
+Polar keeps a `past_due` subscription and continues to renew it while it
+retries the payment. Schedule therefore keeps the next-period count of an
+`active` or a `past_due` subscription. It sends only the `next_period`
+update, so nothing changes in the current period and Polar charges nothing
+now.
+
+The scheduled count grants no access. Invitations, invitation acceptance,
+and seat purchases stay blocked while the subscription is past due or
+paused. The past-due grace period does not change.
+
+When Polar rejects the update, Schedule returns the error and does not
+store `renewal_seats_scheduled`. The background retry and the
+reconciliation worker log the failure and try again on the next run. When
+the payment recovers, the next run keeps the reduced count.
 
 Schedule holds a per-organization PostgreSQL session advisory lock across the
 local reads, Polar requests, and record write. API processes and workers use
@@ -309,8 +339,8 @@ The worker fixes other failures.
 ### Reconciliation worker
 
 `SeatRenewalSyncWorker` runs when `START_SEAT_RENEWAL_SYNC_WORKER=yes`. Every 5
-minutes it checks each organization on an active per-seat Polar subscription
-that is not set to cancel. Organizations with the earliest `current_period_end`
+minutes it checks each organization on a seat-based Polar subscription that
+is not canceled or revoked. Organizations with the earliest `current_period_end`
 go first. The worker uses `seatrenewal.Schedule`, so the same rules apply. It
 fixes counts after a Polar outage, a lost update, a race between a purchase and
 a removal, and membership changes without a live update, such as account
@@ -349,6 +379,19 @@ and `{"current_billing_period_end": "<time>"}`.
 3. Renewal after a scheduled reduction.
    - Step: schedule a reduction from 10 to 9 seats. Move the period end a few minutes ahead and wait for `subscription.cycled`.
    - Expected result: `seats` is 9 in `subscription.cycled`, the renewal invoice charges 9 seats, and Polar issues no credit.
+   - Observed result: pending.
+4. Scheduled reduction on a past-due subscription (gate G9).
+   - Step: make the renewal payment of a subscription with 10 seats fail, so
+     that the status is `past_due`. Send
+     `{"seats": 9, "proration_behavior": "next_period"}`. Read the PATCH
+     response and `GET /v1/subscriptions/{id}`. Then move the period end a
+     few minutes ahead and wait for `subscription.cycled`. Move the period
+     end: the payment retries can end before the next monthly boundary.
+   - Expected result: Polar accepts the update, `pending_update.seats` is 9,
+     and Polar creates no invoice and no charge now. The cycle renews with 9
+     seats. If Polar rejects the update, record the status and the error
+     code. SuperPlane reports the rejection as a failure and tries again, but
+     the past-due eligibility rule then needs a follow-up change.
    - Observed result: pending.
 
 ## Over capacity
