@@ -297,6 +297,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.JiraMoveOnComplete = false
 				settings.JiraCompletionColumn = "QA"
 			case models.FactoryIntakeSourceSentryExceptions:
+				settings.DefaultOwnerID = r.User.String()
 				settings.SentryNewIssues, settings.SentryRegressedIssues, settings.SentryAssignedIssues = false, false, true
 				settings.SentryLevels = []string{"fatal", "warning"}
 				settings.SentryProjectIDs = []string{"payments", "checkout"}
@@ -382,6 +383,12 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 			actual := intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 			assert.Equal(t, expected, serializeIntakeSettings(source, actual))
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				assert.Equal(t, r.User.String(), listed.Intakes[0].GetSettings().GetDefaultOwnerId())
+				create := findIntakeNode(version.Nodes, resolveIntakeGraph(source, spec).CreateNodeID)
+				require.NotNil(t, create)
+				assert.Equal(t, r.User.String(), create.Configuration["defaultOwnerId"])
+			}
 			if tc.restrictAuthors {
 				require.NotNil(t, findIntakeNode(version.Nodes, intakeAuthorPermissionNodeID))
 				assert.True(t, hasCanvasPath(spec.Edges, intakeFilterNodeID, intakeAuthorPermissionNodeID))
