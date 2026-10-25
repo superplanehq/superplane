@@ -323,7 +323,7 @@ func Test__ScheduleSkipsOrganizationsWithoutARenewalSeatCountToKeep(t *testing.T
 		{name: "no subscription", reason: SkipNoSubscription, change: func(f *scheduleFixture) {
 			f.updatePlan(map[string]any{"polar_subscription_id": nil})
 		}},
-		{name: "renewal is past due", reason: SkipSubscriptionNotActive, change: func(f *scheduleFixture) {
+		{name: "past due plan loses paid access without grace", reason: SkipNotPerSeat, change: func(f *scheduleFixture) {
 			f.updatePlan(map[string]any{"polar_subscription_status": models.PolarSubscriptionStatusPastDue})
 		}},
 		{name: "set to cancel", reason: SkipSubscriptionCanceling, change: func(f *scheduleFixture) {

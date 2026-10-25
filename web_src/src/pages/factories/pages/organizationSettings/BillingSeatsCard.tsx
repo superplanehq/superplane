@@ -1,6 +1,6 @@
+import { BILLING_PAYMENT_BLOCKED_SEATS_COPY, billingPeriodEndLabel } from "../../lib/billingPlans";
 import { Button } from "@/components/ui/button";
 import { BillingSeatPurchaseLimit } from "./BillingSeatPurchaseStatus";
-import { billingPeriodEndLabel } from "../../lib/billingPlans";
 import { formatUsdCents } from "../../lib/workOrderUsage";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
 import type { BillingSeatSummary } from "./useOrganizationBillingPageModel";
@@ -22,6 +22,9 @@ export function BillingSeatsCard({
   canBuySeats,
   onBuySeats,
 }: BillingSeatsCardProps) {
+  if (seats.paymentBlocked) {
+    return <BlockedSeatsSummary seats={seats} />;
+  }
   const date = billingPeriodEndLabel(currentPeriodEnd);
   const estimate = renewalEstimate(seats, date);
 
@@ -30,6 +33,7 @@ export function BillingSeatsCard({
       <p className="text-xl font-semibold tracking-[-0.02em] tabular-nums">
         {seats.occupied ?? "Not available"} of {seats.purchased ?? "Not available"} seats used
       </p>
+      <OverCapacityNotice seats={seats} canManageBilling={canManageBilling} />
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-xs text-muted-foreground">Available seats</dt>
@@ -76,6 +80,40 @@ export function BillingSeatsCard({
             <Button onClick={onBuySeats}>Buy seats</Button>
           ))}
       </div>
+    </FactorySettingsCard>
+  );
+}
+
+function OverCapacityNotice({ seats, canManageBilling }: { seats: BillingSeatSummary; canManageBilling: boolean }) {
+  const { occupied, purchased } = seats;
+  if (occupied === undefined || purchased === undefined || occupied <= purchased) {
+    return null;
+  }
+
+  const message = canManageBilling
+    ? `${pluralize(occupied, "member")}, ${pluralize(purchased, "paid seat")}. Buy seats or remove members to invite again.`
+    : "Ask an organization admin to buy seats or remove members.";
+  return (
+    <p role="status" className="mt-3 text-sm text-destructive">
+      {message}
+    </p>
+  );
+}
+
+function pluralize(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+// While payment is blocked, the server sends only the stored and used seats.
+function BlockedSeatsSummary({ seats }: { seats: BillingSeatSummary }) {
+  return (
+    <FactorySettingsCard title="Seats" data-testid="billing-seats">
+      <p className="text-xl font-semibold tracking-[-0.02em] tabular-nums">
+        {seats.occupied ?? "Not available"} of {seats.purchased ?? "Not available"} seats used
+      </p>
+      <p className="mt-3 text-sm text-muted-foreground" data-testid="billing-seats-blocked">
+        {BILLING_PAYMENT_BLOCKED_SEATS_COPY}
+      </p>
     </FactorySettingsCard>
   );
 }

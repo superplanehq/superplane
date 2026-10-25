@@ -267,7 +267,7 @@ func Test__ResolveEnvironmentCollectsUsageAndSetup(t *testing.T) {
 	assert.Equal(t, "sem-token", environmentValues(resolved.Variables)["SEMAPHORE_API_TOKEN"])
 }
 
-func environmentValues(environment []BrokerEnvironmentVariable) map[string]string {
+func environmentValues(environment []TaskEnvironmentVariable) map[string]string {
 	values := map[string]string{}
 	for _, variable := range environment {
 		values[variable.Name] = variable.Value
@@ -319,7 +319,7 @@ func TestAttachExecutionTimeoutEnvUsesDefaultWhenUnset(t *testing.T) {
 	assert.Equal(t, EnvExecutionTimeoutSeconds, got[0].Name)
 	assert.Equal(t, fmt.Sprintf("%d", DefaultExecutionTimeoutSeconds), got[0].Value)
 
-	got = AttachExecutionTimeoutEnv([]BrokerEnvironmentVariable{{Name: "KEEP", Value: "1"}}, 90)
+	got = AttachExecutionTimeoutEnv([]TaskEnvironmentVariable{{Name: "KEEP", Value: "1"}}, 90)
 	require.Len(t, got, 2)
 	assert.Equal(t, "90", got[1].Value)
 }

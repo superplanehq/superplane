@@ -129,7 +129,12 @@ func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 	if a == nil {
 		return errors.New("account is required")
 	}
+	return tx.Transaction(func(inner *gorm.DB) error {
+		return a.softDelete(inner, now)
+	})
+}
 
+func (a *Account) softDelete(tx *gorm.DB, now time.Time) error {
 	candidates, err := listOrganizationsForAccountDeletion(tx, a.ID)
 	if err != nil {
 		return err
@@ -148,7 +153,7 @@ func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 		if organizationHasOtherHumanOwner(owners, a.ID) {
 			continue
 		}
-		if err := SoftDeleteOrganizationInTransaction(tx, organization.ID.String()); err != nil {
+		if err := organization.SoftDelete(tx); err != nil {
 			return err
 		}
 		if err := SoftDeleteOrganizationFactories(tx, organization.ID); err != nil {

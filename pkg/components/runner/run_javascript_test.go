@@ -2,9 +2,7 @@ package runner
 
 import (
 	"encoding/json"
-	"io"
-	"net/http"
-	"strings"
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,19 +26,14 @@ func (s *stubMessageChainBuilder) BuildExecutionMessageChain() (map[string]any, 
 	return s.chain, s.err
 }
 
-func TestRunJSExecuteSendsJavaScriptPayloadToBroker(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
+func TestRunJSExecuteSendsJavaScriptPayloadToRunner(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
 
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-js-1"}`))},
-		},
-	}
+	httpContext := &contexts.HTTPContext{}
 
 	component := &RunJS{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
 			"script": `function main() {
@@ -58,15 +51,15 @@ func TestRunJSExecuteSendsJavaScriptPayloadToBroker(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
+	require.Len(t, httpContext.Requests, 0)
 
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
+	body := tasks.Payload
+	require.NotEmpty(t, body)
 
-	var req brokerCreateTaskRequest
+	var req runnerapi.TaskPayload
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	assert.Equal(t, testRunnerMachineType, req.FleetID)
+	assert.Equal(t, testRunnerMachineType, tasks.FleetID)
 	assert.Equal(t, RunModeJavaScript, req.RunMode)
 	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 	assert.Contains(t, req.Script, "function main()")
@@ -77,18 +70,13 @@ func TestRunJSExecuteSendsJavaScriptPayloadToBroker(t *testing.T) {
 }
 
 func TestRunJSExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	tasks := &contexts.RunnerTaskContext{}
 
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-js-setup-1"}`))},
-		},
-	}
+	httpContext := &contexts.HTTPContext{}
 
 	component := &RunJS{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machine_type":          testRunnerMachineType,
 			"enable_setup_commands": true,
@@ -102,12 +90,12 @@ func TestRunJSExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 		Expressions:    &stubMessageChainBuilder{chain: map[string]any{}},
 	})
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
+	require.Len(t, httpContext.Requests, 0)
 
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
+	body := tasks.Payload
+	require.NotEmpty(t, body)
 
-	var req brokerCreateTaskRequest
+	var req runnerapi.TaskPayload
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, []string{"npm ci", "echo ready"}, req.SetupCommands)
@@ -143,12 +131,12 @@ func TestRunJSProcessTaskStatusIncludesResult(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 0
-	task := &Task{
-		Status:   "succeeded",
+	task := &core.RunnerTask{
+		State:    "succeeded",
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"ok":true}`),
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunJSFinishedEventType, "", nil, nil, nil))
+	require.NoError(t, processTaskStatus(state, task, RunJSFinishedEventType, "", nil, nil, nil))
 	require.Equal(t, PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)

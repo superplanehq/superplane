@@ -20,10 +20,13 @@ vi.mock("@/contexts/usePermissions", () => ({
   }),
 }));
 
-function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse) {
+function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse, newBilling = false) {
   return render(
     <FactoriesHarness
-      pathSuffix={"workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing"}
+      experimentalFeatures={newBilling ? ["new_billing"] : []}
+      pathSuffix={
+        "workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing" + (newBilling ? "?buySeats=1" : "")
+      }
       factoriesFixture={{ ...defaultFactoriesFixture, organizationBilling: billing }}
     />,
   );
@@ -98,6 +101,36 @@ describe("Organization billing seats", () => {
     );
   });
 
+  describe("when members exceed paid seats", () => {
+    const overCapacity = { ...TEAM_ORGANIZATION_BILLING, purchasedSeats: 8, occupiedSeats: 9, availableSeats: 0 };
+
+    it("tells admins to buy seats or remove members", async () => {
+      renderBilling(overCapacity);
+      const card = await screen.findByTestId("billing-seats");
+      expect(card).toHaveTextContent("9 members, 8 paid seats. Buy seats or remove members to invite again.");
+      expect(card).not.toHaveTextContent("Ask an organization admin");
+    });
+
+    it("uses singular forms for one member and one paid seat", async () => {
+      renderBilling({ ...overCapacity, purchasedSeats: 1, occupiedSeats: 2 });
+      expect(await screen.findByTestId("billing-seats")).toHaveTextContent("2 members, 1 paid seat. Buy seats");
+    });
+
+    it("tells other users to ask an admin", async () => {
+      canManageBilling = false;
+      renderBilling(overCapacity);
+      const card = await screen.findByTestId("billing-seats");
+      expect(card).toHaveTextContent("Ask an organization admin to buy seats or remove members.");
+      expect(card).not.toHaveTextContent("Buy seats or remove members to invite again.");
+    });
+
+    it.each([8, 7])("shows no notice when occupied seats do not exceed %s purchased seats", async (occupied) => {
+      renderBilling({ ...overCapacity, occupiedSeats: occupied });
+      const card = await screen.findByTestId("billing-seats");
+      expect(within(card).queryByRole("status")).not.toBeInTheDocument();
+    });
+  });
+
   it.each([undefined, "", "invalid-date"])(
     "handles an unavailable renewal date (%s) and amounts",
     async (currentPeriodEnd) => {
@@ -127,6 +160,36 @@ describe("Organization billing seats", () => {
     renderBilling(billing);
     await screen.findByTestId("billing-plans");
     expect(screen.queryByTestId("billing-seats")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { name: "past due after the grace period", status: "past_due", planPerSeat: false },
+    { name: "past due during the grace period", status: "past_due", planPerSeat: true },
+    { name: "paused", status: "paused", planPerSeat: true },
+  ])("keeps a seats summary and blocks new members while $name", async ({ status, planPerSeat }) => {
+    renderBilling(
+      {
+        ...TEAM_ORGANIZATION_BILLING,
+        polarSubscriptionStatus: status,
+        planPerSeat,
+        purchasedSeats: 8,
+        availableSeats: undefined,
+        planMaximumSeats: undefined,
+        purchasableSeats: undefined,
+        expectedRenewalSeats: undefined,
+        currentMonthlyTotalCents: undefined,
+        expectedRenewalCents: undefined,
+      },
+      true,
+    );
+    const card = await screen.findByTestId("billing-seats");
+    expect(card).toHaveTextContent("9 of 8 seats used");
+    expect(card).toHaveTextContent("No one can join until the payment is updated.");
+    expect(within(card).queryByRole("status")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Expected renewal")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Not available", { selector: "dd" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Buy seats" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument();
   });
 
   it("shows a conditional estimate after cancellation and normal copy after resuming", async () => {

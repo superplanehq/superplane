@@ -328,6 +328,62 @@ and `{"current_billing_period_end": "<time>"}`.
    - Expected result: `seats` is 9 in `subscription.cycled`, the renewal invoice charges 9 seats, and Polar issues no credit.
    - Observed result: pending.
 
+## Over capacity
+
+A per-seat organization is over capacity when it has more active members than
+`purchased_seats`. Admission is already safe in this state. `JoinLimit()` returns
+the purchased seats and `Invitable` is 0, so no one can join or get an
+invitation. The Seats card on the billing page tells Admins to buy seats or
+remove members. Other users see a request to ask an organization admin.
+
+SuperPlane stores the start of the state in
+`organization_billing_plans.over_capacity_since`. It never sends a request to
+Polar and never buys seats.
+
+### Causes
+
+- **Checkout race.** Members join on the old plan while a Team checkout is open.
+  The activation snapshot then has fewer seats than members. The log cause is
+  `activation`.
+- **Renewal after a late join.** A member joins before renewal and the renewal
+  keeps the older seat count. The log cause is `cycle`.
+- **Outside reduction.** Someone lowers the seats in the Polar dashboard. The log
+  cause is `update`.
+- **Recovery from past due.** The payment recovers while members exceed seats. The
+  log cause is `recovery`.
+
+### Log lines
+
+Every line uses the component `billing.seats`. The fields are
+`organization_id`, `subscription_id`, `purchased`, `occupied`, and `cause`.
+
+- `billing.seats_over_capacity` is an error. SuperPlane writes it once when the
+  state starts. Repeated webhooks while the state lasts write nothing.
+- `billing.seats_over_capacity_resolved` is an info line. SuperPlane writes it
+  when members and seats balance again. The cause is one of `update`, `cycle`,
+  `recovery`, `removal`, or `account_deletion`. The next start alerts again.
+
+A plan that is not an active per-seat plan clears the record without a log
+line. Installs with billing off write no line.
+
+With `LOG_FORMAT=json`, find the alerts in Cloud Logging with this query:
+
+```text
+jsonPayload.component="billing.seats" AND jsonPayload.message="billing.seats_over_capacity"
+```
+
+### Repair
+
+1. Find the organization with the query above.
+2. Ask a billing manager of the organization to buy seats in **Settings → Billing**.
+   Or remove members in **Settings → Members**.
+3. Confirm the `billing.seats_over_capacity_resolved` line.
+4. Confirm that the Seats card no longer shows the notice.
+
+Renewal never adds seats automatically. The renewal keeps the seats that Polar
+holds. Until someone buys seats or removes members, the organization stays over
+capacity and admission stays blocked.
+
 ## Resolve subscription identity conflicts
 
 The log `billing.foreign_subscription_snapshot_ignored` means a snapshot arrived
