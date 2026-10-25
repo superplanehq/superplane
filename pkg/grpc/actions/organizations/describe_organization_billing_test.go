@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -268,29 +270,35 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
 				return
 			}
+			subscription := map[string]any{
+				"id":                   "sub_grpc_sync",
+				"status":               "active",
+				"product_id":           "prod_business",
+				"current_period_start": periodStart.Format(time.RFC3339),
+				"current_period_end":   periodEnd.Format(time.RFC3339),
+				"customer_id":          "cust_polar_1",
+				"external_customer_id": r.Organization.ID.String(),
+				"customer": map[string]any{
+					"id":          "cust_polar_1",
+					"external_id": r.Organization.ID.String(),
+				},
+			}
+			if req.URL.Path == "/subscriptions/sub_grpc_sync" {
+				// The renewal schedule after the sync reads the subscription.
+				assert.Equal(t, http.MethodGet, req.Method)
+				require.NoError(t, json.NewEncoder(w).Encode(subscription))
+				return
+			}
 			assert.Equal(t, "/subscriptions/", req.URL.Path)
 			assert.Equal(t, r.Organization.ID.String(), req.URL.Query().Get("external_customer_id"))
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
-				"items": []map[string]any{
-					{
-						"id":                   "sub_grpc_sync",
-						"status":               "active",
-						"product_id":           "prod_business",
-						"current_period_start": periodStart.Format(time.RFC3339),
-						"current_period_end":   periodEnd.Format(time.RFC3339),
-						"customer_id":          "cust_polar_1",
-						"external_customer_id": r.Organization.ID.String(),
-						"customer": map[string]any{
-							"id":          "cust_polar_1",
-							"external_id": r.Organization.ID.String(),
-						},
-					},
-				},
+				"items":      []map[string]any{subscription},
 				"pagination": map[string]any{"max_page": 1},
 			}))
 		})
 		usePolarTestServer(t, server)
 		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+		t.Cleanup(seatrenewal.Wait)
 
 		resp, err := SyncOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
 		require.NoError(t, err)
@@ -415,13 +423,17 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("keeps Business", func(t *testing.T) {
+		var patches atomic.Int32
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 			if strings.HasSuffix(req.URL.Path, "/payment-methods") {
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
 				return
 			}
-			assert.Equal(t, http.MethodPatch, req.Method)
 			assert.Equal(t, "/subscriptions/sub_grpc_resume", req.URL.Path)
+			if req.Method == http.MethodPatch {
+				patches.Add(1)
+			}
+			// The renewal schedule after the resume reads the subscription.
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"id":                   "sub_grpc_resume",
 				"status":               "active",
@@ -439,11 +451,15 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 		usePolarTestServer(t, server)
 		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
 
+		t.Cleanup(seatrenewal.Wait)
+
 		resp, err := ResumeOrganizationSubscription(context.Background(), r.Organization.ID.String(), &pb.ResumeOrganizationSubscriptionRequest{})
 		require.NoError(t, err)
 		assert.Equal(t, models.BillingPlanBusiness, resp.Plan)
 		assert.True(t, resp.CreditPurchaseAllowed)
 		assert.False(t, resp.CancelAtPeriodEnd)
+		seatrenewal.Wait()
+		assert.Equal(t, int32(1), patches.Load(), "only the resume updates the subscription")
 	})
 }
 

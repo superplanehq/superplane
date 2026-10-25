@@ -17,6 +17,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -230,6 +231,7 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 
 	var users []models.User
 	var deletedOrganizations []models.Organization
+	var survivingOrganizations []uuid.UUID
 	var capacityChecks []polar.SeatCapacityCheck
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(account, "id = ?", account.ID).Error; err != nil {
@@ -250,7 +252,8 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 		if err := account.SoftDelete(tx, time.Now(), clearances); err != nil {
 			return err
 		}
-		capacityChecks, err = recheckSeatCapacityAfterAccountDeletion(tx, users, deletedOrganizations)
+		survivingOrganizations = survivingOrganizationIDs(users, deletedOrganizations)
+		capacityChecks, err = recheckSeatCapacityAfterAccountDeletion(tx, survivingOrganizations)
 		return err
 	})
 	if err != nil {
@@ -258,6 +261,11 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 	}
 	for _, check := range capacityChecks {
 		check.Log()
+	}
+	// Each surviving organization lost a human member, so its renewal seat
+	// count can go down. Schedule only after the commit, outside the locks.
+	for _, organizationID := range survivingOrganizations {
+		seatrenewal.ScheduleAsync(ctx, organizationID)
 	}
 
 	if err := s.removeAccountOrganizationRoles(ctx, users); err != nil {
@@ -285,26 +293,35 @@ func verifyAccountOrganizationDeletions(ctx context.Context, account *models.Acc
 
 // recheckSeatCapacityAfterAccountDeletion updates the over-capacity record of
 // each organization that keeps running after the account left it.
-func recheckSeatCapacityAfterAccountDeletion(
-	tx *gorm.DB,
-	users []models.User,
-	deletedOrganizations []models.Organization,
-) ([]polar.SeatCapacityCheck, error) {
-	var checks []polar.SeatCapacityCheck
-	for _, user := range users {
-		isDeleted := slices.ContainsFunc(deletedOrganizations, func(organization models.Organization) bool {
-			return organization.ID == user.OrganizationID
-		})
-		if isDeleted {
-			continue
-		}
-		check, err := polar.RecheckSeatCapacity(tx, user.OrganizationID, polar.SeatCapacityCauseAccountDeleted)
+func recheckSeatCapacityAfterAccountDeletion(tx *gorm.DB, organizationIDs []uuid.UUID) ([]polar.SeatCapacityCheck, error) {
+	checks := make([]polar.SeatCapacityCheck, 0, len(organizationIDs))
+	for _, organizationID := range organizationIDs {
+		check, err := polar.RecheckSeatCapacity(tx, organizationID, polar.SeatCapacityCauseAccountDeleted)
 		if err != nil {
 			return nil, err
 		}
 		checks = append(checks, check)
 	}
 	return checks, nil
+}
+
+// survivingOrganizationIDs returns, once each, the organizations where the
+// account had a human membership and that the deletion does not delete.
+func survivingOrganizationIDs(users []models.User, deletedOrganizations []models.Organization) []uuid.UUID {
+	var organizationIDs []uuid.UUID
+	for _, user := range users {
+		if slices.Contains(organizationIDs, user.OrganizationID) {
+			continue
+		}
+		isDeleted := slices.ContainsFunc(deletedOrganizations, func(organization models.Organization) bool {
+			return organization.ID == user.OrganizationID
+		})
+		if isDeleted {
+			continue
+		}
+		organizationIDs = append(organizationIDs, user.OrganizationID)
+	}
+	return organizationIDs
 }
 
 func (s *Server) refuseAccountDeleteGuards(tx *gorm.DB, account *models.Account) error {

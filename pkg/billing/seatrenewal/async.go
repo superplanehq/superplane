@@ -18,11 +18,11 @@ var retryDelays = []time.Duration{2 * time.Second, 6 * time.Second}
 
 var background sync.WaitGroup
 
-// ScheduleAsync schedules the renewal seat count after a membership or seat
-// change commits. It returns at once and never fails the caller: the
-// schedule runs in the background, outside the transaction and the
-// organization lock. Transient Polar failures get a short retry. The seat
-// renewal sync worker fixes what is left.
+// ScheduleAsync schedules the renewal seat count after a membership, seat,
+// account, or subscription lifecycle change commits. It returns at once and
+// never fails the caller: the schedule runs in the background, outside the
+// transaction and the organization lock. Transient Polar failures get a
+// short retry. The seat renewal sync worker fixes what is left.
 func ScheduleAsync(ctx context.Context, orgID uuid.UUID) {
 	if !models.BillingEnabled() || !polar.Configured() {
 		return
@@ -35,9 +35,10 @@ func ScheduleAsync(ctx context.Context, orgID uuid.UUID) {
 }
 
 // ScheduleAfterSeatPurchaseAsync restores the reduction that an applied
-// purchase clears in Polar. Call it after a subscription webhook, billing
-// sync, or purchase reconciliation commits. Repeated snapshots are safe:
-// Schedule verifies the current target and provider state before any update.
+// purchase clears in Polar. Call it after a purchase reconciliation commits.
+// It schedules only when the latest seat purchase succeeded. Repeated calls
+// are safe: Schedule verifies the current target and provider state before
+// any update.
 func ScheduleAfterSeatPurchaseAsync(ctx context.Context, orgID uuid.UUID) {
 	if !models.BillingEnabled() || !polar.Configured() {
 		return

@@ -53,7 +53,7 @@ type failure struct {
 // Server serves GET and PATCH /subscriptions/{id} like Polar. A next_period
 // seat update sets the pending seat count, and an update back to the current
 // seats clears it. Any other seat update applies at once and drops the
-// pending one.
+// pending one. A cancel_at_period_end update changes only that flag.
 type Server struct {
 	t                    *testing.T
 	mu                   sync.Mutex
@@ -162,7 +162,7 @@ func (s *Server) serve(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
 	case http.MethodPatch:
-		applySeatUpdate(sub, request.Body)
+		applyUpdate(sub, request.Body)
 		if s.losePurchaseResponse && request.Body["proration_behavior"] == "invoice" {
 			s.losePurchaseResponse = false
 			conn, _, err := w.(http.Hijacker).Hijack()
@@ -176,6 +176,14 @@ func (s *Server) serve(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	s.writeJSON(w, http.StatusOK, sub.snapshot())
+}
+
+func applyUpdate(sub *Subscription, body map[string]any) {
+	if cancelAtPeriodEnd, ok := body["cancel_at_period_end"].(bool); ok {
+		sub.CancelAtPeriodEnd = cancelAtPeriodEnd
+		return
+	}
+	applySeatUpdate(sub, body)
 }
 
 func applySeatUpdate(sub *Subscription, body map[string]any) {
