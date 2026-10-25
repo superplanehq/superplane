@@ -59,10 +59,9 @@ describe("IntakeSourceSettingsPopup draft", () => {
     expect(screen.queryByRole("button", { name: "Default task owner" })).not.toBeInTheDocument();
   });
   it("keeps the selected Sentry owner in the draft until Save", async () => {
-    queryClient.setQueryData(
-      ["organization", "users", "org-owner"],
-      [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
-    );
+    queryClient.setQueryData(["organization", "users", "org-owner"], {
+      users: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    });
     const onSave = vi.fn();
     render(
       popup(

@@ -24,26 +24,21 @@ describe("IntakeSettingsHost Sentry settings", () => {
     const user = userEvent.setup();
     renderHost({ intake: SENTRY_INTAKE, initialTab: "general" });
 
-    const dialog = screen.getByTestId("merge-confidence-config");
-    expect(screen.queryByTestId("intake-source-settings")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("heading", { name: "Sentry exceptions" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
-    expect(within(dialog).getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Intake Sentry exceptions" })).toBeInTheDocument();
     expect(
       within(dialog)
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
-    ).toEqual(["Automation", "Runs"]);
-    expect(within(dialog).queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
-    const form = within(dialog).getByTestId("merge-confidence-config-form");
-    expect(within(form).getByTestId("sentry-project-picker")).toBeInTheDocument();
-    expect(within(form).getByRole("button", { name: "Default task owner" })).toBeInTheDocument();
-    expect(within(form).getByRole("checkbox", { name: "A new issue is created" })).toBeChecked();
-    expect(within(form).getByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "true");
+    ).toEqual(["General", "Runs"]);
+    expect(within(dialog).getByTestId("sentry-project-picker")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Default task owner" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("checkbox", { name: "A new issue is created" })).toBeChecked();
+    expect(within(dialog).getByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "true");
 
-    await user.click(within(dialog).getByTestId("merge-confidence-config-tab-runs"));
+    await user.click(within(dialog).getByRole("tab", { name: "Runs" }));
 
-    expect(within(dialog).getByTestId("factory-automation-runs-sidebar")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Open run run-intake-1" })).toBeInTheDocument();
   });
 
   it("saves Sentry projects and rebinds the intake when projects change", async () => {
@@ -71,7 +66,7 @@ describe("IntakeSettingsHost Sentry settings", () => {
     const user = userEvent.setup();
     renderHost({ intake: SENTRY_INTAKE });
 
-    const form = within(screen.getByTestId("merge-confidence-config-form"));
+    const form = within(screen.getByRole("dialog"));
     await user.click(form.getByRole("button", { name: "Default task owner" }));
     await user.click(await screen.findByRole("option", { name: "Alice" }));
     await user.click(form.getByTestId("intake-source-settings-save"));
