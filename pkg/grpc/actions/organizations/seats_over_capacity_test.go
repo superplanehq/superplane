@@ -123,18 +123,7 @@ func (f *seatPurchaseFixture) returnToTrial() {
 // requests go to the subscription server of the fixture.
 func (f *seatPurchaseFixture) useCheckoutServer() {
 	f.t.Helper()
-	orgID := f.r.Organization.ID.String()
-	server := polarAPIServer(f.t, func(w http.ResponseWriter, req *http.Request) {
-		switch req.URL.Path {
-		case "/customers/external/" + orgID:
-			f.writeJSON(w, http.StatusOK, map[string]any{"id": "cust_1", "external_id": orgID})
-		case "/checkouts/":
-			f.writeJSON(w, http.StatusOK, map[string]any{"url": "https://polar.sh/checkout/team"})
-		default:
-			f.serve(w, req)
-		}
-	})
-	usePolarTestServer(f.t, server)
+	newFakePolarCheckouts(f.t, f.r.Organization.ID).serve(f.serve)
 }
 
 func TestSeatsOverCapacityAfterCheckoutRaceAlertsOncePerTransition(t *testing.T) {

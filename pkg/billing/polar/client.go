@@ -108,8 +108,14 @@ type CreateCustomerInput struct {
 }
 
 type CheckoutSession struct {
+	ID         string
 	URL        string
 	CustomerID string
+	ProductID  string
+	Status     CheckoutStatus
+	ExpiresAt  *time.Time
+	Seats      *int
+	Metadata   map[string]string
 }
 
 type CustomerSession struct {
@@ -377,6 +383,8 @@ type CheckoutInput struct {
 	SuccessURL         string
 	CustomerIP         string
 	Seats              *int
+	// Metadata is stored on the Polar checkout and returned by get and list.
+	Metadata map[string]string
 }
 
 func (c *Client) CreateCheckout(ctx context.Context, input CheckoutInput) (*CheckoutSession, error) {
@@ -394,7 +402,18 @@ func (c *Client) CreateCheckout(ctx context.Context, input CheckoutInput) (*Chec
 		body["max_seats"] = *input.Seats
 		body["allow_discount_codes"] = false
 	}
-	return c.createCheckout(ctx, body)
+	if len(input.Metadata) > 0 {
+		body["metadata"] = input.Metadata
+	}
+	session, err := c.createCheckout(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	// Polar created the checkout, so the identity must come from its response.
+	if strings.TrimSpace(session.ID) == "" {
+		return nil, classified(errors.New("polar checkout did not return an id"), ErrOutcomeUnknown)
+	}
+	return session, nil
 }
 
 func (c *Client) CreateCreditCheckout(ctx context.Context, productID, externalCustomerID, successURL, customerIP string, quote *CreditPurchaseQuote) (*CheckoutSession, error) {
@@ -430,12 +449,9 @@ func (c *Client) createCheckout(ctx context.Context, body map[string]any) (*Chec
 		return nil, err
 	}
 	if strings.TrimSpace(payload.URL) == "" {
-		return nil, fmt.Errorf("polar checkout did not return a url")
+		return nil, classified(errors.New("polar checkout did not return a url"), ErrOutcomeUnknown)
 	}
-	return &CheckoutSession{
-		URL:        payload.URL,
-		CustomerID: payload.CustomerID,
-	}, nil
+	return payload.toSession(), nil
 }
 
 func (c *Client) CreateCustomerSession(ctx context.Context, req CustomerSessionRequest) (*CustomerSession, error) {
@@ -960,8 +976,14 @@ func (c customerJSON) toCustomer() *Customer {
 }
 
 type checkoutJSON struct {
-	URL        string `json:"url"`
-	CustomerID string `json:"customer_id"`
+	ID         string         `json:"id"`
+	URL        string         `json:"url"`
+	CustomerID string         `json:"customer_id"`
+	ProductID  string         `json:"product_id"`
+	Status     string         `json:"status"`
+	ExpiresAt  polarTime      `json:"expires_at"`
+	Seats      *int           `json:"seats"`
+	Metadata   map[string]any `json:"metadata"`
 }
 
 type customerSessionJSON struct {

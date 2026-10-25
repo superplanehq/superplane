@@ -221,6 +221,12 @@ func syncSubscriptionSideEffects(tx *gorm.DB, orgID uuid.UUID, data Subscription
 			return err
 		}
 	}
+	// A live subscription ends the pending checkout for its product.
+	if models.PolarSubscriptionIsLive(data.Status, data.CancelAtPeriodEnd, data.CurrentPeriodEnd.TimePtr(), time.Now()) {
+		if err := models.ResolveOrganizationBillingCheckoutForSubscription(tx, orgID, data.ProductID); err != nil {
+			return err
+		}
+	}
 	return models.SyncIncludedLLMCreditGrant(tx, models.IncludedUsageSync{
 		OrganizationID:   orgID,
 		SubscriptionID:   data.ID,
