@@ -8,15 +8,16 @@ export type CompletedSeatPurchasePreview = {
   estimate: OrganizationsPreviewSeatPurchaseResponse;
   additionalSeats: number;
   billingBaseline: number | undefined;
+  /** The billing period end when the preview ran. A renewal makes the preview stale. */
+  billingPeriodEnd: string | undefined;
   request: number;
-  /** Identifies the purchase of this preview. A retry of the same preview sends the same key, so the server cannot charge twice. */
-  operationKey: string;
 };
 
 export function useSeatPurchaseEstimate({
   organizationId,
   count,
   baseline,
+  periodEnd,
   enabled,
   revision,
   request,
@@ -25,6 +26,7 @@ export function useSeatPurchaseEstimate({
   organizationId: string;
   count: number | undefined;
   baseline: number | undefined;
+  periodEnd: string | undefined;
   enabled: boolean;
   revision: number;
   request: RefObject<number>;
@@ -54,8 +56,8 @@ export function useSeatPurchaseEstimate({
           estimate: response.data,
           additionalSeats: count,
           billingBaseline: baseline,
+          billingPeriodEnd: periodEnd,
           request: revision,
-          operationKey: crypto.randomUUID(),
         });
       } catch (previewError) {
         if (isCurrent())
@@ -68,9 +70,14 @@ export function useSeatPurchaseEstimate({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [organizationId, count, baseline, enabled, revision, request, lifecycle]);
+  }, [organizationId, count, baseline, periodEnd, enabled, revision, request, lifecycle]);
 
   const current =
-    enabled && completed?.request === revision && completed?.billingBaseline === baseline ? completed : undefined;
+    enabled &&
+    completed?.request === revision &&
+    completed?.billingBaseline === baseline &&
+    completed?.billingPeriodEnd === periodEnd
+      ? completed
+      : undefined;
   return { completed: current, preview: current?.estimate, pending, error, canConfirm: Boolean(current && !pending) };
 }
