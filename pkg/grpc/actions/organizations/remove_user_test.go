@@ -261,15 +261,77 @@ func TestRemoveUserHandlesPendingInvitationsOfInviter(t *testing.T) {
 	}
 }
 
-type failingRoleRemovalAuthorization struct {
+func TestRemoveGroupAdminThenReinviteAsOperatorGrantsOnlyOperator(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "no")
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	account, err := models.CreateAccount("Group admin", "group-admin@example.com")
+	require.NoError(t, err)
+	member, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	require.NoError(t, r.AuthService.AssignRole(member.ID.String(), models.RoleOrgOperator, orgID, models.DomainTypeOrganization))
+	otherMember := addToAdminGroup(t, r, "admins", member.ID.String())
+	require.True(t, canManageOrganization(t, r, member.ID.String()))
+
+	_, err = RemoveUser(ctx, r.AuthService, orgID, member.ID.String())
+	require.NoError(t, err)
+
+	s := InvitationService{AuthService: r.AuthService, EmailService: services.NewNoopEmailService(), BaseURL: "https://example.com"}
+	created, err := s.Create(ctx, orgID, r.User.String(), &pb.CreateInvitationRequest{Email: account.Email, Role: models.RoleOrgOperator})
+	require.NoError(t, err)
+	_, err = s.Accept(ctx, account.ID.String(), strings.TrimPrefix(created.AcceptanceUrl, "https://example.com/invitations/"))
+	require.NoError(t, err)
+
+	restored, err := models.FindActiveUserByEmail(orgID, account.Email)
+	require.NoError(t, err)
+	require.Equal(t, member.ID, restored.ID)
+	roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), restored.ID.String(), orgID)
+	require.NoError(t, err)
+	require.Equal(t, []string{models.RoleOrgOperator}, invitationRoleNames(roles))
+	assert.False(t, canManageOrganization(t, r, restored.ID.String()), "a reinvited Operator must not keep Admin authority from a retained group membership")
+	users, err := r.AuthService.GetGroupUsers(context.Background(), orgID, models.DomainTypeOrganization, "admins")
+	require.NoError(t, err)
+	require.Equal(t, []string{otherMember}, users)
+	groupRole, err := r.AuthService.GetGroupRole(context.Background(), orgID, models.DomainTypeOrganization, "admins")
+	require.NoError(t, err)
+	require.Equal(t, models.RoleOrgAdmin, groupRole)
+}
+
+// addToAdminGroup creates an Admin group with the user and one other member.
+// It returns the ID of the other member.
+func addToAdminGroup(t *testing.T, r *support.ResourceRegistry, group, userID string) string {
+	t.Helper()
+	orgID := r.Organization.ID.String()
+	otherMember := uuid.NewString()
+	require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, group, models.RoleOrgAdmin, "Admins", "Admins"))
+	require.NoError(t, r.AuthService.AddUserToGroup(orgID, models.DomainTypeOrganization, userID, group))
+	require.NoError(t, r.AuthService.AddUserToGroup(orgID, models.DomainTypeOrganization, otherMember, group))
+	return otherMember
+}
+
+// canManageOrganization reports whether the user can update organization
+// settings, which include billing, or manage members.
+func canManageOrganization(t *testing.T, r *support.ResourceRegistry, userID string) bool {
+	t.Helper()
+	orgID := r.Organization.ID.String()
+	updateOrg, err := r.AuthService.CheckOrganizationPermission(context.Background(), userID, orgID, "org", "update")
+	require.NoError(t, err)
+	updateMembers, err := r.AuthService.CheckOrganizationPermission(context.Background(), userID, orgID, "members", "update")
+	require.NoError(t, err)
+	return updateOrg || updateMembers
+}
+
+type failingGrantRemovalAuthorization struct {
 	authorization.Authorization
 }
 
-func (a failingRoleRemovalAuthorization) RemoveRoleInTransaction(tx *gorm.DB, userID, role, domainID, domainType string) error {
-	if err := a.Authorization.RemoveRoleInTransaction(tx, userID, role, domainID, domainType); err != nil {
+func (a failingGrantRemovalAuthorization) RemoveUserFromOrganizationInTransaction(tx *gorm.DB, userID, orgID string) error {
+	if err := a.Authorization.RemoveUserFromOrganizationInTransaction(tx, userID, orgID); err != nil {
 		return err
 	}
-	return errors.New("role removal interrupted")
+	return errors.New("grant removal interrupted")
 }
 
 func TestRemoveUserRollsBackRolesMembershipAndInvitations(t *testing.T) {
@@ -279,6 +341,7 @@ func TestRemoveUserRollsBackRolesMembershipAndInvitations(t *testing.T) {
 	orgID := r.Organization.ID.String()
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 	member := createInvitationAdmin(t, r, "member@example.com")
+	otherMember := addToAdminGroup(t, r, "admins", member.ID.String())
 	recipient, err := models.CreateAccount("Recipient", "recipient@example.com")
 	require.NoError(t, err)
 	created, err := s.Create(context.Background(), orgID, member.ID.String(), &pb.CreateInvitationRequest{Email: recipient.Email, Role: models.RoleOrgAdmin})
@@ -287,7 +350,7 @@ func TestRemoveUserRollsBackRolesMembershipAndInvitations(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, rolesBefore)
 
-	_, err = RemoveUser(context.Background(), failingRoleRemovalAuthorization{r.AuthService}, orgID, member.ID.String())
+	_, err = RemoveUser(context.Background(), failingGrantRemovalAuthorization{r.AuthService}, orgID, member.ID.String())
 
 	require.Equal(t, codes.Internal, grpcerrors.Code(err))
 	_, err = models.FindActiveUserByID(orgID, member.ID.String())
@@ -295,6 +358,15 @@ func TestRemoveUserRollsBackRolesMembershipAndInvitations(t *testing.T) {
 	rolesAfter, err := r.AuthService.GetUserRolesForOrg(context.Background(), member.ID.String(), orgID)
 	require.NoError(t, err)
 	require.ElementsMatch(t, invitationRoleNames(rolesBefore), invitationRoleNames(rolesAfter))
+	directAdmins, err := r.AuthService.GetOrgUsersForRole(context.Background(), models.RoleOrgAdmin, orgID)
+	require.NoError(t, err)
+	require.Contains(t, directAdmins, member.ID.String())
+	groups, err := r.AuthService.GetUserGroups(context.Background(), orgID, models.DomainTypeOrganization, member.ID.String())
+	require.NoError(t, err)
+	require.Equal(t, []string{"admins"}, groups)
+	users, err := r.AuthService.GetGroupUsers(context.Background(), orgID, models.DomainTypeOrganization, "admins")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{member.ID.String(), otherMember}, users)
 	stored, err := models.FindOrganizationInvitation(database.Conn(), r.Organization.ID, uuid.MustParse(created.Invitation.Id))
 	require.NoError(t, err)
 	require.Equal(t, models.InvitationStatePending, stored.State)
