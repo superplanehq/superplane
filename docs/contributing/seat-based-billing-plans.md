@@ -265,10 +265,29 @@ Only a Polar snapshot from the billing period in which the purchase started can
 settle it. After a renewal, the seat count can return to the original count
 because of a scheduled reduction, so it proves nothing. An unconfirmed purchase
 that crosses a renewal stays `awaiting_confirmation` and blocks new purchases
-for the organization. SuperPlane does not retry the charge. A person must check
-the Polar orders of the subscription and set the purchase status by hand.
+for the organization. SuperPlane does not retry the charge and does not settle
+the purchase because time passed. The worker reports the purchase after one
+hour. An operator repairs it from Polar evidence. See
+[Repair unresolved seat purchases](#repair-unresolved-seat-purchases).
 A purchase from before operation keys has no stored period. Only a snapshot
 whose period started before the purchase can settle it.
+
+An unresolved purchase does not block the renewal seat schedule forever. The
+schedule continues when a Polar snapshot that it read in the same run proves
+that the purchase cannot change the next seat count. All of these must be true:
+
+- The confirmation window of five minutes after the purchase passed, so the
+  purchase request can no longer reach Polar.
+- The snapshot has a current period start.
+- The snapshot is for a different subscription than the purchase, or for a
+  later period of the same subscription. For a purchase with an operation key,
+  the purchase period ends at or before the start of the snapshot period. For
+  a purchase from before operation keys, the snapshot period starts after the
+  confirmation window of the purchase closed.
+
+The schedule does not change the purchase. The purchase keeps its ID, its
+operation key, and its unresolved status, and it continues to block new
+purchases.
 
 The table `organization_seat_purchases` is the marker for seat changes that
 SuperPlane started. Use `models.FindExpectedSeatCount` with the current period
@@ -308,8 +327,12 @@ before December 1, SuperPlane schedules 10 seats again.
 
 `seatrenewal.Schedule` in `pkg/billing/seatrenewal` does the work. It first
 settles or expires an old seat purchase from Polar, so an abandoned purchase
-cannot keep its organization unchecked forever. It then does nothing when one
-of these conditions is true:
+cannot keep its organization unchecked forever. When Polar cannot return the
+subscription of a purchase on a different subscription than the stored plan,
+for example a replaced subscription, Schedule writes
+`billing.seat_purchase_reconcile_failed` (warning) and continues with the
+current subscription. It then does nothing when one of these conditions is
+true:
 
 - The plan is not seat-based: the catalog plan is not per seat and the plan has no purchased seats.
 - Billing is off.
@@ -318,9 +341,12 @@ of these conditions is true:
 - The subscription is `paused` (`subscription_paused`), or it is `unpaid`, `canceled`, `revoked`, or in a different state that does not renew (`subscription_not_active`).
 - The subscription is set to cancel (`subscription_canceling`), also when it is past due.
 - The verified Polar snapshot is not `active` or `past_due`, or it is set to cancel (`polar_subscription_not_active`).
-- A seat purchase is still inside its confirmation window. The purchase
-  replaces any scheduled count when it settles, and SuperPlane schedules the
-  count again after that.
+- A seat purchase is pending or unconfirmed, and the verified Polar snapshot
+  does not release it (`seat_purchase_in_flight`). This applies to a purchase
+  inside its confirmation window, a purchase in the current period, and any
+  purchase when no verified period exists. The purchase replaces any scheduled
+  count when it settles, and SuperPlane schedules the count again after that.
+  The release rule is in [Buy more seats in the sandbox](#buy-more-seats-in-the-sandbox).
 
 ### Past-due subscriptions
 
@@ -404,11 +430,23 @@ unchecked. A run that reaches the end of the list clears the position, and the
 next run starts again with the organizations that renew first.
 
 The worker writes these log entries. Each entry has `organization_id`,
-`polar_subscription_id`, `renewal_target_seats`, `next_period_seats`, and
-`current_seats` when they are known.
+`polar_subscription_id`, `renewal_target_seats`, `next_period_seats`,
+`current_seats`, and `seat_purchase_id` when they are known.
 
 - `billing.seat_renewal_mismatch_fixed` (warning): the worker found a different next-period count and scheduled the target.
 - `billing.seat_renewal_sync_failed` (error): a fix failed, and the period ends in 24 hours or less.
+- `billing.seat_renewal_blocked_by_purchase` (warning): a pending or unconfirmed purchase blocked the schedule. `seat_purchase_id` names the purchase.
+
+At the start of each run, before it reads the candidate list, the worker also
+reports each purchase that stayed `pending` or `unknown` for more than one
+hour. The report covers all organizations that are not deleted, also
+organizations that the candidate list excludes. A failure in the report does
+not stop the schedules, and a failure in the schedules does not stop the
+report. The report changes no purchase.
+
+- `billing.seat_purchase_unresolved` (error): one entry for each unresolved
+  purchase on each run. See
+  [Repair unresolved seat purchases](#repair-unresolved-seat-purchases).
 
 ### Sandbox checks (run before merge)
 
@@ -500,6 +538,155 @@ jsonPayload.component="billing.seats" AND jsonPayload.message="billing.seats_ove
 Renewal never adds seats automatically. The renewal keeps the seats that Polar
 holds. Until someone buys seats or removes members, the organization stays over
 capacity and admission stays blocked.
+
+## Repair unresolved seat purchases
+
+A seat purchase is unresolved when its row in `organization_seat_purchases`
+has the status `pending` or `unknown`. The API shows both as
+`awaiting_confirmation`. A purchase that crosses a renewal with a lost
+response can stay unresolved forever, because only a snapshot from the
+purchase period can settle it. SuperPlane never settles a purchase because
+time passed and never repeats a charge. An operator settles it from Polar
+evidence.
+
+An unresolved purchase blocks new purchases for the organization until it is
+repaired. It blocks the renewal seat schedule only while it can still race the
+next seat count. See [Buy more seats in the sandbox](#buy-more-seats-in-the-sandbox).
+
+### Detection and alerting
+
+- **Detection threshold:** 1 hour after the purchase `created_at`.
+- **Signal:** `SeatRenewalSyncWorker` writes the Error log
+  `billing.seat_purchase_unresolved` on every run (every 5 minutes) while the
+  purchase stays unresolved. The worker keeps no state, so the signal
+  continues after a restart.
+- **Alert owner:** the SuperPlane billing on-call engineer.
+- **Routing:** a log-based alert policy with severity Error sends the alert
+  to the billing on-call notification channel. Task 16 binds the concrete
+  channel to the policy and runs the drill before gate G13 sign-off.
+- **Duplicate suppression:** the alert policy opens one incident for each
+  `seat_purchase_id`. It uses a notification rate limit, and it closes the
+  incident when the line stops.
+
+With `LOG_FORMAT=json`, find the signal in Cloud Logging with this query:
+
+```text
+jsonPayload.message="billing.seat_purchase_unresolved"
+```
+
+Do not filter only on `jsonPayload.component="billing.seats"`. This line does
+not use that component.
+
+Each line has these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `organization_id` | The organization of the purchase. |
+| `seat_purchase_id` | The ID of the purchase row. |
+| `operation_key` | The operation key of the purchase. Purchases from before operation keys do not have it. |
+| `seat_purchase_status` | `pending` or `unknown`. |
+| `polar_subscription_id` | The Polar subscription of the purchase. |
+| `current_polar_subscription_id` | The subscription of the stored plan. |
+| `current_period_start` | The period start of the stored plan. |
+| `purchase_period_start`, `purchase_period_end` | The billing period of the purchase. Purchases from before operation keys do not have them. |
+| `age_seconds` | The time since the purchase started. |
+| `renewal_impact` | `blocks_renewal_maintenance`, `renewal_maintenance_continues`, or `no_renewal_maintenance`. |
+
+`blocks_renewal_maintenance` means that the purchase can still race the next
+seat count, so the renewal can keep unused seats. Repair it before the stored
+period ends. `renewal_maintenance_continues` means that the schedule
+continues, but new purchases stay blocked. `no_renewal_maintenance` means
+that the stored plan does not renew through a Polar subscription.
+
+### Collect the evidence
+
+Read the purchase row:
+
+```sql
+SELECT id, organization_id, polar_subscription_id, from_seats, to_seats,
+       status, error_code, operation_key, period_start, period_end,
+       created_at, updated_at
+FROM organization_seat_purchases
+WHERE id = '<seat_purchase_id>';
+```
+
+In the correct Polar environment, collect this evidence for the purchase
+subscription (`polar_subscription_id`), not for the current subscription:
+
+1. The orders and invoices of the subscription that Polar created from the
+   purchase `created_at` through the confirmation window, five minutes later.
+2. An order for `to_seats - from_seats` seats with a proration charge, and its
+   payment status.
+3. The seats of the subscription in the purchase period, from
+   `purchase_period_start` to `purchase_period_end`.
+
+Use the evidence to select one outcome:
+
+| Evidence | Outcome |
+| --- | --- |
+| A paid order for `to_seats - from_seats` seats with a proration charge, and the subscription had `to_seats` seats or more in the purchase period. | `succeeded` with an empty error code. |
+| No order or invoice in the window, and the subscription never had `to_seats` seats in the purchase period. | `failed` with the error code `not_applied`. |
+| Any other result, for example an unpaid or refunded order, a missing period, or seat counts that do not agree with the orders. | Insufficient evidence. Do not repair. |
+
+### Repair the purchase
+
+Do these steps only when the evidence selects `succeeded` or `failed`.
+
+1. Open an incident ticket. Attach the evidence before you change the row.
+2. Run one guarded update for the outcome. The status condition makes sure
+   that the update does not overwrite an outcome that SuperPlane recorded
+   after you read the row.
+
+   For a purchase that succeeded:
+
+   ```sql
+   UPDATE organization_seat_purchases
+   SET status = 'succeeded', error_code = '', updated_at = now()
+   WHERE id = '<seat_purchase_id>' AND status IN ('pending', 'unknown');
+   ```
+
+   For a purchase that Polar did not apply:
+
+   ```sql
+   UPDATE organization_seat_purchases
+   SET status = 'failed', error_code = 'not_applied', updated_at = now()
+   WHERE id = '<seat_purchase_id>' AND status IN ('pending', 'unknown');
+   ```
+
+3. Confirm that the update changed exactly one row. If it changed no row, read
+   the row again. SuperPlane settled it, so do not run another update.
+4. Do not send a request to Polar. The repair does not charge, refund, or
+   change seats. Seat capacity changes only from a Polar snapshot.
+
+### Record the audit trail
+
+Record these items in the incident ticket:
+
+- The `seat_purchase_id` and the organization ID.
+- The Polar order ID or invoice ID that is the evidence, or a statement that
+  no order exists in the window.
+- The operator and the time of the update.
+- The status and error code before and after the update.
+- Links to the Polar orders, invoices, and subscription.
+
+### Verify the repair
+
+1. Sync organization billing. Confirm the plan, the purchased seats, and the
+   period from Polar.
+2. Confirm that `billing.seat_purchase_unresolved` stops for the
+   `seat_purchase_id` after the next worker run.
+3. Confirm that the next renewal schedule ran: no
+   `billing.seat_renewal_blocked_by_purchase` line for the organization, and
+   `renewal_seats_scheduled_at` changed or the plan is already in sync.
+4. Confirm that a new purchase is allowed: the seat purchase preview for the
+   organization succeeds.
+
+### Insufficient evidence
+
+When the evidence does not prove one outcome, leave the status unresolved.
+Escalate the incident to the billing on-call owner with the evidence that you
+collected. Do not set a status to clear the block. A repair never repeats a
+charge, and SuperPlane never retries a charge for an unresolved purchase.
 
 ## Resolve subscription identity conflicts
 

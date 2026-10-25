@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
@@ -339,18 +341,6 @@ func Test__ScheduleSkipsOrganizationsWithoutARenewalSeatCountToKeep(t *testing.T
 		}},
 		{name: "seat purchase in flight", reason: SkipSeatPurchaseInFlight, reconciles: true, change: func(f *scheduleFixture) {
 			purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 11, nil)
-			require.NoError(t, purchase.Create(database.Conn()))
-		}},
-		{name: "unknown seat purchase from an earlier period", reason: SkipSeatPurchaseInFlight, reconciles: true, change: func(f *scheduleFixture) {
-			// Polar renewed with the original seats after the outcome was lost.
-			// The new period proves nothing, so the purchase stays in flight.
-			renewed := f.polar.Subscription(f.sub.ID).PeriodStart
-			purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 11, &models.SeatPurchaseOperation{
-				Key: uuid.NewString(), Fingerprint: models.SeatPurchaseFingerprint(1, 10),
-				PeriodStart: renewed.AddDate(0, -1, 0), PeriodEnd: renewed,
-			})
-			purchase.Status = models.SeatPurchaseStatusUnknown
-			purchase.CreatedAt = time.Now().Add(-2 * polar.SeatPurchaseConfirmationWindow)
 			require.NoError(t, purchase.Create(database.Conn()))
 		}},
 	}
@@ -843,4 +833,188 @@ func Test__ScheduleWithRetryRetriesOnlyTransientPolarFailures(t *testing.T) {
 			assert.Nil(t, f.polar.Subscription(f.sub.ID).PendingSeats)
 		})
 	}
+}
+
+// unresolvedPurchase records an unknown purchase from fromSeats to toSeats on
+// the subscription. A nil period records a purchase from before operation
+// keys.
+func (f *scheduleFixture) unresolvedPurchase(subscriptionID string, fromSeats, toSeats int, createdAt time.Time, periodStart, periodEnd *time.Time) *models.SeatPurchase {
+	f.t.Helper()
+	var operation *models.SeatPurchaseOperation
+	if periodStart != nil {
+		operation = &models.SeatPurchaseOperation{
+			Key: uuid.NewString(), Fingerprint: models.SeatPurchaseFingerprint(toSeats-fromSeats, fromSeats),
+			PeriodStart: *periodStart, PeriodEnd: *periodEnd,
+		}
+	}
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, subscriptionID, fromSeats, toSeats, operation)
+	purchase.Status = models.SeatPurchaseStatusUnknown
+	purchase.CreatedAt = createdAt
+	require.NoError(f.t, purchase.Create(database.Conn()))
+	return purchase
+}
+
+// assertStillUnresolved fails when Schedule changed the purchase.
+func (f *scheduleFixture) assertStillUnresolved(purchase *models.SeatPurchase) {
+	f.t.Helper()
+	var stored models.SeatPurchase
+	require.NoError(f.t, database.Conn().First(&stored, "id = ?", purchase.ID).Error)
+	assert.Equal(f.t, models.SeatPurchaseStatusUnknown, stored.Status, "renewal maintenance never settles a purchase")
+	assert.Empty(f.t, stored.ErrorCode)
+	assert.Equal(f.t, purchase.OperationKey, stored.OperationKey)
+	latest, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+	require.NoError(f.t, err)
+	assert.Equal(f.t, purchase.ID, latest.ID, "the purchase keeps its identity")
+}
+
+// previousPeriod is the billing period before the current fake period.
+func (f *scheduleFixture) previousPeriod() (start, end time.Time) {
+	current := f.polar.Subscription(f.sub.ID).PeriodStart
+	return current.AddDate(0, -1, 0), current
+}
+
+func captureLogs(t *testing.T) *logtest.Hook {
+	t.Helper()
+	hook := logtest.NewGlobal()
+	t.Cleanup(func() { log.StandardLogger().ReplaceHooks(make(log.LevelHooks)) })
+	return hook
+}
+
+func Test__ScheduleContinuesPastAnUnresolvedPurchaseFromAnEarlierPeriod(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	// Polar renewed after the outcome of the purchase was lost. The new
+	// period proves nothing about the charge, but the purchase can no longer
+	// change this period.
+	start, end := f.previousPeriod()
+	purchase := f.unresolvedPurchase(f.sub.ID, 10, 11, end.Add(-time.Hour), &start, &end)
+
+	result := f.schedule()
+
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, purchase.ID, result.SeatPurchaseID)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	f.assertStillUnresolved(purchase)
+}
+
+func Test__ScheduleMaintainsAReplacementSubscriptionWhenTheOldOneCannotBeRead(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	logs := captureLogs(t)
+	old := polarfake.Subscription{ID: "sub_old_" + uuid.NewString(), Status: models.PolarSubscriptionStatusCanceled}
+	f.polar.Add(old)
+	start, end := f.previousPeriod()
+	purchase := f.unresolvedPurchase(old.ID, 4, 5, f.now.Add(-48*time.Hour), &start, &end)
+	// The reconciliation reads the old subscription first, and Polar fails.
+	f.polar.FailNext(1, http.StatusNotFound, "ResourceNotFound")
+
+	result := f.schedule()
+
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+	f.assertStillUnresolved(purchase)
+	var failed []*log.Entry
+	for _, entry := range logs.AllEntries() {
+		if entry.Message == SeatPurchaseReconcileFailedKey {
+			failed = append(failed, entry)
+		}
+	}
+	require.Len(t, failed, 1)
+	assert.Equal(t, purchase.ID.String(), failed[0].Data["seat_purchase_id"])
+	assert.Equal(t, old.ID, failed[0].Data["polar_subscription_id"])
+	assert.Equal(t, f.sub.ID, failed[0].Data["current_polar_subscription_id"])
+}
+
+func Test__ScheduleFailsWhenThePurchaseOfTheCurrentSubscriptionCannotBeRead(t *testing.T) {
+	f := newScheduleFixture(t, 10, 9)
+	purchase := f.unresolvedPurchase(f.sub.ID, 10, 11, f.now.Add(-time.Hour), new(f.sub.PeriodStart), new(f.sub.PeriodEnd))
+	f.polar.FailNext(1, http.StatusServiceUnavailable, "")
+
+	_, err := f.scheduler.Schedule(context.Background(), f.r.Organization.ID)
+
+	require.Error(t, err, "a purchase in the current period can still race the update")
+	assert.Empty(t, f.polar.Patches())
+	f.assertStillUnresolved(purchase)
+}
+
+func Test__ScheduleKeepsTheGuardForPurchasesThatCanStillRace(t *testing.T) {
+	tests := []struct {
+		name string
+		// renewedAgo is how long ago the current Polar period started.
+		renewedAgo time.Duration
+		// createdBeforeRenewal is how long before the current period the
+		// purchase started.
+		createdBeforeRenewal time.Duration
+		legacy               bool
+		// clearPeriod removes the period from the Polar snapshots.
+		clearPeriod bool
+		blocks      bool
+	}{
+		{name: "keyed purchase that can still reach Polar", renewedAgo: 30 * time.Second, createdBeforeRenewal: time.Minute, blocks: true},
+		{name: "keyed purchase without a verified period", renewedAgo: time.Hour, createdBeforeRenewal: time.Hour, clearPeriod: true, blocks: true},
+		{name: "legacy purchase whose window closed after the period started", renewedAgo: time.Hour, createdBeforeRenewal: time.Minute, legacy: true, blocks: true},
+		{name: "legacy purchase whose window closed before the period started", renewedAgo: time.Hour, createdBeforeRenewal: 10 * time.Minute, legacy: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newScheduleFixture(t, 10, 9)
+			renewed := f.now.Add(-tt.renewedAgo)
+			f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.PeriodStart = renewed })
+			start, end := renewed.AddDate(0, -1, 0), renewed
+			created := renewed.Add(-tt.createdBeforeRenewal)
+			var purchase *models.SeatPurchase
+			if tt.legacy {
+				purchase = f.unresolvedPurchase(f.sub.ID, 10, 11, created, nil, nil)
+			} else {
+				purchase = f.unresolvedPurchase(f.sub.ID, 10, 11, created, &start, &end)
+			}
+			client := Client(f.scheduler.client)
+			if tt.clearPeriod {
+				client = &observedClient{Client: client, afterGet: func(snapshot *polar.SubscriptionData) {
+					snapshot.CurrentPeriodStart.Time = time.Time{}
+				}}
+			}
+
+			result := f.scheduleWith(client)
+
+			f.assertStillUnresolved(purchase)
+			if tt.blocks {
+				assert.Equal(t, ActionSkipped, result.Action)
+				assert.Equal(t, SkipSeatPurchaseInFlight, result.SkipReason)
+				assert.Equal(t, purchase.ID, result.SeatPurchaseID)
+				assert.Empty(t, f.polar.Patches())
+				return
+			}
+			assert.Equal(t, ActionFixed, result.Action)
+			assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
+		})
+	}
+}
+
+func Test__ScheduleReducesTheRenewalAfterALostPurchaseResponse(t *testing.T) {
+	f := newScheduleFixture(t, 9, 10)
+	// A purchase from 9 to 10 seats lost its response. Polar applied it, but
+	// no snapshot settled the purchase before the renewal.
+	start, end := f.sub.PeriodStart, f.sub.PeriodEnd
+	purchase := f.unresolvedPurchase(f.sub.ID, 9, 10, f.now.Add(-time.Hour), &start, &end)
+	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) {
+		sub.Seats = 10
+		sub.PeriodStart = end
+		sub.PeriodEnd = end.AddDate(0, 1, 0)
+	})
+	f.removeMember()
+	f.removeMember()
+	f.removeMember()
+
+	result := f.schedule()
+
+	assert.Equal(t, ActionFixed, result.Action)
+	assert.Equal(t, new(7), result.Target)
+	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(7)}}, f.polar.Patches())
+	f.assertOnlyNextPeriodUpdates()
+	assert.Equal(t, 10, f.polar.Subscription(f.sub.ID).Seats, "the current period keeps its seats")
+	assert.Equal(t, new(7), f.plan().RenewalSeatsScheduled)
+	f.assertStillUnresolved(purchase)
+
+	assert.Equal(t, ActionInSync, f.schedule().Action)
+	assert.Len(t, f.polar.Patches(), 1, "maintenance never repeats the charge or the schedule")
+	f.assertStillUnresolved(purchase)
 }
