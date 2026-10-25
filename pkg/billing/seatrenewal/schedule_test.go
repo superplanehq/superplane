@@ -333,7 +333,19 @@ func Test__ScheduleSkipsOrganizationsWithoutARenewalSeatCountToKeep(t *testing.T
 			f.t.Setenv(models.BillingEnabledEnv, "no")
 		}},
 		{name: "seat purchase in flight", reason: SkipSeatPurchaseInFlight, reconciles: true, change: func(f *scheduleFixture) {
-			purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 11)
+			purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 11, nil)
+			require.NoError(t, purchase.Create(database.Conn()))
+		}},
+		{name: "unknown seat purchase from an earlier period", reason: SkipSeatPurchaseInFlight, reconciles: true, change: func(f *scheduleFixture) {
+			// Polar renewed with the original seats after the outcome was lost.
+			// The new period proves nothing, so the purchase stays in flight.
+			renewed := f.polar.Subscription(f.sub.ID).PeriodStart
+			purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 11, &models.SeatPurchaseOperation{
+				Key: uuid.NewString(), Fingerprint: models.SeatPurchaseFingerprint(1, 10),
+				PeriodStart: renewed.AddDate(0, -1, 0), PeriodEnd: renewed,
+			})
+			purchase.Status = models.SeatPurchaseStatusUnknown
+			purchase.CreatedAt = time.Now().Add(-2 * polar.SeatPurchaseConfirmationWindow)
 			require.NoError(t, purchase.Create(database.Conn()))
 		}},
 	}
@@ -504,7 +516,7 @@ func Test__ScheduleMakesNoPolarRequestWhileTheOrganizationRowIsLocked(t *testing
 
 func Test__ScheduleFailsAnAbandonedPurchaseAndSchedules(t *testing.T) {
 	f := newScheduleFixture(t, 10, 9)
-	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12)
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12, nil)
 	require.NoError(t, purchase.Create(database.Conn()))
 	require.NoError(t, purchase.UpdateStatus(database.Conn(), models.SeatPurchaseStatusUnknown, ""))
 
@@ -522,7 +534,7 @@ func Test__ScheduleFailsAnAbandonedPurchaseAndSchedules(t *testing.T) {
 
 func Test__ScheduleExpiresAPendingPurchaseAfterTheConfirmationWindow(t *testing.T) {
 	f := newScheduleFixture(t, 10, 9)
-	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12)
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12, nil)
 	require.NoError(t, purchase.Create(database.Conn()))
 	created := time.Now().Add(-polar.SeatPurchaseConfirmationWindow - time.Minute)
 	require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("id = ?", purchase.ID).Update("created_at", created).Error)
@@ -539,7 +551,7 @@ func Test__ScheduleExpiresAPendingPurchaseAfterTheConfirmationWindow(t *testing.
 
 func Test__ScheduleAppliesTheSnapshotThatConfirmsAPurchase(t *testing.T) {
 	f := newScheduleFixture(t, 10, 9)
-	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12)
+	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12, nil)
 	require.NoError(t, purchase.Create(database.Conn()))
 	require.NoError(t, purchase.UpdateStatus(database.Conn(), models.SeatPurchaseStatusUnknown, ""))
 	f.polar.Update(f.sub.ID, func(sub *polarfake.Subscription) { sub.Seats = 12 })
