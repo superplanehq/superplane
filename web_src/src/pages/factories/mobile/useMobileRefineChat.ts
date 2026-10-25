@@ -51,6 +51,7 @@ export function useMobileRefineChat({
     workOrderId: orderId,
     enabled: refines && Boolean(organizationId && factoryId && orderId),
     canUpdate,
+    refinementCanStart: refines,
     isUploading: fileUpload.isUploading,
     uploadFiles: fileUpload.uploadFiles,
     analysisDelivered: analysisFirstResultDelivered({ checks: fixture.checks, artifacts }),

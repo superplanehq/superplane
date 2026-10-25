@@ -1,4 +1,5 @@
 import { canvasesCancelRun, type FactoriesWorkOrderResult } from "@/api-client";
+import { useContinueFactoryPullRequestFixes } from "@/hooks/useFactoryPullRequestFixes";
 import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
 import { invalidateFactoryWorkOrderQueries } from "@/hooks/useFactoryWebsocket";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -7,7 +8,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import type { SplitRunFooter, SplitRunStopChoice } from "./splitRunFooter";
+import type { SplitRunContinueFixesTarget, SplitRunFooter, SplitRunStopChoice } from "./splitRunFooter";
 import { isSplitRunRerunChoice, rerunStartStepIndex } from "./splitRunFooter";
 import { applySplitRunStop, stopSplitRunAutomation, type SplitRunStopRun } from "./splitRunStop";
 
@@ -90,8 +91,14 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
   const live = Boolean(organizationId && factoryId && orderId);
   const cancelRun = useSplitRunCancelRun(organizationId, factoryId, orderId);
+  const continueFixes = useContinueFactoryPullRequestFixes(organizationId ?? "", factoryId ?? "", orderId);
 
-  const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
+  const busy =
+    cancelRun.isPending ||
+    closeWorkOrder.isPending ||
+    updateStatus.isPending ||
+    dispatchWorkOrder.isPending ||
+    continueFixes.isPending;
 
   const closeWorkOrderWithToast = useCallback(
     async (copy: RejectedCloseCopy, result: FactoriesWorkOrderResult) => {
@@ -117,6 +124,21 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
   const handleArchive = useCallback(
     () => closeWorkOrderWithToast(ARCHIVE_COPY, "RESULT_ARCHIVED"),
     [closeWorkOrderWithToast],
+  );
+
+  const handleContinueFixes = useCallback(
+    async (target: SplitRunContinueFixesTarget) => {
+      if (!live || busy) {
+        return;
+      }
+      try {
+        await continueFixes.mutateAsync(target);
+        showSuccessToast("Automatic fixes started again.");
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to continue fixes"));
+      }
+    },
+    [busy, continueFixes, live],
   );
 
   const handleStop = useCallback(
@@ -179,6 +201,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     handleStopAutomation,
     handleReject,
     handleArchive,
+    handleContinueFixes,
     busy,
   };
 }

@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { HEADER_MCP_RESOURCE, INLINE_SKILL } from "../__fixtures__/agentResourceFixtures";
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import { factoryAgentPath } from "../lib/factoryPagePaths";
@@ -48,8 +48,8 @@ function renderCard(
 describe("PlanningReviewResourcesCard", () => {
   beforeEach(() => {
     useExperimentalFeature.mockReturnValue({
-      has: (feature: string) => feature === FEATURE_WORKSPACE_MCP || feature === FEATURE_WORKSPACE_SKILLS,
-      enabledExperimentalFeatures: [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS],
+      has: (feature: string) => feature === FEATURE_WORKSPACE_SKILLS,
+      enabledExperimentalFeatures: [FEATURE_WORKSPACE_SKILLS],
       isLoading: false,
     });
     useFactoryAgentResourceTools.mockReturnValue({ data: [], isLoading: false, isError: false });
@@ -61,14 +61,15 @@ describe("PlanningReviewResourcesCard", () => {
     });
   });
 
-  it("hides when the feature is off", () => {
+  it("shows MCP servers when experimental features are off", () => {
     useExperimentalFeature.mockReturnValue({
       has: () => false,
       enabledExperimentalFeatures: [],
       isLoading: false,
     });
     renderCard();
-    expect(screen.queryByTestId("planning-review-resources")).not.toBeInTheDocument();
+    expect(screen.getByText("docs")).toBeInTheDocument();
+    expect(screen.queryByText("Review copy")).not.toBeInTheDocument();
   });
 
   it("shows an empty callout with a settings link", () => {

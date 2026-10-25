@@ -1021,17 +1021,25 @@ func TestHandler_handleMagicCodeRequest_AutomaticSignup(t *testing.T) {
 		assert.Equal(t, int64(1), count)
 	})
 
-	t.Run("sends a code from login when an invite redirect is present", func(t *testing.T) {
-		handler, r := setupAuthHandler(t, false)
+	t.Run("sends a code for an invited email when registration is disabled", func(t *testing.T) {
+		handler, r := setupAuthHandler(t, true)
 		handler.magicCodeEnabled = true
-		invite, err := models.FindInviteLinkByOrganizationID(database.Conn(), r.Organization.ID.String())
-		if err != nil {
-			invite, err = models.CreateInviteLink(database.Conn(), r.Organization.ID)
-		}
-		require.NoError(t, err)
 		email := "invite-login-code@example.com"
+		token := "invited-magic-code-request"
+		hash := crypto.HashToken(token)
+		invitation := models.OrganizationInvitation{
+			OrganizationID: r.Organization.ID,
+			Email:          email,
+			Role:           models.RoleOrgOperator,
+			InvitedBy:      r.User,
+			TokenHash:      &hash,
+			State:          models.InvitationStatePending,
+			SentAt:         time.Now(),
+			ExpiresAt:      time.Now().Add(time.Hour),
+		}
+		require.NoError(t, invitation.Save(database.Conn()))
 
-		form := url.Values{"email": {email}, "redirect": {"/invite/" + invite.Token.String()}}
+		form := url.Values{"email": {email}, "redirect": {"/invitations/" + token}}
 		req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/request", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		recorder := httptest.NewRecorder()

@@ -49,15 +49,16 @@ func SerializeCanvasEvent(event models.CanvasEvent) (*pb.CanvasEvent, error) {
 
 func SerializeNodeExecutionRef(execution models.CanvasNodeExecution, childRuns []models.CanvasRun) *pb.CanvasNodeExecutionRef {
 	return &pb.CanvasNodeExecutionRef{
-		Id:            execution.ID.String(),
-		NodeId:        execution.NodeID,
-		State:         NodeExecutionStateToProto(execution.State),
-		Result:        NodeExecutionResultToProto(execution.Result),
-		ResultReason:  NodeExecutionResultReasonToProto(execution.ResultReason),
-		ResultMessage: execution.ResultMessage,
-		CreatedAt:     timestamppb.New(*execution.CreatedAt),
-		UpdatedAt:     timestamppb.New(*execution.UpdatedAt),
-		Runs:          SerializeCanvasRunRefs(childRuns),
+		Id:             execution.ID.String(),
+		NodeId:         execution.NodeID,
+		State:          NodeExecutionStateToProto(execution.State),
+		Result:         NodeExecutionResultToProto(execution.Result),
+		ResultReason:   NodeExecutionResultReasonToProto(execution.ResultReason),
+		ResultMessage:  execution.ResultMessage,
+		ExistingTaskId: execution.ExistingTaskID(),
+		CreatedAt:      timestamppb.New(*execution.CreatedAt),
+		UpdatedAt:      timestamppb.New(*execution.UpdatedAt),
+		Runs:           SerializeCanvasRunRefs(childRuns),
 	}
 }
 

@@ -82,7 +82,7 @@ func TaskAttachmentsFromDispatch(files []storedfiles.DispatchFile) []TaskAttachm
 	return attachments
 }
 
-func ResolveTaskAttachments(input AgentBrokerTaskInput) []TaskAttachment {
+func ResolveTaskAttachments(input AgentTaskInput) []TaskAttachment {
 	if len(input.Attachments) > 0 {
 		return uniqueTaskAttachments(input.Attachments)
 	}

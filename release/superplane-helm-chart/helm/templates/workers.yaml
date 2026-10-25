@@ -70,8 +70,6 @@ spec:
                 name: {{ include "secrets.linear.name" . }}
             {{- end }}
           env:
-            - name: ENCRYPTION_WRITE_FORMAT
-              value: {{ .Values.encryption.writeFormat | quote }}
             - name: START_CONSUMERS
               value: "yes"
             - name: START_EVENT_ROUTER
@@ -105,6 +103,8 @@ spec:
             - name: START_FACTORY_VELOCITY_SYNC_WORKER
               value: "yes"
             - name: START_PRICE_BOOK_SYNC_WORKER
+              value: "yes"
+            - name: START_SEAT_RENEWAL_SYNC_WORKER
               value: "yes"
             - name: START_PLANNING_SESSION_CLEANUP_WORKER
               value: "yes"

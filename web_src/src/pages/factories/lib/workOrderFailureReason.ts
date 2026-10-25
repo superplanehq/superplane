@@ -4,6 +4,8 @@ import type { FactoriesWorkOrderExecution } from "@/api-client";
 export type WorkOrderCreditFailureReason =
   | "no_hosted_credit"
   | "hosted_subscription_required"
+  | "payment_past_due"
+  | "subscription_paused"
   | "workspace_budget_empty";
 
 export interface WorkOrderCreditFailureCopy {
@@ -18,7 +20,11 @@ export interface WorkOrderCreditFailureCopy {
 /** Result messages the runner stores when hosted credit blocks a node. */
 const CREDIT_FAILURE_MESSAGE: Record<string, WorkOrderCreditFailureReason> = {
   "This organization has no hosted credit.": "no_hosted_credit",
+  "Subscribe to a plan to run agents.": "hosted_subscription_required",
+  "Contact an installation admin to keep SuperPlane-hosted runs.": "hosted_subscription_required",
   "Subscribe to Business to keep SuperPlane-hosted runs.": "hosted_subscription_required",
+  "The renewal payment failed. Update the payment method to run agents.": "payment_past_due",
+  "The subscription is paused. Resume the subscription in Billing to run agents.": "subscription_paused",
   "This workspace has no remaining hosted credit.": "workspace_budget_empty",
 };
 
@@ -30,8 +36,18 @@ const CREDIT_FAILURE_COPY: Record<WorkOrderCreditFailureReason, WorkOrderCreditF
   },
   hosted_subscription_required: {
     label: "No plan",
-    message: "This agent run is blocked. SuperPlane hosted runs need a Business plan.",
-    actionLabel: "Subscribe",
+    message: "This agent run is blocked. Agent runs need an active plan.",
+    actionLabel: "View billing",
+  },
+  payment_past_due: {
+    label: "Payment failed",
+    message: "This agent run is blocked. The renewal payment failed.",
+    actionLabel: "Update payment method",
+  },
+  subscription_paused: {
+    label: "Subscription paused",
+    message: "This agent run is blocked. Resume the subscription in Billing to run agents.",
+    actionLabel: "View billing",
   },
   workspace_budget_empty: {
     label: "No workspace budget",

@@ -52,6 +52,11 @@ const historyRuns = Array.from({ length: 50 }, (_, index) => ({
   ...(index === 0 ? run : olderRun),
   id: index === 0 ? runId : `${index.toString(16).padStart(8, "0")}-7b41-4d2e-9c83-6a0295dce108`,
   createdAt: new Date(Date.parse(run.createdAt!) - index * 30 * 60 * 1000).toISOString(),
+  task: {
+    id: `task-${index + 1}`,
+    key: `SUPER-${971 - index}`,
+    title: index === 0 ? "Keep MCP tool timeouts as retries" : "Use the default branch when starting a task",
+  },
 }));
 const orders = historyRuns.map((item, index) => ({
   id: `task-${index + 1}`,
@@ -69,13 +74,11 @@ const handlers = [
     HttpResponse.json({
       organization: {
         metadata: { id: "storybook-org", name: "SuperPlane Prod" },
-        spec: { enabledExperimentalFeatures: ["factory_run_history"] },
+        spec: { enabledExperimentalFeatures: [] },
       },
     }),
   ),
-  http.get("/account/experimental-features", () =>
-    HttpResponse.json({ features: [{ id: "factory_run_history", label: "Factory Run History", released: false }] }),
-  ),
+  http.get("/account/experimental-features", () => HttpResponse.json({ features: [] })),
   http.get(`${api}/runs`, ({ request }) => runsPage(request)),
   http.get(`${api}/runs/:runId`, ({ params }) =>
     HttpResponse.json({ run: historyRuns.find((item) => item.id === params.runId) }),
@@ -224,7 +227,7 @@ function ConnectedRunPage() {
   );
 }
 const meta = {
-  title: "Factories/Pages/Automation run history/Connected Implement",
+  title: "Factories/Components/Run history/Integration scenarios/Implement",
   component: ConnectedPreview,
   decorators: [withFactoriesTheme],
   parameters: { layout: "fullscreen", msw: { handlers } },

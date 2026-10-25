@@ -22,7 +22,14 @@ const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "w
 
 function isDescribeRunQueryKey(queryKey: readonly unknown[], canvasId: string): boolean {
   const sample = canvasKeys.run(canvasId, "_");
-  return queryKey.length === sample.length && sample.slice(0, -1).every((part, index) => queryKey[index] === part);
+  if (queryKey.length < sample.length || !sample.slice(0, -1).every((part, index) => queryKey[index] === part)) {
+    return false;
+  }
+  if (queryKey.length === sample.length) {
+    return true;
+  }
+  const withTask = canvasKeys.run(canvasId, "_", true);
+  return queryKey.length === withTask.length && queryKey[sample.length] === withTask[sample.length];
 }
 
 function patchDescribeRunQueries(
@@ -165,6 +172,12 @@ export function useCanvasWebsocket({
         queryClient.setQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, run.id), (current) =>
           upsertRunIntoDescribeRunData(current, run),
         );
+        const taskKey = canvasKeys.run(canvasId, run.id, true);
+        if (queryClient.getQueryData(taskKey)) {
+          queryClient.setQueryData<{ run?: CanvasesCanvasRun }>(taskKey, (current) =>
+            upsertRunIntoDescribeRunData(current, run),
+          );
+        }
       }
     },
     [queryClient, canvasId],
@@ -190,12 +203,16 @@ export function useCanvasWebsocket({
       }
 
       if (execution.runId) {
-        const describeKey = canvasKeys.run(canvasId, execution.runId);
-        const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(describeKey);
-        const next = upsertExecutionIntoDescribeRunData(current, execution);
-        if (next && next !== current) {
-          patched = true;
-          queryClient.setQueryData(describeKey, next);
+        for (const describeKey of [
+          canvasKeys.run(canvasId, execution.runId),
+          canvasKeys.run(canvasId, execution.runId, true),
+        ]) {
+          const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(describeKey);
+          const next = upsertExecutionIntoDescribeRunData(current, execution);
+          if (next && next !== current) {
+            patched = true;
+            queryClient.setQueryData(describeKey, next);
+          }
         }
       } else if (patchDescribeRunQueries(queryClient, canvasId, execution)) {
         patched = true;

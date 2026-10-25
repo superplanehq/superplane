@@ -50,7 +50,9 @@ export function MobileDraftStartModelSelect({
   disabled?: boolean;
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName));
-  const modelOptions = lineName ? runnerModelOptions(models.data) : [{ value: DRAFT_START_MODEL_AUTO, label: "Auto" }];
+  const modelOptions = lineName
+    ? runnerModelOptions(models.data?.models)
+    : [{ value: DRAFT_START_MODEL_AUTO, label: "Auto" }];
   const selectedName = modelOptions.find((option) => option.value === model)?.label || model;
   const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
 

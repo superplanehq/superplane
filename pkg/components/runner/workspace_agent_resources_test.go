@@ -36,11 +36,18 @@ func TestAttachWorkspaceAgentResourcesRefreshesOAuthTokenThatWillNotLastTheRun(t
 	})
 }
 
-func attachOAuthWorkspaceMCP(t *testing.T, expiresIn time.Duration, timeoutSeconds int) (string, int) {
+func setupWorkspaceAgentResources(t *testing.T) *support.ResourceRegistry {
 	t.Helper()
 	r := support.Setup(t)
+	crypto.SetProcessEncryptor(r.Encryptor)
+	t.Cleanup(func() { crypto.SetProcessEncryptor(nil) })
+	return r
+}
+
+func attachOAuthWorkspaceMCP(t *testing.T, expiresIn time.Duration, timeoutSeconds int) (string, int) {
+	t.Helper()
+	r := setupWorkspaceAgentResources(t)
 	t.Setenv("NO_ENCRYPTION", "yes")
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -58,8 +65,7 @@ func attachOAuthWorkspaceMCP(t *testing.T, expiresIn time.Duration, timeoutSecon
 		AccessTokenExpiresAt: time.Now().Add(expiresIn).UTC().Format(time.RFC3339),
 	}))
 	require.NoError(t, resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", nil))
-	encryptor, err := crypto.FromEnv()
-	require.NoError(t, err)
+	encryptor := r.Encryptor
 	require.NoError(t, storeWorkspaceOAuthSecret(t, encryptor, db, resource, models.FactoryAgentResourceSecretAccessToken, "cached-access"))
 	require.NoError(t, storeWorkspaceOAuthSecret(t, encryptor, db, resource, models.FactoryAgentResourceSecretRefreshToken, "refresh-1"))
 
@@ -114,7 +120,7 @@ func (c *countingTokenHTTP) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsNonFactoryCanvas(t *testing.T) {
-	r := support.Setup(t)
+	r := setupWorkspaceAgentResources(t)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
@@ -125,8 +131,7 @@ func TestAttachWorkspaceAgentResourcesSkipsNonFactoryCanvas(t *testing.T) {
 }
 
 func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -187,8 +192,7 @@ func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
 }
 
 func TestAttachWorkspaceAgentResourcesWritesPublicServersWithoutHeaders(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -223,8 +227,7 @@ func TestAttachWorkspaceAgentResourcesWritesPublicServersWithoutHeaders(t *testi
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsServerUntilDefaultsAreSaved(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -246,8 +249,7 @@ func TestAttachWorkspaceAgentResourcesSkipsServerUntilDefaultsAreSaved(t *testin
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsServerWhenHeaderSecretMissing(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -275,8 +277,8 @@ func TestAttachWorkspaceAgentResourcesSkipsServerWhenHeaderSecretMissing(t *test
 	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
 }
 
-func TestAttachWorkspaceAgentResourcesSkipsWhenFeatureDisabled(t *testing.T) {
-	r := support.Setup(t)
+func TestAttachWorkspaceAgentResourcesAttachesMCPWithoutFlag(t *testing.T) {
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -303,13 +305,14 @@ func TestAttachWorkspaceAgentResourcesSkipsWhenFeatureDisabled(t *testing.T) {
 			},
 		},
 	}, nil, nil)
-	assert.Empty(t, environment)
-	require.Len(t, files, 1)
+	require.Len(t, environment, 1)
+	require.Len(t, files, 2)
 	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[1].Path)
 }
 
 func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
-	r := support.Setup(t)
+	r := setupWorkspaceAgentResources(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceSkills))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -329,7 +332,7 @@ func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
 	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/refine.txt", Content: "Refine the request.\n", Mode: "0644"},
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n\n", Mode: "0644"},
 	})
@@ -345,8 +348,7 @@ func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
 }
 
 func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceSkills))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -378,8 +380,7 @@ func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceSkills))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -411,7 +412,7 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing
 		Configuration: map[string]any{
 			"disabledAgentResourceIds": []any{disabled.ID.String()},
 		},
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 	require.Len(t, environment, 1)
@@ -435,8 +436,7 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing
 }
 
 func TestAttachWorkspaceAgentResourcesMergesDisabledTools(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -481,8 +481,7 @@ func TestAttachWorkspaceAgentResourcesMergesDisabledTools(t *testing.T) {
 }
 
 func TestAttachWorkspaceAgentResourcesOmitsEnabledOverride(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -521,8 +520,7 @@ func TestAttachWorkspaceAgentResourcesOmitsEnabledOverride(t *testing.T) {
 }
 
 func TestAttachWorkspaceAgentResourcesKeepsToolOffWhenBothListsNameIt(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -561,8 +559,7 @@ func TestAttachWorkspaceAgentResourcesKeepsToolOffWhenBothListsNameIt(t *testing
 }
 
 func TestAttachWorkspaceAgentResourcesAttachesMCPOnlyWhenSkillsFlagIsOff(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -591,8 +588,7 @@ func TestAttachWorkspaceAgentResourcesAttachesMCPOnlyWhenSkillsFlagIsOff(t *test
 }
 
 func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -611,7 +607,7 @@ func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
 		Configuration: map[string]any{
 			"disabledAgentResourceIds": []string{disabled.ID.String()},
 		},
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 	assert.Empty(t, environment)
@@ -621,8 +617,7 @@ func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
 }
 
 func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -639,7 +634,7 @@ func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
 	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 
@@ -673,8 +668,7 @@ func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -692,7 +686,7 @@ func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testin
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
 		Configuration:  map[string]any{runner.SkipSetupCommandsField: true},
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 
@@ -707,10 +701,8 @@ func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testin
 	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss")
 }
 
-func TestAttachWorkspaceAgentResourcesSkipsSetupAndContextWhenFlagOff(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+func TestAttachWorkspaceAgentResourcesAttachesSetupAndContextWithoutAgentFlag(t *testing.T) {
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -719,20 +711,28 @@ func TestAttachWorkspaceAgentResourcesSkipsSetupAndContextWhenFlagOff(t *testing
 		Commands: []string{"npm ci"},
 	})
 	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "superplanehq/suss",
+	})
+	require.NoError(t, err)
 
 	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
 	}, nil, nil)
-	// Setup and context stay flag-gated, but the checkout helper ships on
-	// every factory task.
-	require.Len(t, files, 1)
-	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+
+	paths := map[string]string{}
+	for _, file := range files {
+		paths[file.Path] = file.Content
+	}
+	assert.Contains(t, paths, runner.WorkspaceSetupConfigPath)
+	assert.Contains(t, paths, runner.WorkspaceContextConfigPath)
+	assert.Contains(t, paths[runner.WorkspaceSetupConfigPath], "npm ci")
+	assert.Contains(t, paths[runner.WorkspaceContextConfigPath], "superplanehq/suss")
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsDisabledSetupAndContext(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -752,7 +752,7 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledSetupAndContext(t *testing.T)
 		Configuration: map[string]any{
 			"disabledAgentResourceIds": []string{setup.ID.String(), repo.ID.String()},
 		},
-	}, nil, []runner.BrokerTaskFile{
+	}, nil, []runner.TaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
 	// The prompt stays untouched, but the checkout helper still ships: it
@@ -763,8 +763,7 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledSetupAndContext(t *testing.T)
 }
 
 func TestAttachWorkspaceAgentResourcesShipsCheckoutHelper(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -788,7 +787,7 @@ func TestAttachWorkspaceAgentResourcesShipsCheckoutHelper(t *testing.T) {
 }
 
 func TestAttachWorkspaceAgentResourcesShipsCheckoutHelperWithoutFlags(t *testing.T) {
-	r := support.Setup(t)
+	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -804,7 +803,7 @@ func TestAttachWorkspaceAgentResourcesShipsCheckoutHelperWithoutFlags(t *testing
 }
 
 func TestAttachWorkspaceAgentResourcesKeepsSystemSkillsEnabled(t *testing.T) {
-	r := support.Setup(t)
+	r := setupWorkspaceAgentResources(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceSkills))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")

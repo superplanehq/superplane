@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 )
 
@@ -26,6 +27,9 @@ func GetCanvasAgentChat(ctx context.Context, svc AgentsService, orgID, userID st
 
 	session, err := svc.EnsureSession(ctx, org, user, canvas)
 	if err != nil {
+		if errors.Is(err, models.ErrPaymentMethodRequired) || errors.Is(err, models.ErrHostedSubscriptionRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, err.Error())
+		}
 		if errors.Is(err, agents.ErrSessionForbidden) {
 			return nil, grpcerrors.PermissionDenied(nil, "agent chat is not allowed")
 		}

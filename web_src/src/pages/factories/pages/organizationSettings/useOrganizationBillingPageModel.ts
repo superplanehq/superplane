@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useAccount } from "@/contexts/useAccount";
 import { useGooglePurchaseTracking } from "@/hooks/useGooglePurchaseTracking";
@@ -9,6 +10,7 @@ import type {
   OrganizationsHostedCreditInvoice,
   OrganizationsHostedCreditProduct,
   OrganizationsOrganizationCreditGrant,
+  OrganizationsCreateHostedCreditCheckoutBody,
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useHostedCreditActions, useHostedCreditOwnerContactMessage } from "@/hooks/useHostedCreditActions";
@@ -23,6 +25,7 @@ import { useOrganizationCreditGrants } from "@/hooks/useOrganizationCreditGrants
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import type { HostedCreditRefreshStatus } from "@/lib/hostedCredit";
+import { billingPaymentBlocked } from "@/pages/factories/lib/billingPlans";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 
 type HostedCreditBillingActions = {
@@ -31,12 +34,28 @@ type HostedCreditBillingActions = {
   checkoutPending: boolean;
   businessCheckoutPending: boolean;
   portalPending: boolean;
-  startCheckout: (productId: string) => Promise<void>;
+  startCheckout: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
   startBusinessCheckout: () => Promise<void>;
   openInvoices: () => Promise<void>;
 };
 
+export type BillingSeatSummary = {
+  purchased?: number;
+  occupied?: number;
+  available?: number;
+  pendingInvitations?: number;
+  invitable?: number;
+  planMaximum?: number;
+  purchasable?: number;
+  expectedRenewalSeats?: number;
+  currentMonthlyTotalCents?: string;
+  expectedRenewalCents?: string;
+  /** True while a failed or paused payment stops new members. */
+  paymentBlocked?: boolean;
+};
+
 export type OrganizationBillingPageModel = {
+  seats?: BillingSeatSummary;
   organizationName: string;
   canManageBilling: boolean;
   billingEnabled: boolean;
@@ -91,6 +110,27 @@ function creditMetricsFromSpend(spend: OrganizationsDescribeOrganizationWorkspac
   };
 }
 
+function billingSeats(billing: OrganizationsDescribeOrganizationBillingResponse): BillingSeatSummary | undefined {
+  // The server sends stored seats for a seat-based plan while payment is blocked, even after the plan row changes.
+  const paymentBlocked = billingPaymentBlocked(billing.polarSubscriptionStatus) && billing.purchasedSeats !== undefined;
+  if (!billing.billingEnabled || !(billing.planPerSeat || paymentBlocked)) {
+    return undefined;
+  }
+  return {
+    purchased: billing.purchasedSeats,
+    occupied: billing.occupiedSeats,
+    available: billing.availableSeats,
+    pendingInvitations: billing.pendingInvitationSeats,
+    invitable: billing.invitableSeats,
+    planMaximum: billing.planMaximumSeats,
+    purchasable: billing.purchasableSeats,
+    expectedRenewalSeats: billing.expectedRenewalSeats,
+    currentMonthlyTotalCents: billing.currentMonthlyTotalCents,
+    expectedRenewalCents: billing.expectedRenewalCents,
+    paymentBlocked,
+  };
+}
+
 function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse = {}) {
   return {
     plan: billing.plan,
@@ -98,6 +138,7 @@ function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse 
     planName: billing.planName,
     planPriceCents: billing.planPriceCents,
     planPerSeat: billing.planPerSeat,
+    seats: billingSeats(billing),
     trialEndsAt: billing.trialEndsAt,
     currentPeriodEnd: billing.currentPeriodEnd,
     includedRemaining: parseWorkOrderMetric(billing.includedRemainingCents),
@@ -116,7 +157,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   const [searchParams] = useSearchParams();
   const creditAdded = searchParams.get("credit") === "added";
   const subscribed = searchParams.get("subscribed") === "1";
-  const { canAct } = usePermissions();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canManageBilling = canAct("org", "update");
   const { data: organization } = useOrganization(organizationId);
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -153,9 +194,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     await Promise.all([refetchSpend(), refetchGrants(), refetchBilling()]);
   }, [refetchSpend, refetchGrants, refetchBilling]);
 
-  const syncFromPolar = useCallback(async () => {
-    await syncOrganizationBilling(organizationId);
-  }, [organizationId]);
+  const syncFromPolar = useBillingSyncCallback(organizationId);
 
   const subscription = useOrganizationSubscriptionActions(organizationId);
 
@@ -179,11 +218,12 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     planName: flags.planName,
     planPriceCents: flags.planPriceCents,
     planPerSeat: flags.planPerSeat,
+    seats: flags.seats,
     trialEndsAt: flags.trialEndsAt,
     billing,
     creditRefreshStatus,
     billingContactMessage,
-    isLoading: spend.isLoading || grantsQuery.isLoading || orgBilling.isLoading,
+    isLoading: permissionsLoading || spend.isLoading || grantsQuery.isLoading || orgBilling.isLoading,
     error: spend.error ?? grantsQuery.error ?? orgBilling.error,
     billed: metrics.billed,
     purchased: metrics.purchased,
@@ -207,4 +247,9 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     invoices: metrics.invoices,
     grants: grantsQuery.data?.grants ?? [],
   };
+}
+
+function useBillingSyncCallback(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useCallback(() => syncOrganizationBilling(organizationId, queryClient), [organizationId, queryClient]);
 }

@@ -48,6 +48,7 @@ export type CreateWithAgentMessage = CreateWithAgentTextMessage | CreateWithAgen
 export type CreateWithAgentSurveyQuestion = {
   prompt: string;
   options: string[];
+  recommendedOption?: string;
 };
 
 export type CreateWithAgentSurvey = {

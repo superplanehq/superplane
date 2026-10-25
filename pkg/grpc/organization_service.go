@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/services"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -16,6 +17,7 @@ import (
 
 type OrganizationService struct {
 	pb.UnimplementedOrganizationsServer
+	invitations          organizations.InvitationService
 	authorizationService authorization.Authorization
 	registry             *registry.Registry
 	oidcProvider         oidc.Provider
@@ -36,6 +38,7 @@ func NewOrganizationService(
 		baseURL:              baseURL,
 		webhooksBaseURL:      webhooksBaseURL,
 		authorizationService: authorizationService,
+		invitations:          organizations.InvitationService{AuthService: authorizationService, BaseURL: baseURL, EmailService: services.NewNoopEmailService()},
 	}
 }
 
@@ -153,6 +156,14 @@ func (s *OrganizationService) ListHostedCreditProducts(
 	return organizations.ListHostedCreditProducts(ctx, orgID, req)
 }
 
+func (s *OrganizationService) QuoteHostedCreditCheckout(
+	ctx context.Context,
+	req *pb.QuoteHostedCreditCheckoutRequest,
+) (*pb.QuoteHostedCreditCheckoutResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.QuoteHostedCreditCheckout(ctx, orgID, req)
+}
+
 func (s *OrganizationService) CreateHostedCreditCheckout(
 	ctx context.Context,
 	req *pb.CreateHostedCreditCheckoutRequest,
@@ -195,6 +206,29 @@ func (s *OrganizationService) CreateBusinessCheckout(
 	return organizations.CreateBusinessCheckout(ctx, orgID, req, accountID, s.baseURL)
 }
 
+func (s *OrganizationService) SelectBillingPlan(ctx context.Context, req *pb.SelectBillingPlanRequest) (*pb.CreateBusinessCheckoutResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	accountID, _ := accountIDFromContext(ctx)
+	return organizations.SelectBillingPlan(ctx, orgID, req, accountID, s.baseURL)
+}
+
+func (s *OrganizationService) CreatePaymentMethodSession(ctx context.Context, req *pb.CreatePaymentMethodSessionRequest) (*pb.CreateBillingPortalSessionResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	accountID, _ := accountIDFromContext(ctx)
+	return organizations.CreatePaymentMethodSession(ctx, orgID, req, accountID)
+}
+
+func (s *OrganizationService) PreviewSeatPurchase(ctx context.Context, req *pb.PreviewSeatPurchaseRequest) (*pb.PreviewSeatPurchaseResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.PreviewSeatPurchase(ctx, orgID, req)
+}
+
+func (s *OrganizationService) PurchaseSeats(ctx context.Context, req *pb.PurchaseSeatsRequest) (*pb.PurchaseSeatsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	userID, _ := userIDFromContext(ctx)
+	return organizations.PurchaseSeats(ctx, orgID, req, userID)
+}
+
 func (s *OrganizationService) SyncOrganizationBilling(
 	ctx context.Context,
 	req *pb.SyncOrganizationBillingRequest,
@@ -226,6 +260,14 @@ func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.Invi
 	}
 
 	return organizations.AcceptInviteLink(ctx, s.authorizationService, accountID, req.Token)
+}
+
+func (s *OrganizationService) AcceptInvitation(ctx context.Context, req *pb.AcceptInvitationRequest) (*structpb.Struct, error) {
+	accountID, err := accountIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.invitations.Accept(ctx, accountID, req.Token)
 }
 
 func (s *OrganizationService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
@@ -334,4 +376,28 @@ func userIDFromContext(ctx context.Context) (string, error) {
 	}
 
 	return userMeta[0], nil
+}
+
+func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {
+	inviterID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.invitations.Create(ctx, ctx.Value(authorization.DomainIdContextKey).(string), inviterID, req)
+}
+
+func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListInvitationsRequest) (*pb.ListInvitationsResponse, error) {
+	return s.invitations.List(ctx, ctx.Value(authorization.DomainIdContextKey).(string))
+}
+
+func (s *OrganizationService) ResendInvitation(ctx context.Context, req *pb.ResendInvitationRequest) (*pb.ResendInvitationResponse, error) {
+	actorID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.invitations.Resend(ctx, ctx.Value(authorization.DomainIdContextKey).(string), actorID, req.InvitationId)
+}
+
+func (s *OrganizationService) CancelInvitation(ctx context.Context, req *pb.CancelInvitationRequest) (*pb.CancelInvitationResponse, error) {
+	return s.invitations.Cancel(ctx, ctx.Value(authorization.DomainIdContextKey).(string), req.InvitationId)
 }

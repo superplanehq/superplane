@@ -10,16 +10,10 @@ import { Button } from "@/components/ui/button";
 import { type FleetManagerVerificationStatus, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
 import {
   FLEET_MANAGER_VALUES_FILE,
-  fleetManagerDockerCommand,
   fleetManagerHelmCommand,
   fleetManagerValuesFileCommand,
 } from "@/lib/fleetManagerSetup";
-import {
-  fleetProviderChoiceCopy,
-  omittedFleetWizardStep,
-  singleHostInstall,
-  type FleetManagerWizardStep,
-} from "@/lib/fleetManagerWizard";
+import { fleetProviderChoiceCopy, omittedFleetWizardStep, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import { CheckCircle2, LoaderCircle, TriangleAlert } from "lucide-react";
 
@@ -72,7 +66,7 @@ function WizardActions({
 function ProviderStep({ setup, actions }: { setup: FleetManagerSetupState; actions: React.ReactNode }) {
   if (!setup.metadata || !setup.draft) return null;
 
-  const choice = fleetProviderChoiceCopy(singleHostInstall(setup.metadata.installationType));
+  const choice = fleetProviderChoiceCopy();
 
   return (
     <div data-testid="fleet-manager-provider-step">
@@ -170,56 +164,6 @@ function ValuesStep({ setup, actions }: { setup: FleetManagerSetupState; actions
   );
 }
 
-function DockerStep({ setup, onFinish, onFinishLater }: WizardProps) {
-  const verification = useFleetManagerVerification(Boolean(setup.installationToken), setup.draft, setup.metadata);
-  const command = setup.installationToken ? fleetManagerDockerCommand(setup.installationToken) : null;
-
-  return (
-    <div data-testid="fleet-manager-docker-step">
-      <FirstRunHeading headline="Start runners on this VM" size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          Run this command in the SuperPlane install directory. It starts Fleet Manager on this machine.
-        </p>
-      </FirstRunHeading>
-      {command ? (
-        <div className="mt-5">
-          <FleetManagerCommandBlock code={command} language="shell" copyLabel="Copy runner command" />
-        </div>
-      ) : (
-        <p className="mt-5 text-sm text-muted-foreground">Preparing the runner command...</p>
-      )}
-      {setup.tokenError && (
-        <div className="mt-5">
-          <p role="alert" className="text-sm text-destructive">
-            {setup.tokenError}
-          </p>
-          <Button type="button" className="mt-3" onClick={() => void setup.prepareInstallation()}>
-            Try again
-          </Button>
-        </div>
-      )}
-      <div className="mt-5">
-        <FleetManagerVerificationStatus
-          status={verification.status}
-          onRetry={verification.retry}
-          copy={{
-            waiting: "Waiting for Fleet Manager on this VM...",
-            timeout: "Verification timed out. Check the command in the install directory and retry.",
-          }}
-        />
-      </div>
-      <div className="mt-7 flex flex-wrap gap-3">
-        {verification.status === "verified" && (
-          <Button type="button" onClick={onFinish}>
-            Finish installation
-          </Button>
-        )}
-        <FinishLaterButton onFinishLater={onFinishLater} />
-      </div>
-    </div>
-  );
-}
-
 function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
   const verification = useFleetManagerVerification(true, setup.draft, setup.metadata);
   const helmCommand = useMemo(() => {
@@ -306,9 +250,8 @@ function usePrepareValuesCommand(step: FleetManagerWizardStep, setup: FleetManag
   const started = useRef(false);
 
   useEffect(() => {
-    const preparingDocker = step === "docker" && !setup.installationToken;
     const preparingValues = step === "values" && !setup.values;
-    if ((!preparingDocker && !preparingValues) || started.current) return;
+    if (!preparingValues || started.current) return;
     started.current = true;
     void setup.prepareInstallation();
   }, [setup, step]);
@@ -338,8 +281,7 @@ function FleetManagerWizardSteps(props: WizardProps) {
   const back = props.showBackButton ? props.onBack : undefined;
   const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
   const continueToNextStep = async () => {
-    const createToken =
-      props.step === "fleets" || (props.step === "provider" && props.setup.draft?.provider === "docker");
+    const createToken = props.step === "fleets";
     if (createToken && !(await props.setup.prepareInstallation())) return;
     props.onNext();
   };
@@ -360,7 +302,6 @@ function FleetManagerWizardSteps(props: WizardProps) {
     </>
   );
 
-  if (props.step === "docker") return <DockerStep {...props} />;
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;
   if (props.step === "fleets") return <FleetsStep setup={props.setup} actions={continueActions} />;
   if (props.step === "values") {

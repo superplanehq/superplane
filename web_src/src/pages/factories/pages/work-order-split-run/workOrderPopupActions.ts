@@ -28,6 +28,12 @@ export function footerMutationHandlers(
       }
     },
     onReject: () => void footerActions.handleReject(),
+    onContinueFixes: () => {
+      const target = fixture.footer.continueFixes;
+      if (target) {
+        void footerActions.handleContinueFixes(target);
+      }
+    },
     onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
       void footerActions.handleStop(choice, {
         ...fixture.footer,
