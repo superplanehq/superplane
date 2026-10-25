@@ -209,7 +209,7 @@ func SyncOrganizationBilling(
 	if err := polar.SyncOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
 		log.WithError(err).WithField("organization_id", organizationID.String()).Warn("failed to sync Polar subscription")
 	}
-	reconcileSeatPurchase(ctx, database.DB(ctx), organizationID)
+	_ = reconcileSeatPurchase(ctx, database.DB(ctx), organizationID)
 	// Sync can apply an activation or a payment recovery that no webhook
 	// delivered. Either one can change the renewal seat count.
 	seatrenewal.ScheduleAsync(ctx, organizationID)

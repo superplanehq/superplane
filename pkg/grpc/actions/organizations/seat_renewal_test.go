@@ -200,12 +200,18 @@ func Test__BillingSyncRestoresRenewalReductionAfterLostPurchaseResponse(t *testi
 	require.NoError(t, err)
 	require.Equal(t, seatPurchaseAwaitingConfirmation, response.Purchase.Status)
 	require.Nil(t, f.pendingRenewalSeats(), "the purchase cleared the reduction")
+	f.mu.Lock()
+	readsBeforeSync := f.getCount
+	f.mu.Unlock()
 
 	_, err = SyncOrganizationBilling(t.Context(), f.r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
 	require.NoError(t, err)
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
 	assert.Equal(t, new(1), f.pendingRenewalSeats())
 	assert.Equal(t, new(1), f.plan().RenewalSeatsScheduled)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	assert.Equal(t, 1, f.getCount-readsBeforeSync, "billing sync reads Polar for only one renewal schedule")
 }
 
 func Test__NoRenewalScheduleWhileASeatPurchaseIsInFlight(t *testing.T) {
