@@ -24,6 +24,9 @@ type Subscription struct {
 	ExternalCustomerID string
 	Status             string
 	Seats              int
+	// NoSeats sends seats as null, as Polar does for a product that is not
+	// per seat. Seats is then ignored.
+	NoSeats bool
 	// PendingSeats is the seat count scheduled for the next period.
 	PendingSeats      *int
 	CancelAtPeriodEnd bool
@@ -201,6 +204,9 @@ func (sub *Subscription) snapshot() map[string]any {
 		"current_period_end":   sub.PeriodEnd.UTC().Format(time.RFC3339),
 		"external_customer_id": sub.ExternalCustomerID,
 		"pending_update":       nil,
+	}
+	if sub.NoSeats {
+		snapshot["seats"] = nil
 	}
 	if sub.PendingSeats != nil {
 		snapshot["pending_update"] = map[string]any{

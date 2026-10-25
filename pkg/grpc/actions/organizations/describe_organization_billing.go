@@ -158,9 +158,12 @@ func DescribeOrganizationBilling(
 
 	response.PurchasedSeats = new(int32(*seats.Purchased))
 	response.AvailableSeats = new(int32(*seats.Available))
-	response.ExpectedRenewalSeats = new(int32(*seats.RenewalQuantity))
 	response.CurrentMonthlyTotalCents = new(int64(*seats.Purchased) * plan.Catalog.PriceCents)
-	response.ExpectedRenewalCents = new(int64(*seats.RenewalQuantity) * plan.Catalog.PriceCents)
+	// A plan without paid seats has no renewal count until it is repaired.
+	if seats.RenewalQuantity != nil {
+		response.ExpectedRenewalSeats = new(int32(*seats.RenewalQuantity))
+		response.ExpectedRenewalCents = new(int64(*seats.RenewalQuantity) * plan.Catalog.PriceCents)
+	}
 	if seats.PlanMaximum != nil {
 		response.PlanMaximumSeats = new(int32(*seats.PlanMaximum))
 	}
