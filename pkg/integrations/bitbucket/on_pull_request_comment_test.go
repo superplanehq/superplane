@@ -25,10 +25,10 @@ func TestForgeCommentFetchesContentBeforeMentionFilter(t *testing.T) {
 		response             string
 		wantCode, wantEvents int
 	}{
-		{"mention", http.StatusOK, `{"id":7,"content":{"raw":"@superplaneagent fix conflicts"},"user":{"nickname":"ada"},"inline":{"path":"README.md","to":3}}`, http.StatusOK, 1},
+		{"mention", http.StatusOK, `{"id":7,"content":{"raw":"@SuperPlane fix conflicts"},"user":{"nickname":"ada"},"inline":{"path":"README.md","to":3}}`, http.StatusOK, 1},
 		{"no mention", http.StatusOK, `{"id":7,"content":{"raw":"looks good"}}`, http.StatusOK, 0},
 		{"allowed bot", http.StatusOK, `{"id":7,"content":{"raw":"Fix this race"},"user":{"type":"app_user","display_name":"open-code-review[bot]"}}`, http.StatusOK, 1},
-		{"other bot", http.StatusOK, `{"id":7,"content":{"raw":"@superplaneagent fix this"},"user":{"type":"app_user","display_name":"other[bot]"}}`, http.StatusOK, 0},
+		{"other bot", http.StatusOK, `{"id":7,"content":{"raw":"@SuperPlane fix this"},"user":{"type":"app_user","display_name":"other[bot]"}}`, http.StatusOK, 0},
 		{"fetch failure", http.StatusServiceUnavailable, `{}`, http.StatusInternalServerError, 0},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -44,7 +44,7 @@ func TestForgeCommentFetchesContentBeforeMentionFilter(t *testing.T) {
 			code, _, err := (&OnPullRequestComment{}).HandleWebhook(core.WebhookRequestContext{
 				Body: body, Headers: headers, Webhook: &contexts.NodeWebhookContext{Secret: "secret"}, HTTP: httpContext,
 				Integration:   &contexts.IntegrationContext{Metadata: map[string]any{"authType": AuthTypeForgeApp, "forgeInstallationId": "installation"}},
-				Configuration: map[string]any{"repository": "acme/widgets", "contentFilter": "@superplaneagent", "allowedBots": []string{"open-code-review"}, "ignoreBots": true}, Events: events,
+				Configuration: map[string]any{"repository": "acme/widgets", "contentFilter": "@SuperPlane", "allowedBots": []string{"open-code-review"}, "ignoreBots": true}, Events: events,
 			})
 			assert.Equal(t, test.wantCode, code)
 			assert.Equal(t, test.wantEvents, events.Count())
@@ -57,7 +57,7 @@ func TestForgeCommentFetchesContentBeforeMentionFilter(t *testing.T) {
 			assert.Equal(t, "/2.0/repositories/acme/widgets/pullrequests/2/comments/7", httpContext.Requests[0].URL.Path)
 			if test.name == "mention" {
 				comment := events.Payloads[0].Data.(map[string]any)["comment"].(map[string]any)
-				assert.Equal(t, "@superplaneagent fix conflicts", comment["body"])
+				assert.Equal(t, "@SuperPlane fix conflicts", comment["body"])
 				assert.Equal(t, "ada", comment["nickname"])
 				assert.Equal(t, "README.md", comment["path"])
 			}
@@ -335,4 +335,34 @@ func Test__MatchBitbucketContentFilter(t *testing.T) {
 	assert.False(t, matchBitbucketContentFilter("@adalovelace", event))
 	assert.True(t, matchBitbucketContentFilter("/solve", event))
 	assert.False(t, matchBitbucketContentFilter("/deploy", event))
+}
+
+func Test__BitbucketMentionMatches(t *testing.T) {
+	tests := []struct {
+		name    string
+		filter  string
+		body    string
+		matches bool
+	}{
+		{"new mention matches itself", "@SuperPlane", "@SuperPlane fix conflicts", true},
+		{"new mention is case-insensitive", "@SuperPlane", "please @SUPERPLANE look", true},
+		{"lowercase filter matches display case", "@superplane", "@SuperPlane fix", true},
+		{"legacy filter matches new mention", "@superplaneagent", "@SuperPlane fix", true},
+		{"new filter matches legacy mention", "@SuperPlane", "@superplaneagent fix", true},
+		{"legacy filter matches legacy mention", "@superplaneagent", "@superplaneagent fix", true},
+		{"alias matches at end of body", "@SuperPlane", "fix this @superplaneagent", true},
+		{"alias matches before punctuation", "@SuperPlane", "@superplaneagent, fix this", true},
+		{"alias matches on a later occurrence", "@SuperPlane", "@superplaneagent2 then @superplaneagent", true},
+		{"legacy mention with suffix does not match", "@SuperPlane", "@superplaneagent2 fix", false},
+		{"new mention with suffix does not match", "@superplaneagent", "@superplane-bot fix", false},
+		{"longer filter nickname does not match alias", "@superplanefoo", "@superplaneagent fix", false},
+		{"unrelated mention does not match", "@SuperPlane", "@ada fix", false},
+		{"missing mention does not match", "@SuperPlane", "looks good", false},
+		{"non-alias filter is unchanged", "@ada", "@superplaneagent fix", false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.matches, bitbucketMentionMatches(test.filter, test.body))
+		})
+	}
 }

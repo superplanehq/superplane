@@ -55,7 +55,7 @@ func Test__PRFeedbackSettings__SerializeAndParseAllowedBots(t *testing.T) {
 	serialized := serializePRFeedbackSettings(settings)
 	assert.Equal(t, []string{"coderabbitai", "bugbot"}, serialized.GetDiscussion().GetAllowedBots())
 
-	parsed := parsePRFeedbackSettings(defaultPRFeedbackSettings(), &pb.FactoryPRFeedbackHandler_Settings{
+	parsed := parsePRFeedbackSettings(defaultPRFeedbackSettings(models.ProviderGitHub), &pb.FactoryPRFeedbackHandler_Settings{
 		Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{Repository: "acme/app"},
 		Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
 			Mention:     prFeedbackDefaultMention,
@@ -91,7 +91,7 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 
 	t.Run("rejects attempt values outside 1 through 10", func(t *testing.T) {
 		zero := int32(0)
-		parsed := parsePRFeedbackSettings(defaultPRFeedbackSettings(), &pb.FactoryPRFeedbackHandler_Settings{
+		parsed := parsePRFeedbackSettings(defaultPRFeedbackSettings(models.ProviderGitHub), &pb.FactoryPRFeedbackHandler_Settings{
 			Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{MaximumAttempts: &zero},
 		})
 		err := validatePRFeedbackSettingsForSource(
@@ -106,7 +106,7 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 		require.Error(t, err)
 
 		tooHigh := int32(11)
-		parsed = parsePRFeedbackSettings(defaultPRFeedbackSettings(), &pb.FactoryPRFeedbackHandler_Settings{
+		parsed = parsePRFeedbackSettings(defaultPRFeedbackSettings(models.ProviderGitHub), &pb.FactoryPRFeedbackHandler_Settings{
 			Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{MaximumAttempts: &tooHigh},
 		})
 		err = validatePRFeedbackSettingsForSource(
@@ -126,7 +126,7 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 			nil,
 			uuid.Nil,
 			models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
-			defaultPRFeedbackSettings(),
+			defaultPRFeedbackSettings(models.ProviderGitHub),
 			nil,
 		)
 		require.Error(t, err)
@@ -145,4 +145,22 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 		assert.Equal(t, []string{"lint", "unit"}, settings.CheckNames)
 		assert.Equal(t, "acme/app", settings.Repository)
 	})
+}
+
+func Test__DefaultPRFeedbackSettings__MentionByProvider(t *testing.T) {
+	tests := []struct {
+		provider string
+		mention  string
+	}{
+		{models.ProviderGitHub, "@superplaneagent"},
+		{"", "@superplaneagent"},
+		{"gitlab", "@superplaneagent"},
+		{models.ProviderBitbucket, "@SuperPlane"},
+		{" Bitbucket ", "@SuperPlane"},
+	}
+	for _, test := range tests {
+		t.Run("provider "+test.provider, func(t *testing.T) {
+			assert.Equal(t, test.mention, defaultPRFeedbackSettings(test.provider).Mention)
+		})
+	}
 }

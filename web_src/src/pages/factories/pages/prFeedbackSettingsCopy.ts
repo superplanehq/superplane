@@ -8,8 +8,8 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   repositoryLabel: "Repository",
   repositoryHelper: "Listen for mentions on pull requests in this repository.",
   mentionLabel: "Mention",
-  mentionHelper:
-    "Leave this field empty to start a run from any human comment or review. Use @superplaneagent to require a mention.",
+  mentionHelper: (mention: string) =>
+    `Leave this field empty to start a run from any human comment or review. Use ${mention} to require a mention.`,
   ignoreBotsLabel: "Ignore bot comments",
   ignoreBotsHelper: "Do not start a run when a bot writes the mention.",
   addressAllBotsLabel: "All bots",
@@ -36,8 +36,8 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   wizardStepAIComments: "Which bot comments should SuperPlane address?",
   wizardStepWhichChecks: "Which status checks should be fixed?",
   wizardStepWhichTools: "Which tools report these checks?",
-  wizardMentionRequireOption: "Require @superplaneagent",
-  wizardMentionRequireHelper: "Humans must mention @superplaneagent for pull request feedback.",
+  wizardMentionRequireOption: (mention: string) => `Require ${mention}`,
+  wizardMentionRequireHelper: (mention: string) => `Humans must mention ${mention} for pull request feedback.`,
   wizardMentionAnyOption: "Start from any human comment",
   wizardMentionAnyHelper: "Handle any human comment or review on the pull request.",
   wizardPreviewLabel: "Example pull request comment",

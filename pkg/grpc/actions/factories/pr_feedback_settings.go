@@ -21,9 +21,9 @@ type prFeedbackSettings struct {
 	RunnerIntegrationNames []string
 }
 
-func defaultPRFeedbackSettings() prFeedbackSettings {
+func defaultPRFeedbackSettings(provider string) prFeedbackSettings {
 	return prFeedbackSettings{
-		Mention:         prFeedbackDefaultMention,
+		Mention:         prFeedbackDefaultMentionForProvider(provider),
 		IgnoreBots:      true,
 		MaximumAttempts: prFeedbackDefaultMaximumAttempts,
 	}
@@ -92,7 +92,9 @@ func allowedBotsNodeValue(bots []string) []any {
 }
 
 func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSpec) prFeedbackSettings {
-	settings := defaultPRFeedbackSettings()
+	// The stored contentFilter always replaces the default mention, so the
+	// provider does not matter here.
+	settings := defaultPRFeedbackSettings(models.ProviderGitHub)
 	for _, nodeID := range graph.triggerNodeIDs() {
 		node := findIntakeNode(spec.Nodes, nodeID)
 		if node == nil {

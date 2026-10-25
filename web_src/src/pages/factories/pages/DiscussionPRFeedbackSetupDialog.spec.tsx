@@ -307,4 +307,36 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
       }),
     );
   });
+
+  it("uses the SuperPlane mention for a Bitbucket workspace", async () => {
+    const user = userEvent.setup();
+    render(
+      <DiscussionPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/app"
+        vcsProvider="bitbucket"
+        source={discussionSource}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: /Require @SuperPlane/ })).toBeChecked();
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute(
+      "data-comment",
+      "@SuperPlane fix this and make no mistakes",
+    );
+    await user.click(screen.getByTestId("discussion-setup-continue"));
+    await user.click(screen.getByTestId("discussion-setup-finish"));
+
+    expect(mocks.createHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          discussion: expect.objectContaining({ mention: "@SuperPlane" }),
+        }),
+      }),
+    );
+  });
 });
