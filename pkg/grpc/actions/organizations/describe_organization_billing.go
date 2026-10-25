@@ -151,6 +151,7 @@ func DescribeOrganizationBilling(
 		// The plan row can already be off per-seat, but the stored seats still
 		// describe who can use the workspace.
 		response.PurchasedSeats = new(int32(*seats.Purchased))
+		describeBlockedRenewal(ctx, db, plan, seats, response)
 		return response, nil
 	}
 	if !seats.PerSeat {
@@ -172,6 +173,71 @@ func DescribeOrganizationBilling(
 		response.PurchasableSeats = new(int32(*seats.Purchasable))
 	}
 	return response, nil
+}
+
+// describeBlockedRenewal fills the renewal estimate while payment is blocked,
+// so the admin can see what the recovered subscription charges. A plan
+// without paid seats gets no estimate, and an unverified price leaves the
+// amount empty instead of zero.
+func describeBlockedRenewal(
+	ctx context.Context,
+	db *gorm.DB,
+	plan *models.OrganizationBillingPlan,
+	seats *entitlements.SeatUsage,
+	response *pb.DescribeOrganizationBillingResponse,
+) {
+	if seats.RenewalQuantity == nil {
+		return
+	}
+	response.ExpectedRenewalSeats = new(int32(*seats.RenewalQuantity))
+	price := verifiedPaidSeatPriceCents(ctx, db, plan)
+	if price == nil {
+		return
+	}
+	response.ExpectedRenewalCents = new(int64(*seats.RenewalQuantity) * *price)
+}
+
+// verifiedPaidSeatPriceCents returns the per-seat price of the paid plan that
+// the subscription renews with, or nil when it cannot be verified. A grace
+// period keeps the paid catalog on the row. After the fallback, the row points
+// to the access plan, so only the Polar subscription names the paid product.
+// The access plan price is never a renewal price. A Polar failure only hides
+// the amount: it must not fail the billing page.
+func verifiedPaidSeatPriceCents(ctx context.Context, db *gorm.DB, plan *models.OrganizationBillingPlan) *int64 {
+	if isPaidPerSeatCatalog(&plan.Catalog) {
+		return new(plan.Catalog.PriceCents)
+	}
+	if plan.PolarSubscriptionID == nil || !polar.Configured() {
+		return nil
+	}
+	subscriptionID := strings.TrimSpace(*plan.PolarSubscriptionID)
+	if subscriptionID == "" {
+		return nil
+	}
+	logger := log.WithFields(log.Fields{"organization_id": plan.OrganizationID.String(), "polar_subscription_id": subscriptionID})
+	subscription, err := polar.NewClientFromEnv().GetSubscription(ctx, subscriptionID)
+	if err != nil {
+		logger.WithError(err).Info("renewal price is not available: could not read the Polar subscription")
+		return nil
+	}
+	if subscription.ID != subscriptionID || strings.TrimSpace(subscription.ProductID) == "" {
+		return nil
+	}
+	catalog, err := models.FindBillingPlanByProduct(db, subscription.ProductID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.WithError(err).Warn("renewal price is not available: could not load the billing plan")
+		}
+		return nil
+	}
+	if !isPaidPerSeatCatalog(catalog) {
+		return nil
+	}
+	return new(catalog.PriceCents)
+}
+
+func isPaidPerSeatCatalog(catalog *models.BillingPlan) bool {
+	return catalog.Category == "paid" && catalog.PerSeat
 }
 
 // describePastDue reports when a failed renewal payment started and, while a
