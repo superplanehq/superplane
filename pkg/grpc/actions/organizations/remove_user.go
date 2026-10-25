@@ -53,7 +53,7 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		}
 
 		for _, role := range roles {
-			err = authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
+			err = authService.RemoveRoleInTransaction(tx, user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
 			if err != nil {
 				log.Errorf("Error removing role %s for %s: %v", role.Name, user.ID.String(), err)
 				return grpcerrors.Internal(err, "error removing role")
