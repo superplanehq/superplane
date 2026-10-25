@@ -1,7 +1,9 @@
 # Team plan seats and billing
 
-> Status: Draft. Billing, invitation, and membership rules are agreed. Four
-> decisions remain open. They are listed at the end.
+> Status: Draft. Billing, invitation, and membership rules are agreed. Seven
+> questions remain open. [Open questions](#open-questions) lists them with the
+> shipped behavior, the options, and what each question blocks. No option is
+> chosen.
 >
 > Audience: Product, design, and engineering
 >
@@ -31,9 +33,12 @@ The first release covers:
 
 Deferred: annual billing, cancellation policy, and migration of existing
 organizations above the Team maximum. The current Team plan has no included
-AI credit. Four decisions remain open: access after a failed renewal
-payment, acceptance of invitations near renewal, seat counts lowered outside
-SuperPlane, and pending invitations when an organization starts Team.
+AI credit. Seven questions remain open. They cover access after a failed
+renewal payment, acceptance of invitations near renewal, seat counts lowered
+outside SuperPlane, pending invitations when an organization starts Team,
+the renewal quantity when members exceed paid seats, signup without email
+delivery, and seat purchases while a cancellation is scheduled. See
+[Open questions](#open-questions).
 
 Purchased seats are required only on per-seat plans, such as Team. Email
 invitations and the removal of shared invite links apply to every plan and
@@ -59,7 +64,7 @@ The billing rules apply to per-seat plans, such as Team.
 | Mid-period purchases | Prorate additional seats for the remaining portion of the current billing period. |
 | Payment confirmation | Additional seats become available only after successful payment. |
 | Renewal date | Keep the billing cycle established by the initial subscription. Seat changes do not restart it. |
-| Renewal quantity | Renew only seats occupied by current, accepted members. Pending invitations never count. |
+| Renewal quantity | Renew only seats occupied by current, accepted members. Pending invitations never count. The shipped scheduler caps the quantity at the current paid seats. See [D14](#d14-renewal-quantity-when-over-capacity). |
 | Unused capacity | Automatically remove unused seats at renewal and exclude them from the new period's charge. |
 | Seat changes | Seat count changes only through SuperPlane. Customers do not change seats in the payment provider's portal. |
 
@@ -77,7 +82,7 @@ The billing rules apply to per-seat plans, such as Team.
 | Invitation lifetime | An invitation expires 7 days after it is sent. Installation admins can change this lifetime. Resend sends a new link and restarts the lifetime. |
 | Joining | Sending or accepting an invitation does not create a separate charge or subscription. |
 | Shared invite links | Shared organization invite links are removed for every plan and deployment. Email invitations replace them. |
-| Deployments without email | An Admin can copy the link of an individual invitation and share it directly. |
+| Deployments without email | An Admin can copy the link of an individual invitation and share it directly. Shipped difference: signup through that link still needs an emailed code. See [D15](#d15-signup-without-email-delivery). |
 | Member removal | Remove access immediately. Keep the paid seat available for reuse until renewal. |
 | Seat reuse | A replacement member can use an existing available seat without another payment. |
 | Pending invitations at renewal | Pending invitations stay pending at renewal. They never count toward the renewal quantity, so renewal keeps no seat for them. After renewal, acceptance needs a free seat. |
@@ -100,7 +105,7 @@ quantity) apply to per-seat plans.
 | Unused seat | Purchased capacity without a current member at renewal. Seats used by pending invitations are unused for renewal billing. |
 | Plan maximum | The largest number of seats the organization can purchase on its plan. |
 | Renewal | The end of the current subscription period and the start of the next monthly period. |
-| Renewal quantity | The number of current members at renewal, owner included. The minimum is one. |
+| Renewal quantity | The number of current members at renewal, owner included. The minimum is one. The shipped scheduler sends the lower of this number and the current paid seats. See [D14](#d14-renewal-quantity-when-over-capacity). |
 
 Member counts do not depend on recent activity. A person who remains a member
 still occupies a seat even if they do not sign in during the month.
@@ -113,6 +118,12 @@ Seat values at any moment:
 | Invitable seats | purchased seats − occupied seats − pending invitations |
 | Purchasable seats | plan maximum − purchased seats |
 | Renewal quantity | occupied seats (minimum 1) |
+
+> Shipped difference: the entitlement value matches this formula. The seat
+> renewal scheduler then sends the lower of this value and the current Polar
+> seats. When members exceed paid seats, the shipped renewal quantity is
+> lower than this formula. See
+> [D14](#d14-renewal-quantity-when-over-capacity).
 
 ## Product requirements
 
@@ -167,7 +178,9 @@ and can change before renewal.
 - Each acceptance link belongs to one invitation. It does not provide reusable
   access to the organization.
 - An Admin can copy the acceptance link of an invitation. Deployments without
-  email delivery use this to share invitations.
+  email delivery use this to share invitations. Signup through that link still
+  needs an emailed code. See
+  [D15](#d15-signup-without-email-delivery).
 - An invitation expires 7 days after it is sent. Installation admins can
   change this lifetime.
 
@@ -191,6 +204,11 @@ On per-seat plans:
   invitation must not let another person join under a different email address.
 - A recipient without an account can sign up through the invitation, even when
   open registration is disabled. This applies only to the invited email address.
+
+  > Shipped difference: invitation signup always requires a code that
+  > SuperPlane sends by email. The invitation link alone is not proof of the
+  > mailbox. See [D15](#d15-signup-without-email-delivery).
+
 - Acceptance adds the recipient with the invited role, without another charge.
 - Repeated acceptance must not create another membership, occupied seat, or charge.
 - Canceled and expired invitations admit no one.
@@ -229,6 +247,12 @@ period or create a new allowance of time.
 - Include the owner in that count.
 - Exclude removed members, service accounts, and recipients of pending invitations.
 - Set the new period's purchased capacity to that member count.
+
+  > Shipped difference: the scheduler sends the lower of the member count and
+  > the current paid seats. It sends no count when Polar reports a missing seat
+  > count or a seat count below 1. See
+  > [D14](#d14-renewal-quantity-when-over-capacity).
+
 - Charge the monthly seat price for that quantity.
 - Remove all remaining unused capacity automatically.
 - Do not require an Admin to request a seat reduction.
@@ -242,8 +266,8 @@ invitation stays pending.
 
 Acceptance and renewal must produce a consistent membership and billing
 result. Concurrent actions must not create more members than the paid
-capacity permits. How an acceptance just before renewal is handled is an open
-decision.
+capacity permits. How an acceptance just before renewal is handled is an
+[open decision](#d8-accepting-invitations-near-renewal).
 
 ## Plan catalog and Polar responsibilities
 
@@ -268,7 +292,8 @@ Polar customer portal. SuperPlane does not use Polar seat assignment. The
 portal must not let customers change seat counts. If a seat count changes
 outside SuperPlane, SuperPlane treats the new count as purchased capacity and
 alerts the team. A higher count is paid capacity. What happens when a lower
-count leaves fewer seats than current members is an open question.
+count leaves fewer seats than current members is an
+[open question](#d11-outside-seat-reduction-below-the-member-count).
 
 ## Information customers need
 
@@ -381,18 +406,326 @@ billing state.
 | Accept a pending invitation after renewal and a seat purchase. | Add the recipient with the invited role. No other charge. |
 | Purchase or accept invitations concurrently. | Respect both purchased capacity and the configured maximum. |
 | Raise the seat count outside SuperPlane. | Treat the new count as purchased capacity and alert the team. |
-| Lower the seat count outside SuperPlane below current members. | Alert the team. The access outcome is an open question. |
+| Lower the seat count outside SuperPlane below current members. | Alert the team. The access outcome is an [open question](#d11-outside-seat-reduction-below-the-member-count). Shipped behavior: members keep access, and invitations and acceptance are blocked. |
 | Invite and accept on a plan that is not per-seat. | Require no purchased seat. Apply the plan's member limit, if any. |
 | Invite and accept with billing off. | Apply no seat or member limit. |
 
 ## Open questions
 
-| # | Question | Context | Needed before |
-| --- | --- | --- | --- |
-| 1 | What access does an organization keep after a failed renewal payment? | Polar starts the new period, then charges. If the charge fails, the subscription becomes past due. Polar retries after 2, 7, 14, and 21 days, then revokes the subscription. Polar can keep benefits for 0, 2, 7, 14, or 21 days. Today SuperPlane removes paid access at the first failure, and the fallback plan has no seat limit. Options: keep member access for the retry window with no new invitations or purchases; keep access for a shorter grace period; or remove paid access at once. In every option, no new member can join. | Launch |
-| 2 | How is an invitation acceptance just before renewal handled? | Polar renews with the seat count set before the period ends. An acceptance after the last update can leave more members than renewed seats. Options: update the next-period seat count on every acceptance and reject acceptance when that update fails near renewal; or block all acceptances in a short window before renewal. In every option, there is no automatic charge. | Renewal implementation |
-| 3 | What happens when the seat count drops below current members outside SuperPlane? | Seat counts must change only through SuperPlane, but the payment provider's portal or a support action can still lower them. Example: 10 seats and 10 members, then the count drops to 9. Options: restore the previous count in the payment provider; keep access for all current members and block new joins and invitations until capacity exceeds the member count; or remove access for one member. In every option, SuperPlane alerts the team. | Seat change safeguards |
-| 4 | What happens to pending invitations when an organization starts Team? | Plans that are not per-seat need no seat for an invitation. The initial Team purchase must cover only current members. Invitations sent before Team then have no seat, and acceptance admits no one until an Admin buys seats. Options: set the initial seat count to members plus pending invitations by default; require seats for those invitations; or expire those invitations when Team starts. | Team checkout follow-up |
+This section is the single list of unresolved decisions. Each entry states
+the question, the shipped behavior, the options with their tradeoffs, and what
+the question blocks. This section does not choose an option.
+
+Task IDs (11, 05, 13b, 17, 19, 26, 27b, 32) come from the outside backlog and
+appear as written there.
+
+| ID | Title | Blocks |
+| --- | --- | --- |
+| [D7](#d7-grace-after-a-failed-renewal-payment) | Grace after a failed renewal payment | Launch |
+| [D8](#d8-accepting-invitations-near-renewal) | Accepting invitations near renewal | 13b |
+| [D11](#d11-outside-seat-reduction-below-the-member-count) | Outside seat reduction below the member count | Launch. Also decides whether 17 stays dropped. Affects 11 and 05. |
+| [D13](#d13-checkout-default-with-pending-invitations) | Checkout default with pending invitations | 19 |
+| [D14](#d14-renewal-quantity-when-over-capacity) | Renewal quantity when over capacity | 27b and 32 |
+| [D15](#d15-signup-without-email-delivery) | Signup without email delivery | 26 |
+| [09-a](#09-a-seat-purchase-while-a-cancellation-is-scheduled) | Seat purchase while a cancellation is scheduled | No task is named |
+
+### D7. Grace after a failed renewal payment
+
+**Question.** For how long do existing members keep Team access after a
+renewal payment fails?
+
+**Context.** Polar starts the new period, then charges. If the charge fails,
+the subscription becomes past due. Polar retries after 2, 7, 14, and 21 days,
+then revokes the subscription. Polar can keep benefits for 0, 2, 7, 14, or 21
+days.
+
+**Shipped today.**
+
+- The installation setting `PastDueGraceDays` sets the grace period. The
+  default is 0 days. The maximum is 21 days. An installation admin changes it
+  through the admin API (`pkg/models/installation_metadata.go`,
+  `pkg/public/admin.go`).
+- At 0 days, the paid plan lapses at once. `ApplyPolarSubscription` moves the
+  plan to the fallback plan when it stores the past-due snapshot.
+  `lapsePaymentBlockedCatalog` does the same for a past-due row that has no
+  recorded failure start (`pkg/models/organization_billing_plan.go`).
+- Above 0 days, the paid plan stays until the failure start plus the grace
+  period. After that, `lapseEndedPastDueGrace` moves the plan to the fallback
+  plan.
+- While the subscription is past due, seats lock at the occupied count. No
+  invitation can be sent, no invitation can be accepted, and no seat can be
+  bought (`pkg/entitlements/seats.go`, and `invitations.go`,
+  `accept_invitation.go`, and `purchase_seats.go` in
+  `pkg/grpc/actions/organizations/`). This applies with and without a grace
+  period.
+
+**Options.**
+
+1. Keep the grace period at 0 days. Paid access ends at the first failed
+   payment.
+   - Tradeoff: The rule is simple, and the organization does not use Team
+     without payment.
+   - Tradeoff: Members lose Team features after one failed charge, even when a
+     Polar retry would succeed.
+2. Keep access for the whole Polar retry window, up to 21 days.
+   - Tradeoff: Members keep working while the payment contact fixes the
+     payment method.
+   - Tradeoff: The organization uses Team for up to 21 days without payment.
+3. Keep access for a shorter grace period, for example 2, 7, or 14 days.
+   - Tradeoff: The exposure is smaller than option 2, and members have time to
+     react.
+   - Tradeoff: Access can still end before the last Polar retry succeeds.
+
+In every option, no new member can join while the subscription is past due.
+
+**Blocks.** Launch.
+
+### D8. Accepting invitations near renewal
+
+**Question.** Does SuperPlane block invitation acceptance in a window before
+renewal, or while the stored billing period has expired or cannot be verified?
+If it does, how does acceptance reopen?
+
+**Context.** Polar renews with the seat count set before the period ends. An
+acceptance after the last update can leave more members than renewed seats.
+
+**Shipped today.**
+
+- `Accept` has no pre-renewal window. It does not check the stored billing
+  period (`accept_invitation.go`).
+- After a member joins, `seatrenewal.ScheduleAsync` tries to set the
+  next-period seat count in Polar. It makes up to three attempts in about ten
+  seconds (`pkg/billing/seatrenewal/async.go`).
+- `SeatRenewalSyncWorker` checks and repairs the next-period seat count every
+  5 minutes (`pkg/workers/seat_renewal_sync_worker.go`).
+- Only a seat purchase rejects an unknown or expired billing period
+  (`purchase_seats.go`).
+
+**Options.**
+
+1. Keep the shipped behavior: no window and no period check.
+   - Tradeoff: Invitees never wait because of renewal timing.
+   - Tradeoff: If the Polar update and the worker both fail before renewal,
+     Polar renews with fewer seats than members. This leads to the state in
+     [D11](#d11-outside-seat-reduction-below-the-member-count).
+2. Block acceptance in a window before renewal. It reopens when the renewal
+   snapshot stores the new period.
+   - Tradeoff: The window limits the exposure to a late update.
+   - Tradeoff: Invitees wait during the window. The length of the window
+     needs a value.
+3. Block acceptance while the stored period has expired or cannot be verified.
+   It reopens when a webhook or billing sync stores a current period.
+   - Tradeoff: Acceptance cannot run on stale billing data.
+   - Tradeoff: A late webhook or a Polar outage blocks joins that were valid.
+4. Make acceptance depend on the next-period seat count update near renewal.
+   Acceptance is rejected when the update fails, and it reopens when the
+   update succeeds.
+   - Tradeoff: The renewed seat count always covers the new member.
+   - Tradeoff: A Polar outage near renewal blocks every acceptance.
+
+In every option, there is no automatic charge.
+
+**Blocks.** 13b.
+
+### D11. Outside seat reduction below the member count
+
+**Question.** What happens when the Polar seat count falls below the number of
+members?
+
+**Context.** Seat counts must change only through SuperPlane, but the payment
+provider's portal or a support action can still lower them. Example: 10 seats
+and 10 members, then the count drops to 9.
+
+**Shipped today.**
+
+- SuperPlane alerts the team. `UpdateSeatCapacityState` records
+  `OverCapacitySince`, and `pkg/billing/polar/seat_capacity.go` writes the
+  `billing.seats_over_capacity` log entry.
+- Members keep access.
+- Invitations and acceptance are blocked, because the stored seat count is
+  lower than the member count.
+- Seat purchase stays allowed.
+
+**Options.**
+
+1. Restore the previous count in Polar.
+   - Tradeoff: Members and billing stay consistent with what the organization
+     bought.
+   - Tradeoff: SuperPlane changes a Polar subscription without a customer
+     action. The customer or support can see this as an unexpected change.
+2. Keep access for all current members. Block new joins and invitations until
+   capacity exceeds the member count.
+   - Tradeoff: No member loses access.
+   - Tradeoff: The organization uses more seats than it pays for until an
+     Admin buys seats or removes members.
+3. Remove access for one member.
+   - Tradeoff: Members never exceed paid capacity.
+   - Tradeoff: SuperPlane must choose the member to remove. The removal can
+     interrupt work without a customer action.
+
+In every option, SuperPlane alerts the team.
+
+**Blocks.** Launch. The answer also decides whether 17 stays dropped. It
+affects 11 and 05.
+
+### D13. Checkout default with pending invitations
+
+**Question.** Does the default seat count at Team checkout include pending
+invitations?
+
+**Context.** Plans that are not per-seat need no seat for an invitation.
+Invitations sent before Team therefore hold no seat. After checkout,
+acceptance admits no one until an Admin buys seats.
+
+**Shipped today.**
+
+- The default and the minimum are `max(occupied, 1)`. Pending invitations do
+  not count (`validateCheckoutSeats` in `select_billing_plan.go`, and
+  `web_src/src/pages/factories/pages/organizationSettings/BillingSeatCheckout.tsx`).
+- An Admin can choose a higher count at checkout.
+
+**Options.**
+
+1. Set the default to members plus pending invitations.
+   - Tradeoff: Pending invitees can accept after checkout with no extra
+     purchase.
+   - Tradeoff: The first charge includes seats for people who have not joined.
+     They can decline or let the invitation expire.
+2. Require seats for those invitations. The minimum includes them.
+   - Tradeoff: Every pending invitation has a seat from the start.
+   - Tradeoff: The minimum can be higher than the number of members, and the
+     Admin cannot pay for fewer seats.
+3. Expire those invitations when Team starts.
+   - Tradeoff: The first charge covers current members only.
+   - Tradeoff: Invitees lose a link they already received. The Admin must send
+     the invitations again.
+4. Keep the shipped behavior.
+   - Tradeoff: The first charge covers current members only, and no
+     invitation changes.
+   - Tradeoff: Pending invitations cannot be accepted until an Admin buys
+     seats.
+
+**Blocks.** 19.
+
+### D14. Renewal quantity when over capacity
+
+**Question.** Which seat count does renewal use when members exceed paid seats,
+or when the seat count in Polar is not valid?
+
+**Context.** This entry also records that the shipped cap differs from the
+PRD. The PRD formula for renewal quantity is "occupied seats (minimum 1)".
+
+**Shipped today.**
+
+- `RenewalQuantity` is `max(occupied, 1)` (`pkg/entitlements/seats.go`).
+- The scheduler sends the lower of `RenewalQuantity` and the current Polar
+  seats (`Scheduler.schedule` in `pkg/billing/seatrenewal/schedule.go`).
+  The cap exists because a higher count would add seats.
+- When Polar reports a missing seat count or a count below 1, the scheduler
+  sends nothing and returns an error. The sync worker tries again.
+- Difference from the PRD: with 10 paid seats and 11 members, the PRD formula
+  gives 11. The shipped renewal quantity is 10.
+
+**Options.**
+
+1. Renew all members. Send the occupied count, even above the paid seats.
+   - Tradeoff: Billing matches the people who have access.
+   - Tradeoff: The change adds seats without a purchase flow, so the PRD rule
+     that seat changes need a SuperPlane purchase and payment confirmation
+     does not hold for those seats. It can also exceed the plan maximum.
+2. Cap the renewal quantity at the paid seats (shipped).
+   - Tradeoff: Renewal never adds seats or charges for seats that the
+     organization did not buy.
+   - Tradeoff: Members above the cap stay in the over-capacity state at the
+     next period. See
+     [D11](#d11-outside-seat-reduction-below-the-member-count).
+3. Handle an invalid Polar count.
+   - Send nothing and retry (shipped). Tradeoff: The renewal can use a stale
+     count when the count stays invalid until renewal.
+   - Send the occupied count with no cap. Tradeoff: Renewal can add seats
+     from bad data.
+   - Block joins until the count is valid. Tradeoff: A Polar data problem
+     blocks members who did nothing wrong.
+
+**Blocks.** 27b and 32.
+
+### D15. Signup without email delivery
+
+**Question.** Can an invitation link prove the invited email address in
+self-hosted installs that have no email delivery? If yes, how does SuperPlane
+detect this mode?
+
+**Shipped today.**
+
+- Invitation signup always requires an emailed code
+  (`confirmInvitationEmailProof` in `pkg/authentication/authentication.go`).
+  The invitation link is also shown to the Admin, so the link alone is not
+  proof of the mailbox.
+- No code detects an install without email delivery. The only signal is a nil
+  email service (`pkg/services/build.go`). When owner setup is enabled,
+  `BuildEmailService` returns an SMTP service from stored settings, so a
+  non-nil service does not prove that email works.
+- Without delivery, the Admin can copy and share the invitation link. A
+  recipient without an account cannot finish signup, because no code reaches
+  them.
+
+**Options for the proof.**
+
+1. Always require the emailed code (shipped).
+   - Tradeoff: Whoever holds the link cannot create an account for the invited
+     address without access to its mailbox.
+   - Tradeoff: Self-hosted installs without email cannot onboard new people by
+     invitation.
+2. Allow invitation-link proof when the install has no email delivery.
+   - Tradeoff: Self-hosted installs can onboard people with the shared link.
+   - Tradeoff: Anyone who holds the link can create an account for the
+     invited address without mailbox proof.
+
+**Options for detection (only if option 2 applies).**
+
+1. Use the nil email service as the signal.
+   - Tradeoff: Needs no new setting.
+   - Tradeoff: It does not cover the SMTP service that is built from stored
+     settings and does not deliver.
+2. Add an explicit installation setting that the installer sets.
+   - Tradeoff: The signal is clear and not affected by startup order.
+   - Tradeoff: Installers must set it, and a wrong value changes the proof
+     rule.
+3. Test email delivery and use the result.
+   - Tradeoff: The signal follows real behavior.
+   - Tradeoff: It needs a test send and a rule for transient failures.
+
+**Blocks.** 26.
+
+### 09-a. Seat purchase while a cancellation is scheduled
+
+**Question.** Does buying seats stay blocked while a cancellation is
+scheduled at the end of the period? This is shipped behavior. It needs
+confirmation.
+
+**Shipped today.**
+
+- `checkSeatPurchase` rejects a purchase when `CancelAtPeriodEnd` is set. The
+  message is "Resume the subscription before buying seats."
+  (`pkg/grpc/actions/organizations/purchase_seats.go`).
+- Renewal sync also skips these plans (`SkipSubscriptionCanceling` in
+  `pkg/billing/seatrenewal/schedule.go`).
+
+**Options.**
+
+1. Keep purchases blocked.
+   - Tradeoff: The organization never pays for seats that end with the
+     subscription.
+   - Tradeoff: The Admin must resume the subscription before inviting more
+     people than the free seats allow.
+2. Allow purchases.
+   - Tradeoff: The organization can add members for the rest of the paid
+     period without resuming.
+   - Tradeoff: The organization pays a prorated charge for seats that end at
+     the period end. Polar behavior for seat updates on a canceling
+     subscription needs a check.
+
+**Blocks.** No task is named in the issue.
 
 ## Deferred work
 
