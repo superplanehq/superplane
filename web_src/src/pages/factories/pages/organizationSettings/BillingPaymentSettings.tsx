@@ -242,6 +242,7 @@ function BillingPlanChoice({
         <BillingSeatCheckout
           plan={plan}
           occupied={billing.occupiedSeats}
+          pending={billing.pendingInvitationSeats}
           disabled={busy}
           onSubscribe={(seats) => onSelect(plan.key, seats)}
         />
