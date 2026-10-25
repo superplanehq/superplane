@@ -2,6 +2,7 @@ import { MoreVertical } from "lucide-react";
 import type { OrganizationsOrganizationInvitation } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { formatDate } from "@/lib/datetime";
 import type { AssignableRoleOption } from "./MemberRowControls";
 import { MemberIdentity, MemberStatus, MemberTableRow } from "./MemberTableRow";
 import type { InvitationManager } from "./useOrganizationInvitationManager";
@@ -25,6 +26,7 @@ export function MemberInvitationRow({
         <MemberIdentity
           email={invitation.email || "Unknown email"}
           initials={invitation.email?.slice(0, 2).toUpperCase() || "?"}
+          details={<InvitationDetails invitation={invitation} />}
         />
       }
       role={
@@ -40,6 +42,21 @@ export function MemberInvitationRow({
   );
 }
 
+function InvitationDetails({ invitation }: { invitation: OrganizationsOrganizationInvitation }) {
+  const expiryLabel = invitation.state === "expired" ? "Expired" : "Expires";
+  return (
+    <p className="flex flex-wrap gap-x-3 text-xs leading-4 text-muted-foreground @min-[44rem]/members:leading-5">
+      <span>Invited by {invitation.inviterName || "Unknown"}</span>
+      {invitation.sentAt && <span>Sent {formatDate(invitation.sentAt)}</span>}
+      {invitation.expiresAt && (
+        <span>
+          {expiryLabel} {formatDate(invitation.expiresAt)}
+        </span>
+      )}
+    </p>
+  );
+}
+
 function InvitationRowActions({
   invitation,
   manager,
@@ -50,9 +67,7 @@ function InvitationRowActions({
   onShowLink: () => void;
 }) {
   const knownLink = manager.visibleLink?.id === invitation.id;
-  const resendBlocked =
-    (!manager.canAssignRoles && invitation.role !== "org_operator") ||
-    (invitation.state === "pending" && manager.invitations.data?.seats?.perSeat ? false : manager.sendingBlocked);
+  const resendBlocked = !manager.canResend(invitation);
   const copy = async () => {
     const copied = knownLink ? await manager.copyLink() : await manager.resendAndCopyInvitation(invitation);
     if (!copied) onShowLink();
