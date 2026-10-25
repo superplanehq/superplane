@@ -11,8 +11,21 @@ import {
   useOrganizationInvitations,
   useResendOrganizationInvitation,
 } from "@/hooks/useOrganizationInvitations";
-import { getApiErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getApiErrorReason } from "@/lib/errors";
 import { showSuccessToast } from "@/lib/toast";
+
+export type InvitationCapacity =
+  | { state: "overCapacity"; members: number; paidSeats: number }
+  | {
+      state: "paymentBlocked" | "planMaximum" | "purchaseRequired" | "memberLimit" | "available" | "unlimited";
+    };
+
+const SEAT_LIMIT_REASONS = [
+  "PAYMENT_PAST_DUE",
+  "SEAT_PURCHASE_REQUIRED",
+  "PLAN_MAXIMUM_REACHED",
+  "MEMBER_LIMIT_REACHED",
+];
 
 interface InvitationLink {
   id: string;
@@ -25,6 +38,7 @@ export function useOrganizationInvitationManager(organizationId: string) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canInvite = !permissionsLoading && canAct("members", "create");
   const canAssignRoles = canAct("members", "update");
+  const canManageBilling = canAct("org", "update");
   const invitations = useOrganizationInvitations(organizationId, canAct("members", "read"));
   const create = useCreateOrganizationInvitation(organizationId);
   const resend = useResendOrganizationInvitation(organizationId);
@@ -32,9 +46,26 @@ export function useOrganizationInvitationManager(organizationId: string) {
   const [link, setLink] = useState<InvitationLink | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const busy = create.isPending || resend.isPending || cancel.isPending;
-  const capacityFull = isInvitationCapacityFull(invitations.data?.seats);
-  const sendingBlocked = !invitations.isSuccess || invitations.isFetching || capacityFull;
+  const seats = invitations.data?.seats;
+  const capacity = describeInvitationCapacity(seats);
+  const sendingBlocked = !invitations.isSuccess || invitations.isFetching || blocksInvitations(capacity);
+  const canPurchaseSeats = !!seats?.perSeat && Number(seats.purchasable ?? 0) > 0 && canManageBilling;
   const visibleLink = currentInvitationLink(link, invitations.data?.invitations);
+
+  const reportActionFailure = (error: unknown, fallback: string) => {
+    const reason = getApiErrorReason(error);
+    if (reason === "INVITATION_RATE_LIMITED") {
+      setActionError("Too many invitations were sent. Wait, then try again.");
+      return;
+    }
+    if (reason === "PENDING_INVITATION_LIMIT_REACHED") {
+      setActionError("Too many invitations are pending. Cancel a pending invitation, then try again.");
+      return;
+    }
+    setActionError(getApiErrorMessage(error, fallback));
+    // Another request changed the seat count after this page loaded it.
+    if (reason && SEAT_LIMIT_REASONS.includes(reason)) void invitations.refetch();
+  };
 
   const createInvitation = async (recipient: { email: string; role: string }) => {
     if (!canInvite || sendingBlocked || busy) return false;
@@ -44,13 +75,22 @@ export function useOrganizationInvitationManager(organizationId: string) {
       showSuccessToast("Invitation created.");
       return true;
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Could not create the invitation. Try again."));
+      reportActionFailure(error, "Could not create the invitation. Try again.");
       return false;
     }
   };
 
+  const canResend = (invitation: OrganizationsOrganizationInvitation) => {
+    if (!canAssignRoles && invitation.role !== "org_operator") return false;
+    // The backend checks payment before it checks for an existing pending invitation.
+    if (capacity?.state === "paymentBlocked") return false;
+    // A pending per-seat invitation already holds its seat.
+    const holdsSeat = invitation.state === "pending" && !!seats?.perSeat;
+    return holdsSeat || !sendingBlocked;
+  };
+
   const resendInvitation = async (invitation: OrganizationsOrganizationInvitation) => {
-    if (!canInvite || !invitation.id || busy || (!canAssignRoles && invitation.role !== "org_operator")) return;
+    if (!canInvite || !invitation.id || busy || !canResend(invitation)) return;
     setActionError(null);
     // Resending rotates the token. Stop displaying the previous link immediately.
     setLink(null);
@@ -60,7 +100,7 @@ export function useOrganizationInvitationManager(organizationId: string) {
       showSuccessToast("Invitation renewed.");
       return renewedLink;
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Could not resend the invitation. Try again."));
+      reportActionFailure(error, "Could not resend the invitation. Try again.");
     }
   };
 
@@ -104,8 +144,11 @@ export function useOrganizationInvitationManager(organizationId: string) {
     canInvite,
     canAssignRoles,
     busy,
-    capacityFull,
+    capacity,
+    canPurchaseSeats,
+    canManageBilling,
     sendingBlocked,
+    canResend,
     visibleLink,
     actionError,
     createPending: create.isPending,
@@ -131,10 +174,25 @@ function invitationLinkFromResponse(response: OrganizationsCreateInvitationRespo
   };
 }
 
-function isInvitationCapacityFull(seats: OrganizationsInvitationSeatSummary | undefined): boolean {
-  if (!seats) return true;
-  if (seats.perSeat) return seats.invitable == null || Number(seats.invitable) <= 0;
-  return seats.memberLimit != null && Number(seats.occupied) >= Number(seats.memberLimit);
+function describeInvitationCapacity(
+  seats: OrganizationsInvitationSeatSummary | undefined,
+): InvitationCapacity | undefined {
+  if (!seats) return undefined;
+  if (seats.paymentBlocked) return { state: "paymentBlocked" };
+  const occupied = Number(seats.occupied);
+  if (!seats.perSeat) {
+    if (seats.memberLimit == null) return { state: "unlimited" };
+    return { state: occupied >= Number(seats.memberLimit) ? "memberLimit" : "available" };
+  }
+  if (seats.purchased != null && occupied > Number(seats.purchased)) {
+    return { state: "overCapacity", members: occupied, paidSeats: Number(seats.purchased) };
+  }
+  if (seats.invitable != null && Number(seats.invitable) > 0) return { state: "available" };
+  return { state: seats.purchasable != null && Number(seats.purchasable) === 0 ? "planMaximum" : "purchaseRequired" };
+}
+
+function blocksInvitations(capacity: InvitationCapacity | undefined): boolean {
+  return !capacity || (capacity.state !== "available" && capacity.state !== "unlimited");
 }
 
 function currentInvitationLink(

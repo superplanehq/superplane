@@ -40,12 +40,14 @@ export function MemberIdentity({
   initials,
   avatar,
   isOwner,
+  details,
 }: {
   name?: string;
   email: string;
   initials: string;
   avatar?: string;
   isOwner?: boolean;
+  details?: ReactNode;
 }) {
   return (
     <div className="flex min-w-0 items-start gap-3">
@@ -66,6 +68,7 @@ export function MemberIdentity({
         >
           {email}
         </p>
+        {details}
       </div>
     </div>
   );

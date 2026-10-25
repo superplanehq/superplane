@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { defaultOrganizationRoleSortIndex } from "@/lib/organizationRoles";
 import { type OrganizationMember } from "./MemberRowControls";
+import type { OrganizationsInvitationSeatSummary } from "@/api-client";
 
 interface MembersProps {
   organizationId: string;
@@ -51,8 +52,8 @@ export function Members({ organizationId }: MembersProps) {
     isSuccess: membersLoaded,
     error: usersError,
   } = useOrganizationMembers(organizationId);
-  const seatsFull = seatLimit != null && users.length >= seatLimit;
   const capacityLoading = loadingMembers || refreshingMembers;
+  const capacitySummary = seatSummary(invitationManager.invitations.data?.seats, users.length, seatLimit);
   const {
     data: organizationRoles = [],
     isLoading: loadingRoles,
@@ -239,15 +240,15 @@ export function Members({ organizationId }: MembersProps) {
       {!inviteOpen && !showingLink && <InvitationErrors manager={invitationManager} />}
       <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 text-sm text-muted-foreground" aria-live="polite">
-          {capacityLoading
-            ? "Loading seat usage..."
-            : membersLoaded &&
-              (seatLimit == null
-                ? `${users.length} ${users.length === 1 ? "member" : "members"}`
-                : `${users.length} of ${seatLimit} seats used`)}
+          {capacityLoading ? "Loading seat usage..." : membersLoaded && capacitySummary}
         </div>
         {invitationManager.canInvite && (
-          <Button type="button" onClick={() => setInviteOpen(true)} className="h-11 w-full sm:h-9 sm:w-auto">
+          <Button
+            type="button"
+            onClick={() => setInviteOpen(true)}
+            disabled={invitationManager.sendingBlocked}
+            className="h-11 w-full sm:h-9 sm:w-auto"
+          >
             <Plus className="size-4" aria-hidden="true" />
             Invite member
           </Button>
@@ -278,15 +279,11 @@ export function Members({ organizationId }: MembersProps) {
             (invitation) => invitation.state === "pending" || invitation.state === "expired",
           ) && <p className="p-6 text-sm text-muted-foreground">No members yet. Invite a member to get started.</p>}
       </section>
-      {seatsFull && (
-        <p className="text-sm text-amber-700 dark:text-amber-400">
-          {users.length > seatLimit! ? "Seat limit exceeded." : "Seat limit reached."}
-        </p>
-      )}
-      {!inviteOpen && <InvitationCapacityNotice manager={invitationManager} />}
+      {!inviteOpen && <InvitationCapacityNotice manager={invitationManager} organizationId={organizationId} />}
       {invitationManager.canInvite && (
         <InviteMemberDialog
           key={organizationId}
+          organizationId={organizationId}
           open={inviteOpen}
           onOpenChange={setInviteOpen}
           manager={invitationManager}
@@ -298,4 +295,24 @@ export function Members({ organizationId }: MembersProps) {
       <InvitationLinkDialog manager={invitationManager} open={linkOpen} onOpenChange={setLinkOpen} />
     </div>
   );
+}
+
+function seatSummary(
+  seats: OrganizationsInvitationSeatSummary | undefined,
+  memberCount: number,
+  seatLimit: number | undefined,
+): string {
+  if (seats?.perSeat) {
+    const { occupied = 0, purchased = 0, pendingInvitations = 0, invitable = 0 } = seats;
+    return `${occupied} of ${purchased} seats used · ${pendingInvitations} pending · ${invitable} invitable`;
+  }
+  if (seats?.memberLimit != null) return `${seats.occupied ?? 0} of ${seats.memberLimit} members`;
+  if (seats) return pluralizeMembers(memberCount);
+  // Invitation data is still loading. Use the member list response.
+  if (seatLimit == null) return pluralizeMembers(memberCount);
+  return `${memberCount} of ${seatLimit} seats used`;
+}
+
+function pluralizeMembers(count: number): string {
+  return `${count} ${count === 1 ? "member" : "members"}`;
 }
