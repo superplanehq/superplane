@@ -29,6 +29,10 @@ type Subscription struct {
 	CancelAtPeriodEnd bool
 	PeriodStart       time.Time
 	PeriodEnd         time.Time
+	// ModifiedAt is the modified_at of the snapshots. When it is nil, each
+	// snapshot uses the current time. Set it to send an older or newer
+	// snapshot than an event that a test applied.
+	ModifiedAt *time.Time
 }
 
 // Request is one request that the fake received.
@@ -186,9 +190,13 @@ func applySeatUpdate(sub *Subscription, body map[string]any) {
 }
 
 func (sub *Subscription) snapshot() map[string]any {
+	modifiedAt := time.Now()
+	if sub.ModifiedAt != nil {
+		modifiedAt = *sub.ModifiedAt
+	}
 	snapshot := map[string]any{
 		"id": sub.ID, "product_id": sub.ProductID, "status": sub.Status, "seats": sub.Seats,
-		"cancel_at_period_end": sub.CancelAtPeriodEnd, "modified_at": time.Now().UTC().Format(time.RFC3339Nano),
+		"cancel_at_period_end": sub.CancelAtPeriodEnd, "modified_at": modifiedAt.UTC().Format(time.RFC3339Nano),
 		"current_period_start": sub.PeriodStart.UTC().Format(time.RFC3339),
 		"current_period_end":   sub.PeriodEnd.UTC().Format(time.RFC3339),
 		"external_customer_id": sub.ExternalCustomerID,

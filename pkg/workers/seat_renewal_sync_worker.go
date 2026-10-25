@@ -23,10 +23,14 @@ const (
 	seatRenewalSyncFailedKey    = "billing.seat_renewal_sync_failed"
 )
 
-// SeatRenewalSyncWorker fixes organizations whose next-period Polar seat
-// count differs from the member count. It covers a Polar outage, lost live
-// updates, races between a purchase and a removal, and membership changes
-// that do not schedule the renewal seat count, such as account deletion.
+// SeatRenewalSyncWorker reconciles the stored plan of each organization with
+// its Polar subscription and fixes the next-period Polar seat count when it
+// differs from the member count. The reconciliation repairs lost subscription
+// webhooks: a missed renewal, payment failure, or recovery. It covers
+// organizations whose subscription lapsed, and these get no scheduled seat
+// count. The seat count fix covers a Polar outage, races between a purchase
+// and a removal, and membership changes that do not schedule the renewal seat
+// count, such as account deletion.
 type SeatRenewalSyncWorker struct {
 	scheduler *seatrenewal.Scheduler
 	now       func() time.Time
@@ -62,7 +66,7 @@ func (w *SeatRenewalSyncWorker) Start(ctx context.Context) {
 	}
 }
 
-// tick checks every candidate organization, the one that renews first first.
+// tick reconciles every candidate organization, the one that renews first first.
 func (w *SeatRenewalSyncWorker) tick(ctx context.Context) {
 	if ctx.Err() != nil || !models.BillingEnabled() || !polar.Configured() {
 		return
