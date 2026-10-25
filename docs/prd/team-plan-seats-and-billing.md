@@ -1,13 +1,13 @@
 # Team plan seats and billing
 
-> Status: Draft. Billing, invitation, and membership rules are agreed. Seven
+> Status: Draft. Billing, invitation, and membership rules are agreed. Five
 > questions remain open. [Open questions](#open-questions) lists them with the
-> shipped behavior, the options, and what each question blocks. No option is
-> chosen.
+> shipped behavior, the options, and what each question blocks. Decided
+> entries stay in that section as decision records.
 >
 > Audience: Product, design, and engineering
 >
-> Date: October 23, 2026. Updated: October 24, 2026.
+> Date: October 23, 2026. Updated: October 25, 2026.
 
 ## Goal
 
@@ -33,12 +33,10 @@ The first release covers:
 
 Deferred: annual billing, cancellation policy, and migration of existing
 organizations above the Team maximum. The current Team plan has no included
-AI credit. Seven questions remain open. They cover access after a failed
+AI credit. Five questions remain open. They cover access after a failed
 renewal payment, acceptance of invitations near renewal, seat counts lowered
-outside SuperPlane, pending invitations when an organization starts Team,
-the renewal quantity when members exceed paid seats, signup without email
-delivery, and seat purchases while a cancellation is scheduled. See
-[Open questions](#open-questions).
+outside SuperPlane, signup without email delivery, and seat purchases while a
+cancellation is scheduled. See [Open questions](#open-questions).
 
 Purchased seats are required only on per-seat plans, such as Team. Email
 invitations and the removal of shared invite links apply to every plan and
@@ -64,7 +62,7 @@ The billing rules apply to per-seat plans, such as Team.
 | Mid-period purchases | Prorate additional seats for the remaining portion of the current billing period. |
 | Payment confirmation | Additional seats become available only after successful payment. |
 | Renewal date | Keep the billing cycle established by the initial subscription. Seat changes do not restart it. |
-| Renewal quantity | Renew only seats occupied by current, accepted members. Pending invitations never count. The shipped scheduler caps the quantity at the current paid seats. See [D14](#d14-renewal-quantity-when-over-capacity). |
+| Renewal quantity | Renew only seats occupied by current, accepted members. Pending invitations never count. Renewal never adds seats: the quantity is capped at the current paid seats. See [D14](#d14-renewal-quantity-when-over-capacity). |
 | Unused capacity | Automatically remove unused seats at renewal and exclude them from the new period's charge. |
 | Seat changes | Seat count changes only through SuperPlane. Customers do not change seats in the payment provider's portal. |
 
@@ -105,7 +103,7 @@ quantity) apply to per-seat plans.
 | Unused seat | Purchased capacity without a current member at renewal. Seats used by pending invitations are unused for renewal billing. |
 | Plan maximum | The largest number of seats the organization can purchase on its plan. |
 | Renewal | The end of the current subscription period and the start of the next monthly period. |
-| Renewal quantity | The number of current members at renewal, owner included. The minimum is one. The shipped scheduler sends the lower of this number and the current paid seats. See [D14](#d14-renewal-quantity-when-over-capacity). |
+| Renewal quantity | The number of current members at renewal, owner included. The minimum is one. The maximum is the current paid seats. See [D14](#d14-renewal-quantity-when-over-capacity). |
 
 Member counts do not depend on recent activity. A person who remains a member
 still occupies a seat even if they do not sign in during the month.
@@ -117,12 +115,11 @@ Seat values at any moment:
 | Available seats | purchased seats − occupied seats |
 | Invitable seats | purchased seats − occupied seats − pending invitations |
 | Purchasable seats | plan maximum − purchased seats |
-| Renewal quantity | occupied seats (minimum 1) |
+| Renewal quantity | min(max(occupied seats, 1), purchased seats) |
 
-> Shipped difference: the entitlement value matches this formula. The seat
-> renewal scheduler then sends the lower of this value and the current Polar
-> seats. When members exceed paid seats, the shipped renewal quantity is
-> lower than this formula. See
+> The renewal quantity is defined only when the purchased seats are 1 or
+> more. Zero or missing purchased seats are an invalid state that needs
+> repair. That state has no renewal quantity. See
 > [D14](#d14-renewal-quantity-when-over-capacity).
 
 ## Product requirements
@@ -248,12 +245,10 @@ period or create a new allowance of time.
 - Determine the number of current, accepted members at renewal.
 - Include the owner in that count.
 - Exclude removed members, service accounts, and recipients of pending invitations.
-- Set the new period's purchased capacity to that member count.
-
-  > Shipped difference: the scheduler sends the lower of the member count and
-  > the current paid seats. It sends no count when Polar reports a missing seat
-  > count or a seat count below 1. See
-  > [D14](#d14-renewal-quantity-when-over-capacity).
+- Set the new period's purchased capacity to that member count, at least one
+  and at most the current paid seats. Renewal never adds seats.
+- When the paid seat count is zero or missing, send no count. That state needs
+  repair. See [D14](#d14-renewal-quantity-when-over-capacity).
 
 - Charge the monthly seat price for that quantity.
 - Remove all remaining unused capacity automatically.
@@ -428,7 +423,6 @@ appear as written there.
 | [D7](#d7-grace-after-a-failed-renewal-payment) | Grace after a failed renewal payment | Launch |
 | [D8](#d8-accepting-invitations-near-renewal) | Accepting invitations near renewal | 13b |
 | [D11](#d11-outside-seat-reduction-below-the-member-count) | Outside seat reduction below the member count | Launch. Also decides whether 17 stays dropped. Affects 11 and 05. |
-| [D14](#d14-renewal-quantity-when-over-capacity) | Renewal quantity when over capacity | 27b and 32 |
 | [D15](#d15-signup-without-email-delivery) | Signup without email delivery | 26 |
 | [09-a](#09-a-seat-purchase-while-a-cancellation-is-scheduled) | Seat purchase while a cancellation is scheduled | No task is named |
 
@@ -604,45 +598,76 @@ checkout lifetime race; 33a and 33b own that work.
 
 ### D14. Renewal quantity when over capacity
 
+**Decided.** 2026-10-25. Option 2 for valid paid seats, and the first choice
+of option 3 for an invalid count.
+
 **Question.** Which seat count does renewal use when members exceed paid seats,
 or when the seat count in Polar is not valid?
 
-**Context.** This entry also records that the shipped cap differs from the
-PRD. The PRD formula for renewal quantity is "occupied seats (minimum 1)".
+**Context.** The earlier PRD formula for renewal quantity was "occupied seats
+(minimum 1)". The scheduler capped that value at the paid seats, so the
+renewal estimate and the scheduled count could differ. Example: 3 members and
+1 paid seat gave an estimate of 3 seats, but the scheduler sent 1.
 
-**Shipped today.**
+**Decision.**
 
-- `RenewalQuantity` is `max(occupied, 1)` (`pkg/entitlements/seats.go`).
-- The scheduler sends the lower of `RenewalQuantity` and the current Polar
-  seats (`Scheduler.schedule` in `pkg/billing/seatrenewal/schedule.go`).
-  The cap exists because a higher count would add seats.
-- When Polar reports a missing seat count or a count below 1, the scheduler
-  sends nothing and returns an error. The sync worker tries again.
-- Difference from the PRD: with 10 paid seats and 11 members, the PRD formula
-  gives 11. The shipped renewal quantity is 10.
+- For valid paid seats (1 or more), the renewal quantity is
+  `min(max(members, 1), current paid seats)`. Members are current, accepted
+  human members, owner included. Pending invitations never count.
+- Renewal never increases the seat count automatically. Only a seat purchase
+  adds seats. A change to the plan maximum does not create purchased seats.
+- When members exceed the paid seats, the organization stays over capacity at
+  the next period. The billing page shows the billed seat count and a
+  separate over-capacity warning. See
+  [D11](#d11-outside-seat-reduction-below-the-member-count).
+- Zero or missing stored paid seats are an invalid state that needs repair. That
+  state has no renewal estimate, and the scheduler sends no count. The
+  scheduler returns an error, and the sync worker tries again.
+- The billing estimate and the scheduler use the same quantity from the stored
+  plan. Before sending, the scheduler also caps that quantity at the paid seats
+  in the Polar response. The estimate and scheduled count match when the stored
+  plan and the Polar response report the same valid paid seat count.
+- An older Polar response does not replace the newer stored plan, but its paid
+  seat count still caps the scheduled count. For example, 9 members and 10
+  stored paid seats give an estimate of 9. An older Polar response with 4 paid
+  seats caps the scheduled count at 4. The next scheduler run reads Polar again.
 
-**Options.**
+**Implementation.** `RenewalSeats` and `ResolveRenewalSeats` in
+`pkg/entitlements/seat_renewal.go` define the quantity from the stored plan.
+They return `ErrInvalidPaidSeats` for zero or missing paid seats.
+`resolvePlanSeats` in `pkg/entitlements/seats.go` uses the rule for the estimate, and
+`describe_organization_billing.go` in `pkg/grpc/actions/organizations/` omits
+`expected_renewal_seats` and `expected_renewal_cents` when the rule returns no
+count. `loadLocalState` in `pkg/billing/seatrenewal/schedule.go` uses the same
+rule for the initial scheduler target. `Scheduler.schedule` then applies
+`min(*result.Target, *snapshot.Seats)` before sending the count to Polar. This
+extra cap prevents renewal from adding seats above the Polar response count.
+`BillingSeatsCard.tsx` in
+`web_src/src/pages/factories/pages/organizationSettings/` shows the estimate,
+the over-capacity explanation, and the unavailable estimate.
+
+**Options considered.**
 
 1. Renew all members. Send the occupied count, even above the paid seats.
    - Tradeoff: Billing matches the people who have access.
    - Tradeoff: The change adds seats without a purchase flow, so the PRD rule
      that seat changes need a SuperPlane purchase and payment confirmation
      does not hold for those seats. It can also exceed the plan maximum.
-2. Cap the renewal quantity at the paid seats (shipped).
+2. Cap the renewal quantity at the paid seats (chosen).
    - Tradeoff: Renewal never adds seats or charges for seats that the
      organization did not buy.
    - Tradeoff: Members above the cap stay in the over-capacity state at the
      next period. See
      [D11](#d11-outside-seat-reduction-below-the-member-count).
 3. Handle an invalid Polar count.
-   - Send nothing and retry (shipped). Tradeoff: The renewal can use a stale
+   - Send nothing and retry (chosen). Tradeoff: The renewal can use a stale
      count when the count stays invalid until renewal.
    - Send the occupied count with no cap. Tradeoff: Renewal can add seats
      from bad data.
    - Block joins until the count is valid. Tradeoff: A Polar data problem
      blocks members who did nothing wrong.
 
-**Blocks.** 27b and 32.
+**Unblocks.** 27b and 32.
 
 ### D15. Signup without email delivery
 
