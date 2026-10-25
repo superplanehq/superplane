@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -7,11 +7,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
-import { prepareData } from "@/pages/app/workflowPageHelpers";
+import { organizationKeys } from "@/hooks/useOrganizationData";
+import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { mergeConfidenceAvailableIntegrations } from "./MergeConfidenceConfigModal.spec.fixtures";
+import {
+  confidenceGraph,
+  implementConfigGraph,
+  issueGraph,
+  mergeConfidenceAvailableIntegrations,
+} from "./MergeConfidenceConfigModal.spec.fixtures";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
@@ -80,123 +87,22 @@ function emptyRunsQuery() {
   };
 }
 
-function confidenceGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData({
-    workflow: {
-      metadata: { id: "merge-confidence", name: "Merge confidence", factoryId: "factory-1" },
-      spec: {
-        nodes: [
-          {
-            id: "on-pr-risk",
-            name: "On Pull Request",
-            type: "TYPE_TRIGGER",
-            component: "github.onPullRequest",
-          },
-          {
-            id: "assess-risk",
-            name: "Assess Merge Confidence",
-            type: "TYPE_ACTION",
-            component: "runnerClaudeCode",
-            configuration: { model: "sonnet" },
-          },
-        ],
-        edges: [{ channel: "default", sourceId: "on-pr-risk", targetId: "assess-risk" }],
-      },
-    },
-    triggers: [{ name: "github.onPullRequest", label: "On Pull Request" }],
-    components: [{ name: "runnerClaudeCode", label: "Claude Code" }],
-    nodeEventsMap: {},
-    nodeExecutionsMap: {},
-    nodeQueueItemsMap: {},
-    workflowId: "merge-confidence",
-    queryClient: new QueryClient(),
-    user: null,
-    canvasMode: "live",
-  });
-  return {
-    nodes,
-    edges,
-    factoryId: "factory-1",
-    specNodes: [
-      {
-        id: "on-pr-risk",
-        name: "On Pull Request",
-        type: "TYPE_TRIGGER",
-        component: "github.onPullRequest",
-        configuration: {
-          actions: ["opened", "synchronize", "reopened", "ready_for_review", "labeled"],
-          ignoreDrafts: true,
-          onlyFactoryPullRequests: true,
-          repository: "{{ install_params.appRepository }}",
-        },
-      },
-      {
-        id: "assess-risk",
-        name: "Assess Merge Confidence",
-        type: "TYPE_ACTION",
-        component: "runnerClaudeCode",
-        configuration: { model: "sonnet" },
-      },
-    ],
-  };
-}
-
-function issueGraph(): IntakeAutomationGraph {
-  const { nodes, edges } = prepareData({
-    workflow: {
-      metadata: { id: "github-issues", name: "GitHub issues", factoryId: "factory-1" },
-      spec: {
-        nodes: [
-          {
-            id: "on-issue",
-            name: "On Issue",
-            type: "TYPE_TRIGGER",
-            component: "github.onIssue",
-            configuration: {
-              repository: "{{ install_params.appRepository }}",
-              actions: ["opened", "edited"],
-            },
-          },
-        ],
-        edges: [],
-      },
-    },
-    triggers: [{ name: "github.onIssue", label: "On Issue" }],
-    components: [],
-    nodeEventsMap: {},
-    nodeExecutionsMap: {},
-    nodeQueueItemsMap: {},
-    workflowId: "github-issues",
-    queryClient: new QueryClient(),
-    user: null,
-    canvasMode: "live",
-  });
-  return {
-    nodes,
-    edges,
-    factoryId: "factory-1",
-    specNodes: [
-      {
-        id: "on-issue",
-        name: "On Issue",
-        type: "TYPE_TRIGGER",
-        component: "github.onIssue",
-        configuration: {
-          repository: "{{ install_params.appRepository }}",
-          actions: ["opened", "edited"],
-        },
-      },
-    ],
-  };
-}
-
 function renderModal(
   onDelete: () => void = vi.fn(),
   onSaveNode = vi.fn(),
   graph: IntakeAutomationGraph = confidenceGraph(),
-  options: { initialNodeId?: string } = {},
+  options: { initialNodeId?: string; onClose?: () => void } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const features = [FEATURE_WORKSPACE_SKILLS];
+  client.setQueryData(experimentalFeaturesKeys.registry(), {
+    features: features.map((id) => ({ id, released: false })),
+  });
+  if (graph.organizationId) {
+    client.setQueryData(organizationKeys.details(graph.organizationId), {
+      spec: { enabledExperimentalFeatures: [] },
+    });
+  }
   const element = (nextGraph: IntakeAutomationGraph = graph) => (
     <QueryClientProvider client={client}>
       <MemoryRouter>
@@ -206,10 +112,11 @@ function renderModal(
               title="Merge confidence"
               graph={nextGraph}
               canvasId="merge-confidence"
-              onClose={vi.fn()}
+              onClose={options.onClose ?? vi.fn()}
               onSaveNode={onSaveNode}
               onDelete={onDelete}
               initialNodeId={options.initialNodeId}
+              factoryKey="SUPER"
             />
           </TooltipProvider>
         </ThemeProvider>
@@ -229,6 +136,82 @@ afterEach(() => {
 });
 
 describe("MergeConfidenceConfigModal", () => {
+  it("saves Implement configuration without an experimental feature", async () => {
+    const user = userEvent.setup();
+    let finishSave = () => {};
+    const saving = new Promise<void>((resolve) => {
+      finishSave = resolve;
+    });
+    const onClose = vi.fn();
+    const onSaveNode = vi.fn(() => saving);
+    const steps = [{ name: "Implementation", type: "prompt", prompt: "Built-in implementation instructions" }];
+    const graph = implementConfigGraph(steps);
+    const view = renderModal(vi.fn(), onSaveNode, graph, {
+      initialNodeId: "implementation-agent-no-issue",
+      onClose,
+    });
+
+    expect(Boolean(screen.queryByTestId("merge-confidence-config-canvas"))).toBe(false);
+    expect(Boolean(screen.queryByRole("region", { name: "Steps" }))).toBe(false);
+    expect(Boolean(screen.queryByRole("button", { name: "Collapse step" }))).toBe(false);
+    expect(screen.getByDisplayValue("sonnet")).toBeInTheDocument();
+    const concurrency = screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" });
+    expect(concurrency).toHaveValue(5);
+    await user.clear(concurrency);
+    await user.type(concurrency, "3");
+    await user.tab();
+
+    expect(onSaveNode).not.toHaveBeenCalled();
+    expect(screen.queryByRole("navigation", { name: "Automation settings" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("textbox", { name: /^Name/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Key")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "MCP servers" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Skills" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Start implementation")).not.toBeInTheDocument();
+    expect(screen.queryByText("Implement From Task Description")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add step" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "false");
+    const draftPullRequest = screen.getByRole("switch", { name: "Create draft pull requests" });
+    expect(draftPullRequest).toBeChecked();
+    await user.click(draftPullRequest);
+    expect(draftPullRequest).not.toBeChecked();
+    expect(onSaveNode).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("tab", { name: "Runs" }));
+    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("group", { name: "Default model" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Configuration" }));
+    expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(3);
+    expect(screen.getByRole("switch", { name: "Create draft pull requests" })).not.toBeChecked();
+    view.rerenderGraph(implementConfigGraph(steps));
+    expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(3);
+    expect(onSaveNode).not.toHaveBeenCalled();
+    const save = screen.getByTestId("implement-settings-save");
+    await user.click(save);
+    expect(save).toHaveTextContent("Saving");
+    expect(save).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toBeDisabled();
+    await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(1));
+    finishSave();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(onSaveNode).toHaveBeenCalledWith([
+      expect.objectContaining({
+        nodeId: "implementation-agent-no-issue",
+        configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
+        concurrency: { max: 3, key: "implementation" },
+      }),
+      expect.objectContaining({
+        nodeId: "create-pr",
+        name: "Create Pull Request",
+        configuration: { draft: false, repository: "{{ install_params.appRepository }}" },
+        integration: { id: "github-connection" },
+        concurrency: { max: 1, key: "{{ $.data.branch }}" },
+      }),
+    ]);
+  });
+
   it("opens the first component beside the automation", () => {
     renderModal();
 

@@ -4,9 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { DEFAULT_SPLIT_CONFIG_DELETE_COPY, type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { MergeConfidenceConfigShell } from "./MergeConfidenceConfigShell";
-import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { useSplitRunPanePercent } from "./work-order-split-run/useSplitRunPanePercent";
+import { useAutomationRunNavigation } from "./useAutomationRunNavigation";
 
 interface MergeConfidenceConfigModalProps {
   title: string;
@@ -19,7 +20,7 @@ interface MergeConfidenceConfigModalProps {
   factoryKey?: string;
   runHrefFor?: RunsSidebarHrefForRun;
   onClose: () => void;
-  onSaveNode: (update: NodeConfigurationUpdate) => Promise<void> | void;
+  onSaveNode: (update: NodeConfigurationSave) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   deletePending?: boolean;
   deleteError?: string;
@@ -54,8 +55,8 @@ export function MergeConfidenceConfigModal({
   fallbackNode,
   initialNodeId,
 }: MergeConfidenceConfigModalProps) {
-  const [tab, setTab] = useState<"automation" | "runs">("automation");
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const showAutomationTab = showsAutomationTab(graph, showRunsTab);
+  const { tab, setTab, selectedRunId, setSelectedRunId } = useAutomationRunNavigation(showRunsTab, showAutomationTab);
   const selection = useCanvasNodeSelection(graph, initialNodeId);
   const focus = usePanelFocus(tab, selection.selectedNodeId);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -76,6 +77,7 @@ export function MergeConfidenceConfigModal({
       onConfirmDelete={() => setConfirmDelete(true)}
       onConfirmDeleteChange={setConfirmDelete}
       tab={tab}
+      showAutomationTab={showAutomationTab}
       showRunsTab={showRunsTab}
       onTabChange={setTab}
       containerRef={split.containerRef}
@@ -188,6 +190,11 @@ function visiblePanelNode(
     return undefined;
   }
   return fallbackNode;
+}
+
+function showsAutomationTab(graph: IntakeAutomationGraph | undefined, showRunsTab: boolean) {
+  if (!showRunsTab) return true;
+  return !graph?.specNodes?.some((node) => node.id === "on-pr-closed");
 }
 
 function panelFactoryId(factoryId: string | undefined, graph: IntakeAutomationGraph | undefined) {

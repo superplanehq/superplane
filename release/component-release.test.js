@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -93,6 +94,7 @@ test("rejects build metadata and malformed prereleases", () => {
 
 test("maps each component to its independent tag", () => {
   assert.equal(componentTag("superplane", "v1.2.3"), "v1.2.3");
+  assert.equal(componentTag("cli", "v1.2.3"), "cli/v1.2.3");
   assert.equal(componentTag("runner", "v1.2.3"), "runner/v1.2.3");
   assert.equal(
     componentTag("fleet-manager", "v2.0.0-rc.1"),
@@ -372,6 +374,52 @@ test("manifest verification rejects altered assets", () => {
       }),
     /filenames/,
   );
+});
+
+function sha256OfZeros(size) {
+  const hash = crypto.createHash("sha256");
+  const chunk = Buffer.alloc(8 * 1024 * 1024);
+  let remaining = size;
+  while (remaining > 0) {
+    const length = Math.min(chunk.length, remaining);
+    hash.update(length === chunk.length ? chunk : chunk.subarray(0, length));
+    remaining -= length;
+  }
+  return hash.digest("hex");
+}
+
+test("manifest records the checksum of an asset larger than 2 GiB", () => {
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "component-release-large-asset-"),
+  );
+  const assetSize = 2 * 1024 * 1024 * 1024 + 1;
+  const asset = fs.openSync(path.join(directory, "runner.oci.tar"), "w");
+  try {
+    fs.ftruncateSync(asset, assetSize);
+  } finally {
+    fs.closeSync(asset);
+  }
+  fs.writeFileSync(
+    path.join(directory, "release-notes.md"),
+    "## runner/v1.2.3\n",
+  );
+
+  try {
+    const manifest = createManifest({
+      component: "runner",
+      version: "v1.2.3",
+      sha: "a".repeat(40),
+      workflowID: "workflow-1",
+      pipelineID: "pipeline-1",
+      directory,
+      assetNames: ["runner.oci.tar"],
+    });
+
+    assert.equal(manifest.assets[0].size, assetSize);
+    assert.equal(manifest.assets[0].sha256, sha256OfZeros(assetSize));
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("manifest binds stable notes and excludes them from prereleases", () => {

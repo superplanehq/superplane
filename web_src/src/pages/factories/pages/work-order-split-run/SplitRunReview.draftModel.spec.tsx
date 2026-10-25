@@ -15,7 +15,7 @@ import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   useFactoryLineRunnerModels: () => ({
-    data: [{ id: "claude-opus-4-6", name: "claude-opus-4-6" }],
+    data: { models: [{ id: "claude-opus-4-6", name: "claude-opus-4-6" }] },
     isLoading: false,
   }),
 }));

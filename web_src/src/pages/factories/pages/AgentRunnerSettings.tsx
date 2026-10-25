@@ -22,6 +22,7 @@ type SaveState = {
   saving: boolean;
   pending: PendingSave | null;
   submitted: string;
+  view: "step" | "implementation";
 };
 
 /** Agent settings for one runner step. Choices save on change. Text saves when you leave the field. */
@@ -31,14 +32,95 @@ export function AgentRunnerSettings({
   factoryId,
   factoryKey,
   onSave,
+  draft,
+  onDraftChange,
+  view = "step",
+  disabled = false,
 }: {
   node: SuperplaneComponentsNode;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
   onSave: SaveAgent;
+  draft?: PlanningReviewDraft;
+  onDraftChange?: (draft: PlanningReviewDraft) => void;
+  view?: "step" | "implementation";
+  disabled?: boolean;
 }) {
-  const initial = draftFromNode(node);
+  if (view === "implementation") {
+    return (
+      <ImplementationAgentFields
+        node={node}
+        draft={draft}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        onDraftChange={onDraftChange}
+        disabled={disabled}
+      />
+    );
+  }
+  return (
+    <StepAgentRunnerSettings
+      node={node}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      onSave={onSave}
+      view={view}
+    />
+  );
+}
+
+function ImplementationAgentFields({
+  node,
+  draft,
+  organizationId,
+  factoryId,
+  factoryKey,
+  onDraftChange,
+  disabled = false,
+}: {
+  node: SuperplaneComponentsNode;
+  draft?: PlanningReviewDraft;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  onDraftChange?: (draft: PlanningReviewDraft) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <PlanningReviewForm
+      appearance="fields"
+      view="implementation"
+      showResources={false}
+      showConcurrency={showsImplementAgentControls(node)}
+      draft={draft ?? draftFromNode(node, "implementation")}
+      onChange={(next) => onDraftChange?.(next)}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      disabled={disabled}
+    />
+  );
+}
+
+function StepAgentRunnerSettings({
+  node,
+  organizationId,
+  factoryId,
+  factoryKey,
+  onSave,
+  view,
+}: {
+  node: SuperplaneComponentsNode;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  onSave: SaveAgent;
+  view: "step" | "implementation";
+}) {
+  const initial = draftFromNode(node, view);
   const [draft, setDraft] = useState(initial);
   const saveState = useRef<SaveState>({
     draft: initial,
@@ -47,6 +129,7 @@ export function AgentRunnerSettings({
     saving: false,
     pending: null,
     submitted: snapshotOf(initial),
+    view,
   });
   saveState.current.onSave = onSave;
   const nodeSignature = agentNodeSignature(node);
@@ -64,7 +147,7 @@ export function AgentRunnerSettings({
 
   return (
     <div
-      className="min-h-0 flex-1 overflow-y-auto px-10 py-6"
+      className={view === "step" ? "min-h-0 flex-1 overflow-y-auto px-10 py-6" : undefined}
       onBlurCapture={(event) => {
         if (!isTextControl(event.target)) {
           return;
@@ -75,7 +158,8 @@ export function AgentRunnerSettings({
     >
       <PlanningReviewForm
         appearance="fields"
-        showResources={showsImplementAgentControls(node)}
+        view={view === "implementation" ? "implementation" : "full"}
+        showResources={view === "step" && showsImplementAgentControls(node)}
         showConcurrency={showsImplementAgentControls(node)}
         draft={draft}
         onChange={(next) => applyDraft(saveState.current, next, setDraft)}
@@ -96,7 +180,7 @@ function acceptNodeUpdate(
   node: SuperplaneComponentsNode,
   setDraft: (draft: PlanningReviewDraft) => void,
 ) {
-  const incoming = draftFromNode(node);
+  const incoming = draftFromNode(node, state.view);
   const current = state.draft;
   if ((state.node.id ?? "") !== (node.id ?? "")) {
     void persistAgent(current, state.node, state);
@@ -226,8 +310,9 @@ function snapshotOf(draft: PlanningReviewDraft): string {
   return component ? JSON.stringify(agentSnapshot(component)) : "";
 }
 
-function draftFromNode(node: SuperplaneComponentsNode): PlanningReviewDraft {
+function draftFromNode(node: SuperplaneComponentsNode, view: "step" | "implementation"): PlanningReviewDraft {
   const component = canvasNodeToPlanningReviewComponent(node as CanvasSpecNode);
+  if (view === "implementation") return { title: component.title, components: [component] };
   const steps = component.configuration.steps;
   return {
     title: component.title,
@@ -273,7 +358,8 @@ function updateFromComponent(
   const next = nodeFromComponent(node, component);
   return {
     nodeId: node.id ?? "",
-    name: component.title,
+    name: node.name ?? "",
+    integration: node.integration,
     configuration: next.configuration ?? {},
     concurrency: next.concurrency,
   };

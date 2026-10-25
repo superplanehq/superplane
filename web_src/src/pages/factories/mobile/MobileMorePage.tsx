@@ -7,12 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useTheme } from "@/contexts/useTheme";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_WORKSPACE_AGENT } from "@/lib/experimentalFeatures";
 import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useFactoryAutomations } from "@/hooks/useFactoryData";
 import { useOrganization } from "@/hooks/useOrganizationData";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { isThemePreference } from "@/lib/themePreference";
 import type { FeedbackCategory } from "@/lib/submitFeedback";
@@ -71,16 +70,15 @@ export function MobileMorePage() {
   const { organizationId, routeSegment, factory } = useFactoriesLayout();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { has } = useExperimentalFeature(organizationId);
   const showAgent = isWorkspaceAgentNavVisible({
     permissionsLoading,
     canUpdateFactories: canAct("factories", "update"),
-    workspaceAgentEnabled: has(FEATURE_WORKSPACE_AGENT),
   });
   const { data: organization } = useOrganization(organizationId);
   const { preference, setPreference } = useTheme();
   const appearanceId = useId();
   const { headerKicker } = useHostedCreditChrome(organizationId, routeSegment);
+  const billingProductEnabled = useBillingProductEnabled();
   const [feedbackCategory, setFeedbackCategory] = useState<FeedbackCategory>();
   usePageTitle(["More", factory?.name ?? "Workspace"]);
   const settingsHref = (scope: "workspace" | "organization" | "account", section: string) =>
@@ -124,9 +122,11 @@ export function MobileMorePage() {
             Installation Admin
           </MoreLink>
         ) : null}
-        <MoreLink href={settingsHref("organization", "billing")} icon={<CreditCard />}>
-          Billing
-        </MoreLink>
+        {billingProductEnabled ? (
+          <MoreLink href={settingsHref("organization", "billing")} icon={<CreditCard />}>
+            Billing
+          </MoreLink>
+        ) : null}
         <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
           <Label htmlFor={appearanceId}>Appearance</Label>
           <Select

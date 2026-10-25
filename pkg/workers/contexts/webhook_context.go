@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -22,7 +23,7 @@ func NewWebhookContext(tx *gorm.DB, webhook *models.Webhook, encryptor crypto.En
 	return &WebhookContext{
 		tx:        tx,
 		webhook:   webhook,
-		encryptor: encryptor,
+		encryptor: encryption.ForDB(tx, encryptor),
 		baseURL:   baseURL,
 	}
 }

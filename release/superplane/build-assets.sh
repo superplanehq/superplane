@@ -24,9 +24,9 @@ rm -rf "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}"
 
 cd "${REPO_ROOT}"
-cp release/cli/install.sh "${OUTPUT_DIR}/install.sh"
-chmod 0755 "${OUTPUT_DIR}/install.sh"
-
+echo "* Resolving component release defaults"
+node release/superplane-helm-chart/update-component-release-defaults.js
+export COMPONENT_RELEASES_ALREADY_RESOLVED=yes
 bash release/superplane-single-host-tarball/build.sh "${VERSION}"
 single_host_dir="build/superplane-single-host-tarball-${VERSION}"
 cp "${single_host_dir}/superplane-single-host.tar.gz" "${OUTPUT_DIR}/"

@@ -4,7 +4,6 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import {
@@ -21,8 +20,12 @@ let permissionsLoading = false;
 let canUpdateFactories = true;
 let enabledFeatures = new Set<string>();
 
+const accountRef = vi.hoisted(() => ({
+  current: { id: "account-1", name: "Ada", billing_enabled: true as boolean | undefined },
+}));
+
 vi.mock("@/contexts/useAccount", () => ({
-  useAccount: () => ({ account: { id: "account-1", name: "Ada" } }),
+  useAccount: () => ({ account: accountRef.current, loading: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -91,23 +94,17 @@ describe("MobileMorePage", () => {
   beforeEach(() => {
     permissionsLoading = false;
     canUpdateFactories = true;
-    enabledFeatures = new Set([FEATURE_WORKSPACE_AGENT]);
+    enabledFeatures = new Set();
+    accountRef.current = { id: "account-1", name: "Ada", billing_enabled: true };
   });
 
-  it("opens Agent when the user can update factories and SuperPlane Agent is on", () => {
+  it("opens Agent when the user can update factories", () => {
     renderMore();
 
     expect(screen.getByRole("link", { name: "Agent" })).toHaveAttribute(
       "href",
       factoryAgentPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT),
     );
-  });
-
-  it("hides Agent when only MCP is on", () => {
-    enabledFeatures = new Set([FEATURE_WORKSPACE_MCP]);
-    renderMore();
-
-    expect(screen.queryByRole("link", { name: "Agent" })).not.toBeInTheDocument();
   });
 
   it("hides Agent while permissions load", () => {
@@ -124,10 +121,14 @@ describe("MobileMorePage", () => {
     expect(screen.queryByRole("link", { name: "Agent" })).not.toBeInTheDocument();
   });
 
-  it("hides Agent when SuperPlane Agent is off", () => {
-    enabledFeatures = new Set();
+  it("shows Billing when product billing is on", () => {
     renderMore();
+    expect(screen.getByRole("link", { name: "Billing" })).toBeInTheDocument();
+  });
 
-    expect(screen.queryByRole("link", { name: "Agent" })).not.toBeInTheDocument();
+  it("omits Billing when product billing is off", () => {
+    accountRef.current = { id: "account-1", name: "Ada", billing_enabled: false };
+    renderMore();
+    expect(screen.queryByRole("link", { name: "Billing" })).not.toBeInTheDocument();
   });
 });

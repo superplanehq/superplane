@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { FleetManagerCommandBlock } from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
 import {
@@ -13,7 +13,7 @@ import {
   fleetManagerHelmCommand,
   fleetManagerValuesFileCommand,
 } from "@/lib/fleetManagerSetup";
-import type { FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
+import { fleetProviderChoiceCopy, omittedFleetWizardStep, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import { CheckCircle2, LoaderCircle, TriangleAlert } from "lucide-react";
 
@@ -66,12 +66,12 @@ function WizardActions({
 function ProviderStep({ setup, actions }: { setup: FleetManagerSetupState; actions: React.ReactNode }) {
   if (!setup.metadata || !setup.draft) return null;
 
+  const choice = fleetProviderChoiceCopy();
+
   return (
     <div data-testid="fleet-manager-provider-step">
-      <FirstRunHeading headline="Choose a cloud provider" size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          Select the account that will run your fleet machines.
-        </p>
+      <FirstRunHeading headline={choice.title} size="display">
+        <p className="text-[15px] leading-6 text-muted-foreground">{choice.description}</p>
       </FirstRunHeading>
       <div className="mt-7">
         <FleetManagerProviderSection setup={setup} />
@@ -106,15 +106,17 @@ const fleetManagerVerificationCopy: Record<FleetManagerVerificationStatus, strin
   verified: "Fleet Manager created every selected fleet with the requested configuration.",
   unauthorized: "SuperPlane could not verify the fleets. Sign in again and retry.",
   error: "SuperPlane could not verify the fleets. Check the installation and retry.",
-  timeout: "Verification timed out. Check the Helm command and retry.",
+  timeout: "Verification timed out. Check the install command and retry.",
 };
 
 export function FleetManagerVerificationStatus({
   status,
   onRetry,
+  copy,
 }: {
   status: FleetManagerVerificationStatus;
   onRetry: () => void;
+  copy?: Partial<Record<FleetManagerVerificationStatus, string>>;
 }) {
   const failed = ["unauthorized", "error", "timeout"].includes(status);
 
@@ -128,7 +130,7 @@ export function FleetManagerVerificationStatus({
         <LoaderCircle className="mt-0.5 size-5 shrink-0 animate-spin" aria-hidden />
       )}
       <div>
-        <p>{fleetManagerVerificationCopy[status]}</p>
+        <p>{copy?.[status] ?? fleetManagerVerificationCopy[status]}</p>
         {failed && (
           <Button type="button" variant="link" className="h-auto p-0" onClick={onRetry}>
             Retry verification
@@ -190,19 +192,97 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
             Finish installation
           </Button>
         )}
-        <Button type="button" variant="ghost" onClick={onFinishLater}>
-          Finish later
-        </Button>
+        <FinishLaterButton onFinishLater={onFinishLater} />
       </div>
     </div>
   );
 }
 
+function FinishLaterButton({ onFinishLater }: { onFinishLater: () => void }) {
+  return (
+    <Button type="button" variant="ghost" onClick={onFinishLater}>
+      Finish later
+    </Button>
+  );
+}
+
+function ValuesCommandPending({
+  setup,
+  onRetry,
+  onFinishLater,
+}: {
+  setup: FleetManagerSetupState;
+  onRetry: () => void;
+  onFinishLater: () => void;
+}) {
+  return (
+    <div data-testid="fleet-manager-values-step">
+      <FirstRunHeading headline="Create the chart values" size="display">
+        <p className="text-[15px] leading-6 text-muted-foreground">
+          Run this command. It writes {FLEET_MANAGER_VALUES_FILE}.
+        </p>
+      </FirstRunHeading>
+      {setup.tokenError ? (
+        <div className="mt-5">
+          <p role="alert" className="text-sm text-destructive">
+            {setup.tokenError}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Button type="button" onClick={onRetry}>
+              Try again
+            </Button>
+            <FinishLaterButton onFinishLater={onFinishLater} />
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="mt-5 text-sm text-muted-foreground">Preparing the values command...</p>
+          <div className="mt-7">
+            <FinishLaterButton onFinishLater={onFinishLater} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function usePrepareValuesCommand(step: FleetManagerWizardStep, setup: FleetManagerSetupState) {
+  const started = useRef(false);
+
+  useEffect(() => {
+    const preparingValues = step === "values" && !setup.values;
+    if (!preparingValues || started.current) return;
+    started.current = true;
+    void setup.prepareInstallation();
+  }, [setup, step]);
+}
+
 export function FleetManagerWizardScreen(props: WizardProps) {
+  const omittedStep = props.setup.metadata
+    ? omittedFleetWizardStep(props.step, props.setup.metadata.installationType)
+    : null;
+  usePrepareValuesCommand(omittedStep ?? props.step, props.setup);
+
+  if (props.setup.loadError) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        SuperPlane could not load Fleet Manager setup. Refresh the page and try again.
+      </p>
+    );
+  }
+  if (!props.setup.metadata || !props.setup.draft || omittedStep) {
+    return <p className="text-sm text-muted-foreground">Loading Fleet Manager setup...</p>;
+  }
+
+  return <FleetManagerWizardSteps {...props} />;
+}
+
+function FleetManagerWizardSteps(props: WizardProps) {
   const back = props.showBackButton ? props.onBack : undefined;
   const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
   const continueToNextStep = async () => {
-    if (props.step === "fleets" && !(await props.setup.prepareInstallation())) return;
+    const createToken = props.step === "fleets";
+    if (createToken && !(await props.setup.prepareInstallation())) return;
     props.onNext();
   };
   const continueActions = (
@@ -222,19 +302,19 @@ export function FleetManagerWizardScreen(props: WizardProps) {
     </>
   );
 
-  if (props.setup.loadError) {
-    return (
-      <p role="alert" className="text-sm text-destructive">
-        SuperPlane could not load Fleet Manager setup. Refresh the page and try again.
-      </p>
-    );
-  }
-  if (!props.setup.metadata || !props.setup.draft) {
-    return <p className="text-sm text-muted-foreground">Loading Fleet Manager setup...</p>;
-  }
-
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;
   if (props.step === "fleets") return <FleetsStep setup={props.setup} actions={continueActions} />;
-  if (props.step === "values") return <ValuesStep setup={props.setup} actions={continueActions} />;
+  if (props.step === "values") {
+    if (!props.setup.values) {
+      return (
+        <ValuesCommandPending
+          setup={props.setup}
+          onRetry={() => void props.setup.prepareInstallation()}
+          onFinishLater={props.onFinishLater}
+        />
+      );
+    }
+    return <ValuesStep setup={props.setup} actions={continueActions} />;
+  }
   return <InstallStep {...props} />;
 }

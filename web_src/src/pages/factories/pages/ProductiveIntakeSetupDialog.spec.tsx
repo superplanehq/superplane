@@ -147,8 +147,8 @@ describe("ProductiveIntakeSetupDialog", () => {
     expect(screen.getByText(PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
       "listens for new tasks",
     );
-    expect(screen.getByText(PRODUCTIVE_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent("10 newest");
-    expect(screen.getByTestId("productive-skip-initial-import")).toBeChecked();
+    expect(screen.getByText(PRODUCTIVE_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent("up to 3");
+    expect(screen.getByTestId("productive-skip-initial-import")).not.toBeChecked();
     expect(screen.getByTestId("productive-intake-setup-stepper")).toBeInTheDocument();
     expect(screen.getByTestId("productive-intake-setup-sphere")).toBeInTheDocument();
   });
@@ -178,7 +178,7 @@ describe("ProductiveIntakeSetupDialog", () => {
 
     await screen.findByTestId("productive-project-project-1");
     expect(screen.getByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
-    expect(screen.getByTestId("productive-skip-initial-import")).toBeChecked();
+    expect(screen.getByTestId("productive-skip-initial-import")).not.toBeChecked();
     await user.click(screen.getByTestId("productive-skip-initial-import"));
     expect(screen.getByText(PRODUCTIVE_INTAKE_SETUP_COPY.importExistingHelperOff)).toBeInTheDocument();
     await user.click(screen.getByTestId("productive-project-project-1"));

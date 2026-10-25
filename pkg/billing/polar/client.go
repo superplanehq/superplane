@@ -39,6 +39,35 @@ var (
 	ErrUnauthorized          = errors.New("polar unauthorized")
 	ErrTeamMemberRequired    = errors.New("polar team member required")
 	ErrUnsupportedAPIVersion = errors.New("polar api version is not supported")
+
+	// Subscription update failures. Polar leaves the subscription unchanged
+	// for each of them.
+	ErrPaymentFailed         = errors.New("polar payment failed")
+	ErrPaymentActionRequired = errors.New("polar payment needs customer action")
+	ErrSubscriptionLocked    = errors.New("polar subscription is locked by another update")
+	ErrSubscriptionInactive  = errors.New("polar subscription is canceled or inactive")
+
+	// ErrOutcomeUnknown marks a request that Polar may have applied. The
+	// connection failed, timed out, answered 5xx, or returned an unreadable body.
+	ErrOutcomeUnknown = errors.New("polar request outcome is unknown")
+
+	// ErrInvalidRequest marks a 422. Polar rejected the request values.
+	ErrInvalidRequest = errors.New("polar rejected the request values")
+)
+
+// Polar proration behaviors for a subscription seat update.
+const (
+	prorationInvoice    = "invoice"
+	prorationNextPeriod = "next_period"
+)
+
+// Polar error codes in the "error" field of a response body.
+const (
+	errorCodePaymentFailed         = "PaymentFailed"
+	errorCodePaymentActionRequired = "PaymentActionRequired"
+	errorCodeSubscriptionLocked    = "SubscriptionLocked"
+	errorCodeAlreadyCanceled       = "AlreadyCanceledSubscription"
+	errorCodeInactiveSubscription  = "InactiveSubscription"
 )
 
 type Client struct {
@@ -48,11 +77,21 @@ type Client struct {
 	httpClient  *http.Client
 }
 
+type ProductKind string
+
+const (
+	ProductKindOneTime      ProductKind = "one_time"
+	ProductKindSubscription ProductKind = "subscription"
+)
+
 type Product struct {
-	ID          string
-	Name        string
-	AmountCents int64
-	CustomPrice bool
+	ID                 string
+	Name               string
+	AmountCents        int64
+	CustomPrice        bool
+	Currency           string
+	MinimumAmountCents int64
+	MaximumAmountCents int64
 }
 
 type Customer struct {
@@ -74,6 +113,7 @@ type CheckoutSession struct {
 }
 
 type CustomerSession struct {
+	Token      string
 	PortalURL  string
 	CustomerID string
 }
@@ -103,10 +143,6 @@ func Configured() bool {
 
 func BusinessProductID() string {
 	return strings.TrimSpace(os.Getenv("POLAR_BUSINESS_PRODUCT_ID"))
-}
-
-func SubscriptionCheckoutEnabled() bool {
-	return Configured() && BusinessProductID() != ""
 }
 
 func NewClientFromEnv() *Client {
@@ -147,12 +183,13 @@ func APIBaseURL() string {
 	return sandboxAPIBaseURL
 }
 
-func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
+func (c *Client) listProducts(ctx context.Context, kind ProductKind) ([]productJSON, error) {
 	var items []productJSON
 	page := 1
 	for {
 		query := url.Values{}
 		query.Set("is_archived", "false")
+		query.Set("is_recurring", strconv.FormatBool(kind == ProductKindSubscription))
 		query.Set("limit", "100")
 		query.Set("page", strconv.Itoa(page))
 		var payload listProductsJSON
@@ -167,6 +204,37 @@ func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
 			break
 		}
 		page++
+	}
+
+	return items, nil
+}
+
+func (c *Client) ListProducts(ctx context.Context, kind ProductKind) ([]Product, error) {
+	items, err := c.listProducts(ctx, kind)
+	if err != nil {
+		return nil, err
+	}
+	products := make([]Product, 0, len(items))
+	for _, item := range items {
+		product, ok := catalogProduct(item, kind)
+		if !ok {
+			continue
+		}
+		products = append(products, product)
+	}
+	slices.SortFunc(products, func(left, right Product) int {
+		if order := strings.Compare(left.Name, right.Name); order != 0 {
+			return order
+		}
+		return strings.Compare(left.ID, right.ID)
+	})
+	return products, nil
+}
+
+func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
+	items, err := c.listProducts(ctx, ProductKindOneTime)
+	if err != nil {
+		return nil, err
 	}
 
 	packs := make([]Product, 0, len(items))
@@ -192,7 +260,45 @@ func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
 	return packs, nil
 }
 
+func catalogProduct(item productJSON, kind ProductKind) (Product, bool) {
+	if kind == ProductKindOneTime {
+		product, ok := creditPackFromProduct(item)
+		return product, ok && strings.EqualFold(product.Currency, "usd")
+	}
+	if kind != ProductKindSubscription || !item.IsRecurring || item.IsArchived {
+		return Product{}, false
+	}
+	// Subscription plans can use fixed, per-seat, or other recurring prices.
+	if !slices.ContainsFunc(item.Prices, func(price priceJSON) bool {
+		return !price.IsArchived && strings.EqualFold(price.currency(), "usd")
+	}) {
+		return Product{}, false
+	}
+	return Product{ID: item.ID, Name: item.Name, Currency: "usd"}, true
+}
+
 func (c *Client) GetCreditPack(ctx context.Context, productID string) (*Product, error) {
+	payload, err := c.getProduct(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+	if !isCreditPack(payload.Metadata) {
+		return nil, ErrNotCreditPack
+	}
+	return checkoutProduct(*payload)
+}
+
+// GetCheckoutProduct validates a product linked by an installation admin.
+// The local catalog identifies credit packs, so Polar metadata is not required.
+func (c *Client) GetCheckoutProduct(ctx context.Context, productID string) (*Product, error) {
+	payload, err := c.getProduct(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+	return checkoutProduct(*payload)
+}
+
+func (c *Client) getProduct(ctx context.Context, productID string) (*productJSON, error) {
 	id := strings.TrimSpace(productID)
 	if id == "" {
 		return nil, fmt.Errorf("product id is required")
@@ -202,12 +308,13 @@ func (c *Client) GetCreditPack(ctx context.Context, productID string) (*Product,
 	if err := c.get(ctx, "/products/"+url.PathEscape(id), &payload); err != nil {
 		return nil, err
 	}
-	if !isCreditPack(payload.Metadata) {
-		return nil, ErrNotCreditPack
-	}
+	return &payload, nil
+}
+
+func checkoutProduct(payload productJSON) (*Product, error) {
 	pack, ok := creditPackFromProduct(payload)
 	if !ok {
-		return nil, fmt.Errorf("credit pack face value is missing")
+		return nil, fmt.Errorf("%w: an active one-time product with USD pricing is required", ErrNotCreditPack)
 	}
 	return &pack, nil
 }
@@ -264,16 +371,60 @@ func (c *Client) EnsureCustomer(ctx context.Context, input CreateCustomerInput) 
 	return nil, fmt.Errorf("%w: polar customer already exists for a different organization", ErrConflict)
 }
 
-func (c *Client) CreateCheckout(ctx context.Context, productID, externalCustomerID, successURL, customerIP string) (*CheckoutSession, error) {
+type CheckoutInput struct {
+	ProductID          string
+	ExternalCustomerID string
+	SuccessURL         string
+	CustomerIP         string
+	Seats              *int
+}
+
+func (c *Client) CreateCheckout(ctx context.Context, input CheckoutInput) (*CheckoutSession, error) {
+	body := map[string]any{
+		"products":             []string{input.ProductID},
+		"external_customer_id": input.ExternalCustomerID,
+		"success_url":          input.SuccessURL,
+	}
+	if strings.TrimSpace(input.CustomerIP) != "" {
+		body["customer_ip_address"] = input.CustomerIP
+	}
+	if input.Seats != nil {
+		body["seats"] = *input.Seats
+		body["min_seats"] = *input.Seats
+		body["max_seats"] = *input.Seats
+		body["allow_discount_codes"] = false
+	}
+	return c.createCheckout(ctx, body)
+}
+
+func (c *Client) CreateCreditCheckout(ctx context.Context, productID, externalCustomerID, successURL, customerIP string, quote *CreditPurchaseQuote) (*CheckoutSession, error) {
+	if quote == nil || quote.CreditAmountCents <= 0 || quote.CreditAmountCents > quote.SubtotalCents ||
+		quote.SubtotalCents < minimumUSDPriceCents || quote.SubtotalCents > maximumUSDPriceCents ||
+		quote.Currency != "usd" || quote.ProcessingFeeCents != quote.SubtotalCents-quote.CreditAmountCents {
+		return nil, fmt.Errorf("credit purchase quote is invalid")
+	}
 	body := map[string]any{
 		"products":             []string{productID},
 		"external_customer_id": externalCustomerID,
 		"success_url":          successURL,
+		"allow_discount_codes": false,
+		"metadata":             quote.metadata(),
+		"prices": map[string]any{
+			productID: []map[string]any{{
+				"amount_type":    "fixed",
+				"price_amount":   quote.SubtotalCents,
+				"price_currency": "usd",
+				"tax_behavior":   "exclusive",
+			}},
+		},
 	}
 	if strings.TrimSpace(customerIP) != "" {
 		body["customer_ip_address"] = customerIP
 	}
+	return c.createCheckout(ctx, body)
+}
 
+func (c *Client) createCheckout(ctx context.Context, body map[string]any) (*CheckoutSession, error) {
 	var payload checkoutJSON
 	if err := c.post(ctx, "/checkouts/", body, &payload); err != nil {
 		return nil, err
@@ -308,6 +459,7 @@ func (c *Client) CreateCustomerSession(ctx context.Context, req CustomerSessionR
 		return nil, fmt.Errorf("polar customer session did not return a portal url")
 	}
 	return &CustomerSession{
+		Token:      payload.Token,
 		PortalURL:  payload.CustomerPortalURL,
 		CustomerID: payload.CustomerID,
 	}, nil
@@ -359,8 +511,20 @@ func (c *Client) ListSubscriptions(ctx context.Context, externalCustomerID, prod
 		if err := c.get(ctx, "/subscriptions/?"+query.Encode(), &payload); err != nil {
 			return nil, err
 		}
+		if payload.Items == nil {
+			return nil, fmt.Errorf("polar subscriptions response is missing items")
+		}
+		for _, item := range payload.Items {
+			if strings.TrimSpace(item.ID) == "" || strings.TrimSpace(item.Status) == "" {
+				return nil, fmt.Errorf("polar subscriptions response has an invalid subscription")
+			}
+		}
 		items = append(items, payload.Items...)
-		if len(payload.Items) == 0 || len(payload.Items) < 100 {
+		if payload.Pagination.MaxPage > page {
+			page++
+			continue
+		}
+		if len(payload.Items) < 100 {
 			break
 		}
 		if payload.Pagination.MaxPage > 0 && page >= payload.Pagination.MaxPage {
@@ -369,14 +533,7 @@ func (c *Client) ListSubscriptions(ctx context.Context, externalCustomerID, prod
 		page++
 	}
 
-	subscriptions := make([]SubscriptionData, 0, len(items))
-	for _, item := range items {
-		if strings.TrimSpace(item.ID) == "" {
-			continue
-		}
-		subscriptions = append(subscriptions, item)
-	}
-	return subscriptions, nil
+	return items, nil
 }
 
 func (c *Client) CancelSubscriptionAtPeriodEnd(ctx context.Context, subscriptionID string) (*SubscriptionData, error) {
@@ -402,6 +559,57 @@ func (c *Client) setSubscriptionCancelAtPeriodEnd(ctx context.Context, subscript
 	}
 	if strings.TrimSpace(payload.ID) == "" {
 		return nil, fmt.Errorf("polar subscription update did not return an id")
+	}
+	return &payload, nil
+}
+
+// UpdateSubscriptionSeats sets the absolute seat count and invoices the
+// prorated difference at once. Polar applies the change only when that payment
+// succeeds. The renewal date does not change.
+func (c *Client) UpdateSubscriptionSeats(ctx context.Context, subscriptionID string, seats int) (*SubscriptionData, error) {
+	return c.patchSubscriptionSeats(ctx, subscriptionID, seats, prorationInvoice)
+}
+
+// ScheduleSubscriptionSeats sets the seat count of the next billing period.
+// The current period does not change: Polar charges and credits nothing now,
+// and the subscription reports the change in pending_update. A later seat
+// update replaces the scheduled one.
+func (c *Client) ScheduleSubscriptionSeats(ctx context.Context, subscriptionID string, seats int) (*SubscriptionData, error) {
+	return c.patchSubscriptionSeats(ctx, subscriptionID, seats, prorationNextPeriod)
+}
+
+func (c *Client) patchSubscriptionSeats(ctx context.Context, subscriptionID string, seats int, prorationBehavior string) (*SubscriptionData, error) {
+	id := strings.TrimSpace(subscriptionID)
+	if id == "" {
+		return nil, fmt.Errorf("subscription id is required")
+	}
+
+	var payload SubscriptionData
+	err := c.patch(ctx, "/subscriptions/"+url.PathEscape(id), map[string]any{
+		"seats":              seats,
+		"proration_behavior": prorationBehavior,
+	}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(payload.ID) == "" {
+		return nil, classified(fmt.Errorf("polar subscription update did not return an id"), ErrOutcomeUnknown)
+	}
+	return &payload, nil
+}
+
+func (c *Client) GetSubscription(ctx context.Context, subscriptionID string) (*SubscriptionData, error) {
+	id := strings.TrimSpace(subscriptionID)
+	if id == "" {
+		return nil, fmt.Errorf("subscription id is required")
+	}
+
+	var payload SubscriptionData
+	if err := c.get(ctx, "/subscriptions/"+url.PathEscape(id), &payload); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(payload.ID) == "" {
+		return nil, fmt.Errorf("polar subscription response did not return an id")
 	}
 	return &payload, nil
 }
@@ -480,13 +688,13 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return err
+		return classified(err, ErrOutcomeUnknown)
 	}
 	defer resp.Body.Close()
 
 	payload, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return classified(err, ErrOutcomeUnknown)
 	}
 	servedVersion := strings.TrimSpace(resp.Header.Get(apiVersionHeader))
 	// Polar echoes Polar-Version on every response it routes. A 404 without it
@@ -504,8 +712,23 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 			"polar_path":               path,
 		}).Warn("polar served a different api version than the pinned one")
 	}
+	errorCode := responseErrorCode(payload)
 	if resp.StatusCode == http.StatusConflict {
+		if errorCode == errorCodeSubscriptionLocked {
+			return fmt.Errorf("%w: %w: %s", ErrSubscriptionLocked, ErrConflict, strings.TrimSpace(string(payload)))
+		}
 		return fmt.Errorf("%w: %s", ErrConflict, strings.TrimSpace(string(payload)))
+	}
+	if resp.StatusCode == http.StatusPaymentRequired {
+		switch errorCode {
+		case errorCodePaymentFailed:
+			return fmt.Errorf("%w: %s", ErrPaymentFailed, strings.TrimSpace(string(payload)))
+		case errorCodePaymentActionRequired:
+			return fmt.Errorf("%w: %s", ErrPaymentActionRequired, strings.TrimSpace(string(payload)))
+		}
+	}
+	if resp.StatusCode == http.StatusForbidden && isSubscriptionInactiveCode(errorCode) {
+		return fmt.Errorf("%w: %s", ErrSubscriptionInactive, strings.TrimSpace(string(payload)))
 	}
 	if resp.StatusCode == http.StatusTooManyRequests {
 		retryAfter := strings.TrimSpace(resp.Header.Get("Retry-After"))
@@ -521,12 +744,58 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 		return fmt.Errorf("%w: %s", ErrTeamMemberRequired, strings.TrimSpace(string(payload)))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("polar api %s %s: %d %s", method, path, resp.StatusCode, strings.TrimSpace(string(payload)))
+		statusErr := fmt.Errorf("polar api %s %s: %d %s", method, path, resp.StatusCode, strings.TrimSpace(string(payload)))
+		if resp.StatusCode >= 500 || resp.StatusCode == http.StatusRequestTimeout {
+			return classified(statusErr, ErrOutcomeUnknown)
+		}
+		if resp.StatusCode == http.StatusUnprocessableEntity {
+			return classified(statusErr, ErrInvalidRequest)
+		}
+		return statusErr
 	}
 	if dest == nil || len(payload) == 0 {
 		return nil
 	}
-	return json.Unmarshal(payload, dest)
+	if err := json.Unmarshal(payload, dest); err != nil {
+		return classified(err, ErrOutcomeUnknown)
+	}
+	return nil
+}
+
+// classifiedError keeps the original message and also matches a sentinel.
+type classifiedError struct {
+	err   error
+	class error
+}
+
+func classified(err, class error) error {
+	return &classifiedError{err: err, class: class}
+}
+
+func (e *classifiedError) Error() string {
+	return e.err.Error()
+}
+
+func (e *classifiedError) Unwrap() error {
+	return e.err
+}
+
+func (e *classifiedError) Is(target error) bool {
+	return target == e.class
+}
+
+func responseErrorCode(payload []byte) string {
+	var body struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(payload, &body); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(body.Error)
+}
+
+func isSubscriptionInactiveCode(code string) bool {
+	return code == errorCodeAlreadyCanceled || code == errorCodeInactiveSubscription
 }
 
 func IsNotFound(err error) bool {
@@ -543,6 +812,31 @@ func IsRateLimited(err error) bool {
 
 func IsUnauthorized(err error) bool {
 	return err != nil && errors.Is(err, ErrUnauthorized)
+}
+
+func IsPaymentFailed(err error) bool {
+	return err != nil && errors.Is(err, ErrPaymentFailed)
+}
+
+func IsPaymentActionRequired(err error) bool {
+	return err != nil && errors.Is(err, ErrPaymentActionRequired)
+}
+
+func IsSubscriptionLocked(err error) bool {
+	return err != nil && errors.Is(err, ErrSubscriptionLocked)
+}
+
+func IsSubscriptionInactive(err error) bool {
+	return err != nil && errors.Is(err, ErrSubscriptionInactive)
+}
+
+func IsInvalidRequest(err error) bool {
+	return err != nil && errors.Is(err, ErrInvalidRequest)
+}
+
+// IsOutcomeUnknown reports that Polar may have applied the request.
+func IsOutcomeUnknown(err error) bool {
+	return err != nil && errors.Is(err, ErrOutcomeUnknown)
 }
 
 func IsUnsupportedAPIVersion(err error) bool {
@@ -578,31 +872,31 @@ type productJSON struct {
 	ID          string         `json:"id"`
 	Name        string         `json:"name"`
 	IsRecurring bool           `json:"is_recurring"`
+	IsArchived  bool           `json:"is_archived"`
 	Metadata    map[string]any `json:"metadata"`
 	Prices      []priceJSON    `json:"prices"`
 }
 
 func creditPackFromProduct(item productJSON) (Product, bool) {
-	amount := item.faceValueCents()
-	custom := item.hasCustomPrice() && amount <= 0
-	if !custom && amount <= 0 {
+	if item.IsRecurring || item.IsArchived {
 		return Product{}, false
 	}
-	return Product{
-		ID:          item.ID,
-		Name:        item.Name,
-		AmountCents: amount,
-		CustomPrice: custom,
-	}, true
-}
-
-func (p productJSON) hasCustomPrice() bool {
-	for _, price := range p.Prices {
-		if price.isCustom() {
-			return true
+	for _, price := range item.Prices {
+		if !price.IsArchived && price.isFixed() && price.PriceAmount > 0 {
+			return Product{
+				ID: item.ID, Name: item.Name, AmountCents: price.PriceAmount, Currency: price.currency(),
+			}, true
 		}
 	}
-	return false
+	for _, price := range item.Prices {
+		if !price.IsArchived && price.isCustom() {
+			return Product{
+				ID: item.ID, Name: item.Name, CustomPrice: true, Currency: price.currency(),
+				MinimumAmountCents: price.MinimumAmount, MaximumAmountCents: price.MaximumAmount,
+			}, true
+		}
+	}
+	return Product{}, false
 }
 
 func (p productJSON) faceValueCents() int64 {
@@ -618,8 +912,20 @@ func (p productJSON) faceValueCents() int64 {
 }
 
 type priceJSON struct {
-	AmountType  string `json:"amount_type"`
-	PriceAmount int64  `json:"price_amount"`
+	AmountType    string `json:"amount_type"`
+	PriceAmount   int64  `json:"price_amount"`
+	PriceCurrency string `json:"price_currency"`
+	MinimumAmount int64  `json:"minimum_amount"`
+	MaximumAmount int64  `json:"maximum_amount"`
+	IsArchived    bool   `json:"is_archived"`
+}
+
+func (p priceJSON) currency() string {
+	currency := strings.ToLower(strings.TrimSpace(p.PriceCurrency))
+	if currency == "" {
+		return "usd"
+	}
+	return currency
 }
 
 func (p priceJSON) isCustom() bool {
@@ -659,6 +965,7 @@ type checkoutJSON struct {
 }
 
 type customerSessionJSON struct {
+	Token             string `json:"token"`
 	CustomerPortalURL string `json:"customer_portal_url"`
 	CustomerID        string `json:"customer_id"`
 }

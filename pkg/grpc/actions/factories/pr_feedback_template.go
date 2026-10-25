@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
@@ -52,8 +53,9 @@ const (
 	prFeedbackReviewFlowY  = 360
 	prFeedbackReplyFlowY   = 640
 
-	prFeedbackAcknowledgeX       = 360
-	prFeedbackAcknowledgeOffsetY = 120
+	prFeedbackAcknowledgeX = 640
+	prFeedbackActivityX    = 920
+	prFeedbackRunnerX      = 1200
 
 	// A node with no concurrency spec runs one execution at a time across
 	// every pull request. Waiting for checks or addressing comments on one
@@ -74,6 +76,7 @@ type prFeedbackBuildRequest struct {
 	Repository             string
 	Mention                string
 	IgnoreBots             bool
+	AddressAllBots         bool
 	IncludeVisualEvidence  bool
 	AllowedBots            []string
 	CheckNames             []string
@@ -81,6 +84,8 @@ type prFeedbackBuildRequest struct {
 	RunnerIntegrationNames []string
 	Binding                *intakeBinding
 	Agent                  *intakeAgent
+	AgentSettings          map[string]*factoryAgentSettings
+	TriggerSettings        map[string]*factoryTriggerSettings
 	// VCSProvider selects the Git host. Empty means GitHub.
 	VCSProvider string
 	// OmitCommitIdentity drops the git user and DCO steps. The factory git
@@ -132,7 +137,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Name:          "On PR Comment",
 			Type:          yaml.NodeTypeTrigger,
 			Component:     "github.onPRComment",
-			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
+			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
 			Integration:   request.Binding.integrationRef(),
 		},
 		FindID:       prFeedbackFindNodeID,
@@ -158,7 +163,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Name:          "On PR Review",
 			Type:          yaml.NodeTypeTrigger,
 			Component:     "github.onPRReview",
-			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
+			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
 			Integration:   request.Binding.integrationRef(),
 		},
 		FindID:       prFeedbackReviewFindNodeID,
@@ -189,6 +194,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 				mention,
 				request.IgnoreBots,
 				request.AllowedBots,
+				request.AddressAllBots,
 				includeReviewSubmissions,
 			),
 			Integration: request.Binding.integrationRef(),
@@ -236,6 +242,9 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 		"contentFilter": mention,
 		"allowedBots":   allowedBotsNodeValue(request.AllowedBots),
 		"ignoreBots":    request.IgnoreBots,
+	}
+	if request.AddressAllBots {
+		triggerConfig["addressAllBots"] = true
 	}
 	if strings.TrimSpace(request.Repository) != "" {
 		triggerConfig["repository"] = request.Repository
@@ -297,7 +306,9 @@ func withPRFeedbackConcurrency(canvas *yaml.Canvas) *yaml.Canvas {
 		if canvas.Spec.Nodes[i].Type != yaml.NodeTypeAction {
 			continue
 		}
-		canvas.Spec.Nodes[i].Concurrency = prFeedbackConcurrency()
+		if canvas.Spec.Nodes[i].Concurrency == nil {
+			canvas.Spec.Nodes[i].Concurrency = prFeedbackConcurrency()
+		}
 	}
 	return canvas
 }
@@ -339,17 +350,33 @@ type prFeedbackDiscussionFlowRequest struct {
 }
 
 type prFeedbackDiscussionFlowSpec struct {
-	triggerID string
-	nodes     []yaml.Node
-	edges     []yaml.Edge
+	findID string
+	nodes  []yaml.Node
+	edges  []yaml.Edge
 }
 
+// withAcknowledge reacts only after Find Pull Request emits found.
+// The reaction stays on that path, so the canvas remains one line.
+// A mention on a pull request that is not a factory task does not reach it.
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedbackDiscussionFlowSpec {
-	return flow.withAcknowledgeFrom(flow.triggerID, "default", node)
+	return flow.withAcknowledgeFrom(flow.findID, "found", node)
 }
 
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledgeFrom(sourceID, channel string, node yaml.Node) prFeedbackDiscussionFlowSpec {
 	flow.nodes = append(flow.nodes, node)
+	for i := range flow.edges {
+		if flow.edges[i].SourceID != sourceID || flow.edges[i].Channel != channel {
+			continue
+		}
+		nextID := flow.edges[i].TargetID
+		flow.edges[i].TargetID = node.ID
+		flow.edges = slices.Insert(flow.edges, i+1, yaml.Edge{
+			Channel:  "default",
+			SourceID: node.ID,
+			TargetID: nextID,
+		})
+		return flow
+	}
 	flow.edges = append(flow.edges, yaml.Edge{
 		Channel:  channel,
 		SourceID: sourceID,
@@ -383,16 +410,17 @@ func prFeedbackAcknowledgeReactionNode(
 }
 
 func prFeedbackAcknowledgePosition(flowY int) yaml.Position {
-	return yaml.Position{X: prFeedbackAcknowledgeX, Y: flowY - prFeedbackAcknowledgeOffsetY}
+	return yaml.Position{X: prFeedbackAcknowledgeX, Y: flowY}
 }
 
 func prFeedbackDiscussionFlowNodes(
 	flow prFeedbackDiscussionFlowRequest,
 	request prFeedbackBuildRequest,
 ) prFeedbackDiscussionFlowSpec {
+	flow.Trigger = request.TriggerSettings[flow.Trigger.ID].configure(flow.Trigger)
 	flow.Trigger.Position = yaml.Position{X: 80, Y: flow.Y}
 	return prFeedbackDiscussionFlowSpec{
-		triggerID: flow.Trigger.ID,
+		findID: flow.FindID,
 		nodes: []yaml.Node{
 			flow.Trigger,
 			{
@@ -419,16 +447,16 @@ func prFeedbackDiscussionFlowNodes(
 					"description":   flow.Description,
 					"access":        "exclusive",
 				},
-				Position: yaml.Position{X: 640, Y: flow.Y},
+				Position: yaml.Position{X: prFeedbackActivityX, Y: flow.Y},
 			},
-			{
+			request.AgentSettings[flow.RunnerID].configure(yaml.Node{
 				ID:            flow.RunnerID,
 				Name:          prFeedbackRunnerNodeName,
 				Type:          yaml.NodeTypeAction,
 				Component:     request.Agent.component(),
 				Configuration: prFeedbackRunnerConfiguration(request),
-				Position:      yaml.Position{X: 920, Y: flow.Y},
-			},
+				Position:      yaml.Position{X: prFeedbackRunnerX, Y: flow.Y},
+			}),
 		},
 		edges: []yaml.Edge{
 			{Channel: "default", SourceID: flow.Trigger.ID, TargetID: flow.FindID},
@@ -438,14 +466,14 @@ func prFeedbackDiscussionFlowNodes(
 	}
 }
 
-func prFeedbackReplyTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, includeReviewSubmissions bool) map[string]any {
-	configuration := prFeedbackTriggerConfiguration(repository, mention, ignoreBots, allowedBots)
+func prFeedbackReplyTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, addressAllBots bool, includeReviewSubmissions bool) map[string]any {
+	configuration := prFeedbackTriggerConfiguration(repository, mention, ignoreBots, allowedBots, addressAllBots)
 	configuration["includeReviewSubmissions"] = includeReviewSubmissions
 	configuration["commentScope"] = prFeedbackCommentScopeReplies
 	return configuration
 }
 
-func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string) map[string]any {
+func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, addressAllBots bool) map[string]any {
 	configuration := map[string]any{
 		"contentFilter": mention,
 		"ignoreBots":    ignoreBots,
@@ -455,6 +483,9 @@ func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool,
 	}
 	if len(allowedBots) > 0 {
 		configuration["allowedBots"] = allowedBotsNodeValue(allowedBots)
+	}
+	if addressAllBots {
+		configuration["addressAllBots"] = true
 	}
 	return configuration
 }
@@ -647,7 +678,7 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 			"name":             "Address PR feedback",
 			"type":             "prompt",
 			"workingDirectory": "repo",
-			"prompt":           prFeedbackPrompt(),
+			"prompt":           prFeedbackPromptFor(request),
 		},
 		map[string]any{
 			"name":             "Commit and Push",
@@ -701,9 +732,7 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 			"",
 			"Use the Bitbucket token in BITBUCKET_TOKEN.",
 			"When BITBUCKET_EMAIL is set, send HTTP basic authentication with that email and BITBUCKET_TOKEN.",
-			"Read pull request comments that mention the workspace agent.",
-			"Use inline file and line context on code-anchored comments.",
-			"Ignore replies that SuperPlane Agent already wrote.",
+			strings.Join(prFeedbackBitbucketReadInstructions(request), "\n"),
 			"",
 			"For each request:",
 			"- Check that the change is valid and safe.",
@@ -729,11 +758,7 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 		"Pull request: #{{ root().data.pull_request?.number ?? root().data.issue?.number }}",
 		"",
 		"Use the GitHub token in GITHUB_TOKEN.",
-		"Read unresolved review threads.",
-		"Read pull request conversation comments that mention @superplaneagent.",
-		"Also read comments from bots that the automation allows, even without a mention.",
-		"Ignore comments from all other bots.",
-		"Ignore replies that SuperPlane Agent already wrote.",
+		strings.Join(prFeedbackGitHubReadInstructions(request), "\n"),
 		"",
 		"For each request:",
 		"- Check that the change is valid and safe.",
@@ -750,4 +775,61 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 		"Keep the change focused. Add tests where they are needed.",
 		runner.FactoryCommitIdentityPrompt,
 	}, "\n")
+}
+
+func prFeedbackGitHubReadInstructions(request prFeedbackBuildRequest) []string {
+	if request.AddressAllBots {
+		return []string{
+			"Read unresolved review threads.",
+			"Read pull request conversation comments that mention " + prFeedbackPromptMention(request) + ".",
+			"Read every bot comment, including comments with no mention.",
+			"Ignore comments SuperPlane already wrote.",
+		}
+	}
+	return []string{
+		"Read unresolved review threads.",
+		"Read pull request conversation comments that mention @superplaneagent.",
+		"Also read comments from bots that the automation allows, even without a mention.",
+		"Ignore comments from all other bots.",
+		"Ignore replies that SuperPlane Agent already wrote.",
+	}
+}
+
+func prFeedbackBitbucketReadInstructions(request prFeedbackBuildRequest) []string {
+	if request.AddressAllBots {
+		return []string{
+			"Read pull request comments that mention " + prFeedbackPromptMention(request) + ".",
+			"Read every bot comment, including comments with no mention.",
+			"Ignore comments SuperPlane already wrote.",
+			"Use inline file and line context on code-anchored comments.",
+		}
+	}
+	return []string{
+		"Read pull request comments that mention the workspace agent.",
+		"Use inline file and line context on code-anchored comments.",
+		"Ignore replies that SuperPlane Agent already wrote.",
+	}
+}
+
+func prFeedbackPromptMention(request prFeedbackBuildRequest) string {
+	mention := strings.TrimSpace(request.Mention)
+	if mention == "" {
+		return prFeedbackDefaultMention
+	}
+	return mention
+}
+
+func refreshDiscussionRunnerPrompt(configuration map[string]any, request prFeedbackBuildRequest) {
+	steps, ok := configuration["steps"].([]any)
+	if !ok {
+		return
+	}
+	prompt := prFeedbackPromptFor(request)
+	for _, item := range steps {
+		step, ok := item.(map[string]any)
+		if !ok || step["name"] != "Address PR feedback" || step["type"] != "prompt" {
+			continue
+		}
+		step["prompt"] = prompt
+	}
 }

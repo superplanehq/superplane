@@ -45,6 +45,81 @@ describe("OrganizationSettingsBillingPage plans", () => {
     canUpdateOrg = true;
   });
 
+  it.each(["admin", "polar"])(
+    "shows the assigned %s catalog plan instead of Business",
+    async (planSource) => {
+      const user = userEvent.setup();
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+          factoriesFixture={{
+            ...defaultFactoriesFixture,
+            organizationBilling: {
+              ...ADMIN_ORGANIZATION_BILLING,
+              planSource,
+              plan: "team",
+              planCategory: "paid",
+              planName: "Team",
+              planPriceCents: "2900",
+              planPerSeat: true,
+            },
+          }}
+        />,
+      );
+
+      const plans = await screen.findByTestId("billing-plans", {}, { timeout: 5000 });
+      expect(within(plans).getByRole("heading", { name: "Team" })).toBeInTheDocument();
+      expect(plans).toHaveTextContent("Current plan");
+      expect(plans).toHaveTextContent("$29.00");
+      expect(plans).toHaveTextContent("per seat per month");
+      expect(plans).not.toHaveTextContent("Business");
+      expect(plans).not.toHaveTextContent("$199");
+      const balance = screen.getByTestId("billing-credit-balance");
+      expect(balance).not.toHaveTextContent("This is trial usage");
+      expect(balance).not.toHaveTextContent("Subscribe to Business");
+      expect(balance).not.toHaveTextContent("Included with Business");
+      expect(within(balance).getByTestId("billing-credit-trial")).toHaveTextContent("Trial credit");
+      await user.click(screen.getByTestId("factories-sidebar-user-menu-trigger"));
+      expect(screen.getByTestId("factories-sidebar-plan-status")).toHaveTextContent("Team");
+      await user.keyboard("{Escape}");
+      if (planSource === "polar") {
+        await user.click(screen.getByRole("button", { name: "Cancel Team" }));
+        expect(screen.getByTestId("billing-cancel-subscription-dialog")).toHaveTextContent("Team stays active until");
+        expect(screen.getByRole("heading", { name: "Cancel Team?" })).toBeInTheDocument();
+      }
+    },
+    10000,
+  );
+
+  it("uses the assigned catalog name and price with new billing enabled", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        experimentalFeatures={["new_billing"]}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: {
+            ...BUSINESS_ORGANIZATION_BILLING,
+            plan: "team",
+            planCategory: "paid",
+            planName: "Team",
+            planPriceCents: "2900",
+            planPerSeat: true,
+          },
+        }}
+      />,
+    );
+
+    const plans = await screen.findByTestId("billing-plans");
+    expect(within(plans).getByRole("heading", { name: "Team" })).toBeInTheDocument();
+    expect(plans).toHaveTextContent("$29.00");
+    expect(plans).toHaveTextContent("per seat per month");
+    expect(plans).not.toHaveTextContent("Business");
+    await user.click(within(plans).getByRole("button", { name: "Cancel Team" }));
+    expect(screen.getByRole("heading", { name: "Cancel Team?" })).toBeInTheDocument();
+  }, 10000);
+
   it("shows SuperPlane grant after top-up when remaining grant is greater than zero", async () => {
     render(
       <FactoriesHarness
@@ -138,7 +213,7 @@ describe("OrganizationSettingsBillingPage plans", () => {
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
-          organizationBilling: RESTORED_TRIAL_ORGANIZATION_BILLING,
+          organizationBilling: { ...RESTORED_TRIAL_ORGANIZATION_BILLING, planName: "Trial" },
           organizationWorkspaceUsage: {
             ...DEFAULT_FACTORY_USAGE,
             remainingCreditCents: "5000",
@@ -151,6 +226,9 @@ describe("OrganizationSettingsBillingPage plans", () => {
     );
 
     expect(await screen.findByTestId("billing-credit-trial")).toHaveTextContent("Trial credit");
+    const plans = screen.getByTestId("billing-plans");
+    expect(within(plans).getByRole("heading", { name: "Trial" })).toBeInTheDocument();
+    expect(within(plans).getAllByText("Current plan")).toHaveLength(1);
     expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$50.00 remaining");
     expect(screen.getByTestId("billing-credit-trial")).toHaveTextContent(`Expires on ${WELCOME_EXPIRY_LABEL}`);
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
@@ -245,4 +323,23 @@ describe("OrganizationSettingsBillingPage plans", () => {
     expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Keep Business" })).not.toBeInTheDocument();
   }, 10000);
+  it("shows public catalog plans independently of the legacy checkout flag", async () => {
+    render(
+      <FactoriesHarness
+        experimentalFeatures={["new_billing"]}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: {
+            ...defaultFactoriesFixture.organizationBilling,
+            subscriptionCheckoutEnabled: false,
+            availablePlans: [{ key: "payg", name: "Pay-as-you-go", requirePaymentMethod: true, priceCents: "0" }],
+          },
+        }}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: "Select Pay-as-you-go" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
+  });
 });

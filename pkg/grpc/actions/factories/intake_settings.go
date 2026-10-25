@@ -51,6 +51,7 @@ const (
 // canvas by hand. Filter fields are stored in, and read back from, the filter
 // expression: the graph is what the workers run, so nothing is kept twice.
 type intakeSettings struct {
+	DefaultOwnerID    string
 	ConfidencePct     int
 	Labels            []string
 	LabelFilterMode   string
@@ -627,6 +628,11 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		settings = defaultLinearIntakeSettings()
 	}
 	settings.ConfidencePct = graph.ConfidencePct
+	if source == models.FactoryIntakeSourceGitHubIssues {
+		if create := findIntakeNode(spec.Nodes, graph.CreateNodeID); create != nil {
+			settings.DefaultOwnerID, _ = create.Configuration["defaultOwnerId"].(string)
+		}
+	}
 
 	trigger := findIntakeNode(spec.Nodes, graph.TriggerNodeID)
 	if trigger != nil {
@@ -774,6 +780,9 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		ReopenedIssues:       proto.Bool(settings.ReopenedIssues),
 		SuperplaneLabelAdded: proto.Bool(settings.SuperplaneLabelAdded),
 	}
+	if source == models.FactoryIntakeSourceGitHubIssues {
+		serialized.DefaultOwnerId = proto.String(settings.DefaultOwnerID)
+	}
 	if source == models.FactoryIntakeSourceJiraIssues {
 		serialized.JiraMoveOnComplete = proto.Bool(settings.JiraMoveOnComplete)
 		serialized.JiraCompletionColumn = settings.JiraCompletionColumn
@@ -815,6 +824,12 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 	}
 
 	updated := current
+	if requested.DefaultOwnerId != nil {
+		updated.DefaultOwnerID = requested.GetDefaultOwnerId()
+	}
+	if intakeSettingsOnlyDefaultOwner(requested) {
+		return updated
+	}
 	updated.ConfidencePct = int(requested.GetConfidencePct())
 	updated.Labels = requested.GetLabels()
 
@@ -996,4 +1011,14 @@ func parseIntakeAssignment(assignment pb.FactoryIntake_Settings_Assignment) stri
 	default:
 		return intakeAssignmentAny
 	}
+}
+
+// Presence distinguishes an explicit clear from a request by an older client.
+func intakeSettingsOnlyDefaultOwner(settings *pb.FactoryIntake_Settings) bool {
+	if settings == nil || settings.DefaultOwnerId == nil {
+		return false
+	}
+	other := proto.Clone(settings).(*pb.FactoryIntake_Settings)
+	other.DefaultOwnerId = nil
+	return proto.Equal(other, &pb.FactoryIntake_Settings{})
 }

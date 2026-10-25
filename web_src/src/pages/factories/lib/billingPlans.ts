@@ -61,20 +61,20 @@ export function billingPeriodEndLabel(periodEnd?: string): string | null {
   return date.toLocaleDateString();
 }
 
-export function billingSubscriptionEndsCopy(periodEnd?: string): string | null {
+export function billingSubscriptionEndsCopy(periodEnd?: string, planName = BILLING_BUSINESS_NAME): string | null {
   const dateLabel = billingPeriodEndLabel(periodEnd);
   if (!dateLabel) {
     return null;
   }
-  return `Business ends on ${dateLabel}. Hosted runs continue until that date.`;
+  return `${planName} ends on ${dateLabel}. Hosted runs continue until that date.`;
 }
 
-export function billingCancelBusinessConfirmCopy(periodEnd?: string): string {
+export function billingCancelBusinessConfirmCopy(periodEnd?: string, planName = BILLING_BUSINESS_NAME): string {
   const dateLabel = billingPeriodEndLabel(periodEnd);
   if (!dateLabel) {
-    return "Business stays active until the current period ends. SuperPlane will not renew after that date.";
+    return `${planName} stays active until the current period ends. SuperPlane will not renew after that date.`;
   }
-  return `Business stays active until ${dateLabel}. SuperPlane will not renew after that date.`;
+  return `${planName} stays active until ${dateLabel}. SuperPlane will not renew after that date.`;
 }
 
 export function billingUsagePercentUsed(remainingCents: number, allowanceCents: number): number {
@@ -83,4 +83,28 @@ export function billingUsagePercentUsed(remainingCents: number, allowanceCents: 
   }
   const used = Math.max(0, allowanceCents - remainingCents);
   return Math.min(100, Math.round((used / allowanceCents) * 100));
+}
+
+export const BILLING_UPDATE_PAYMENT_METHOD_LABEL = "Update payment method";
+export const BILLING_PAYMENT_BLOCKED_SEATS_COPY = "No one can join until the payment is updated.";
+
+/** True while Polar retries a failed renewal payment. */
+export function billingIsPastDue(status?: string): boolean {
+  return status === "past_due";
+}
+
+/** True while no new member can join because payment is failed or paused. */
+export function billingPaymentBlocked(status?: string): boolean {
+  return billingIsPastDue(status) || status === "paused";
+}
+
+/** Banner text for a failed renewal. A grace period adds the date that Team features end. */
+export function billingPaymentFailedCopy(failedAt?: string, accessEndsAt?: string): string {
+  const failedDate = billingPeriodEndLabel(failedAt);
+  const failure = failedDate ? `The renewal payment failed on ${failedDate}.` : "The renewal payment failed.";
+  const endDate = billingPeriodEndLabel(accessEndsAt);
+  if (endDate) {
+    return `${failure} Update the payment method by ${endDate} to keep Team features.`;
+  }
+  return `${failure} Team features are off until you update the payment method.`;
 }

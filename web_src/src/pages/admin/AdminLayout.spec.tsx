@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router";
 
@@ -22,7 +23,11 @@ const pageLinks = [
   { label: "Organizations", href: "/admin", icon: "lucide-building" },
   { label: "Accounts", href: "/admin/accounts", icon: "lucide-users" },
   { label: "Settings", href: "/admin/settings", icon: "lucide-network" },
+  { label: "Encryption", href: "/admin/encryption", icon: "lucide-key-round" },
   { label: "License", href: "/admin/license", icon: "lucide-key-round" },
+  { label: "Billing plans", href: "/admin/billing-plans", icon: "lucide-book-open" },
+  { label: "Credits", href: "/admin/credits", icon: "lucide-credit-card" },
+  { label: "Features", href: "/admin/features", icon: "lucide-book-open" },
   { label: "Price Books", href: "/admin/price-books", icon: "lucide-book-open" },
   { label: "Fleets", href: "/admin/runner-tasks", icon: "lucide-terminal" },
   { label: "Fleet setup", href: "/admin/fleet-manager-setup", icon: "lucide-terminal" },
@@ -38,6 +43,7 @@ const renderLayout = (path: string) =>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<h1>Organizations page</h1>} />
           <Route path="organizations/:orgId" element={<h1>Organization detail</h1>} />
+          <Route path="features" element={<h1>Features page</h1>} />
           <Route path="webhooks" element={<h1>Webhooks page</h1>} />
           <Route path="*" element={null} />
         </Route>
@@ -51,6 +57,12 @@ beforeEach(() => {
 });
 
 describe("AdminLayout", () => {
+  it("navigates to Features from the sidebar", async () => {
+    renderLayout("/admin");
+    await userEvent.setup().click(screen.getByRole("link", { name: "Features" }));
+    expect(screen.getByRole("heading", { name: "Features page" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Features" })).toHaveAttribute("aria-current", "page");
+  });
   it("places page links in the left sidebar and keeps header chrome", () => {
     renderLayout("/admin");
 

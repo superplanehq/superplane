@@ -2,14 +2,17 @@ package organizations
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -183,5 +186,102 @@ func Test__UpdateOrganization(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, org.Slug, response.Organization.Metadata.Slug)
+	})
+}
+
+type organizationGroupRecorder struct {
+	mu     sync.Mutex
+	groups []productanalytics.OrganizationGroupIdentity
+}
+
+func (r *organizationGroupRecorder) Capture(productanalytics.Event) {}
+
+func (r *organizationGroupRecorder) IdentifyOrganizationGroup(identity productanalytics.OrganizationGroupIdentity) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.groups = append(r.groups, identity)
+}
+
+func (r *organizationGroupRecorder) Close() error { return nil }
+
+func (r *organizationGroupRecorder) Enabled() bool { return true }
+
+func (r *organizationGroupRecorder) snapshot() []productanalytics.OrganizationGroupIdentity {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	copied := make([]productanalytics.OrganizationGroupIdentity, len(r.groups))
+	copy(copied, r.groups)
+	return copied
+}
+
+func (r *organizationGroupRecorder) reset() {
+	r.mu.Lock()
+	r.groups = nil
+	r.mu.Unlock()
+}
+
+func TestUpdateOrganizationIdentifiesGroupWhenNameOrSlugChanges(t *testing.T) {
+	r := support.Setup(t)
+	recorder := &organizationGroupRecorder{}
+	previous := productanalytics.SetCurrent(recorder)
+	t.Cleanup(func() {
+		productanalytics.SetCurrent(previous)
+	})
+	ctx := authentication.SetAccountIDInMetadata(context.Background(), r.Account.ID.String())
+
+	t.Run("name change identifies the group", func(t *testing.T) {
+		recorder.reset()
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+
+		_, err = UpdateOrganization(ctx, org.ID.String(), &protos.Organization{
+			Metadata: &protos.Organization_Metadata{
+				Name: "Renamed Organization",
+			},
+		})
+		require.NoError(t, err)
+
+		groups := recorder.snapshot()
+		require.Len(t, groups, 1)
+		assert.Equal(t, org.ID.String(), groups[0].ID)
+		assert.Equal(t, "Renamed Organization", groups[0].Name)
+		assert.Equal(t, org.Slug, groups[0].Slug)
+		assert.Equal(t, r.Account.ID.String(), groups[0].AccountID)
+	})
+
+	t.Run("slug change identifies the group", func(t *testing.T) {
+		recorder.reset()
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		nextSlug := support.RandomName("slug")
+
+		_, err = UpdateOrganization(ctx, org.ID.String(), &protos.Organization{
+			Metadata: &protos.Organization_Metadata{
+				Slug: nextSlug,
+			},
+		})
+		require.NoError(t, err)
+
+		groups := recorder.snapshot()
+		require.Len(t, groups, 1)
+		assert.Equal(t, org.ID.String(), groups[0].ID)
+		assert.Equal(t, org.Name, groups[0].Name)
+		assert.Equal(t, nextSlug, groups[0].Slug)
+		assert.Equal(t, r.Account.ID.String(), groups[0].AccountID)
+	})
+
+	t.Run("description-only save does not identify the group", func(t *testing.T) {
+		recorder.reset()
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+
+		_, err = UpdateOrganization(ctx, org.ID.String(), &protos.Organization{
+			Metadata: &protos.Organization_Metadata{
+				Description: "only the description",
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Empty(t, recorder.snapshot())
 	})
 }

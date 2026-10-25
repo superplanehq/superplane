@@ -22,9 +22,8 @@ describe("FirstRunFlow", () => {
 
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.tickets.headline })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /GitHub Issues/ }));
-    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-analysis")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /GitHub Issues/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
 
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
 

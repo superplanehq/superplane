@@ -3,7 +3,6 @@ import { useFactory, useFactoryAutomations, useUpdateFactory } from "@/hooks/use
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
 
-import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { findBacklogAutomationApp } from "../lib/linePhaseRuns";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
@@ -32,7 +31,6 @@ export function PlanningSettingsHost({
   organizationId,
   factoryId,
   factoryKey,
-  lineId,
   initialTab = "general",
   onClose,
 }: PlanningSettingsHostProps) {
@@ -68,8 +66,10 @@ export function PlanningSettingsHost({
       organizationId={organizationId}
       factoryId={factoryId}
       factoryKey={factoryKey}
-      lineId={lineId}
       canvasId={canvasId}
+      canvasLoading={appsQuery.isPending}
+      canvasError={appsQuery.isError}
+      onRetryCanvas={() => void appsQuery.refetch()}
       lines={planningAutoStartLines(factoryQuery.data)}
       settings={planningSettingsFromFactory(factoryQuery.data)}
       title={findBacklogAutomationApp(appsQuery.data ?? [])?.name?.trim() || PLANNING_SETTINGS_COPY.title}
@@ -83,8 +83,10 @@ function PlanningSettingsLoaded({
   organizationId,
   factoryId,
   factoryKey,
-  lineId,
   canvasId,
+  canvasLoading,
+  canvasError,
+  onRetryCanvas,
   lines,
   settings,
   title,
@@ -96,6 +98,9 @@ function PlanningSettingsLoaded({
   factoryKey: string;
   lineId?: string;
   canvasId?: string;
+  canvasLoading: boolean;
+  canvasError: boolean;
+  onRetryCanvas: () => void;
   lines: ReturnType<typeof planningAutoStartLines>;
   settings: ReturnType<typeof planningSettingsFromFactory>;
   title: string;
@@ -108,19 +113,22 @@ function PlanningSettingsLoaded({
     preferredAgentNodeId: REFINE_TASK_NODE_ID,
   });
   const updateFactory = useUpdateFactory(organizationId, factoryId);
-  const editAutomationHref = canvasId
-    ? factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "lines", lineId })
-    : undefined;
 
   return (
     <PlanningSettingsPopup
+      key={canvasId ?? factoryId}
+      organizationId={organizationId}
+      factoryId={factoryId}
       title={title}
       lines={lines}
       settings={settings}
       automationGraph={automation.graph}
-      automationLoading={automation.isLoading}
-      automationError={automation.isError}
-      onRetryAutomation={() => void automation.refetch()}
+      automationLoading={canvasLoading || automation.isLoading}
+      automationError={canvasError || automation.isError}
+      onRetryAutomation={() => {
+        onRetryCanvas();
+        void automation.refetch();
+      }}
       savePending={updateFactory.isPending}
       saveError={saveError}
       onSave={async (next) => {
@@ -133,27 +141,16 @@ function PlanningSettingsLoaded({
           throw error;
         }
       }}
-      editAutomationHref={editAutomationHref}
       canvasId={canvasId}
-      runHrefFor={
-        canvasId
-          ? (runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
-          : undefined
-      }
-      agent={
-        agent.agentNode
-          ? {
-              draft: agent.draft ?? undefined,
-              isLoading: agent.isLoading || !agent.draft,
-              organizationId,
-              factoryId,
-              factoryKey,
-              automationId: canvasId,
-              onSave: agent.save,
-              showVisualEvidenceSetting: false,
-            }
-          : undefined
-      }
+      agent={{
+        draft: agent.draft ?? undefined,
+        isLoading: canvasLoading || agent.isLoading,
+        organizationId,
+        factoryId,
+        factoryKey,
+        automationId: canvasId,
+        onSave: agent.save,
+      }}
       onClose={onClose}
       initialTab={initialTab}
     />

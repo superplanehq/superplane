@@ -20,7 +20,7 @@ export function discussionMention(vcsProvider?: string): string {
   return factoryVCSProvider(vcsProvider) === "bitbucket" ? BITBUCKET_DISCUSSION_MENTION : GITHUB_DISCUSSION_MENTION;
 }
 
-export type DiscussionBotMode = "ignore" | "address";
+export type DiscussionBotMode = "ignore" | "address" | "all";
 
 export function catalogReviewBots(catalog: Array<{ id?: string; name?: string }>): ReviewBotOption[] {
   const seen = new Set<string>();
@@ -41,8 +41,11 @@ export function catalogReviewBots(catalog: Array<{ id?: string; name?: string }>
 }
 
 export function discussionBotModeFromDraft(
-  draft: Pick<PRFeedbackDraftSettings, "ignoreBots" | "allowedBots">,
+  draft: Pick<PRFeedbackDraftSettings, "ignoreBots" | "allowedBots" | "addressAllBots">,
 ): DiscussionBotMode {
+  if (draft.addressAllBots) {
+    return "all";
+  }
   if (!draft.ignoreBots || draft.allowedBots.length > 0) {
     return "address";
   }
@@ -52,11 +55,14 @@ export function discussionBotModeFromDraft(
 export function discussionBotSettings(
   mode: DiscussionBotMode,
   allowedBots: string[],
-): { ignoreBots: boolean; allowedBots: string[] } {
-  if (mode === "address") {
-    return { ignoreBots: true, allowedBots };
+): { ignoreBots: boolean; allowedBots: string[]; addressAllBots: boolean } {
+  if (mode === "all") {
+    return { ignoreBots: true, allowedBots: [], addressAllBots: true };
   }
-  return { ignoreBots: true, allowedBots: [] };
+  if (mode === "address") {
+    return { ignoreBots: true, allowedBots, addressAllBots: false };
+  }
+  return { ignoreBots: true, allowedBots: [], addressAllBots: false };
 }
 
 export function useDiscussionPRFeedbackSetup(

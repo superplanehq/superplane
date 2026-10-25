@@ -2,10 +2,9 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { useBYOKLLMModels, useSwitchFactoryModelSource } from "@/hooks/useLLMModelAllowlists";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER } from "@/lib/experimentalFeatures";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -31,13 +30,12 @@ export function FactorySettingsOrganizationLLMModelsPage() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("org", "update") && !permissionsLoading;
   const integrationsHref = useIntegrationsBasePath(organizationId);
-  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const customProviderEnabled =
-    hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK) &&
-    hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER);
-  const providers: LLMModelsSwitchProvider[] = customProviderEnabled
-    ? [...NAMED_BYOK_PROVIDERS, "custom"]
-    : [...NAMED_BYOK_PROVIDERS];
+  const { allowed: byokAllowed, customProviderAllowed: customProviderEnabled } = useBYOKAccess(organizationId);
+  const providers: LLMModelsSwitchProvider[] = !byokAllowed
+    ? []
+    : customProviderEnabled
+      ? [...NAMED_BYOK_PROVIDERS, "custom"]
+      : [...NAMED_BYOK_PROVIDERS];
 
   const anthropic = useBYOKLLMModels(organizationId, "anthropic", true);
   const openai = useBYOKLLMModels(organizationId, "openai", true);

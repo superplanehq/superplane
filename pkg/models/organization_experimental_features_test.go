@@ -14,7 +14,7 @@ import (
 func Test__ExperimentalFeatures(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
-	t.Run("new org has factories and task refinement enabled", func(t *testing.T) {
+	t.Run("new org has factories enabled", func(t *testing.T) {
 		org, err := CreateOrganization("expfeat-new", "")
 		require.NoError(t, err)
 
@@ -22,6 +22,7 @@ func Test__ExperimentalFeatures(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{features.FeatureFactories}, []string(reloaded.EnabledExperimentalFeatures))
 		assert.True(t, reloaded.HasExperimentalFeature(features.FeatureFactories))
+		assert.False(t, reloaded.HasExperimentalFeature("workspace_agent"))
 	})
 
 	t.Run("Enable adds the feature and is idempotent", func(t *testing.T) {

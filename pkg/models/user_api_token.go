@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // UserAPIToken is a single named personal API token belonging to a human
@@ -33,7 +34,13 @@ func (t *UserAPIToken) TableName() string {
 }
 
 func CreateUserAPIToken(tx *gorm.DB, token *UserAPIToken) error {
-	return tx.Create(token).Error
+	return tx.Transaction(func(tx *gorm.DB) error {
+		// Serialize token creation with member removal so tokens cannot outlive membership.
+		if _, err := FindActiveUserByIDAnyOrg(tx.Clauses(clause.Locking{Strength: "UPDATE"}), token.UserID); err != nil {
+			return err
+		}
+		return tx.Create(token).Error
+	})
 }
 
 func ListUserAPITokens(tx *gorm.DB, userID uuid.UUID) ([]UserAPIToken, error) {

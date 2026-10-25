@@ -25,13 +25,19 @@ import (
 )
 
 const (
-	// intakeSeedSize is how many items a new intake analyzes at once. A source
-	// with few open items gives fewer, so the seed is an upper bound.
-	intakeSeedSize = 30
+	// intakeDependabotSeedSize is how many open Dependabot alerts a new intake
+	// imports. A repository with fewer open alerts gives fewer, so the seed is
+	// an upper bound.
+	intakeDependabotSeedSize = 3
+
+	// intakeGitHubIssueSeedSize is how many open GitHub issues a new intake
+	// imports. The wizard tells the user this number. Each imported issue
+	// starts a planning session, so the first batch stays small.
+	intakeGitHubIssueSeedSize = 3
 
 	// intakeSentrySeedSize is how many unresolved Sentry issues a new intake
 	// imports. The wizard tells the user this number.
-	intakeSentrySeedSize = 10
+	intakeSentrySeedSize = 3
 
 	// intakeSentrySeedEventWindow is how many recent trigger events a reseed
 	// reads so it can drop issues that already sit on the intake.
@@ -39,11 +45,11 @@ const (
 
 	// intakeProductiveSeedSize is how many open Productive.io tasks a new
 	// intake imports. The wizard tells the user this number.
-	intakeProductiveSeedSize = 10
+	intakeProductiveSeedSize = 3
 
 	// intakeJiraSeedSize is how many unresolved Jira issues a new intake
 	// imports. The wizard tells the user this number.
-	intakeJiraSeedSize = 10
+	intakeJiraSeedSize = 3
 
 	// intakeJiraSeedEventWindow is how many recent trigger events a reseed
 	// reads so it can drop issues that already sit on the intake.
@@ -52,7 +58,7 @@ const (
 	// intakeDatadogSeedSize is how many open Datadog errors a new intake
 	// imports. The wizard tells the user this number. Datadog returns at
 	// most one page, so the seed is the newest of that page.
-	intakeDatadogSeedSize = 10
+	intakeDatadogSeedSize = 3
 
 	// intakeDatadogSearchPageSize is the Error Tracking search page. The
 	// seed sorts that page by last seen and keeps intakeDatadogSeedSize.
@@ -220,7 +226,7 @@ func seedGitHubIssues(
 	}
 
 	repository, _ := binding.Configuration["repository"].(string)
-	payloads, err := newestGitHubIssueEvents(ctx, client, repository, intakeSeedSize)
+	payloads, err := newestGitHubIssueEvents(ctx, client, repository, intakeGitHubIssueSeedSize)
 	if err != nil {
 		return intakeSeedResult{}, err
 	}
@@ -245,7 +251,7 @@ func seedDependabotAlerts(
 	}
 
 	repository, _ := binding.Configuration["repository"].(string)
-	alerts, _, err := client.ListOpenDependabotAlerts(ctx, repository, intakeSeedSize)
+	alerts, _, err := client.ListOpenDependabotAlerts(ctx, repository, intakeDependabotSeedSize)
 	if err != nil {
 		return intakeSeedResult{}, ghdependabot.UnavailableError(fmt.Errorf("failed to list Dependabot alerts of %s: %w", repository, err))
 	}

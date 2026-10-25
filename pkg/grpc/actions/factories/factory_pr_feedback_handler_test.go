@@ -70,17 +70,19 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, liveVersion.Nodes, 15)
 		assert.Len(t, liveVersion.Edges, 12)
+		assertLivePRFeedbackOmitsCommitIdentity(t, liveVersion.Nodes,
+			prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID)
 		for _, node := range liveVersion.Nodes {
 			assert.NotEqual(t, "noop", node.ComponentName())
 		}
 		assertLivePRFeedbackAcknowledge(t, liveVersion.Nodes, liveVersion.Edges,
-			prFeedbackAcknowledgeCommentNodeID, prFeedbackCommentTriggerNodeID,
+			prFeedbackAcknowledgeCommentNodeID, prFeedbackFindNodeID,
 			prFeedbackCommentAcknowledgeCommentIDExpression(), "issueComment")
 		assertLivePRFeedbackAcknowledge(t, liveVersion.Nodes, liveVersion.Edges,
-			prFeedbackAcknowledgeReviewNodeID, prFeedbackReviewTriggerNodeID,
+			prFeedbackAcknowledgeReviewNodeID, prFeedbackReviewFindNodeID,
 			prFeedbackReviewAcknowledgeCommentIDExpression(), "reviewComment")
 		assertLivePRFeedbackAcknowledge(t, liveVersion.Nodes, liveVersion.Edges,
-			prFeedbackAcknowledgeReviewReplyNodeID, prFeedbackReplyTriggerNodeID,
+			prFeedbackAcknowledgeReviewReplyNodeID, prFeedbackReplyFindNodeID,
 			prFeedbackCommentAcknowledgeCommentIDExpression(), "reviewComment")
 		assertLivePRFeedbackConcurrency(t, canvas.ID, liveVersion.Nodes)
 
@@ -236,6 +238,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		assert.Len(t, liveVersion.Nodes, 9)
+		assertLivePRFeedbackOmitsCommitIdentity(t, liveVersion.Nodes, prFeedbackRunnerNodeID)
 		var foundWait bool
 		for _, node := range liveVersion.Nodes {
 			if node.ID == prFeedbackWaitChecksNodeID {
@@ -374,12 +377,36 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 	})
 }
 
+func assertLivePRFeedbackOmitsCommitIdentity(t *testing.T, nodes []models.Node, nodeIDs ...string) {
+	t.Helper()
+
+	for _, nodeID := range nodeIDs {
+		var found bool
+		for _, node := range nodes {
+			if node.ID != nodeID {
+				continue
+			}
+			found = true
+			steps, ok := node.Configuration["steps"].([]any)
+			require.True(t, ok, "runner %s has no steps", nodeID)
+			for _, item := range steps {
+				step, ok := item.(map[string]any)
+				require.True(t, ok)
+				name, _ := step["name"].(string)
+				assert.NotEqual(t, "Set Up Git User", name)
+				assert.NotEqual(t, "Set Up DCO Signing", name)
+			}
+		}
+		assert.Truef(t, found, "missing runner %s", nodeID)
+	}
+}
+
 func assertLivePRFeedbackAcknowledge(
 	t *testing.T,
 	nodes []models.Node,
 	edges []models.Edge,
 	nodeID string,
-	triggerID string,
+	findNodeID string,
 	commentID string,
 	target string,
 ) {
@@ -399,14 +426,13 @@ func assertLivePRFeedbackAcknowledge(
 	}
 	assert.Truef(t, foundNode, "missing acknowledge node %s", nodeID)
 
-	var foundEdge bool
+	var foundTargets []string
 	for _, edge := range edges {
-		if edge.SourceID == triggerID && edge.TargetID == nodeID && edge.Channel == "default" {
-			foundEdge = true
-			break
+		if edge.SourceID == findNodeID && edge.Channel == "found" {
+			foundTargets = append(foundTargets, edge.TargetID)
 		}
 	}
-	assert.Truef(t, foundEdge, "missing acknowledge edge %s -> %s", triggerID, nodeID)
+	assert.Equal(t, []string{nodeID}, foundTargets)
 }
 
 func assertLivePRFeedbackConcurrency(t *testing.T, canvasID uuid.UUID, nodes []models.Node) {

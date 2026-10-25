@@ -66,6 +66,7 @@ type checkoutScriptOptions struct {
 	extraEnv    []string
 	omitRepoURL bool
 	setup       string
+	prepare     func(binDir string)
 }
 
 func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkoutScriptOptions) (string, error) {
@@ -76,6 +77,9 @@ func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkou
 	binDir := filepath.Join(dir, "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(binDir, "checkout"), []byte(runner.WorkspaceCheckoutScript()), 0o755))
+	if opts.prepare != nil {
+		opts.prepare(binDir)
+	}
 	if opts.context != "" {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "workspace_context.json"), []byte(opts.context), 0o644))
 	}
@@ -179,6 +183,48 @@ func TestWorkspaceCheckoutScriptClonesMainAndContext(t *testing.T) {
 	assert.DirExists(t, filepath.Join(dir, "repo", ".git"))
 	assert.DirExists(t, filepath.Join(dir, "context", "acme", "extra", ".git"))
 	assert.Contains(t, output, "Checkout complete")
+}
+
+func TestWorkspaceCheckoutScriptClonesGitHubContextReadOnly(t *testing.T) {
+	gitPath := requireGitAndNode(t)
+	main := initBareRepo(t, "main")
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "git-args")
+	const readToken = "read-token-secret"
+	output, err := runCheckoutScriptFull(t, dir, "file://"+main, "main", checkoutScriptOptions{
+		context: contextJSON(t, map[string]string{
+			"context/acme/extra": "https://github.com/acme/extra.git",
+		}),
+		extraEnv: []string{
+			runner.GitHubContextTokenEnv + "=" + readToken,
+			"GIT_ARGV_LOG=" + logPath,
+			"REAL_GIT=" + gitPath,
+		},
+		prepare: func(binDir string) {
+			wrapper := `#!/bin/bash
+printf '%s\n' "$*" >> "$GIT_ARGV_LOG"
+for arg in "$@"; do
+  case "$arg" in
+    https://github.com/*|https://www.github.com/*)
+      mkdir -p "${@: -1}/.git"
+      exit 0
+      ;;
+  esac
+done
+exec "$REAL_GIT" "$@"
+`
+			require.NoError(t, os.WriteFile(filepath.Join(binDir, "git"), []byte(wrapper), 0o755))
+		},
+	})
+	require.NoError(t, err, output)
+	assert.DirExists(t, filepath.Join(dir, "context", "acme", "extra", ".git"))
+	logged, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	commands := string(logged)
+	assert.Contains(t, commands, "credential.helper=")
+	assert.Contains(t, commands, "password=$"+runner.GitHubContextTokenEnv)
+	assert.NotContains(t, commands, readToken)
+	assert.NotContains(t, commands, "x-access-token")
 }
 
 func TestWorkspaceCheckoutScriptReusesExistingCheckouts(t *testing.T) {
@@ -474,7 +520,7 @@ func TestWorkspaceCheckoutScriptLeavesSetupCommandsForALaterStep(t *testing.T) {
 	require.NoError(t, err, output)
 	assert.NoFileExists(t, filepath.Join(dir, "repo", "from-setup"))
 
-	files := []runner.BrokerTaskFile{{
+	files := []runner.TaskFile{{
 		Path:    runner.WorkspaceSetupConfigPath,
 		Content: "{\"commands\":[\"touch from-setup\"]}\n",
 	}}
@@ -496,7 +542,7 @@ func TestFactorySetupCommandStopsAfterAFailure(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "repo"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "task_cwd"), []byte(dir+"\n"), 0o644))
-	files := []runner.BrokerTaskFile{{
+	files := []runner.TaskFile{{
 		Path:    runner.WorkspaceSetupConfigPath,
 		Content: "{\"commands\":[\"exit 1\",\"touch should-not-exist\"]}\n",
 	}}
@@ -516,7 +562,7 @@ func commandPtr(command string) *string {
 }
 
 func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
-	commands := []runner.BrokerCommand{
+	commands := []runner.TaskCommand{
 		{Name: "Auth", Kind: runner.LiveLogKindSetup, Command: "gh auth"},
 		{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"},
 	}
@@ -524,7 +570,7 @@ func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
 		{Name: "Score", Type: runner.AgentStepPrompt, Prompt: commandPtr("review the checkout")},
 		{Name: "Diff", Type: runner.AgentStepBash, Command: commandPtr("git rev-parse HEAD > /tmp/pr.diff")},
 	}
-	files := []runner.BrokerTaskFile{{
+	files := []runner.TaskFile{{
 		Path:    runner.WorkspaceSetupConfigPath,
 		Content: "{\"commands\":[\"npm ci\",\"echo ready\"]}\n",
 	}}
@@ -545,12 +591,12 @@ func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
 }
 
 func TestInsertFactoryCheckoutCommandSkipsExistingClone(t *testing.T) {
-	commands := []runner.BrokerCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
+	commands := []runner.TaskCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
 	cases := []runner.AgentStep{
 		{Name: "Clone", Type: runner.AgentStepBash, Command: commandPtr("git clone https://example.com/repo.git repo")},
 		{Name: "Helper", Type: runner.AgentStepBash, Command: commandPtr("set -euo pipefail\ncheckout\n")},
 	}
-	files := []runner.BrokerTaskFile{{
+	files := []runner.TaskFile{{
 		Path:    runner.WorkspaceSetupConfigPath,
 		Content: "{\"commands\":[\"npm ci\"]}\n",
 	}}
@@ -567,7 +613,7 @@ func TestApplyFactoryCheckoutKeepsInstructionsForSavedClone(t *testing.T) {
 		Type:    runner.AgentStepBash,
 		Command: commandPtr("git clone https://example.com/repo.git repo"),
 	}}
-	commands := []runner.BrokerCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
+	commands := []runner.TaskCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
 	out := runner.ApplyFactoryCheckout(files, commands, steps)
 	assert.Equal(t, commands, out)
 	assert.Contains(t, files[0].Content, "run `checkout`")
@@ -576,7 +622,7 @@ func TestApplyFactoryCheckoutKeepsInstructionsForSavedClone(t *testing.T) {
 
 func TestApplyFactoryCheckoutMarksInstructionsDone(t *testing.T) {
 	files := checkoutHintFiles()
-	commands := []runner.BrokerCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
+	commands := []runner.TaskCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
 	out := runner.ApplyFactoryCheckout(files, commands, nil)
 	require.Len(t, out, 2)
 	assert.Equal(t, "Checkout", out[0].Name)
@@ -585,8 +631,8 @@ func TestApplyFactoryCheckoutMarksInstructionsDone(t *testing.T) {
 	assert.NotContains(t, files[0].Content, "run `checkout`")
 }
 
-func checkoutHintFiles() []runner.BrokerTaskFile {
-	return []runner.BrokerTaskFile{
+func checkoutHintFiles() []runner.TaskFile {
+	return []runner.TaskFile{
 		{
 			Path: "prompts/implement.txt",
 			Content: "Implement.\nYou can use these resources." +
@@ -598,12 +644,12 @@ func checkoutHintFiles() []runner.BrokerTaskFile {
 }
 
 func TestApplyFactoryCheckoutRequiresHelperFile(t *testing.T) {
-	commands := []runner.BrokerCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
+	commands := []runner.TaskCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
 	out := runner.ApplyFactoryCheckout(nil, commands, nil)
 	assert.Equal(t, commands, out)
 
 	out = runner.ApplyFactoryCheckout(
-		[]runner.BrokerTaskFile{{Path: runner.WorkspaceCheckoutScriptPath}},
+		[]runner.TaskFile{{Path: runner.WorkspaceCheckoutScriptPath}},
 		commands,
 		nil,
 	)

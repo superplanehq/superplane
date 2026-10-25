@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   usersListUsers,
   rolesListRoles,
@@ -18,9 +18,6 @@ import {
   organizationsDescribeOrganization,
   organizationsUpdateOrganization,
   organizationsRemoveUser,
-  organizationsGetInviteLink,
-  organizationsUpdateInviteLink,
-  organizationsResetInviteLink,
   organizationsDeleteOrganization,
   organizationsSetUserOwner,
 } from "../api-client/sdk.gen";
@@ -38,8 +35,8 @@ export const organizationKeys = {
   group: (orgId: string, groupName: string) => [...organizationKeys.all, "group", orgId, groupName] as const,
   groupUsers: (orgId: string, groupName: string) => [...organizationKeys.all, "groupUsers", orgId, groupName] as const,
   role: (orgId: string, roleName: string) => [...organizationKeys.all, "role", orgId, roleName] as const,
+  invitations: (orgId: string) => [...organizationKeys.all, "invitations", orgId] as const,
   canvases: (orgId: string) => [...organizationKeys.all, "canvases", orgId] as const,
-  inviteLink: (orgId: string) => [...organizationKeys.all, "inviteLink", orgId] as const,
 };
 
 // Hooks for fetching data
@@ -61,8 +58,8 @@ export const useOrganization = (organizationId: string, enabled = true) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string, includeRoles = false, enabled = true) => {
-  return useQuery({
+const organizationUsersOptions = (organizationId: string, includeRoles = false, enabled = true) =>
+  queryOptions({
     queryKey: includeRoles
       ? [...organizationKeys.users(organizationId), includeRoles]
       : organizationKeys.users(organizationId),
@@ -76,12 +73,23 @@ export const useOrganizationUsers = (organizationId: string, includeRoles = fals
           },
         }),
       );
-      return response.data?.users || [];
+      if (!response.data) throw new Error("Failed to load members.");
+      return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!organizationId && enabled,
   });
+
+export const useOrganizationUsers = (organizationId: string, includeRoles = false, enabled = true) =>
+  useQuery({
+    ...organizationUsersOptions(organizationId, includeRoles, enabled),
+    select: (response) => response.users || [],
+  });
+
+export const useOrganizationMembers = (organizationId: string) => {
+  const query = useQuery({ ...organizationUsersOptions(organizationId, true), refetchOnWindowFocus: "always" });
+  return { ...query, users: query.data?.users || [], seatLimit: query.data?.seatLimit };
 };
 
 export const useOrganizationRoles = (organizationId: string) => {
@@ -175,23 +183,6 @@ export const useRole = (organizationId: string, roleName: string) => {
   });
 };
 
-export const useOrganizationInviteLink = (organizationId: string, enabled = true) => {
-  return useQuery({
-    queryKey: organizationKeys.inviteLink(organizationId),
-    queryFn: async () => {
-      const response = await organizationsGetInviteLink(
-        withOrganizationHeader({
-          path: { id: organizationId },
-        }),
-      );
-      return response.data?.inviteLink || null;
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!organizationId && enabled,
-  });
-};
-
 export const useDeleteOrganization = (organizationId: string) => {
   const queryClient = useQueryClient();
 
@@ -280,43 +271,7 @@ export const useRemoveOrganizationSubject = (organizationId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) });
-    },
-  });
-};
-
-export const useUpdateOrganizationInviteLink = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const response = await organizationsUpdateInviteLink(
-        withOrganizationHeader({
-          path: { id: organizationId },
-          body: { enabled },
-        }),
-      );
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.inviteLink(organizationId) });
-    },
-  });
-};
-
-export const useResetOrganizationInviteLink = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      const response = await organizationsResetInviteLink(
-        withOrganizationHeader({
-          path: { id: organizationId },
-        }),
-      );
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.inviteLink(organizationId) });
+      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) });
     },
   });
 };

@@ -26,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -114,9 +115,13 @@ func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Invalid activity provider", http.StatusBadRequest)
 		return
 	}
-	if err := session.UpsertActivity(database.DB(r.Context()), activity); err != nil {
+	written, err := session.UpsertActivity(database.DB(r.Context()), activity)
+	if err != nil {
 		writeRunnerPlanningError(w, r, session, err)
 		return
+	}
+	if written {
+		messages.PublishPlanningBoardStatus(session)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "stored"})
 }
@@ -490,9 +495,30 @@ func maybeAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanning
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
 		return
 	}
-	if _, _, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, order.CreatedByID, 0, false, "", ""); err != nil {
+	_, dispatchedOrder, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, order.CreatedByID, 0, false, "", "")
+	if err != nil {
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
+		return
 	}
+	captureAutoStartedWorkOrder(db, dispatchedOrder)
+}
+
+func captureAutoStartedWorkOrder(db *gorm.DB, order *models.FactoryWorkOrder) {
+	eventID := productanalytics.StableEventID(productanalytics.EventFactoryTaskStarted, order.ID.String(), order.UpdatedAt.UTC().String())
+	if dispatch, err := order.FindActiveLineDispatch(db); err == nil {
+		eventID = productanalytics.StableEventID(productanalytics.EventFactoryTaskStarted, dispatch.ID.String())
+	}
+	productanalytics.Capture(productanalytics.Event{
+		Name:           productanalytics.EventFactoryTaskStarted,
+		EventID:        eventID,
+		DistinctID:     productanalytics.SyntheticDistinctID(order.OrganizationID.String(), productanalytics.ActorSystem, "factory"),
+		OrganizationID: order.OrganizationID.String(),
+		FactoryID:      order.FactoryID.String(),
+		TaskID:         order.ID.String(),
+		ActorType:      productanalytics.ActorSystem,
+		Source:         productanalytics.SourceAutomation,
+		Properties:     productanalytics.Properties{"run_kind": "initial"},
+	})
 }
 
 func proposePlanningSpecAndNotify(db *gorm.DB, session *models.FactoryPlanningSession, body string) error {

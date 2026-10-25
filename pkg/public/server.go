@@ -37,6 +37,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
@@ -48,6 +49,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
@@ -417,7 +419,12 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	if err := pbAdminRunners.RegisterRunnersHandlerServer(ctx, adminGatewayMux, services.AdminRunners); err != nil {
 		return err
 	}
-	s.adminRouter.PathPrefix("/installation/fleets").Handler(s.grpcGatewayAccountHandler(adminGatewayMux))
+	if err := pbAdminKeys.RegisterKeysHandlerServer(ctx, adminGatewayMux, services.AdminKeys); err != nil {
+		return err
+	}
+	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
+	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
+	s.adminRouter.PathPrefix("/installation/keys").Handler(adminGatewayHandler)
 
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
@@ -484,6 +491,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
+	s.Router.PathPrefix("/api/v1/invitations").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
@@ -500,6 +508,8 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 func headersMatcher(key string) (string, bool) {
 	switch key {
+	case "Grpc-Metadata-X-User-Id", "Grpc-Metadata-X-Organization-Id", "Grpc-Metadata-X-Account-Id", "Grpc-Metadata-X-Token-Scopes":
+		return "", false
 	case "X-User-Id", "X-Organization-Id", "X-Account-Id":
 		return key, true
 	case "X-Token-Scopes":
@@ -562,13 +572,17 @@ func apiKeyCanvasScopes(canvasIDs []string) []string {
 
 func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := middleware.CloneGatewayRequest(r)
+		if middleware.IsFleetManagerRequest(r.Context()) {
+			middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
+			return
+		}
 		account, ok := middleware.GetAccountFromContext(r.Context())
 		if !ok {
 			http.Error(w, "Account not found in context", http.StatusUnauthorized)
 			return
 		}
 
-		r2 := middleware.CloneGatewayRequest(r)
 		r2.Header.Set("x-account-id", account.ID.String())
 		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
@@ -729,6 +743,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
+	publicRoute.HandleFunc("/api/v1/setup-owner/status", s.setupOwnerStatus).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/public/organizations/{org}/workspaces/{key}/lines/{lineId}/board", s.handlePublicFactoryBoard).Methods("GET")
@@ -802,12 +817,19 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
+	accountRoute.HandleFunc("/api/v1/setup-owner/progress", s.updateSetupOwnerProgress).Methods("PATCH")
 	accountRoute.HandleFunc(mcpserver.PathAuthorize, s.handleMCPAuthorize).Methods("GET", "POST")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
-	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt))
+	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt, singleHostFleetManagerToken()))
 	adminRoute.Use(middleware.RequireInstallationAdmin())
+	adminRoute.HandleFunc("/billing-plans", s.adminListBillingPlans).Methods("GET")
+	adminRoute.HandleFunc("/credit-packs", s.adminListCreditPacks).Methods("GET")
+	adminRoute.HandleFunc("/credit-packs", s.adminSaveCreditPack).Methods("POST")
+	adminRoute.HandleFunc("/credit-packs/{packId}", s.adminSaveCreditPack).Methods("PUT")
+	adminRoute.HandleFunc("/credit-packs/{packId}", s.adminDeleteCreditPack).Methods("DELETE")
+	adminRoute.HandleFunc("/polar/products", s.adminListPolarProducts).Methods("GET")
 	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}", s.adminGetOrganization).Methods("GET")
@@ -815,6 +837,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/pin", s.adminUnpinOrganization).Methods("DELETE")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/built-in-automations/reset", s.adminResetBuiltInAutomations).Methods("POST")
+	adminRoute.HandleFunc("/built-in-automations", s.adminListBuiltInAutomations).Methods("GET")
+	adminRoute.HandleFunc("/built-in-automations/reset", s.adminResetBuiltInAutomation).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/integrations", s.adminListOrgIntegrations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
@@ -836,11 +860,20 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminListOrganizationCreditGrants).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/balances", s.adminSetOrganizationCreditBalance).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-settings", s.adminUpdateOrganizationLLMMarkup).Methods("PATCH")
+	adminRoute.HandleFunc("/billing-plans", s.adminSaveBillingPlan).Methods("POST")
+	adminRoute.HandleFunc("/billing-plans/{planId}", s.adminSaveBillingPlan).Methods("PUT")
+	adminRoute.HandleFunc("/billing-plans/{planId}", s.adminDeleteBillingPlan).Methods("DELETE")
+	adminRoute.HandleFunc("/feature-definitions/{featureKey}/organizations", s.adminListFeatureOrganizations).Methods("GET")
+	adminRoute.HandleFunc("/feature-definitions", s.adminListFeatureDefinitions).Methods("GET")
+	adminRoute.HandleFunc("/feature-definitions", s.adminSaveFeatureDefinition).Methods("POST")
+	adminRoute.HandleFunc("/feature-definitions/{featureKey}", s.adminSaveFeatureDefinition).Methods("PUT")
+	adminRoute.HandleFunc("/feature-definitions/{featureKey}", s.adminDeleteFeatureDefinition).Methods("DELETE")
+	adminRoute.HandleFunc("/organizations/{orgId}/seat-limit", s.adminOrganizationSeatLimit).Methods("GET", "PUT", "DELETE")
+	adminRoute.HandleFunc("/organizations/{orgId}/features", s.adminOrganizationFeatures).Methods("GET", "PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/spending-report", s.adminGetOrganizationSpendingReport).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/velocity", s.adminGetOrganizationVelocity).Methods("GET")
-	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/endpoints", s.adminListPolarWebhookEndpoints).Methods("GET")
 	adminRoute.HandleFunc("/sentry/webhooks", s.adminListSentryWebhooks).Methods("GET")
@@ -868,6 +901,13 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	}
 
 	s.Router = r
+}
+
+func singleHostFleetManagerToken() string {
+	if os.Getenv("SUPERPLANE_INSTALLATION_TYPE") != "single-host" {
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv("FLEET_MANAGER_API_TOKEN"))
 }
 
 type oidcDiscoveryResponse struct {
@@ -1154,12 +1194,14 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
-	if err != nil {
-		tx.Rollback()
-		log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
-		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-		return
+	if models.BillingEnabled() {
+		err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+		if err != nil {
+			tx.Rollback()
+			log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
+			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	err = tx.Commit().Error
@@ -1170,6 +1212,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
+	recordOrganizationCreated(organization, account.ID, "workspace_switcher")
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
@@ -1253,6 +1296,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
 	}
+	recordOrganizationCreated(organization, account.ID, "initial_onboarding")
 
 	writeInitialWorkspaceResponse(w, organization, workspace)
 }
@@ -1327,6 +1371,26 @@ func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.O
 	json.NewEncoder(w).Encode(initialWorkspaceResponse{
 		OrganizationSlug: organization.Slug,
 		WorkspaceKey:     workspace.Key,
+	})
+}
+
+func recordOrganizationCreated(organization *models.Organization, accountID uuid.UUID, creationPath string) {
+	organizationID := organization.ID.String()
+	productanalytics.Capture(productanalytics.Event{
+		Name:           productanalytics.EventOrganizationCreated,
+		EventID:        productanalytics.StableEventID(productanalytics.EventOrganizationCreated, organizationID),
+		DistinctID:     accountID.String(),
+		OrganizationID: organizationID,
+		ActorType:      productanalytics.ActorUser,
+		Source:         productanalytics.SourceUI,
+		Properties:     productanalytics.Properties{"creation_path": creationPath},
+	})
+	productanalytics.IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity{
+		ID:        organizationID,
+		Name:      organization.Name,
+		Slug:      organization.Slug,
+		CreatedAt: organization.CreatedAt,
+		AccountID: accountID.String(),
 	})
 }
 
@@ -1438,8 +1502,10 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
 	}
-	if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
-		return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
+	if models.BillingEnabled() {
+		if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
+			return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
+		}
 	}
 
 	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")
@@ -1491,6 +1557,7 @@ type AccountResponse struct {
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
 	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
 	License                      AccountLicense                       `json:"license"`
+	BillingEnabled               bool                                 `json:"billing_enabled"`
 }
 
 // HideLicenseExpiryBannerEnv hides the license expiry banner when it is "yes"
@@ -1605,6 +1672,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
 		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
+		BillingEnabled:               models.BillingEnabled(),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {

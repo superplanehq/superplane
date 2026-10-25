@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -6,7 +6,6 @@ import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { analytics } from "@/lib/analytics";
 import {
   isCapabilityBasedIntegrationDefinition,
   usesHostedGitHubAppInstall,
@@ -14,15 +13,12 @@ import {
   usesPrivateGitHubAppWizard,
 } from "@/lib/integrations";
 import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
-import { posthog, isPostHogEnabled } from "@/posthog";
 import { integrationDetailPath, integrationSetupPath, useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { buildIntegrationCatalog, filterIntegrationCatalog, integrationNameSet } from "@/lib/integrationCatalog";
 import { startDirectJiraConnect } from "@/lib/startDirectJiraConnect";
 import { areRequiredCreateFieldsFilled } from "@/ui/IntegrationCreateDialog/configurationFields";
 import { useMe } from "@/hooks/useMe";
-
-const INTEGRATION_SURVEY_NAME = "Integration Survey";
 
 export function useIntegrationCatalog(organizationId: string) {
   const navigate = useNavigate();
@@ -34,7 +30,6 @@ export function useIntegrationCatalog(organizationId: string) {
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
-  const isIntegrationSurveyActive = useIntegrationSurveyActive();
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
 
@@ -84,7 +79,6 @@ export function useIntegrationCatalog(organizationId: string) {
     canUpdateIntegrations,
     filterQuery,
     setFilterQuery,
-    isIntegrationSurveyActive,
     integrationCatalog,
     filteredIntegrationCatalog,
     selectedIntegration,
@@ -109,25 +103,6 @@ export function useIntegrationCatalog(organizationId: string) {
       }),
     ...actions,
   };
-}
-
-function useIntegrationSurveyActive() {
-  const [isActive, setIsActive] = useState(false);
-
-  useEffect(() => {
-    if (!isPostHogEnabled()) {
-      return;
-    }
-    posthog.getSurveys((surveys) => {
-      setIsActive(
-        surveys.some(
-          (survey) => survey.name === INTEGRATION_SURVEY_NAME && survey.start_date != null && survey.end_date == null,
-        ),
-      );
-    }, true);
-  }, []);
-
-  return isActive;
 }
 
 function useIntegrationCatalogActions({
@@ -200,7 +175,6 @@ function useIntegrationCatalogActions({
         if (!integration.name) {
           return;
         }
-        analytics.integrationConnectStart(integration.name, "integrations_page", organizationId);
         navigate(integrationSetupPath(integrationsBasePath, integration.name));
         return;
       }
@@ -208,7 +182,6 @@ function useIntegrationCatalogActions({
       setIntegrationName(getNextIntegrationName(integration.name || "integration", integrationNames));
       setConfiguration({});
       setIsModalOpen(true);
-      analytics.integrationConnectStart(integration.name ?? "", "integrations_page", organizationId);
     },
     handleConnect: () =>
       submitCatalogConnect({
@@ -224,9 +197,6 @@ function useIntegrationCatalogActions({
         setIntegrationName,
         setConfiguration,
       }),
-    handleRequestIntegration: () => {
-      analytics.integrationRequested(organizationId);
-    },
     handleCloseModal: () => {
       setIsModalOpen(false);
       setSelectedIntegration(null);
@@ -326,7 +296,6 @@ function startCatalogHostedJiraConnect({
     return false;
   }
 
-  analytics.integrationConnectStart("jira", "integrations_page", organizationId);
   void startDirectJiraConnect({
     organizationId,
     returnTo: integrationsBasePath,

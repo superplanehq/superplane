@@ -1,19 +1,29 @@
+import {
+  credit,
+  catalog,
+  grants,
+  billingPlan,
+  jsonResponse,
+  mockOrgCreditFetch,
+} from "./OrgLLMCreditSection.test-support";
+import {
+  ADMIN_POLAR_MANAGED_PLAN_COPY,
+  ADMIN_LOCAL_PLAN_COPY,
+  ADMIN_PLAN_UNKNOWN_COPY,
+  ADMIN_TRIAL_ENDS_LABEL,
+  ADMIN_TRIAL_ENDS_HELP,
+  ADMIN_TRIAL_ENDS_ERROR,
+} from "./OrgBillingPlanField";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import {
   ADMIN_CREDIT_HISTORY_ERROR_COPY,
-  ADMIN_LOCAL_PLAN_COPY,
   ADMIN_NO_ACTIVE_TRIAL_COPY,
-  ADMIN_PLAN_UNKNOWN_COPY,
-  ADMIN_POLAR_MANAGED_PLAN_COPY,
-  ADMIN_TRIAL_ENDS_ERROR,
-  ADMIN_TRIAL_ENDS_HELP,
-  ADMIN_TRIAL_ENDS_LABEL,
   OrgLLMCreditSection,
 } from "./OrgLLMCreditSection";
-import { CREDIT_BALANCE_CHANGED_COPY, prefilledTrialEndDate, type OrganizationLLMCredit } from "./useOrgLLMCredit";
+import { CREDIT_BALANCE_CHANGED_COPY, prefilledTrialEndDate } from "./useOrgLLMCredit";
 import { showErrorToast } from "@/lib/toast";
 
 vi.mock("@/lib/toast", () => ({
@@ -21,35 +31,11 @@ vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
 }));
 
-const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+let billingProductEnabled = true;
 
-const credit: OrganizationLLMCredit = {
-  remaining_credit_cents: 9500,
-  grant_total_cents: 10000,
-  superplane_grant_cents: 7000,
-  purchased_credit_cents: 3000,
-  hosted_billed_cents: 500,
-  welcome_remaining_cents: 4500,
-  included_remaining_cents: 0,
-  purchased_remaining_cents: 3000,
-  admin_remaining_cents: 2000,
-  welcome_credit_expires_at: trialEnd,
-  markup_bps: 2000,
-  markup_override_bps: null,
-  warning: false,
-};
-
-const grants = [
-  {
-    id: "grant-2",
-    kind: "trial_adjustment",
-    amountCents: "-500",
-    note: "Support correction",
-    actorName: "Ada",
-    createdAt: new Date().toISOString(),
-  },
-  { id: "grant-1", kind: "welcome", amountCents: "5000", note: "", createdAt: new Date().toISOString() },
-];
+vi.mock("@/hooks/useBillingProductEnabled", () => ({
+  useBillingProductEnabled: () => billingProductEnabled,
+}));
 
 function futureUtcDate(daysAhead: number): string {
   const now = new Date();
@@ -58,65 +44,47 @@ function futureUtcDate(daysAhead: number): string {
     .slice(0, 10);
 }
 
-function billingPlan(
-  polarManaged: boolean,
-  trialEndsAt: string | null = null,
-  plan = polarManaged ? "business" : "trial",
-) {
-  return {
-    plan,
-    plan_source: polarManaged ? "polar" : "system",
-    polar_subscription_status: polarManaged ? "active" : "",
-    polar_managed: polarManaged,
-    trial_ends_at: trialEndsAt,
-    current_period_end: null,
-  };
-}
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
-
-function mockOrgCreditFetch(
-  options: {
-    polarManaged?: boolean;
-    planStatus?: number;
-    plan?: ReturnType<typeof billingPlan>;
-    creditData?: typeof credit;
-    onPutBalance?: (body: unknown) => Response;
-    onGetGrants?: () => Response;
-  } = {},
-) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    if (url.endsWith("/llm-credit/balances") && init?.method === "PUT") {
-      const body = JSON.parse(String(init.body));
-      return options.onPutBalance ? options.onPutBalance(body) : jsonResponse(options.creditData ?? credit);
-    }
-    if (url.endsWith("/llm-credit/grants")) {
-      return options.onGetGrants ? options.onGetGrants() : jsonResponse({ grants });
-    }
-    if (url.endsWith("/llm-credit")) {
-      return jsonResponse(options.creditData ?? credit);
-    }
-    if (url.includes("/billing-plan")) {
-      if (options.planStatus) {
-        return new Response("failed", { status: options.planStatus });
-      }
-      return jsonResponse(options.plan ?? billingPlan(options.polarManaged ?? false));
-    }
-    return new Response("not found", { status: 404 });
-  });
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
-}
-
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.mocked(showErrorToast).mockClear();
+  billingProductEnabled = true;
 });
 
 describe("OrgLLMCreditSection billing plan", () => {
+  it("disables plans that require payment and saves a manual plan", async () => {
+    const fetchMock = mockOrgCreditFetch();
+    const user = userEvent.setup();
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    await user.click(await screen.findByTestId("admin-org-billing-plan"));
+    expect(await screen.findByRole("option", { name: "Business" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("option", { name: "Pay-as-you-go" }).getAttribute("aria-disabled")).toBe("true");
+    await user.click(screen.getByRole("option", { name: "Business Manual" }));
+    await user.click(screen.getByTestId("admin-org-billing-plan-save"));
+
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+      expect(String(put?.[0])).toBe("/admin/api/organizations/org-1/billing-plan");
+      expect(JSON.parse(String(put?.[1]?.body))).toEqual({ plan: "business_manual" });
+    });
+  });
+
+  it("shows the assigned catalog key when the legacy plan field differs", async () => {
+    mockOrgCreditFetch({ plan: { ...billingPlan(false, null, "business"), catalog_key: "business_manual" } });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-billing-plan")).toHaveTextContent("Business Manual");
+  });
+
+  it("blocks plan changes when the catalog cannot load", async () => {
+    mockOrgCreditFetch({ catalogStatus: 500 });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load billing plans");
+    expect(screen.getByTestId("admin-org-billing-plan")).toBeDisabled();
+    expect(screen.getByTestId("admin-org-billing-plan-save")).toBeDisabled();
+  });
+
   it("keeps Save plan when Polar is not set up", async () => {
     mockOrgCreditFetch();
     render(<OrgLLMCreditSection orgId="org-1" />);
@@ -124,6 +92,18 @@ describe("OrgLLMCreditSection billing plan", () => {
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeEnabled();
     expect(screen.getByTestId("admin-org-billing-plan-save")).toBeInTheDocument();
     expect(screen.getByText(ADMIN_LOCAL_PLAN_COPY)).toBeInTheDocument();
+  });
+
+  it("hides plan controls when product billing is off", async () => {
+    billingProductEnabled = false;
+    const fetchMock = mockOrgCreditFetch({ planStatus: 404 });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-credit-total-remaining")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-org-billing-plan")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-org-billing-plan-save")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/billing-plan"))).toBe(false);
+    expect(showErrorToast).not.toHaveBeenCalledWith("Failed to load billing plan");
   });
 
   it("disables the plan control when Polar manages billing", async () => {
@@ -147,25 +127,7 @@ describe("OrgLLMCreditSection billing plan", () => {
   it("shows the trial end and date field only for Trial", async () => {
     const trialDate = futureUtcDate(40);
     const trialEndsAt = `${trialDate}T23:59:59Z`;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.includes("/llm-credit") && !url.includes("/grants")) {
-          return new Response(JSON.stringify(credit), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (url.includes("/billing-plan")) {
-          return new Response(JSON.stringify(billingPlan(false, trialEndsAt, "trial")), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        return new Response("not found", { status: 404 });
-      }),
-    );
+    mockOrgCreditFetch({ plan: billingPlan(false, trialEndsAt, "trial") });
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
 
@@ -174,33 +136,25 @@ describe("OrgLLMCreditSection billing plan", () => {
     expect(screen.getByText(ADMIN_TRIAL_ENDS_HELP)).toBeInTheDocument();
 
     await user.click(screen.getByTestId("admin-org-billing-plan"));
-    await user.click(await screen.findByRole("option", { name: "Business" }));
+    expect((await screen.findByRole("option", { name: /^Business$/ })).getAttribute("aria-disabled")).toBe("true");
+    await user.click(await screen.findByRole("option", { name: "Business Manual" }));
 
     expect(screen.queryByTestId("admin-org-trial-ends-input")).not.toBeInTheDocument();
-    expect(screen.getByTestId("admin-org-trial-ends")).toHaveTextContent(trialDate);
+    expect(screen.queryByText(ADMIN_TRIAL_ENDS_LABEL)).not.toBeInTheDocument();
     expect(screen.queryByText(ADMIN_TRIAL_ENDS_HELP)).not.toBeInTheDocument();
   });
 
+  it("hides a leftover trial end on an assigned paid plan", async () => {
+    mockOrgCreditFetch({ plan: billingPlan(false, `${futureUtcDate(40)}T23:59:59Z`, "business") });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-billing-plan")).toHaveTextContent("Business Manual");
+    expect(screen.queryByText(ADMIN_TRIAL_ENDS_LABEL)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-org-trial-ends-input")).not.toBeInTheDocument();
+  });
+
   it("hides the trial end when Polar manages billing", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.includes("/llm-credit") && !url.includes("/grants")) {
-          return new Response(JSON.stringify(credit), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (url.includes("/billing-plan")) {
-          return new Response(JSON.stringify(billingPlan(true, "2026-12-20T23:59:59Z", "business")), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        return new Response("not found", { status: 404 });
-      }),
-    );
+    mockOrgCreditFetch({ plan: billingPlan(true, `${futureUtcDate(40)}T23:59:59Z`, "business") });
     render(<OrgLLMCreditSection orgId="org-1" />);
 
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeDisabled();
@@ -223,6 +177,17 @@ describe("OrgLLMCreditSection billing plan", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
+        if (url.endsWith("/billing-plans"))
+          return jsonResponse([
+            { key: "trial", name: "Trial", category: "trial" },
+            { key: "business_legacy", name: "Business", category: "paid" },
+            { key: "business_manual", name: "Business Manual", category: "paid" },
+            { key: "none", name: "None", category: "none" },
+          ]);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
         const method = init?.method ?? "GET";
         if (method === "PUT") {
           requests.push({ url, body: typeof init?.body === "string" ? init.body : null });
@@ -237,6 +202,7 @@ describe("OrgLLMCreditSection billing plan", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
+        if (url.endsWith("/billing-plans")) return jsonResponse(catalog);
         if (url.includes("/billing-plan")) {
           return new Response(JSON.stringify(billingPlan(false, `${futureUtcDate(40)}T23:59:59Z`, "trial")), {
             status: 200,
@@ -265,16 +231,157 @@ describe("OrgLLMCreditSection billing plan", () => {
       trial_ends_at: `${futureDate}T23:59:59Z`,
     });
   });
+
+  it("edits the trial end and unlocks Set trial credit for a custom trial plan", async () => {
+    const trialEndsAt = `${futureUtcDate(30)}T23:59:59Z`;
+    const requests: Array<{ url: string; body: string | null }> = [];
+    const customTrial = { key: "custom_trial", name: "Custom Trial", category: "trial", require_payment_method: false };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/feature-definitions")) return jsonResponse([]);
+        if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
+        if (url.endsWith("/llm-credit/grants")) return jsonResponse({ grants });
+        if (url.endsWith("/llm-credit")) {
+          return jsonResponse({
+            ...credit,
+            welcome_remaining_cents: 0,
+            welcome_credit_expires_at: "2020-01-01T00:00:00Z",
+          });
+        }
+        if (url.endsWith("/billing-plans")) return jsonResponse([...catalog, customTrial]);
+        if (url.includes("/billing-plan")) {
+          if (init?.method === "PUT") {
+            requests.push({ url, body: typeof init.body === "string" ? init.body : null });
+          }
+          return jsonResponse(billingPlan(false, trialEndsAt, "custom_trial", "trial"));
+        }
+        return new Response("not found", { status: 404 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-billing-plan")).toHaveTextContent("Custom Trial");
+    expect(screen.getByTestId("admin-org-credit-trial-target")).toBeEnabled();
+    expect(screen.queryByText(ADMIN_NO_ACTIVE_TRIAL_COPY)).not.toBeInTheDocument();
+
+    const input = await screen.findByTestId("admin-org-trial-ends-input");
+    expect(input).toHaveValue(futureUtcDate(30));
+    const newDate = futureUtcDate(45);
+    fireEvent.change(input, { target: { value: newDate } });
+    await user.click(screen.getByTestId("admin-org-billing-plan-save"));
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(JSON.parse(requests[0]?.body ?? "{}")).toEqual({
+      plan: "custom_trial",
+      trial_ends_at: `${newDate}T23:59:59Z`,
+    });
+  });
+});
+
+describe("OrgLLMCreditSection Polar verification", () => {
+  it("enables stale plans, shows the stored subscription link, and clears the warning after save", async () => {
+    const saved = {
+      ...billingPlan(true),
+      polar_subscription_verification: "none",
+      polar_subscription_id: "sub_stored",
+      polar_subscription_url: "https://polar.sh/dashboard/superplane-inc/sales/subscriptions/sub_stored",
+    };
+    const fetchMock = mockOrgCreditFetch({ plan: saved });
+    const original = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) => {
+      if (init?.method === "PUT") {
+        saved.polar_managed = false;
+        saved.polar_subscription_status = "";
+        saved.catalog_key = "business_manual";
+        saved.plan_source = "admin";
+      }
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    const view = render(<OrgLLMCreditSection orgId="org-1" />);
+    expect(await screen.findByTestId("admin-org-billing-plan")).toBeEnabled();
+    const warning = "No active Polar subscription";
+    expect(screen.getByText(warning)).toBeInTheDocument();
+    expect(screen.getByText("sub_stored")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View subscription in Polar" })).toHaveAttribute(
+      "href",
+      saved.polar_subscription_url,
+    );
+    await user.click(screen.getByTestId("admin-org-billing-plan"));
+    await user.click(await screen.findByRole("option", { name: "Business Manual" }));
+    expect(screen.getByText(warning)).toBeInTheDocument();
+    await user.click(screen.getByTestId("admin-org-billing-plan-save"));
+    await waitFor(() => expect(screen.queryByText(warning)).not.toBeInTheDocument());
+    view.unmount();
+    render(<OrgLLMCreditSection orgId="org-1" />);
+    expect(await screen.findByTestId("admin-org-billing-plan")).toBeEnabled();
+    expect(screen.queryByText(warning)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["business_legacy", true],
+    ["business_manual", false],
+    ["pay_as_you_go", false],
+    ["trial", false],
+  ] as const)("warns only when the saved %s plan requires a subscription", async (key, warns) => {
+    mockOrgCreditFetch({
+      plan: { ...billingPlan(false), catalog_key: key, polar_subscription_verification: "none" },
+    });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+    await screen.findByTestId("admin-org-billing-plan");
+    const warning = "No active Polar subscription";
+    if (warns) {
+      expect(screen.getByText(warning)).toBeInTheDocument();
+      return;
+    }
+    expect(screen.queryByText(warning)).not.toBeInTheDocument();
+  });
+
+  it("locks editing when verification fails even for a local plan", async () => {
+    mockOrgCreditFetch({ plan: { ...billingPlan(false), polar_subscription_verification: "failed" } });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+    expect(await screen.findByTestId("admin-org-billing-plan")).toBeDisabled();
+    expect(
+      screen.getByText("SuperPlane could not verify the Polar subscription. Refresh and try again."),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-org-billing-plan-save")).not.toBeInTheDocument();
+  });
+
+  it("shows canceled subscription IDs without a link when no dashboard URL is configured", async () => {
+    mockOrgCreditFetch({
+      plan: { ...billingPlan(false), polar_subscription_status: "canceled", polar_subscription_id: "sub_canceled" },
+    });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+    expect(await screen.findByText("sub_canceled")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View subscription in Polar" })).not.toBeInTheDocument();
+  });
+
+  it("does not show a subscription link without a subscription ID", async () => {
+    mockOrgCreditFetch({
+      plan: {
+        ...billingPlan(false),
+        polar_subscription_url: "https://polar.sh/dashboard/superplane-inc/sales/subscriptions/sub_missing",
+      },
+    });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+    await screen.findByTestId("admin-org-billing-plan");
+    expect(screen.queryByRole("link", { name: "View subscription in Polar" })).not.toBeInTheDocument();
+  });
 });
 
 describe("OrgLLMCreditSection balances", () => {
-  it("shows the remaining balance of each credit type and the credit history", async () => {
+  it("shows credit balances and history without controls to set included credit", async () => {
     mockOrgCreditFetch();
     render(<OrgLLMCreditSection orgId="org-1" />);
 
     expect(await screen.findByTestId("admin-org-credit-total-remaining")).toHaveTextContent("$95.00");
     expect(screen.getByTestId("admin-org-credit-trial-remaining")).toHaveTextContent("$45.00");
     expect(screen.getByTestId("admin-org-credit-included-remaining")).toHaveTextContent("$0.00");
+    expect(screen.queryByLabelText("Included credit (USD)")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Set included credit" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Included credit expiration (UTC)")).not.toBeInTheDocument();
     expect(screen.getByTestId("admin-org-credit-topup-remaining")).toHaveTextContent("$30.00");
     expect(screen.getByTestId("admin-org-credit-grant-remaining")).toHaveTextContent("$20.00");
     expect(screen.getByTestId("admin-org-credit-trial-target")).toHaveValue("45.00");
@@ -294,7 +401,7 @@ describe("OrgLLMCreditSection balances", () => {
     const trial = await screen.findByTestId("admin-org-credit-trial-target");
     await user.clear(trial);
     await user.type(trial, "10");
-    expect(screen.getByTestId("admin-org-credit-trial-change")).toHaveTextContent("Ledger change: -$35.00");
+    expect(screen.getByTestId("admin-org-credit-trial-change")).toHaveTextContent("Balance change: -$35.00");
     await user.type(screen.getByTestId("admin-org-credit-note"), "Correct trial");
     await user.click(screen.getByTestId("admin-org-credit-trial-save"));
 
@@ -437,8 +544,9 @@ describe("OrgLLMCreditSection balances", () => {
     expect(screen.queryByText("No credit grants yet.")).not.toBeInTheDocument();
 
     grantsFailed = false;
-    await user.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("Trial adjustment")).toBeInTheDocument();
-    expect(screen.queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
+    const history = screen.getByTestId("admin-org-credit-history");
+    await user.click(within(history).getByRole("button", { name: "Try again" }));
+    expect(await within(history).findByText("Trial adjustment")).toBeInTheDocument();
+    expect(within(history).queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
   });
 });

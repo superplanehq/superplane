@@ -358,7 +358,7 @@ func (c *CurrentContext) GetActiveApp() string {
 
 func (c *CurrentContext) SetActiveApp(appID string) error {
 	if c.readOnly {
-		return fmt.Errorf("cannot set active app when using %s and %s; pass --app-id instead", EnvURL, EnvToken)
+		return fmt.Errorf("cannot set active automation when using %s and %s; pass --automation instead", EnvURL, EnvToken)
 	}
 
 	appID = strings.TrimSpace(appID)

@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/metadata"
+	"gorm.io/gorm"
 )
 
 func ListHostedCreditProducts(
@@ -24,7 +25,7 @@ func ListHostedCreditProducts(
 	if err != nil {
 		return nil, err
 	}
-	if !polar.Configured() {
+	if !models.BillingEnabled() || !polar.Configured() {
 		return &pb.ListHostedCreditProductsResponse{}, nil
 	}
 
@@ -36,13 +37,16 @@ func ListHostedCreditProducts(
 		return &pb.ListHostedCreditProductsResponse{BillingEnabled: true}, nil
 	}
 
-	packs, err := polar.NewClientFromEnv().ListCreditPacks(ctx)
+	packs, err := availableHostedCreditPacks(ctx)
 	if err != nil {
 		return nil, polarBillingError(err, "failed to list hosted credit products")
 	}
 
 	products := make([]*pb.HostedCreditProduct, 0, len(packs))
 	for _, pack := range packs {
+		if !strings.EqualFold(pack.Currency, "usd") {
+			continue
+		}
 		products = append(products, &pb.HostedCreditProduct{
 			Id:          pack.ID,
 			Name:        pack.Name,
@@ -55,6 +59,146 @@ func ListHostedCreditProducts(
 	}, nil
 }
 
+func availableHostedCreditPacks(ctx context.Context) ([]polar.Product, error) {
+	tx := database.DB(ctx)
+	configured, err := models.CreditPackCatalogConfigured(tx)
+	if err != nil {
+		return nil, err
+	}
+	if !configured {
+		return polar.NewClientFromEnv().ListCreditPacks(ctx)
+	}
+	packs, err := models.ListCreditPacks(tx)
+	if err != nil {
+		return nil, err
+	}
+	products := make([]polar.Product, 0, len(packs))
+	for _, pack := range packs {
+		if !pack.Enabled || pack.PolarProductID == nil {
+			continue
+		}
+		products = append(products, polar.Product{
+			ID: *pack.PolarProductID, Name: pack.Name, AmountCents: pack.AmountCents, Currency: "usd",
+		})
+	}
+	return products, nil
+}
+
+func hostedCreditPack(ctx context.Context, productID string) (*polar.Product, error) {
+	tx := database.DB(ctx)
+	configured, err := models.CreditPackCatalogConfigured(tx)
+	if err != nil {
+		return nil, err
+	}
+	if !configured {
+		return polar.NewClientFromEnv().GetCreditPack(ctx, productID)
+	}
+	pack, err := models.FindCreditPackByProduct(tx, productID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, polar.ErrNotCreditPack
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !pack.Enabled {
+		return nil, polar.ErrNotCreditPack
+	}
+	product, err := polar.NewClientFromEnv().GetCheckoutProduct(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+	product.Name = pack.Name
+	if pack.AmountCents > 0 {
+		// Checkout uses an ad-hoc fixed price. Polar catalog prices and custom
+		// amount limits do not change the credit amount set by the admin.
+		product.AmountCents = pack.AmountCents
+		product.CustomPrice = false
+		product.MinimumAmountCents = 0
+		product.MaximumAmountCents = 0
+		return product, nil
+	}
+	product.AmountCents = 0
+	product.CustomPrice = true
+	return product, nil
+}
+
+func QuoteHostedCreditCheckout(
+	ctx context.Context,
+	orgID string,
+	req *pb.QuoteHostedCreditCheckoutRequest,
+) (*pb.QuoteHostedCreditCheckoutResponse, error) {
+	_, err := hostedCreditPurchaseOrganization(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	quote, err := hostedCreditPurchaseQuote(ctx, req.GetProductId(), req.GetCreditAmountCents())
+	if err != nil {
+		return nil, err
+	}
+	return &pb.QuoteHostedCreditCheckoutResponse{
+		CreditAmountCents:  quote.CreditAmountCents,
+		ProcessingFeeCents: quote.ProcessingFeeCents,
+		SubtotalCents:      quote.SubtotalCents,
+		Currency:           quote.Currency,
+		FixedFeeCents:      quote.FixedFeeCents,
+		PercentageFeeBps:   int32(quote.PercentageFeeBPS),
+		PercentageFeeCents: quote.PercentageFeeCents,
+	}, nil
+}
+
+func hostedCreditPurchaseOrganization(ctx context.Context, orgID string) (uuid.UUID, error) {
+	organizationID, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if !models.BillingEnabled() || !polar.Configured() {
+		return uuid.Nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")
+	}
+	plan, err := models.ResolveOrganizationBillingPlan(database.DB(ctx), organizationID)
+	if err != nil {
+		return uuid.Nil, grpcerrors.Internal(err, "failed to load hosted credit billing")
+	}
+	if !plan.AllowsCreditPurchase() {
+		return uuid.Nil, grpcerrors.FailedPrecondition(nil, "An active paid plan is required to purchase hosted credit.")
+	}
+	return organizationID, nil
+}
+
+func hostedCreditPurchaseQuote(ctx context.Context, productID string, creditCents int64) (*polar.CreditPurchaseQuote, error) {
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "product id is required")
+	}
+	pack, err := hostedCreditPack(ctx, productID)
+	if err != nil {
+		if polar.IsNotFound(err) || errors.Is(err, polar.ErrNotCreditPack) {
+			return nil, grpcerrors.InvalidArgument(err, "product is not a hosted credit pack")
+		}
+		return nil, polarBillingError(err, "failed to quote hosted credit")
+	}
+	if !strings.EqualFold(pack.Currency, "usd") {
+		return nil, grpcerrors.InvalidArgument(nil, "Hosted credit purchases require a USD product.")
+	}
+	if !pack.CustomPrice {
+		if creditCents != 0 && creditCents != pack.AmountCents {
+			return nil, grpcerrors.FailedPrecondition(nil, "The credit amount changed. Review the updated price.")
+		}
+		creditCents = pack.AmountCents
+	}
+	if creditCents <= 0 || creditCents < pack.MinimumAmountCents || (pack.MaximumAmountCents > 0 && creditCents > pack.MaximumAmountCents) {
+		return nil, grpcerrors.InvalidArgument(nil, "Enter a credit amount within the product limits.")
+	}
+	settings, err := models.GetInstallationLLMSettings(database.DB(ctx))
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load credit purchase fees")
+	}
+	quote, err := polar.CalculateCreditPurchase(creditCents, settings.CreditPurchaseFeeBPS, settings.CreditPurchaseFixedFeeCents)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, err.Error())
+	}
+	return quote, nil
+}
+
 func CreateHostedCreditCheckout(
 	ctx context.Context,
 	orgID string,
@@ -62,19 +206,9 @@ func CreateHostedCreditCheckout(
 	accountID string,
 	baseURL string,
 ) (*pb.CreateHostedCreditCheckoutResponse, error) {
-	organizationID, err := resolveOrganizationID(ctx, orgID)
+	organizationID, err := hostedCreditPurchaseOrganization(ctx, orgID)
 	if err != nil {
 		return nil, err
-	}
-	if !polar.Configured() {
-		return nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")
-	}
-	plan, err := models.ResolveOrganizationBillingPlan(database.DB(ctx), organizationID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
-	}
-	if !plan.AllowsCreditPurchase() {
-		return nil, grpcerrors.FailedPrecondition(nil, "Subscribe to Business to purchase hosted credit.")
 	}
 	productID := strings.TrimSpace(req.GetProductId())
 	if productID == "" {
@@ -85,6 +219,16 @@ func CreateHostedCreditCheckout(
 	if email == "" {
 		return nil, grpcerrors.FailedPrecondition(nil, "A user email is required to start checkout.")
 	}
+	if req.GetCreditAmountCents() <= 0 || req.GetExpectedSubtotalCents() <= 0 {
+		return nil, grpcerrors.InvalidArgument(nil, "Review the credit amount and subtotal before checkout.")
+	}
+	quote, err := hostedCreditPurchaseQuote(ctx, productID, req.GetCreditAmountCents())
+	if err != nil {
+		return nil, err
+	}
+	if quote.SubtotalCents != req.GetExpectedSubtotalCents() {
+		return nil, grpcerrors.FailedPrecondition(nil, "The processing fee changed. Review the updated price.")
+	}
 
 	organization, err := models.FindOrganizationByIDInTransaction(database.DB(ctx), organizationID.String())
 	if err != nil {
@@ -92,13 +236,6 @@ func CreateHostedCreditCheckout(
 	}
 
 	client := polar.NewClientFromEnv()
-	if _, err := client.GetCreditPack(ctx, productID); err != nil {
-		if polar.IsNotFound(err) || errors.Is(err, polar.ErrNotCreditPack) {
-			return nil, grpcerrors.InvalidArgument(err, "product is not a hosted credit pack")
-		}
-		return nil, polarBillingError(err, "failed to create hosted credit checkout")
-	}
-
 	customer, err := client.EnsureCustomer(ctx, polar.CreateCustomerInput{
 		ExternalID: organizationID.String(),
 		Name:       organization.Name,
@@ -118,7 +255,7 @@ func CreateHostedCreditCheckout(
 	// client-supplied body field (CreateHostedCreditCheckoutRequest.customer_ip_address is ignored).
 	customerIP := clientIPFromContext(ctx)
 
-	session, err := client.CreateCheckout(ctx, productID, organizationID.String(), hostedCreditCheckoutSuccessURL(baseURL, organizationID), customerIP)
+	session, err := client.CreateCreditCheckout(ctx, productID, organizationID.String(), hostedCreditCheckoutSuccessURL(baseURL, organizationID), customerIP, quote)
 	if err != nil {
 		return nil, polarBillingError(err, "failed to create hosted credit checkout")
 	}
@@ -139,7 +276,7 @@ func CreateBillingPortalSession(
 	if err != nil {
 		return nil, err
 	}
-	if !polar.Configured() {
+	if !models.BillingEnabled() || !polar.Configured() {
 		return nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")
 	}
 
@@ -258,7 +395,7 @@ func metadataValue(ctx context.Context, key string) string {
 }
 
 func billingState(ctx context.Context, orgID uuid.UUID) (enabled bool, hasCustomer bool) {
-	if !polar.Configured() {
+	if !models.BillingEnabled() || !polar.Configured() {
 		return false, false
 	}
 	settings, err := models.FindOrganizationLLMSettings(database.DB(ctx), orgID)

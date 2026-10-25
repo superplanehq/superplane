@@ -14,11 +14,11 @@ import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
 
 export { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 
-export type PRFeedbackSettingsTab = "general" | "agent" | "automation";
+export type PRFeedbackSettingsTab = "general" | "agent" | "automation" | "runs";
 export type PRFeedbackSourceId = "discussion" | "checks";
 
 export function isPRFeedbackSettingsTab(value: string | null | undefined): value is PRFeedbackSettingsTab {
-  return value === "general" || value === "agent" || value === "automation";
+  return value === "general" || value === "agent" || value === "automation" || value === "runs";
 }
 
 export function prFeedbackSettingsTabs(hasAgent: boolean): PRFeedbackSettingsTab[] {
@@ -113,6 +113,7 @@ export interface PRFeedbackDraftSettings {
   repository: string;
   mention: string;
   ignoreBots: boolean;
+  addressAllBots: boolean;
   allowedBots: string[];
   checkNames: string[];
   maximumAttempts: number;
@@ -129,6 +130,7 @@ export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHa
     repository: handlerDraftRepository(handler),
     mention: handlerDraftMention(discussion?.mention),
     ignoreBots: discussion?.ignoreBots !== false,
+    addressAllBots: discussion?.addressAllBots === true,
     allowedBots: discussion?.allowedBots ?? [],
     checkNames: checks?.names ?? [],
     maximumAttempts: checks?.maximumAttempts ?? 3,
@@ -164,6 +166,7 @@ export function normalizePRFeedbackDraft(draft: PRFeedbackDraftSettings): PRFeed
     repository: draft.repository.trim(),
     mention: draft.mention.trim(),
     ignoreBots: draft.ignoreBots,
+    addressAllBots: draft.addressAllBots,
     allowedBots: normalizeAllowedBots(draft.allowedBots),
     checkNames: normalizeUniqueStrings(draft.checkNames),
     maximumAttempts: draft.maximumAttempts,
@@ -261,6 +264,7 @@ export function prFeedbackSettingsToApi(draft: PRFeedbackDraftSettings): Factori
       mention: draft.mention,
       ignoreBots: draft.ignoreBots,
       allowedBots: draft.allowedBots,
+      addressAllBots: draft.addressAllBots,
     },
   };
 }

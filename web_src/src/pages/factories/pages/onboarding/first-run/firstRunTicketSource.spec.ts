@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   canAnalyzeTicketSource,
   issuesChoiceForTicketSource,
+  resolveTicketSelection,
   ticketSourceFromIssuesChoice,
 } from "./firstRunTicketSource";
 
@@ -28,7 +29,49 @@ describe("firstRunTicketSource", () => {
     expect(ticketSourceFromIssuesChoice("linear", "bitbucket")).toBe("linear");
   });
 
-  it("requires a GitHub connection for analysis", () => {
+  it("selects GitHub Issues when GitHub is already connected and no source is saved", () => {
+    expect(resolveTicketSelection({ issuesChoice: null, vcsHost: "github", githubConnected: true })).toEqual({
+      ticketSource: "github-issues",
+      issuesChoice: "vcs",
+    });
+  });
+
+  it("does not select GitHub Issues for another host, a saved choice, or a missing connection", () => {
+    expect(resolveTicketSelection({ issuesChoice: null, vcsHost: "github", githubConnected: false })).toEqual({
+      ticketSource: null,
+      issuesChoice: null,
+    });
+    expect(resolveTicketSelection({ issuesChoice: null, vcsHost: "bitbucket", githubConnected: true })).toEqual({
+      ticketSource: null,
+      issuesChoice: null,
+    });
+    expect(resolveTicketSelection({ issuesChoice: null, vcsHost: "gitlab", githubConnected: true })).toEqual({
+      ticketSource: null,
+      issuesChoice: null,
+    });
+    expect(resolveTicketSelection({ issuesChoice: null, vcsHost: null, githubConnected: true })).toEqual({
+      ticketSource: null,
+      issuesChoice: null,
+    });
+    expect(resolveTicketSelection({ issuesChoice: "jira", vcsHost: "github", githubConnected: true })).toEqual({
+      ticketSource: "jira",
+      issuesChoice: "jira",
+    });
+    expect(resolveTicketSelection({ issuesChoice: "linear", vcsHost: "github", githubConnected: true })).toEqual({
+      ticketSource: "linear",
+      issuesChoice: "linear",
+    });
+    expect(resolveTicketSelection({ issuesChoice: "skip", vcsHost: "github", githubConnected: true })).toEqual({
+      ticketSource: null,
+      issuesChoice: "skip",
+    });
+    expect(resolveTicketSelection({ issuesChoice: "vcs", vcsHost: "bitbucket", githubConnected: true })).toEqual({
+      ticketSource: null,
+      issuesChoice: "vcs",
+    });
+  });
+
+  it("allows GitHub Issues analysis only after connection", () => {
     expect(canAnalyzeTicketSource({ ticketSource: "github-issues" })).toBe(false);
     expect(canAnalyzeTicketSource({ ticketSource: "github-issues", githubConnected: true })).toBe(true);
     expect(canAnalyzeTicketSource({ ticketSource: null })).toBe(false);

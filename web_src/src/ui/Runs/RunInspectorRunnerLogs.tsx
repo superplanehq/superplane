@@ -1,3 +1,4 @@
+import { CopyButton } from "@/ui/CopyButton";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { buildExecutionInfo } from "@/pages/app/utils";
 import { isExecutionInFlight } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
@@ -5,6 +6,7 @@ import {
   terminalCommandStatusForExecution,
   terminalTimeMsForExecution,
   useLiveLogStream,
+  type LiveLogStreamSession,
 } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
 import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
@@ -38,14 +40,21 @@ export function RunnerLogsTimelineCard({ section, isOpen }: { section: RunInspec
   );
 }
 
-function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecution }) {
+export function RunnerLogsTerminal({
+  execution,
+  session,
+}: {
+  execution: CanvasesCanvasNodeExecution;
+  session?: LiveLogStreamSession;
+}) {
   const executionInfo = buildExecutionInfo(execution);
   const executionInFlight = isExecutionInFlight(executionInfo);
-  const { sections, orphanLines, error, isLoading, retry, scrollRef } = useLiveLogStream(
+  const { sections, orphanLines, error, isLoading, isStreaming, retry, scrollRef } = useLiveLogStream(
     executionInfo.id,
     executionInFlight,
     terminalCommandStatusForExecution(executionInfo),
     terminalTimeMsForExecution(executionInfo),
+    session,
   );
   const lines = runnerLogLines(orphanLines, sections);
 
@@ -53,7 +62,7 @@ function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecut
     return <LiveLogStateNotice state="error" error={error} willRetry={executionInFlight} onRetry={retry} compact />;
   }
 
-  if (lines.length === 0 && isLoading) {
+  if (lines.length === 0 && (isLoading || (isStreaming && !executionInFlight))) {
     return <LiveLogStateNotice state="loading" compact />;
   }
 
@@ -70,6 +79,10 @@ function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecut
       {error ? (
         <LiveLogStateNotice state="error" error={error} willRetry={executionInFlight} onRetry={retry} compact />
       ) : null}
+      <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+        <span>Runner log</span>
+        <CopyButton text={lines.join("\n")} ariaLabel="Copy logs" />
+      </div>
       <div
         ref={scrollRef}
         data-testid="run-inspector-runner-logs-terminal"

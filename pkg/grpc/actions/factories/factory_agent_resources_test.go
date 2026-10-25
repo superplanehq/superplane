@@ -12,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -24,15 +26,14 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
-func enableWorkspaceMCPAndSkills(t *testing.T, orgID uuid.UUID) {
+func enableWorkspaceSkills(t *testing.T, orgID uuid.UUID) {
 	t.Helper()
-	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureWorkspaceMCP))
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureWorkspaceSkills))
 }
 
 func Test__DeleteFactoryAgentResourceRevokesOAuth(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -72,7 +73,7 @@ func Test__DeleteFactoryAgentResourceRevokesOAuth(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceRevokesOAuthOnURLChange(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -115,7 +116,7 @@ func Test__UpdateFactoryAgentResourceRevokesOAuthOnURLChange(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceKeepsOAuthWhenUpdateFails(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -176,7 +177,7 @@ func Test__UpdateFactoryAgentResourceKeepsOAuthWhenUpdateFails(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceCreatesInlineSkill(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -197,7 +198,7 @@ func Test__CreateFactoryAgentResourceCreatesInlineSkill(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceRejectsEmptySkillMarkdown(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -213,7 +214,7 @@ func Test__CreateFactoryAgentResourceRejectsEmptySkillMarkdown(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceRejectsConnectedURL(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -253,7 +254,7 @@ func Test__CreateFactoryAgentResourceRejectsConnectedURL(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceStoresDisabledTools(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -280,7 +281,7 @@ func Test__UpdateFactoryAgentResourceStoresDisabledTools(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceEmptyToolListSetsDefaultApplied(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -306,7 +307,7 @@ func Test__UpdateFactoryAgentResourceEmptyToolListSetsDefaultApplied(t *testing.
 
 func Test__CreateFactoryAgentResourceDefaultsWriteToolsOff(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -333,7 +334,7 @@ func Test__CreateFactoryAgentResourceDefaultsWriteToolsOff(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceKeepsGoingWhenToolListFails(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -358,7 +359,7 @@ func Test__CreateFactoryAgentResourceKeepsGoingWhenToolListFails(t *testing.T) {
 
 func Test__finishFactoryAgentResourceOAuthConnectLeavesDefaultUnsetWhenListFails(t *testing.T) {
 	r := support.Setup(t)
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -426,7 +427,6 @@ func Test__finishFactoryAgentResourceOAuthConnectRejectsDuplicateURL(t *testing.
 
 func Test__CreateFactoryAgentResourceCreatesSetupCommands(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -445,7 +445,6 @@ func Test__CreateFactoryAgentResourceCreatesSetupCommands(t *testing.T) {
 
 func Test__CreateFactoryAgentResourceCreatesContextRepo(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -463,9 +462,82 @@ func Test__CreateFactoryAgentResourceCreatesContextRepo(t *testing.T) {
 	assert.Equal(t, "superplanehq/suss", response.GetResource().GetRepository())
 }
 
+func Test__CreateFactoryAgentResourceRejectsInaccessibleContextRepo(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "123")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+	t.Setenv("GITHUB_CLIENT_ID", "Iv1.env")
+	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
+
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	const githubUserID = int64(42)
+	const installationID = int64(707)
+	require.NoError(t, models.SaveAccountLinkedAccount(db, models.NewAccountLinkedAccount(
+		r.Account.ID,
+		models.ProviderGitHub,
+		"42",
+		"octocat",
+		"The Octocat",
+		"https://github.com/octocat.png",
+	)))
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: installationID,
+		AccountLogin:   "acme",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, []models.VCSProviderRepository{
+		{RepositoryID: 801, FullName: "acme/api"},
+		{RepositoryID: 802, FullName: "acme/secret"},
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, 801, []models.VCSProviderRepositoryCollaborator{{
+		ProviderUserID: githubUserID,
+		ProviderLogin:  "octocat",
+	}}))
+	integration, err := models.FindOrCreateVCSProviderBinding(db, r.Organization.ID, models.ProviderGitHub, installationID, "acme")
+	require.NoError(t, err)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	integrationID := integration.ID.String()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	_, err = CreateFactoryAgentResource(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId:  factory.ID.String(),
+		Kind:       pb.FactoryAgentResource_KIND_CONTEXT_REPO,
+		Enabled:    true,
+		Repository: "acme/secret",
+	})
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, code)
+
+	response, err := CreateFactoryAgentResource(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId:  factory.ID.String(),
+		Kind:       pb.FactoryAgentResource_KIND_CONTEXT_REPO,
+		Enabled:    true,
+		Repository: "acme/api",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acme/api", response.GetResource().GetRepository())
+
+	personal, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	personalIntegrationID := uuid.NewString()
+	require.NoError(t, personal.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &personalIntegrationID}))
+	personalResponse, err := CreateFactoryAgentResource(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId:  personal.ID.String(),
+		Kind:       pb.FactoryAgentResource_KIND_CONTEXT_REPO,
+		Enabled:    true,
+		Repository: "acme/other",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acme/other", personalResponse.GetResource().GetRepository())
+}
+
 func Test__CreateFactoryAgentResourceRejectsDuplicateContextRepo(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -490,7 +562,6 @@ func Test__CreateFactoryAgentResourceRejectsDuplicateContextRepo(t *testing.T) {
 
 func Test__UpdateFactoryAgentResourceReplacesSetupCommands(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -512,8 +583,7 @@ func Test__UpdateFactoryAgentResourceReplacesSetupCommands(t *testing.T) {
 
 func Test__ListFactoryAgentResourcesFiltersByNewKinds(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
-	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	enableWorkspaceSkills(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -539,20 +609,4 @@ func Test__ListFactoryAgentResourcesFiltersByNewKinds(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, repoList.GetResources(), 1)
-}
-
-func Test__CreateFactoryAgentResourceRequiresAgentFeatureForNewKinds(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-
-	_, err = CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
-		FactoryId: factory.ID.String(),
-		Kind:      pb.FactoryAgentResource_KIND_SETUP_COMMAND,
-		Enabled:   true,
-		Commands:  []string{"npm ci"},
-	})
-	require.Error(t, err)
-	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 }

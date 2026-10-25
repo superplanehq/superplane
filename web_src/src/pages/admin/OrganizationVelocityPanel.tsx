@@ -214,13 +214,7 @@ function VelocityCards({ report, periodDays }: { report: VelocityReport; periodD
         includePeople={report.hasPeopleCohort}
       />
       {report.automations.length > 0 ? (
-        <VelocityAutomationsTable
-          automations={report.automations}
-          organizationId=""
-          factoryKey=""
-          periodLabel={periodLabel}
-          linkNames={false}
-        />
+        <VelocityAutomationsTable automations={report.automations} periodLabel={periodLabel} />
       ) : null}
       <CostCard totals={report.totals} points={report.points} />
       <TaskCostCard points={report.points} />

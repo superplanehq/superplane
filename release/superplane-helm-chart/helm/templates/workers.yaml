@@ -104,6 +104,8 @@ spec:
               value: "yes"
             - name: START_PRICE_BOOK_SYNC_WORKER
               value: "yes"
+            - name: START_SEAT_RENEWAL_SYNC_WORKER
+              value: "yes"
             - name: START_PLANNING_SESSION_CLEANUP_WORKER
               value: "yes"
             - name: START_EVENT_RETENTION_WORKER
@@ -150,6 +152,7 @@ spec:
               value: {{ .Values.blobStorage.credentialsFile | quote }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
+            {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
 
           volumeMounts:
             - name: oidc-keys

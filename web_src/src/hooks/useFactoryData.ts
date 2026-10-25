@@ -35,6 +35,7 @@ import type {
   FactoriesWorkOrderState,
   FactoryAutomation,
   FactoryLineStep,
+  OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
@@ -65,6 +66,7 @@ import {
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
 import { integrationKeys } from "./useIntegrations";
+import { organizationBillingQueryKey } from "./useOrganizationBilling";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -73,6 +75,8 @@ export const factoryQueryKeys = {
   detail: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId] as const,
   workOrders: (organizationId: string, factoryId: string) =>
     ["factories", organizationId, factoryId, "work-orders"] as const,
+  historicalWorkOrders: (organizationId: string, factoryId: string) =>
+    ["factories", organizationId, factoryId, "work-orders", "including-archived"] as const,
   workOrdersPagePrefix: factoryWorkOrdersPagePrefix,
   workOrdersPage: factoryWorkOrdersPageKey,
   workOrderDetail: (organizationId: string, factoryId: string, orderId: string) =>
@@ -175,9 +179,16 @@ export function useFactory(organizationId: string, factoryId: string) {
   });
 }
 
-export function useFactoryWorkOrders(organizationId: string, factoryId: string) {
+export function useFactoryWorkOrders(
+  organizationId: string,
+  factoryId: string,
+  options?: { includeArchived?: boolean },
+) {
+  const includeArchived = options?.includeArchived === true;
   return useQuery({
-    queryKey: workOrdersKey(organizationId, factoryId),
+    queryKey: includeArchived
+      ? factoryQueryKeys.historicalWorkOrders(organizationId, factoryId)
+      : workOrdersKey(organizationId, factoryId),
     queryFn: async (): Promise<FactoriesWorkOrderSummary[]> => {
       const orders: FactoriesWorkOrderSummary[] = [];
       let beforeId: string | undefined;
@@ -188,6 +199,7 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
             path: { factoryId },
             query: {
               limit: WORK_ORDER_LIST_PAGE_SIZE,
+              ...(includeArchived ? { includeArchived: true } : {}),
               ...(beforeId ? { beforeId } : {}),
             },
           }),
@@ -575,7 +587,7 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { title: string; description: string; assigneeIds?: string[] }) => {
+    mutationFn: async (input: { title: string; description: string; assigneeIds?: string[]; model?: string }) => {
       const response = await factoriesCreateWorkOrder(
         withOrganizationHeader({
           organizationId,
@@ -584,6 +596,7 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
             title: input.title,
             description: input.description,
             assigneeIds: input.assigneeIds,
+            ...(input.model ? { model: input.model } : {}),
           },
         }),
       );
@@ -594,10 +607,13 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     },
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      // A Backlog run starts only when Planning is on. Show Analyzing until
-      // that run arrives. Missing factory data defaults to Planning on.
       const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
-      if (factoryPlanningEnabled(factory)) {
+      const billing = queryClient.getQueryData<OrganizationsDescribeOrganizationBillingResponse>(
+        organizationBillingQueryKey(organizationId),
+      );
+      // Predict analysis only when the server permits runs. Otherwise wait
+      // for a real run, including when billing has not loaded yet.
+      if (factoryPlanningEnabled(factory) && billing?.hostedExecutionAllowed === true) {
         markBacklogAnalysisPending(order.id);
       }
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });

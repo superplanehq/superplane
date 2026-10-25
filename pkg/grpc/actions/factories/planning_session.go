@@ -2,18 +2,21 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -91,6 +94,15 @@ func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndP
 }
 
 func SendPlanningSessionMessage(ctx context.Context, organizationID string, req *pb.SendPlanningSessionMessageRequest) (*pb.SendPlanningSessionMessageResponse, error) {
+	return sendPlanningSessionMessage(ctx, organizationID, req, "message")
+}
+
+func sendPlanningSessionMessage(
+	ctx context.Context,
+	organizationID string,
+	req *pb.SendPlanningSessionMessageRequest,
+	interaction string,
+) (*pb.SendPlanningSessionMessageResponse, error) {
 	session, factoryModel, userID, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
@@ -99,7 +111,20 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
 	db := database.DB(ctx)
+	if err := polar.AssertOrganizationPaymentMethod(db, session.OrganizationID); err != nil {
+		if errors.Is(err, models.ErrPaymentMethodRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, err.Error())
+		}
+		return nil, grpcerrors.Internal(err, "Could not verify the payment method.")
+	}
+	if err := models.AssertOrganizationPlanAllowsRuns(db, session.OrganizationID); err != nil {
+		if errors.Is(err, models.ErrHostedSubscriptionRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
+		}
+		return nil, grpcerrors.Internal(err, "Could not verify the organization plan.")
+	}
 	assigned := false
+	firstRefinement := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		draft, err := lockAnalysisSessionAndDraft(tx, session)
 		if err != nil {
@@ -117,6 +142,7 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		if err := session.SendUserMessage(tx, req.GetText(), userID); err != nil {
 			return err
 		}
+		firstRefinement = isFirstPlanningUserMessage(tx, session.ID)
 		// Taking part in the refinement makes the sender an owner of the draft.
 		if assigned, err = draft.AddAssignee(tx, userID, userID); err != nil {
 			return err
@@ -135,6 +161,9 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 		publishDraftAssigneesUpdated(session)
 	}
 	messages.PublishPlanningBoardStatus(session)
+	if firstRefinement {
+		capturePlanningRefinement(ctx, db, factoryModel, session, interaction)
+	}
 	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
@@ -142,12 +171,47 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 	return &pb.SendPlanningSessionMessageResponse{Session: serialized}, nil
 }
 
+func isFirstPlanningUserMessage(tx *gorm.DB, sessionID uuid.UUID) bool {
+	userMessages, err := models.CountPlanningSessionUserMessages(tx, sessionID)
+	if err != nil {
+		log.WithError(err).Warn("Skipped factory task refined analytics")
+		return false
+	}
+	return userMessages == 1
+}
+
+func capturePlanningRefinement(
+	ctx context.Context,
+	db *gorm.DB,
+	factory *models.Factory,
+	session *models.FactoryPlanningSession,
+	interaction string,
+) {
+	if session == nil {
+		return
+	}
+
+	taskID := uuid.Nil
+	if session.DraftWorkOrderID != nil {
+		taskID = *session.DraftWorkOrderID
+	}
+	captureFactoryProductEvent(
+		ctx,
+		db,
+		factory,
+		taskID,
+		productanalytics.EventFactoryTaskRefined,
+		productanalytics.StableEventID(productanalytics.EventFactoryTaskRefined, session.ID.String()),
+		productanalytics.Properties{"interaction": interaction},
+	)
+}
+
 func AnswerPlanningSessionSurvey(ctx context.Context, organizationID string, req *pb.AnswerPlanningSessionSurveyRequest) (*pb.AnswerPlanningSessionSurveyResponse, error) {
-	response, err := SendPlanningSessionMessage(ctx, organizationID, &pb.SendPlanningSessionMessageRequest{
+	response, err := sendPlanningSessionMessage(ctx, organizationID, &pb.SendPlanningSessionMessageRequest{
 		FactoryId: req.GetFactoryId(),
 		SessionId: req.GetSessionId(),
 		Text:      req.GetText(),
-	})
+	}, "survey_answer")
 	if err != nil {
 		return nil, err
 	}
@@ -474,8 +538,9 @@ func planningSessionSurveyQuestions(survey models.PlanningSessionSurvey) []*pb.P
 	questions := make([]*pb.PlanningSessionSurveyQuestion, 0, len(survey.Questions))
 	for _, question := range survey.Questions {
 		questions = append(questions, &pb.PlanningSessionSurveyQuestion{
-			Prompt:  question.Prompt,
-			Options: question.Options,
+			Prompt:            question.Prompt,
+			Options:           question.Options,
+			RecommendedOption: question.RecommendedOption,
 		})
 	}
 	return questions

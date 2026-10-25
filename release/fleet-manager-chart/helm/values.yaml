@@ -44,8 +44,8 @@ startupJob:
 fleets:
   - id: e1-large-amd64
     runnerVersion: v0.1.0
-    warmCapacity: 0
-    maxCapacity: 1
+    warmCapacity: 1
+    maxCapacity: 10
     spec:
       operatingSystem: linux
       architecture: amd64

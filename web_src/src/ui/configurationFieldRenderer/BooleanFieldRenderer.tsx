@@ -30,7 +30,7 @@ export const BooleanFieldRenderer: React.FC<FieldRendererProps & { labeled?: boo
     );
   }
 
-  return <Switch checked={checked} onCheckedChange={onChange} className="" />;
+  return <Switch checked={checked} onCheckedChange={onChange} aria-label={field?.label || fieldName} className="" />;
 };
 
 function coerceFieldValuesIntoBoolean(

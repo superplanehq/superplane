@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,8 @@ import {
   type SpendingUsageEvent,
 } from "./spendingRedesignLib";
 import { SpendingPeriodControls } from "./SpendingPeriodControls";
-import { SpendingKpiRow, SpendingUsageSection } from "./SpendingRedesignPanels";
+import { SpendingKpiRow } from "./SpendingKpiRow";
+import { SpendingUsageSection } from "./SpendingRedesignPanels";
 import { useSpendingRedesignPageModel, type SpendingRedesignControlledState } from "./useSpendingRedesignPageModel";
 
 export interface SpendingRedesignPageProps extends SpendingRedesignControlledState {
@@ -68,6 +70,7 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
     ...modelArgs
   } = props;
   usePageTitle(["Spending"], { enabled: setDocumentTitle });
+  const billingProductEnabled = useBillingProductEnabled();
   const view = useSpendingRedesignPageModel({ ...modelArgs, catalogs });
   const metrics = spendingMetricCopy(view.rangeTotals);
   // Reports from a real query are only present once the first fetch
@@ -116,9 +119,15 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
         }
       />
       <div className={cn(factorySettingsWideSectionBodyClassName, "flex flex-col gap-5")}>
-        <SpendingKpiRow credit={credit} metrics={metrics} rangeCaption={formatSpendingRangeCaption(view.range)} />
+        <SpendingKpiRow
+          billingEnabled={billingProductEnabled}
+          credit={credit}
+          metrics={metrics}
+          rangeCaption={formatSpendingRangeCaption(view.range)}
+        />
         <SpendingUsageSection
           breakdown={view.modelBreakdown}
+          billingEnabled={billingProductEnabled}
           catalogs={catalogs}
           filters={view.modelFilters}
           kind="model"
@@ -128,6 +137,7 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
         />
         <SpendingUsageSection
           breakdown={view.machineBreakdown}
+          billingEnabled={billingProductEnabled}
           catalogs={catalogs}
           filters={view.machineFilters}
           kind="compute"

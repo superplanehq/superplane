@@ -32,6 +32,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
@@ -43,6 +44,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/public"
 	"github.com/superplanehq/superplane/pkg/public/runnerapi"
 	registry "github.com/superplanehq/superplane/pkg/registry"
@@ -380,6 +382,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_SEAT_RENEWAL_SYNC_WORKER") == "yes" {
+		log.Println("Starting Seat Renewal Sync Worker")
+
+		w := workers.NewSeatRenewalSyncWorker()
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_PLANNING_SESSION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Planning Session Cleanup Worker")
 
@@ -412,13 +421,7 @@ func startWorkers(
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
-	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
-		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
-		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
-		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
-		FromName:          os.Getenv("EMAIL_FROM_NAME"),
-		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
-	})
+	emailService := buildEmailService(encryptor)
 	discord := services.NewDiscordWebhookClient(os.Getenv("DISCORD_FEEDBACK_WEBHOOK_URL"))
 
 	if emailService == nil && !discord.Enabled() {
@@ -480,15 +483,18 @@ func buildGRPCServices(
 	agentService agentsActions.AgentsService,
 	jwtSigner *jwt.Signer,
 	licenseService *licensing.Service,
+	keyStore *encryption.Store,
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
 
 	return grpc.NewServices(grpc.ServicesConfig{
+		EmailService:     buildEmailService(encryptor),
 		BaseURL:          baseURL,
 		WebhooksBaseURL:  webhooksBaseURL,
 		RunnerAPIBaseURL: runnerAPIBaseURL,
 		Encryptor:        encryptor,
+		EncryptionStore:  keyStore,
 		AuthService:      authService,
 		Registry:         registry,
 		OIDCProvider:     oidcProvider,
@@ -499,7 +505,43 @@ func buildGRPCServices(
 	})
 }
 
-func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string) {
+type processShutdown struct {
+	mu                sync.Mutex
+	stopRunner        func()
+	stopNotifications context.CancelFunc
+}
+
+func (s *processShutdown) setRunner(stopRunner func(), stopNotifications context.CancelFunc) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopRunner = stopRunner
+	s.stopNotifications = stopNotifications
+}
+
+func (s *processShutdown) wait() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
+	<-signals
+	signal.Stop(signals)
+	s.stop()
+}
+
+func (s *processShutdown) stop() {
+	s.mu.Lock()
+	stopRunner := s.stopRunner
+	stopNotifications := s.stopNotifications
+	s.mu.Unlock()
+
+	if stopNotifications != nil {
+		stopNotifications()
+	}
+	if stopRunner != nil {
+		stopRunner()
+	}
+	closeProductAnalytics()
+}
+
+func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string, shutdown *processShutdown) {
 	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
 	if err != nil {
 		log.Fatalf("failed to create runner API server: %v", err)
@@ -510,20 +552,9 @@ func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLog
 	notificationsCtx, stopNotifications := context.WithCancel(context.Background())
 	defer stopNotifications()
 	server.StartControlNotifications(notificationsCtx, uuid.NewString())
-	serveDone := make(chan error, 1)
-	go func() { serveDone <- server.Serve(address) }()
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
-	select {
-	case err := <-serveDone:
-		if err != nil {
-			log.Fatal(err)
-		}
-	case <-signals:
-		stopNotifications()
-		shutdownRunnerAPI(server)
-		os.Exit(0)
+	shutdown.setRunner(func() { shutdownRunnerAPI(server) }, stopNotifications)
+	if err := server.Serve(address); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -532,6 +563,7 @@ func registerRunnerAPI(
 	jwtSigner *jwt.Signer,
 	encryptor crypto.Encryptor,
 	activeLogStoreName string,
+	shutdown *processShutdown,
 ) {
 	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
 	if err != nil {
@@ -541,16 +573,7 @@ func registerRunnerAPI(
 	publicServer.Router.PathPrefix("/runner/v1").Handler(server.Handler())
 	notificationsCtx, stopNotifications := context.WithCancel(context.Background())
 	server.StartControlNotifications(notificationsCtx, uuid.NewString())
-
-	go func() {
-		signals := make(chan os.Signal, 1)
-		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
-		defer signal.Stop(signals)
-		<-signals
-		stopNotifications()
-		shutdownRunnerAPI(server)
-		os.Exit(0)
-	}()
+	shutdown.setRunner(func() { shutdownRunnerAPI(server) }, stopNotifications)
 }
 
 func shutdownRunnerAPI(server *runnerapi.Server) {
@@ -576,6 +599,7 @@ func startPublicAPI(
 	licenseService *licensing.Service,
 	grpcServices *grpc.Services,
 	activeLogStoreName string,
+	shutdown *processShutdown,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
 
@@ -632,7 +656,7 @@ func startPublicAPI(
 
 	if os.Getenv("START_RUNNER_API") == "yes" {
 		log.Println("Registering Runner API routes on Public API")
-		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName)
+		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName, shutdown)
 	}
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
@@ -735,28 +759,27 @@ func Start() {
 	configureLogging()
 	setupOtel()
 	startPprofServer()
+	initializeProductAnalytics()
 
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
 
+	if err := models.BindLegacyBillingProduct(database.Conn(), os.Getenv("POLAR_BUSINESS_PRODUCT_ID")); err != nil {
+		log.Fatalf("bind legacy billing product: %v", err)
+	}
 	if err := models.LoadCurrentPriceBook(database.Conn()); err != nil {
 		log.WithError(err).Warn("failed to load usage price book; using in-memory rates")
 	}
 
-	encryptionKey := os.Getenv("ENCRYPTION_KEY")
-	if encryptionKey == "" {
-		panic("ENCRYPTION_KEY can't be empty")
-	}
-
 	log.SetLevel(log.DebugLevel)
 
-	var encryptorInstance crypto.Encryptor
-	if os.Getenv("NO_ENCRYPTION") == "yes" {
-		log.Warn("NO_ENCRYPTION is set to yes, using NoOpEncryptor")
-		encryptorInstance = crypto.NewNoOpEncryptor()
-	} else {
-		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
+	encryptionConfig, err := loadApplicationEncryption(context.Background())
+	if err != nil {
+		panic(err)
 	}
+	encryptorInstance := encryptionConfig.encryptor
+	keyStore := encryptionConfig.keyStore
+	crypto.SetProcessEncryptor(encryptorInstance)
 
 	bitbucketapp.SetSystemTokenSource(func(installationID string) (string, time.Time, error) {
 		return bitbucketapp.LoadSystemToken(context.Background(), database.Conn(), encryptorInstance, installationID, time.Now())
@@ -860,10 +883,19 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
+	if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
+		rabbitMQURL, err := config.RabbitMQURL()
+		if err != nil {
+			panic(err)
+		}
+		worker := workers.NewApplicationEncryptionMigrationWorker(rabbitMQURL, encryptorInstance, registry, models.ApplicationEncryptedStorage())
+		go worker.Start(context.Background())
+	}
 
 	agentProvider, agentService := buildAgentService(authService)
 
 	var grpcServices *grpc.Services
+	shutdown := &processShutdown{}
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		services, err := buildGRPCServices(
 			baseURL,
@@ -876,6 +908,7 @@ func Start() {
 			agentService,
 			jwtSigner,
 			licenseService,
+			keyStore,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)
@@ -893,9 +926,10 @@ func Start() {
 			licenseService,
 			grpcServices,
 			activeLogStoreName,
+			shutdown,
 		)
 	} else if os.Getenv("START_RUNNER_API") == "yes" {
-		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName)
+		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName, shutdown)
 	}
 
 	startWorkers(
@@ -908,8 +942,22 @@ func Start() {
 	)
 
 	log.Println("SuperPlane is UP.")
+	shutdown.wait()
+}
 
-	select {}
+func initializeProductAnalytics() {
+	client, err := productanalytics.New(os.Getenv("POSTHOG_KEY"))
+	if err != nil {
+		log.WithError(err).Warn("Failed to initialize product analytics")
+		return
+	}
+	productanalytics.SetCurrent(client)
+}
+
+func closeProductAnalytics() {
+	if err := productanalytics.CloseCurrent(); err != nil {
+		log.WithError(err).Warn("Failed to flush product analytics")
+	}
 }
 
 func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
@@ -999,3 +1047,13 @@ func newRunnerActiveLogStore() (runnerlogs.Store, error) {
  * and also from emitting large events.
  */
 var DefaultMaxHTTPResponseBytes int64 = 8 * 1024 * 1024
+
+func buildEmailService(encryptor crypto.Encryptor) services.EmailService {
+	return services.BuildEmailService(encryptor, services.EmailServiceConfig{
+		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
+		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
+		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+		FromName:          os.Getenv("EMAIL_FROM_NAME"),
+		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
+	})
+}

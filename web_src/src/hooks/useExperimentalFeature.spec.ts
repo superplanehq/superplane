@@ -1,6 +1,6 @@
 import type { OrganizationsOrganization } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -20,7 +20,7 @@ import {
   type ExperimentalFeaturesRegistry,
 } from "@/hooks/useExperimentalFeatures";
 import { organizationKeys } from "@/hooks/useOrganizationData";
-import * as organizationDataModule from "@/hooks/useOrganizationData";
+import * as apiClient from "@/api-client";
 
 const ORG_ID = "org-1";
 
@@ -86,6 +86,7 @@ describe("useExperimentalFeature", () => {
       "isLoading",
       "lookupFailed",
       "organizationReady",
+      "retryOrganization",
     ]);
     expect(result.current.has).toEqual(expect.any(Function));
     expect(result.current.enabledExperimentalFeatures).toEqual(expect.any(Array));
@@ -300,27 +301,27 @@ describe("useExperimentalFeature", () => {
     expect(result.current.enabledExperimentalFeatures).toEqual([]);
   });
 
-  it("does not mark the organization ready when the organization lookup fails", () => {
+  it("allows retry without marking a failed organization lookup ready", async () => {
     const queryClient = createQueryClient();
-    seedQueries(queryClient, {
-      registry: {
-        features: [makeFeature({ id: "factory_jira_intake" })],
-      },
-    });
-    const organizationSpy = vi.spyOn(organizationDataModule, "useOrganization").mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isSuccess: false,
-      isError: true,
-    } as ReturnType<typeof organizationDataModule.useOrganization>);
-
-    const { result } = renderHook(() => useExperimentalFeature(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.organizationReady).toBe(false);
-    expect(result.current.has("factory_jira_intake")).toBe(false);
-    organizationSpy.mockRestore();
+    seedQueries(queryClient, { registry: { features: [makeFeature({ id: "preview" })] } });
+    const request = vi
+      .spyOn(apiClient, "organizationsDescribeOrganization")
+      .mockRejectedValueOnce(new Error("Organization unavailable"))
+      .mockResolvedValue({
+        data: { organization: { spec: { enabledExperimentalFeatures: ["preview"] } } },
+        request: new Request("http://localhost/api/v1/organizations/org-1"),
+        response: new Response(),
+      });
+    try {
+      const { result } = renderHook(() => useExperimentalFeature(), { wrapper: createWrapper(queryClient) });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.organizationReady).toBe(false);
+      expect(result.current.has("preview")).toBe(false);
+      act(() => result.current.retryOrganization?.());
+      await waitFor(() => expect(result.current.organizationReady).toBe(true));
+      expect(result.current.has("preview")).toBe(true);
+    } finally {
+      request.mockRestore();
+    }
   });
 });

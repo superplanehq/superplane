@@ -13,6 +13,8 @@ import { FactoryAutomationRunsSidebar } from "./factoryAutomationRunsSidebar/Fac
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { useSettingsAutomationRunCanvas } from "./useSettingsAutomationRunCanvas";
 
+export type RunSelectionChange = (runId: string | null, options?: { replace?: boolean }) => void;
+
 interface SettingsAutomationWorkspaceProps {
   graph: IntakeAutomationGraph;
   testId: string;
@@ -35,7 +37,7 @@ interface SettingsAutomationWorkspaceProps {
   layoutFitNonce?: number | null;
   /** Keep the chosen run when this workspace unmounts. */
   selectedRunId?: string | null;
-  onSelectedRunIdChange?: (runId: string | null) => void;
+  onSelectedRunIdChange?: RunSelectionChange;
   className?: string;
 }
 
@@ -142,7 +144,7 @@ function useAutomationRuns({
   selectLatestRun: boolean;
   showRuns: boolean;
   controlledRunId?: string | null;
-  onSelectedRunIdChange?: (runId: string | null) => void;
+  onSelectedRunIdChange?: RunSelectionChange;
 }) {
   const resolvedCanvasId = canvasId ?? "";
   const organizationId = graph.organizationId ?? "";
@@ -254,7 +256,7 @@ function useSelectedCanvasRun(
   listedRuns: { id?: string }[],
   selectLatestRun: boolean,
   controlledRunId: string | null | undefined,
-  onSelectedRunIdChange?: (runId: string | null) => void,
+  onSelectedRunIdChange?: RunSelectionChange,
 ) {
   const [uncontrolledRunId, setUncontrolledRunId] = useState<string | null>(null);
   const latestRunSelected = useRef(false);
@@ -280,7 +282,7 @@ function useSelectedCanvasRun(
     if (!isControlled) {
       setUncontrolledRunId(latestRunId);
     }
-    onSelectedRunIdChange?.(latestRunId);
+    onSelectedRunIdChange?.(latestRunId, { replace: true });
   }, [isControlled, listedRuns, onSelectedRunIdChange, selectLatestRun, selectedRunId]);
 
   return { selectedRunId, selectRun };

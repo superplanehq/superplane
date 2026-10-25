@@ -248,6 +248,82 @@ CREATE TABLE public.app_messages (
 
 
 --
+-- Name: application_encryption_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.application_encryption_keys (
+    id uuid NOT NULL,
+    wrapped_key bytea NOT NULL,
+    master_key_ref text NOT NULL,
+    state text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT application_encryption_keys_state_check CHECK ((state = ANY (ARRAY['active'::text, 'available'::text])))
+);
+
+
+--
+-- Name: application_encryption_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.application_encryption_migrations (
+    id uuid NOT NULL,
+    target_key_id uuid NOT NULL,
+    state text NOT NULL,
+    registry_version integer NOT NULL,
+    storage_location text NOT NULL,
+    cursor text DEFAULT ''::text NOT NULL,
+    error_message text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    CONSTRAINT application_encryption_migrations_state_check CHECK ((state = ANY (ARRAY['pending'::text, 'running'::text, 'auditing'::text, 'failed'::text, 'completed'::text])))
+);
+
+
+--
+-- Name: billing_plans; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.billing_plans (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    key text NOT NULL,
+    name text NOT NULL,
+    category text NOT NULL,
+    visibility text DEFAULT 'private'::text NOT NULL,
+    price_cents bigint DEFAULT 0 NOT NULL,
+    per_seat boolean DEFAULT false NOT NULL,
+    polar_product_id text,
+    seat_limit integer,
+    parallel_task_limit integer,
+    credit_amount_cents bigint DEFAULT 0 NOT NULL,
+    credit_frequency text DEFAULT 'none'::text NOT NULL,
+    credit_expiration text DEFAULT 'never'::text NOT NULL,
+    credit_validity_days integer,
+    trial_credit_cents bigint DEFAULT 0 NOT NULL,
+    trial_length_days integer DEFAULT 14 NOT NULL,
+    markup_bps integer,
+    features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    require_payment_method boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT billing_plans_category_check CHECK ((category = ANY (ARRAY['none'::text, 'trial'::text, 'paid'::text]))),
+    CONSTRAINT billing_plans_check CHECK (((credit_expiration <> 'after_days'::text) OR (credit_validity_days > 0))),
+    CONSTRAINT billing_plans_credit_amount_cents_check CHECK ((credit_amount_cents >= 0)),
+    CONSTRAINT billing_plans_credit_expiration_check CHECK ((credit_expiration = ANY (ARRAY['period_end'::text, 'after_days'::text, 'never'::text]))),
+    CONSTRAINT billing_plans_credit_frequency_check CHECK ((credit_frequency = ANY (ARRAY['none'::text, 'once'::text, 'billing_period'::text]))),
+    CONSTRAINT billing_plans_key_check CHECK ((key ~ '^[a-z][a-z0-9_]*$'::text)),
+    CONSTRAINT billing_plans_markup_bps_check CHECK ((markup_bps >= 0)),
+    CONSTRAINT billing_plans_name_check CHECK ((btrim(name) <> ''::text)),
+    CONSTRAINT billing_plans_parallel_task_limit_check CHECK ((parallel_task_limit > 0)),
+    CONSTRAINT billing_plans_price_cents_check CHECK ((price_cents >= 0)),
+    CONSTRAINT billing_plans_seat_limit_check CHECK ((seat_limit > 0)),
+    CONSTRAINT billing_plans_trial_credit_cents_check CHECK ((trial_credit_cents >= 0)),
+    CONSTRAINT billing_plans_trial_length_days_check CHECK ((trial_length_days > 0)),
+    CONSTRAINT billing_plans_visibility_check CHECK ((visibility = ANY (ARRAY['public'::text, 'private'::text])))
+);
+
+
+--
 -- Name: bitbucket_forge_installations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -264,6 +340,17 @@ CREATE TABLE public.bitbucket_forge_installations (
     uninstalled_at timestamp without time zone,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: built_in_automation_resets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.built_in_automation_resets (
+    template_id character varying(255) NOT NULL,
+    account_id uuid,
+    reset_at timestamp without time zone NOT NULL
 );
 
 
@@ -327,6 +414,24 @@ CREATE SEQUENCE public.casbin_rule_id_seq
 --
 
 ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
+
+
+--
+-- Name: credit_packs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.credit_packs (
+    id uuid NOT NULL,
+    name text NOT NULL,
+    amount_cents bigint NOT NULL,
+    enabled boolean DEFAULT false NOT NULL,
+    polar_product_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    CONSTRAINT credit_packs_amount_cents_check CHECK (((amount_cents = 0) OR ((amount_cents >= 50) AND (amount_cents <= 99999999)))),
+    CONSTRAINT credit_packs_name_check CHECK ((length(TRIM(BOTH FROM name)) > 0))
+);
 
 
 --
@@ -631,6 +736,7 @@ CREATE TABLE public.factory_pull_request_runs (
     access_granted_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     title text DEFAULT ''::text NOT NULL,
+    fixes_continued_at timestamp with time zone,
     CONSTRAINT factory_pull_request_runs_access_valid CHECK (((access)::text = ANY ((ARRAY['concurrent'::character varying, 'waiting'::character varying, 'exclusive'::character varying, 'released'::character varying])::text[]))),
     CONSTRAINT factory_pull_request_runs_attempt_limit_positive CHECK (((attempt_limit IS NULL) OR (attempt_limit > 0))),
     CONSTRAINT factory_pull_request_runs_attempt_positive CHECK (((attempt IS NULL) OR (attempt > 0))),
@@ -899,6 +1005,7 @@ CREATE TABLE public.factory_work_orders (
     mcp_client_id text,
     mcp_client_name text,
     vcs_provider text,
+    refinement_model text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -1051,6 +1158,10 @@ CREATE TABLE public.installation_llm_settings (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     default_hosted_provider text,
     default_hosted_model text,
+    credit_purchase_fee_bps integer DEFAULT 0 NOT NULL,
+    credit_purchase_fixed_fee_cents bigint DEFAULT 0 NOT NULL,
+    CONSTRAINT installation_llm_settings_credit_purchase_fee_range CHECK (((credit_purchase_fee_bps >= 0) AND (credit_purchase_fee_bps < 10000))),
+    CONSTRAINT installation_llm_settings_credit_purchase_fixed_fee_non_negativ CHECK ((credit_purchase_fixed_fee_cents >= 0)),
     CONSTRAINT installation_llm_settings_default_model_pair CHECK ((((default_hosted_provider IS NULL) AND (default_hosted_model IS NULL)) OR ((default_hosted_provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])) AND (default_hosted_model IS NOT NULL) AND (btrim(default_hosted_model) <> ''::text)))),
     CONSTRAINT installation_llm_settings_markup_non_negative CHECK ((markup_bps >= 0)),
     CONSTRAINT installation_llm_settings_singleton CHECK ((id = 1)),
@@ -1070,6 +1181,12 @@ CREATE TABLE public.installation_metadata (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     allow_private_network_access boolean DEFAULT false NOT NULL,
     signups_enabled boolean DEFAULT true NOT NULL,
+    owner_setup_step text,
+    share_owner_identity boolean DEFAULT false NOT NULL,
+    invitation_duration_days integer DEFAULT 7 NOT NULL,
+    past_due_grace_days integer DEFAULT 0 NOT NULL,
+    CONSTRAINT installation_metadata_invitation_duration_days_check CHECK (((invitation_duration_days >= 1) AND (invitation_duration_days <= 365))),
+    CONSTRAINT installation_metadata_past_due_grace_days_check CHECK (((past_due_grace_days >= 0) AND (past_due_grace_days <= 21))),
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -1167,7 +1284,14 @@ CREATE TABLE public.organization_billing_plans (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     cancel_at_period_end boolean DEFAULT false NOT NULL,
     polar_modified_at timestamp with time zone,
-    CONSTRAINT organization_billing_plans_plan CHECK ((plan = ANY (ARRAY['trial'::text, 'business'::text, 'none'::text]))),
+    plan_id uuid NOT NULL,
+    purchased_seats integer,
+    past_due_since timestamp with time zone,
+    over_capacity_since timestamp with time zone,
+    renewal_seats_scheduled integer,
+    renewal_seats_scheduled_at timestamp with time zone,
+    CONSTRAINT organization_billing_plans_purchased_seats_check CHECK ((purchased_seats >= 0)),
+    CONSTRAINT organization_billing_plans_renewal_seats_scheduled_check CHECK ((renewal_seats_scheduled >= 1)),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
 
@@ -1186,6 +1310,17 @@ CREATE TABLE public.organization_byok_model_allowlists (
 
 
 --
+-- Name: organization_feature_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_feature_grants (
+    organization_id uuid NOT NULL,
+    feature_key text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL
+);
+
+
+--
 -- Name: organization_hosted_model_allowlists; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1195,6 +1330,28 @@ CREATE TABLE public.organization_hosted_model_allowlists (
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT organization_hosted_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+);
+
+
+--
+-- Name: organization_invitation_replaced_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_invitation_replaced_tokens (
+    token_hash character varying(64) NOT NULL,
+    invitation_id uuid NOT NULL
+);
+
+
+--
+-- Name: organization_invitation_sends; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_invitation_sends (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    email character varying(255) NOT NULL,
+    sent_at timestamp with time zone NOT NULL
 );
 
 
@@ -1210,7 +1367,13 @@ CREATE TABLE public.organization_invitations (
     state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    canvas_ids jsonb DEFAULT '[]'::jsonb
+    canvas_ids jsonb DEFAULT '[]'::jsonb,
+    role character varying(255) DEFAULT 'org_operator'::character varying NOT NULL,
+    token_hash character varying(64),
+    expires_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    accepted_at timestamp without time zone,
+    accepted_by uuid,
+    sent_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -1243,8 +1406,8 @@ CREATE TABLE public.organization_llm_credit_grants (
     polar_order_id text,
     polar_refund_id text,
     expires_at timestamp with time zone,
-    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'topup_refund'::text) AND (amount_micros < 0)) OR ((kind = ANY (ARRAY['trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text])) AND (amount_micros <> 0)) OR ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text])) AND (amount_micros > 0)))),
-    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text, 'topup_refund'::text, 'trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text])))
+    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'topup_refund'::text) AND (amount_micros < 0)) OR ((kind = ANY (ARRAY['trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text, 'included_adjustment'::text])) AND (amount_micros <> 0)) OR ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text])) AND (amount_micros > 0)))),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text, 'topup_refund'::text, 'trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text, 'included_adjustment'::text])))
 );
 
 
@@ -1258,6 +1421,38 @@ CREATE TABLE public.organization_llm_settings (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     polar_customer_id text,
     CONSTRAINT organization_llm_settings_markup_non_negative CHECK (((markup_bps IS NULL) OR (markup_bps >= 0)))
+);
+
+
+--
+-- Name: organization_seat_limit_overrides; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_seat_limit_overrides (
+    organization_id uuid NOT NULL,
+    seat_limit integer,
+    CONSTRAINT organization_seat_limit_overrides_seat_limit_check CHECK ((seat_limit > 0))
+);
+
+
+--
+-- Name: organization_seat_purchases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_seat_purchases (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid,
+    polar_subscription_id text NOT NULL,
+    from_seats integer NOT NULL,
+    to_seats integer NOT NULL,
+    status text NOT NULL,
+    error_code text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_seat_purchases_adds_seats CHECK ((to_seats > from_seats)),
+    CONSTRAINT organization_seat_purchases_from_seats_check CHECK ((from_seats >= 0)),
+    CONSTRAINT organization_seat_purchases_status CHECK ((status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'action_required'::text, 'unknown'::text])))
 );
 
 
@@ -1277,6 +1472,19 @@ CREATE TABLE public.organizations (
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
     created_by_account_id uuid
+);
+
+
+--
+-- Name: plan_feature_definitions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.plan_feature_definitions (
+    key text NOT NULL,
+    label text NOT NULL,
+    gated boolean DEFAULT true NOT NULL,
+    CONSTRAINT plan_feature_definitions_key_check CHECK ((key ~ '^[a-z][a-z0-9_]*$'::text)),
+    CONSTRAINT plan_feature_definitions_label_check CHECK ((btrim(label) <> ''::text))
 );
 
 
@@ -2176,11 +2384,59 @@ ALTER TABLE ONLY public.app_messages
 
 
 --
+-- Name: application_encryption_keys application_encryption_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.application_encryption_keys
+    ADD CONSTRAINT application_encryption_keys_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: application_encryption_migrations application_encryption_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.application_encryption_migrations
+    ADD CONSTRAINT application_encryption_migrations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: billing_plans billing_plans_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_plans
+    ADD CONSTRAINT billing_plans_key_key UNIQUE (key);
+
+
+--
+-- Name: billing_plans billing_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_plans
+    ADD CONSTRAINT billing_plans_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: billing_plans billing_plans_polar_product_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_plans
+    ADD CONSTRAINT billing_plans_polar_product_id_key UNIQUE (polar_product_id);
+
+
+--
 -- Name: bitbucket_forge_installations bitbucket_forge_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.bitbucket_forge_installations
     ADD CONSTRAINT bitbucket_forge_installations_pkey PRIMARY KEY (installation_id);
+
+
+--
+-- Name: built_in_automation_resets built_in_automation_resets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.built_in_automation_resets
+    ADD CONSTRAINT built_in_automation_resets_pkey PRIMARY KEY (template_id);
 
 
 --
@@ -2205,6 +2461,14 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 ALTER TABLE ONLY public.casbin_rule
     ADD CONSTRAINT casbin_rule_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: credit_packs credit_packs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.credit_packs
+    ADD CONSTRAINT credit_packs_pkey PRIMARY KEY (id);
 
 
 --
@@ -2640,6 +2904,14 @@ ALTER TABLE ONLY public.organization_byok_model_allowlists
 
 
 --
+-- Name: organization_feature_grants organization_feature_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_feature_grants
+    ADD CONSTRAINT organization_feature_grants_pkey PRIMARY KEY (organization_id, feature_key);
+
+
+--
 -- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2648,11 +2920,35 @@ ALTER TABLE ONLY public.organization_hosted_model_allowlists
 
 
 --
+-- Name: organization_invitation_replaced_tokens organization_invitation_replaced_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_replaced_tokens
+    ADD CONSTRAINT organization_invitation_replaced_tokens_pkey PRIMARY KEY (token_hash);
+
+
+--
+-- Name: organization_invitation_sends organization_invitation_sends_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_sends
+    ADD CONSTRAINT organization_invitation_sends_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_invitations organization_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_invitations
     ADD CONSTRAINT organization_invitations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_invitations organization_invitations_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitations
+    ADD CONSTRAINT organization_invitations_token_hash_key UNIQUE (token_hash);
 
 
 --
@@ -2696,11 +2992,35 @@ ALTER TABLE ONLY public.organization_llm_settings
 
 
 --
+-- Name: organization_seat_limit_overrides organization_seat_limit_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_limit_overrides
+    ADD CONSTRAINT organization_seat_limit_overrides_pkey PRIMARY KEY (organization_id);
+
+
+--
+-- Name: organization_seat_purchases organization_seat_purchases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: plan_feature_definitions plan_feature_definitions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.plan_feature_definitions
+    ADD CONSTRAINT plan_feature_definitions_pkey PRIMARY KEY (key);
 
 
 --
@@ -3124,10 +3444,31 @@ CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USIN
 
 
 --
+-- Name: application_encryption_keys_one_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX application_encryption_keys_one_active ON public.application_encryption_keys USING btree ((1)) WHERE (state = 'active'::text);
+
+
+--
+-- Name: application_encryption_migrations_unfinished; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.application_encryption_migrations USING btree ((1)) WHERE (state = ANY (ARRAY['pending'::text, 'running'::text, 'auditing'::text]));
+
+
+--
 -- Name: bitbucket_forge_installations_workspace_uuid_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX bitbucket_forge_installations_workspace_uuid_idx ON public.bitbucket_forge_installations USING btree (workspace_uuid);
+
+
+--
+-- Name: credit_packs_polar_product_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX credit_packs_polar_product_id_idx ON public.credit_packs USING btree (polar_product_id) WHERE (deleted_at IS NULL);
 
 
 --
@@ -3649,10 +3990,24 @@ CREATE INDEX idx_factory_work_order_comments_work_order_created ON public.factor
 
 
 --
+-- Name: idx_factory_work_order_events_status_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_events_status_created_at ON public.factory_work_order_events USING btree (created_at) WHERE (type = 'order.status.updated'::text);
+
+
+--
 -- Name: idx_factory_work_order_events_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_factory_work_order_events_work_order_created ON public.factory_work_order_events USING btree (work_order_id, created_at DESC);
+
+
+--
+-- Name: idx_factory_work_order_executions_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_executions_created_at ON public.factory_work_order_executions USING btree (created_at);
 
 
 --
@@ -3723,6 +4078,13 @@ CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
+
+
+--
+-- Name: idx_factory_work_orders_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_created_at ON public.factory_work_orders USING btree (created_at);
 
 
 --
@@ -3828,6 +4190,13 @@ CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_refund ON public.organizatio
 --
 
 CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm_credit_grants USING btree (organization_id) WHERE (kind = 'welcome'::text);
+
+
+--
+-- Name: idx_organization_seat_purchases_organization_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_seat_purchases_organization_created ON public.organization_seat_purchases USING btree (organization_id, created_at);
 
 
 --
@@ -4055,6 +4424,13 @@ CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (c
 
 
 --
+-- Name: idx_workflow_runs_parent_execution; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_parent_execution ON public.workflow_runs USING btree (parent_workflow_id, parent_execution_id) WHERE (parent_execution_id IS NOT NULL);
+
+
+--
 -- Name: idx_workflow_runs_parent_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4202,6 +4578,13 @@ CREATE INDEX index_accounts_on_deleted_at ON public.accounts USING btree (delete
 
 
 --
+-- Name: index_built_in_automation_resets_on_account_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_built_in_automation_resets_on_account_id ON public.built_in_automation_resets USING btree (account_id);
+
+
+--
 -- Name: index_mcp_oauth_clients_on_client_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4234,6 +4617,48 @@ CREATE INDEX index_organizations_on_created_by_account_id ON public.organization
 --
 
 CREATE INDEX installation_admin_organization_pins_account_pinned_at_idx ON public.installation_admin_organization_pins USING btree (account_id, pinned_at DESC);
+
+
+--
+-- Name: organization_billing_plans_catalog; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_billing_plans_catalog ON public.organization_billing_plans USING btree (plan_id);
+
+
+--
+-- Name: organization_invitation_replaced_tokens_invitation_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_replaced_tokens_invitation_id_idx ON public.organization_invitation_replaced_tokens USING btree (invitation_id);
+
+
+--
+-- Name: organization_invitation_sends_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_email_sent_at_idx ON public.organization_invitation_sends USING btree (email, sent_at);
+
+
+--
+-- Name: organization_invitation_sends_organization_id_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_organization_id_email_sent_at_idx ON public.organization_invitation_sends USING btree (organization_id, email, sent_at);
+
+
+--
+-- Name: organization_invitation_sends_organization_id_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_organization_id_sent_at_idx ON public.organization_invitation_sends USING btree (organization_id, sent_at);
+
+
+--
+-- Name: organization_invitations_pending_email_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organization_invitations_pending_email_idx ON public.organization_invitations USING btree (organization_id, lower((email)::text)) WHERE ((state)::text = 'pending'::text);
 
 
 --
@@ -4332,6 +4757,13 @@ CREATE UNIQUE INDEX unique_api_key_in_organization ON public.users USING btree (
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
+
+
+--
+-- Name: uq_organization_seat_purchases_in_flight; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_seat_purchases_in_flight ON public.organization_seat_purchases USING btree (organization_id) WHERE (status = ANY (ARRAY['pending'::text, 'unknown'::text]));
 
 
 --
@@ -4534,6 +4966,22 @@ ALTER TABLE ONLY public.app_messages
 
 ALTER TABLE ONLY public.app_messages
     ADD CONSTRAINT app_messages_canvas_id_node_id_fkey FOREIGN KEY (canvas_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
+-- Name: application_encryption_migrations application_encryption_migrations_target_key_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.application_encryption_migrations
+    ADD CONSTRAINT application_encryption_migrations_target_key_id_fkey FOREIGN KEY (target_key_id) REFERENCES public.application_encryption_keys(id);
+
+
+--
+-- Name: built_in_automation_resets built_in_automation_resets_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.built_in_automation_resets
+    ADD CONSTRAINT built_in_automation_resets_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id) ON DELETE SET NULL;
 
 
 --
@@ -5169,11 +5617,51 @@ ALTER TABLE ONLY public.installation_licenses
 
 
 --
+-- Name: organization_billing_plans organization_billing_plans_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_plans
+    ADD CONSTRAINT organization_billing_plans_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.billing_plans(id);
+
+
+--
+-- Name: organization_feature_grants organization_feature_grants_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_feature_grants
+    ADD CONSTRAINT organization_feature_grants_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_hosted_model_allowlists
     ADD CONSTRAINT organization_hosted_model_allowlists_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_invitation_replaced_tokens organization_invitation_replaced_tokens_invitation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_replaced_tokens
+    ADD CONSTRAINT organization_invitation_replaced_tokens_invitation_id_fkey FOREIGN KEY (invitation_id) REFERENCES public.organization_invitations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_invitation_sends organization_invitation_sends_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_sends
+    ADD CONSTRAINT organization_invitation_sends_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_invitations organization_invitations_accepted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitations
+    ADD CONSTRAINT organization_invitations_accepted_by_fkey FOREIGN KEY (accepted_by) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -5190,6 +5678,30 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_seat_limit_overrides organization_seat_limit_overrides_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_limit_overrides
+    ADD CONSTRAINT organization_seat_limit_overrides_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_seat_purchases organization_seat_purchases_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_seat_purchases organization_seat_purchases_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -5720,7 +6232,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261018095021	f
+20261025103122	f
 \.
 
 
@@ -5756,7 +6268,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260925150940	f
+20261021224722	f
 \.
 
 

@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFetchLatestReleaseFollowsPagesToStableApplicationRelease(t *testing.T) {
+func TestFetchLatestReleaseSelectsCLIReleaseAmongComponentReleases(t *testing.T) {
 	requestCount := 0
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +26,7 @@ func TestFetchLatestReleaseFollowsPagesToStableApplicationRelease(t *testing.T) 
 		if r.URL.Query().Get("page") == "2" {
 			releases = []map[string]any{
 				{
-					"tag_name": "v0.17.0",
+					"tag_name": "cli/v0.17.0",
 					"assets": []map[string]string{
 						{
 							"name":                 "superplane-cli-linux-amd64",
@@ -37,9 +37,18 @@ func TestFetchLatestReleaseFollowsPagesToStableApplicationRelease(t *testing.T) 
 			}
 		} else {
 			releases = []map[string]any{
+				{
+					"tag_name": "v0.99.0",
+					"assets": []map[string]string{
+						{
+							"name":                 "superplane-cli-linux-amd64",
+							"browser_download_url": "https://example.com/stale-application-cli",
+						},
+					},
+				},
 				{"tag_name": "runner/v1.2.3"},
 				{"tag_name": "fleet-manager/v1.2.3"},
-				{"tag_name": "v0.18.0-rc.1", "prerelease": true},
+				{"tag_name": "cli/v0.18.0-rc.1", "prerelease": true},
 			}
 			w.Header().Set("Link", fmt.Sprintf(`<%s?page=2>; rel="next"`, server.URL))
 		}
@@ -53,7 +62,7 @@ func TestFetchLatestReleaseFollowsPagesToStableApplicationRelease(t *testing.T) 
 
 	release, err := fetchLatestRelease()
 	require.NoError(t, err)
-	require.Equal(t, "v0.17.0", release.TagName)
+	require.Equal(t, "cli/v0.17.0", release.TagName)
 	require.Len(t, release.Assets, 1)
 	require.Equal(t, 2, requestCount)
 }

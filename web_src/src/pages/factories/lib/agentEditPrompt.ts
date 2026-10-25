@@ -44,23 +44,10 @@ export function buildAgentEditPrompt(input: AgentEditPromptInput): string {
 
   return [
     "You are editing a SuperPlane canvas.",
-    "The canvas is YAML-backed. Use the SuperPlane CLI to read and update it.",
     "",
     `Canvas name: ${appName}`,
     `Canvas id: ${appId}`,
     ...buildLinkedContextLines(input.runId, input.lineId),
-    "",
-    "Get the canvas:",
-    "",
-    "```bash",
-    `superplane apps canvas get ${appId} -o yaml > canvas.yaml`,
-    "```",
-    "",
-    "Update the canvas:",
-    "",
-    "```bash",
-    `superplane apps canvas update ${appId} -f canvas.yaml -m "Describe the change"`,
-    "```",
   ].join("\n");
 }
 

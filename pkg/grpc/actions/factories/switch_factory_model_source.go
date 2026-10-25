@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -313,7 +314,7 @@ func ensureWorkspaceProviderIntegration(
 	}
 
 	integrationID := uuid.New()
-	encrypted, err := encryptAPIKey(ctx, encryptor, integrationID, key)
+	encrypted, err := encryptAPIKey(ctx, encryption.ForDB(tx, encryptor), integrationID, key)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +391,7 @@ func ensureCustomProviderIntegration(
 		return nil, err
 	}
 	integrationID := uuid.New()
-	encrypted, err := encryptAPIKey(ctx, encryptor, integrationID, key)
+	encrypted, err := encryptAPIKey(ctx, encryption.ForDB(tx, encryptor), integrationID, key)
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +435,7 @@ func updateCustomProviderIntegration(
 		return nil, grpcerrors.InvalidArgument(nil, "Enter a new API token when you change the provider URL.")
 	}
 	if apiKey != "" {
-		encrypted, err := encryptAPIKey(ctx, encryptor, existing.ID, apiKey)
+		encrypted, err := encryptAPIKey(ctx, encryption.ForDB(tx, encryptor), existing.ID, apiKey)
 		if err != nil {
 			return nil, err
 		}
@@ -499,6 +500,9 @@ func switchFactoryModelSource(
 	var integration *models.Integration
 	if strings.TrimSpace(source) != modelSourceHosted {
 		provider := strings.TrimSpace(source)
+		if err := models.RequireOrganizationBYOKAccess(tx, factory.OrganizationID, provider); err != nil {
+			return nil, "", factoryErrorToStatus(err, "failed to switch model source")
+		}
 		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, reg.Encryptor, factory.OrganizationID, provider, apiKey, baseURL, apiType)
 		if err != nil {
 			return nil, "", err

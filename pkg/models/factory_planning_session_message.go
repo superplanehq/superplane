@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,6 +33,14 @@ func sessionWaitText(tx *gorm.DB, session *FactoryPlanningSession, text string, 
 
 func (s *FactoryPlanningSession) usesAnalysisFollowUp(_ *gorm.DB) bool {
 	return s.IsAnalysisSession()
+}
+
+func CountPlanningSessionUserMessages(tx *gorm.DB, sessionID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Model(&PlanningSessionMessage{}).
+		Where("session_id = ? AND role = ?", sessionID, PlanningSessionMessageRoleUser).
+		Count(&count).Error
+	return count, err
 }
 
 func ListPlanningSessionMessages(tx *gorm.DB, sessionID uuid.UUID) ([]PlanningSessionMessage, error) {
@@ -206,7 +215,12 @@ func normalizePlanningSurvey(survey PlanningSessionSurvey) (PlanningSessionSurve
 		if len(options) == 0 {
 			return PlanningSessionSurvey{}, fmt.Errorf("%w: survey question needs an option", ErrFactoryPlanningSessionInvalid)
 		}
-		questions = append(questions, PlanningSessionSurveyQuestion{Prompt: prompt, Options: options})
+		if question.RecommendedOption != "" && !slices.Contains(options, question.RecommendedOption) {
+			return PlanningSessionSurvey{}, fmt.Errorf("%w: recommended option must match an option exactly", ErrFactoryPlanningSessionInvalid)
+		}
+		questions = append(questions, PlanningSessionSurveyQuestion{
+			Prompt: prompt, Options: options, RecommendedOption: question.RecommendedOption,
+		})
 	}
 	return PlanningSessionSurvey{Questions: questions}, nil
 }

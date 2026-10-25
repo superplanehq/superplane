@@ -1,25 +1,52 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+name: superplane
+
 services:
+  prepare-volumes:
+    image: busybox:1.36
+    logging: *default-logging
+    user: "0:0"
+    restart: "no"
+    command: ["sh", "-c", "mkdir -p /blobs /logs && chown -R 65534:65534 /blobs /logs"]
+    volumes:
+      - blob-data:/blobs
+      - runner-active-logs:/logs
+
   app:
     image: ghcr.io/superplanehq/superplane:__SUPERPLANE_VERSION__
+    logging: *default-logging
     restart: always
     depends_on:
+      prepare-volumes:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    environment:
+      SUPERPLANE_VERSION: __SUPERPLANE_VERSION__
+      SUPERPLANE_BILLING_ENABLED: "no"
     env_file:
       - superplane.env
     volumes:
       - ${OIDC_KEYS_HOST_PATH:-./oidc}:${OIDC_KEYS_CONTAINER_PATH:-/app/oidc-keys}
+      - blob-data:/var/lib/superplane/blobs
+      - runner-active-logs:/var/lib/superplane/runner-active-logs
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 12
-      start_period: 30s
+      retries: 30
+      start_period: 90s
 
   caddy:
     image: caddy:2
+    logging: *default-logging
     restart: always
     depends_on:
       app:
@@ -36,6 +63,7 @@ services:
 
   db:
     image: postgres:17.5
+    logging: *default-logging
     restart: always
     env_file:
       - superplane.env
@@ -51,20 +79,36 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
+    logging: *default-logging
+    hostname: rabbitmq
     restart: always
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+    env_file:
+      - rabbitmq.env
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_port_connectivity"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  fleet-manager:
+    image: ghcr.io/superplanehq/fleet-manager:__FLEET_MANAGER_VERSION__-docker
+    logging: *default-logging
+    restart: always
+    depends_on:
+      app:
+        condition: service_healthy
+    env_file:
+      - fleet-manager.env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./fleet-manager.yaml:/etc/superplane/fleet-manager.yaml:ro
+
 volumes:
   postgres-data:
-    driver: local
+  rabbitmq-data:
+  blob-data:
+  runner-active-logs:
   caddy-data:
-    driver: local
   caddy-config:
-    driver: local

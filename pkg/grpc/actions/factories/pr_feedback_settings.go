@@ -13,6 +13,7 @@ type prFeedbackSettings struct {
 	Repository             string
 	Mention                string
 	IgnoreBots             bool
+	AddressAllBots         bool
 	AllowedBots            []string
 	CheckNames             []string
 	MaximumAttempts        int
@@ -104,6 +105,7 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 		}
 		settings.Mention = strings.TrimSpace(prFeedbackNodeString(node, "contentFilter"))
 		settings.IgnoreBots = prFeedbackNodeBool(node, "ignoreBots", settings.IgnoreBots)
+		settings.AddressAllBots = prFeedbackNodeBool(node, "addressAllBots", false)
 		settings.AllowedBots = prFeedbackNodeStringSlice(node, "allowedBots")
 		break
 	}
@@ -163,9 +165,10 @@ func serializePRFeedbackSettings(settings prFeedbackSettings) *pb.FactoryPRFeedb
 			Repository: settings.Repository,
 		},
 		Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
-			Mention:     settings.Mention,
-			IgnoreBots:  settings.IgnoreBots,
-			AllowedBots: settings.AllowedBots,
+			Mention:        settings.Mention,
+			IgnoreBots:     settings.IgnoreBots,
+			AllowedBots:    settings.AllowedBots,
+			AddressAllBots: settings.AddressAllBots,
 		},
 		Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
 			Names:                settings.CheckNames,
@@ -258,6 +261,7 @@ func parsePRFeedbackSettings(current prFeedbackSettings, requested *pb.FactoryPR
 	if requested.GetDiscussion() != nil {
 		updated.Mention = strings.TrimSpace(requested.GetDiscussion().GetMention())
 		updated.IgnoreBots = requested.GetDiscussion().GetIgnoreBots()
+		updated.AddressAllBots = requested.GetDiscussion().GetAddressAllBots()
 		updated.AllowedBots = requested.GetDiscussion().GetAllowedBots()
 	}
 	if requested.GetChecks() != nil {
@@ -268,4 +272,44 @@ func parsePRFeedbackSettings(current prFeedbackSettings, requested *pb.FactoryPR
 		updated.RunnerIntegrationIDs = requested.GetChecks().GetRunnerIntegrationIds()
 	}
 	return updated.normalized()
+}
+
+func prFeedbackAgentSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSpec, saved *factoryAutomationSettings) map[string]*factoryAgentSettings {
+	if saved == nil {
+		return nil
+	}
+	settings := map[string]*factoryAgentSettings{}
+	if graph.isChecks() {
+		settings[prFeedbackRunnerNodeID] = saved.agents[graph.RunnerNodeID]
+		return settings
+	}
+	for _, flow := range []struct{ trigger, runner string }{
+		{graph.CommentTriggerNodeID, prFeedbackRunnerNodeID},
+		{graph.ReviewTriggerNodeID, prFeedbackReviewRunnerNodeID},
+		{graph.ReplyTriggerNodeID, prFeedbackReplyRunnerNodeID},
+	} {
+		if flow.trigger == "" {
+			continue
+		}
+		if resolved, ok := resolvePRFeedbackDiscussionFlow(spec, flow.trigger); ok {
+			settings[flow.runner] = saved.agents[resolved.RunnerNodeID]
+		}
+	}
+	return settings
+}
+
+func prFeedbackTriggerSettingsFromGraph(graph prFeedbackGraph, saved *factoryAutomationSettings) map[string]*factoryTriggerSettings {
+	if saved == nil {
+		return nil
+	}
+	settings := map[string]*factoryTriggerSettings{}
+	for _, trigger := range []struct{ generated, saved string }{
+		{prFeedbackPullRequestTriggerNodeID, graph.PullRequestTriggerNodeID},
+		{prFeedbackCommentTriggerNodeID, graph.CommentTriggerNodeID},
+		{prFeedbackReviewTriggerNodeID, graph.ReviewTriggerNodeID},
+		{prFeedbackReplyTriggerNodeID, graph.ReplyTriggerNodeID},
+	} {
+		settings[trigger.generated] = saved.triggers[trigger.saved]
+	}
+	return settings
 }

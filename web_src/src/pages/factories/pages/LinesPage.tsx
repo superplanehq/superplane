@@ -63,7 +63,6 @@ import {
   isWorkspaceNextStepsQueryReady,
   workspaceNextStepBanner,
   workspaceNextSteps,
-  workspaceNextStepsProgressCopy,
 } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
 
@@ -708,6 +707,7 @@ export function LinesPage() {
           factoryKey={routeSegment}
           lineId={selectedLine.id}
           canvasId={automationViewCanvasId}
+          columnKey={viewedAutomation?.columnKey}
           title={viewedAutomation?.name?.trim() || "Automation"}
           onClose={closeAutomationView}
           onDelete={canDeleteViewedCustom ? deleteViewedCustomAutomation : undefined}
@@ -749,11 +749,7 @@ export function LinesPage() {
             hostedCreditHeaderKicker={hostedCreditHeaderKicker}
             nextStepsRestore={
               nextStepsCollapsed && nextStepBanner ? (
-                <WorkspaceNextStepsHeaderBadge
-                  progress={workspaceNextStepsProgressCopy(nextStepBanner.doneCount, nextStepBanner.totalCount)}
-                  title={nextStepBanner.badgeLabel}
-                  onOpen={nextStepDeferral.restore}
-                />
+                <WorkspaceNextStepsHeaderBadge title={nextStepBanner.badgeLabel} onOpen={nextStepDeferral.restore} />
               ) : undefined
             }
             intakes={factoryIntakes}

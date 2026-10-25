@@ -134,10 +134,8 @@ describe("JiraIntakeSetupDialog", () => {
     expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.wizardStepProjectHelper)).toHaveTextContent(
       "listens for new issues",
     );
-    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent(
-      "adds the newest unresolved issues",
-    );
-    expect(screen.getByTestId("jira-skip-initial-import")).toBeChecked();
+    expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent("adds up to 3");
+    expect(screen.getByTestId("jira-skip-initial-import")).not.toBeChecked();
     expect(screen.getByTestId("jira-intake-setup-stepper")).toBeInTheDocument();
     expect(screen.getByTestId("jira-intake-setup-sphere")).toBeInTheDocument();
     expect(screen.queryByTestId("jira-setup-preview")).not.toBeInTheDocument();
@@ -172,7 +170,7 @@ describe("JiraIntakeSetupDialog", () => {
 
     await screen.findByTestId("jira-project-ENG");
     expect(screen.getByText(INTAKE_SKIP_INITIAL_IMPORT_COPY.label)).toBeInTheDocument();
-    expect(screen.getByTestId("jira-skip-initial-import")).toBeChecked();
+    expect(screen.getByTestId("jira-skip-initial-import")).not.toBeChecked();
     await user.click(screen.getByTestId("jira-skip-initial-import"));
     expect(screen.getByText(JIRA_INTAKE_SETUP_COPY.importExistingHelperOff)).toBeInTheDocument();
     await chooseProjectAndWaitForDone(user);

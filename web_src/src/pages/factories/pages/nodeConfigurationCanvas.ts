@@ -13,6 +13,8 @@ export function canvasHasNode(canvas: CanvasesCanvas, nodeId: string): boolean {
   return (canvas.spec?.nodes ?? []).some((node) => node.id === nodeId);
 }
 
+export type NodeConfigurationSave = NodeConfigurationUpdate | NodeConfigurationUpdate[];
+
 export function applyNodeConfiguration(canvas: CanvasesCanvas, update: NodeConfigurationUpdate): CanvasesCanvas {
   const nodes = (canvas.spec?.nodes ?? []).map((node) => {
     if (node.id !== update.nodeId) {
@@ -39,6 +41,14 @@ export function applyNodeConfiguration(canvas: CanvasesCanvas, update: NodeConfi
   };
 }
 
+export function applyNodeConfigurations(canvas: CanvasesCanvas, updates: NodeConfigurationUpdate[]): CanvasesCanvas {
+  return updates.reduce(applyNodeConfiguration, canvas);
+}
+
+export function serializeNodeConfigurations(canvas: CanvasesCanvas, updates: NodeConfigurationUpdate[]): string {
+  return materializeCanvasSpec(applyNodeConfigurations(canvas, updates));
+}
+
 export function serializeNodeConfiguration(canvas: CanvasesCanvas, update: NodeConfigurationUpdate): string {
-  return materializeCanvasSpec(applyNodeConfiguration(canvas, update));
+  return serializeNodeConfigurations(canvas, [update]);
 }

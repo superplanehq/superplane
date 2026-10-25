@@ -8,6 +8,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -25,7 +26,7 @@ type IntegrationSecretStorage struct {
 func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integration *models.Integration) *IntegrationSecretStorage {
 	return &IntegrationSecretStorage{
 		tx:          tx,
-		encryptor:   encryptor,
+		encryptor:   encryption.ForDB(tx, encryptor),
 		integration: integration,
 		secrets:     []models.IntegrationSecret{},
 	}

@@ -37,6 +37,10 @@ const (
 	// Implement sets it on the node environment. Pull request checkouts
 	// leave it off so the helper never pushes an initial commit.
 	WorkspaceCheckoutCommitSetupEnv = "CHECKOUT_COMMIT_SETUP"
+	// GitHubContextTokenEnv is the read-only installation token used to
+	// clone context repositories. The GitHub integration sets it. The
+	// write token in GITHUB_TOKEN stays on the workspace repository.
+	GitHubContextTokenEnv = "SUPERPLANE_GITHUB_CONTEXT_TOKEN"
 )
 
 type workspaceMCPServer struct {
@@ -72,9 +76,9 @@ type workspaceContextFile struct {
 // no-op when the canvas is not factory-owned.
 func AttachWorkspaceAgentResources(
 	ctx core.ExecutionContext,
-	environment []BrokerEnvironmentVariable,
-	files []BrokerTaskFile,
-) ([]BrokerEnvironmentVariable, []BrokerTaskFile) {
+	environment []TaskEnvironmentVariable,
+	files []TaskFile,
+) ([]TaskEnvironmentVariable, []TaskFile) {
 	logger := workspaceAgentResourcesLogger(ctx)
 	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
 	if err != nil {
@@ -102,49 +106,30 @@ func AttachWorkspaceAgentResources(
 	// when those steps do not already clone.
 	files = appendWorkspaceCheckoutFile(files)
 
-	mcpEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceMCP)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: MCP feature check failed")
-		return environment, files
-	}
 	skillsEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceSkills)
 	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: skills feature check failed")
-		return environment, files
-	}
-	agentEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgent)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: agent feature check failed")
-		return environment, files
-	}
-	if !mcpEnabled && !skillsEnabled && !agentEnabled {
-		return environment, files
+		logger.WithError(err).Warn("skip workspace skills: skills feature check failed")
+		skillsEnabled = false
 	}
 
-	var mcpServers []models.FactoryAgentResource
-	if mcpEnabled {
-		mcpServers, err = factory.ListEnabledMCPServers(db)
-		if err != nil {
-			logger.WithError(err).Warn("skip workspace agent resources: list MCP failed")
-			return environment, files
-		}
+	mcpServers, err := factory.ListEnabledMCPServers(db)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace MCP: list failed")
+		mcpServers = nil
 	}
 	var skills []models.FactoryAgentResource
 	if skillsEnabled {
 		skills, err = factory.ListEnabledSkills(db)
 		if err != nil {
-			logger.WithError(err).Warn("skip workspace agent resources: list skills failed")
-			return environment, files
+			logger.WithError(err).Warn("skip workspace skills: list failed")
+			skills = nil
 		}
 	}
-	var setupCommands []string
-	var contextRepos []models.FactoryAgentResource
-	if agentEnabled {
-		setupCommands, contextRepos, err = loadWorkspaceSetupAndContext(db, factory)
-		if err != nil {
-			logger.WithError(err).Warn("skip workspace setup and context: list failed")
-			return environment, files
-		}
+	setupCommands, contextRepos, err := loadWorkspaceSetupAndContext(db, factory)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace setup and context: list failed")
+		setupCommands = nil
+		contextRepos = nil
 	}
 
 	disabled := disabledAgentResourceIDs(ctx.Configuration)
@@ -199,14 +184,18 @@ func attachWorkspaceMCPServers(
 	resources []models.FactoryAgentResource,
 	disabledTools map[string][]string,
 	enabledTools map[string][]string,
-	environment []BrokerEnvironmentVariable,
-	files []BrokerTaskFile,
-) ([]BrokerEnvironmentVariable, []BrokerTaskFile, []string) {
+	environment []TaskEnvironmentVariable,
+	files []TaskFile,
+) ([]TaskEnvironmentVariable, []TaskFile, []string) {
 	if len(resources) == 0 {
 		return environment, files, nil
 	}
 	logger := workspaceAgentResourcesLogger(ctx)
-	encryptor, _ := crypto.FromEnv()
+	encryptor, err := crypto.ProcessEncryptor()
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace MCP: encryptor unavailable")
+		return environment, files, nil
+	}
 	httpClient := mcp.DoerFromCore(ctx.HTTP)
 	tokenLifetime := workspaceMCPAccessTokenLifetime(ctx.Configuration)
 	servers := make([]workspaceMCPServer, 0, len(resources))
@@ -240,19 +229,19 @@ func attachWorkspaceMCPServers(
 	for _, server := range servers {
 		names = append(names, server.Name)
 	}
-	files = append(files, BrokerTaskFile{
+	files = append(files, TaskFile{
 		Path:    WorkspaceMCPConfigPath,
 		Content: string(payload) + "\n",
 		Mode:    "0644",
 	})
-	environment = append(environment, BrokerEnvironmentVariable{
+	environment = append(environment, TaskEnvironmentVariable{
 		Name:  EnvSuperplaneWorkspaceMCPConfig,
 		Value: workspaceMCPConfigEnvValue,
 	})
 	return environment, files, names
 }
 
-func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []TaskFile) []TaskFile {
 	for i := range resources {
 		markdown := strings.TrimSpace(resources[i].Config.Data().Markdown)
 		if markdown == "" || resources[i].Name == models.ReservedFactoryAgentResourceName {
@@ -263,14 +252,14 @@ func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []
 		}
 		content := markdown + "\n"
 		files = append(files,
-			BrokerTaskFile{Path: fmt.Sprintf(workspaceClaudeSkillPath, resources[i].Name), Content: content, Mode: "0644"},
-			BrokerTaskFile{Path: fmt.Sprintf(workspaceAgentsSkillPath, resources[i].Name), Content: content, Mode: "0644"},
+			TaskFile{Path: fmt.Sprintf(workspaceClaudeSkillPath, resources[i].Name), Content: content, Mode: "0644"},
+			TaskFile{Path: fmt.Sprintf(workspaceAgentsSkillPath, resources[i].Name), Content: content, Mode: "0644"},
 		)
 	}
 	return files
 }
 
-func appendWorkspaceSetupFiles(commands []string, files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceSetupFiles(commands []string, files []TaskFile) []TaskFile {
 	commands = models.NormalizeSetupCommands(commands)
 	if len(commands) == 0 {
 		return files
@@ -279,7 +268,7 @@ func appendWorkspaceSetupFiles(commands []string, files []BrokerTaskFile) []Brok
 	if err != nil {
 		return files
 	}
-	return append(files, BrokerTaskFile{
+	return append(files, TaskFile{
 		Path:    WorkspaceSetupConfigPath,
 		Content: string(payload) + "\n",
 		Mode:    "0644",
@@ -305,7 +294,7 @@ func WorkspaceContextRepoDirectory(repository string) string {
 	return "context/" + repository
 }
 
-func appendWorkspaceContextFiles(factory *models.Factory, resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceContextFiles(factory *models.Factory, resources []models.FactoryAgentResource, files []TaskFile) []TaskFile {
 	if len(resources) == 0 {
 		return files
 	}
@@ -341,7 +330,7 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 	if err != nil {
 		return files
 	}
-	return append(files, BrokerTaskFile{
+	return append(files, TaskFile{
 		Path:    WorkspaceContextConfigPath,
 		Content: string(payload) + "\n",
 		Mode:    "0644",
@@ -352,9 +341,11 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 // factory agent steps. It checks out the main repo to repo/, positions a
 // pull request when the task environment describes one, then clones every
 // workspace_context.json entry. Setup commands are separate steps.
-// Authentication comes from the VCS integration setup that already ran
-// (gh auth setup-git / Bitbucket credential helper), so the script uses
-// plain HTTPS URLs and never embeds tokens. It is idempotent: directories
+// Authentication for the main repository comes from the VCS integration
+// setup that already ran (gh auth setup-git / Bitbucket credential
+// helper). GitHub context repositories use a read-only token from
+// SUPERPLANE_GITHUB_CONTEXT_TOKEN and skip the write credential helper.
+// The script uses plain HTTPS URLs and never embeds tokens. It is idempotent: directories
 // that already contain a checkout are reused, never wiped. The factory
 // commit setup (agent git identity, trailer hook, branch handling) runs
 // only for a default-branch checkout when CHECKOUT_COMMIT_SETUP=1.
@@ -577,6 +568,17 @@ if [ -f "$ctx" ]; then
     _sp_tab="$(printf '\t')"
     _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();if(u&&dir){console.log(u+"\t"+dir);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx")" || exit 1
     if [ -n "$_sp_ctx_list" ]; then
+      clone_context_repository() {
+        case "$1" in
+          https://github.com/*|https://www.github.com/*)
+            if [ -n "${` + GitHubContextTokenEnv + `:-}" ]; then
+              git -c credential.helper= -c 'credential.helper=!f() { echo username=superplane; echo "password=$` + GitHubContextTokenEnv + `"; }; f' clone --depth 1 "$1" "$2"
+              return
+            fi
+            ;;
+        esac
+        git clone --depth 1 "$1" "$2"
+      }
       printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir; do
         case "$dir" in
           ""|"."|"/"|*..*)
@@ -596,7 +598,7 @@ if [ -f "$ctx" ]; then
         fi
         mkdir -p "$(dirname "$dir")"
         rm -rf "$dir"
-        git clone --depth 1 "$url" "$dir" || exit 1
+        clone_context_repository "$url" "$dir" || exit 1
       done
     fi
     unset _sp_tab _sp_ctx_list
@@ -649,20 +651,20 @@ fi
 `
 }
 
-func appendWorkspaceCheckoutFile(files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceCheckoutFile(files []TaskFile) []TaskFile {
 	for i := range files {
 		if files[i].Path == WorkspaceCheckoutScriptPath {
 			return files
 		}
 	}
-	return append(files, BrokerTaskFile{
+	return append(files, TaskFile{
 		Path:    WorkspaceCheckoutScriptPath,
 		Content: WorkspaceCheckoutScript(),
 		Mode:    "0755",
 	})
 }
 
-func taskShipsCheckout(files []BrokerTaskFile) bool {
+func taskShipsCheckout(files []TaskFile) bool {
 	for i := range files {
 		if files[i].Path == WorkspaceCheckoutScriptPath {
 			return true
@@ -683,7 +685,7 @@ const (
 // already clones keeps that step and does not get a second checkout.
 // Prompt hints stay on the saved-clone instructions unless this inserts
 // the command, because only then have setup and context checkout run.
-func ApplyFactoryCheckout(files []BrokerTaskFile, commands []BrokerCommand, steps []AgentStep) []BrokerCommand {
+func ApplyFactoryCheckout(files []TaskFile, commands []TaskCommand, steps []AgentStep) []TaskCommand {
 	if !taskShipsCheckout(files) {
 		return commands
 	}
@@ -695,7 +697,7 @@ func ApplyFactoryCheckout(files []BrokerTaskFile, commands []BrokerCommand, step
 // regular commands so the task log shows them apart. Steps that already
 // run git clone, or the checkout helper, are left unchanged so saved
 // automations keep their own clone and run setup themselves.
-func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, files []BrokerTaskFile) []BrokerCommand {
+func InsertFactoryCheckoutCommand(commands []TaskCommand, steps []AgentStep, files []TaskFile) []TaskCommand {
 	if stepsAlreadyCheckout(steps) {
 		return commands
 	}
@@ -705,7 +707,7 @@ func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, f
 		if command.Kind == LiveLogKindSetup {
 			continue
 		}
-		out := make([]BrokerCommand, 0, len(commands)+len(inserted))
+		out := make([]TaskCommand, 0, len(commands)+len(inserted))
 		out = append(out, commands[:i]...)
 		out = append(out, inserted...)
 		return append(out, commands[i:]...)
@@ -713,8 +715,8 @@ func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, f
 	return append(commands, inserted...)
 }
 
-func factoryCheckoutCommands(files []BrokerTaskFile) []BrokerCommand {
-	commands := []BrokerCommand{{
+func factoryCheckoutCommands(files []TaskFile) []TaskCommand {
+	commands := []TaskCommand{{
 		Name:    "Checkout",
 		Command: WrapAgentStepCommand("checkout"),
 		Kind:    LiveLogKindBash,
@@ -724,7 +726,7 @@ func factoryCheckoutCommands(files []BrokerTaskFile) []BrokerCommand {
 	if len(setup) == 0 {
 		return commands
 	}
-	return append(commands, BrokerCommand{
+	return append(commands, TaskCommand{
 		Name:    "Setup",
 		Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory("repo", setupCommandBody(setup))),
 		Kind:    LiveLogKindBash,
@@ -747,7 +749,7 @@ func setupCommandBody(commands []string) string {
 	return strings.Join(lines, "\n")
 }
 
-func setupCommandsFromFiles(files []BrokerTaskFile) []string {
+func setupCommandsFromFiles(files []TaskFile) []string {
 	for i := range files {
 		if files[i].Path != WorkspaceSetupConfigPath {
 			continue
@@ -761,7 +763,7 @@ func setupCommandsFromFiles(files []BrokerTaskFile) []string {
 	return nil
 }
 
-func markCheckoutHintsComplete(files []BrokerTaskFile) {
+func markCheckoutHintsComplete(files []TaskFile) {
 	for i := range files {
 		if !strings.HasPrefix(files[i].Path, "prompts/") || !strings.HasSuffix(files[i].Path, ".txt") {
 			continue
@@ -1056,7 +1058,7 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 	return builder.String()
 }
 
-func appendWorkspaceAgentResourcesHint(files []BrokerTaskFile, mcpNames []string, setupCommands []string, contextRepos []models.FactoryAgentResource) []BrokerTaskFile {
+func appendWorkspaceAgentResourcesHint(files []TaskFile, mcpNames []string, setupCommands []string, contextRepos []models.FactoryAgentResource) []TaskFile {
 	hint := workspaceAgentResourcesHint(mcpNames, setupCommands, contextRepos)
 	if hint == "" {
 		return files

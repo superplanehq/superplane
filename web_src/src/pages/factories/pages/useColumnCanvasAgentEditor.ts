@@ -20,7 +20,12 @@ import {
   primaryAgentNode,
   serializeColumnAgentCanvasNodes,
 } from "../lib/columnCanvasAgent";
-import { canvasHasNode, serializeNodeConfiguration, type NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import {
+  canvasHasNode,
+  serializeNodeConfigurations,
+  type NodeConfigurationSave,
+  type NodeConfigurationUpdate,
+} from "./nodeConfigurationCanvas";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 const UPDATE_AGENT_COMMIT_MESSAGE = "Update agent";
@@ -60,7 +65,6 @@ type AgentCanvasEdit = {
 };
 
 interface ColumnCanvasAgentEditorOptions {
-  showVisualEvidenceSetting?: boolean;
   synchronizedAgentNodeIds?: readonly string[];
   preferredAgentNodeId?: string;
 }
@@ -98,7 +102,6 @@ export function useColumnCanvasAgentEditor(
   const agentNode = primaryAgentNode(canvas?.spec, preferredAgentNodeId);
   const agentNodeIds = editableAgentNodeIds(canvas, agentNode?.id, options.synchronizedAgentNodeIds);
   const draft = canvas && agentNode?.id ? planningReviewDraftFromCanvas(canvas, agentNode.id) : null;
-  const showVisualEvidenceSetting = options.showVisualEvidenceSetting ?? false;
 
   const canvasEditDeps = {
     appId: canvasId,
@@ -131,10 +134,10 @@ export function useColumnCanvasAgentEditor(
     });
   };
 
-  const saveNode = async (update: NodeConfigurationUpdate, options?: { notify?: boolean }) => {
+  const saveNode = async (update: NodeConfigurationSave, options?: { notify?: boolean }) => {
     await persistNodeConfiguration({
       ...canvasEditDeps,
-      update,
+      updates: Array.isArray(update) ? update : [update],
       notify: options?.notify,
     });
   };
@@ -144,7 +147,6 @@ export function useColumnCanvasAgentEditor(
     agentNodeIds,
     isLoading: enabled && canvasQuery.isPending,
     draft,
-    showVisualEvidenceSetting,
     editorOpen,
     openEditor: agentNode ? () => setEditorOpen(true) : undefined,
     closeEditor: () => setEditorOpen(false),
@@ -208,7 +210,8 @@ export async function persistColumnAgent(args: {
 export async function persistNodeConfiguration(args: {
   appId: string;
   canvas: CanvasesCanvas | undefined;
-  update: NodeConfigurationUpdate;
+  update?: NodeConfigurationUpdate;
+  updates?: NodeConfigurationUpdate[];
   stageYaml: StageCanvasYaml;
   commit: (message: string) => Promise<unknown>;
   invalidate: () => Promise<unknown> | unknown;
@@ -218,8 +221,9 @@ export async function persistNodeConfiguration(args: {
   /** Merge confidence saves stay quiet. Other step saves still announce. */
   notify?: boolean;
 }) {
-  const { canvas, appId, update, notify = true } = args;
-  if (!canvas || !update.nodeId || !appId) {
+  const updates = args.updates ?? (args.update ? [args.update] : []);
+  const { canvas, appId, notify = true } = args;
+  if (!canvas || !appId || updates.length === 0 || updates.some((update) => !update.nodeId)) {
     throw new Error(CANVAS_NOT_LOADED_MESSAGE);
   }
 
@@ -229,8 +233,8 @@ export async function persistNodeConfiguration(args: {
     change: {
       missingMessage: STEP_MISSING_MESSAGE,
       unloadedMessage: CANVAS_NOT_LOADED_MESSAGE,
-      hasTarget: (current) => canvasHasNode(current, update.nodeId),
-      toYaml: (current) => serializeNodeConfiguration(current, update),
+      hasTarget: (current) => updates.every((update) => canvasHasNode(current, update.nodeId)),
+      toYaml: (current) => serializeNodeConfigurations(current, updates),
     },
     commitMessage: UPDATE_STEP_COMMIT_MESSAGE,
     successNotice: notify ? STEP_SAVED_NOTICE : undefined,

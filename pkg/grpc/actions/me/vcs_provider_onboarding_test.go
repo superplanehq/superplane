@@ -355,15 +355,15 @@ func TestStartGitHubInstallationWithoutAccountConnection(t *testing.T) {
 
 func saveInstallationGitHubApp(t *testing.T) {
 	t.Helper()
-	t.Setenv("NO_ENCRYPTION", "yes")
+	encryptor := crypto.NewNoOpEncryptor()
+	crypto.SetProcessEncryptor(encryptor)
+	t.Cleanup(func() { crypto.SetProcessEncryptor(nil) })
 	t.Setenv(githubcommon.EnvGitHubAppID, "")
 	t.Setenv(githubcommon.EnvGitHubAppSlug, "")
 	t.Setenv(githubcommon.EnvGitHubAppPrivateKey, "")
 	t.Setenv(githubcommon.EnvGitHubAppWebhookSecret, "")
 	t.Setenv("GITHUB_CLIENT_ID", "")
 	t.Setenv("GITHUB_CLIENT_SECRET", "")
-	encryptor, err := crypto.FromEnv()
-	require.NoError(t, err)
 	require.NoError(t, githubapp.Save(t.Context(), database.Conn(), encryptor, config.GitHubHostedAppConfig{
 		ID:            12345,
 		Slug:          "superplane",

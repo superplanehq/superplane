@@ -2,6 +2,7 @@ package openrouter
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -99,6 +100,7 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 			"git clone https://github.com/org/repo.git /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
+		runner.AgentAdditionalInstructionsField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envOpenRouterAPIKey),
 		runner.AgentSkipSetupCommandsField(),
@@ -106,16 +108,20 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 	}
 }
 
+func (c *RunOpenRouter) ValidateNodeConfiguration(config map[string]any) error {
+	spec, err := decodeRunOpenRouterSpec(config)
+	if err != nil {
+		return err
+	}
+	return validateRunOpenRouterSpec(spec)
+}
+
 func (c *RunOpenRouter) Setup(ctx core.SetupContext) error {
 	spec, err := decodeRunOpenRouterSpec(ctx.Configuration)
 	if err != nil {
 		return err
 	}
-	if err := validateRunOpenRouterSpec(spec); err != nil {
-		return err
-	}
-	_, err = ctx.Webhook.Setup()
-	return err
+	return validateRunOpenRouterSpec(spec)
 }
 
 func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
@@ -136,16 +142,6 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("webhook setup: %w", err)
-	}
-
-	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
-	if err != nil {
-		return fmt.Errorf("new runner task client: %w", err)
-	}
-
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
@@ -160,7 +156,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	}
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
-	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
+	task := buildOpenRouterTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
@@ -169,23 +165,21 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps)
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
-	taskID, err := client.CreateTask(runner.CreateTaskParams{
+	taskID, err := runner.CreateTask(ctx.RunnerTasks, runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		Files:          task.Files,
-		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
-		Labels:         runner.OriginLabelsForTask(ctx),
 	})
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
+	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
-func injectOpenRouterCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {
+func injectOpenRouterCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.TaskEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenRouterAPIKey, credentials.Secret)
@@ -204,17 +198,17 @@ func (c *RunOpenRouter) Hooks() []core.Hook {
 
 func (c *RunOpenRouter) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == runner.HookPoll {
-		return runner.PollBrokerTask(ctx, FinishedEventType)
+		return runner.PollTask(ctx, FinishedEventType)
 	}
 	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
 func (c *RunOpenRouter) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return runner.HandleBrokerWebhook(ctx, FinishedEventType)
+	return http.StatusNotFound, nil, nil
 }
 
 func (c *RunOpenRouter) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerTask(ctx, FinishedEventType)
+	return runner.CancelTask(ctx, FinishedEventType)
 }
 
 func (c *RunOpenRouter) Cleanup(ctx core.SetupContext) error { return nil }

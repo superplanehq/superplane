@@ -15,12 +15,9 @@ const {
   createCanvasMock,
   defaultAccount,
   defaultPermissions,
-  inviteLinkQueryState,
-  inviteLinkState,
   navigateMock,
   paletteQueryState,
   permissionsState,
-  writeTextMock,
 } = vi.hoisted(() => {
   const defaultAccount = {
     id: "account-1",
@@ -50,8 +47,6 @@ const {
     createCanvasMock: vi.fn(),
     defaultAccount,
     defaultPermissions,
-    inviteLinkQueryState: { enabledValues: [] as boolean[] },
-    inviteLinkState: { data: { token: "test-invite-token", enabled: true } },
     navigateMock: vi.fn(),
     paletteQueryState: {
       apiKeysCalls: 0,
@@ -61,7 +56,6 @@ const {
       organizationEnabledValues: [] as Array<boolean | undefined>,
     },
     permissionsState: { permissions: defaultPermissions },
-    writeTextMock: vi.fn(),
   };
 });
 
@@ -135,13 +129,6 @@ vi.mock("@/hooks/useOrganizationData", () => ({
           name: "Acme",
         },
       },
-    };
-  },
-  useOrganizationInviteLink: (_organizationId: string, enabled: boolean) => {
-    inviteLinkQueryState.enabledValues.push(enabled);
-    return {
-      data: enabled ? inviteLinkState.data : undefined,
-      isLoading: paletteQueryState.loading,
     };
   },
 }));
@@ -234,13 +221,6 @@ function renderPalette(path = "/org-1") {
   );
 }
 
-function installClipboardWriteMock() {
-  Object.defineProperty(navigator, "clipboard", {
-    configurable: true,
-    value: { writeText: writeTextMock },
-  });
-}
-
 let unregisterCanvasNodeSearchProvider: (() => void) | null = null;
 
 describe("GlobalCommandPalette", () => {
@@ -256,12 +236,7 @@ describe("GlobalCommandPalette", () => {
     paletteQueryState.integrationsCalls = 0;
     paletteQueryState.loading = false;
     paletteQueryState.organizationEnabledValues = [];
-    inviteLinkQueryState.enabledValues = [];
-    inviteLinkState.data = { token: "test-invite-token", enabled: true };
     permissionsState.permissions = [...defaultPermissions];
-    writeTextMock.mockReset();
-    writeTextMock.mockResolvedValue(undefined);
-    installClipboardWriteMock();
   });
 
   afterEach(() => {
@@ -276,7 +251,7 @@ describe("GlobalCommandPalette", () => {
 
     expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
     expect(screen.getByText("New App")).toBeInTheDocument();
-    expect(await screen.findByText("Copy Invite Link")).toBeInTheDocument();
+    expect(await screen.findByText("Invite by email")).toBeInTheDocument();
     expect(screen.getByText("Apps")).toBeInTheDocument();
     expect(screen.getByText("Integrations")).toBeInTheDocument();
     expect(screen.getByText("Go to Docs")).toBeInTheDocument();
@@ -288,7 +263,6 @@ describe("GlobalCommandPalette", () => {
 
     expect(paletteQueryState.apiKeysCalls).toBe(0);
     expect(paletteQueryState.integrationsCalls).toBe(0);
-    expect(inviteLinkQueryState.enabledValues).toEqual([]);
     expect(paletteQueryState.canvasEnabledValues).not.toContain(true);
     expect(paletteQueryState.organizationEnabledValues).not.toContain(true);
 
@@ -297,7 +271,6 @@ describe("GlobalCommandPalette", () => {
     expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
     expect(paletteQueryState.apiKeysCalls).toBeGreaterThan(0);
     expect(paletteQueryState.integrationsCalls).toBeGreaterThan(0);
-    expect(inviteLinkQueryState.enabledValues).toContain(true);
     expect(paletteQueryState.canvasEnabledValues).toContain(true);
     expect(paletteQueryState.organizationEnabledValues).toContain(true);
   });
@@ -457,73 +430,25 @@ describe("GlobalCommandPalette", () => {
     });
   });
 
-  it("does not fetch or show the invite command without member create permission", async () => {
+  it("hides the invitation command without member create permission", async () => {
     permissionsState.permissions = defaultPermissions.filter(
       (permission) => permission.resource !== "members" || permission.action !== "create",
     );
     renderPalette();
-
     openPalette();
-
     expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
-    await waitFor(() => {
-      expect(inviteLinkQueryState.enabledValues.length).toBeGreaterThan(0);
-    });
-    expect(inviteLinkQueryState.enabledValues).not.toContain(true);
-    expect(screen.queryByText("Copy Invite Link")).not.toBeInTheDocument();
+    expect(screen.queryByText("Invite by email")).not.toBeInTheDocument();
   });
 
-  it("disables invite copy when the invite link is inactive", async () => {
+  it("opens member settings to invite a specific recipient", async () => {
     const user = setupUser();
-    installClipboardWriteMock();
-    inviteLinkState.data = { token: "test-invite-token", enabled: false };
     renderPalette();
-
     openPalette();
-    const copyInviteLink = await screen.findByText("Copy Invite Link");
-
-    expect(copyInviteLink.closest("[cmdk-item]")).toHaveAttribute("data-disabled", "true");
-    await user.click(copyInviteLink);
-    expect(writeTextMock).not.toHaveBeenCalled();
-  });
-
-  it("closes after copying the invite link successfully", async () => {
-    const user = setupUser();
-    installClipboardWriteMock();
-    renderPalette();
-
-    openPalette();
-    const copyInviteLink = await screen.findByText("Copy Invite Link");
-    await waitFor(() => {
-      expect(copyInviteLink.closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
-    });
-    await user.click(copyInviteLink);
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/invite/test-invite-token"));
-    });
+    await user.click(await screen.findByText("Invite by email"));
+    expect(navigateMock).toHaveBeenCalledWith("/org-1/settings/members");
     await waitFor(() => {
       expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
     });
-  });
-
-  it("stays open when invite link copy fails", async () => {
-    const user = setupUser();
-    installClipboardWriteMock();
-    writeTextMock.mockRejectedValue(new Error("Clipboard unavailable"));
-    renderPalette();
-
-    openPalette();
-    const copyInviteLink = await screen.findByText("Copy Invite Link");
-    await waitFor(() => {
-      expect(copyInviteLink.closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
-    });
-    await user.click(copyInviteLink);
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/invite/test-invite-token"));
-    });
-    expect(screen.getByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
   });
 
   it("creates an app with the quick shortcut", async () => {

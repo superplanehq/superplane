@@ -514,6 +514,7 @@ func TestDeriveFactoryTemplateInputCarriesVisualEvidence(t *testing.T) {
 					},
 				}}},
 				mustFactoryAppTemplate(t, "line-implementation"),
+				nil,
 			)
 			require.NotNil(t, input.includeVisualEvidence)
 			assert.Equal(t, enabled, *input.includeVisualEvidence)
@@ -547,9 +548,54 @@ func TestCanvasAgentIncludesVisualEvidenceIgnoresUnrelatedRunners(t *testing.T) 
 		&models.Canvas{ID: uuid.New(), Name: "Implement"},
 		&models.CanvasVersion{Nodes: nodes},
 		mustFactoryAppTemplate(t, "line-implementation"),
+		nil,
 	)
 	require.NotNil(t, input.includeVisualEvidence)
 	assert.False(t, *input.includeVisualEvidence)
+}
+
+func TestMaterializePRFeedbackDefaultsOmitsCommitIdentity(t *testing.T) {
+	cases := []struct {
+		name    string
+		source  string
+		build   func(prFeedbackBuildRequest) *yaml.Canvas
+		runners []string
+	}{
+		{
+			name:    "discussion",
+			source:  models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+			build:   buildDiscussionPRFeedbackCanvas,
+			runners: []string{prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID},
+		},
+		{
+			name:    "checks",
+			source:  models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
+			build:   buildChecksPRFeedbackCanvas,
+			runners: []string{prFeedbackRunnerNodeID},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			current := testCase.build(prFeedbackBuildRequest{Repository: "acme/app"})
+			result, err := materializePRFeedbackDefaults(
+				nil,
+				&models.Factory{OrganizationID: uuid.New()},
+				&models.Canvas{ID: uuid.New(), Name: "PR feedback"},
+				&models.CanvasVersion{Nodes: current.Nodes(), Edges: current.Edges()},
+				&models.FactoryPRFeedbackHandler{Source: testCase.source},
+				nil,
+			)
+			require.NoError(t, err)
+
+			defaults, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+			require.NoError(t, err)
+			for _, nodeID := range testCase.runners {
+				runner := findYAMLNode(t, defaults, nodeID)
+				assert.False(t, runnerHasStep(t, *runner, "Set Up Git User"))
+				assert.False(t, runnerHasStep(t, *runner, "Set Up DCO Signing"))
+			}
+		})
+	}
 }
 
 func TestMaterializePRFeedbackDefaultsRemovesSeparateEvidenceComment(t *testing.T) {
@@ -596,6 +642,7 @@ func TestMaterializePRFeedbackDefaultsRemovesSeparateEvidenceComment(t *testing.
 		&models.Canvas{ID: canvasID, Name: "Address PR feedback"},
 		&models.CanvasVersion{Nodes: current.Nodes(), Edges: current.Edges()},
 		&models.FactoryPRFeedbackHandler{Source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion},
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -631,6 +678,7 @@ func TestMaterializePRFeedbackChecksDefaultsKeepsVisualEvidence(t *testing.T) {
 		&models.Canvas{ID: canvasID, Name: "Fix pull request checks"},
 		&models.CanvasVersion{Nodes: current.Nodes(), Edges: current.Edges()},
 		&models.FactoryPRFeedbackHandler{Source: models.FactoryPRFeedbackHandlerSourcePullRequestChecks},
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -828,6 +876,8 @@ func TestBuildDiscussionPRFeedbackCanvasBitbucket(t *testing.T) {
 	assert.Equal(t, `Sure, looking into this. Follow along: [{{ $["Find Pull Request"].data.workOrder.key }}]({{ $["Find Pull Request"].data.workOrder.url }})`, acknowledge.Configuration["body"])
 	edges := yamlEdgeChannels(canvas)
 	assert.Contains(t, edges, "found:"+prFeedbackFindNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
+	assert.Contains(t, edges, "default:"+prFeedbackAcknowledgeCommentNodeID+"->"+prFeedbackActivityNodeID)
+	assert.NotContains(t, edges, "found:"+prFeedbackFindNodeID+"->"+prFeedbackActivityNodeID)
 	assert.NotContains(t, edges, "default:"+prFeedbackCommentTriggerNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
 
 	for _, node := range canvas.Spec.Nodes {
@@ -931,7 +981,7 @@ func TestMaterializeIntakeDefaults(t *testing.T) {
 		Source:    source,
 	}
 
-	result, err := materializeIntakeDefaults(nil, canvas, version, intake)
+	result, err := materializeIntakeDefaults(nil, canvas, version, intake, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "intake:"+source, result.templateID)
 
@@ -964,7 +1014,7 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		Edges: current.Edges(),
 	}
 
-	result, err := materializeBacklogDefaults(nil, nil, canvas, version)
+	result, err := materializeBacklogDefaults(nil, nil, canvas, version, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "backlog", result.templateID)
 
@@ -982,19 +1032,15 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 	prompt := implementationStep(t, refinement, "Refine Task")
 	text, ok := prompt["prompt"].(string)
 	require.True(t, ok)
-	assert.Contains(t, text, runner.PlanningSessionUserPromptReviewMarkdown())
-	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
+	assert.Equal(t, "Review and score this task\n\n{{ root().data.workOrder }}", text)
 }
 
-func TestBuildBacklogCanvasUsesReviewPrompt(t *testing.T) {
+func TestBuildBacklogCanvasUsesMinimalTaskPrompt(t *testing.T) {
 	canvas := buildBacklogCanvas(backlogCanvasRequest{})
 	refinement := findYAMLNode(t, canvas, backlogRefinementNodeID)
 	assert.Equal(t, true, refinement.Configuration[runner.SkipSetupCommandsField])
 	text := backlogRefinementPromptText(t, canvas)
-	assert.Contains(t, text, runner.PlanningSessionUserPromptReviewMarkdown())
-	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
-	assert.Contains(t, text, "Clarity, Complexity, and Verifiability")
-	assert.NotContains(t, text, "1 through 5")
+	assert.Equal(t, "Review and score this task\n\n{{ root().data.workOrder }}", text)
 }
 
 func backlogRefinementPromptText(t *testing.T, canvas *yaml.Canvas) string {

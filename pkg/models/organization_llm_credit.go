@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -19,22 +20,27 @@ const (
 	LLMCreditGrantKindTopup       = "topup"
 	LLMCreditGrantKindTopupRefund = "topup_refund"
 
-	LLMCreditGrantKindTrialAdjustment = "trial_adjustment"
-	LLMCreditGrantKindTopupAdjustment = "topup_adjustment"
-	LLMCreditGrantKindAdminAdjustment = "admin_adjustment"
+	LLMCreditGrantKindIncludedAdjustment = "included_adjustment"
+	LLMCreditGrantKindTrialAdjustment    = "trial_adjustment"
+	LLMCreditGrantKindTopupAdjustment    = "topup_adjustment"
+	LLMCreditGrantKindAdminAdjustment    = "admin_adjustment"
 
-	CreditBalanceBucketTrial = "trial"
-	CreditBalanceBucketTopup = "topup"
-	CreditBalanceBucketGrant = "grant"
+	CreditBalanceBucketIncluded = "included"
+	CreditBalanceBucketTrial    = "trial"
+	CreditBalanceBucketTopup    = "topup"
+	CreditBalanceBucketGrant    = "grant"
 
 	canceledIncludedGrantPrefix = "canceled:"
+
+	initialPlanTrialCreditNote = "Initial billing plan trial credit"
 )
 
 var (
 	ErrHostedCreditEmpty        = errors.New("hosted credit is empty")
 	ErrCreditGrantNotPositive   = errors.New("credit grant must be greater than zero")
-	ErrCreditBalanceBucket      = errors.New("credit type must be trial, topup, or grant")
+	ErrCreditBalanceBucket      = errors.New("credit type must be trial, included, topup, or grant")
 	ErrCreditBalanceNegative    = errors.New("credit balance cannot be negative")
+	ErrCreditExpiration         = errors.New("choose a future UTC expiration or no scheduled expiration")
 	ErrCreditBalanceChanged     = errors.New("the credit balance changed; reload and try again")
 	ErrTrialCreditNotActive     = errors.New("this organization has no active trial credit")
 	ErrFactoryHostedBudgetEmpty = errors.New("this workspace has no remaining hosted credit")
@@ -67,12 +73,14 @@ func (OrganizationLLMCreditGrant) TableName() string {
 // CreditBalanceAdjustment sets one credit type to an exact remaining balance.
 // ExpectedMicros is the remaining balance the admin saw before the change.
 type CreditBalanceAdjustment struct {
-	OrganizationID uuid.UUID
-	Bucket         string
-	TargetMicros   int64
-	ExpectedMicros int64
-	Note           string
-	ActorAccountID *uuid.UUID
+	ExpirationChoice *string
+	ExpiresAt        *time.Time
+	OrganizationID   uuid.UUID
+	Bucket           string
+	TargetMicros     int64
+	ExpectedMicros   int64
+	Note             string
+	ActorAccountID   *uuid.UUID
 }
 
 // OrganizationLLMSettings holds the hidden per-org markup override.
@@ -119,11 +127,11 @@ func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
 		return nil
 	}
 
-	settings, err := GetInstallationLLMSettings(tx)
+	settings, err := FindBillingPlan(tx, BillingPlanTrial)
 	if err != nil {
 		return err
 	}
-	amount := CentsToMicros(settings.WelcomeGrantCents)
+	amount := CentsToMicros(settings.TrialCreditCents)
 	if amount <= 0 {
 		return nil
 	}
@@ -143,7 +151,7 @@ func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
 		return err
 	}
 
-	expiresAt := now.Add(DefaultWelcomeGrantTTL)
+	expiresAt := now.AddDate(0, 0, settings.TrialLengthDays)
 	grant := OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
@@ -241,7 +249,31 @@ func AdjustOrganizationLLMCreditBalance(tx *gorm.DB, adjustment CreditBalanceAdj
 			return nil
 		}
 
-		grant, err := insertCreditAdjustment(inner, adjustment, kind, adjustment.TargetMicros-current, nil, now)
+		delta := adjustment.TargetMicros - current
+		var expiresAt *time.Time
+		if kind == LLMCreditGrantKindIncludedAdjustment {
+			if delta > 0 {
+				if adjustment.ExpirationChoice == nil {
+					return ErrCreditExpiration
+				}
+				switch *adjustment.ExpirationChoice {
+				case "never":
+				case "at":
+					if adjustment.ExpiresAt == nil || !adjustment.ExpiresAt.After(now) {
+						return ErrCreditExpiration
+					}
+					end := adjustment.ExpiresAt.UTC()
+					expiresAt = &end
+				default:
+					return ErrCreditExpiration
+				}
+			}
+			delta, err = includedCreditDeltaForTarget(inner, adjustment.OrganizationID, adjustment.TargetMicros, now)
+			if err != nil {
+				return err
+			}
+		}
+		grant, err := insertCreditAdjustment(inner, adjustment, kind, delta, expiresAt, now)
 		if err != nil {
 			return err
 		}
@@ -256,6 +288,8 @@ func AdjustOrganizationLLMCreditBalance(tx *gorm.DB, adjustment CreditBalanceAdj
 
 func creditAdjustmentKindForBucket(bucket string) (string, bool) {
 	switch bucket {
+	case CreditBalanceBucketIncluded:
+		return LLMCreditGrantKindIncludedAdjustment, true
 	case CreditBalanceBucketTrial:
 		return LLMCreditGrantKindTrialAdjustment, true
 	case CreditBalanceBucketTopup:
@@ -269,6 +303,8 @@ func creditAdjustmentKindForBucket(bucket string) (string, bool) {
 
 func remainingMicrosForBucket(summary OrganizationLLMCreditSummary, bucket string) int64 {
 	switch bucket {
+	case CreditBalanceBucketIncluded:
+		return summary.IncludedRemainingMicros
 	case CreditBalanceBucketTrial:
 		return summary.WelcomeRemainingMicros
 	case CreditBalanceBucketTopup:
@@ -630,6 +666,14 @@ func ResolveOrganizationMarkupBPS(tx *gorm.DB, orgID uuid.UUID) (int, error) {
 		return *orgSettings.MarkupBPS, nil
 	}
 
+	plan, err := FindOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return 0, err
+	}
+	if plan != nil && plan.Catalog.MarkupBPS != nil {
+		return *plan.Catalog.MarkupBPS, nil
+	}
+
 	installation, err := GetInstallationLLMSettings(tx)
 	if err != nil {
 		return 0, err
@@ -811,21 +855,18 @@ func AssertFactoryHostedBudgetAvailable(tx *gorm.DB, factory *Factory) error {
 }
 
 // AssertHostedRunAllowed rejects a new hosted start when the organization has
-// no open trial or active Business plan, remaining credit is empty, or the
+// no open trial or active paid plan, remaining credit is empty, or the
 // factory hosted budget is exhausted. Pass a committed connection so remaining
 // credit includes billed spend from other runs.
 func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) error {
+	if !BillingEnabled() {
+		return nil
+	}
 	if orgID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
-	if HostedPlanGatesEnabled() {
-		plan, err := ResolveOrganizationBillingPlan(tx, orgID)
-		if err != nil {
-			return err
-		}
-		if !plan.AllowsHostedExecution(time.Now()) {
-			return ErrHostedSubscriptionRequired
-		}
+	if err := AssertOrganizationPlanAllowsRuns(tx, orgID); err != nil {
+		return err
 	}
 	if err := AssertHostedCreditAvailable(tx, orgID); err != nil {
 		return err
@@ -852,13 +893,21 @@ type IncludedUsageSync struct {
 // way Polar subscription webhooks do.
 func SyncIncludedLLMCreditGrant(tx *gorm.DB, sync IncludedUsageSync) error {
 	if sync.GrantIncluded {
+		plan, err := FindOrganizationBillingPlan(tx, sync.OrganizationID)
+		if err != nil {
+			return err
+		}
+		// New catalog policies are stored until automatic delivery is implemented.
+		if plan == nil || (plan.Catalog.Key != "business_legacy" && plan.Catalog.Key != BillingPlanBusinessManual) || plan.Catalog.CreditAmountCents == 0 {
+			return nil
+		}
 		if sync.PeriodEnd == nil {
 			return nil
 		}
-		_, err := AddIncludedLLMCreditGrant(
+		_, err = AddIncludedLLMCreditGrant(
 			tx,
 			sync.OrganizationID,
-			CentsToMicros(DefaultIncludedGrantCents),
+			CentsToMicros(plan.Catalog.CreditAmountCents),
 			IncludedGrantKey(sync.SubscriptionID, *sync.PeriodEnd),
 			*sync.PeriodEnd,
 		)
@@ -917,9 +966,9 @@ func ExpireOpenIncludedGrants(tx *gorm.DB, orgID uuid.UUID) error {
 	now := time.Now()
 	var grants []OrganizationLLMCreditGrant
 	err := tx.Where(
-		"organization_id = ? AND kind = ? AND (expires_at IS NULL OR expires_at > ?)",
+		"organization_id = ? AND kind IN ? AND (expires_at IS NULL OR expires_at > ?)",
 		orgID,
-		LLMCreditGrantKindIncluded,
+		[]string{LLMCreditGrantKindIncluded, LLMCreditGrantKindIncludedAdjustment},
 		now,
 	).Find(&grants).Error
 	if err != nil {
@@ -948,4 +997,83 @@ func canceledIncludedOrderID(polarOrderID string, grantID uuid.UUID) string {
 		return trimmed
 	}
 	return canceledIncludedGrantPrefix + trimmed + ":" + grantID.String()
+}
+
+func includedCreditDeltaForTarget(tx *gorm.DB, orgID uuid.UUID, target int64, now time.Time) (int64, error) {
+	grants, err := ListOrganizationLLMCreditGrants(tx, orgID)
+	if err != nil {
+		return 0, err
+	}
+	billed, err := sumHostedBilledMicros(tx, orgID, nil)
+	if err != nil {
+		return 0, err
+	}
+	atExpiry, err := billedMicrosAtExpiredGrants(tx, orgID, grants, now)
+	if err != nil {
+		return 0, err
+	}
+	spend := liveHostedSpendMicros(grants, billed, atExpiry, now)
+	_, live := splitCreditGrantsForSpend(grants, now)
+	var included, earlier int64
+	for _, grant := range live {
+		switch grantCreditBucket(grant.Kind) {
+		case creditBucketWelcome:
+			earlier += grant.AmountMicros
+		case creditBucketIncluded:
+			included += grant.AmountMicros
+		}
+	}
+	spend = max(int64(0), spend-earlier)
+	needed, ok := checkedAddMicros(target, spend)
+	if !ok {
+		return 0, errors.New("included balance is too large")
+	}
+	return needed - included, nil
+}
+
+func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingPlan) error {
+	if previous == nil || previous.PlanSource == BillingPlanSourceAdmin || previous.Catalog.Category != "trial" ||
+		next.Catalog.Category != "paid" || next.Catalog.Visibility != "public" || next.Catalog.TrialCreditCents == 0 {
+		return nil
+	}
+	enabled, err := OrganizationHasExperimentalFeatures(tx, next.OrganizationID, features.FeatureNewBilling)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return nil
+	}
+
+	granted, err := initialPlanTrialCreditGranted(tx, next.OrganizationID)
+	if err != nil {
+		return err
+	}
+	if granted {
+		return nil
+	}
+
+	welcome, err := findWelcomeGrant(tx, next.OrganizationID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	if !welcomeExpiryIsLive(welcome, now) {
+		return nil
+	}
+	_, err = insertCreditAdjustment(tx, CreditBalanceAdjustment{
+		OrganizationID: next.OrganizationID,
+		Note:           initialPlanTrialCreditNote,
+	}, LLMCreditGrantKindTrialAdjustment, CentsToMicros(next.Catalog.TrialCreditCents), welcome.ExpiresAt, now)
+	return err
+}
+
+// initialPlanTrialCreditGranted reports whether the initial paid plan trial
+// credit was already added. A canceled subscription can restore an unexpired
+// trial, and a later reactivation must not grant the credit again.
+func initialPlanTrialCreditGranted(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	var count int64
+	err := tx.Model(&OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ? AND note = ?", orgID, LLMCreditGrantKindTrialAdjustment, initialPlanTrialCreditNote).
+		Count(&count).Error
+	return count > 0, err
 }

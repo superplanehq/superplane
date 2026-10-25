@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -25,6 +27,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -298,6 +301,10 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	onFileBindCleanup := func(job contexts.FileBindCleanup) {
 		pendingFileBindCleanups = append(pendingFileBindCleanups, job)
 	}
+	pendingProductAnalytics := []productanalytics.Event{}
+	onProductAnalytics := func(event productanalytics.Event) {
+		pendingProductAnalytics = append(pendingProductAnalytics, event)
+	}
 
 	runCancellations := &RunCancellationNotifier{}
 
@@ -337,7 +344,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, runCancellations)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -358,6 +365,9 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	contexts.ApplyFileBindCleanups(pendingFileBindCleanups, nil)
+	for _, event := range pendingProductAnalytics {
+		productanalytics.Capture(event)
+	}
 
 	for _, event := range newEvents {
 		messages.PublishCanvasEventCreatedMessage(&event)
@@ -421,6 +431,7 @@ func (w *NodeExecutor) executeActionNode(
 	onFactoryWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage),
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
+	onProductAnalytics func(productanalytics.Event),
 	runCancellations *RunCancellationNotifier,
 ) error {
 	logger := logging.WithExecution(
@@ -504,6 +515,7 @@ func (w *NodeExecutor) executeActionNode(
 			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
+			WithProductAnalytics(onProductAnalytics).
 			WithRemoteImageIngest(w.encryptor, w.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
@@ -531,6 +543,41 @@ func (w *NodeExecutor) executeActionNode(
 	}
 
 	ctx.Logger = logger
+	if err := polar.AssertOrganizationPaymentMethod(tx, workflow.OrganizationID); err != nil {
+		// Only a confirmed missing card fails the node. Temporary verification
+		// errors roll back the transaction, so the pending execution is retried.
+		if !errors.Is(err, models.ErrPaymentMethodRequired) {
+			return err
+		}
+		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+	}
+	// Every agent run needs an active paid plan or an open trial. Credit and
+	// BYOK keys do not replace the plan. Database failures leave the execution
+	// pending for the worker retry.
+	if models.IsAgentRunnerComponent(componentName) {
+		if err := models.AssertOrganizationPlanAllowsRuns(tx, workflow.OrganizationID); err != nil {
+			if !errors.Is(err, models.ErrHostedSubscriptionRequired) {
+				return err
+			}
+			return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+		}
+	}
+	// Recheck saved BYOK configurations immediately before a new runner action.
+	// Database failures leave the execution pending for the worker retry.
+	if slices.Contains([]string{"runnerClaudeCode", "runnerCodex", "runnerOpenRouter"}, componentName) {
+		configuration := execution.Configuration.Data()
+		credentials, _ := configuration["credentials"].(map[string]any)
+		source, _ := credentials["source"].(string)
+		if source == "integration" || source == "secret" {
+			provider, _ := configuration["llmProvider"].(string)
+			if err := models.RequireOrganizationBYOKAccess(tx, workflow.OrganizationID, provider); err != nil {
+				if !errors.Is(err, models.ErrBYOKAccessDenied) {
+					return err
+				}
+				return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+			}
+		}
+	}
 	if err := action.Execute(ctx); err != nil {
 		logger = withFactoryOrder(logger, tx, execution.RunID)
 		logger = withRejectedHostedCredit(logger, workflow.OrganizationID, err)

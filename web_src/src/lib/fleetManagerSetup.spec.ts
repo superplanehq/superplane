@@ -56,15 +56,23 @@ const metadata: FleetManagerSetupMetadata = {
 };
 
 describe("generateFleetManagerValues", () => {
+  const baseInput = {
+    metadata,
+    installationAdminToken: "personal-token",
+    provider: "aws" as const,
+    managerId: "test-aws",
+    superplaneUrl: "https://superplane.example.com",
+    runnerVersion: "v0.1.0",
+    selectedFleetIds: ["e1-large-amd64"],
+    fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+    fields: {},
+  };
+
   it.each(["aws", "gcp", "azure"] as const)("generates complete %s values", (provider) => {
     const values = generateFleetManagerValues({
-      metadata,
-      installationAdminToken: "personal-token",
+      ...baseInput,
       provider,
       managerId: `test-${provider}`,
-      superplaneUrl: "https://superplane.example.com",
-      runnerVersion: "v0.1.0",
-      selectedFleetIds: ["e1-large-amd64"],
       fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 2 } },
       fields: { imageAmd64: "runner-image-amd64" },
     });
@@ -75,18 +83,14 @@ describe("generateFleetManagerValues", () => {
     expect(values).not.toContain("credentials:");
   });
 
+  it("uses warm 1 and max 10 when a selected fleet has no saved capacity", () => {
+    const values = generateFleetManagerValues({ ...baseInput, fleetCapacities: {} });
+    const configuration = load(values) as { fleets: Array<{ warmCapacity: number; maxCapacity: number }> };
+    expect(configuration.fleets[0]).toMatchObject({ warmCapacity: 1, maxCapacity: 10 });
+  });
+
   it("quotes the runner release URL so a shell paste keeps the version placeholder", () => {
-    const values = generateFleetManagerValues({
-      metadata,
-      installationAdminToken: "personal-token",
-      provider: "gcp",
-      managerId: "test-gcp",
-      superplaneUrl: "https://superplane.example.com",
-      runnerVersion: "v0.1.0",
-      selectedFleetIds: ["e1-large-amd64"],
-      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
-      fields: {},
-    });
+    const values = generateFleetManagerValues({ ...baseInput, provider: "gcp", managerId: "test-gcp" });
 
     expect(values).toContain('releaseBaseUrl: "https://example/releases/runner%2F{version}"');
     const parsed = load(values) as { runner: { releaseBaseUrl: string } };
@@ -165,17 +169,7 @@ describe("generateFleetManagerValues", () => {
   });
 
   it("does not attach a GCP service account unless one is configured", () => {
-    const values = generateFleetManagerValues({
-      metadata,
-      installationAdminToken: "personal-token",
-      provider: "gcp",
-      managerId: "test-gcp",
-      superplaneUrl: "https://superplane.example.com",
-      runnerVersion: "v0.1.0",
-      selectedFleetIds: ["e1-large-amd64"],
-      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
-      fields: {},
-    });
+    const values = generateFleetManagerValues({ ...baseInput, provider: "gcp", managerId: "test-gcp" });
 
     expect(values).not.toContain("serviceAccountEmail");
   });

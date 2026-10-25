@@ -24,12 +24,14 @@ import (
 )
 
 type installationLLMSettingsResponse struct {
-	WelcomeGrantCents     int64                       `json:"welcome_grant_cents"`
-	MarkupBPS             int                         `json:"markup_bps"`
-	WarningThresholdBPS   int                         `json:"warning_threshold_bps"`
-	DefaultHostedProvider string                      `json:"default_hosted_provider"`
-	DefaultHostedModel    string                      `json:"default_hosted_model"`
-	Providers             []hostedLLMProviderResponse `json:"providers"`
+	WelcomeGrantCents           int64                       `json:"welcome_grant_cents"`
+	MarkupBPS                   int                         `json:"markup_bps"`
+	WarningThresholdBPS         int                         `json:"warning_threshold_bps"`
+	CreditPurchaseFeeBPS        int                         `json:"credit_purchase_fee_bps"`
+	CreditPurchaseFixedFeeCents int64                       `json:"credit_purchase_fixed_fee_cents"`
+	DefaultHostedProvider       string                      `json:"default_hosted_provider"`
+	DefaultHostedModel          string                      `json:"default_hosted_model"`
+	Providers                   []hostedLLMProviderResponse `json:"providers"`
 }
 
 type hostedLLMProviderResponse struct {
@@ -42,11 +44,13 @@ type hostedLLMProviderResponse struct {
 }
 
 type installationLLMSettingsRequest struct {
-	WelcomeGrantCents     *int64  `json:"welcome_grant_cents"`
-	MarkupBPS             *int    `json:"markup_bps"`
-	WarningThresholdBPS   *int    `json:"warning_threshold_bps"`
-	DefaultHostedProvider *string `json:"default_hosted_provider"`
-	DefaultHostedModel    *string `json:"default_hosted_model"`
+	WelcomeGrantCents           *int64  `json:"welcome_grant_cents"`
+	MarkupBPS                   *int    `json:"markup_bps"`
+	WarningThresholdBPS         *int    `json:"warning_threshold_bps"`
+	CreditPurchaseFeeBPS        *int    `json:"credit_purchase_fee_bps"`
+	CreditPurchaseFixedFeeCents *int64  `json:"credit_purchase_fixed_fee_cents"`
+	DefaultHostedProvider       *string `json:"default_hosted_provider"`
+	DefaultHostedModel          *string `json:"default_hosted_model"`
 }
 
 type hostedLLMProviderRequest struct {
@@ -93,10 +97,12 @@ type addOrganizationLLMCreditRequest struct {
 }
 
 type setOrganizationCreditBalanceRequest struct {
-	Bucket                 string `json:"bucket"`
-	TargetCents            int64  `json:"target_cents"`
-	ExpectedRemainingCents int64  `json:"expected_remaining_cents"`
-	Note                   string `json:"note"`
+	ExpirationChoice       *string    `json:"expiration"`
+	ExpiresAt              *time.Time `json:"expires_at"`
+	Bucket                 string     `json:"bucket"`
+	TargetCents            int64      `json:"target_cents"`
+	ExpectedRemainingCents int64      `json:"expected_remaining_cents"`
+	Note                   string     `json:"note"`
 }
 
 // organizationCreditGrantResponse matches the OrganizationCreditGrant JSON
@@ -121,12 +127,21 @@ type organizationLLMMarkupRequest struct {
 }
 
 type organizationBillingPlanResponse struct {
-	Plan                    string  `json:"plan"`
-	PlanSource              string  `json:"plan_source"`
-	PolarSubscriptionStatus string  `json:"polar_subscription_status"`
-	PolarManaged            bool    `json:"polar_managed"`
-	TrialEndsAt             *string `json:"trial_ends_at"`
-	CurrentPeriodEnd        *string `json:"current_period_end"`
+	CreditExpiration              string    `json:"credit_expiration"`
+	CreditValidityDays            *int      `json:"credit_validity_days"`
+	CatalogID                     uuid.UUID `json:"catalog_id"`
+	CatalogKey                    string    `json:"catalog_key"`
+	CatalogName                   string    `json:"catalog_name"`
+	CatalogCategory               string    `json:"catalog_category"`
+	Plan                          string    `json:"plan"`
+	PlanSource                    string    `json:"plan_source"`
+	PolarSubscriptionVerification string    `json:"polar_subscription_verification"`
+	PolarSubscriptionID           string    `json:"polar_subscription_id"`
+	PolarSubscriptionURL          string    `json:"polar_subscription_url,omitempty"`
+	PolarSubscriptionStatus       string    `json:"polar_subscription_status"`
+	PolarManaged                  bool      `json:"polar_managed"`
+	TrialEndsAt                   *string   `json:"trial_ends_at"`
+	CurrentPeriodEnd              *string   `json:"current_period_end"`
 }
 
 type organizationBillingPlanRequest struct {
@@ -151,20 +166,28 @@ func (s *Server) adminUpdateInstallationLLMSettings(w http.ResponseWriter, r *ht
 		return
 	}
 
+	if req.WelcomeGrantCents != nil {
+		http.Error(w, "Edit trial credit in Billing plans", http.StatusBadRequest)
+		return
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		current, err := models.GetInstallationLLMSettings(tx)
 		if err != nil {
 			return err
 		}
 		next := *current
-		if req.WelcomeGrantCents != nil {
-			next.WelcomeGrantCents = *req.WelcomeGrantCents
-		}
 		if req.MarkupBPS != nil {
 			next.MarkupBPS = *req.MarkupBPS
 		}
 		if req.WarningThresholdBPS != nil {
 			next.WarningThresholdBPS = *req.WarningThresholdBPS
+		}
+		if req.CreditPurchaseFeeBPS != nil {
+			next.CreditPurchaseFeeBPS = *req.CreditPurchaseFeeBPS
+		}
+		if req.CreditPurchaseFixedFeeCents != nil {
+			next.CreditPurchaseFixedFeeCents = *req.CreditPurchaseFixedFeeCents
 		}
 		if req.DefaultHostedProvider != nil {
 			next.DefaultHostedProvider = optionalTrimmedStringPointer(*req.DefaultHostedProvider)
@@ -458,12 +481,14 @@ func (s *Server) adminSetOrganizationCreditBalance(w http.ResponseWriter, r *htt
 
 	db := database.DB(r.Context())
 	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
-		OrganizationID: orgID,
-		Bucket:         req.Bucket,
-		TargetMicros:   targetMicros,
-		ExpectedMicros: expectedMicros,
-		Note:           req.Note,
-		ActorAccountID: actor,
+		OrganizationID:   orgID,
+		ExpirationChoice: req.ExpirationChoice,
+		ExpiresAt:        req.ExpiresAt,
+		Bucket:           req.Bucket,
+		TargetMicros:     targetMicros,
+		ExpectedMicros:   expectedMicros,
+		Note:             req.Note,
+		ActorAccountID:   actor,
 	})
 	if err != nil {
 		writeCreditBalanceError(w, err)
@@ -496,6 +521,7 @@ func writeCreditBalanceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, models.ErrCreditBalanceChanged):
 		http.Error(w, "The balance changed. Reload and try again.", http.StatusConflict)
 	case errors.Is(err, models.ErrCreditBalanceBucket),
+		errors.Is(err, models.ErrCreditExpiration),
 		errors.Is(err, models.ErrCreditBalanceNegative),
 		errors.Is(err, errCreditCentsOutOfRange):
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -551,13 +577,50 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 	respondJSON(w, response)
 }
 
+// adminBillingPlanListItem is an admin list response item. It is not a
+// persisted model. The display fields are never accepted as authorization:
+// the server checks assignments again on save and delete.
+type adminBillingPlanListItem struct {
+	models.BillingPlan
+	Assigned             bool    `json:"assigned"`
+	DeleteDisabledReason *string `json:"delete_disabled_reason"`
+}
+
+func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
+	db := database.DB(r.Context())
+	plans, err := models.ListBillingPlans(db)
+	if err != nil {
+		writeBillingPlanServerError(w, r, err, billingPlanLoadErrorMessage)
+		return
+	}
+	planIDs := make([]uuid.UUID, 0, len(plans))
+	for _, plan := range plans {
+		planIDs = append(planIDs, plan.ID)
+	}
+	assigned, err := models.ListAssignedBillingPlanIDs(db, planIDs)
+	if err != nil {
+		writeBillingPlanServerError(w, r, err, billingPlanLoadErrorMessage)
+		return
+	}
+	items := make([]adminBillingPlanListItem, 0, len(plans))
+	for _, plan := range plans {
+		item := adminBillingPlanListItem{BillingPlan: plan, Assigned: assigned.Contains(plan.ID)}
+		if reason := plan.DeleteBlockReason(assigned.Contains(plan.ID)); reason != "" {
+			item.DeleteDisabledReason = &reason
+		}
+		items = append(items, item)
+	}
+	respondJSON(w, items)
+}
+
 func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
+	if !models.BillingEnabled() {
+		http.Error(w, "Billing is not available", http.StatusNotFound)
+		return
+	}
 	orgID, ok := parseAdminOrgID(w, r)
 	if !ok {
 		return
-	}
-	if err := polar.SyncOrganizationSubscription(r.Context(), database.Conn(), orgID); err != nil {
-		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
 	}
 	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
 	if err != nil {
@@ -565,10 +628,19 @@ func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
 		return
 	}
+	verification, verifyErr := polar.VerifyOrganizationSubscription(r.Context(), orgID)
+	if verifyErr != nil {
+		log.WithError(verifyErr).Warn("admin: failed to verify Polar subscription")
+	}
+	response.PolarSubscriptionVerification = verification
 	respondJSON(w, response)
 }
 
 func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
+	if !models.BillingEnabled() {
+		http.Error(w, "Billing is not available", http.StatusNotFound)
+		return
+	}
 	orgID, ok := parseAdminOrgID(w, r)
 	if !ok {
 		return
@@ -580,18 +652,39 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := polar.SyncOrganizationSubscription(r.Context(), database.Conn(), orgID); err != nil {
-		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
+	db := database.DB(r.Context())
+	snapshot, err := models.ResolveOrganizationBillingPlan(db, orgID)
+	if err != nil {
+		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
+		return
+	}
+	verification, err := polar.VerifyOrganizationSubscription(r.Context(), orgID)
+	if err != nil {
+		log.WithError(err).Warn("admin: failed to verify Polar subscription")
+		http.Error(w, "SuperPlane could not verify the Polar subscription. Refresh and try again.", http.StatusBadGateway)
+		return
+	}
+	if verification == "active" {
+		http.Error(w, models.ErrPolarManagedBillingPlan.Error(), http.StatusBadRequest)
+		return
 	}
 
 	planName := strings.TrimSpace(req.Plan)
-	trialEndsAt, err := trialEndForAdminPlan(planName, req.TrialEndsAt)
+	trialEndsAt, err := trialEndForAdminPlan(database.Conn(), planName, req.TrialEndsAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	_, err = models.SetAdminOrganizationPlan(database.Conn(), orgID, planName, trialEndsAt)
+	if verification == "none" {
+		_, err = snapshot.AssignAdminPlanAfterPolarVerification(db, planName, trialEndsAt)
+	} else {
+		_, err = models.SetAdminOrganizationPlan(db, orgID, planName, trialEndsAt)
+	}
+	if errors.Is(err, models.ErrBillingPlanChanged) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -603,6 +696,7 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
 		return
 	}
+	response.PolarSubscriptionVerification = verification
 	respondJSON(w, response)
 }
 
@@ -611,7 +705,19 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 	if err != nil {
 		return organizationBillingPlanResponse{}, err
 	}
+	subscriptionID := ""
+	if plan.PolarSubscriptionID != nil {
+		subscriptionID = *plan.PolarSubscriptionID
+	}
 	return organizationBillingPlanResponse{
+		PolarSubscriptionID:     subscriptionID,
+		PolarSubscriptionURL:    polar.SubscriptionDashboardURL(subscriptionID),
+		CatalogID:               plan.PlanID,
+		CatalogKey:              plan.Catalog.Key,
+		CatalogName:             plan.Catalog.Name,
+		CatalogCategory:         plan.Catalog.Category,
+		CreditExpiration:        plan.Catalog.CreditExpiration,
+		CreditValidityDays:      plan.Catalog.CreditValidityDays,
 		Plan:                    plan.Plan,
 		PlanSource:              plan.PlanSource,
 		PolarSubscriptionStatus: plan.PolarSubscriptionStatus,
@@ -621,8 +727,9 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 	}, nil
 }
 
-func trialEndForAdminPlan(planName string, raw *string) (*time.Time, error) {
-	if planName != models.BillingPlanTrial {
+func trialEndForAdminPlan(tx *gorm.DB, planName string, raw *string) (*time.Time, error) {
+	catalog, err := models.FindBillingPlan(tx, planName)
+	if err != nil || catalog.Category != "trial" {
 		return nil, nil
 	}
 	if raw == nil || strings.TrimSpace(*raw) == "" {
@@ -676,14 +783,20 @@ func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettings
 		})
 	}
 
+	catalog, err := models.FindBillingPlan(tx, models.BillingPlanTrial)
+	if err != nil {
+		return installationLLMSettingsResponse{}, err
+	}
 	defaultModel := models.InstallationDefaultHostedLLMModel(settings)
 	return installationLLMSettingsResponse{
-		WelcomeGrantCents:     settings.WelcomeGrantCents,
-		MarkupBPS:             settings.MarkupBPS,
-		WarningThresholdBPS:   settings.WarningThresholdBPS,
-		DefaultHostedProvider: defaultModel.Provider,
-		DefaultHostedModel:    defaultModel.Model,
-		Providers:             providers,
+		WelcomeGrantCents:           catalog.TrialCreditCents,
+		MarkupBPS:                   settings.MarkupBPS,
+		WarningThresholdBPS:         settings.WarningThresholdBPS,
+		CreditPurchaseFeeBPS:        settings.CreditPurchaseFeeBPS,
+		CreditPurchaseFixedFeeCents: settings.CreditPurchaseFixedFeeCents,
+		DefaultHostedProvider:       defaultModel.Provider,
+		DefaultHostedModel:          defaultModel.Model,
+		Providers:                   providers,
 	}, nil
 }
 
@@ -765,6 +878,8 @@ func isClientLLMSettingsError(err error) bool {
 		strings.Contains(msg, "markup cannot") ||
 		strings.Contains(msg, "welcome grant") ||
 		strings.Contains(msg, "warning threshold") ||
+		strings.Contains(msg, "credit purchase fee") ||
+		strings.Contains(msg, "credit purchase fixed fee") ||
 		strings.Contains(msg, "provisioning api key") ||
 		strings.Contains(msg, "llm base url") ||
 		strings.Contains(msg, "superplane agent model")

@@ -38,6 +38,8 @@ const metadata = {
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
   runnerVersions: ["v0.2.0", "v0.1.0"],
+  stableRunnerVersion: "v0.2.0",
+  installationType: "",
   fleetPresets: [
     { id: "e1-large-amd64", spec: fleetSpec },
     { id: "e1-large-arm64", spec: { ...fleetSpec, architecture: "arm64" as const } },
@@ -107,10 +109,44 @@ describe("FleetManagerSetup", () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
+  it("starts a new fleet at warm 1 and max 10", async () => {
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByLabelText("Warm capacity")).toHaveValue(1);
+    expect(screen.getByLabelText("Maximum capacity")).toHaveValue(10);
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate install command" }));
+    const command = await screen.findByTestId("fleet-manager-install-command");
+    expect(command).toHaveTextContent("warmCapacity: 1");
+    expect(command).toHaveTextContent("maxCapacity: 10");
+  });
+
+  it("keeps a saved warm 0 and max 1 capacity", async () => {
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({
+        provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v0.2.0",
+        selectedFleetIds: ["e1-large-amd64"],
+        fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+        fields: { region: "us-east-1", imageAmd64: "ami-amd64" },
+      }),
+    );
+
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByLabelText("Warm capacity")).toHaveValue(0);
+    expect(screen.getByLabelText("Maximum capacity")).toHaveValue(1);
+  });
+
   it("uses the Provider, Fleets, and Install sequence", async () => {
     render(<FleetManagerSetup />);
 
-    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose where runners run" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /cloud infrastructure/i })).not.toBeInTheDocument();
@@ -122,6 +158,19 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByText(/The most machines this fleet can run at one time/)).toBeInTheDocument();
     expect(screen.queryByText("e1-large-arm64")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
+  });
+
+  it("explains that single-host Fleet Manager is automatic", async () => {
+    stubSetup({ ...metadata, installationType: "single-host" });
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByRole("heading", { name: "Local runners" })).toBeInTheDocument();
+    expect(screen.getByText(/manages Fleet Manager automatically/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Configure the default fleet" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "This VM" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/enable-runners.sh/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/helm upgrade --install fleet-manager/)).not.toBeInTheDocument();
+    expect(createToken).not.toHaveBeenCalled();
   });
 
   it("switches the machine type list when the cloud changes", async () => {

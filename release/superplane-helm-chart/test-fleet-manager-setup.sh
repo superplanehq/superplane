@@ -21,6 +21,18 @@ common_args=(
   --set telemetry.secretName=test-telemetry
 )
 
+email_manifest="${TMP_DIR}/api-email.yaml"
+helm template superplane "${CHART_DIR}" \
+  "${common_args[@]}" \
+  --show-only templates/api.yaml \
+  --set api.ownerSetupEnabled=false \
+  --set email.secretName=test-email \
+  --set email.fromName="Invitation Sender" \
+  --set email.fromAddress=invites@example.com >"${email_manifest}"
+grep -q 'name: test-email' "${email_manifest}"
+grep -A1 'name: EMAIL_FROM_NAME' "${email_manifest}" | grep -q 'value: "Invitation Sender"'
+grep -A1 'name: EMAIL_FROM_ADDRESS' "${email_manifest}" | grep -q 'value: "invites@example.com"'
+
 helm template superplane "${CHART_DIR}" \
   "${common_args[@]}" \
   --set fleetManagerSetup.managerId=test-cluster >"${manifest}"
@@ -56,3 +68,72 @@ for provider in aws gcp azure; do
   grep -q '"source":"terraform"' "${provider_manifest}"
   grep -q "\"testField\":\"${provider}-value\"" "${provider_manifest}"
 done
+
+billing_off="$(grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${manifest}" | grep -c 'value: "no"' || true)"
+if [ "${billing_off}" -lt 3 ]; then
+  echo "expected SUPERPLANE_BILLING_ENABLED=no on API, workers, and websocket" >&2
+  exit 1
+fi
+
+polar_manifest="${TMP_DIR}/polar-billing.yaml"
+helm template superplane "${CHART_DIR}" \
+  "${common_args[@]}" \
+  --set polar.enabled=true \
+  --set polar.secretName=test-polar >"${polar_manifest}"
+if grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${polar_manifest}" | grep -q 'value: "yes"'; then
+  echo "Polar credentials must not turn SUPERPLANE_BILLING_ENABLED on" >&2
+  exit 1
+fi
+polar_billing_off="$(grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${polar_manifest}" | grep -c 'value: "no"' || true)"
+if [ "${polar_billing_off}" -lt 3 ]; then
+  echo "expected SUPERPLANE_BILLING_ENABLED=no when Polar is enabled" >&2
+  exit 1
+fi
+
+explicit_on="${TMP_DIR}/billing-on.yaml"
+helm template superplane "${CHART_DIR}" \
+  "${common_args[@]}" \
+  --set billing.enabled=yes >"${explicit_on}"
+billing_on="$(grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${explicit_on}" | grep -c 'value: "yes"' || true)"
+if [ "${billing_on}" -lt 3 ]; then
+  echo "expected SUPERPLANE_BILLING_ENABLED=yes when billing.enabled=yes" >&2
+  exit 1
+fi
+
+forced_off="${TMP_DIR}/billing-off.yaml"
+helm template superplane "${CHART_DIR}" \
+  "${common_args[@]}" \
+  --set polar.enabled=true \
+  --set polar.secretName=test-polar \
+  --set billing.enabled=no >"${forced_off}"
+if grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${forced_off}" | grep -q 'value: "yes"'; then
+  echo "operator billing.enabled=no must stay off when Polar is enabled" >&2
+  exit 1
+fi
+
+forced_bool_off="${TMP_DIR}/billing-bool-off.yaml"
+helm template superplane "${CHART_DIR}" \
+  "${common_args[@]}" \
+  --set polar.enabled=true \
+  --set polar.secretName=test-polar \
+  --set billing.enabled=false >"${forced_bool_off}"
+if grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${forced_bool_off}" | grep -q 'value: "yes"'; then
+  echo "operator billing.enabled=false must stay off when Polar is enabled" >&2
+  exit 1
+fi
+bool_off="$(grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${forced_bool_off}" | grep -c 'value: "no"' || true)"
+if [ "${bool_off}" -lt 3 ]; then
+  echo "expected SUPERPLANE_BILLING_ENABLED=no when billing.enabled is boolean false" >&2
+  exit 1
+fi
+
+runner_manifest="${TMP_DIR}/runner-billing.yaml"
+helm template superplane "${CHART_DIR}" \
+  "${common_args[@]}" \
+  --set blobStorage.provider=gcs \
+  --set runner.api.enabled=true >"${runner_manifest}"
+runner_billing="$(grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${runner_manifest}" | grep -c 'value: "no"' || true)"
+if [ "${runner_billing}" -lt 4 ]; then
+  echo "expected SUPERPLANE_BILLING_ENABLED=no on the runner API" >&2
+  exit 1
+fi

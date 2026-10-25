@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams,
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
+import { useIdentifyOrganizationGroup } from "./hooks/useIdentifyOrganizationGroup";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
@@ -16,6 +17,7 @@ import "./App.css";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
+import { SetupGuard } from "./components/SetupGuard";
 import { GlobalCommandPalette } from "./components/GlobalCommandPalette";
 import { RequireExperimentalFeature } from "./components/RequireExperimentalFeature";
 import { AccountProvider } from "./contexts/AccountProvider";
@@ -29,7 +31,7 @@ import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
-import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
+import WelcomeRedirect from "./pages/auth/WelcomeRedirect";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
   AutomationsPage,
@@ -94,11 +96,15 @@ import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
+import { Credits as CreditsAdmin } from "./pages/admin/Credits";
+import { InstallationEncryption as InstallationEncryptionAdmin } from "./pages/admin/InstallationEncryption";
 import InstallationLicenseAdmin from "./pages/admin/InstallationLicense";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import { FleetManagerSetup as FleetManagerSetupAdmin } from "./pages/admin/FleetManagerSetup";
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
+import { BillingPlans } from "./pages/admin/BillingPlans";
+import { Features } from "./pages/admin/Features";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import LicenseExpiryBanner from "./components/LicenseExpiryBanner";
@@ -265,14 +271,18 @@ function AppRouter() {
             <Routes>
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Login mode="signup" />} />
-              <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
+              <Route path="welcome" element={withAuthOnly(WelcomeRedirect)} />
               <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<OrganizationsListAdmin />} />
                 <Route path="accounts" element={<AccountsListAdmin />} />
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
+                <Route path="credits" element={<CreditsAdmin />} />
+                <Route path="encryption" element={<InstallationEncryptionAdmin />} />
                 <Route path="license" element={<InstallationLicenseAdmin />} />
+                <Route path="billing-plans" element={<BillingPlans />} />
+                <Route path="features" element={<Features />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="fleet-manager-setup" element={<FleetManagerSetupAdmin />} />
@@ -283,6 +293,7 @@ function AppRouter() {
               </Route>
               <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
+              <Route path="invitations/:token" element={withAuthOnly(InviteLinkAccept)} />
               {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
               <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
               {organizationScopedRouteTree()}
@@ -317,10 +328,13 @@ function PageObservabilityScope() {
   return null;
 }
 
+function organizationScopeQueryEnabled(segment: string | undefined, isReserved: boolean, guestLine: boolean): boolean {
+  return !isReserved && !!segment && !guestLine;
+}
+
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account, loading: accountLoading } = useAccount();
-  const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
@@ -334,7 +348,8 @@ export function OrganizationScope() {
     data: organization,
     isLoading: organizationLoading,
     error: organizationError,
-  } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
+    refetch: refreshOrganization,
+  } = useOrganization(segment ?? "", organizationScopeQueryEnabled(segment, isReserved, guestLine));
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
   useRedirectIntegrationSetupReturn(segment, resolvedSlug);
@@ -352,11 +367,19 @@ export function OrganizationScope() {
         })
       : null;
   usePersistOrganizationLastLocation({
-    accountId,
+    accountId: account?.id,
     resolvedSlug,
     isReserved,
     uidRedirectPath,
     path: `${location.pathname}${location.search}`,
+  });
+  useIdentifyOrganizationGroup({
+    accountId: account?.id,
+    organizationKey: segment,
+    impersonating: account?.impersonation?.active,
+    refreshOrganization: organizationScopeQueryEnabled(segment, isReserved, guestLine)
+      ? refreshOrganization
+      : undefined,
   });
 
   if (isReserved) {
@@ -463,17 +486,6 @@ function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {
 
   const path = settings ? appSettingsPath(organizationId, canvasId) : appPath(organizationId, canvasId);
   return <Navigate to={`${path}${location.search}`} replace />;
-}
-
-function SetupGuard({ children }: { children: React.ReactNode }) {
-  const { setupRequired, loading } = useAccount();
-  const location = useLocation();
-
-  if (!loading && setupRequired && location.pathname !== "/setup") {
-    return <Navigate to="/setup" replace />;
-  }
-
-  return <>{children}</>;
 }
 
 export default App;

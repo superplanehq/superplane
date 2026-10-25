@@ -213,19 +213,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         scope: "organization",
         section: "members",
         permission: { resource: "members", action: "read" },
-        keywords: [
-          "invite",
-          "invite link",
-          "copy link",
-          "people",
-          "team",
-          "role",
-          "email",
-          "name",
-          "remove",
-          "owner",
-          "admin",
-        ],
+        keywords: ["invite", "copy link", "people", "team", "role", "email", "name", "remove", "owner", "admin"],
       },
       {
         id: "organization-integrations",
@@ -332,6 +320,18 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
 ];
 
 export const FACTORY_SETTINGS_NAV_ITEMS = FACTORY_SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
+
+const BILLING_PRODUCT_SETTINGS_NAV_ITEM_IDS = new Set(["organization-billing"]);
+
+/** Drops Billing when product billing is off. Usage reports stay. */
+export function omitFactorySettingsBillingItem(groups: FactorySettingsNavGroup[]): FactorySettingsNavGroup[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !BILLING_PRODUCT_SETTINGS_NAV_ITEM_IDS.has(item.id)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
 
 /**
  * Filters settings nav groups for the Find settings field.

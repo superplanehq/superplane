@@ -103,6 +103,7 @@ describe("WorkOrderIntentDocument composer", () => {
     expect(within(chips).getByTestId("split-run-intent-composer-score")).toHaveAccessibleName("Clarity 4/5");
     expect(within(chips).queryByTestId("split-run-intent-plan-status")).not.toBeInTheDocument();
     expect(showPlan).toHaveTextContent("Open plan");
+    expect(showPlan.querySelector(".lucide-chevron-down")).not.toHaveClass("rotate-180");
     expect(showPlan).not.toHaveTextContent(CREATE_WITH_AGENT_COPY.showPlan);
     expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
@@ -125,6 +126,7 @@ describe("WorkOrderIntentDocument composer", () => {
     expect(hidePlan).toHaveAttribute("aria-expanded", "true");
     expect(hidePlan).toHaveAttribute("aria-pressed", "true");
     expect(hidePlan).toHaveTextContent("Hide plan");
+    expect(hidePlan.querySelector(".lucide-chevron-down")).toHaveClass("rotate-180");
     expect(within(hidePlan).queryByTestId("split-run-intent-plan-status")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-intent-result")).queryByRole("button", {

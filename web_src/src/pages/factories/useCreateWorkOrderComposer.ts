@@ -14,6 +14,7 @@ const MAX_DESCRIPTION_LENGTH = 20000;
 export interface CreateWorkOrderComposerDraft {
   title: string;
   description: string;
+  model?: string;
 }
 
 interface UseCreateWorkOrderComposerArgs {
@@ -78,6 +79,7 @@ export function useCreateWorkOrderComposer({
         title: trimmedTitle,
         description: trimmedDescription,
         assigneeIds,
+        ...(draft?.model ? { model: draft.model } : {}),
       });
       goToOrder(order);
     } catch (error) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCreateUserToken } from "@/hooks/useUserTokens";
 
@@ -51,6 +51,7 @@ function withRecommendedMachineTypes(
   fields: Record<string, string>,
   provider: FleetManagerProvider,
 ): Record<string, string> {
+  if (provider === "docker") return fields;
   const key = `machineType.${DEFAULT_SETUP_FLEET_ID}`;
   return { ...fields, [key]: resolveSetupMachineType(provider, fields[key]) };
 }
@@ -76,7 +77,10 @@ function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDra
       ? [metadata.defaultRunnerVersion]
       : [];
   const restoredDraft = loadFleetManagerDraft();
-  const draft = restoredDraft ? mergeTerraformInfrastructure(restoredDraft, metadata) : defaultDraft(metadata);
+  let draft = restoredDraft ? mergeTerraformInfrastructure(restoredDraft, metadata) : defaultDraft(metadata);
+  if (draft.provider === "docker") {
+    draft = draftForProvider(draft, "aws", metadata);
+  }
   return pinSetupFleet({ ...draft, runnerVersion: installationRunnerVersion(metadata) }, metadata);
 }
 
@@ -100,7 +104,7 @@ function draftForProvider(
 }
 
 function missingImageErrors(draft: FleetManagerDraft, metadata: FleetManagerSetupMetadata): string[] {
-  if (metadata.infrastructureDefaults.source !== "terraform") return [];
+  if (draft.provider === "docker" || metadata.infrastructureDefaults.source !== "terraform") return [];
   return draft.selectedFleetIds.flatMap((fleetId) => {
     const preset = metadata.fleetPresets.find((candidate) => candidate.id === fleetId);
     if (!preset || fleetImage(draft.fields, preset.spec.architecture)) return [];
@@ -163,25 +167,33 @@ function useFleetManagerToken(organizationId: string) {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const createToken = useCreateUserToken(organizationId);
   const plaintext = tokenState?.organizationId === organizationId ? tokenState.plaintext : "";
+  const inFlight = useRef<Promise<boolean> | null>(null);
 
   const prepareInstallation = useCallback(async (): Promise<boolean> => {
     if (plaintext) return true;
+    if (inFlight.current) return inFlight.current;
     if (!organizationId) {
       setTokenError("SuperPlane could not identify the organization for this personal token.");
       return false;
     }
 
     setTokenError(null);
-    try {
-      const response = await createToken.mutateAsync({ name: "Fleet Manager" });
-      const created = response?.plaintext?.trim();
-      if (!created) throw new Error("Personal token response did not include plaintext");
-      setTokenState({ organizationId, plaintext: created });
-      return true;
-    } catch {
-      setTokenError("SuperPlane could not create the Fleet Manager personal token. Try again.");
-      return false;
-    }
+    const run = (async () => {
+      try {
+        const response = await createToken.mutateAsync({ name: "Fleet Manager" });
+        const created = response?.plaintext?.trim();
+        if (!created) throw new Error("Personal token response did not include plaintext");
+        setTokenState({ organizationId, plaintext: created });
+        return true;
+      } catch {
+        setTokenError("SuperPlane could not create the Fleet Manager personal token. Try again.");
+        return false;
+      } finally {
+        inFlight.current = null;
+      }
+    })();
+    inFlight.current = run;
+    return run;
   }, [createToken, organizationId, plaintext]);
 
   return {
@@ -235,7 +247,7 @@ export function useFleetManagerSetup(enabled = true, organizationId = "") {
 
   const values = useMemo(
     () =>
-      metadata && draft && token.plaintext
+      metadata && draft && token.plaintext && draft.provider !== "docker"
         ? generateFleetManagerValues({ metadata, ...draft, installationAdminToken: token.plaintext })
         : "",
     [draft, metadata, token.plaintext],
@@ -254,6 +266,7 @@ export function useFleetManagerSetup(enabled = true, organizationId = "") {
     draft,
     loadError,
     values,
+    installationToken: token.plaintext,
     tokenError: token.tokenError,
     isPreparingInstallation: token.isPreparingInstallation,
     validationErrors,
@@ -317,7 +330,9 @@ export function useFleetManagerVerification(
         }
 
         const body = (await response.json()) as { fleets?: InstalledFleet[] };
-        if (fleetsMatchConfiguration(body.fleets ?? [], draft, metadata.fleetPresets)) {
+        const installed = body.fleets ?? [];
+        const matches = fleetsMatchConfiguration(installed, draft, metadata.fleetPresets);
+        if (matches) {
           clearFleetManagerDraft();
           setStatus("verified");
           return;

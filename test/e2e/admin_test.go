@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -65,6 +66,7 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Login()
 		steps.session.Visit("/admin/settings")
 		steps.assertOnInstallationSettingsPage()
+		steps.openNetworkSettings()
 		steps.enablePrivateNetworkAccess()
 		steps.saveInstallationSettings()
 		steps.assertPrivateNetworkAccessEnabled()
@@ -77,6 +79,7 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Login()
 		steps.session.Visit("/admin/settings")
 		steps.assertOnInstallationSettingsPage()
+		steps.openEmailSettings()
 		steps.assertSMTPSettingsSaveDisabled()
 		steps.enableSMTPSettings()
 		steps.fillInSMTPSettings("smtp.example.com", "587", "smtp-user", "smtp-pass", "SuperPlane", "noreply@example.com", true)
@@ -161,7 +164,16 @@ func (s *adminSteps) clickExitImpersonation() {
 
 func (s *adminSteps) assertOnInstallationSettingsPage() {
 	s.session.AssertText("Installation Settings")
+	s.session.AssertText("Reset one automation")
+}
+
+func (s *adminSteps) openNetworkSettings() {
+	s.session.Click(q.Locator("role=tab[name='Network']"))
 	s.session.AssertText("Private network access")
+}
+
+func (s *adminSteps) openEmailSettings() {
+	s.session.Click(q.Locator("role=tab[name='Email']"))
 	s.session.AssertText("SMTP configuration")
 }
 
@@ -212,7 +224,11 @@ func (s *adminSteps) assertSMTPSettingsEnabled() {
 	assert.Equal(s.t, "smtp.example.com", settings.SMTPHost)
 	assert.Equal(s.t, 587, settings.SMTPPort)
 	assert.Equal(s.t, "smtp-user", settings.SMTPUsername)
-	assert.Equal(s.t, []byte("smtp-pass"), settings.SMTPPassword)
+	encryptor, err := crypto.ProcessEncryptor()
+	require.NoError(s.t, err)
+	password, err := encryptor.Decrypt(s.t.Context(), settings.SMTPPassword, []byte("smtp_password"))
+	require.NoError(s.t, err)
+	assert.Equal(s.t, "smtp-pass", string(password))
 	assert.Equal(s.t, "SuperPlane", settings.SMTPFromName)
 	assert.Equal(s.t, "noreply@example.com", settings.SMTPFromEmail)
 	assert.True(s.t, settings.SMTPUseTLS)

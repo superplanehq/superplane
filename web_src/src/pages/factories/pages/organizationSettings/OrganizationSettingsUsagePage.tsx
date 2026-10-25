@@ -4,6 +4,7 @@ import { Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useFactoryWorkOrderRunUsage, WORK_ORDER_RUN_USAGE_PAGE_SIZE } from "@/hooks/useFactoryWorkOrderRunUsage";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -38,6 +39,7 @@ import { SpendingPeriodControls } from "./spending-redesign/SpendingPeriodContro
 
 export function OrganizationSettingsUsagePage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
+  const billingProductEnabled = useBillingProductEnabled();
   const factoryKey = factoryRouteSegment(factory);
   const [period, setPeriod] = useState<SpendingPeriodPreset>("month");
   const [customRange, setCustomRange] = useState<SpendingDateRange | undefined>();
@@ -102,7 +104,9 @@ export function OrganizationSettingsUsagePage() {
       }
     >
       <p className="text-[13px] text-muted-foreground">
-        This list does not show which credit grant paid. Your keys spend is estimated.
+        {billingProductEnabled
+          ? "This list does not show which credit grant paid. Your keys spend is estimated."
+          : "Your keys spend is estimated."}
       </p>
       <FactorySettingsCard data-testid="organization-usage-history">
         <UsageHistoryBody

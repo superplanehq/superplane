@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -28,6 +29,7 @@ func UpdateFactoryOnboarding(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
+	wasComplete := factory.IsOnboardingComplete()
 
 	patch, err := factoryOnboardingPatchFromRequest(req)
 	if err != nil {
@@ -39,13 +41,32 @@ func UpdateFactoryOnboarding(
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 
-	if req.Complete != nil && *req.Complete {
-		config, configErr := factory.OnboardingConfigAfter(patch)
-		if configErr != nil {
-			return nil, factoryErrorToStatus(configErr, "failed to update factory onboarding")
+	config, err := factory.OnboardingConfigAfter(patch)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+	if config.AgentIntegrationID != "" && (patch.AgentIntegrationID != nil || patch.AgentHarness != nil || req.GetComplete()) {
+		integration, err := findReadyOnboardingIntegration(db, orgID, config.AgentIntegrationID)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 		}
+		provider := ""
+		if integration.AppName == models.CustomLLMAppName {
+			provider = models.UsageProviderCustom
+		}
+		if err := models.RequireOrganizationBYOKAccess(db, orgID, provider); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+	}
+
+	if req.Complete != nil && *req.Complete {
 		if validationErr := validateFactoryOnboardingResources(db, orgID, factory, config); validationErr != nil {
 			return nil, factoryErrorToStatus(validationErr, "failed to update factory onboarding")
+		}
+		if !wasComplete {
+			if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, db, factory, patch, config); err != nil {
+				return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+			}
 		}
 		err = factory.CompleteOnboarding(db, patch)
 	} else {
@@ -57,6 +78,23 @@ func UpdateFactoryOnboarding(
 
 	if err := ensureFactoryMergeabilityWebhook(ctx, db, deps, factory); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+
+	if !wasComplete && factory.IsOnboardingComplete() {
+		config := factory.OnboardingConfigValue()
+		captureFactoryProductEvent(
+			ctx,
+			db,
+			factory,
+			uuid.Nil,
+			productanalytics.EventFactoryOnboardingCompleted,
+			productanalytics.StableEventID(productanalytics.EventFactoryOnboardingCompleted, factory.ID.String()),
+			productanalytics.Properties{
+				"vcs_provider":  config.EffectiveVCSProvider(),
+				"issues_source": config.IssuesSource,
+				"agent_harness": config.AgentHarness,
+			},
+		)
 	}
 
 	lines, err := factory.ListLines(db)
@@ -74,12 +112,67 @@ func UpdateFactoryOnboarding(
 	}, nil
 }
 
+func ensureOnboardingDiscussionHandler(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID string,
+	db *gorm.DB,
+	factory *models.Factory,
+	patch models.FactoryOnboardingPatch,
+	config models.FactoryOnboardingConfig,
+) error {
+	if err := config.ReadyForCompletion(); err != nil {
+		return nil
+	}
+	repository := strings.TrimSpace(config.AppRepository)
+	if repository == "" {
+		return nil
+	}
+	if err := factory.UpdateOnboarding(db, patch); err != nil {
+		return err
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(
+			"SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
+			"factory-discussion-handler:"+factory.ID.String(),
+		).Error; err != nil {
+			return err
+		}
+		handlers, err := factory.ListPRFeedbackHandlers(tx)
+		if err != nil {
+			return err
+		}
+		for _, handler := range handlers {
+			if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+				return nil
+			}
+		}
+		_, err = createFactoryPRFeedbackHandler(ctx, deps, organizationID, tx, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			FactoryId: factory.ID.String(),
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+					Repository: repository,
+				},
+				Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+					Mention:        prFeedbackDefaultMention,
+					IgnoreBots:     true,
+					AddressAllBots: true,
+				},
+			},
+		})
+		return err
+	})
+}
+
 func validateFactoryOnboardingResources(
 	db *gorm.DB,
 	organizationID uuid.UUID,
 	factory *models.Factory,
 	config models.FactoryOnboardingConfig,
 ) error {
+	if config.IssuesSource == models.FactoryOnboardingIssuesSourceVCS && config.EffectiveVCSProvider() != models.ProviderGitHub {
+		return invalidArgument("GitHub Issues requires a GitHub repository")
+	}
 	if config.VCSIntegrationID != "" {
 		integration, err := findReadyOnboardingIntegration(db, organizationID, config.VCSIntegrationID)
 		if err != nil {

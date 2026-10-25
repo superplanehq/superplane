@@ -76,8 +76,6 @@ function SetupHeader({ step, onBack }: { step: "mention" | "bots"; onBack: () =>
     step === "mention"
       ? PR_FEEDBACK_SETTINGS_COPY.wizardStepHumanComments
       : PR_FEEDBACK_SETTINGS_COPY.wizardStepAIComments;
-  const stepIntro = step === "bots" ? PR_FEEDBACK_SETTINGS_COPY.wizardBotsIntro : undefined;
-
   return (
     <header className="text-left">
       <button
@@ -92,7 +90,6 @@ function SetupHeader({ step, onBack }: { step: "mention" | "bots"; onBack: () =>
         </span>
       </button>
       <h1 className={factoryPageTitleClassName}>{stepTitle}</h1>
-      {stepIntro ? <p className="workspace-body-text mt-2 text-muted-foreground">{stepIntro}</p> : null}
     </header>
   );
 }
@@ -124,16 +121,14 @@ function MentionStep({ setup }: { setup: DiscussionPRFeedbackSetupModel }) {
   );
 }
 
-const BOT_MODE_OPTIONS: Array<{ value: DiscussionBotMode; title: string; helper: string }> = [
+const BOT_MODE_OPTIONS: Array<{ value: DiscussionBotMode; title: string }> = [
   {
     value: "ignore",
     title: PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreOption,
-    helper: PR_FEEDBACK_SETTINGS_COPY.wizardBotIgnoreHelper,
   },
   {
     value: "address",
     title: PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressOption,
-    helper: PR_FEEDBACK_SETTINGS_COPY.wizardBotAddressHelper,
   },
 ];
 
@@ -152,7 +147,6 @@ function BotsStep({ setup }: { setup: DiscussionPRFeedbackSetupModel }) {
             value={option.value}
             checked={setup.botMode === option.value}
             title={option.title}
-            helper={option.helper}
             onChange={() => setup.setBotMode(option.value)}
           />
         ))}

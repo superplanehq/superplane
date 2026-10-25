@@ -71,7 +71,9 @@ export function createOrgWorkspaceFixtureFetch(
   // Connect flows push into this list, so each fetch impl owns a private copy.
   const orgIntegrations: StorybookOrgIntegration[] = structuredClone(options?.orgIntegrations ?? []);
   const agentMessages = createStorybookAgentMessageStore(appFixture?.agentMessages?.messages);
-  const accountState = createStorybookAccountState(homeFixture.organizationId);
+  const accountState = createStorybookAccountState(homeFixture.organizationId, {
+    billingEnabled: homeFixture.billingEnabled,
+  });
 
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), fixtureFetchBaseHref());

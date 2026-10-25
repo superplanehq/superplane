@@ -25,6 +25,7 @@ import {
   useSelectFactoryVcsProviderRepository,
 } from "./useFactoryData";
 import { useConnectedIntegrations } from "./useIntegrations";
+import { organizationBillingQueryKey } from "./useOrganizationBilling";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -91,7 +92,11 @@ describe("useCreateWorkOrder", () => {
     });
   }
 
-  async function createOrder(queryClient: QueryClient, orderId: string) {
+  function seedRunPermission(queryClient: QueryClient, hostedExecutionAllowed: boolean) {
+    queryClient.setQueryData(organizationBillingQueryKey("org-1"), { hostedExecutionAllowed });
+  }
+
+  async function createOrder(queryClient: QueryClient, orderId: string, model?: string) {
     factoriesCreateWorkOrder.mockResolvedValue({ data: { order: { id: orderId } } });
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useCreateWorkOrder("org-1", "factory-1"), {
@@ -99,7 +104,7 @@ describe("useCreateWorkOrder", () => {
     });
 
     await act(async () => {
-      await result.current.mutateAsync({ title: "New task", description: "" });
+      await result.current.mutateAsync({ title: "New task", description: "", model });
     });
 
     return invalidateSpy;
@@ -120,6 +125,7 @@ describe("useCreateWorkOrder", () => {
   it("marks the new order pending analysis when Planning is on", async () => {
     const queryClient = new QueryClient();
     seedFactory(queryClient, true);
+    seedRunPermission(queryClient, true);
 
     const invalidateSpy = await createOrder(queryClient, "wo-planning-on");
 
@@ -127,8 +133,23 @@ describe("useCreateWorkOrder", () => {
     expectListAndRunInvalidation(invalidateSpy);
   });
 
+  it.each([undefined, "claude-opus-4-6"])("sends the optional model through the create API (%s)", async (model) => {
+    await createOrder(new QueryClient(), "wo-created-1", model);
+    const request = factoriesCreateWorkOrder.mock.calls.at(-1)?.[0];
+    expect(request.body).toEqual({
+      title: "New task",
+      description: "",
+      assigneeIds: undefined,
+      ...(model ? { model } : {}),
+    });
+    if (!model) {
+      expect(request.body).not.toHaveProperty("model");
+    }
+  });
+
   it("marks the new order pending analysis when the factory cache is missing", async () => {
     const queryClient = new QueryClient();
+    seedRunPermission(queryClient, true);
 
     const invalidateSpy = await createOrder(queryClient, "wo-created-1");
 
@@ -139,10 +160,27 @@ describe("useCreateWorkOrder", () => {
   it("does not mark analysis pending when Planning is off", async () => {
     const queryClient = new QueryClient();
     seedFactory(queryClient, false);
+    seedRunPermission(queryClient, true);
 
     const invalidateSpy = await createOrder(queryClient, "wo-planning-off");
 
     expect(pendingBacklogAnalysisIds().has("wo-planning-off")).toBe(false);
+    expectListAndRunInvalidation(invalidateSpy);
+  });
+
+  it.each([
+    { name: "the organization has no plan", billing: { planCategory: "none", hostedExecutionAllowed: false } },
+    { name: "billing has not loaded", billing: undefined },
+  ])("does not mark analysis pending when $name", async ({ billing }) => {
+    const queryClient = new QueryClient();
+    seedFactory(queryClient, true);
+    if (billing) {
+      queryClient.setQueryData(organizationBillingQueryKey("org-1"), billing);
+    }
+
+    const invalidateSpy = await createOrder(queryClient, "wo-created-1");
+
+    expect(pendingBacklogAnalysisIds().has("wo-created-1")).toBe(false);
     expectListAndRunInvalidation(invalidateSpy);
   });
 });

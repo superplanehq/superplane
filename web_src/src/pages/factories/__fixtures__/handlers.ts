@@ -1,4 +1,10 @@
-import { ACTIVE_TRIAL_ENDS_AT, BUSINESS_ORGANIZATION_BILLING, EMPTY_USAGE_REPORT } from "./usageReportFixtures";
+import {
+  ACTIVE_BILLING_PERIOD_ENDS_AT,
+  ACTIVE_TRIAL_ENDS_AT,
+  BUSINESS_ORGANIZATION_BILLING,
+  EMPTY_USAGE_REPORT,
+  TEAM_ORGANIZATION_BILLING,
+} from "./usageReportFixtures";
 import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
@@ -32,6 +38,8 @@ import type {
   FactoriesWorkOrderLineDispatch,
   FactoriesWorkOrderRunUsageRow,
   MeDescribeVcsProviderOnboardingResponse,
+  OrganizationsPreviewSeatPurchaseResponse,
+  OrganizationsPurchaseSeatsResponse,
 } from "@/api-client";
 import { HOSTED_LLM_PROVIDERS } from "@/lib/hostedLLMModels";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
@@ -437,6 +445,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
             { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
             { id: "claude-opus-4-6", name: "claude-opus-4-6" },
           ],
+          usesHostedFunding: true,
         },
       }),
     },
@@ -1460,6 +1469,7 @@ function organizationBillingSyncRoute(fixture: FactoriesFixture): FactoriesRoute
       return {
         json: fixture.organizationBilling ?? {
           plan: "trial",
+          productFeatures: { byo_key: true },
           planSource: "system",
           trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
           billingEnabled: true,
@@ -1478,7 +1488,7 @@ function organizationBillingCancelRoute(fixture: FactoriesFixture): FactoriesRou
     resolve: () => {
       fixture.organizationBilling = {
         ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
-        plan: "business",
+        plan: fixture.organizationBilling?.plan ?? "business",
         planSource: "polar",
         creditPurchaseAllowed: true,
         cancelAtPeriodEnd: true,
@@ -1494,7 +1504,7 @@ function organizationBillingResumeRoute(fixture: FactoriesFixture): FactoriesRou
     resolve: () => {
       fixture.organizationBilling = {
         ...(fixture.organizationBilling ?? BUSINESS_ORGANIZATION_BILLING),
-        plan: "business",
+        plan: fixture.organizationBilling?.plan ?? "business",
         planSource: "polar",
         creditPurchaseAllowed: true,
         cancelAtPeriodEnd: false,
@@ -1510,6 +1520,7 @@ function organizationBillingRoute(fixture: FactoriesFixture): FactoriesRoute {
     resolve: () => ({
       json: fixture.organizationBilling ?? {
         plan: "trial",
+        productFeatures: { byo_key: true },
         planSource: "system",
         trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
         billingEnabled: true,
@@ -1532,6 +1543,156 @@ function hostedCreditCheckoutRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-checkout"),
     resolve: () => ({ json: { checkoutUrl: "https://buy.polar.sh/polar_c_storybook" } }),
+  };
+}
+
+function hostedCreditCheckoutQuoteRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-checkout-quote"),
+    resolve: (_match, method, _body, url) => {
+      if (method !== "GET") return null;
+      const product = fixture.hostedCreditProducts?.find((pack) => pack.id === url.searchParams.get("productId"));
+      if (!product) return { status: 400, json: { message: "Select an available credit amount." } };
+      const creditAmountCents = Number(url.searchParams.get("creditAmountCents"));
+      if (!Number.isSafeInteger(creditAmountCents) || creditAmountCents <= 0) {
+        return { status: 400, json: { message: "Enter a valid credit amount." } };
+      }
+      const subtotalCents = Math.ceil((creditAmountCents + 50) / 0.95);
+      return {
+        json: {
+          creditAmountCents: String(creditAmountCents),
+          processingFeeCents: String(subtotalCents - creditAmountCents),
+          fixedFeeCents: "50",
+          percentageFeeBps: 500,
+          percentageFeeCents: String(subtotalCents - creditAmountCents - 50),
+          subtotalCents: String(subtotalCents),
+          currency: "usd",
+        },
+      };
+    },
+  };
+}
+
+function billingPlanSelectionRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/select-plan"),
+    resolve: (_match, method, body) => {
+      if (method !== "POST") return null;
+      const plan = fixture.organizationBilling?.availablePlans?.find((option) => option.key === body?.planKey);
+      if (!plan) return { status: 400, json: { message: "Select an available plan." } };
+      if (plan.subscriptionRequired)
+        return { status: 503, json: { message: "Subscription checkout is unavailable in this preview." } };
+      if (plan.requirePaymentMethod && !fixture.organizationBilling?.hasPaymentMethod)
+        return { status: 400, json: { message: "Add a payment card before continuing." } };
+      fixture.organizationBilling = {
+        ...fixture.organizationBilling,
+        catalogKey: plan.key,
+        plan: plan.key,
+        planName: plan.name,
+        planCategory: "paid",
+        planPriceCents: plan.priceCents,
+        planPerSeat: plan.perSeat,
+        requirePaymentMethod: plan.requirePaymentMethod,
+      };
+      return { json: {} };
+    },
+  };
+}
+
+function seatPurchasePreview(
+  fixture: FactoriesFixture,
+  additionalSeats: number,
+): OrganizationsPreviewSeatPurchaseResponse {
+  if (fixture.seatPurchasePreview) return fixture.seatPurchasePreview;
+  const billing = fixture.organizationBilling ?? TEAM_ORGANIZATION_BILLING;
+  const purchasedSeats = billing.purchasedSeats ?? 10;
+  const seatPriceCents = billing.planPriceCents ?? "2900";
+  return {
+    purchasedSeats,
+    targetSeats: purchasedSeats + additionalSeats,
+    seatPriceCents,
+    proratedChargeCents: String(1234 * additionalSeats),
+    periodStart: new Date().toISOString(),
+    periodEnd: billing.currentPeriodEnd ?? ACTIVE_BILLING_PERIOD_ENDS_AT,
+    newMonthlyTotalCents: String((purchasedSeats + additionalSeats) * Number(seatPriceCents)),
+    purchasableSeats: billing.purchasableSeats,
+    estimate: true,
+    excludesTax: true,
+  };
+}
+
+function successfulSeatPurchase(
+  fixture: FactoriesFixture,
+  additionalSeats: number,
+): OrganizationsPurchaseSeatsResponse {
+  const billing = fixture.organizationBilling ?? TEAM_ORGANIZATION_BILLING;
+  const fromSeats = billing.purchasedSeats ?? 10;
+  const purchase = {
+    id: `seat-purchase-storybook-${fixture.seatPurchaseCalls}`,
+    status: "succeeded",
+    fromSeats,
+    toSeats: fromSeats + additionalSeats,
+    createdAt: new Date().toISOString(),
+  };
+  return {
+    purchase,
+    billing: {
+      ...billing,
+      purchasedSeats: purchase.toSeats,
+      availableSeats: (billing.availableSeats ?? 0) + additionalSeats,
+      invitableSeats: (billing.invitableSeats ?? 0) + additionalSeats,
+      purchasableSeats:
+        billing.purchasableSeats == null ? undefined : Math.max(0, billing.purchasableSeats - additionalSeats),
+      currentMonthlyTotalCents: String(purchase.toSeats * Number(billing.planPriceCents ?? "2900")),
+      lastSeatPurchase: purchase,
+    },
+  };
+}
+
+function seatPurchaseRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/organizations/([^/]+)/billing/seats/preview"),
+      resolve: (_match, method, body) => {
+        if (method !== "POST") return null;
+        fixture.seatPurchasePreviewCalls = (fixture.seatPurchasePreviewCalls ?? 0) + 1;
+        if (fixture.seatPurchasePreviewError) {
+          return {
+            status: fixture.seatPurchasePreviewError.status,
+            json: { message: fixture.seatPurchasePreviewError.message },
+          };
+        }
+        const additionalSeats = Number(body?.additionalSeats ?? 1);
+        return { json: seatPurchasePreview(fixture, additionalSeats) };
+      },
+    },
+    {
+      pattern: re("/api/v1/organizations/([^/]+)/billing/seats/purchase"),
+      resolve: (_match, method, body) => {
+        if (method !== "POST") return null;
+        fixture.seatPurchaseCalls = (fixture.seatPurchaseCalls ?? 0) + 1;
+        if (fixture.seatPurchaseError) {
+          return { status: fixture.seatPurchaseError.status, json: { message: fixture.seatPurchaseError.message } };
+        }
+        const billing = fixture.organizationBilling ?? TEAM_ORGANIZATION_BILLING;
+        const additionalSeats = Number(body?.additionalSeats ?? 1);
+        const fromSeats = billing.purchasedSeats ?? 10;
+        if (body?.expectedPurchasedSeats !== fromSeats) {
+          return { status: 409, json: { message: "Seat capacity changed. Review the updated estimate." } };
+        }
+        const response = fixture.seatPurchaseResponse ?? successfulSeatPurchase(fixture, additionalSeats);
+        if (response.billing) fixture.organizationBilling = response.billing;
+        else if (response.purchase) fixture.organizationBilling = { ...billing, lastSeatPurchase: response.purchase };
+        return { json: response };
+      },
+    },
+  ];
+}
+
+function paymentMethodSessionRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing/payment-method-session"),
+    resolve: () => ({ status: 503, json: { message: "Card setup is unavailable in this preview." } }),
   };
 }
 
@@ -1639,12 +1800,16 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),
+    hostedCreditCheckoutQuoteRoute(fixture),
     organizationBillingSyncRoute(fixture),
     organizationBillingCancelRoute(fixture),
     organizationBillingResumeRoute(fixture),
     organizationBillingRoute(fixture),
     businessCheckoutRoute(),
     billingPortalSessionRoute(),
+    billingPlanSelectionRoute(fixture),
+    ...seatPurchaseRoutes(fixture),
+    paymentMethodSessionRoute(),
   ];
 }
 

@@ -41,6 +41,8 @@ export function SplitRunPullRequestReviewNote({
   compact = false,
   stacked = false,
   ctaOnly = false,
+  continueFixes,
+  actionBusy = false,
   children,
 }: {
   ctaLabel: string;
@@ -50,6 +52,9 @@ export function SplitRunPullRequestReviewNote({
   factoryId?: string;
   orderId?: string;
   canAct?: boolean;
+  /** Resumes paused automatic fixes. Set only while fixes are paused. */
+  continueFixes?: () => void;
+  actionBusy?: boolean;
   compact?: boolean;
   /** In a tinted panel section: no box of its own. */
   stacked?: boolean;
@@ -71,6 +76,8 @@ export function SplitRunPullRequestReviewNote({
           factoryId={factoryId}
           orderId={orderId}
           canAct={canAct}
+          continueFixes={continueFixes}
+          actionBusy={actionBusy}
         />
       </div>
     );
@@ -87,6 +94,8 @@ export function SplitRunPullRequestReviewNote({
         canAct={canAct}
         copy={copy}
         stacked={stacked}
+        continueFixes={continueFixes}
+        actionBusy={actionBusy}
       />
     );
   }
@@ -116,6 +125,7 @@ export function SplitRunPullRequestReviewNote({
                 <ExternalLink className="size-4" aria-hidden />
               </a>
             </Button>
+            <ContinueFixesButton onContinue={continueFixes} disabled={actionBusy} size="lg" />
             <SplitRunPullRequestMergeAction
               organizationId={organizationId}
               factoryId={factoryId}
@@ -166,6 +176,8 @@ function CompactPullRequestReviewNote({
   canAct,
   copy,
   stacked,
+  continueFixes,
+  actionBusy,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
@@ -176,6 +188,8 @@ function CompactPullRequestReviewNote({
   canAct: boolean;
   copy: PullRequestReviewCopy;
   stacked: boolean;
+  continueFixes?: () => void;
+  actionBusy: boolean;
 }) {
   return (
     <div
@@ -199,6 +213,8 @@ function CompactPullRequestReviewNote({
             factoryId={factoryId}
             orderId={orderId}
             canAct={canAct}
+            continueFixes={continueFixes}
+            actionBusy={actionBusy}
           />
         </div>
       </div>
@@ -214,6 +230,8 @@ function ReviewCallToAction({
   factoryId,
   orderId,
   canAct,
+  continueFixes,
+  actionBusy,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
@@ -222,6 +240,8 @@ function ReviewCallToAction({
   factoryId?: string;
   orderId?: string;
   canAct: boolean;
+  continueFixes?: () => void;
+  actionBusy: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -231,6 +251,7 @@ function ReviewCallToAction({
           <ExternalLink className="size-3.5" aria-hidden />
         </a>
       </Button>
+      <ContinueFixesButton onContinue={continueFixes} disabled={actionBusy} />
       <SplitRunPullRequestMergeAction
         organizationId={organizationId}
         factoryId={factoryId}
@@ -240,6 +261,32 @@ function ReviewCallToAction({
         compact
       />
     </div>
+  );
+}
+
+/** Resumes paused automatic fixes. Renders nothing when fixes are not paused. */
+function ContinueFixesButton({
+  onContinue,
+  disabled,
+  size = "sm",
+}: {
+  onContinue?: () => void;
+  disabled: boolean;
+  size?: "sm" | "lg";
+}) {
+  if (!onContinue) {
+    return null;
+  }
+  return (
+    <Button
+      type="button"
+      size={size}
+      disabled={disabled}
+      onClick={onContinue}
+      data-testid="split-run-footer-continue-fixes"
+    >
+      Continue fixes
+    </Button>
   );
 }
 
@@ -324,6 +371,7 @@ export function WaitingPullRequestReview({
   if (!pullRequest || !note.cta) {
     return null;
   }
+  const continueAction = actions.find((action) => action.kind === "continue-fixes");
   if (actionsOnly) {
     return <MoreActionsMenu actions={actions} disabled={actionBusy} onAction={onAction} />;
   }
@@ -339,6 +387,8 @@ export function WaitingPullRequestReview({
       compact={compact}
       stacked={stacked}
       ctaOnly={ctaOnly}
+      continueFixes={continueAction ? () => onAction?.(continueAction) : undefined}
+      actionBusy={actionBusy}
     >
       {children}
     </SplitRunPullRequestReviewNote>

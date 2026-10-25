@@ -135,6 +135,9 @@ func (s *TestSession) resetDatabase() {
 		s.t.Fatalf("reset database: %v", err)
 	}
 
+	// The server keeps using its encryption key registry across test sessions.
+	// Keep those rows so each session can still encrypt new values.
+	// Migrations seed the billing catalog, and organization creation needs it.
 	sql := `DO $$
     DECLARE r RECORD;
     BEGIN
@@ -142,7 +145,7 @@ func (s *TestSession) resetDatabase() {
             SELECT tablename
             FROM pg_tables
             WHERE schemaname = 'public'
-              AND tablename NOT IN ('schema_migrations', 'usage_price_books', 'usage_price_book_rates')
+              AND tablename NOT IN ('schema_migrations', 'usage_price_books', 'usage_price_book_rates', 'application_encryption_keys', 'billing_plans', 'plan_feature_definitions')
         ) LOOP
             EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
         END LOOP;

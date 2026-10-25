@@ -200,6 +200,17 @@ describe("findWorkOrderForAutomationRun", () => {
     expect(findWorkOrderForAutomationRun([intakeOrder], "run-intake")?.id).toBe("wo-intake");
   });
 
+  it.each(["activities", "runs"] as const)("matches PR feedback through pull request %s", (field) => {
+    const task: FactoriesWorkOrder = {
+      id: "wo-feedback",
+      title: "Fix webhook retries",
+      pullRequests: [{ id: "pr-1", [field]: [{ run: { id: "feedback-run" } }] }],
+    };
+    const run: CanvasesCanvasRun = { id: "feedback-run", rootEvent: { data: { issue: { number: 42 } } } };
+    expect(findWorkOrderForAutomationRun([task], "feedback-run", run)?.id).toBe("wo-feedback");
+    expect(findWorkOrderForAutomationRun([task], "another-run", run)).toBeUndefined();
+  });
+
   it("matches a backlog analysis run from the trigger payload", () => {
     const draft: FactoriesWorkOrder = { id: "wo-draft", title: "Draft from intake" };
     const run: CanvasesCanvasRun = {

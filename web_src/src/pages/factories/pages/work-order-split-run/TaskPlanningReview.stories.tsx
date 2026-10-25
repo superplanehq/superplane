@@ -94,3 +94,13 @@ export const CreatingPlanWithoutPlan: Story = {
   name: "Creating the first plan · no Start",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "updating", hasPlan: false },
 };
+
+export const ModerateComplexityPlan: Story = {
+  name: "Complexity needs review · Start without confirmation",
+  args: { scores: { clarity: 3, complexity: 2, verifiability: 3 }, response: "ready" },
+};
+
+export const CriticalComplexityPlan: Story = {
+  name: "Complexity critical · confirm before Start",
+  args: { scores: { clarity: 3, complexity: 1, verifiability: 3 }, response: "ready" },
+};

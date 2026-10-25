@@ -146,7 +146,7 @@ func buildUpdateNotice(currentVersion string, release *releaseInfo, goos, goarch
 }
 
 // isNewerVersion returns true if latest is a newer semver than current.
-// Both may optionally have a "v" prefix.
+// Versions may use a bare semver, a v prefix, or a cli/ release tag.
 func isNewerVersion(current, latest string) bool {
 	currentVersion, currentOK := parseSemanticVersion(current)
 	latestVersion, latestOK := parseSemanticVersion(latest)
@@ -167,7 +167,7 @@ type semanticVersion struct {
 	prerelease []string
 }
 
-var semanticVersionPattern = regexp.MustCompile(`^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$`)
+var semanticVersionPattern = regexp.MustCompile(`^(?:cli/)?v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$`)
 
 func parseSemanticVersion(value string) (semanticVersion, bool) {
 	match := semanticVersionPattern.FindStringSubmatch(value)

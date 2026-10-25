@@ -426,6 +426,20 @@ service Factories {
     };
   }
 
+  rpc ContinueFactoryPullRequestFixes(
+    ContinueFactoryPullRequestFixesRequest
+  ) returns (ContinueFactoryPullRequestFixesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/continue-fixes"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Continue factory pull request fixes";
+      description: "Resumes paused automatic fixes for a tracked pull request with a fresh attempt budget";
+      tags: "Factory";
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -1088,6 +1102,10 @@ message Factory {
     // automation is not attached to a board column. Allowed values:
     // "backlog", "verify", "done".
     string column_key = 6;
+    // Saved app template id. "backlog" also marks a Backlog graph that
+    // predates template metadata. Empty for a custom automation.
+    // The id does not change when the canvas name changes.
+    string template_id = 7;
   }
 
   string id = 1;
@@ -1369,6 +1387,8 @@ message FactoryIntake {
     // Projects that still create a task. Required for a Sentry intake.
     // Sentry exception intakes only. Values are project slugs.
     repeated string sentry_project_ids = 23;
+    // Organization user ID. Omitted updates preserve the selection; empty clears it.
+    optional string default_owner_id = 24;
   }
 
   string id = 1;
@@ -1514,6 +1534,8 @@ message FactoryPRFeedbackHandler {
     bool ignore_bots = 2;
     // GitHub usernames of bots to react to even without the mention.
     repeated string allowed_bots = 3;
+    // Start a run for every bot comment except comments SuperPlane wrote.
+    bool address_all_bots = 4;
   }
 
   message CheckSettings {
@@ -1739,6 +1761,18 @@ message MergeFactoryPullRequestResponse {
   FactoryPullRequest pull_request = 1;
 }
 
+message ContinueFactoryPullRequestFixesRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  // Run of the paused activity that reached the attempt limit.
+  string run_id = 3;
+}
+
+message ContinueFactoryPullRequestFixesResponse {
+  // Root event that restarts the checks automation.
+  string event_id = 1;
+}
+
 message FactoryIntakeItem {
   string id = 1;
   string key = 2;
@@ -1746,6 +1780,8 @@ message FactoryIntakeItem {
   string body = 4;
   string url = 5;
   google.protobuf.Timestamp created_at = 6;
+  // Nonempty when an exact search match cannot be imported by this intake.
+  string disabled_reason = 7;
 }
 
 message SearchFactoryIntakeItemsRequest {
@@ -1803,6 +1839,8 @@ message ListWorkOrdersRequest {
   // Recorded external issue URL. Match that issue, not a text fragment.
   // GitHub matches the repository and issue number. Archived tasks stay hidden.
   string source_url = 9;
+  // Include archived tasks when resolving historical run identities.
+  bool include_archived = 10;
 }
 
 message ListWorkOrdersResponse {
@@ -1816,6 +1854,7 @@ message CreateWorkOrderRequest {
   string title = 2;
   string description = 3;
   repeated string assignee_ids = 4;
+  string model = 5;
 }
 
 message CreateWorkOrderResponse {
@@ -1909,7 +1948,7 @@ message WorkOrder {
 
 // WorkOrderSummary is the list row for a work order.
 // DescribeWorkOrder returns WorkOrder, which adds files, the usage
-// breakdown, the source run, and the full checks. Both carry
+// breakdown and the full checks. Both carry the source run and
 // PlanningSessionSummary.
 message WorkOrderSummary {
   string id = 1;
@@ -1937,6 +1976,8 @@ message WorkOrderSummary {
   // MCP client that created this task through a hand-off. Empty for
   // tasks that did not come from an MCP client.
   WorkOrderMcpClient mcp_client = 21;
+  // Canvas run that created this task. Needed to link intake history rows.
+  string source_run_id = 22;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -2106,7 +2147,7 @@ message WorkOrderExecution {
   repeated string models = 13;
   // Why the step failed before it could run. Set only for SuperPlane
   // hosted credit failures: no_hosted_credit,
-  // hosted_subscription_required, or workspace_budget_empty.
+  // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
 }
 
@@ -2607,6 +2648,12 @@ message DescribeFactoryUsageResponse {
   bool factory_remaining_credit_warning = 12;
   int64 total_duration_seconds = 13;
   repeated UsageByMachineType by_machine_type = 14;
+  // Exact hosted credit gate for new runs. Whole-cent balances round down,
+  // so clients must use this flag instead of remaining_credit_cents.
+  bool hosted_credit_available = 15;
+  // Exact workspace hosted budget gate for new runs. True when the workspace
+  // has no cap or its capped remainder is still positive.
+  bool factory_hosted_budget_available = 16;
 }
 
 message ListFactoryWorkOrderRunUsageRequest {
@@ -2663,6 +2710,7 @@ message ListFactoryLineRunnerModelsRequest {
 
 message ListFactoryLineRunnerModelsResponse {
   repeated FactoryLLMModel models = 1;
+  bool uses_hosted_funding = 2;
 }
 
 message ListFactoryLLMModelsRequest {
@@ -2936,6 +2984,7 @@ message PlanningSessionActivity {
 message PlanningSessionSurveyQuestion {
   string prompt = 1;
   repeated string options = 2;
+  string recommended_option = 3;
 }
 
 message PlanningSessionSurvey {

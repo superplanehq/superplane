@@ -5,11 +5,13 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
+	"net"
 	"net/smtp"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -482,6 +484,36 @@ func TestSupportFeedbackTemplates_FromLineEscapes(t *testing.T) {
 	assert.Contains(t, html, "The canvas did not load.")
 	assert.Contains(t, html, "Bug report")
 	assert.NotRegexp(t, `<ada@example.com>`, html)
+}
+
+func TestSMTPDialStopsWhenTheServerDoesNotReply(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { listener.Close() })
+	accepted := make(chan struct{})
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		close(accepted)
+		defer conn.Close()
+		time.Sleep(5 * time.Second)
+	}()
+
+	original := smtpConversationTimeout
+	smtpConversationTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { smtpConversationTimeout = original })
+
+	started := time.Now()
+	_, err = smtpDial(listener.Addr().String())
+	require.Error(t, err)
+	require.Less(t, time.Since(started), 2*time.Second)
+	select {
+	case <-accepted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("smtp dial did not reach the server")
+	}
 }
 
 func writeSupportFeedbackTemplates(t *testing.T, root string) {
