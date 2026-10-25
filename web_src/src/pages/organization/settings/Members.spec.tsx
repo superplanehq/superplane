@@ -370,7 +370,7 @@ function perSeatCapacity(overrides: NonNullable<OrganizationsListInvitationsResp
   return { perSeat: true, purchased: "10", occupied: "9", pendingInvitations: "0", invitable: "1", ...overrides };
 }
 
-const fullSeats = (purchasable: string) => perSeatCapacity({ occupied: "10", invitable: "0", purchasable });
+const fullSeats = (purchasable?: string) => perSeatCapacity({ occupied: "10", invitable: "0", purchasable });
 const capacityNotice = () => screen.queryByRole("status", { name: "Invitation capacity" });
 const purchaseLink = () => screen.queryByRole("link", { name: "Purchase seats" });
 
@@ -439,6 +439,7 @@ it.each([
   { link: "Open Billing", billing: false, href: null, seats: perSeatCapacity({ paymentBlocked: true }) },
   { link: "Purchase seats", billing: true, href: `${billingPath}?buySeats=1`, seats: fullSeats("5") },
   { link: "Purchase seats", billing: false, href: null, seats: fullSeats("5") },
+  { link: "Purchase seats", billing: true, href: `${billingPath}?buySeats=1`, seats: fullSeats() },
   { link: "Purchase seats", billing: true, href: null, seats: fullSeats("0") },
 ])("offers the $link link only when allowed: billing=$billing href=$href", async ({ link, billing, href, seats }) => {
   manageBilling = billing;

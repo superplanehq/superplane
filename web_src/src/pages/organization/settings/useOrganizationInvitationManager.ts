@@ -49,7 +49,8 @@ export function useOrganizationInvitationManager(organizationId: string) {
   const seats = invitations.data?.seats;
   const capacity = describeInvitationCapacity(seats);
   const sendingBlocked = !invitations.isSuccess || invitations.isFetching || blocksInvitations(capacity);
-  const canPurchaseSeats = !!seats?.perSeat && Number(seats.purchasable ?? 0) > 0 && canManageBilling;
+  const canPurchaseSeats =
+    !!seats?.perSeat && (seats.purchasable == null || Number(seats.purchasable) > 0) && canManageBilling;
   const visibleLink = currentInvitationLink(link, invitations.data?.invitations);
 
   const reportActionFailure = (error: unknown, fallback: string) => {
