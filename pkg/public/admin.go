@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -38,6 +39,7 @@ type installationSettingsResponse struct {
 	AllowPrivateNetworkAccess  bool     `json:"allow_private_network_access"`
 	SignupsEnabled             bool     `json:"signups_enabled"`
 	InvitationDurationDays     int      `json:"invitation_duration_days"`
+	PastDueGraceDays           int      `json:"past_due_grace_days"`
 	SignupsBlockedByEnv        bool     `json:"signups_blocked_by_environment"`
 	EffectiveBlockedHTTPHosts  []string `json:"effective_blocked_http_hosts"`
 	EffectivePrivateIPRanges   []string `json:"effective_private_ip_ranges"`
@@ -57,6 +59,7 @@ type installationSettingsRequest struct {
 	AllowPrivateNetworkAccess *bool   `json:"allow_private_network_access"`
 	SignupsEnabled            *bool   `json:"signups_enabled"`
 	InvitationDurationDays    *int    `json:"invitation_duration_days"`
+	PastDueGraceDays          *int    `json:"past_due_grace_days"`
 	SMTPEnabled               *bool   `json:"smtp_enabled"`
 	SMTPHost                  *string `json:"smtp_host"`
 	SMTPPort                  *int    `json:"smtp_port"`
@@ -140,8 +143,11 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 	if req.InvitationDurationDays != nil && (*req.InvitationDurationDays < 1 || *req.InvitationDurationDays > 365) {
 		return errors.Join(errInvalidInstallationSettingsRequest, errors.New("invitation duration must be between 1 and 365 days"))
 	}
+	if req.PastDueGraceDays != nil && (*req.PastDueGraceDays < 0 || *req.PastDueGraceDays > models.MaxPastDueGraceDays) {
+		return errors.Join(errInvalidInstallationSettingsRequest, fmt.Errorf("past due grace must be between 0 and %d days", models.MaxPastDueGraceDays))
+	}
 	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil || req.InvitationDurationDays != nil {
+		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil || req.InvitationDurationDays != nil || req.PastDueGraceDays != nil {
 			err := models.ApplyInstallationMetadata(tx, func(metadata *models.InstallationMetadata) {
 				if req.AllowPrivateNetworkAccess != nil {
 					metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
@@ -153,6 +159,10 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 
 				if req.InvitationDurationDays != nil {
 					metadata.InvitationDurationDays = *req.InvitationDurationDays
+				}
+
+				if req.PastDueGraceDays != nil {
+					metadata.PastDueGraceDays = *req.PastDueGraceDays
 				}
 
 				metadata.UpdatedAt = time.Now()
@@ -185,6 +195,7 @@ func (s *Server) buildInstallationSettingsResponse() (installationSettingsRespon
 		AllowPrivateNetworkAccess:  policy.AllowPrivateNetworkAccess,
 		SignupsEnabled:             metadata.SignupsEnabled,
 		InvitationDurationDays:     metadata.InvitationDurationDays,
+		PastDueGraceDays:           metadata.PastDueGraceDays,
 		SignupsBlockedByEnv:        s.authHandler.SignupsBlockedByEnvironment(),
 		EffectiveBlockedHTTPHosts:  policy.BlockedHosts,
 		EffectivePrivateIPRanges:   policy.PrivateIPRanges,

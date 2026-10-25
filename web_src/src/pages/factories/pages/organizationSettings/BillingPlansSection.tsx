@@ -88,6 +88,7 @@ export function BillingPlansSection({
           onCancel={onCancel}
           onKeep={onKeep}
           onRequestCancel={() => setConfirmOpen(true)}
+          planPerSeat={planPerSeat}
         />
       </div>
       {!showUpgrade ? (
@@ -128,6 +129,7 @@ function BillingPlanActions({
   cancelAtPeriodEnd,
   pending,
   displayName,
+  planPerSeat,
   onSubscribe,
   onCancel,
   onKeep,
@@ -172,7 +174,8 @@ function BillingPlanActions({
         </div>
       ) : null}
       {canKeep && onKeep ? (
-        <div className="mt-4">
+        <div className="mt-4 space-y-2">
+          {planPerSeat && <p className="text-sm text-muted-foreground">Resume the subscription before buying seats.</p>}
           <Button
             type="button"
             disabled={pending}

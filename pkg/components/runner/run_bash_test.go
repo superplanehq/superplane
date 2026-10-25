@@ -2,9 +2,7 @@ package runner
 
 import (
 	"encoding/json"
-	"io"
-	"net/http"
-	"strings"
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,19 +13,14 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestRunBashExecuteSendsBashPayloadToBroker(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
+func TestRunBashExecuteSendsBashPayloadToRunner(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
 
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-bash-1"}`))},
-		},
-	}
+	httpContext := &contexts.HTTPContext{}
 
 	component := &RunBash{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
 			"script": `num=$(jq -r '."GitHub PR".data.number' "$SUPERPLANE_PAYLOAD_FILE")
@@ -44,15 +37,15 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"`,
 		},
 	})
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
+	require.Len(t, httpContext.Requests, 0)
 
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
+	body := tasks.Payload
+	require.NotEmpty(t, body)
 
-	var req brokerCreateTaskRequest
+	var req runnerapi.TaskPayload
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	assert.Equal(t, testRunnerMachineType, req.FleetID)
+	assert.Equal(t, testRunnerMachineType, tasks.FleetID)
 	assert.Equal(t, RunModeBash, req.RunMode)
 	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 	assert.Contains(t, req.Script, "jq")
@@ -65,15 +58,9 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"`,
 }
 
 func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	tasks := &contexts.RunnerTaskContext{}
 
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-bash-setup-1"}`))},
-		},
-	}
+	httpContext := &contexts.HTTPContext{}
 
 	component := &RunBash{}
 	setupCommands := `if ! command -v aws >/dev/null 2>&1; then
@@ -83,6 +70,7 @@ fi
 echo ready`
 
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machine_type":          testRunnerMachineType,
 			"enable_setup_commands": true,
@@ -96,12 +84,12 @@ echo ready`
 		Expressions:    &stubMessageChainBuilder{chain: map[string]any{}},
 	})
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
+	require.Len(t, httpContext.Requests, 0)
 
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
+	body := tasks.Payload
+	require.NotEmpty(t, body)
 
-	var req brokerCreateTaskRequest
+	var req runnerapi.TaskPayload
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, []string{`if ! command -v aws >/dev/null 2>&1; then
@@ -140,12 +128,12 @@ func TestRunBashProcessTaskStatusIncludesResult(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 0
-	task := &Task{
-		Status:   "succeeded",
+	task := &core.RunnerTask{
+		State:    "succeeded",
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"ok":true}`),
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil, nil, nil))
+	require.NoError(t, processTaskStatus(state, task, RunBashFinishedEventType, "", nil, nil, nil))
 	require.Equal(t, PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)
@@ -157,11 +145,11 @@ func TestRunBashProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 130
-	task := &Task{
-		Status:   "canceled",
+	task := &core.RunnerTask{
+		State:    "canceled",
 		ExitCode: &exit,
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil, nil, nil))
+	require.NoError(t, processTaskStatus(state, task, RunBashFinishedEventType, "", nil, nil, nil))
 	require.Equal(t, FailedOutputChannel, state.Channel)
 	assert.False(t, state.Cancelled)
 }
@@ -171,12 +159,12 @@ func TestRunBashProcessTaskStatusIncludesError(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 1
-	task := &Task{
-		Status:   "failed",
-		ExitCode: &exit,
-		Error:    "runner lost before completion",
+	task := &core.RunnerTask{
+		State:        "failed",
+		ExitCode:     &exit,
+		ErrorMessage: "runner lost before completion",
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil, nil, nil))
+	require.NoError(t, processTaskStatus(state, task, RunBashFinishedEventType, "", nil, nil, nil))
 	require.Equal(t, FailedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)

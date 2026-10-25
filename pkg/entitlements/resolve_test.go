@@ -109,15 +109,13 @@ func TestResolvePurchasedSeats(t *testing.T) {
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	maximum := 50
-	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, CreditFrequency: "none", CreditExpiration: "never"}
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
-	require.NoError(t, err)
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
+	newSubscriptionReplay(t, r.Organization.ID, &plan).apply("active", seatCount(3))
 	member := support.CreateUser(t, r, r.Organization.ID)
 	removed := support.CreateUser(t, r, r.Organization.ID)
 	require.NoError(t, db.Delete(removed).Error)
-	_, err = models.CreateAPIKey(db, r.Organization.ID, "service", nil, r.User, nil, nil)
+	_, err := models.CreateAPIKey(db, r.Organization.ID, "service", nil, r.User, nil, nil)
 	require.NoError(t, err)
 
 	expected := SeatUsage{Invitable: seatCount(1), PerSeat: true, Purchased: seatCount(3), Occupied: 2, Available: seatCount(1), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(2)}
@@ -155,15 +153,19 @@ func TestResolvePurchasedSeats(t *testing.T) {
 		require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", quantity).Error)
 		expected.Invitable = seatCount(0)
 		expected.Purchased, expected.Available = quantity, seatCount(0)
-		if quantity == nil {
-			expected.Purchased = seatCount(0)
+		// The renewal never adds seats, and no paid seats give no renewal count.
+		expected.RenewalQuantity = quantity
+		if quantity == nil || *quantity == 0 {
+			expected.Purchased, expected.RenewalQuantity = seatCount(0), nil
 		}
 		expected.Purchasable = seatCount(1 - *expected.Purchased)
 		check()
 	}
 	require.NoError(t, db.Delete(member).Error)
 	require.NoError(t, db.Delete(&models.User{}, "id = ?", r.User).Error)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
 	expected.Occupied, expected.RenewalQuantity = 0, seatCount(1)
+	expected.Purchased, expected.Available, expected.Invitable, expected.Purchasable = seatCount(3), seatCount(3), seatCount(3), seatCount(0)
 	check()
 	t.Setenv(models.BillingEnabledEnv, "no")
 	actual, err := ResolveSeats(db, r.Organization.ID)
@@ -232,11 +234,9 @@ func TestResolveSeatsForPlanUsesLoadedPlan(t *testing.T) {
 	defer r.Close()
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	db := database.Conn()
-	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: seatCount(50), CreditFrequency: "none", CreditExpiration: "never"}
+	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: seatCount(50), PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
-	require.NoError(t, err)
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
+	newSubscriptionReplay(t, r.Organization.ID, &plan).apply("active", seatCount(3))
 	loaded, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
 	now := time.Now()
@@ -265,6 +265,8 @@ type subscriptionReplay struct {
 	productID      string
 	subscriptionID string
 	modifiedAt     time.Time
+	// pastDueAt is sent as past_due_at when set.
+	pastDueAt *time.Time
 }
 
 func newSubscriptionReplay(t *testing.T, orgID uuid.UUID, catalog *models.BillingPlan) *subscriptionReplay {
@@ -275,11 +277,15 @@ func (s *subscriptionReplay) apply(status string, seats *int) {
 	s.t.Helper()
 	s.modifiedAt = s.modifiedAt.Add(time.Minute)
 	start := time.Now().Add(-7 * 24 * time.Hour)
-	body, err := json.Marshal(map[string]any{"type": "subscription.updated", "data": map[string]any{
+	data := map[string]any{
 		"id": s.subscriptionID, "product_id": s.productID, "status": status, "seats": seats,
 		"external_customer_id": s.orgID.String(), "modified_at": s.modifiedAt.UTC().Format(time.RFC3339),
 		"current_period_start": start.UTC().Format(time.RFC3339), "current_period_end": start.AddDate(0, 1, 0).UTC().Format(time.RFC3339),
-	}})
+	}
+	if s.pastDueAt != nil {
+		data["past_due_at"] = s.pastDueAt.UTC().Format(time.RFC3339)
+	}
+	body, err := json.Marshal(map[string]any{"type": "subscription.updated", "data": data})
 	require.NoError(s.t, err)
 	var event polar.SubscriptionWebhookEvent
 	require.NoError(s.t, json.Unmarshal(body, &event))
@@ -328,6 +334,58 @@ func TestPastDueLocksSeatsOfSeatBasedSubscription(t *testing.T) {
 
 	replay.apply("active", seatCount(2))
 	require.Equal(t, *active, *resolve(), "an active snapshot restores the normal seat rules")
+}
+
+func TestPausedSubscriptionLocksSeats(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	support.CreateUser(t, r, r.Organization.ID)
+	replay := newSubscriptionReplay(t, r.Organization.ID, savePaidCatalog(t, true))
+
+	replay.apply("active", seatCount(5))
+	replay.apply("paused", seatCount(5))
+
+	usage, err := ResolveSeats(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.True(t, usage.PaymentBlocked)
+	require.Equal(t, seatCount(5), usage.Purchased)
+	require.Equal(t, seatCount(2), usage.JoinLimit())
+	require.Equal(t, seatCount(0), usage.Invitable)
+}
+
+func TestPastDueGraceKeepsTeamPlanButLocksSeats(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	support.CreateUser(t, r, r.Organization.ID)
+	require.NoError(t, models.ApplyInstallationMetadata(db, func(metadata *models.InstallationMetadata) {
+		metadata.PastDueGraceDays = 7
+	}))
+	replay := newSubscriptionReplay(t, r.Organization.ID, savePaidCatalog(t, true))
+	replay.apply("active", seatCount(5))
+
+	failure := time.Now().Add(-24 * time.Hour)
+	replay.pastDueAt = &failure
+	replay.apply("past_due", seatCount(5))
+
+	plan, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.True(t, plan.Catalog.PerSeat, "Team features stay on during grace")
+	usage, err := ResolveSeats(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.True(t, usage.PaymentBlocked)
+	require.Equal(t, seatCount(2), usage.JoinLimit())
+	require.Equal(t, seatCount(0), usage.Invitable)
+
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).
+		Update("past_due_since", time.Now().Add(-8*24*time.Hour)).Error)
+	lapsed, err := ResolveSeats(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.True(t, lapsed.PaymentBlocked, "the seat lock outlives the grace period")
+	require.Equal(t, seatCount(2), lapsed.JoinLimit())
 }
 
 func TestPastDueLockIgnoresSubscriptionWithoutSeats(t *testing.T) {

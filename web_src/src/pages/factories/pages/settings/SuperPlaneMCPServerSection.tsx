@@ -107,7 +107,7 @@ export function SuperPlaneMCPServerSection({
         open={Boolean(pendingRevoke)}
         factoryName={pendingName}
         title={SUPERPLANE_MCP_SERVER_COPY.revokeTitle(pendingName)}
-        description={SUPERPLANE_MCP_SERVER_COPY.revokeDescription}
+        description={SUPERPLANE_MCP_SERVER_COPY.revokeDescription(pendingRevoke?.workspaceCount)}
         confirmLabel={SUPERPLANE_MCP_SERVER_COPY.revoke}
         loadingText={SUPERPLANE_MCP_SERVER_COPY.revoking}
         canDelete={canUpdate}

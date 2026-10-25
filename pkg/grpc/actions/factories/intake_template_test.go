@@ -496,3 +496,57 @@ func findModelNodeOrNil(nodes []models.Node, nodeID string) *models.Node {
 	}
 	return nil
 }
+
+func Test__IntakeAuthorAccessWithRenamedNodes(t *testing.T) {
+	integrationID := "integration-1"
+	trigger := triggerNode(intakeTriggerNodeID, "github.onIssue")
+	trigger.IntegrationID = &integrationID
+	trigger.Configuration = map[string]any{"repository": "acme/widgets"}
+	filter := componentNode(intakeFilterNodeID, intakeFilterComponent)
+	filter.Configuration = map[string]any{"expression": "true"}
+	spec := models.LiveCanvasSpec{
+		Nodes: []models.Node{trigger, filter, componentNode(intakeCreateNodeID, intakeCreateComponent)},
+		Edges: []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+		},
+	}
+	// Repeated saves before the fix left multiple gates with publisher-assigned IDs.
+	for _, suffix := range []string{"first", "duplicate"} {
+		permission := componentNode("permission-"+suffix, intakeAuthorPermissionComponent)
+		permission.Configuration = map[string]any{
+			"repository": "acme/widgets", "username": "{{ root().data.issue.user.login }}",
+		}
+		permission.IntegrationID = &integrationID
+		gate := componentNode("access-"+suffix, intakeFilterComponent)
+		gate.Configuration = map[string]any{"expression": `root().data.permission != "none"`}
+		spec.Nodes = append(spec.Nodes, permission, gate)
+		spec.Edges = append(spec.Edges,
+			models.Edge{Channel: "true", SourceID: intakeFilterNodeID, TargetID: permission.ID},
+			models.Edge{Channel: "default", SourceID: permission.ID, TargetID: gate.ID},
+			models.Edge{Channel: "true", SourceID: gate.ID, TargetID: intakeCreateNodeID},
+		)
+	}
+
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
+	require.True(t, intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, spec).AuthorsWithAccess)
+
+	for _, enabled := range []bool{true, true, false, true, false} {
+		graph = resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
+		nodes, edges, err := configureIntakeAuthorAccess(spec.Nodes, spec.Edges, graph, enabled)
+		require.NoError(t, err)
+		spec = models.LiveCanvasSpec{Nodes: nodes, Edges: edges}
+		graph = resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
+		assert.Equal(t, enabled, intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, spec).AuthorsWithAccess)
+		assert.True(t, graph.Healthy(edges))
+		if enabled {
+			assert.Len(t, nodes, 5)
+			assert.Len(t, edges, 4)
+			continue
+		}
+		assert.Len(t, nodes, 3)
+		assert.Equal(t, []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, edges)
+	}
+}

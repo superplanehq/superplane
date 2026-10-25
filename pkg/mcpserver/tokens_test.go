@@ -27,9 +27,30 @@ func TestAccessTokenRoundTrip(t *testing.T) {
 	require.Equal(t, claims.UserID, parsed.UserID)
 	require.Equal(t, claims.OrgID, parsed.OrgID)
 	require.Equal(t, claims.FactoryID, parsed.FactoryID)
+	require.Equal(t, []uuid.UUID{claims.FactoryID}, parsed.FactoryIDs)
 	require.Equal(t, claims.ClientID, parsed.ClientID)
 	require.Equal(t, claims.Resource, parsed.Resource)
 	require.Equal(t, GrantedScopes, parsed.Scopes)
+}
+
+func TestAccessTokenWithOnlyFactoryIDIsOneWorkspace(t *testing.T) {
+	signer := jwt.NewSigner("test-secret")
+	factoryID := uuid.New()
+	token, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+		"purpose":    AccessTokenPurpose,
+		"sub":        uuid.New().String(),
+		"org_id":     uuid.New().String(),
+		"factory_id": factoryID.String(),
+		"client_id":  "superplane-local",
+		"aud":        "http://localhost:8000/mcp",
+		"scope":      "work_orders:read",
+	})
+	require.NoError(t, err)
+
+	parsed, err := ParseAccessToken(signer, token, "http://localhost:8000/mcp")
+	require.NoError(t, err)
+	require.Equal(t, factoryID, parsed.FactoryID)
+	require.Equal(t, []uuid.UUID{factoryID}, parsed.FactoryIDs)
 }
 
 func TestAccessTokenRejectsWrongAudience(t *testing.T) {

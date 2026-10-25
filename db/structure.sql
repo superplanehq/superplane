@@ -1184,7 +1184,9 @@ CREATE TABLE public.installation_metadata (
     owner_setup_step text,
     share_owner_identity boolean DEFAULT false NOT NULL,
     invitation_duration_days integer DEFAULT 7 NOT NULL,
+    past_due_grace_days integer DEFAULT 0 NOT NULL,
     CONSTRAINT installation_metadata_invitation_duration_days_check CHECK (((invitation_duration_days >= 1) AND (invitation_duration_days <= 365))),
+    CONSTRAINT installation_metadata_past_due_grace_days_check CHECK (((past_due_grace_days >= 0) AND (past_due_grace_days <= 21))),
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -1243,7 +1245,8 @@ CREATE TABLE public.mcp_oauth_codes (
     factory_id uuid NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     expires_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    factory_ids jsonb
 );
 
 
@@ -1261,7 +1264,33 @@ CREATE TABLE public.mcp_oauth_refresh_tokens (
     resource text NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     expires_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    factory_ids jsonb
+);
+
+
+--
+-- Name: organization_billing_checkouts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_billing_checkouts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    plan_key text NOT NULL,
+    polar_product_id text NOT NULL,
+    seats integer,
+    state text NOT NULL,
+    polar_checkout_id text,
+    checkout_url text,
+    polar_status text,
+    expires_at timestamp with time zone,
+    last_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    resolved_at timestamp with time zone,
+    CONSTRAINT organization_billing_checkouts_resolved_at CHECK (((state = ANY (ARRAY['creating'::text, 'ambiguous'::text, 'open'::text])) = (resolved_at IS NULL))),
+    CONSTRAINT organization_billing_checkouts_seats_check CHECK ((seats >= 1)),
+    CONSTRAINT organization_billing_checkouts_state CHECK ((state = ANY (ARRAY['creating'::text, 'ambiguous'::text, 'open'::text, 'succeeded'::text, 'expired'::text, 'failed'::text, 'released'::text])))
 );
 
 
@@ -1284,7 +1313,12 @@ CREATE TABLE public.organization_billing_plans (
     polar_modified_at timestamp with time zone,
     plan_id uuid NOT NULL,
     purchased_seats integer,
+    past_due_since timestamp with time zone,
+    over_capacity_since timestamp with time zone,
+    renewal_seats_scheduled integer,
+    renewal_seats_scheduled_at timestamp with time zone,
     CONSTRAINT organization_billing_plans_purchased_seats_check CHECK ((purchased_seats >= 0)),
+    CONSTRAINT organization_billing_plans_renewal_seats_scheduled_check CHECK ((renewal_seats_scheduled >= 1)),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
 
@@ -1333,6 +1367,18 @@ CREATE TABLE public.organization_hosted_model_allowlists (
 CREATE TABLE public.organization_invitation_replaced_tokens (
     token_hash character varying(64) NOT NULL,
     invitation_id uuid NOT NULL
+);
+
+
+--
+-- Name: organization_invitation_sends; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_invitation_sends (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    email character varying(255) NOT NULL,
+    sent_at timestamp with time zone NOT NULL
 );
 
 
@@ -1431,8 +1477,14 @@ CREATE TABLE public.organization_seat_purchases (
     error_code text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    operation_key text,
+    request_fingerprint text,
+    period_start timestamp with time zone,
+    period_end timestamp with time zone,
     CONSTRAINT organization_seat_purchases_adds_seats CHECK ((to_seats > from_seats)),
     CONSTRAINT organization_seat_purchases_from_seats_check CHECK ((from_seats >= 0)),
+    CONSTRAINT organization_seat_purchases_operation_complete CHECK ((((operation_key IS NULL) AND (request_fingerprint IS NULL) AND (period_start IS NULL) AND (period_end IS NULL)) OR ((operation_key IS NOT NULL) AND (request_fingerprint IS NOT NULL) AND (period_start IS NOT NULL) AND (period_end IS NOT NULL)))),
+    CONSTRAINT organization_seat_purchases_operation_key_length CHECK (((operation_key IS NULL) OR ((char_length(operation_key) >= 1) AND (char_length(operation_key) <= 128)))),
     CONSTRAINT organization_seat_purchases_status CHECK ((status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'action_required'::text, 'unknown'::text])))
 );
 
@@ -2869,6 +2921,14 @@ ALTER TABLE ONLY public.mcp_oauth_refresh_tokens
 
 
 --
+-- Name: organization_billing_checkouts organization_billing_checkouts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_checkouts
+    ADD CONSTRAINT organization_billing_checkouts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_billing_plans organization_billing_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2906,6 +2966,14 @@ ALTER TABLE ONLY public.organization_hosted_model_allowlists
 
 ALTER TABLE ONLY public.organization_invitation_replaced_tokens
     ADD CONSTRAINT organization_invitation_replaced_tokens_pkey PRIMARY KEY (token_hash);
+
+
+--
+-- Name: organization_invitation_sends organization_invitation_sends_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_sends
+    ADD CONSTRAINT organization_invitation_sends_pkey PRIMARY KEY (id);
 
 
 --
@@ -4166,6 +4234,13 @@ CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm
 
 
 --
+-- Name: idx_organization_billing_checkouts_organization_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_billing_checkouts_organization_created ON public.organization_billing_checkouts USING btree (organization_id, created_at);
+
+
+--
 -- Name: idx_organization_seat_purchases_organization_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4607,6 +4682,27 @@ CREATE INDEX organization_invitation_replaced_tokens_invitation_id_idx ON public
 
 
 --
+-- Name: organization_invitation_sends_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_email_sent_at_idx ON public.organization_invitation_sends USING btree (email, sent_at);
+
+
+--
+-- Name: organization_invitation_sends_organization_id_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_organization_id_email_sent_at_idx ON public.organization_invitation_sends USING btree (organization_id, email, sent_at);
+
+
+--
+-- Name: organization_invitation_sends_organization_id_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_organization_id_sent_at_idx ON public.organization_invitation_sends USING btree (organization_id, sent_at);
+
+
+--
 -- Name: organization_invitations_pending_email_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4712,10 +4808,31 @@ CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btre
 
 
 --
+-- Name: uq_organization_billing_checkouts_polar_checkout; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_billing_checkouts_polar_checkout ON public.organization_billing_checkouts USING btree (polar_checkout_id) WHERE (polar_checkout_id IS NOT NULL);
+
+
+--
+-- Name: uq_organization_billing_checkouts_unresolved; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_billing_checkouts_unresolved ON public.organization_billing_checkouts USING btree (organization_id) WHERE (state = ANY (ARRAY['creating'::text, 'ambiguous'::text, 'open'::text]));
+
+
+--
 -- Name: uq_organization_seat_purchases_in_flight; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX uq_organization_seat_purchases_in_flight ON public.organization_seat_purchases USING btree (organization_id) WHERE (status = ANY (ARRAY['pending'::text, 'unknown'::text]));
+
+
+--
+-- Name: uq_organization_seat_purchases_operation_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_seat_purchases_operation_key ON public.organization_seat_purchases USING btree (organization_id, operation_key) WHERE (operation_key IS NOT NULL);
 
 
 --
@@ -5569,6 +5686,14 @@ ALTER TABLE ONLY public.installation_licenses
 
 
 --
+-- Name: organization_billing_checkouts organization_billing_checkouts_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_checkouts
+    ADD CONSTRAINT organization_billing_checkouts_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_billing_plans organization_billing_plans_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5598,6 +5723,14 @@ ALTER TABLE ONLY public.organization_hosted_model_allowlists
 
 ALTER TABLE ONLY public.organization_invitation_replaced_tokens
     ADD CONSTRAINT organization_invitation_replaced_tokens_invitation_id_fkey FOREIGN KEY (invitation_id) REFERENCES public.organization_invitations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_invitation_sends organization_invitation_sends_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_sends
+    ADD CONSTRAINT organization_invitation_sends_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -6176,7 +6309,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261024133316	f
+20261025145014	f
 \.
 
 

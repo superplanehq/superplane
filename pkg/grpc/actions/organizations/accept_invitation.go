@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -88,6 +89,9 @@ func (s *InvitationService) Accept(ctx context.Context, accountID, token string)
 			if err != nil {
 				return err
 			}
+			if seats.PaymentBlocked {
+				return grpcerrors.FailedPreconditionWithReason("This organization cannot add members until its payment is updated. Ask an organization admin.", "PAYMENT_PAST_DUE")
+			}
 			if limit := seats.JoinLimit(); limit != nil && seats.Occupied >= *limit {
 				if seats.PerSeat {
 					return grpcerrors.FailedPreconditionWithReason("No seat is available. Ask an organization admin to free or buy a seat.", "NO_SEAT_AVAILABLE")
@@ -116,6 +120,10 @@ func (s *InvitationService) Accept(ctx context.Context, accountID, token string)
 	})
 	if err != nil {
 		return nil, invitationActionError(err)
+	}
+	// A new or restored member occupies a seat, so Polar must renew it.
+	if statusValue == "joined" {
+		seatrenewal.ScheduleAsync(ctx, org.ID)
 	}
 	return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
 }

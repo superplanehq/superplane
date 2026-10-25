@@ -2147,7 +2147,7 @@ message WorkOrderExecution {
   repeated string models = 13;
   // Why the step failed before it could run. Set only for SuperPlane
   // hosted credit failures: no_hosted_credit,
-  // hosted_subscription_required, or workspace_budget_empty.
+  // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
 }
 
@@ -3081,6 +3081,7 @@ message FactoryMCPClient {
   string user_email = 5;
   google.protobuf.Timestamp created_at = 6;
   string user_avatar_url = 7;
+  int32 workspace_count = 8;
 }
 
 message ListFactoryMCPClientsRequest {

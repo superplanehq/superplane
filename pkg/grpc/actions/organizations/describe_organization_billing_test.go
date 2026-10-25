@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -69,14 +71,21 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	catalog := models.BillingPlan{
 		Key: "billing_response_custom", Name: "Team", Category: "paid", Visibility: "private",
-		PriceCents: 2900, PerSeat: true, SeatLimit: new(50), CreditFrequency: "none", CreditExpiration: "never",
+		PriceCents: 2900, PerSeat: true, SeatLimit: new(50), PolarProductID: new("prod_billing_response_custom"),
+		CreditFrequency: "none", CreditExpiration: "never",
 	}
 	require.NoError(t, models.SaveBillingPlan(database.Conn(), &catalog))
 	t.Cleanup(func() {
 		require.NoError(t, database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBillingPlan{}).Error)
+		require.NoError(t, database.Conn().Model(&catalog).Update("polar_product_id", nil).Error)
 		require.NoError(t, models.DeleteBillingPlan(database.Conn(), catalog.ID))
 	})
-	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, catalog.Key, nil)
+	periodStart := time.Now().UTC()
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	_, err := models.ApplyPolarSubscription(database.DB(t.Context()), r.Organization.ID, models.PolarSubscriptionApply{
+		ID: "sub_billing_response_custom", ProductID: *catalog.PolarProductID, Status: models.PolarSubscriptionStatusActive,
+		PurchasedSeats: new(10), PeriodStart: &periodStart, PeriodEnd: &periodEnd,
+	}, nil)
 	require.NoError(t, err)
 
 	resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
@@ -88,12 +97,12 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	assert.True(t, resp.PlanPerSeat)
 
 	db := database.Conn()
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 10).Error)
 	for range 8 {
 		support.CreateUser(t, r, r.Organization.ID)
 	}
 	expected := map[string]any{
 		"purchasedSeats": float64(10), "occupiedSeats": float64(9), "availableSeats": float64(1),
+		"pendingInvitationSeats": float64(0), "invitableSeats": float64(1),
 		"planMaximumSeats": float64(50), "purchasableSeats": float64(40), "expectedRenewalSeats": float64(9),
 		"currentMonthlyTotalCents": "29000", "expectedRenewalCents": "26100",
 	}
@@ -105,18 +114,32 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	}
 	check()
 
+	now := time.Now()
+	invitation := models.OrganizationInvitation{
+		OrganizationID: r.Organization.ID, Email: "pending@example.com", Role: models.RoleOrgOperator,
+		InvitedBy: r.User, State: models.InvitationStatePending, SentAt: now, ExpiresAt: now.Add(time.Hour),
+	}
+	require.NoError(t, invitation.Save(db))
+	expected["pendingInvitationSeats"], expected["invitableSeats"] = float64(1), float64(0)
+	check()
+
 	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, new(80)))
 	expected["planMaximumSeats"], expected["purchasableSeats"] = float64(80), float64(70)
 	check()
 
 	require.NoError(t, db.Delete(&models.User{}, "id = ?", r.User).Error)
 	expected["occupiedSeats"], expected["availableSeats"], expected["expectedRenewalSeats"] = float64(8), float64(2), float64(8)
+	expected["invitableSeats"] = float64(1)
 	expected["expectedRenewalCents"] = "23200"
 	check()
 
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", nil).Error)
 	expected["purchasedSeats"], expected["availableSeats"], expected["purchasableSeats"] = float64(0), float64(0), float64(80)
+	expected["invitableSeats"] = float64(0)
 	expected["currentMonthlyTotalCents"] = "0"
+	// A plan without paid seats needs repair, so it has no renewal estimate.
+	delete(expected, "expectedRenewalSeats")
+	delete(expected, "expectedRenewalCents")
 	check()
 
 	require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, nil))
@@ -125,8 +148,9 @@ func Test__DescribeOrganizationBillingCatalogPlan(t *testing.T) {
 	check()
 
 	require.NoError(t, db.Delete(&models.User{}, "organization_id = ?", r.Organization.ID).Error)
-	expected["occupiedSeats"], expected["expectedRenewalSeats"] = float64(0), float64(1)
-	expected["expectedRenewalCents"] = "2900"
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 10).Error)
+	expected["occupiedSeats"], expected["purchasedSeats"], expected["availableSeats"], expected["invitableSeats"] = float64(0), float64(10), float64(10), float64(9)
+	expected["currentMonthlyTotalCents"], expected["expectedRenewalSeats"], expected["expectedRenewalCents"] = "29000", float64(1), "2900"
 	check()
 }
 
@@ -138,7 +162,7 @@ func assertBillingSeatJSON(t *testing.T, resp *pb.DescribeOrganizationBillingRes
 	require.NoError(t, err)
 	var fields map[string]any
 	require.NoError(t, json.Unmarshal(body, &fields))
-	for _, key := range []string{"purchasedSeats", "occupiedSeats", "availableSeats", "planMaximumSeats", "purchasableSeats", "expectedRenewalSeats", "currentMonthlyTotalCents", "expectedRenewalCents"} {
+	for _, key := range []string{"purchasedSeats", "occupiedSeats", "availableSeats", "pendingInvitationSeats", "invitableSeats", "planMaximumSeats", "purchasableSeats", "expectedRenewalSeats", "currentMonthlyTotalCents", "expectedRenewalCents"} {
 		value, present := expected[key]
 		if !present {
 			assert.NotContains(t, fields, key)
@@ -149,7 +173,7 @@ func assertBillingSeatJSON(t *testing.T, resp *pb.DescribeOrganizationBillingRes
 	}
 }
 
-func Test__DescribeOrganizationBillingOccupiedOnNonPerSeatPlans(t *testing.T) {
+func Test__DescribeOrganizationBillingSeatUsageOnNonPerSeatPlans(t *testing.T) {
 	for _, key := range []string{"business_legacy", "trial", "none"} {
 		t.Run(key, func(t *testing.T) {
 			r := support.Setup(t)
@@ -163,10 +187,16 @@ func Test__DescribeOrganizationBillingOccupiedOnNonPerSeatPlans(t *testing.T) {
 				"trial_ends_at": time.Now().Add(time.Hour), "purchased_seats": 99,
 			}).Error)
 			support.CreateUser(t, r, r.Organization.ID)
+			now := time.Now()
+			invitation := models.OrganizationInvitation{
+				OrganizationID: r.Organization.ID, Email: "pending@example.com", Role: models.RoleOrgOperator,
+				InvitedBy: r.User, State: models.InvitationStatePending, SentAt: now, ExpiresAt: now.Add(time.Hour),
+			}
+			require.NoError(t, invitation.Save(db))
 			resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
 			require.NoError(t, err)
 			assert.False(t, resp.PlanPerSeat)
-			assertBillingSeatJSON(t, resp, map[string]any{"occupiedSeats": float64(2)})
+			assertBillingSeatJSON(t, resp, map[string]any{"occupiedSeats": float64(2), "pendingInvitationSeats": float64(1)})
 		})
 	}
 }
@@ -187,7 +217,7 @@ func Test__DescribeOrganizationBillingNonePlanWithCreditDoesNotAllowRuns(t *test
 
 func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBusinessProduct(t, new("prod_business"))
 	t.Setenv(models.BillingEnabledEnv, "no")
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
@@ -215,7 +245,7 @@ func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
 
 func Test__SyncOrganizationBilling(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBusinessProduct(t, new("prod_business"))
 
 	t.Run("invalid organization id", func(t *testing.T) {
 		_, err := SyncOrganizationBilling(context.Background(), "not-a-uuid", &pb.SyncOrganizationBillingRequest{})
@@ -240,29 +270,35 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
 				return
 			}
+			subscription := map[string]any{
+				"id":                   "sub_grpc_sync",
+				"status":               "active",
+				"product_id":           "prod_business",
+				"current_period_start": periodStart.Format(time.RFC3339),
+				"current_period_end":   periodEnd.Format(time.RFC3339),
+				"customer_id":          "cust_polar_1",
+				"external_customer_id": r.Organization.ID.String(),
+				"customer": map[string]any{
+					"id":          "cust_polar_1",
+					"external_id": r.Organization.ID.String(),
+				},
+			}
+			if req.URL.Path == "/subscriptions/sub_grpc_sync" {
+				// The renewal schedule after the sync reads the subscription.
+				assert.Equal(t, http.MethodGet, req.Method)
+				require.NoError(t, json.NewEncoder(w).Encode(subscription))
+				return
+			}
 			assert.Equal(t, "/subscriptions/", req.URL.Path)
 			assert.Equal(t, r.Organization.ID.String(), req.URL.Query().Get("external_customer_id"))
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
-				"items": []map[string]any{
-					{
-						"id":                   "sub_grpc_sync",
-						"status":               "active",
-						"product_id":           "prod_business",
-						"current_period_start": periodStart.Format(time.RFC3339),
-						"current_period_end":   periodEnd.Format(time.RFC3339),
-						"customer_id":          "cust_polar_1",
-						"external_customer_id": r.Organization.ID.String(),
-						"customer": map[string]any{
-							"id":          "cust_polar_1",
-							"external_id": r.Organization.ID.String(),
-						},
-					},
-				},
+				"items":      []map[string]any{subscription},
 				"pagination": map[string]any{"max_page": 1},
 			}))
 		})
 		usePolarTestServer(t, server)
 		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+		t.Cleanup(seatrenewal.Wait)
 
 		resp, err := SyncOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
 		require.NoError(t, err)
@@ -290,7 +326,7 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 
 func Test__DescribeOrganizationBillingLapsesExpiredTrial(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBusinessProduct(t, new("prod_business"))
 	ended := time.Now().Add(-time.Hour)
 	require.NoError(t, database.Conn().Model(&models.OrganizationBillingPlan{}).
 		Where("organization_id = ?", r.Organization.ID).
@@ -311,16 +347,16 @@ func Test__DescribeOrganizationBillingLapsesExpiredTrial(t *testing.T) {
 
 func Test__CancelOrganizationSubscription(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBusinessProduct(t, new("prod_business"))
 	db := database.Conn()
 	periodStart := time.Now().UTC().Truncate(time.Second)
 	periodEnd := periodStart.AddDate(0, 1, 0)
-	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
+	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 		ID:          "sub_grpc_cancel",
 		Status:      models.PolarSubscriptionStatusActive,
 		PeriodStart: &periodStart,
 		PeriodEnd:   &periodEnd,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	t.Run("invalid organization id", func(t *testing.T) {
@@ -373,27 +409,31 @@ func Test__CancelOrganizationSubscription(t *testing.T) {
 
 func Test__ResumeOrganizationSubscription(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBusinessProduct(t, new("prod_business"))
 	db := database.Conn()
 	periodStart := time.Now().UTC().Truncate(time.Second)
 	periodEnd := periodStart.AddDate(0, 1, 0)
-	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
+	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 		ID:                "sub_grpc_resume",
 		Status:            models.PolarSubscriptionStatusActive,
 		PeriodStart:       &periodStart,
 		PeriodEnd:         &periodEnd,
 		CancelAtPeriodEnd: true,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	t.Run("keeps Business", func(t *testing.T) {
+		var patches atomic.Int32
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 			if strings.HasSuffix(req.URL.Path, "/payment-methods") {
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
 				return
 			}
-			assert.Equal(t, http.MethodPatch, req.Method)
 			assert.Equal(t, "/subscriptions/sub_grpc_resume", req.URL.Path)
+			if req.Method == http.MethodPatch {
+				patches.Add(1)
+			}
+			// The renewal schedule after the resume reads the subscription.
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"id":                   "sub_grpc_resume",
 				"status":               "active",
@@ -411,17 +451,37 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 		usePolarTestServer(t, server)
 		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
 
+		t.Cleanup(seatrenewal.Wait)
+
 		resp, err := ResumeOrganizationSubscription(context.Background(), r.Organization.ID.String(), &pb.ResumeOrganizationSubscriptionRequest{})
 		require.NoError(t, err)
 		assert.Equal(t, models.BillingPlanBusiness, resp.Plan)
 		assert.True(t, resp.CreditPurchaseAllowed)
 		assert.False(t, resp.CancelAtPeriodEnd)
+		seatrenewal.Wait()
+		assert.Equal(t, int32(1), patches.Load(), "only the resume updates the subscription")
 	})
 }
 
 func TestBusinessCheckoutSuccessURLIncludesCheckoutID(t *testing.T) {
 	id := uuid.New()
 	assert.Equal(t, "https://app.superplane.com/"+id.String()+"/organization/billing?subscribed=1&checkout_id={CHECKOUT_ID}", businessCheckoutSuccessURL("https://app.superplane.com/", id))
+}
+
+func setLegacyBusinessProduct(t *testing.T, productID *string) *models.BillingPlan {
+	t.Helper()
+	db := database.DB(t.Context())
+	catalog, err := models.FindBillingPlan(db, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	originalProduct := catalog.PolarProductID
+	if originalProduct != nil {
+		originalProduct = new(*originalProduct)
+	}
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.WithoutCancel(t.Context())).Model(catalog).Update("polar_product_id", originalProduct).Error)
+	})
+	require.NoError(t, db.Model(catalog).Update("polar_product_id", productID).Error)
+	return catalog
 }
 
 func TestLegacyBusinessCheckoutRemainsAvailable(t *testing.T) {
@@ -436,35 +496,18 @@ func TestLegacyBusinessCheckoutRemainsAvailable(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
-			db := database.DB(t.Context())
-			catalog, err := models.FindBillingPlan(db, models.BillingPlanBusiness)
-			require.NoError(t, err)
-			originalProduct := catalog.PolarProductID
-			t.Cleanup(func() {
-				require.NoError(t, database.Conn().Model(catalog).Update("polar_product_id", originalProduct).Error)
-			})
 			var catalogProduct *string
 			if tc.catalogProduct != "" {
 				catalogProduct = &tc.catalogProduct
 			}
-			require.NoError(t, db.Model(catalog).Update("polar_product_id", catalogProduct).Error)
+			setLegacyBusinessProduct(t, catalogProduct)
 			t.Setenv(models.BillingEnabledEnv, "yes")
 			t.Setenv("POLAR_BUSINESS_PRODUCT_ID", tc.envProduct)
-			server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
-				switch req.URL.Path {
-				case "/customers/external/" + r.Organization.ID.String():
-					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_legacy", "external_id": r.Organization.ID.String()}))
-				case "/checkouts/":
-					var body map[string]any
-					require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
-					require.Equal(t, []any{tc.wantProduct}, body["products"])
-					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"url": "https://polar.sh/checkout/legacy"}))
-				default:
-					t.Errorf("unexpected Polar request %s", req.URL.Path)
-					w.WriteHeader(http.StatusInternalServerError)
-				}
-			})
-			usePolarTestServer(t, server)
+			polarCheckouts := newFakePolarCheckouts(t, r.Organization.ID)
+			polarCheckouts.onCreate = func(body map[string]any) {
+				require.Equal(t, []any{tc.wantProduct}, body["products"])
+			}
+			polarCheckouts.serve(nil)
 			response, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
 			require.NoError(t, err)
 			require.True(t, response.BillingEnabled)
@@ -475,7 +518,120 @@ func TestLegacyBusinessCheckoutRemainsAvailable(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, "https://polar.sh/checkout/legacy", checkout.CheckoutUrl)
+			created := polarCheckouts.checkouts()
+			require.Len(t, created, 1)
+			require.Equal(t, "https://polar.sh/checkout/"+created[0].ID, checkout.CheckoutUrl)
+		})
+	}
+}
+
+func TestLegacyBusinessCheckoutReusesThePendingCheckout(t *testing.T) {
+	for _, preexisting := range []bool{false, true} {
+		name := "new checkout"
+		if preexisting {
+			name = "adopted checkout"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			setLegacyBusinessProduct(t, new("prod_business"))
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			polarCheckouts := newFakePolarCheckouts(t, r.Organization.ID)
+			var existing *fakePolarCheckout
+			if preexisting {
+				existing = polarCheckouts.seed("prod_business", nil, nil)
+			}
+			polarCheckouts.serve(nil)
+
+			first, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
+			second, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+			require.NoError(t, err)
+
+			require.Equal(t, first.CheckoutUrl, second.CheckoutUrl)
+			if preexisting {
+				require.Equal(t, "https://polar.sh/checkout/"+existing.ID, first.CheckoutUrl)
+				require.Zero(t, polarCheckouts.createCalls())
+			} else {
+				require.Equal(t, 1, polarCheckouts.createCalls())
+			}
+			intent, err := models.FindUnresolvedOrganizationBillingCheckout(database.DB(t.Context()), r.Organization.ID)
+			require.NoError(t, err)
+			require.NotNil(t, intent)
+			require.Equal(t, "prod_business", intent.PolarProductID)
+			require.Nil(t, intent.Seats)
+		})
+	}
+}
+
+func TestLegacyBusinessCheckoutRejectsUnsafeBillingStateBeforePolar(t *testing.T) {
+	const renewalRecovery = "The last renewal payment failed. Update the payment method to recover the current subscription."
+	const manageSubscription = "Manage your current subscription in the billing portal before selecting another plan."
+	for _, tc := range []struct {
+		name, subscriptionStatus, configuration, wantMessage string
+		newBilling, scheduledCancellation                    bool
+	}{
+		{name: "past due", subscriptionStatus: models.PolarSubscriptionStatusPastDue, wantMessage: renewalRecovery},
+		{name: "past due before new billing", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, wantMessage: renewalRecovery},
+		{name: "new billing", newBilling: true, wantMessage: "Select a plan in Billing."},
+		{name: "new billing before managed subscription", subscriptionStatus: models.PolarSubscriptionStatusActive, newBilling: true, wantMessage: "Select a plan in Billing."},
+		{name: "active subscription", subscriptionStatus: models.PolarSubscriptionStatusActive, wantMessage: manageSubscription},
+		{name: "trialing subscription", subscriptionStatus: models.PolarSubscriptionStatusTrialing, wantMessage: manageSubscription},
+		{name: "scheduled cancellation", subscriptionStatus: models.PolarSubscriptionStatusCanceled, scheduledCancellation: true, wantMessage: manageSubscription},
+		{name: "paused subscription", subscriptionStatus: models.PolarSubscriptionStatusPaused, wantMessage: manageSubscription},
+		{name: "paused with scheduled cancellation", subscriptionStatus: models.PolarSubscriptionStatusPaused, scheduledCancellation: true, wantMessage: manageSubscription},
+		{name: "billing disabled before billing guards", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, configuration: "disabled", wantMessage: "Business checkout is not configured"},
+		{name: "missing token before billing guards", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, configuration: "missing token", wantMessage: "Business checkout is not configured"},
+		{name: "missing product before billing guards", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, configuration: "missing product", wantMessage: "Business checkout is not configured"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			db := database.DB(t.Context())
+			t.Setenv(models.BillingEnabledEnv, "yes")
+			t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+			catalog := setLegacyBusinessProduct(t, new("prod_business"))
+			if tc.newBilling {
+				require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+			}
+			if tc.subscriptionStatus != "" {
+				require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
+					"plan_id": catalog.ID, "plan": catalog.ResponsePlan(), "plan_source": models.BillingPlanSourcePolar,
+					"polar_subscription_id": "sub_current", "polar_subscription_status": tc.subscriptionStatus,
+					"cancel_at_period_end": tc.scheduledCancellation, "current_period_end": time.Now().Add(time.Hour),
+				}).Error)
+			}
+			requests := 0
+			server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+				requests++
+				if req.URL.Path == "/checkouts/" {
+					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"url": "https://polar.sh/checkout/unexpected"}))
+					return
+				}
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_unexpected", "external_id": r.Organization.ID.String()}))
+			})
+			usePolarTestServer(t, server)
+			switch tc.configuration {
+			case "disabled":
+				t.Setenv(models.BillingEnabledEnv, "no")
+			case "missing token":
+				t.Setenv("POLAR_ACCESS_TOKEN", "")
+			case "missing product":
+				t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "")
+				require.NoError(t, db.Model(catalog).Update("polar_product_id", nil).Error)
+			}
+			before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+
+			response, err := CreateBusinessCheckout(t.Context(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+
+			require.Nil(t, response)
+			require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+			require.Equal(t, tc.wantMessage, grpcerrors.StatusMessage(err))
+			require.Zero(t, requests)
+			after, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.Equal(t, before, after)
 		})
 	}
 }

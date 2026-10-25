@@ -16,6 +16,7 @@ const installationSettingsResponse = {
   allow_private_network_access: false,
   signups_enabled: false,
   invitation_duration_days: 7,
+  past_due_grace_days: 0,
   signups_blocked_by_environment: false,
   effective_blocked_http_hosts: [],
   effective_private_ip_ranges: [],
@@ -191,4 +192,44 @@ it("saves invitation duration and restores it after reload", async () => {
   renderInstallationSettings();
   await user.click(await screen.findByRole("tab", { name: "Invitations" }));
   expect(screen.getByRole("spinbutton", { name: "Invitation duration (days)" })).toHaveValue(14);
+});
+
+it("saves the payment grace period and restores it after reload", async () => {
+  const user = userEvent.setup();
+  let settings = { ...installationSettingsResponse };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        settings = { ...settings, ...JSON.parse(String(init.body)) };
+      }
+      return Response.json(settings);
+    }),
+  );
+  const view = renderInstallationSettings();
+  await user.click(await screen.findByRole("tab", { name: "Invitations" }));
+  const grace = screen.getByRole("spinbutton", { name: "Payment grace period (days)" });
+  expect(grace).toHaveValue(0);
+  const save = screen.getByRole("button", { name: "Save payment settings" });
+  expect(save).toBeDisabled();
+  await user.clear(grace);
+  await user.type(grace, "22");
+  expect(save).toBeDisabled();
+  await user.clear(grace);
+  await user.type(grace, "7");
+  const duration = screen.getByRole("spinbutton", { name: "Invitation duration (days)" });
+  await user.clear(duration);
+  await user.type(duration, "14");
+  await user.click(save);
+  expect(await screen.findByRole("button", { name: "Save payment settings" })).toBeDisabled();
+  expect(settings.past_due_grace_days).toBe(7);
+  expect(duration).toHaveValue(14);
+  expect(settings.invitation_duration_days).toBe(7);
+  await user.click(screen.getByRole("button", { name: "Save invitation settings" }));
+  expect(await screen.findByRole("button", { name: "Save invitation settings" })).toBeDisabled();
+  expect(settings.invitation_duration_days).toBe(14);
+  view.unmount();
+  renderInstallationSettings();
+  await user.click(await screen.findByRole("tab", { name: "Invitations" }));
+  expect(screen.getByRole("spinbutton", { name: "Payment grace period (days)" })).toHaveValue(7);
 });

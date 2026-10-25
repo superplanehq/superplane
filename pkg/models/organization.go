@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -17,6 +18,67 @@ import (
 )
 
 const OrganizationSortRemainingCreditCents = "remaining_credit_cents"
+
+// Preserve the instruction used by both deletion APIs.
+//
+//revive:disable-next-line:error-strings
+var ErrOrganizationSubscriptionLive = errors.New("Cancel the subscription in Billing before you delete the organization. You can delete it after the paid period ends.")
+
+// ErrOrganizationSubscriptionUnverified stops a deletion when Polar did not
+// confirm that the subscription ended. The organization stays.
+//
+//revive:disable-next-line:error-strings
+var ErrOrganizationSubscriptionUnverified = errors.New("SuperPlane could not confirm with Polar that the subscription ended. Try again later.")
+
+// OrganizationDeletionClearance records the billing row that a deletion check
+// read before it took any lock. Organization.SoftDelete compares it with the
+// locked row, so a subscription change between the check and the delete stops
+// the delete.
+//
+// Only NewLocalDeletionClearance and NewVerifiedDeletionClearance make a
+// clearance. Call NewVerifiedDeletionClearance only after Polar confirmed that
+// the stored subscription ended.
+type OrganizationDeletionClearance struct {
+	organizationID   uuid.UUID
+	hasBillingPlan   bool
+	subscriptionID   string
+	polarModifiedAt  *time.Time
+	planUpdatedAt    time.Time
+	providerVerified bool
+}
+
+// NewLocalDeletionClearance clears a deletion from the stored row alone. It
+// refuses a row that may still bill: only Polar can prove that such a
+// subscription ended. A nil plan means that the organization has no billing
+// row.
+func NewLocalDeletionClearance(orgID uuid.UUID, plan *OrganizationBillingPlan) (*OrganizationDeletionClearance, error) {
+	if plan.MayBeBillable(time.Now()) {
+		return nil, ErrOrganizationSubscriptionLive
+	}
+	return newDeletionClearance(orgID, plan, false), nil
+}
+
+// NewVerifiedDeletionClearance clears a deletion after Polar confirmed that
+// the stored subscription of plan ended. It returns nil for a nil plan, and
+// SoftDelete refuses a nil clearance.
+func NewVerifiedDeletionClearance(plan *OrganizationBillingPlan) *OrganizationDeletionClearance {
+	if plan == nil {
+		return nil
+	}
+	return newDeletionClearance(plan.OrganizationID, plan, true)
+}
+
+func newDeletionClearance(orgID uuid.UUID, plan *OrganizationBillingPlan, providerVerified bool) *OrganizationDeletionClearance {
+	clearance := &OrganizationDeletionClearance{organizationID: orgID, providerVerified: providerVerified}
+	if plan == nil {
+		return clearance
+	}
+	clearance.hasBillingPlan = true
+	clearance.subscriptionID = storedPolarSubscriptionID(plan)
+	clearance.polarModifiedAt = plan.PolarModifiedAt
+	clearance.planUpdatedAt = plan.UpdatedAt
+	return clearance
+}
 
 type Organization struct {
 	ID uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
@@ -309,6 +371,23 @@ func FindOrganizationByIDInTransaction(tx *gorm.DB, id string) (*Organization, e
 	return &organization, nil
 }
 
+// FindOrganizationByIDIncludingDeleted finds an organization that can be soft-deleted.
+func FindOrganizationByIDIncludingDeleted(tx *gorm.DB, id string) (*Organization, error) {
+	organization := Organization{}
+
+	err := tx.
+		Unscoped().
+		Where("id = ?", id).
+		First(&organization).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &organization, nil
+}
+
 func LockOrganization(tx *gorm.DB, orgID uuid.UUID) (*Organization, error) {
 	return FindOrganizationByIDInTransaction(
 		tx.Clauses(clause.Locking{Strength: "UPDATE"}),
@@ -397,15 +476,51 @@ func ListOrganizationsCreatedByAccount(tx *gorm.DB, accountID uuid.UUID) ([]Orga
 	return organizations, err
 }
 
+// SoftDeleteOrganization deletes an organization whose stored billing row
+// cannot bill. It refuses an organization that needs Polar verification.
 func SoftDeleteOrganization(id string) error {
 	return SoftDeleteOrganizationInTransaction(database.Conn(), id)
 }
 
 func SoftDeleteOrganizationInTransaction(tx *gorm.DB, id string) error {
-	return tx.
-		Where("id = ?", id).
-		Delete(&Organization{}).
-		Error
+	return tx.Transaction(func(inner *gorm.DB) error {
+		organization, err := FindOrganizationByIDInTransaction(inner, id)
+		if err != nil {
+			return err
+		}
+		plan, err := FindOrganizationBillingPlan(inner, organization.ID)
+		if err != nil {
+			return err
+		}
+		clearance, err := NewLocalDeletionClearance(organization.ID, plan)
+		if err != nil {
+			return err
+		}
+		return organization.SoftDelete(inner, clearance)
+	})
+}
+
+// SoftDelete deletes under the same organization and billing row locks as
+// subscription updates. It also works within an account transaction.
+//
+// The clearance must come from a check that read the billing row before the
+// transaction took these locks. A Polar call must not hold the organization
+// lock. SoftDelete refuses a missing clearance, a row that may still bill
+// without Polar verification, and a row that changed after the check.
+func (o *Organization) SoftDelete(tx *gorm.DB, clearance *OrganizationDeletionClearance) error {
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if _, err := LockOrganization(inner, o.ID); err != nil {
+			return err
+		}
+		plan, err := lockOrganizationBillingPlan(inner, o.ID)
+		if err != nil {
+			return err
+		}
+		if err := clearance.permits(o.ID, plan, time.Now()); err != nil {
+			return err
+		}
+		return inner.Delete(o).Error
+	})
 }
 
 func HardDeleteOrganization(id string) error {
@@ -596,4 +711,44 @@ func excludeOrganizationIDs(query *gorm.DB, ids []uuid.UUID) *gorm.DB {
 	}
 
 	return query.Where("organizations.id NOT IN ?", ids)
+}
+
+// permits checks the locked billing row against the clearance. A row that may
+// still bill needs Polar verification, even when the row did not change. A
+// verified clearance stops being proof once the row changes.
+func (c *OrganizationDeletionClearance) permits(orgID uuid.UUID, locked *OrganizationBillingPlan, now time.Time) error {
+	if c == nil || c.organizationID != orgID {
+		return ErrOrganizationSubscriptionUnverified
+	}
+	if locked.MayBeBillable(now) && !c.providerVerified {
+		return ErrOrganizationSubscriptionLive
+	}
+	if !c.matches(locked) {
+		return ErrBillingPlanChanged
+	}
+	return nil
+}
+
+func (c *OrganizationDeletionClearance) matches(plan *OrganizationBillingPlan) bool {
+	if plan == nil {
+		return !c.hasBillingPlan
+	}
+	return c.hasBillingPlan &&
+		c.subscriptionID == storedPolarSubscriptionID(plan) &&
+		sameOptionalTime(c.polarModifiedAt, plan.PolarModifiedAt) &&
+		c.planUpdatedAt.Equal(plan.UpdatedAt)
+}
+
+func storedPolarSubscriptionID(plan *OrganizationBillingPlan) string {
+	if plan == nil || plan.PolarSubscriptionID == nil {
+		return ""
+	}
+	return strings.TrimSpace(*plan.PolarSubscriptionID)
+}
+
+func sameOptionalTime(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(*b)
 }

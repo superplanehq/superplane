@@ -24,11 +24,12 @@ import (
 )
 
 const (
-	runnerHelloTimeout = 15 * time.Second
-	runnerReadTimeout  = 60 * time.Second
-	runnerWriteTimeout = 10 * time.Second
-	runnerPingInterval = 20 * time.Second
-	runnerMessageLimit = 2 * 1024 * 1024
+	runnerHelloTimeout       = 15 * time.Second
+	runnerReadTimeout        = 60 * time.Second
+	runnerWriteTimeout       = 10 * time.Second
+	runnerPingInterval       = 20 * time.Second
+	runnerMessageLimit       = 2 * 1024 * 1024
+	runnerTaskCompletionWait = 5 * time.Second
 )
 
 var runnerUpgrader = websocket.Upgrader{
@@ -492,6 +493,7 @@ func (s *Server) completeRunnerTask(
 	}
 
 	var completedTask *models.RunnerTask
+	var completedNow bool
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		currentRunner, err := models.FindRunner(tx, runner.ID)
 		if err != nil {
@@ -505,7 +507,7 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		completedNow, err := task.Complete(
+		completedNow, err = task.Complete(
 			tx,
 			currentRunner,
 			hash,
@@ -518,16 +520,57 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		if completedNow {
-			completedTask = task
-		}
+		completedTask = task
 		*runner = *currentRunner
 		return nil
 	})
-	if err == nil && completedTask != nil {
+	if err != nil {
+		return err
+	}
+	if completedNow {
 		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask, fleetSlug, fleetScope)
 	}
-	return err
+	// The task result must be committed before its execution request reads it.
+	// Failures leave the scheduled request available as a fallback.
+	if s.nodeRequestExecutor == nil {
+		return nil
+	}
+	s.waitForTaskExecutionRequest(ctx, completedTask)
+	return nil
+}
+
+func (s *Server) waitForTaskExecutionRequest(ctx context.Context, task *models.RunnerTask) {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Task completion is durable. Request processing must survive the runner
+		// disconnecting after its acknowledgement, including during slow cleanup.
+		if err := s.runTaskExecutionRequest(context.WithoutCancel(ctx), task); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.WithError(err).WithField("task", task.ID).Error("Failed to process runner task completion request")
+		}
+	}()
+
+	timer := time.NewTimer(runnerTaskCompletionWait)
+	defer timer.Stop()
+	select {
+	case <-done:
+	case <-ctx.Done():
+	case <-timer.C:
+		log.WithField("task", task.ID).Warn("Runner task completion request continues in the background")
+	}
+}
+
+func (s *Server) runTaskExecutionRequest(ctx context.Context, task *models.RunnerTask) error {
+	db := database.DB(ctx)
+	execution, err := task.FindExecution(db)
+	if err != nil {
+		return fmt.Errorf("find task execution: %w", err)
+	}
+	request, err := execution.FindPendingRequest(db)
+	if err != nil {
+		return fmt.Errorf("find pending execution request: %w", err)
+	}
+	return s.nodeRequestExecutor.RunNow(*request)
 }
 
 func completionHash(complete completeMessage) (string, error) {

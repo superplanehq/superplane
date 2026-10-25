@@ -71,7 +71,7 @@ func TestParseMergeConfidenceTokenRejectsPlanningPurpose(t *testing.T) {
 }
 
 func TestAttachMergeConfidenceEnvLeavesOtherRunsAlone(t *testing.T) {
-	environment := []runner.BrokerEnvironmentVariable{{Name: "REPO", Value: "acme/app"}}
+	environment := []runner.TaskEnvironmentVariable{{Name: "REPO", Value: "acme/app"}}
 	got, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{}, environment, nil, 60)
 	require.NoError(t, err)
 	assert.Equal(t, environment, got)
@@ -87,7 +87,7 @@ func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
 	runID := uuid.New()
 	executionID := uuid.New()
 	t.Setenv("JWT_SECRET", "merge-secret")
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("RUNNER_API_BASE_URL", "https://app.example")
 	t.Setenv("WEBHOOKS_BASE_URL", "https://app.example")
 	t.Setenv("BASE_URL", "https://app.example")
 
@@ -97,7 +97,7 @@ func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
 		RunID:          runID,
 		WorkflowID:     canvas.ID.String(),
 		OrganizationID: r.Organization.ID.String(),
-	}, []runner.BrokerEnvironmentVariable{
+	}, []runner.TaskEnvironmentVariable{
 		{Name: "REPO", Value: "acme/app"},
 		{Name: runner.EnvSuperplaneMergeConfidenceOrderID, Value: orderID.String()},
 	}, []runner.AgentStep{{
@@ -122,7 +122,7 @@ func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "https://app.example", baseURL)
 
-	withFile := runner.AppendMergeConfidenceMCP(environment, []runner.BrokerTaskFile{{Path: "run.js"}})
+	withFile := runner.AppendMergeConfidenceMCP(environment, []runner.TaskFile{{Path: "run.js"}})
 	require.Len(t, withFile, 2)
 	assert.Equal(t, "merge_confidence_mcp.js", withFile[1].Path)
 }
@@ -131,7 +131,7 @@ func TestAttachMergeConfidenceEnvRequiresFactoryCanvas(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 	t.Setenv("JWT_SECRET", "merge-secret")
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("RUNNER_API_BASE_URL", "https://app.example")
 	t.Setenv("WEBHOOKS_BASE_URL", "https://app.example")
 
 	_, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{
@@ -139,14 +139,14 @@ func TestAttachMergeConfidenceEnvRequiresFactoryCanvas(t *testing.T) {
 		RunID:          uuid.New(),
 		WorkflowID:     canvas.ID.String(),
 		OrganizationID: r.Organization.ID.String(),
-	}, []runner.BrokerEnvironmentVariable{
+	}, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplaneMergeConfidenceOrderID, Value: uuid.NewString()},
 	}, nil, 60)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "factory canvas")
 }
 
-func environmentLookup(environment []runner.BrokerEnvironmentVariable, name string) (string, bool) {
+func environmentLookup(environment []runner.TaskEnvironmentVariable, name string) (string, bool) {
 	for _, item := range environment {
 		if item.Name == name {
 			return item.Value, true
@@ -155,7 +155,7 @@ func environmentLookup(environment []runner.BrokerEnvironmentVariable, name stri
 	return "", false
 }
 
-func environmentHas(environment []runner.BrokerEnvironmentVariable, name string) bool {
+func environmentHas(environment []runner.TaskEnvironmentVariable, name string) bool {
 	_, ok := environmentLookup(environment, name)
 	return ok
 }
