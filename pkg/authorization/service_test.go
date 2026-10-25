@@ -3,11 +3,13 @@ package authorization_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -198,12 +200,9 @@ func Test__AuthService_RemoveRoleInTransaction(t *testing.T) {
 		t.Helper()
 		roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), userID, orgID)
 		require.NoError(t, err)
-		for _, role := range roles {
-			if role.Name == models.RoleOrgAdmin {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(roles, func(role *authorization.RoleDefinition) bool {
+			return role.Name == models.RoleOrgAdmin
+		})
 	}
 
 	t.Run("rolled back transaction keeps the role", func(t *testing.T) {
