@@ -1331,24 +1331,36 @@ func Test__applyIntakeSettingsToGraph_Datadog(t *testing.T) {
 }
 
 func TestIntakeDefaultOwnerGraphUpdates(t *testing.T) {
-	source := models.FactoryIntakeSourceGitHubIssues
 	owner := "3ea1cf96-c943-4891-8e90-172519547bee"
-	nodes := []models.Node{{ID: "custom-create", Configuration: map[string]any{"title": "keep", "defaultOwnerId": owner}}}
-	graph := intakeGraph{CreateNodeID: "custom-create"}
-	spec := models.LiveCanvasSpec{Nodes: nodes}
-	current := intakeSettingsFromGraph(source, graph, spec)
-	assert.Equal(t, owner, current.DefaultOwnerID, "read owner even without a filter")
-	assert.Equal(t, owner, parseIntakeSettings(current, &pb.FactoryIntake_Settings{}).DefaultOwnerID)
-	for _, selected := range []string{"", "b3b7685e-ee96-44cf-a506-65683ef80eb3"} {
-		updated, edges, err := applyIntakeSettingsToGraph(source, graph, spec, &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(selected)}, append([]models.Node{}, nodes...), nil)
-		require.NoError(t, err)
-		assert.Empty(t, edges)
-		assert.Equal(t, "keep", updated[0].Configuration["title"])
-		actual := intakeSettingsFromGraph(source, graph, models.LiveCanvasSpec{Nodes: updated})
-		assert.Equal(t, selected, serializeIntakeSettings(source, actual).GetDefaultOwnerId())
+	for _, source := range []string{models.FactoryIntakeSourceGitHubIssues, models.FactoryIntakeSourceSentryExceptions} {
+		t.Run(source, func(t *testing.T) {
+			nodes := []models.Node{{ID: "custom-create", Configuration: map[string]any{"title": "keep", "defaultOwnerId": owner}}}
+			graph := intakeGraph{CreateNodeID: "custom-create"}
+			spec := models.LiveCanvasSpec{Nodes: nodes}
+			current := intakeSettingsFromGraph(source, graph, spec)
+			assert.Equal(t, owner, current.DefaultOwnerID, "read owner even without a filter")
+			assert.Equal(t, owner, parseIntakeSettings(current, &pb.FactoryIntake_Settings{}).DefaultOwnerID)
+			for _, selected := range []string{"", "b3b7685e-ee96-44cf-a506-65683ef80eb3"} {
+				updated, edges, err := applyIntakeSettingsToGraph(source, graph, spec, &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(selected)}, append([]models.Node{}, nodes...), nil)
+				require.NoError(t, err)
+				assert.Empty(t, edges)
+				assert.Equal(t, "keep", updated[0].Configuration["title"])
+				actual := intakeSettingsFromGraph(source, graph, models.LiveCanvasSpec{Nodes: updated})
+				assert.Equal(t, selected, serializeIntakeSettings(source, actual).GetDefaultOwnerId())
+			}
+			assert.Equal(t, owner, nodes[0].Configuration["defaultOwnerId"], "do not mutate the published version")
+			_, _, err := applyIntakeSettingsToGraph(source, intakeGraph{}, models.LiveCanvasSpec{}, &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(owner)}, nil, nil)
+			require.ErrorContains(t, err, "no task creation node")
+			assert.Empty(t, intakeSettingsFromGraph(source, graph, models.LiveCanvasSpec{}).DefaultOwnerID)
+		})
 	}
-	assert.Equal(t, owner, nodes[0].Configuration["defaultOwnerId"], "do not mutate the published version")
-	_, _, err := applyIntakeSettingsToGraph(source, intakeGraph{}, models.LiveCanvasSpec{}, &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(owner)}, nil, nil)
-	require.ErrorContains(t, err, "no task creation node")
-	assert.Empty(t, intakeSettingsFromGraph(source, graph, models.LiveCanvasSpec{}).DefaultOwnerID)
+
+	t.Run("unsupported sources reject the field and do not read it", func(t *testing.T) {
+		source := models.FactoryIntakeSourceJiraIssues
+		nodes := []models.Node{{ID: "custom-create", Configuration: map[string]any{"defaultOwnerId": owner}}}
+		graph := intakeGraph{CreateNodeID: "custom-create"}
+		assert.Empty(t, intakeSettingsFromGraph(source, graph, models.LiveCanvasSpec{Nodes: nodes}).DefaultOwnerID)
+		_, _, err := applyIntakeSettingsToGraph(source, graph, models.LiveCanvasSpec{Nodes: nodes}, &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}, append([]models.Node{}, nodes...), nil)
+		require.ErrorContains(t, err, "not supported for this intake")
+	})
 }
