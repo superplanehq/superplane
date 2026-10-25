@@ -330,21 +330,7 @@ func TestCompleteRunnerTaskRetriesPendingRequest(t *testing.T) {
 			resource := support.Setup(t)
 			defer resource.Close()
 			db := database.DB(t.Context())
-			runner, _, fleet := createRegistrationFixture(t)
-			connectionID := uuid.New()
-			require.NoError(t, db.Model(runner).Updates(map[string]any{
-				"state": models.RunnerStateIdle, "current_connection_id": connectionID,
-			}).Error)
-			task := &models.RunnerTask{
-				ID: uuid.New(), OrganizationID: resource.Organization.ID, FleetID: fleet.ID,
-				Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued,
-				QueuedAt: time.Now(), PayloadCiphertext: []byte(`{}`),
-			}
-			require.NoError(t, db.Create(task).Error)
-			require.NoError(t, task.Reserve(db, runner.ID))
-			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-				return task.Start(tx, runner, runnerlogs.StoreFS, time.Now())
-			}))
+			runner, task, fleet, connectionID := createRunningRunnerTask(t, resource)
 			execution, request := createRunnerTaskPoll(t, resource, task)
 			// Completion must use the component's pending request without depending
 			// on its action name or parameter schema.
@@ -410,6 +396,88 @@ func TestCompleteRunnerTaskRetriesPendingRequest(t *testing.T) {
 			assert.Equal(t, "passed", events[0].Channel)
 		})
 	}
+}
+
+func TestCompleteRunnerTaskDoesNotWaitForSlowExecutionRequest(t *testing.T) {
+	resource := support.Setup(t)
+	defer resource.Close()
+	db := database.DB(t.Context())
+	runner, task, fleet, connectionID := createRunningRunnerTask(t, resource)
+	execution, request := createRunnerTaskPoll(t, resource, task)
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	componentName := "slowTaskCompletionTest"
+	resource.Registry.Actions[componentName] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  componentName,
+		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			if err := ctx.ExecutionState.Emit("passed", "task.finished", []any{map[string]any{"value": "ok"}}); err != nil {
+				return err
+			}
+			close(started)
+			<-release
+			return nil
+		},
+	})
+	node, err := models.FindCanvasNode(db, execution.WorkflowID, execution.NodeID)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(node).Update("ref", datatypes.NewJSONType(models.NodeRef{
+		Component: &models.ComponentRef{Name: componentName},
+	})).Error)
+	executor := workers.NewNodeRequestExecutor(resource.Encryptor, resource.Registry, "", resource.AuthService)
+	server, err := NewServer(jwt.NewSigner("secret"), resource.Encryptor, runnerlogs.StoreFS, executor)
+	require.NoError(t, err)
+	completion := completeMessage{RequestID: uuid.NewString(), TaskID: task.ID.String(), Result: json.RawMessage(`{"value":"ok"}`)}
+	completed := make(chan error, 1)
+	defer func() {
+		close(release)
+		require.Eventually(t, func() bool {
+			updated, err := models.FindCanvasNodeRequest(db, request.ID)
+			return err == nil && updated.State == models.NodeExecutionRequestStateCompleted
+		}, 5*time.Second, 10*time.Millisecond, "the slow request must finish after the runner is released")
+	}()
+	go func() {
+		completed <- server.completeRunnerTask(t.Context(), runner, connectionID, completion, fleet.Slug, fleet.ScopeType)
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the execution hook did not start")
+	}
+	select {
+	case err := <-completed:
+		require.NoError(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("slow cleanup must not block the runner completion reply")
+	}
+	reloadedTask, err := models.FindRunnerTask(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStateSucceeded, reloadedTask.State)
+	pending, err := models.FindCanvasNodeRequest(db, request.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStatePending, pending.State, "slow cleanup must still hold the request until its transaction commits")
+}
+
+func createRunningRunnerTask(t *testing.T, resource *support.ResourceRegistry) (*models.Runner, *models.RunnerTask, *models.RunnerFleet, uuid.UUID) {
+	t.Helper()
+	db := database.DB(t.Context())
+	runner, _, fleet := createRegistrationFixture(t)
+	connectionID := uuid.New()
+	require.NoError(t, db.Model(runner).Updates(map[string]any{
+		"state": models.RunnerStateIdle, "current_connection_id": connectionID,
+	}).Error)
+	task := &models.RunnerTask{
+		ID: uuid.New(), OrganizationID: resource.Organization.ID, FleetID: fleet.ID,
+		Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued,
+		QueuedAt: time.Now(), PayloadCiphertext: []byte(`{}`),
+	}
+	require.NoError(t, db.Create(task).Error)
+	require.NoError(t, task.Reserve(db, runner.ID))
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return task.Start(tx, runner, runnerlogs.StoreFS, time.Now())
+	}))
+	return runner, task, fleet, connectionID
 }
 
 func createRunnerTaskPoll(t *testing.T, resource *support.ResourceRegistry, task *models.RunnerTask) (*models.CanvasNodeExecution, *models.CanvasNodeRequest) {

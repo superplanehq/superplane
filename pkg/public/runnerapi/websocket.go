@@ -24,11 +24,12 @@ import (
 )
 
 const (
-	runnerHelloTimeout = 15 * time.Second
-	runnerReadTimeout  = 60 * time.Second
-	runnerWriteTimeout = 10 * time.Second
-	runnerPingInterval = 20 * time.Second
-	runnerMessageLimit = 2 * 1024 * 1024
+	runnerHelloTimeout       = 15 * time.Second
+	runnerReadTimeout        = 60 * time.Second
+	runnerWriteTimeout       = 10 * time.Second
+	runnerPingInterval       = 20 * time.Second
+	runnerMessageLimit       = 2 * 1024 * 1024
+	runnerTaskCompletionWait = 5 * time.Second
 )
 
 var runnerUpgrader = websocket.Upgrader{
@@ -534,10 +535,29 @@ func (s *Server) completeRunnerTask(
 	if s.nodeRequestExecutor == nil {
 		return nil
 	}
-	if err := s.runTaskExecutionRequest(ctx, completedTask); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.WithError(err).WithField("task", taskID).Error("Failed to process runner task completion request")
-	}
+	s.waitForTaskExecutionRequest(ctx, completedTask)
 	return nil
+}
+
+func (s *Server) waitForTaskExecutionRequest(ctx context.Context, task *models.RunnerTask) {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Task completion is durable. Request processing must survive the runner
+		// disconnecting after its acknowledgement, including during slow cleanup.
+		if err := s.runTaskExecutionRequest(context.WithoutCancel(ctx), task); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.WithError(err).WithField("task", task.ID).Error("Failed to process runner task completion request")
+		}
+	}()
+
+	timer := time.NewTimer(runnerTaskCompletionWait)
+	defer timer.Stop()
+	select {
+	case <-done:
+	case <-ctx.Done():
+	case <-timer.C:
+		log.WithField("task", task.ID).Warn("Runner task completion request continues in the background")
+	}
 }
 
 func (s *Server) runTaskExecutionRequest(ctx context.Context, task *models.RunnerTask) error {
