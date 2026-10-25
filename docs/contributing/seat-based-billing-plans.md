@@ -140,6 +140,29 @@ an example. Use your catalog price for the actual estimates.
 Team checkout sends `allow_discount_codes: false`. Legacy Business checkout omits
 this field.
 
+Each organization has at most one pending subscription checkout. The table
+`organization_billing_checkouts` stores its plan, seat count, and Polar status.
+A repeated request returns the pending checkout when the plan and seats match.
+It fails when they differ. Polar is the only source of an end state:
+
+- Polar reports `expired` or `failed`: the request records the state and
+  creates a new checkout.
+- Polar reports `succeeded`: the request records the state. It reads the
+  subscription from Polar before it creates another checkout.
+- A subscription that becomes live for the plan product resolves the pending
+  checkout.
+- Polar reports `open` or `confirmed`: the checkout stays pending. A past local
+  expiry and a closed browser do not cancel it. `confirmed` does not show that
+  the payment succeeded.
+- The create call times out or fails with a 5xx error: the checkout is
+  `ambiguous`. The next request finds it through the
+  `superplane_checkout_intent_id` metadata. When no checkout appears within 10
+  minutes, the request releases the intent.
+
+On the first request of an organization without intents, SuperPlane adopts a
+payable Polar checkout that was opened before this table existed. The migration
+creates no rows.
+
 Checkout creation does not activate a plan or grant capacity. Only subscription
 activation stores the purchased quantity. The monthly total describes purchased
 capacity. Membership-based renewal estimates belong to

@@ -132,9 +132,16 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		if err := ensureOrganizationBillingCustomer(ctx, organizationID, accountID); err != nil {
 			return nil, err
 		}
-		session, err := polar.NewClientFromEnv().CreateCheckout(ctx, polar.CheckoutInput{ProductID: *catalog.PolarProductID, ExternalCustomerID: organizationID.String(), SuccessURL: successURL, CustomerIP: clientIPFromContext(ctx), Seats: seats})
+		session, err := startSubscriptionCheckout(ctx, subscriptionCheckoutRequest{
+			OrganizationID: organizationID,
+			PlanKey:        catalog.Key,
+			ProductID:      *catalog.PolarProductID,
+			Seats:          seats,
+			SuccessURL:     successURL,
+			CustomerIP:     clientIPFromContext(ctx),
+		})
 		if err != nil {
-			return nil, polarBillingError(err, "Could not start subscription checkout.")
+			return nil, err
 		}
 		return &pb.CreateBusinessCheckoutResponse{CheckoutUrl: session.URL}, nil
 	}

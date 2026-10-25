@@ -1270,6 +1270,31 @@ CREATE TABLE public.mcp_oauth_refresh_tokens (
 
 
 --
+-- Name: organization_billing_checkouts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_billing_checkouts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    plan_key text NOT NULL,
+    polar_product_id text NOT NULL,
+    seats integer,
+    state text NOT NULL,
+    polar_checkout_id text,
+    checkout_url text,
+    polar_status text,
+    expires_at timestamp with time zone,
+    last_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    resolved_at timestamp with time zone,
+    CONSTRAINT organization_billing_checkouts_resolved_at CHECK (((state = ANY (ARRAY['creating'::text, 'ambiguous'::text, 'open'::text])) = (resolved_at IS NULL))),
+    CONSTRAINT organization_billing_checkouts_seats_check CHECK ((seats >= 1)),
+    CONSTRAINT organization_billing_checkouts_state CHECK ((state = ANY (ARRAY['creating'::text, 'ambiguous'::text, 'open'::text, 'succeeded'::text, 'expired'::text, 'failed'::text, 'released'::text])))
+);
+
+
+--
 -- Name: organization_billing_plans; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2890,6 +2915,14 @@ ALTER TABLE ONLY public.mcp_oauth_refresh_tokens
 
 
 --
+-- Name: organization_billing_checkouts organization_billing_checkouts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_checkouts
+    ADD CONSTRAINT organization_billing_checkouts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_billing_plans organization_billing_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4195,6 +4228,13 @@ CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm
 
 
 --
+-- Name: idx_organization_billing_checkouts_organization_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_billing_checkouts_organization_created ON public.organization_billing_checkouts USING btree (organization_id, created_at);
+
+
+--
 -- Name: idx_organization_seat_purchases_organization_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4759,6 +4799,20 @@ CREATE UNIQUE INDEX unique_api_key_in_organization ON public.users USING btree (
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
+
+
+--
+-- Name: uq_organization_billing_checkouts_polar_checkout; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_billing_checkouts_polar_checkout ON public.organization_billing_checkouts USING btree (polar_checkout_id) WHERE (polar_checkout_id IS NOT NULL);
+
+
+--
+-- Name: uq_organization_billing_checkouts_unresolved; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_billing_checkouts_unresolved ON public.organization_billing_checkouts USING btree (organization_id) WHERE (state = ANY (ARRAY['creating'::text, 'ambiguous'::text, 'open'::text]));
 
 
 --
@@ -5619,6 +5673,14 @@ ALTER TABLE ONLY public.installation_licenses
 
 
 --
+-- Name: organization_billing_checkouts organization_billing_checkouts_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_checkouts
+    ADD CONSTRAINT organization_billing_checkouts_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_billing_plans organization_billing_plans_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6234,7 +6296,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261025115500	f
+20261025134112	f
 \.
 
 
