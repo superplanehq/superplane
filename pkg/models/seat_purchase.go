@@ -1,10 +1,14 @@
 package models
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -27,9 +31,17 @@ const (
 	SeatPurchaseErrorRenewalBoundary       = "renewal_boundary"
 )
 
+// seatPurchaseOperationKeyIndex is the unique index on the caller operation
+// key of an organization.
+const seatPurchaseOperationKeyIndex = "uq_organization_seat_purchases_operation_key"
+
 // SeatPurchase records one attempt to buy seats on a Polar subscription.
 // Capacity never changes from this row. It changes only from a Polar snapshot.
 // At most one purchase per organization is in flight (pending or unknown).
+//
+// A purchase that a caller started has an operation key, the fingerprint of
+// the request, and the billing period it was made for. Purchases recorded
+// before operation keys existed have none of them.
 type SeatPurchase struct {
 	ID                  uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
 	OrganizationID      uuid.UUID
@@ -39,12 +51,28 @@ type SeatPurchase struct {
 	ToSeats             int
 	Status              string
 	ErrorCode           string
+	OperationKey        *string
+	RequestFingerprint  *string
+	PeriodStart         *time.Time
+	PeriodEnd           *time.Time
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
 
-func NewSeatPurchase(orgID uuid.UUID, userID *uuid.UUID, subscriptionID string, fromSeats, toSeats int) *SeatPurchase {
-	return &SeatPurchase{
+// SeatPurchaseOperation is the caller request that starts a purchase and the
+// billing period that the purchase is made for.
+type SeatPurchaseOperation struct {
+	Key         string
+	Fingerprint string
+	PeriodStart time.Time
+	PeriodEnd   time.Time
+}
+
+// NewSeatPurchase builds a pending purchase. A nil operation builds a
+// purchase without an operation key or a period, like the rows recorded
+// before operation keys existed.
+func NewSeatPurchase(orgID uuid.UUID, userID *uuid.UUID, subscriptionID string, fromSeats, toSeats int, operation *SeatPurchaseOperation) *SeatPurchase {
+	purchase := &SeatPurchase{
 		OrganizationID:      orgID,
 		UserID:              userID,
 		PolarSubscriptionID: subscriptionID,
@@ -52,6 +80,24 @@ func NewSeatPurchase(orgID uuid.UUID, userID *uuid.UUID, subscriptionID string, 
 		ToSeats:             toSeats,
 		Status:              SeatPurchaseStatusPending,
 	}
+	if operation != nil {
+		key, fingerprint := operation.Key, operation.Fingerprint
+		start, end := operation.PeriodStart.UTC(), operation.PeriodEnd.UTC()
+		purchase.OperationKey = &key
+		purchase.RequestFingerprint = &fingerprint
+		purchase.PeriodStart = &start
+		purchase.PeriodEnd = &end
+	}
+	return purchase
+}
+
+// SeatPurchaseFingerprint identifies the charge that a purchase request asks
+// for. Two requests with the same fingerprint buy the same seats from the
+// same seat count. The user is not part of the charge, so it is not included.
+func SeatPurchaseFingerprint(additionalSeats, expectedPurchasedSeats int) string {
+	canonical := fmt.Sprintf("seat_purchase/v1;additional_seats=%d;expected_purchased_seats=%d", additionalSeats, expectedPurchasedSeats)
+	sum := sha256.Sum256([]byte(canonical))
+	return hex.EncodeToString(sum[:])
 }
 
 func (SeatPurchase) TableName() string {
@@ -63,15 +109,41 @@ func (p *SeatPurchase) InFlight() bool {
 	return p.Status == SeatPurchaseStatusPending || p.Status == SeatPurchaseStatusUnknown
 }
 
+// MatchesRequest reports that the purchase was started by a request with
+// this fingerprint.
+func (p *SeatPurchase) MatchesRequest(fingerprint string) bool {
+	return p.RequestFingerprint != nil && *p.RequestFingerprint == fingerprint
+}
+
+// StartedInPeriod reports that a Polar snapshot with this period start
+// describes the billing period in which the purchase started. Only such a
+// snapshot is evidence for the purchase: after a renewal, Polar can report
+// the original seat count again, and that count proves nothing about the
+// purchase.
+//
+// A purchase without a stored period predates operation keys. Its snapshot
+// is in the purchase period only when that period started before the
+// purchase was recorded.
+func (p *SeatPurchase) StartedInPeriod(periodStart *time.Time) bool {
+	if periodStart == nil {
+		return false
+	}
+	if p.PeriodStart != nil {
+		return p.PeriodStart.Equal(*periodStart)
+	}
+	return !periodStart.After(p.CreatedAt)
+}
+
 // SettlementFor returns the final status that a Polar snapshot proves for an
 // in-flight purchase. It reports false when the snapshot proves nothing.
 //
+//   - A snapshot from another billing period proves nothing.
 //   - Seats at or above the target prove the purchase succeeded.
 //   - The original seats with a modification time after the purchase prove
 //     that Polar did not apply an unknown purchase. A pending purchase can
 //     still be on its way to Polar, so only its own result can fail it.
-func (p *SeatPurchase) SettlementFor(seats *int, modifiedAt *time.Time) (string, bool) {
-	if !p.InFlight() || seats == nil {
+func (p *SeatPurchase) SettlementFor(periodStart *time.Time, seats *int, modifiedAt *time.Time) (string, bool) {
+	if !p.InFlight() || seats == nil || !p.StartedInPeriod(periodStart) {
 		return "", false
 	}
 	if *seats >= p.ToSeats {
@@ -107,6 +179,27 @@ func (p *SeatPurchase) UpdateStatus(tx *gorm.DB, status, errorCode string) error
 	return nil
 }
 
+// IsSeatPurchaseOperationKeyConflict reports that a purchase with the same
+// operation key already exists for the organization.
+func IsSeatPurchaseOperationKeyConflict(err error) bool {
+	var conflict *pgconn.PgError
+	return errors.As(err, &conflict) && conflict.Code == pgUniqueViolation && conflict.ConstraintName == seatPurchaseOperationKeyIndex
+}
+
+// FindSeatPurchaseByOperationKey returns the purchase that an organization
+// started with an operation key, or nil when none exists.
+func FindSeatPurchaseByOperationKey(tx *gorm.DB, orgID uuid.UUID, key string) (*SeatPurchase, error) {
+	var purchase SeatPurchase
+	err := tx.Where("organization_id = ? AND operation_key = ?", orgID, key).First(&purchase).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &purchase, nil
+}
+
 // FindInFlightSeatPurchase returns the pending or unknown purchase of an
 // organization, or nil when none exists.
 func FindInFlightSeatPurchase(tx *gorm.DB, orgID uuid.UUID) (*SeatPurchase, error) {
@@ -136,13 +229,14 @@ func FindLatestSeatPurchase(tx *gorm.DB, orgID uuid.UUID) (*SeatPurchase, error)
 }
 
 // SettleSeatPurchase settles the in-flight purchase of a subscription when the
-// Polar snapshot proves its outcome. The caller holds the organization lock.
-func SettleSeatPurchase(tx *gorm.DB, orgID uuid.UUID, subscriptionID string, seats *int, modifiedAt *time.Time) error {
+// Polar snapshot proves its outcome. Only a snapshot from the period in which
+// the purchase started can prove it. The caller holds the organization lock.
+func SettleSeatPurchase(tx *gorm.DB, orgID uuid.UUID, subscriptionID string, periodStart *time.Time, seats *int, modifiedAt *time.Time) error {
 	purchase, err := FindInFlightSeatPurchase(tx, orgID)
 	if err != nil || purchase == nil || purchase.PolarSubscriptionID != subscriptionID {
 		return err
 	}
-	status, settled := purchase.SettlementFor(seats, modifiedAt)
+	status, settled := purchase.SettlementFor(periodStart, seats, modifiedAt)
 	if !settled {
 		return nil
 	}
@@ -154,15 +248,21 @@ func SettleSeatPurchase(tx *gorm.DB, orgID uuid.UUID, subscriptionID string, sea
 }
 
 // FindExpectedSeatCount returns the seat count that SuperPlane itself asked
-// Polar to set on a subscription: the target of the latest pending, unknown,
-// or succeeded purchase. It returns nil when no purchase expects a count.
+// Polar to set on a subscription in the billing period that starts at
+// periodStart: the target of the latest pending, unknown, or succeeded
+// purchase of that period. It returns nil when no purchase expects a count.
 // A snapshot with this seat count is not an outside change.
-func FindExpectedSeatCount(tx *gorm.DB, orgID uuid.UUID, subscriptionID string) (*int, error) {
+//
+// A purchase from an earlier period expects nothing: a renewal can reduce
+// the seats back to the count before that purchase.
+func FindExpectedSeatCount(tx *gorm.DB, orgID uuid.UUID, subscriptionID string, periodStart time.Time) (*int, error) {
 	var purchase SeatPurchase
 	err := tx.Where(
 		"organization_id = ? AND polar_subscription_id = ? AND status IN ?",
 		orgID, subscriptionID,
 		[]string{SeatPurchaseStatusPending, SeatPurchaseStatusUnknown, SeatPurchaseStatusSucceeded},
+	).Where(
+		"period_start = ? OR (period_start IS NULL AND created_at >= ?)", periodStart, periodStart,
 	).Order("created_at DESC, id DESC").First(&purchase).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil

@@ -81,7 +81,11 @@ async function submitPurchase(organizationId: string, preview: CompletedSeatPurc
     ...withOrganizationHeader({
       organizationId,
       path: { id: organizationId },
-      body: { additionalSeats: preview.additionalSeats, expectedPurchasedSeats: preview.estimate.purchasedSeats },
+      body: {
+        additionalSeats: preview.additionalSeats,
+        expectedPurchasedSeats: preview.estimate.purchasedSeats,
+        operationKey: preview.operationKey,
+      },
     }),
     throwOnError: false,
   });

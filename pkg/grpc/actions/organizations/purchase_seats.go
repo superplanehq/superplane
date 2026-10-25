@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -26,7 +27,20 @@ const (
 	messageSeatPurchaseNeedsResume       = "Resume the subscription before buying seats."
 	messageSeatPurchaseInFlight          = "A seat purchase is already in progress."
 	messageSeatCountChanged              = "Seat count changed. Refresh and try again."
+	messageSeatPurchaseKeyMissing        = "Add an operation key to the seat purchase request."
+	messageSeatPurchaseKeyInvalid        = "The operation key must have 1 to 128 printable ASCII characters and no spaces."
+	messageSeatPurchaseKeyReused         = "This operation key was used for another seat purchase. Refresh and try again."
 )
+
+// maxSeatPurchaseOperationKeyLength limits the caller operation key.
+const maxSeatPurchaseOperationKeyLength = 128
+
+// seatPurchaseOperation identifies one purchase request of an organization.
+// A repeat with the same key and fingerprint is the same purchase.
+type seatPurchaseOperation struct {
+	key         string
+	fingerprint string
+}
 
 // seatPurchaseState is the verified subscription state that a seat purchase
 // or preview works from.
@@ -93,11 +107,25 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 	if err != nil {
 		return nil, err
 	}
+	operation, err := newSeatPurchaseOperation(req)
+	if err != nil {
+		return nil, err
+	}
 	db := database.DB(ctx)
 
-	// Settle an unfinished purchase before the local checks. When Polar
-	// applied it and renewed the subscription, reconciliation loads the new
-	// period, so a retry after a renewal works from the refreshed plan.
+	// A repeat of a known operation returns the stored purchase in any
+	// billing period. It never reaches Polar, so it cannot charge again,
+	// also after a renewal restored the original seat count.
+	stored, err := findSeatPurchaseOperation(db, organizationID, operation)
+	if err != nil {
+		return nil, err
+	}
+	if stored != nil {
+		return seatPurchaseResponse(ctx, organizationID, stored), nil
+	}
+
+	// Settle an unfinished purchase before the local checks. Only a snapshot
+	// from the period of that purchase can settle it.
 	reconcileSeatPurchase(ctx, db, organizationID)
 
 	// The purchase sends an absolute seat count, so it must start from the
@@ -114,16 +142,22 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 
 	// The refresh can apply a renewal. Such a purchase was previewed for
 	// another period, and its absolute seat count can be wrong.
-	purchase, locked, err := beginSeatPurchase(ctx, organizationID, req, userID, state, clock)
+	started, err := beginSeatPurchase(ctx, organizationID, req, operation, userID, state, clock)
 	if err != nil {
 		return nil, err
 	}
+	if started.replayed {
+		// A concurrent request with the same operation recorded the purchase
+		// first. That request owns the Polar call.
+		return seatPurchaseResponse(ctx, organizationID, started.purchase), nil
+	}
+	purchase := started.purchase
 
 	// Last check before the charge. Time passed since the locked check.
 	// A purchase that cannot start safely never reaches Polar. Nothing was
 	// sent, so the recorded attempt ends as failed and does not block the
 	// next purchase.
-	if err := checkSeatPurchaseBoundary(locked.periodEnd, clock()); err != nil {
+	if err := checkSeatPurchaseBoundary(started.state.periodEnd, clock()); err != nil {
 		settleCtx := context.WithoutCancel(ctx)
 		if recordErr := recordSeatPurchaseStatus(settleCtx, purchase, models.SeatPurchaseStatusFailed, models.SeatPurchaseErrorRenewalBoundary); recordErr != nil {
 			return nil, recordErr
@@ -152,6 +186,55 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 		return seatPurchaseResponse(ctx, organizationID, purchase), nil
 	}
 	return nil, seatPurchaseError(purchase, updateErr)
+}
+
+// newSeatPurchaseOperation validates the operation key of a purchase request
+// and computes the fingerprint of the charge that the request asks for.
+//
+// The key is required. A request without a key could not be replayed safely,
+// so no purchase path charges without one. A client from before operation
+// keys gets InvalidArgument and no charge until it sends a key.
+func newSeatPurchaseOperation(req *pb.PurchaseSeatsRequest) (seatPurchaseOperation, error) {
+	key := req.GetOperationKey()
+	if key == "" {
+		return seatPurchaseOperation{}, grpcerrors.InvalidArgument(nil, messageSeatPurchaseKeyMissing)
+	}
+	if !validSeatPurchaseOperationKey(key) {
+		return seatPurchaseOperation{}, grpcerrors.InvalidArgument(nil, messageSeatPurchaseKeyInvalid)
+	}
+	return seatPurchaseOperation{
+		key:         key,
+		fingerprint: models.SeatPurchaseFingerprint(int(req.GetAdditionalSeats()), int(req.GetExpectedPurchasedSeats())),
+	}, nil
+}
+
+func validSeatPurchaseOperationKey(key string) bool {
+	if len(key) > maxSeatPurchaseOperationKeyLength {
+		return false
+	}
+	for i := 0; i < len(key); i++ {
+		if key[i] < '!' || key[i] > '~' {
+			return false
+		}
+	}
+	return true
+}
+
+// findSeatPurchaseOperation returns the purchase that the operation already
+// started, or nil when the key is new. A key that started another request
+// is rejected, so it cannot buy seats that the caller did not ask for.
+func findSeatPurchaseOperation(tx *gorm.DB, orgID uuid.UUID, operation seatPurchaseOperation) (*models.SeatPurchase, error) {
+	stored, err := models.FindSeatPurchaseByOperationKey(tx, orgID, operation.key)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not buy seats.")
+	}
+	if stored == nil {
+		return nil, nil
+	}
+	if !stored.MatchesRequest(operation.fingerprint) {
+		return nil, grpcerrors.FailedPrecondition(nil, messageSeatPurchaseKeyReused)
+	}
+	return stored, nil
 }
 
 func requireSeatPurchaseAvailable(ctx context.Context, orgID string) (uuid.UUID, error) {
@@ -231,19 +314,42 @@ func proratedChargeCents(additionalSeats int, seatPriceCents int64, periodStart,
 	return int64(math.Round(fullCharge * float64(remainingSeconds) / float64(periodSeconds)))
 }
 
+// seatPurchaseStart is the purchase that beginSeatPurchase recorded or found.
+type seatPurchaseStart struct {
+	purchase *models.SeatPurchase
+	// state is the locked state that a new purchase works from. It is nil
+	// for a replay.
+	state *seatPurchaseState
+	// replayed marks a purchase that another request with the same
+	// operation recorded. Only that request calls Polar.
+	replayed bool
+}
+
 // beginSeatPurchase checks the request and records a pending purchase under the
-// organization lock. The lock is not held during the Polar call. It returns the
-// locked state that the purchase works from. The billing period must be the
-// period that the caller saw before the Polar refresh.
-func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSeatsRequest, userID string, seen *seatPurchaseState, clock seatPurchaseClock) (*models.SeatPurchase, *seatPurchaseState, error) {
-	var purchase *models.SeatPurchase
-	var state *seatPurchaseState
-	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+// organization lock. The lock is not held during the Polar call. The billing
+// period must be the period that the caller saw before the Polar refresh.
+//
+// The purchase stores the operation, the subscription, and the billing period,
+// so a repeat and a later settlement can refer to them. The lock serializes
+// requests with the same operation. The unique operation key index catches a
+// writer that does not take the lock.
+func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSeatsRequest, operation seatPurchaseOperation, userID string, seen *seatPurchaseState, clock seatPurchaseClock) (*seatPurchaseStart, error) {
+	var started *seatPurchaseStart
+	db := database.DB(ctx)
+	err := db.Transaction(func(tx *gorm.DB) error {
 		if _, err := models.LockOrganization(tx, orgID); err != nil {
 			return grpcerrors.Internal(err, "Could not buy seats.")
 		}
-		var err error
-		state, err = checkSeatPurchase(tx, orgID, req.GetAdditionalSeats(), clock())
+		stored, err := findSeatPurchaseOperation(tx, orgID, operation)
+		if err != nil {
+			return err
+		}
+		if stored != nil {
+			started = &seatPurchaseStart{purchase: stored, replayed: true}
+			return nil
+		}
+
+		state, err := checkSeatPurchase(tx, orgID, req.GetAdditionalSeats(), clock())
 		if err != nil {
 			return err
 		}
@@ -261,16 +367,38 @@ func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSea
 			return grpcerrors.Conflict(nil, messageSeatPurchaseInFlight)
 		}
 
-		purchase = models.NewSeatPurchase(orgID, parseUserID(userID), state.subscriptionID, state.purchased, state.target)
+		purchase := models.NewSeatPurchase(orgID, parseUserID(userID), state.subscriptionID, state.purchased, state.target, &models.SeatPurchaseOperation{
+			Key:         operation.key,
+			Fingerprint: operation.fingerprint,
+			PeriodStart: state.periodStart,
+			PeriodEnd:   state.periodEnd,
+		})
 		if err := purchase.Create(tx); err != nil {
 			return grpcerrors.Internal(err, "Could not buy seats.")
 		}
+		started = &seatPurchaseStart{purchase: purchase, state: state}
 		return nil
 	})
-	if err != nil {
-		return nil, nil, err
+	if models.IsSeatPurchaseOperationKeyConflict(err) {
+		return replaySeatPurchaseOperation(db, orgID, operation)
 	}
-	return purchase, state, nil
+	if err != nil {
+		return nil, err
+	}
+	return started, nil
+}
+
+// replaySeatPurchaseOperation reads the purchase that another request with
+// the same operation key recorded first.
+func replaySeatPurchaseOperation(tx *gorm.DB, orgID uuid.UUID, operation seatPurchaseOperation) (*seatPurchaseStart, error) {
+	stored, err := findSeatPurchaseOperation(tx, orgID, operation)
+	if err != nil {
+		return nil, err
+	}
+	if stored == nil {
+		return nil, grpcerrors.Internal(errors.New("seat purchase operation conflict without a stored purchase"), "Could not buy seats.")
+	}
+	return &seatPurchaseStart{purchase: stored, replayed: true}, nil
 }
 
 // recordAppliedSeatPurchase applies the snapshot of a confirmed update. Polar has

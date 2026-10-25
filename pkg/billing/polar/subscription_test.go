@@ -821,7 +821,7 @@ func Test__ApplySubscriptionStaleSnapshotDoesNotSettleSeatPurchase(t *testing.T)
 	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, fresh))
 
 	// A purchase from 3 to 4 seats lost its response.
-	purchase := models.NewSeatPurchase(org.ID, nil, "sub_seats", 3, 4)
+	purchase := models.NewSeatPurchase(org.ID, nil, "sub_seats", 3, 4, nil)
 	purchase.Status = models.SeatPurchaseStatusUnknown
 	require.NoError(t, purchase.Create(db))
 
@@ -858,7 +858,7 @@ func Test__ApplySubscriptionSettlesSeatPurchaseFromFreshSnapshot(t *testing.T) {
 	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, initial))
 
 	// A purchase from 3 to 4 seats lost its response.
-	purchase := models.NewSeatPurchase(org.ID, nil, "sub_seats", 3, 4)
+	purchase := models.NewSeatPurchase(org.ID, nil, "sub_seats", 3, 4, nil)
 	purchase.Status = models.SeatPurchaseStatusUnknown
 	require.NoError(t, purchase.Create(db))
 
@@ -1015,7 +1015,7 @@ func Test__ApplySubscriptionIgnoresForeignCancellation(t *testing.T) {
 	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, initial))
 	_, err := models.AddIncludedLLMCreditGrant(db, org.ID, models.CentsToMicros(500), storedID, now.AddDate(0, 1, 0))
 	require.NoError(t, err)
-	purchase := models.NewSeatPurchase(org.ID, nil, foreignID, 3, 4)
+	purchase := models.NewSeatPurchase(org.ID, nil, foreignID, 3, 4, nil)
 	require.NoError(t, purchase.Create(db))
 	before := captureSubscriptionState(t, db, org.ID)
 	hook := logtest.NewGlobal()
@@ -1075,7 +1075,7 @@ func Test__ApplySubscriptionSettlesSeatPurchaseOnIgnoredForeignSnapshot(t *testi
 				replacement.Data.ModifiedAt = polarTime{Time: now.Add(time.Second)}
 				require.NoError(t, ApplySubscriptionEvent(t.Context(), db, replacement))
 			}
-			purchase := models.NewSeatPurchase(org.ID, nil, oldID, 3, 4)
+			purchase := models.NewSeatPurchase(org.ID, nil, oldID, 3, 4, nil)
 			purchase.Status = models.SeatPurchaseStatusUnknown
 			purchase.CreatedAt = now
 			require.NoError(t, purchase.Create(db))
@@ -1127,7 +1127,7 @@ func Test__ReconcileSeatPurchaseSettlesPurchaseOnReplacedSubscription(t *testing
 	replacement.Data.ProductID, replacement.Data.Seats = product, intPointer(5)
 	replacement.Data.ModifiedAt = polarTime{Time: now}
 	require.NoError(t, ApplySubscriptionEvent(t.Context(), db, replacement))
-	purchase := models.NewSeatPurchase(org.ID, nil, oldID, 3, 4)
+	purchase := models.NewSeatPurchase(org.ID, nil, oldID, 3, 4, nil)
 	purchase.Status = models.SeatPurchaseStatusUnknown
 	require.NoError(t, purchase.Create(db))
 	before := captureSubscriptionState(t, db, org.ID)
@@ -1773,7 +1773,7 @@ func Test__ApplySubscriptionRollsBackCancellationWhenReplacementIsInvalid(t *tes
 	require.NoError(t, err)
 	require.Equal(t, org.ID, oldGrant.OrganizationID)
 	require.False(t, oldGrant.IsExpired(time.Now()))
-	purchase := models.NewSeatPurchase(org.ID, nil, storedID, 3, 4)
+	purchase := models.NewSeatPurchase(org.ID, nil, storedID, 3, 4, nil)
 	require.NoError(t, purchase.Create(db))
 	product := createSeatSubscriptionProduct(t, db)
 	before := captureSubscriptionState(t, db, org.ID)
@@ -1830,7 +1830,7 @@ func Test__ApplySubscriptionPreservesStateWhenStoredRefreshSeatsAreInvalid(t *te
 			initial.Data.ProductID, initial.Data.Seats = product, intPointer(5)
 			initial.Data.ModifiedAt = polarTime{Time: now}
 			require.NoError(t, ApplySubscriptionEvent(t.Context(), db, initial))
-			purchase := models.NewSeatPurchase(org.ID, nil, storedID, 5, 6)
+			purchase := models.NewSeatPurchase(org.ID, nil, storedID, 5, 6, nil)
 			require.NoError(t, purchase.Create(db))
 			before := captureSubscriptionState(t, db, org.ID)
 			requests := 0

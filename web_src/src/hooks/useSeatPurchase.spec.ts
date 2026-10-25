@@ -207,7 +207,11 @@ describe("useSeatPurchase", () => {
     });
     expect(hook.result.current.submitting).toBe(true);
     expect(organizationsPurchaseSeats).toHaveBeenCalledTimes(1);
-    expect(organizationsPurchaseSeats.mock.calls[0][0].body).toEqual({ additionalSeats: 1, expectedPurchasedSeats: 8 });
+    expect(organizationsPurchaseSeats.mock.calls[0][0].body).toEqual({
+      additionalSeats: 1,
+      expectedPurchasedSeats: 8,
+      operationKey: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
     act(() => hook.result.current.setAdditionalSeats("2"));
     expect(hook.result.current.additionalSeats).toBe("1");
     await act(async () => {
@@ -301,6 +305,10 @@ describe("useSeatPurchase", () => {
     });
     await act(async () => hook.result.current.confirm());
     expect(organizationsPurchaseSeats.mock.calls[1][0].body.expectedPurchasedSeats).toBe(7);
+    const [first, second] = organizationsPurchaseSeats.mock.calls.map((call) => call[0].body.operationKey);
+    expect(first).toEqual(expect.any(String));
+    expect(second).toEqual(expect.any(String));
+    expect(second).not.toBe(first);
   });
 
   it("shows server renewal freeze messages without retrying the purchase", async () => {
