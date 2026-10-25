@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { OrganizationsSeatPurchase } from "@/api-client";
-import { loadSeatPurchaseOperation } from "@/lib/seatPurchaseOperations";
+import { loadSeatPurchaseOperations } from "@/lib/seatPurchaseOperations";
 import { recentSeatPurchase, seatPurchaseMessage } from "@/lib/seatPurchases";
 
 export function useSeatPurchaseState(organizationId: string, billingPurchase: OrganizationsSeatPurchase | undefined) {
@@ -30,7 +30,7 @@ export function useSeatPurchaseState(organizationId: string, billingPurchase: Or
     clearFeedback();
     // An operation stored before a page refresh has an unknown outcome. Offer
     // the billing refresh until billing shows a purchase status.
-    setSubmissionUnresolved(loadSeatPurchaseOperation(organizationId) !== undefined);
+    setSubmissionUnresolved(loadSeatPurchaseOperations(organizationId).length > 0);
     submissionLock.current = false;
     return () => {
       lifecycle.current += 1;

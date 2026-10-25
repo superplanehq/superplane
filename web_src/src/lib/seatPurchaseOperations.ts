@@ -26,9 +26,9 @@ export type SeatPurchaseOperation = SeatPurchaseRequest &
 
 type StoredSeatPurchaseOperation = SeatPurchaseOperation & { version: number };
 
-// Holds operations when the browser blocks storage, so a retry in the same
-// page still reuses the key.
-const memoryOperations = new Map<string, SeatPurchaseOperation>();
+// Holds the current collection when a storage write fails. It takes precedence
+// over storage reads, which can still return an older collection.
+const memoryOperations = new Map<string, SeatPurchaseOperation[]>();
 
 function storageKey(organizationId: string) {
   return `${STORAGE_PREFIX}${organizationId}`;
@@ -54,42 +54,43 @@ function isStoredOperation(value: unknown, organizationId: string): value is Sto
   );
 }
 
-function parseOperation(raw: string | null, organizationId: string): SeatPurchaseOperation | undefined {
-  if (!raw) return undefined;
+function parseOperations(raw: string | null, organizationId: string): SeatPurchaseOperation[] {
+  if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!isStoredOperation(parsed, organizationId)) return undefined;
-    return {
-      organizationId: parsed.organizationId,
-      operationKey: parsed.operationKey,
-      additionalSeats: parsed.additionalSeats,
-      expectedPurchasedSeats: parsed.expectedPurchasedSeats,
-      periodStart: parsed.periodStart,
-      periodEnd: parsed.periodEnd,
-      confirmedAt: parsed.confirmedAt,
-    };
+    // Keep the single-operation format from earlier clients readable.
+    const records: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+    return records
+      .filter((record): record is StoredSeatPurchaseOperation => isStoredOperation(record, organizationId))
+      .map(({ version: _version, ...operation }) => operation);
   } catch {
-    return undefined;
+    return [];
   }
 }
 
-/** Returns the unresolved purchase operation of the organization, if any. */
-export function loadSeatPurchaseOperation(organizationId: string): SeatPurchaseOperation | undefined {
-  if (!organizationId) return undefined;
+/** Returns all unresolved purchase operations of the organization. */
+export function loadSeatPurchaseOperations(organizationId: string): SeatPurchaseOperation[] {
+  if (!organizationId) return [];
+  const fallback = memoryOperations.get(organizationId);
+  if (fallback) return fallback;
   try {
-    return parseOperation(window.localStorage.getItem(storageKey(organizationId)), organizationId);
+    return parseOperations(window.localStorage.getItem(storageKey(organizationId)), organizationId);
   } catch {
-    return memoryOperations.get(organizationId);
+    return [];
   }
 }
 
-function saveSeatPurchaseOperation(operation: SeatPurchaseOperation) {
-  const stored: StoredSeatPurchaseOperation = { version: STORAGE_VERSION, ...operation };
+function saveSeatPurchaseOperations(organizationId: string, operations: SeatPurchaseOperation[]) {
+  const stored: StoredSeatPurchaseOperation[] = operations.map((operation) => ({
+    version: STORAGE_VERSION,
+    ...operation,
+  }));
   try {
-    window.localStorage.setItem(storageKey(operation.organizationId), JSON.stringify(stored));
-    memoryOperations.delete(operation.organizationId);
+    if (stored.length === 0) window.localStorage.removeItem(storageKey(organizationId));
+    else window.localStorage.setItem(storageKey(organizationId), JSON.stringify(stored));
+    memoryOperations.delete(organizationId);
   } catch {
-    memoryOperations.set(operation.organizationId, operation);
+    memoryOperations.set(organizationId, operations);
   }
 }
 
@@ -103,15 +104,17 @@ function sameRequest(operation: SeatPurchaseOperation, request: SeatPurchaseRequ
 /**
  * Returns the operation for a confirmed request. The same request reuses the
  * unresolved operation and keeps its original period. Another request gets a
- * new key, which is stored before the request is sent.
+ * new key, which is stored before the request is sent. Earlier unresolved
+ * requests keep their keys until their own outcomes are known.
  */
 export function confirmSeatPurchaseOperation(
   organizationId: string,
   request: SeatPurchaseRequest,
   period: SeatPurchasePeriod,
 ): SeatPurchaseOperation {
-  const stored = loadSeatPurchaseOperation(organizationId);
-  if (stored && sameRequest(stored, request)) return stored;
+  const operations = loadSeatPurchaseOperations(organizationId);
+  const stored = operations.find((operation) => sameRequest(operation, request));
+  if (stored) return stored;
   const operation: SeatPurchaseOperation = {
     organizationId,
     operationKey: crypto.randomUUID(),
@@ -120,7 +123,7 @@ export function confirmSeatPurchaseOperation(
     periodEnd: period.periodEnd,
     confirmedAt: new Date().toISOString(),
   };
-  saveSeatPurchaseOperation(operation);
+  saveSeatPurchaseOperations(organizationId, [...operations, operation]);
   return operation;
 }
 
@@ -132,11 +135,8 @@ export function retireSeatPurchaseOperation({
   organizationId,
   operationKey,
 }: Pick<SeatPurchaseOperation, "organizationId" | "operationKey">) {
-  if (memoryOperations.get(organizationId)?.operationKey === operationKey) memoryOperations.delete(organizationId);
-  try {
-    if (loadSeatPurchaseOperation(organizationId)?.operationKey !== operationKey) return;
-    window.localStorage.removeItem(storageKey(organizationId));
-  } catch {
-    // The memory record is already gone. A blocked storage has no record.
-  }
+  const operations = loadSeatPurchaseOperations(organizationId);
+  const remaining = operations.filter((operation) => operation.operationKey !== operationKey);
+  if (remaining.length === operations.length) return;
+  saveSeatPurchaseOperations(organizationId, remaining);
 }

@@ -201,7 +201,8 @@ organization use the same key.
 - A new confirmation of the same `additional_seats` and
   `expected_purchased_seats` sends the stored key again. This applies after a
   lost response, an HTTP 5xx error, a page refresh, and a renewal.
-- A confirmation of a different request gets a new key.
+- A confirmation of a different request gets a new key. Earlier unresolved
+  requests keep their own keys, even if the quantity or seat baseline changes.
 - The browser forgets the key when the server answers for that key with a
   known outcome: a `succeeded`, `failed`, or `action_required` purchase, or an
   HTTP 4xx error.

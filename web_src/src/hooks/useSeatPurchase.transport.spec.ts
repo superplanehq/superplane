@@ -24,6 +24,7 @@ class FakeBillingServer {
   periodEnd = new Date(Date.now() + 20 * DAY_MS).toISOString();
   lastSeatPurchase: OrganizationsSeatPurchase | undefined;
   charges = 0;
+  billingUnavailable = false;
   purchaseRequests: PurchaseBody[] = [];
   private nextFault: Fault | undefined;
   private operations = new Map<string, { fingerprint: string; purchase: OrganizationsSeatPurchase }>();
@@ -62,7 +63,10 @@ class FakeBillingServer {
       });
     }
     if (path.endsWith("/seats/purchase")) return this.purchase((await request.json()) as PurchaseBody);
-    if (path.endsWith("/billing/sync") || path.endsWith("/billing")) return this.respond(200, this.billing());
+    if (path.endsWith("/billing/sync") || path.endsWith("/billing")) {
+      if (this.billingUnavailable) throw new TypeError("Failed to fetch");
+      return this.respond(200, this.billing());
+    }
     throw new Error(`Unexpected billing request: ${path}`);
   };
 
@@ -238,17 +242,50 @@ describe("seat purchase HTTP recovery", () => {
     expect(next.result.current.purchase?.id).toBe("purchase-2");
   });
 
-  it("sends a new key when the quantity changes after an unresolved attempt", async () => {
-    const page = await loadPage();
-    server.failNextPurchase("lost request");
-    await previewAndConfirm(page);
-    act(() => page.result.current.setAdditionalSeats("2"));
-    await advance(300);
-    await act(async () => page.result.current.confirm());
-    const [first, changed] = server.purchaseRequests;
-    expect(changed.additionalSeats).toBe(2);
-    expect(changed.operationKey).not.toBe(first.operationKey);
-  });
+  it.each([
+    { change: "quantity", additionalSeats: "2", baseline: 4 },
+    { change: "baseline", additionalSeats: "1", baseline: 6 },
+  ])(
+    "retains each unresolved key after a changed $change request and retires only the replayed key",
+    async ({ additionalSeats, baseline }) => {
+      const firstPage = await loadPage();
+      server.billingUnavailable = true;
+      server.failNextPurchase("lost response");
+      await previewAndConfirm(firstPage);
+      expect(server.charges).toBe(1);
+      firstPage.unmount();
+      server.renew();
+      server.billingUnavailable = false;
+      server.purchasedSeats = baseline;
+
+      const changedPage = await loadPage();
+      act(() => changedPage.result.current.setOpen(true));
+      act(() => changedPage.result.current.setAdditionalSeats(additionalSeats));
+      server.billingUnavailable = true;
+      server.failNextPurchase("lost request");
+      await previewAndConfirm(changedPage);
+      const [first, changed] = server.purchaseRequests;
+      expect(changed.operationKey).not.toBe(first.operationKey);
+      changedPage.unmount();
+      server.billingUnavailable = false;
+      server.purchasedSeats = 4;
+
+      const retryPage = await loadPage();
+      await previewAndConfirm(retryPage);
+      expect(server.purchaseRequests[2]).toEqual(first);
+      expect(server.charges).toBe(1);
+      expect(retryPage.result.current.purchase?.id).toBe("purchase-1");
+      retryPage.unmount();
+      server.purchasedSeats = baseline;
+
+      const remainingPage = await loadPage();
+      act(() => remainingPage.result.current.setOpen(true));
+      act(() => remainingPage.result.current.setAdditionalSeats(additionalSeats));
+      await previewAndConfirm(remainingPage);
+      expect(server.purchaseRequests[3]).toEqual(changed);
+      expect(server.charges).toBe(2);
+    },
+  );
 
   it("never sends the unresolved key of one organization for another organization", async () => {
     const first = await loadPage();
@@ -269,20 +306,66 @@ describe("seat purchase HTTP recovery", () => {
     expect(retry).toBe(original);
   });
 
-  it("reuses the key in the same page when the browser blocks storage", async () => {
+  it("preserves an unresolved key from the earlier single-operation storage format when another request is confirmed", async () => {
+    const operationKey = crypto.randomUUID();
+    window.localStorage.setItem(
+      "superplane:seat-purchase-operation:org-1",
+      JSON.stringify({
+        version: 1,
+        organizationId: "org-1",
+        operationKey,
+        additionalSeats: 1,
+        expectedPurchasedSeats: 4,
+        confirmedAt: new Date().toISOString(),
+      }),
+    );
+    const page = await loadPage();
+    act(() => page.result.current.setOpen(true));
+    act(() => page.result.current.setAdditionalSeats("2"));
+    server.failNextPurchase("lost request");
+    await previewAndConfirm(page);
+    page.unmount();
+
+    const restored = await loadPage();
+    await previewAndConfirm(restored);
+    expect(server.purchaseRequests[1]).toEqual({ additionalSeats: 1, expectedPurchasedSeats: 4, operationKey });
+    expect(server.charges).toBe(1);
+  });
+
+  it.each(["all storage", "writes only"])("reuses the key when the browser blocks %s", async (blocked) => {
     const storage = Object.getOwnPropertyDescriptor(window, "localStorage");
+    const localStorage = window.localStorage;
     Object.defineProperty(window, "localStorage", {
       configurable: true,
       get: () => {
+        if (blocked === "writes only")
+          return {
+            getItem: localStorage.getItem.bind(localStorage),
+            removeItem: localStorage.removeItem.bind(localStorage),
+            setItem: () => {
+              throw new DOMException("Storage is full.", "QuotaExceededError");
+            },
+          };
         throw new DOMException("Storage is blocked.", "SecurityError");
       },
     });
     try {
       const page = await loadPage();
-      server.failNextPurchase("lost request");
+      server.billingUnavailable = true;
+      server.failNextPurchase("lost response");
       await previewAndConfirm(page);
+      server.renew();
+      server.billingUnavailable = false;
+      await act(async () => page.result.current.refreshBilling());
       await previewAndConfirm(page);
       expect(server.purchaseRequests[1]).toEqual(server.purchaseRequests[0]);
+      expect(server.charges).toBe(1);
+      // A terminal result must retire the fallback key as well.
+      server.renew();
+      await act(async () => page.result.current.refreshBilling());
+      await previewAndConfirm(page);
+      expect(server.purchaseRequests[2].operationKey).not.toBe(server.purchaseRequests[0].operationKey);
+      expect(server.charges).toBe(2);
     } finally {
       if (storage) Object.defineProperty(window, "localStorage", storage);
     }
