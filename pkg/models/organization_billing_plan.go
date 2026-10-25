@@ -361,20 +361,29 @@ func FindOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBil
 	return &plan, nil
 }
 
-// ListSeatRenewalSyncPlans returns the per-seat plans on an active Polar
-// subscription that is not set to cancel. The plan that renews first comes
-// first.
+// ListSeatRenewalSyncPlans returns the seat-based plans whose stored Polar
+// subscription can still change, so that the seat renewal sync can reconcile
+// them with Polar. The plan that renews first comes first.
+//
+// A plan is seat-based when its catalog plan is per seat or when it keeps
+// purchased seats. A past-due, unpaid, or paused subscription lapses to a
+// catalog plan that is not per seat but keeps its purchased seats, so it stays
+// in the list. A canceling subscription stays too. Only a canceled or revoked
+// subscription is final and leaves the list.
+//
+// This list decides which plans the sync reads from Polar. It does not decide
+// which plans get a scheduled seat count. The scheduler decides that after it
+// applies the Polar state.
 func ListSeatRenewalSyncPlans(tx *gorm.DB) ([]OrganizationBillingPlan, error) {
 	var plans []OrganizationBillingPlan
 	err := tx.
 		Joins("JOIN billing_plans ON billing_plans.id = organization_billing_plans.plan_id").
 		Joins("JOIN organizations ON organizations.id = organization_billing_plans.organization_id").
 		Where("organizations.deleted_at IS NULL").
-		Where("billing_plans.per_seat = ?", true).
 		Where("organization_billing_plans.plan_source = ?", BillingPlanSourcePolar).
 		Where("organization_billing_plans.polar_subscription_id IS NOT NULL AND organization_billing_plans.polar_subscription_id <> ''").
-		Where("organization_billing_plans.polar_subscription_status = ?", PolarSubscriptionStatusActive).
-		Where("organization_billing_plans.cancel_at_period_end = ?", false).
+		Where("lower(organization_billing_plans.polar_subscription_status) NOT IN ?", []string{PolarSubscriptionStatusCanceled, PolarSubscriptionStatusRevoked}).
+		Where("billing_plans.per_seat = ? OR organization_billing_plans.purchased_seats IS NOT NULL", true).
 		Order("organization_billing_plans.current_period_end ASC NULLS LAST").
 		Order("organization_billing_plans.organization_id").
 		Find(&plans).Error

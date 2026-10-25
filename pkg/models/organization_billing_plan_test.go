@@ -1591,3 +1591,87 @@ func polarPlan(subscriptionID *string, status string, cancelAtPeriodEnd bool, pe
 		CurrentPeriodEnd:        periodEnd,
 	}
 }
+
+func Test__ListSeatRenewalSyncPlansFindsSeatBasedPlansWithAChangeableSubscription(t *testing.T) {
+	support.Setup(t)
+	db := database.Conn()
+	save := func(perSeat bool) *models.BillingPlan {
+		catalog := models.BillingPlan{
+			Key: "sync_" + uuid.NewString()[:8], Name: "Sync", Category: "paid", Visibility: "private", PerSeat: perSeat,
+			CreditFrequency: "none", CreditExpiration: "never",
+		}
+		if perSeat {
+			catalog.SeatLimit = new(50)
+		}
+		require.NoError(t, models.SaveBillingPlan(db, &catalog))
+		return &catalog
+	}
+	perSeat, flat := save(true), save(false)
+	now := time.Now().UTC()
+
+	type row struct {
+		catalog      *models.BillingPlan
+		status       string
+		source       string
+		subscription *string
+		seats        *int
+		renewsIn     *time.Duration
+		deleted      bool
+		cancelAtEnd  bool
+	}
+	hours := func(n int) *time.Duration { return new(time.Duration(n) * time.Hour) }
+	subscription := func() *string { return new("sub_" + uuid.NewString()) }
+	polarSource := models.BillingPlanSourcePolar
+	rows := map[string]row{
+		// Included, ordered by renewal. A null renewal comes last.
+		"active":                    {catalog: perSeat, status: "active", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(4)},
+		"canceling":                 {catalog: perSeat, status: "active", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(1), cancelAtEnd: true},
+		"past due":                  {catalog: perSeat, status: "past_due", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(2)},
+		"unpaid":                    {catalog: perSeat, status: "unpaid", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(3)},
+		"paused":                    {catalog: perSeat, status: "paused", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(5)},
+		"lapsed with purchased":     {catalog: flat, status: "past_due", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(6)},
+		"lapsed without renewal":    {catalog: flat, status: "unpaid", source: polarSource, subscription: subscription(), seats: new(3)},
+		"per seat without purchase": {catalog: perSeat, status: "active", source: polarSource, subscription: subscription(), renewsIn: hours(7)},
+		// Excluded.
+		"canceled":                    {catalog: perSeat, status: "canceled", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(1)},
+		"revoked":                     {catalog: perSeat, status: "revoked", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(1)},
+		"admin plan":                  {catalog: perSeat, status: "active", source: models.BillingPlanSourceAdmin, subscription: subscription(), seats: new(3), renewsIn: hours(1)},
+		"deleted organization":        {catalog: perSeat, status: "active", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(1), deleted: true},
+		"empty subscription":          {catalog: perSeat, status: "active", source: polarSource, subscription: new(""), seats: new(3), renewsIn: hours(1)},
+		"no subscription":             {catalog: perSeat, status: "active", source: polarSource, seats: new(3), renewsIn: hours(1)},
+		"not seat based and no seats": {catalog: flat, status: "past_due", source: polarSource, subscription: subscription(), renewsIn: hours(1)},
+	}
+	ids := map[uuid.UUID]string{}
+	for name, tc := range rows {
+		org, err := models.CreateOrganizationInTransaction(db, "Org "+uuid.NewString()[:8], "")
+		require.NoError(t, err)
+		_, err = models.EnsureOrganizationBillingPlan(db, org.ID)
+		require.NoError(t, err)
+		var periodEnd *time.Time
+		if tc.renewsIn != nil {
+			periodEnd = new(now.Add(*tc.renewsIn))
+		}
+		require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", org.ID).Updates(map[string]any{
+			"plan_id": tc.catalog.ID, "plan": tc.catalog.Key, "plan_source": tc.source,
+			"polar_subscription_id": tc.subscription, "polar_subscription_status": tc.status,
+			"purchased_seats": tc.seats, "current_period_end": periodEnd, "cancel_at_period_end": tc.cancelAtEnd,
+		}).Error)
+		if tc.deleted {
+			require.NoError(t, db.Delete(org).Error)
+		}
+		ids[org.ID] = name
+	}
+
+	plans, err := models.ListSeatRenewalSyncPlans(db)
+
+	require.NoError(t, err)
+	var listed []string
+	for _, plan := range plans {
+		if name, ok := ids[plan.OrganizationID]; ok {
+			listed = append(listed, name)
+		}
+	}
+	assert.Equal(t, []string{
+		"canceling", "past due", "unpaid", "active", "paused", "lapsed with purchased", "per seat without purchase", "lapsed without renewal",
+	}, listed)
+}
