@@ -527,6 +527,8 @@ func TestLegacyBusinessCheckoutRejectsUnsafeBillingStateBeforePolar(t *testing.T
 		{name: "active subscription", subscriptionStatus: models.PolarSubscriptionStatusActive, wantMessage: manageSubscription},
 		{name: "trialing subscription", subscriptionStatus: models.PolarSubscriptionStatusTrialing, wantMessage: manageSubscription},
 		{name: "scheduled cancellation", subscriptionStatus: models.PolarSubscriptionStatusCanceled, scheduledCancellation: true, wantMessage: manageSubscription},
+		{name: "paused subscription", subscriptionStatus: models.PolarSubscriptionStatusPaused, wantMessage: manageSubscription},
+		{name: "paused with scheduled cancellation", subscriptionStatus: models.PolarSubscriptionStatusPaused, scheduledCancellation: true, wantMessage: manageSubscription},
 		{name: "billing disabled before billing guards", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, configuration: "disabled", wantMessage: "Business checkout is not configured"},
 		{name: "missing token before billing guards", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, configuration: "missing token", wantMessage: "Business checkout is not configured"},
 		{name: "missing product before billing guards", subscriptionStatus: models.PolarSubscriptionStatusPastDue, newBilling: true, configuration: "missing product", wantMessage: "Business checkout is not configured"},

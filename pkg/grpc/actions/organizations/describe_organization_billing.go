@@ -246,7 +246,9 @@ func CreateBusinessCheckout(
 	if newBilling {
 		return nil, grpcerrors.FailedPrecondition(nil, "Select a plan in Billing.")
 	}
-	if models.OrganizationBillingIsPolarManaged(current) {
+	// A paused subscription has no paid access but can resume billing. Checkout
+	// must not start a second subscription while any live one exists.
+	if current.HasLivePolarSubscription(time.Now()) {
 		return nil, grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
 	}
 
