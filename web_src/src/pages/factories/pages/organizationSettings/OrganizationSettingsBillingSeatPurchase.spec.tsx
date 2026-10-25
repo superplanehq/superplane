@@ -98,6 +98,27 @@ describe("Organization billing seat purchases", () => {
     expect(purchaseRequests).toHaveLength(0);
   });
 
+  it("clears the over-capacity notice after buying enough seats", async () => {
+    const user = userEvent.setup();
+    renderBilling(
+      { ...TEAM_ORGANIZATION_BILLING, purchasedSeats: 8, occupiedSeats: 9, availableSeats: 0 },
+      { newBilling: true },
+    );
+    const card = await screen.findByTestId("billing-seats");
+    expect(within(card).getByRole("status")).toHaveTextContent(
+      "9 members, 8 paid seats. Buy seats or remove members to invite again.",
+    );
+    await user.click(within(card).getByRole("button", { name: "Buy seats" }));
+    const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
+    const confirm = within(dialog).getByRole<HTMLButtonElement>("button", { name: "Confirm purchase" });
+    await waitFor(() => expect(confirm.disabled).toBe(false));
+    await user.click(confirm);
+    expect(await within(dialog).findByText("Seats added.")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(card).toHaveTextContent("9 of 9 seats used"));
+    expect(within(card).queryByRole("status")).not.toBeInTheDocument();
+  });
+
   it.each([
     { name: "admin-sourced plan", overrides: { planSource: "admin" }, newBilling: true },
     { name: "inactive subscription", overrides: { polarSubscriptionStatus: "canceled" }, newBilling: true },

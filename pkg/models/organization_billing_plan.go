@@ -73,7 +73,30 @@ type OrganizationBillingPlan struct {
 	CurrentPeriodEnd        *time.Time
 	TrialStartedAt          *time.Time
 	TrialEndsAt             *time.Time
-	UpdatedAt               time.Time
+	// OverCapacitySince is when a per-seat plan first had more members than
+	// purchased seats. A Polar snapshot never writes it.
+	// UpdateSeatCapacityState owns it.
+	OverCapacitySince *time.Time
+	UpdatedAt         time.Time
+}
+
+// SeatCapacityChange tells whether a capacity check started or ended the
+// over-capacity state.
+type SeatCapacityChange string
+
+const (
+	SeatCapacityUnchanged SeatCapacityChange = "unchanged"
+	SeatCapacityStarted   SeatCapacityChange = "started"
+	SeatCapacityResolved  SeatCapacityChange = "resolved"
+)
+
+// SeatCapacityTransition is the result of UpdateSeatCapacityState. The caller
+// logs it after its transaction commits.
+type SeatCapacityTransition struct {
+	Change         SeatCapacityChange
+	SubscriptionID string
+	Purchased      int
+	Occupied       int
 }
 
 // PolarSubscriptionApply is the Polar subscription snapshot to persist.
@@ -155,6 +178,11 @@ func (p *OrganizationBillingPlan) IsActiveBusiness() bool {
 		return true
 	}
 	return p.holdsPastDueGraceRow()
+}
+
+// IsPaidPerSeat is true for an active paid plan that sells seats.
+func (p *OrganizationBillingPlan) IsPaidPerSeat() bool {
+	return p != nil && p.Catalog.PerSeat && p.IsActiveBusiness()
 }
 
 func (p *OrganizationBillingPlan) IsOpenTrial(now time.Time) bool {
@@ -324,6 +352,70 @@ func FindOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBil
 		return nil, err
 	}
 	return &plan, nil
+}
+
+// UpdateSeatCapacityState records when a per-seat plan starts or stops having
+// more members than purchased seats. It counts the active members while it
+// holds the billing plan row lock, so a concurrent membership change commits
+// before the count or waits for it. It does not log. The caller logs the
+// returned transition after commit.
+//
+// A plan that is not an active per-seat plan has no over-capacity state. The
+// record clears without a transition, so a later recovery alerts again.
+func UpdateSeatCapacityState(tx *gorm.DB, orgID uuid.UUID, now time.Time) (SeatCapacityTransition, error) {
+	transition := SeatCapacityTransition{Change: SeatCapacityUnchanged}
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		plan, err := lockOrganizationBillingPlan(inner, orgID)
+		if err != nil || plan == nil {
+			return err
+		}
+		// A payment grace period keeps Team features, but admission stays
+		// blocked. Recovery must start a fresh capacity alert.
+		if !plan.IsPaidPerSeat() || PolarSubscriptionIsPaymentBlocked(plan.PolarSubscriptionStatus) {
+			return plan.setOverCapacitySince(inner, nil)
+		}
+
+		count, err := CountActiveHumanUsersByOrganization(inner, orgID.String())
+		if err != nil {
+			return err
+		}
+		occupied := int(count)
+
+		purchased := 0
+		if plan.PurchasedSeats != nil {
+			purchased = *plan.PurchasedSeats
+		}
+		transition.Purchased = purchased
+		transition.Occupied = occupied
+		if plan.PolarSubscriptionID != nil {
+			transition.SubscriptionID = *plan.PolarSubscriptionID
+		}
+
+		overCapacity := occupied > purchased
+		switch {
+		case overCapacity && plan.OverCapacitySince == nil:
+			transition.Change = SeatCapacityStarted
+			return plan.setOverCapacitySince(inner, &now)
+		case !overCapacity && plan.OverCapacitySince != nil:
+			transition.Change = SeatCapacityResolved
+			return plan.setOverCapacitySince(inner, nil)
+		default:
+			return nil
+		}
+	})
+	return transition, err
+}
+
+// setOverCapacitySince writes only that column. It keeps updated_at, which
+// other flows use to detect a changed billing record.
+func (p *OrganizationBillingPlan) setOverCapacitySince(tx *gorm.DB, since *time.Time) error {
+	if p.OverCapacitySince == nil && since == nil {
+		return nil
+	}
+	return tx.Model(&OrganizationBillingPlan{}).
+		Where("organization_id = ?", p.OrganizationID).
+		UpdateColumn("over_capacity_since", since).
+		Error
 }
 
 func lockOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
