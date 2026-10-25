@@ -41,12 +41,13 @@ type AuthorizeRequest struct {
 }
 
 type TokenIssue struct {
-	UserID    uuid.UUID
-	OrgID     uuid.UUID
-	FactoryID uuid.UUID
-	ClientID  string
-	Resource  string
-	Scopes    []string
+	UserID     uuid.UUID
+	OrgID      uuid.UUID
+	FactoryID  uuid.UUID
+	FactoryIDs []uuid.UUID
+	ClientID   string
+	Resource   string
+	Scopes     []string
 }
 
 type OAuthError struct {
@@ -255,7 +256,11 @@ func fetchClientMetadata(ctx context.Context, httpClient mcp.HTTPDoer, metadataU
 	}, nil
 }
 
-func CreateAuthorizationCode(tx *gorm.DB, req *AuthorizeRequest, userID, orgID, factoryID uuid.UUID) (string, error) {
+func CreateAuthorizationCode(tx *gorm.DB, req *AuthorizeRequest, userID, orgID uuid.UUID, factoryIDs []uuid.UUID) (string, error) {
+	ids, err := models.NormalizeFactoryIDs(factoryIDs)
+	if err != nil {
+		return "", err
+	}
 	raw, err := mcp.RandomToken()
 	if err != nil {
 		return "", err
@@ -269,7 +274,7 @@ func CreateAuthorizationCode(tx *gorm.DB, req *AuthorizeRequest, userID, orgID, 
 		CodeChallengeMethod: req.CodeChallengeMethod,
 		UserID:              userID,
 		OrganizationID:      orgID,
-		FactoryID:           factoryID,
+		FactoryIDs:          datatypes.NewJSONSlice(factoryIDStrings(ids)),
 		Scopes:              datatypes.NewJSONSlice(GrantedScopes),
 		ExpiresAt:           time.Now().Add(AuthorizationCodeTTL),
 	})
@@ -311,26 +316,16 @@ func ExchangeAuthorizationCode(tx *gorm.DB, values url.Values, resource string) 
 	if UserAccountBlocked(tx, stored.UserID) {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
 	}
+	issue, err := tokenIssueFromGrant(stored.UserID, stored.OrganizationID, stored.WorkspaceIDs(), stored.ClientID, stored.Resource, []string(stored.Scopes))
+	if err != nil {
+		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
+	}
 
-	refresh, err := storeRefreshToken(tx, TokenIssue{
-		UserID:    stored.UserID,
-		OrgID:     stored.OrganizationID,
-		FactoryID: stored.FactoryID,
-		ClientID:  stored.ClientID,
-		Resource:  stored.Resource,
-		Scopes:    []string(stored.Scopes),
-	})
+	refresh, err := storeRefreshToken(tx, issue)
 	if err != nil {
 		return nil, "", &OAuthError{Code: "server_error", Description: "failed to issue refresh token", Status: http.StatusInternalServerError}
 	}
-	return &TokenIssue{
-		UserID:    stored.UserID,
-		OrgID:     stored.OrganizationID,
-		FactoryID: stored.FactoryID,
-		ClientID:  stored.ClientID,
-		Resource:  stored.Resource,
-		Scopes:    []string(stored.Scopes),
-	}, refresh, nil
+	return &issue, refresh, nil
 }
 
 func RefreshTokens(tx *gorm.DB, values url.Values, resource string) (*TokenIssue, string, *OAuthError) {
@@ -363,13 +358,9 @@ func RefreshTokens(tx *gorm.DB, values url.Values, resource string) (*TokenIssue
 	if err := models.DeleteMCPOAuthRefreshToken(tx, stored); err != nil {
 		return nil, "", &OAuthError{Code: "server_error", Description: "failed to rotate refresh token", Status: http.StatusInternalServerError}
 	}
-	issue := TokenIssue{
-		UserID:    stored.UserID,
-		OrgID:     stored.OrganizationID,
-		FactoryID: stored.FactoryID,
-		ClientID:  stored.ClientID,
-		Resource:  stored.Resource,
-		Scopes:    []string(stored.Scopes),
+	issue, err := tokenIssueFromGrant(stored.UserID, stored.OrganizationID, stored.WorkspaceIDs(), stored.ClientID, stored.Resource, []string(stored.Scopes))
+	if err != nil {
+		return nil, "", &OAuthError{Code: "invalid_grant", Description: "refresh token is not valid", Status: http.StatusBadRequest}
 	}
 	refresh, err := storeRefreshToken(tx, issue)
 	if err != nil {
@@ -411,6 +402,10 @@ func RegisterClient(tx *gorm.DB, body []byte) (*Client, *OAuthError) {
 }
 
 func storeRefreshToken(tx *gorm.DB, issue TokenIssue) (string, error) {
+	ids, err := issue.workspaceIDs()
+	if err != nil {
+		return "", err
+	}
 	raw, err := mcp.RandomToken()
 	if err != nil {
 		return "", err
@@ -420,7 +415,7 @@ func storeRefreshToken(tx *gorm.DB, issue TokenIssue) (string, error) {
 		ClientID:       issue.ClientID,
 		UserID:         issue.UserID,
 		OrganizationID: issue.OrgID,
-		FactoryID:      issue.FactoryID,
+		FactoryIDs:     datatypes.NewJSONSlice(factoryIDStrings(ids)),
 		Resource:       issue.Resource,
 		Scopes:         datatypes.NewJSONSlice(issue.Scopes),
 		ExpiresAt:      time.Now().Add(RefreshTokenTTL),
@@ -435,15 +430,20 @@ func AccessGrantIsActive(tx *gorm.DB, claims *AccessClaims, now time.Time) bool 
 	if claims == nil {
 		return false
 	}
-	ok, err := models.HasMCPOAuthRefreshTokenForClient(
-		tx,
-		claims.OrgID,
-		claims.FactoryID,
-		claims.UserID,
-		claims.ClientID,
-		now,
-	)
-	return err == nil && ok
+	wanted := claims.WorkspaceIDs()
+	if len(wanted) == 0 {
+		return false
+	}
+	tokens, err := models.ListActiveMCPOAuthRefreshTokensForClient(tx, claims.OrgID, claims.UserID, claims.ClientID, now)
+	if err != nil {
+		return false
+	}
+	for _, token := range tokens {
+		if sameWorkspaceSet(token.WorkspaceIDs(), wanted) {
+			return true
+		}
+	}
+	return false
 }
 
 func AuthorizationRedirect(redirectURI, code, state string) (string, error) {
@@ -458,4 +458,50 @@ func AuthorizationRedirect(redirectURI, code, state string) (string, error) {
 	}
 	parsed.RawQuery = query.Encode()
 	return parsed.String(), nil
+}
+
+func (issue TokenIssue) workspaceIDs() ([]uuid.UUID, error) {
+	if len(issue.FactoryIDs) > 0 {
+		return models.NormalizeFactoryIDs(issue.FactoryIDs)
+	}
+	return models.NormalizeFactoryIDs([]uuid.UUID{issue.FactoryID})
+}
+
+func tokenIssueFromGrant(userID, orgID uuid.UUID, factoryIDs []uuid.UUID, clientID, resource string, scopes []string) (TokenIssue, error) {
+	ids, err := models.NormalizeFactoryIDs(factoryIDs)
+	if err != nil {
+		return TokenIssue{}, err
+	}
+	return TokenIssue{
+		UserID:     userID,
+		OrgID:      orgID,
+		FactoryID:  ids[0],
+		FactoryIDs: ids,
+		ClientID:   clientID,
+		Resource:   resource,
+		Scopes:     scopes,
+	}, nil
+}
+
+func sameWorkspaceSet(left, right []uuid.UUID) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	normalizedLeft, err := models.NormalizeFactoryIDs(left)
+	if err != nil {
+		return false
+	}
+	normalizedRight, err := models.NormalizeFactoryIDs(right)
+	if err != nil {
+		return false
+	}
+	return slices.Equal(normalizedLeft, normalizedRight)
+}
+
+func factoryIDStrings(ids []uuid.UUID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = id.String()
+	}
+	return out
 }

@@ -24,7 +24,10 @@ export const SUPERPLANE_MCP_SERVER_COPY = {
   clientsColumnAction: "Action",
   revoke: "Revoke",
   revokeTitle: (name: string) => `Revoke "${name}"?`,
-  revokeDescription: "This disconnects the client from this workspace. The client must sign in again.",
+  revokeDescription: (workspaceCount?: number) =>
+    (workspaceCount ?? 1) > 1
+      ? "This disconnects the client from every workspace on this connection. The client must sign in again."
+      : "This disconnects the client from this workspace. The client must sign in again.",
   revoking: "Revoking...",
   revoked: "MCP client revoked.",
   revokeFailed: "SuperPlane could not revoke the MCP client.",
