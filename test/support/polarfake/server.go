@@ -220,6 +220,8 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, body any) {
 // given seats and period end, and adds the matching subscription to the fake.
 func (s *Server) AddSeatPlan(db *gorm.DB, orgID uuid.UUID, seats int, periodEnd time.Time) Subscription {
 	s.t.Helper()
+	// Match the whole-second precision of the subscription snapshots.
+	periodEnd = periodEnd.UTC().Truncate(time.Second)
 	product := "prod_team_" + uuid.NewString()
 	catalog := models.BillingPlan{
 		Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private",
