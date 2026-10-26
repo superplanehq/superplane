@@ -32,6 +32,21 @@ const steps: PlanningReviewStep[] = MERGE_CONFIDENCE_CHECKS.map((id) => ({
   prompt: `Merge check: ${id}.\nSaved ${id} rules.`,
 }));
 const custom: PlanningReviewStep = { name: "Custom", type: "prompt", prompt: "Merge check: new-check.\nKeep this." };
+const legacyReview = [
+  "Review this pull request. The diff is in /tmp/pr.diff.",
+  "Report each enabled check with the report_merge_check tool.",
+  "Call the tool once for every check named in Enabled checks.",
+  "Do not write a file.",
+  "",
+  "Enabled checks: risk, security.",
+  "",
+  "Risk. Use this section only when risk is enabled.",
+  "A higher score means more risk.",
+  "",
+  "Security. Use this section only when security is enabled.",
+  "Read the security practices.",
+  "",
+].join("\n");
 
 function renderSettings(savedSteps = steps, onSave = vi.fn(), onClose = vi.fn()) {
   const agent: SuperplaneComponentsNode = {
@@ -94,6 +109,48 @@ describe("Merge confidence configuration", () => {
       }),
     );
     expect(loadDefaults).not.toHaveBeenCalled();
+  });
+
+  it("shows scores from an older combined prompt and saves them as separate checks", async () => {
+    const checkout: PlanningReviewStep = { name: "Checkout Pull Request", type: "bash", command: "git clone" };
+    const { onSave } = renderSettings([
+      checkout,
+      { name: "Review Pull Request", type: "prompt", prompt: legacyReview, workingDirectory: "repo" },
+    ]);
+    expect(screen.getByRole("switch", { name: "Blast radius" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Security" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Performance" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Drift from Specification" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Reversibility" })).not.toBeChecked();
+
+    fireEvent.change(screen.getByDisplayValue("sonnet"), { target: { value: "opus" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const saved = onSave.mock.calls[0]?.[0] as { configuration: { model: string; steps: PlanningReviewStep[] } };
+    expect(saved.configuration.model).toBe("opus");
+    expect(saved.configuration.steps.map((step) => step.name)).toEqual([
+      "Checkout Pull Request",
+      "Blast radius",
+      "Security",
+    ]);
+    expect(saved.configuration.steps.map((step) => step.prompt).join("\n")).not.toContain("Enabled checks:");
+    expect(saved.configuration.steps[1]?.prompt).toContain("Merge check: risk.");
+    expect(saved.configuration.steps[2]?.prompt).toContain("Merge check: security.");
+    expect(loadDefaults).not.toHaveBeenCalled();
+  });
+
+  it("removes a score stored only in an older combined prompt", async () => {
+    const { onSave } = renderSettings([
+      { name: "Review Pull Request", type: "prompt", prompt: legacyReview, workingDirectory: "repo" },
+    ]);
+    fireEvent.click(screen.getByRole("switch", { name: "Security" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const saved = onSave.mock.calls[0]?.[0] as { configuration: { steps: PlanningReviewStep[] } };
+    expect(saved.configuration.steps.map((step) => step.name)).toEqual(["Blast radius"]);
+    expect(saved.configuration.steps[0]?.prompt).toContain("Merge check: risk.");
+    expect(saved.configuration.steps.map((step) => step.prompt).join("\n")).not.toContain("Enabled checks:");
+    expect(saved.configuration.steps.map((step) => step.prompt).join("\n")).not.toContain("Merge check: security.");
   });
 
   it("removes Security only on Save and preserves custom checks and runner settings", async () => {

@@ -9,6 +9,7 @@ import { loadDefaultAgentPrompt } from "../lib/loadDefaultAgentPrompt";
 import { implementDurationMinutes } from "./implementSettingsDraft";
 import { MERGE_CONFIDENCE_CHECKS, type MergeConfidenceCheck } from "./mergeConfidenceChecks";
 import { enabledMergeChecks, stepsWithMergeChecks } from "./mergeConfidenceStepSelection";
+import { expandMergeConfidenceSteps } from "./mergeConfidenceSteps";
 import type { NodeConfigurationSave, NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
@@ -53,7 +54,7 @@ function createDraft(agent: SuperplaneComponentsNode): SettingsDraft {
   const draft: SettingsDraft = {
     agentBase,
     agentDraft,
-    checks: enabledMergeChecks(draftSteps(agentDraft)),
+    checks: enabledMergeChecks(expandMergeConfidenceSteps(draftSteps(agentDraft))),
     savedSnapshot: "",
     durationMinutes: implementDurationMinutes(agent.configuration?.executionTimeoutSeconds),
     durationInvalid: false,
@@ -64,11 +65,14 @@ function createDraft(agent: SuperplaneComponentsNode): SettingsDraft {
 
 async function updateForSave(current: SettingsDraft, context: SettingsContext): Promise<NodeConfigurationUpdate> {
   const storedSteps = draftSteps(current.agentDraft);
-  const storedChecks = enabledMergeChecks(storedSteps);
+  const expandedSteps = expandMergeConfidenceSteps(storedSteps);
+  const storedChecks = enabledMergeChecks(expandedSteps);
   const update = nodeUpdate(current);
-  if (JSON.stringify(current.checks) === JSON.stringify(storedChecks)) return update;
+  const checksChanged = JSON.stringify(current.checks) !== JSON.stringify(storedChecks);
+  const legacyPrompt = JSON.stringify(storedSteps) !== JSON.stringify(expandedSteps);
+  if (!checksChanged && !legacyPrompt) return update;
   let defaults: PlanningReviewStep[] = [];
-  if (current.checks.some((id) => !storedChecks.includes(id))) {
+  if (checksChanged && current.checks.some((id) => !storedChecks.includes(id))) {
     const { organizationId, factoryId, canvasId } = context;
     if (!organizationId || !factoryId || !canvasId)
       throw new Error("Could not load default checks. Reload the settings and try again.");
@@ -85,7 +89,7 @@ async function updateForSave(current: SettingsDraft, context: SettingsContext): 
   }
   return {
     ...update,
-    configuration: { ...update.configuration, steps: stepsWithMergeChecks(storedSteps, current.checks, defaults) },
+    configuration: { ...update.configuration, steps: stepsWithMergeChecks(expandedSteps, current.checks, defaults) },
   };
 }
 
