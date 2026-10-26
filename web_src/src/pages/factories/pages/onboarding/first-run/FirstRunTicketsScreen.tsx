@@ -24,8 +24,8 @@ type FirstRunTicketsScreenProps = {
   onAutomaticIntakeChange?: (on: boolean) => void;
   ticketSource: FirstRunTicketSource | null;
   /**
-   * Open on the source list even when a source is already selected, for
-   * example a default the user did not choose. The card opens on click.
+   * Open on the source list with no row highlighted, even when a default
+   * source is already selected. The card opens when the user picks a row.
    */
   startOnSourceList?: boolean;
   /** Repository the GitHub intake reads, e.g. "acme/payments". */
@@ -151,14 +151,18 @@ function sourceConnected(
  */
 function useTicketScreenPhase(ticketSource: FirstRunTicketSource | null, startOnSourceList: boolean) {
   const [browsing, setBrowsing] = useState(startOnSourceList);
+  // A default the user did not pick shows no highlighted row on the list.
+  const [defaultOnly, setDefaultOnly] = useState(startOnSourceList);
   const [confirmedFor, setConfirmedFor] = useState<FirstRunTicketSource | null>(null);
   const projectsConfirmed = confirmedFor !== null && confirmedFor === ticketSource;
   const listPhase = ticketSource === null || browsing;
   return {
     listPhase,
+    listSelection: defaultOnly ? null : ticketSource,
     projectsConfirmed,
     choose: () => {
       setBrowsing(false);
+      setDefaultOnly(false);
       setConfirmedFor(null);
     },
     confirmProjects: () => setConfirmedFor(ticketSource),
@@ -200,7 +204,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
         ) : (
           <FirstRunTicketSourceList
             githubAvailable={resolved.githubAvailable}
-            ticketSource={ticketSource}
+            ticketSource={phase.listSelection}
             saving={saving}
             githubConnected={resolved.githubConnected}
             jiraConnected={resolved.jiraConnected}

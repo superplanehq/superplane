@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
+import { repositorySphereFor, sphereFor } from "./firstRunSphereFor";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
 
 const copy = FIRST_RUN_COPY.tickets;
@@ -36,7 +37,7 @@ describe("FirstRunTicketsScreen", () => {
       expect(onConnectJira).not.toHaveBeenCalled();
     });
 
-    it("stays on the list when the source is only a default, and opens the card on click", async () => {
+    it("shows no selection while the source is only a default, and opens the card on click", async () => {
       const user = userEvent.setup();
       const onSelectTicketSource = vi.fn();
 
@@ -52,7 +53,7 @@ describe("FirstRunTicketsScreen", () => {
 
       expect(screen.getByRole("heading", { name: copy.headline })).toBeInTheDocument();
       const githubIssues = screen.getByRole("button", { name: /GitHub issues/ });
-      expect(githubIssues).toHaveAttribute("aria-pressed", "true");
+      expect(githubIssues).toHaveAttribute("aria-pressed", "false");
       expect(screen.queryByTestId("first-run-analyze-tickets")).not.toBeInTheDocument();
 
       await user.click(githubIssues);
@@ -431,6 +432,37 @@ describe("FirstRunTicketsScreen", () => {
       expect(screen.getByTestId("first-run-linear-choice-notice")).toHaveTextContent(copy.linearLookupFailed);
       await user.click(screen.getByTestId("first-run-confirm-projects"));
       expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    });
+  });
+
+  describe("text over the art", () => {
+    it("turns dark on the light green repository scene and stays light on the welcome scene", () => {
+      const chrome = { stepIndex: 3, email: "ada@example.com" };
+      const { rerender } = render(
+        <FirstRunTicketsScreen
+          ticketSource={null}
+          chrome={chrome}
+          sphere={repositorySphereFor("acme/payments")}
+          onSelectTicketSource={vi.fn()}
+          onAnalyzeTickets={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("first-run-signed-in")).toHaveAttribute("data-ink", "dark");
+      expect(screen.getByTestId("first-run-art-pill")).toHaveAttribute("data-ink", "dark");
+
+      rerender(
+        <FirstRunTicketsScreen
+          ticketSource={null}
+          chrome={chrome}
+          sphere={sphereFor("welcome", null)}
+          onSelectTicketSource={vi.fn()}
+          onAnalyzeTickets={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("first-run-signed-in")).toHaveAttribute("data-ink", "light");
+      expect(screen.getByTestId("first-run-art-pill")).toHaveAttribute("data-ink", "light");
     });
   });
 

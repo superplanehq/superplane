@@ -373,9 +373,9 @@ describe("FirstRunSetup chrome", () => {
 
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
     expect(model.saveIssues).not.toHaveBeenCalled();
-    // GitHub is highlighted as the default, but the list stays until the user picks it.
+    // Nothing is highlighted until the user picks a source.
     const githubIssues = screen.getByRole("button", { name: /GitHub issues/ });
-    expect(githubIssues).toHaveAttribute("aria-pressed", "true");
+    expect(githubIssues).toHaveAttribute("aria-pressed", "false");
     await user.click(githubIssues);
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.saveIssues).toHaveBeenCalledWith("vcs"));
