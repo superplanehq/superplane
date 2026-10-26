@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const AccountBlockedMessage = "Your account has been blocked. Please contact support."
@@ -182,6 +183,18 @@ func FindAccountByID(id string) (*Account, error) {
 		return nil, err
 	}
 
+	return &account, nil
+}
+
+// LockAccount reloads an account that is not deleted and locks its row until
+// the transaction ends. Flows that change memberships of an account take this
+// lock before any organization lock.
+func LockAccount(tx *gorm.DB, id uuid.UUID) (*Account, error) {
+	var account Account
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&account).Error
+	if err != nil {
+		return nil, err
+	}
 	return &account, nil
 }
 

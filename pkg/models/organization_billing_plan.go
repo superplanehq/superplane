@@ -77,9 +77,11 @@ type OrganizationBillingPlan struct {
 	TrialEndsAt             *time.Time
 	UpdatedAt               time.Time
 
-	// RenewalSeatsScheduled is the last next-period seat count that SuperPlane
-	// scheduled in Polar, and RenewalSeatsScheduledAt is when it was sent.
-	// Subscription snapshots do not change them.
+	// RenewalSeatsScheduled is the last next-period seat count that the
+	// retired automatic renewal scheduler sent to Polar, and
+	// RenewalSeatsScheduledAt is when it was sent. Nothing writes them now.
+	// They stay so that legacy cleanup can identify verified automatic
+	// reductions and keep schedules that an Admin made.
 	RenewalSeatsScheduled   *int
 	RenewalSeatsScheduledAt *time.Time
 
@@ -381,9 +383,8 @@ func FindOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBil
 // in the list. A canceling subscription stays too. Only a canceled or revoked
 // subscription is final and leaves the list.
 //
-// This list decides which plans the sync reads from Polar. It does not decide
-// which plans get a scheduled seat count. The scheduler decides that after it
-// applies the Polar state.
+// This list decides which plans the sync reads from Polar. The sync never
+// writes a seat count.
 func ListSeatRenewalSyncPlans(tx *gorm.DB) ([]OrganizationBillingPlan, error) {
 	var plans []OrganizationBillingPlan
 	err := tx.
@@ -401,25 +402,6 @@ func ListSeatRenewalSyncPlans(tx *gorm.DB) ([]OrganizationBillingPlan, error) {
 		return nil, err
 	}
 	return plans, nil
-}
-
-// RecordScheduledRenewalSeats stores the next-period seat count that
-// SuperPlane sent to Polar. It changes no other column, so the plan version
-// in updated_at stays the same.
-func (p *OrganizationBillingPlan) RecordScheduledRenewalSeats(tx *gorm.DB, seats int, sentAt time.Time) error {
-	sentAt = sentAt.UTC()
-	err := tx.Model(&OrganizationBillingPlan{}).
-		Where("organization_id = ?", p.OrganizationID).
-		UpdateColumns(map[string]any{
-			"renewal_seats_scheduled":    seats,
-			"renewal_seats_scheduled_at": sentAt,
-		}).Error
-	if err != nil {
-		return err
-	}
-	p.RenewalSeatsScheduled = &seats
-	p.RenewalSeatsScheduledAt = &sentAt
-	return nil
 }
 
 // UpdateSeatCapacityState records when a per-seat plan starts or stops having
