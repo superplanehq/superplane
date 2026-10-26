@@ -61,7 +61,9 @@ export function DraftStartModelSelect({
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName);
   const selectedName =
-    model === DRAFT_START_MODEL_AUTO ? "Auto" : (models.data ?? []).find((item) => item.id === model)?.name || model;
+    model === DRAFT_START_MODEL_AUTO
+      ? "Auto"
+      : (models.data?.models ?? []).find((item) => item.id === model)?.name || model;
   const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
   const showName = appearance !== "icon";
 
@@ -89,7 +91,7 @@ export function DraftStartModelSelect({
           value={model}
           options={[
             { value: DRAFT_START_MODEL_AUTO, label: "Auto" },
-            ...(models.data ?? [])
+            ...(models.data?.models ?? [])
               .filter((item) => (item.id ?? "") !== "")
               .map((item) => ({ value: item.id ?? "", label: item.name || item.id || "" })),
           ]}

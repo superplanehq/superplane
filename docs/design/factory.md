@@ -21,15 +21,15 @@ Lines are stored on `factory_lines`; steps are JSON on the line row. Work orders
 ## Dispatch flow
 
 1. User dispatches a **draft** or **open** work order to a line (`PATCH …/orders/{id}/dispatch`).
-2. Backend creates a line dispatch and checks organization capacity, queue order, and the step limit.
+2. Backend creates a line dispatch and checks the line-step concurrency limit.
 3. If admission succeeds, the backend creates a pending canvas run and step execution. Otherwise, it saves a line queue item.
 4. A queued initial start remains in Backlog. Admission opens the draft work order when its execution starts.
 5. Run finalizer marks the execution finished from the run result.
 6. If the run **passed**, the next step uses the same admission checks. Otherwise, the traversal stops.
 7. A work order has one active line dispatch. That dispatch can have a running step or a queued step.
 
-See [Task queue and admission](task-queue.md) for capacity accounting, FIFO
-ordering, cancellation, recovery scans, and the separate canvas node queues.
+See [Runner queue and organization limits](task-queue.md) for organization
+runner slots, individual job positions, cancellation, and timeout accounting.
 
 Run input shape (for app triggers):
 
@@ -109,8 +109,8 @@ this vocabulary — six statuses that map to four board lanes:
 | Persisted state | Derived UI status | Board lane | Notes |
 | --- | --- | --- | --- |
 | `draft` | Draft | Backlog | Being scoped or queued for its initial line start. Admission promotes it to `open`. |
-| `open`, no active dispatch and no `queued_tasks[].task_active` flag | Waiting | Review | Idle between runs. The row shows the last line and step separately from the pill. |
-| `open`, active dispatch or `queued_tasks[].task_active` flag | Running | Running | Includes a traversal waiting for a later step. |
+| `open`, no active dispatch | Waiting | Review | Idle between runs. The row shows the last line and step separately from the pill. |
+| `open`, active dispatch | Running | Running | Includes a traversal waiting for a later step. |
 | `closed`, `result=completed` | Completed | Done | |
 | `closed`, `result=rejected` | Cancelled | Done | Abandoned before or during work. |
 | `closed`, `result=failed` | Failed | Done | Line execution did not pass. Same red styling as an in-flight failure. |

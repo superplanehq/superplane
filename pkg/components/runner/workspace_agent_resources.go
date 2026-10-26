@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 	"gorm.io/gorm"
 )
 
@@ -76,9 +77,9 @@ type workspaceContextFile struct {
 // no-op when the canvas is not factory-owned.
 func AttachWorkspaceAgentResources(
 	ctx core.ExecutionContext,
-	environment []BrokerEnvironmentVariable,
-	files []BrokerTaskFile,
-) ([]BrokerEnvironmentVariable, []BrokerTaskFile) {
+	environment []TaskEnvironmentVariable,
+	files []TaskFile,
+) ([]TaskEnvironmentVariable, []TaskFile) {
 	logger := workspaceAgentResourcesLogger(ctx)
 	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
 	if err != nil {
@@ -184,9 +185,9 @@ func attachWorkspaceMCPServers(
 	resources []models.FactoryAgentResource,
 	disabledTools map[string][]string,
 	enabledTools map[string][]string,
-	environment []BrokerEnvironmentVariable,
-	files []BrokerTaskFile,
-) ([]BrokerEnvironmentVariable, []BrokerTaskFile, []string) {
+	environment []TaskEnvironmentVariable,
+	files []TaskFile,
+) ([]TaskEnvironmentVariable, []TaskFile, []string) {
 	if len(resources) == 0 {
 		return environment, files, nil
 	}
@@ -229,19 +230,19 @@ func attachWorkspaceMCPServers(
 	for _, server := range servers {
 		names = append(names, server.Name)
 	}
-	files = append(files, BrokerTaskFile{
+	files = append(files, TaskFile{
 		Path:    WorkspaceMCPConfigPath,
 		Content: string(payload) + "\n",
 		Mode:    "0644",
 	})
-	environment = append(environment, BrokerEnvironmentVariable{
+	environment = append(environment, TaskEnvironmentVariable{
 		Name:  EnvSuperplaneWorkspaceMCPConfig,
 		Value: workspaceMCPConfigEnvValue,
 	})
 	return environment, files, names
 }
 
-func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []TaskFile) []TaskFile {
 	for i := range resources {
 		markdown := strings.TrimSpace(resources[i].Config.Data().Markdown)
 		if markdown == "" || resources[i].Name == models.ReservedFactoryAgentResourceName {
@@ -252,14 +253,14 @@ func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []
 		}
 		content := markdown + "\n"
 		files = append(files,
-			BrokerTaskFile{Path: fmt.Sprintf(workspaceClaudeSkillPath, resources[i].Name), Content: content, Mode: "0644"},
-			BrokerTaskFile{Path: fmt.Sprintf(workspaceAgentsSkillPath, resources[i].Name), Content: content, Mode: "0644"},
+			TaskFile{Path: fmt.Sprintf(workspaceClaudeSkillPath, resources[i].Name), Content: content, Mode: "0644"},
+			TaskFile{Path: fmt.Sprintf(workspaceAgentsSkillPath, resources[i].Name), Content: content, Mode: "0644"},
 		)
 	}
 	return files
 }
 
-func appendWorkspaceSetupFiles(commands []string, files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceSetupFiles(commands []string, files []TaskFile) []TaskFile {
 	commands = models.NormalizeSetupCommands(commands)
 	if len(commands) == 0 {
 		return files
@@ -268,7 +269,7 @@ func appendWorkspaceSetupFiles(commands []string, files []BrokerTaskFile) []Brok
 	if err != nil {
 		return files
 	}
-	return append(files, BrokerTaskFile{
+	return append(files, TaskFile{
 		Path:    WorkspaceSetupConfigPath,
 		Content: string(payload) + "\n",
 		Mode:    "0644",
@@ -294,7 +295,7 @@ func WorkspaceContextRepoDirectory(repository string) string {
 	return "context/" + repository
 }
 
-func appendWorkspaceContextFiles(factory *models.Factory, resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceContextFiles(factory *models.Factory, resources []models.FactoryAgentResource, files []TaskFile) []TaskFile {
 	if len(resources) == 0 {
 		return files
 	}
@@ -330,7 +331,7 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 	if err != nil {
 		return files
 	}
-	return append(files, BrokerTaskFile{
+	return append(files, TaskFile{
 		Path:    WorkspaceContextConfigPath,
 		Content: string(payload) + "\n",
 		Mode:    "0644",
@@ -651,20 +652,20 @@ fi
 `
 }
 
-func appendWorkspaceCheckoutFile(files []BrokerTaskFile) []BrokerTaskFile {
+func appendWorkspaceCheckoutFile(files []TaskFile) []TaskFile {
 	for i := range files {
 		if files[i].Path == WorkspaceCheckoutScriptPath {
 			return files
 		}
 	}
-	return append(files, BrokerTaskFile{
+	return append(files, TaskFile{
 		Path:    WorkspaceCheckoutScriptPath,
 		Content: WorkspaceCheckoutScript(),
 		Mode:    "0755",
 	})
 }
 
-func taskShipsCheckout(files []BrokerTaskFile) bool {
+func taskShipsCheckout(files []TaskFile) bool {
 	for i := range files {
 		if files[i].Path == WorkspaceCheckoutScriptPath {
 			return true
@@ -685,7 +686,7 @@ const (
 // already clones keeps that step and does not get a second checkout.
 // Prompt hints stay on the saved-clone instructions unless this inserts
 // the command, because only then have setup and context checkout run.
-func ApplyFactoryCheckout(files []BrokerTaskFile, commands []BrokerCommand, steps []AgentStep) []BrokerCommand {
+func ApplyFactoryCheckout(files []TaskFile, commands []TaskCommand, steps []AgentStep) []TaskCommand {
 	if !taskShipsCheckout(files) {
 		return commands
 	}
@@ -697,7 +698,7 @@ func ApplyFactoryCheckout(files []BrokerTaskFile, commands []BrokerCommand, step
 // regular commands so the task log shows them apart. Steps that already
 // run git clone, or the checkout helper, are left unchanged so saved
 // automations keep their own clone and run setup themselves.
-func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, files []BrokerTaskFile) []BrokerCommand {
+func InsertFactoryCheckoutCommand(commands []TaskCommand, steps []AgentStep, files []TaskFile) []TaskCommand {
 	if stepsAlreadyCheckout(steps) {
 		return commands
 	}
@@ -707,7 +708,7 @@ func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, f
 		if command.Kind == LiveLogKindSetup {
 			continue
 		}
-		out := make([]BrokerCommand, 0, len(commands)+len(inserted))
+		out := make([]TaskCommand, 0, len(commands)+len(inserted))
 		out = append(out, commands[:i]...)
 		out = append(out, inserted...)
 		return append(out, commands[i:]...)
@@ -715,8 +716,8 @@ func InsertFactoryCheckoutCommand(commands []BrokerCommand, steps []AgentStep, f
 	return append(commands, inserted...)
 }
 
-func factoryCheckoutCommands(files []BrokerTaskFile) []BrokerCommand {
-	commands := []BrokerCommand{{
+func factoryCheckoutCommands(files []TaskFile) []TaskCommand {
+	commands := []TaskCommand{{
 		Name:    "Checkout",
 		Command: WrapAgentStepCommand("checkout"),
 		Kind:    LiveLogKindBash,
@@ -726,7 +727,7 @@ func factoryCheckoutCommands(files []BrokerTaskFile) []BrokerCommand {
 	if len(setup) == 0 {
 		return commands
 	}
-	return append(commands, BrokerCommand{
+	return append(commands, TaskCommand{
 		Name:    "Setup",
 		Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory("repo", setupCommandBody(setup))),
 		Kind:    LiveLogKindBash,
@@ -749,7 +750,7 @@ func setupCommandBody(commands []string) string {
 	return strings.Join(lines, "\n")
 }
 
-func setupCommandsFromFiles(files []BrokerTaskFile) []string {
+func setupCommandsFromFiles(files []TaskFile) []string {
 	for i := range files {
 		if files[i].Path != WorkspaceSetupConfigPath {
 			continue
@@ -763,7 +764,7 @@ func setupCommandsFromFiles(files []BrokerTaskFile) []string {
 	return nil
 }
 
-func markCheckoutHintsComplete(files []BrokerTaskFile) {
+func markCheckoutHintsComplete(files []TaskFile) {
 	for i := range files {
 		if !strings.HasPrefix(files[i].Path, "prompts/") || !strings.HasSuffix(files[i].Path, ".txt") {
 			continue
@@ -865,25 +866,38 @@ func assembleWorkspaceMCPServer(
 				return workspaceMCPServer{}, false
 			}
 			headers[header.Name] = string(value)
+			if recorder, ok := ctx.RunnerTasks.(runnerapi.CredentialRefreshRecorder); ok {
+				secret, err := models.FindSecretByNameInTransaction(db, models.DomainTypeOrganization, resource.OrganizationID, header.SecretName)
+				if err != nil {
+					return workspaceMCPServer{}, false
+				}
+				recorder.RecordCredentialRefresh(runnerapi.CredentialRefresh{Version: 1, Kind: "mcp_header", OrganizationID: resource.OrganizationID.String(), ResourceID: resource.ID.String(), Recipient: config.URL, Scope: map[string]string{"name": resource.Name, "factory_id": resource.FactoryID.String(), "secret_id": secret.ID.String(), "key": header.SecretKey, "header": header.Name, "auth": config.MCPAuth()}, Current: string(value)})
+			}
 		}
 	case models.FactoryAgentResourceAuthOAuth:
 		if encryptor == nil {
 			logger.WithField("mcp", resource.Name).Warn("skip workspace MCP: encryptor missing")
 			return workspaceMCPServer{}, false
 		}
-		token, err := mcp.MintFactoryAgentResourceAccessTokenWithLifetime(
-			context.Background(),
-			encryptor,
-			httpClient,
-			db,
-			resource,
-			tokenLifetime,
-		)
-		if err != nil || strings.TrimSpace(token) == "" {
-			logger.WithError(err).WithField("mcp", resource.Name).Warn("skip workspace MCP: sign-in required")
-			return workspaceMCPServer{}, false
+		token := "pending-mcp-" + resource.ID.String()
+		if _, deferred := ctx.RunnerTasks.(runnerapi.CredentialRefreshRecorder); !deferred {
+			var err error
+			token, err = mcp.MintFactoryAgentResourceAccessTokenWithLifetime(context.Background(), encryptor, httpClient, db, resource, tokenLifetime)
+			if err != nil || strings.TrimSpace(token) == "" {
+				logger.WithError(err).WithField("mcp", resource.Name).Warn("skip workspace MCP: sign-in required")
+				return workspaceMCPServer{}, false
+			}
 		}
+
 		headers["Authorization"] = "Bearer " + token
+		if recorder, ok := ctx.RunnerTasks.(runnerapi.CredentialRefreshRecorder); ok {
+			metadata := resource.OAuthMetadata.Data()
+			connectedAt := ""
+			if resource.OAuthConnectedAt != nil {
+				connectedAt = resource.OAuthConnectedAt.UTC().Truncate(time.Microsecond).Format(time.RFC3339Nano)
+			}
+			recorder.RecordCredentialRefresh(runnerapi.CredentialRefresh{Version: 1, Kind: "mcp_oauth", OrganizationID: resource.OrganizationID.String(), ResourceID: resource.ID.String(), Recipient: config.URL, Scope: map[string]string{"name": resource.Name, "factory_id": resource.FactoryID.String(), "auth": config.MCPAuth(), "client_id": metadata.ClientID, "token_endpoint": metadata.TokenEndpoint, "authorization_endpoint": metadata.AuthorizationEndpoint, "resource": metadata.Resource, "connected_at": connectedAt}, Current: token})
+		}
 	default:
 		return workspaceMCPServer{}, false
 	}
@@ -1058,7 +1072,7 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 	return builder.String()
 }
 
-func appendWorkspaceAgentResourcesHint(files []BrokerTaskFile, mcpNames []string, setupCommands []string, contextRepos []models.FactoryAgentResource) []BrokerTaskFile {
+func appendWorkspaceAgentResourcesHint(files []TaskFile, mcpNames []string, setupCommands []string, contextRepos []models.FactoryAgentResource) []TaskFile {
 	hint := workspaceAgentResourcesHint(mcpNames, setupCommands, contextRepos)
 	if hint == "" {
 		return files

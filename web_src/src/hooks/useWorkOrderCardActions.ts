@@ -9,17 +9,17 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
   const cancelQueue = useCancelWorkOrderQueue(organizationId, factoryId);
-  const [cancellingQueueOrderIds, setCancellingQueueOrderIds] = useState<ReadonlySet<string>>(NO_ORDERS);
+  const [cancellingQueueJobIds, setCancellingQueueJobIds] = useState<ReadonlySet<string>>(NO_ORDERS);
 
-  const onCancelQueuedTask = useCallback(
+  const onCancelQueuedRunnerJob = useCallback(
     async (orderId: string, queueId: string) => {
-      setCancellingQueueOrderIds((current) => withOrderId(current, orderId));
+      setCancellingQueueJobIds((current) => withOrderId(current, queueId));
       try {
         await cancelQueue.mutateAsync({ orderId, queueId });
       } catch {
-        showErrorToast("Could not remove the task from the queue. Refresh and try again.");
+        showErrorToast("Could not cancel the runner job. Refresh and try again.");
       } finally {
-        setCancellingQueueOrderIds((current) => withoutOrderId(current, orderId));
+        setCancellingQueueJobIds((current) => withoutOrderId(current, queueId));
       }
     },
     [cancelQueue],
@@ -60,8 +60,8 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
   );
 
   return {
-    onCancelQueuedTask,
-    cancellingQueueOrderIds,
+    onCancelQueuedRunnerJob,
+    cancellingQueueJobIds,
     dispatchingOrderIds,
     isAssigneesSaving: updateAssignees.isPending,
     onDispatch,

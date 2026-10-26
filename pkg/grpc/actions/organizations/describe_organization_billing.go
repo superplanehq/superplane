@@ -10,12 +10,15 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
+	"gorm.io/gorm"
 )
 
 func DescribeOrganizationBilling(
@@ -71,15 +74,29 @@ func DescribeOrganizationBilling(
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "Could not load billing plans.")
 		}
+		override, err := models.FindOrganizationSeatLimitOverride(db, organizationID)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "Could not load seat limits.")
+		}
 		for _, item := range catalog {
 			if item.Visibility != "public" || item.Category != "paid" {
 				continue
 			}
 			checkoutEnabled = checkoutEnabled || item.PolarProductID != nil
-			available = append(available, &pb.BillingPlanOption{Key: item.Key, Name: item.Name, PriceCents: item.PriceCents, PerSeat: item.PerSeat, RequirePaymentMethod: item.RequirePaymentMethod, SubscriptionRequired: item.PolarProductID != nil || item.PriceCents != 0})
+			maximum := entitlements.SeatMaximum(item.SeatLimit, override)
+			var seatMaximum *int32
+			if maximum != nil {
+				seatMaximum = new(int32(*maximum))
+			}
+			available = append(available, &pb.BillingPlanOption{
+				Key: item.Key, Name: item.Name, PriceCents: item.PriceCents,
+				PerSeat: item.PerSeat, SeatMaximum: seatMaximum,
+				RequirePaymentMethod: item.RequirePaymentMethod,
+				SubscriptionRequired: item.PerSeat || item.PolarProductID != nil || item.PriceCents != 0,
+			})
 		}
 	}
-	return &pb.DescribeOrganizationBillingResponse{
+	response := &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
 		ProductFeatures:             productFeatures,
 		RequirePaymentMethod:        models.BillingEnabled() && newBilling && plan.Catalog.RequirePaymentMethod,
@@ -91,6 +108,7 @@ func DescribeOrganizationBilling(
 		PlanPerSeat:                 plan.Catalog.PerSeat,
 		CatalogKey:                  plan.Catalog.Key,
 		HostedExecutionAllowed:      !models.BillingEnabled() || plan.AllowsHostedExecution(time.Now()) && (!newBilling || !plan.Catalog.RequirePaymentMethod || hasCard),
+		HostedCreditAvailable:       !models.BillingEnabled() || credit.RemainingMicros > 0,
 		PlanSource:                  plan.PlanSource,
 		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
 		TrialEndsAt:                 protoTimestamp(plan.TrialEndsAt),
@@ -106,7 +124,138 @@ func DescribeOrganizationBilling(
 		WelcomeRemainingCents:       pricebook.MicrosToCents(credit.WelcomeRemainingMicros),
 		AdminRemainingCents:         pricebook.MicrosToCents(credit.AdminRemainingMicros),
 		CancelAtPeriodEnd:           plan.CancelAtPeriodEnd,
-	}, nil
+	}
+	if !models.BillingEnabled() {
+		return response, nil
+	}
+	if err := describePastDue(db, plan, response); err != nil {
+		return nil, err
+	}
+
+	lastSeatPurchase, err := models.FindLatestSeatPurchase(db, organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load the last seat purchase.")
+	}
+	response.LastSeatPurchase = seatPurchaseToProto(lastSeatPurchase)
+
+	seats, err := entitlements.ResolveSeatsForPlan(db, organizationID, plan)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load seat usage.")
+	}
+	response.OccupiedSeats = new(int32(seats.Occupied))
+	response.PendingInvitationSeats = new(int32(seats.PendingInvitations))
+	if seats.Invitable != nil {
+		response.InvitableSeats = new(int32(*seats.Invitable))
+	}
+	if seats.PaymentBlocked {
+		// The plan row can already be off per-seat, but the stored seats still
+		// describe who can use the workspace.
+		response.PurchasedSeats = new(int32(*seats.Purchased))
+		describeBlockedRenewal(ctx, db, plan, seats, response)
+		return response, nil
+	}
+	if !seats.PerSeat {
+		return response, nil
+	}
+
+	response.PurchasedSeats = new(int32(*seats.Purchased))
+	response.AvailableSeats = new(int32(*seats.Available))
+	response.CurrentMonthlyTotalCents = new(int64(*seats.Purchased) * plan.Catalog.PriceCents)
+	// A plan without paid seats has no renewal count until it is repaired.
+	if seats.RenewalQuantity != nil {
+		response.ExpectedRenewalSeats = new(int32(*seats.RenewalQuantity))
+		response.ExpectedRenewalCents = new(int64(*seats.RenewalQuantity) * plan.Catalog.PriceCents)
+	}
+	if seats.PlanMaximum != nil {
+		response.PlanMaximumSeats = new(int32(*seats.PlanMaximum))
+	}
+	if seats.Purchasable != nil {
+		response.PurchasableSeats = new(int32(*seats.Purchasable))
+	}
+	return response, nil
+}
+
+// describeBlockedRenewal fills the renewal estimate while payment is blocked,
+// so the admin can see what the recovered subscription charges. A plan
+// without paid seats gets no estimate, and an unverified price leaves the
+// amount empty instead of zero.
+func describeBlockedRenewal(
+	ctx context.Context,
+	db *gorm.DB,
+	plan *models.OrganizationBillingPlan,
+	seats *entitlements.SeatUsage,
+	response *pb.DescribeOrganizationBillingResponse,
+) {
+	if seats.RenewalQuantity == nil {
+		return
+	}
+	response.ExpectedRenewalSeats = new(int32(*seats.RenewalQuantity))
+	price := verifiedPaidSeatPriceCents(ctx, db, plan)
+	if price == nil {
+		return
+	}
+	response.ExpectedRenewalCents = new(int64(*seats.RenewalQuantity) * *price)
+}
+
+// verifiedPaidSeatPriceCents returns the per-seat price of the paid plan that
+// the subscription renews with, or nil when it cannot be verified. A grace
+// period keeps the paid catalog on the row. After the fallback, the row points
+// to the access plan, so only the Polar subscription names the paid product.
+// The access plan price is never a renewal price. A Polar failure only hides
+// the amount: it must not fail the billing page.
+func verifiedPaidSeatPriceCents(ctx context.Context, db *gorm.DB, plan *models.OrganizationBillingPlan) *int64 {
+	if isPaidPerSeatCatalog(&plan.Catalog) {
+		return new(plan.Catalog.PriceCents)
+	}
+	if plan.PolarSubscriptionID == nil || !polar.Configured() {
+		return nil
+	}
+	subscriptionID := strings.TrimSpace(*plan.PolarSubscriptionID)
+	if subscriptionID == "" {
+		return nil
+	}
+	logger := log.WithFields(log.Fields{"organization_id": plan.OrganizationID.String(), "polar_subscription_id": subscriptionID})
+	subscription, err := polar.NewClientFromEnv().GetSubscription(ctx, subscriptionID)
+	if err != nil {
+		logger.WithError(err).Info("renewal price is not available: could not read the Polar subscription")
+		return nil
+	}
+	if subscription.ID != subscriptionID || strings.TrimSpace(subscription.ProductID) == "" {
+		return nil
+	}
+	catalog, err := models.FindBillingPlanByProduct(db, subscription.ProductID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.WithError(err).Warn("renewal price is not available: could not load the billing plan")
+		}
+		return nil
+	}
+	if !isPaidPerSeatCatalog(catalog) {
+		return nil
+	}
+	return new(catalog.PriceCents)
+}
+
+func isPaidPerSeatCatalog(catalog *models.BillingPlan) bool {
+	return catalog.Category == "paid" && catalog.PerSeat
+}
+
+// describePastDue reports when a failed renewal payment started and, while a
+// grace period keeps Team features on, when they end.
+func describePastDue(db *gorm.DB, plan *models.OrganizationBillingPlan, response *pb.DescribeOrganizationBillingResponse) error {
+	if !models.PolarSubscriptionIsPastDue(plan.PolarSubscriptionStatus) || plan.PastDueSince == nil {
+		return nil
+	}
+	response.PaymentFailedAt = protoTimestamp(plan.PastDueSince)
+	if !plan.IsActiveBusiness() {
+		return nil
+	}
+	metadata, err := models.GetInstallationMetadata(db)
+	if err != nil {
+		return grpcerrors.Internal(err, "Could not load billing settings.")
+	}
+	response.PaidAccessEndsAt = protoTimestamp(plan.PastDueAccessEndsAt(metadata.PastDueGraceDays))
+	return nil
 }
 
 func SyncOrganizationBilling(
@@ -126,6 +275,10 @@ func SyncOrganizationBilling(
 	if err := polar.SyncOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
 		log.WithError(err).WithField("organization_id", organizationID.String()).Warn("failed to sync Polar subscription")
 	}
+	_ = reconcileSeatPurchase(ctx, database.DB(ctx), organizationID)
+	// Sync can apply an activation or a payment recovery that no webhook
+	// delivered. Either one can change the renewal seat count.
+	seatrenewal.ScheduleAsync(ctx, organizationID)
 
 	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
 }
@@ -150,6 +303,26 @@ func CreateBusinessCheckout(
 	}
 	if productID == "" {
 		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
+	}
+
+	current, err := models.FindOrganizationBillingPlan(database.DB(ctx), organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load the current plan.")
+	}
+	if current != nil && models.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) {
+		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
+	}
+	newBilling, err := models.OrganizationHasExperimentalFeatures(database.DB(ctx), organizationID, features.FeatureNewBilling)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
+	}
+	if newBilling {
+		return nil, grpcerrors.FailedPrecondition(nil, "Select a plan in Billing.")
+	}
+	// A paused subscription has no paid access but can resume billing. Checkout
+	// must not start a second subscription while any live one exists.
+	if current.HasLivePolarSubscription(time.Now()) {
+		return nil, grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
 	}
 
 	email := actingUserEmail(ctx, organizationID.String(), accountID)
@@ -178,15 +351,15 @@ func CreateBusinessCheckout(
 		return nil, grpcerrors.Internal(err, "failed to create Business checkout")
 	}
 
-	session, err := client.CreateCheckout(
-		ctx,
-		productID,
-		organizationID.String(),
-		businessCheckoutSuccessURL(baseURL, organizationID),
-		clientIPFromContext(ctx),
-	)
+	session, err := startSubscriptionCheckout(ctx, subscriptionCheckoutRequest{
+		OrganizationID: organizationID,
+		PlanKey:        models.BillingPlanBusiness,
+		ProductID:      productID,
+		SuccessURL:     businessCheckoutSuccessURL(baseURL, organizationID),
+		CustomerIP:     clientIPFromContext(ctx),
+	})
 	if err != nil {
-		return nil, polarBillingError(err, "failed to create Business checkout")
+		return nil, err
 	}
 	if session.CustomerID != "" {
 		if err := models.SetOrganizationPolarCustomerID(database.DB(ctx), organizationID, session.CustomerID); err != nil {
@@ -214,10 +387,10 @@ func CancelOrganizationSubscription(
 		return nil, err
 	}
 	if !models.BillingEnabled() {
-		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
+		return nil, grpcerrors.FailedPrecondition(nil, "Subscription checkout is not configured.")
 	}
 	if err := polar.CancelOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
-		return nil, subscriptionCancelError(err, "failed to cancel Business")
+		return nil, subscriptionCancelError(err, "Could not cancel the subscription.")
 	}
 	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
 }
@@ -232,26 +405,29 @@ func ResumeOrganizationSubscription(
 		return nil, err
 	}
 	if !models.BillingEnabled() {
-		return nil, grpcerrors.FailedPrecondition(nil, "Business checkout is not configured")
+		return nil, grpcerrors.FailedPrecondition(nil, "Subscription checkout is not configured.")
 	}
 	if err := polar.ResumeOrganizationSubscription(ctx, database.DB(ctx), organizationID); err != nil {
-		return nil, subscriptionCancelError(err, "failed to keep Business")
+		return nil, subscriptionCancelError(err, "Could not resume the subscription.")
 	}
+	// The resumed subscription renews again, so schedule the next-period
+	// seat count. A Polar failure here does not fail the resume.
+	seatrenewal.ScheduleAsync(ctx, organizationID)
 	return DescribeOrganizationBilling(ctx, orgID, &pb.DescribeOrganizationBillingRequest{Id: req.GetId()})
 }
 
 func subscriptionCancelError(err error, fallback string) error {
 	switch {
 	case errors.Is(err, polar.ErrSubscriptionCheckoutDisabled):
-		return grpcerrors.FailedPrecondition(err, "Business checkout is not configured")
+		return grpcerrors.FailedPrecondition(err, "Subscription checkout is not configured.")
 	case errors.Is(err, polar.ErrAdminPlanCannotCancel):
 		return grpcerrors.FailedPrecondition(err, "An admin plan cannot be canceled from Billing.")
 	case errors.Is(err, polar.ErrSubscriptionNotCancelable), polar.IsNotFound(err):
-		return grpcerrors.FailedPrecondition(err, "This organization has no Business subscription to cancel.")
+		return grpcerrors.FailedPrecondition(err, "This organization has no subscription to cancel.")
 	case errors.Is(err, polar.ErrSubscriptionAlreadyCanceling):
-		return grpcerrors.FailedPrecondition(err, "Business is already set to end at the period end.")
+		return grpcerrors.FailedPrecondition(err, "The subscription is already set to end at the period end.")
 	case errors.Is(err, polar.ErrSubscriptionNotCanceling):
-		return grpcerrors.FailedPrecondition(err, "Business is not set to end at the period end.")
+		return grpcerrors.FailedPrecondition(err, "The subscription is not set to end at the period end.")
 	default:
 		return polarBillingError(err, fallback)
 	}

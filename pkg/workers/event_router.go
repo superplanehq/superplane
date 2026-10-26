@@ -173,8 +173,8 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var runID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		// Task admission must lock the organization before the event, run,
-		// or planning session, matching line dispatch and run finalization.
+		// Serialize task mutations before event, run, and planning-session
+		// locks, matching cancellation, merge, and line replacement.
 		if event.ExecutionID == nil {
 			canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
 			if err != nil {
@@ -204,10 +204,9 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		return nil
 	})
 
-	if errors.Is(err, models.ErrOrganizationTaskCapacity) {
-		// Roll back routing and session attachment, keeping the root event in
-		// the durable queue. The pending-event sweep retries it after capacity
-		// is freed.
+	if errors.Is(err, models.ErrWorkOrderBusy) {
+		// Keep replacement work pending until its earlier run subtree stops
+		// or the work order merge finishes.
 		outcome = executorOutcomeSkipped
 		reason = executorReasonNone
 		return nil
@@ -321,7 +320,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, run.ID, nil
 	}
 
-	if err := models.CheckTaskRootEventAdmission(tx, canvas, event); err != nil {
+	if err := models.CheckTaskRootEventReady(tx, canvas, event); err != nil {
 		return nil, uuid.Nil, err
 	}
 	if err := models.MaybeAttachAnalysisSession(tx, canvas, event, run); err != nil {

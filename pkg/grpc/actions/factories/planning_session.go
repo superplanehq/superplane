@@ -114,6 +114,12 @@ func sendPlanningSessionMessage(
 		}
 		return nil, grpcerrors.Internal(err, "Could not verify the payment method.")
 	}
+	if err := models.AssertOrganizationPlanAllowsRuns(db, factoryModel.OrganizationID); err != nil {
+		if errors.Is(err, models.ErrHostedSubscriptionRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
+		}
+		return nil, grpcerrors.Internal(err, "Could not verify the organization plan.")
+	}
 	assigned := false
 	firstRefinement := false
 	if err := db.Transaction(func(tx *gorm.DB) error {

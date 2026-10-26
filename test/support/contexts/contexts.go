@@ -821,6 +821,8 @@ func (c *AppContext) Unsubscribe() error {
 }
 
 type RunExecutionContext struct {
+	QueueWaitResult  core.RunQueueWait
+	QueueWaitErr     error
 	CreateRunID      uuid.UUID
 	CreateErr        error
 	CancelErr        error
@@ -828,6 +830,10 @@ type RunExecutionContext struct {
 	LastCreateParams *core.RunCreationParams
 	AddErrorCalls    []string
 	AddErrorErr      error
+}
+
+func (c *RunExecutionContext) QueueWait(_ string, _, _ time.Time) (*core.RunQueueWait, error) {
+	return &c.QueueWaitResult, c.QueueWaitErr
 }
 
 func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {

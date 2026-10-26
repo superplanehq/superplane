@@ -4,7 +4,6 @@ import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client
 import { WorkOrderQueueStatus } from "../../workOrders/WorkOrderQueueStatus";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
-import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
@@ -16,12 +15,7 @@ import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { draftAnalysisQueued, draftStripAnalysis } from "./draftStripAnalysis";
-import {
-  classicSplitRunFooter,
-  isTaskResultFooter,
-  SPLIT_RUN_ANALYZING_NOTE,
-  withTaskQueueActions,
-} from "./splitRunFooter";
+import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { refinePopupShowsAutomations, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
@@ -36,6 +30,7 @@ import { AnalysisPopupHeader, LoadingWorkOrderPopup } from "./workOrderPopupHead
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled } from "../planningSettingsModel";
 import { PopupShell } from "../work-order-popup-redesign/popupShared";
+import { useWorkOrderStartFooter } from "./useWorkOrderStartFooter";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -139,20 +134,18 @@ function AnalysisWorkOrderPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
-  const { data: workspaceUsage } = useOrganizationWorkspaceUsage(organizationId ?? "", 30, true);
-  const analysisTaskLimitReached =
-    workspaceUsage?.activeTaskCount != null
-      ? workspaceUsage.parallelTaskLimit != null && workspaceUsage.activeTaskCount >= workspaceUsage.parallelTaskLimit
-      : fixture.taskLimitReached;
+  const { sourceOnly, viewFixture: originalViewFixture } = analysisPopupView(fixture, factory);
+  const footer = useWorkOrderStartFooter(originalViewFixture.footer, organizationId, factoryId, fixture.lineName);
+  const viewFixture = { ...originalViewFixture, footer };
+  const startAllowed = canDispatch && !footer.actions.some((action) => action.kind === "start" && action.disabled);
   const draftStart = draftStartAction(
     fixture.footer.kind,
-    onDispatch,
+    startAllowed ? onDispatch : undefined,
     draftModel,
     factoryPlanningEnabled(factory) ? draftThinking : undefined,
   );
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
-  const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
   const unified = refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
     factory,
@@ -162,14 +155,13 @@ function AnalysisWorkOrderPopup({
     lineId,
     fixture: viewFixture,
     analysis,
-    taskLimitReached: analysisTaskLimitReached,
     draftModel,
     draftThinking,
     onDraftStartChange: ({ model, thinkingLevel }) => {
       setDraftModel(model);
       setDraftThinking(thinkingLevel);
     },
-    disabled: isDispatching || !canDispatch,
+    disabled: isDispatching || !startAllowed,
   });
   const reviewArgs = analysisReviewArgs({
     viewFixture,
@@ -184,7 +176,7 @@ function AnalysisWorkOrderPopup({
     mutations,
     isDispatching,
     footerBusy: footerActions.busy,
-    canDispatch,
+    canDispatch: startAllowed,
     compact: analysisReviewCompact(showSidebarNote, viewFixture.footer.kind, sourceOnly),
     modelSelect: draftChrome.footerModelSelect,
     factory,
@@ -242,9 +234,9 @@ function AnalysisWorkOrderPopup({
                 planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
                 views={views}
               />
-              {fixture.queuedTasks?.length ? (
+              {fixture.queuedRunnerJobs?.length ? (
                 <div className="flex flex-wrap gap-2 border-b border-border px-5 py-2">
-                  {fixture.queuedTasks.map((queue) => (
+                  {fixture.queuedRunnerJobs.map((queue) => (
                     <WorkOrderQueueStatus
                       key={queue.id}
                       queue={queue}
@@ -403,7 +395,6 @@ type AnalysisDraftChromeArgs = {
   lineId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
-  taskLimitReached?: boolean;
   draftModel: string;
   draftThinking: string;
   onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
@@ -462,7 +453,7 @@ function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], fact
   const footer = sourceOnly ? classicSplitRunFooter(fixture.footer) : { ...fixture.footer, note: analysisNote };
   return {
     sourceOnly,
-    viewFixture: { ...fixture, footer: withTaskQueueActions(footer, fixture) },
+    viewFixture: { ...fixture, footer },
   };
 }
 

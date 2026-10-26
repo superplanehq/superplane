@@ -63,7 +63,7 @@ vi.mock("../pages/usePlanningSessionLiveRun", () => ({
 }));
 
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
-  useOrganizationWorkspaceUsage: () => ({ data: { activeTaskCount: 0, parallelTaskLimit: 1 } }),
+  useOrganizationWorkspaceUsage: () => ({ data: { activeRunnerCount: 0, parallelRunnerLimit: 1 } }),
 }));
 
 vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
@@ -112,10 +112,12 @@ vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   useFactoryLineRunnerModels: (...args: unknown[]) => {
     runnerModelCalls.push(args);
     return {
-      data: [
-        { id: "claude-opus-4-6", name: "claude-opus-4-6" },
-        { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
-      ],
+      data: {
+        models: [
+          { id: "claude-opus-4-6", name: "claude-opus-4-6" },
+          { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
+        ],
+      },
       isLoading: false,
     };
   },
@@ -368,9 +370,9 @@ describe("MobileTaskDetailPage model select", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
   });
 
-  it("queues implementation when the organization is at capacity", async () => {
+  it("starts implementation through the automation flow", async () => {
     useWorkOrder.mockReturnValue({
-      data: { ...DRAFT_WORK_ORDER, taskLimitReached: true },
+      data: DRAFT_WORK_ORDER,
       isLoading: false,
       isError: false,
     });
@@ -379,46 +381,14 @@ describe("MobileTaskDetailPage model select", () => {
     );
 
     await screen.findByTestId("split-run-intent-composer");
-    const queue = await screen.findByRole("button", { name: "Queue" });
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-    await userEvent.setup().click(queue);
+    const start = await screen.findByRole("button", { name: "Start" });
+    await userEvent.setup().click(start);
 
     expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
       lineName: PLAN_LINE_NAME,
       model: undefined,
       thinkingLevel: "medium",
     });
-  });
-
-  it("hides implementation actions while the line start is already queued", async () => {
-    useWorkOrder.mockReturnValue({
-      data: {
-        ...DRAFT_WORK_ORDER,
-        state: "STATE_OPEN",
-        taskLimitReached: true,
-        queuedTasks: [
-          { id: "queued-start", name: "Implement", position: 2, startsLine: true, lineDispatchId: "dispatch-1" },
-        ],
-        lineDispatches: [
-          {
-            id: "dispatch-1",
-            line: { id: REFUND_LINE_PLAN_ID },
-            queueItem: { id: "queued-start", position: 2 },
-            stepExecutions: [],
-          },
-        ],
-      },
-      isLoading: false,
-      isError: false,
-    });
-    renderTask(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
-
-    await screen.findByTestId("split-run-intent-composer");
-    expect(screen.getByText("Queued #2")).toBeVisible();
-    expect(screen.queryByRole("button", { name: /^(Start|Queue)$/ })).not.toBeInTheDocument();
-    expect(onDispatch).not.toHaveBeenCalled();
   });
 
   it("opens model and thinking choices in one menu and updates the closed label", async () => {

@@ -1,6 +1,7 @@
 package runners
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -18,6 +19,8 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func TestCreateRunnerIsIdempotentAndReservesTask(t *testing.T) {
@@ -88,6 +91,9 @@ func TestCreateRunnerReplacesTerminatedIdempotentRunner(t *testing.T) {
 		"creation_request_hash":    requestHash,
 	}).Error)
 
+	_, err = service.CreateRunner(ctx, request)
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	require.NoError(t, db.Model(fleet).Update("provisioning_cooldown_until", time.Now().Add(-time.Second)).Error)
 	replacement, err := service.CreateRunner(ctx, request)
 	require.NoError(t, err)
 	assert.NotEqual(t, first.Runner.Id, replacement.Runner.Id)
@@ -502,40 +508,201 @@ func TestListFleetTasksPagesOldestFirst(t *testing.T) {
 	assert.Equal(t, int64(3), missing.TotalCount)
 }
 
-func TestDeleteBusyEphemeralRunnerRequestsTaskCancellation(t *testing.T) {
+func TestDeleteBusyEphemeralRunnerHandlesStatePrecondition(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		states     []string
+		wantCode   codes.Code
+		wantCancel bool
+	}{
+		{name: "explicit cancellation", wantCode: codes.OK, wantCancel: true},
+		{name: "idle precondition after task claim", states: []string{models.RunnerStateIdle}, wantCode: codes.Aborted},
+		{name: "matching busy state requests cancellation", states: []string{models.RunnerStateBusy}, wantCode: codes.OK, wantCancel: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			resource := support.Setup(t)
+			db := database.DB(t.Context())
+			fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+			task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
+			now := time.Now()
+			runner := &models.Runner{
+				ID:            uuid.New(),
+				FleetID:       fleet.ID,
+				State:         models.RunnerStateIdle,
+				RunnerVersion: "0.1.0",
+				Ephemeral:     true,
+				CreatedAt:     now,
+				UpdatedAt:     now,
+			}
+			require.NoError(t, db.Create(runner).Error)
+			require.NoError(t, task.Reserve(db, runner.ID))
+			require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, now))
+
+			ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
+			service := newTestRunnerService()
+			response, err := service.DeleteRunner(ctx, &pb.DeleteRunnerRequest{
+				FleetId:  fleet.Slug,
+				RunnerId: runner.ID.String(),
+				States:   test.states,
+			})
+			require.Equal(t, test.wantCode, grpcerrors.Code(err))
+			if err == nil {
+				assert.Equal(t, models.RunnerStateBusy, response.Runner.State)
+			}
+
+			reloadedTask, err := models.FindRunnerTask(db, task.ID)
+			require.NoError(t, err)
+			assert.Equal(t, test.wantCancel, reloadedTask.CancelRequestedAt != nil)
+			assert.Equal(t, models.RunnerTaskStateRunning, reloadedTask.State)
+			reloadedRunner, err := models.FindRunner(db, runner.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.RunnerStateBusy, reloadedRunner.State)
+		})
+	}
+}
+
+func TestDeleteRunnerValidatesStatePrecondition(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		state    string
+		states   []string
+		wantCode codes.Code
+	}{
+		{name: "matching idle state", state: models.RunnerStateIdle, states: []string{models.RunnerStateIdle}, wantCode: codes.OK},
+		{name: "registration changed pending to idle", state: models.RunnerStateIdle, states: []string{models.RunnerStatePending}, wantCode: codes.Aborted},
+		{name: "unknown state", state: models.RunnerStateIdle, states: []string{"unknown"}, wantCode: codes.InvalidArgument},
+		{name: "multiple allowed states", state: models.RunnerStateIdle, states: []string{models.RunnerStatePending, models.RunnerStateIdle}, wantCode: codes.OK},
+		{name: "empty state entry", state: models.RunnerStateIdle, states: []string{""}, wantCode: codes.InvalidArgument},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			support.Setup(t)
+			db := database.DB(t.Context())
+			fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+			runner := createListedRunner(t, fleet.ID, uuid.New(), test.state, time.Now())
+			response, err := newTestRunnerService().DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{
+				FleetId: fleet.Slug, RunnerId: runner.ID.String(), States: test.states,
+			})
+			require.Equal(t, test.wantCode, grpcerrors.Code(err))
+			stored, err := models.FindRunner(db, runner.ID)
+			require.NoError(t, err)
+			if test.wantCode == codes.OK {
+				assert.Equal(t, models.RunnerStateTerminated, response.Runner.State)
+				assert.Equal(t, models.RunnerStateTerminated, stored.State)
+				return
+			}
+			assert.Equal(t, test.state, stored.State)
+		})
+	}
+}
+
+func TestDeleteRunnerChecksStatesAfterConcurrentRegistration(t *testing.T) {
+	support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+	runner := createListedRunner(t, fleet.ID, uuid.New(), models.RunnerStatePending, time.Now())
+
+	registration := db.Begin()
+	require.NoError(t, registration.Error)
+	defer registration.Rollback()
+	_, err := fleet.FindRunner(registration.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
+	require.NoError(t, err)
+
+	deleted := make(chan error, 1)
+	go func() {
+		_, err := newTestRunnerService().DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{
+			FleetId: fleet.Slug, RunnerId: runner.ID.String(), States: []string{models.RunnerStatePending},
+		})
+		deleted <- err
+	}()
+
+	// Wait for deletion to reach the row held by registration before the
+	// pending-to-idle transition commits.
+	waitForRunnerLockWaiters(t, db, 1)
+
+	require.NoError(t, registration.Model(runner).Update("state", models.RunnerStateIdle).Error)
+	require.NoError(t, registration.Commit().Error)
+	select {
+	case err := <-deleted:
+		require.Equal(t, codes.Aborted, grpcerrors.Code(err))
+	case <-time.After(5 * time.Second):
+		t.Fatal("runner deletion did not finish after registration committed")
+	}
+	stored, err := models.FindRunner(db, runner.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerStateIdle, stored.State)
+	assert.Nil(t, stored.TerminatedAt)
+}
+
+func TestDeleteBusyRunnerDoesNotDeadlockWithTaskCompletion(t *testing.T) {
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+	runner := createListedRunner(t, fleet.ID, uuid.New(), models.RunnerStateIdle, time.Now())
+	require.NoError(t, db.Model(runner).Update("ephemeral", true).Error)
+	runner.Ephemeral = true
 	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
-	now := time.Now()
-	runner := &models.Runner{
-		ID:            uuid.New(),
-		FleetID:       fleet.ID,
-		State:         models.RunnerStateIdle,
-		RunnerVersion: "0.1.0",
-		Ephemeral:     true,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}
-	require.NoError(t, db.Create(runner).Error)
 	require.NoError(t, task.Reserve(db, runner.ID))
-	require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, now))
+	require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, time.Now()))
 
-	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
-	service := newTestRunnerService()
-	response, err := service.DeleteRunner(ctx, &pb.DeleteRunnerRequest{
-		FleetId:  fleet.Slug,
-		RunnerId: runner.ID.String(),
-	})
+	// Hold the task so completion and cancellation overlap at their first
+	// contended lock, rather than relying on scheduler timing.
+	heldTask := db.Begin()
+	require.NoError(t, heldTask.Error)
+	defer heldTask.Rollback()
+	_, err := models.FindRunnerTask(heldTask.Clauses(clause.Locking{Strength: "UPDATE"}), task.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.RunnerStateBusy, response.Runner.State)
 
-	reloadedTask, err := models.FindRunnerTask(db, task.ID)
+	completion := make(chan error, 1)
+	go func() {
+		completingTask, completingRunner := *task, *runner
+		completion <- db.Transaction(func(tx *gorm.DB) error {
+			_, err := completingTask.Complete(tx, &completingRunner, "completion", datatypes.JSON(`{}`), 0, "", false, time.Now())
+			return err
+		})
+	}()
+	waitForRunnerLockWaiters(t, db, 1)
+
+	cancellation := make(chan error, 1)
+	go func() {
+		_, err := newTestRunnerService().DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{
+			FleetId: fleet.Slug, RunnerId: runner.ID.String(), States: []string{models.RunnerStateBusy},
+		})
+		cancellation <- err
+	}()
+	waitForRunnerLockWaiters(t, db, 2)
+	require.NoError(t, heldTask.Rollback().Error)
+
+	select {
+	case err := <-completion:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("task completion did not finish after releasing the task")
+	}
+	select {
+	case err := <-cancellation:
+		require.Equal(t, codes.Aborted, grpcerrors.Code(err))
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancellation did not finish after task completion")
+	}
+	storedTask, err := models.FindRunnerTask(db, task.ID)
 	require.NoError(t, err)
-	assert.NotNil(t, reloadedTask.CancelRequestedAt)
-	reloadedRunner, err := models.FindRunner(db, runner.ID)
+	assert.Equal(t, models.RunnerTaskStateSucceeded, storedTask.State)
+	assert.Nil(t, storedTask.CancelRequestedAt)
+	storedRunner, err := models.FindRunner(db, runner.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.RunnerStateBusy, reloadedRunner.State)
+	assert.Equal(t, models.RunnerStateTerminated, storedRunner.State)
+}
+
+func waitForRunnerLockWaiters(t *testing.T, db *gorm.DB, count int) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		var waiting int
+		err := db.Raw(`SELECT COUNT(*) FROM pg_stat_activity
+			WHERE datname = current_database() AND wait_event_type = 'Lock'
+			AND pid <> pg_backend_pid() AND query LIKE '%runner%'
+		`).Scan(&waiting).Error
+		return err == nil && waiting >= count
+	}, 5*time.Second, 10*time.Millisecond)
 }
 
 func TestDeleteRunnerRejectsBusyReusableRunnerWithConflict(t *testing.T) {
@@ -741,4 +908,219 @@ func taskIDs(tasks []*pb.Task) []string {
 		ids = append(ids, task.Id)
 	}
 	return ids
+}
+
+func TestConcurrentManagersEnforceWarmTargetAtomically(t *testing.T) {
+	support.Setup(t)
+	fleet := createTestFleetWithSlug(t, "managed-warm")
+	service := newTestRunnerService()
+	warm, maximum := int32(1), int32(3)
+	ready := make(chan struct{})
+	results := make(chan error, 8)
+	var group sync.WaitGroup
+	for range 8 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			<-ready
+			_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
+				FleetId: fleet.Slug, Ephemeral: true, IdempotencyKey: uuid.NewString(),
+				WarmCapacity: &warm, MaxCapacity: &maximum,
+			})
+			results <- err
+		}()
+	}
+	close(ready)
+	group.Wait()
+	close(results)
+	created := 0
+	for err := range results {
+		if err == nil {
+			created++
+			continue
+		}
+		require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	}
+	require.Equal(t, 1, created)
+	var count int64
+	require.NoError(t, database.DB(t.Context()).Model(&models.Runner{}).Where("fleet_id = ?", fleet.ID).Count(&count).Error)
+	require.EqualValues(t, 1, count)
+}
+
+func TestAdminAndAutomaticReservationsShareCapacityAcrossFleets(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	require.NoError(t, db.Model(&models.BillingPlan{}).Where("key = ?", "trial").Update("parallel_task_limit", 1).Error)
+	firstFleet := createTestFleetWithSlug(t, "admin-demand")
+	secondFleet := createTestFleetWithSlug(t, "automatic-demand")
+	first := createTestTask(t, r.Organization.ID, firstFleet.ID, []byte("encrypted"))
+	second := createTestTask(t, r.Organization.ID, secondFleet.ID, []byte("encrypted"))
+	runner := createListedRunner(t, secondFleet.ID, uuid.New(), models.RunnerStateIdle, time.Now())
+	service := newTestRunnerService()
+	ready := make(chan struct{})
+	adminResult, automaticResult := make(chan error, 1), make(chan error, 1)
+	go func() {
+		<-ready
+		_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
+			FleetId: firstFleet.Slug, TaskId: stringPointer(first.ID.String()),
+			IdempotencyKey: "admin-reservation", Ephemeral: true,
+		})
+		adminResult <- err
+	}()
+	go func() { <-ready; automaticResult <- second.Reserve(db, runner.ID) }()
+	close(ready)
+	adminErr, automaticErr := <-adminResult, <-automaticResult
+	if adminErr == nil {
+		require.ErrorIs(t, automaticErr, models.ErrOrganizationRunnerCapacity)
+	} else {
+		require.NoError(t, automaticErr)
+		require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(adminErr))
+	}
+	count, err := models.CountActiveOrganizationRunnerJobs(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+}
+
+func TestProvisionFailureReleasesCapacityAndPersistsFleetCooldown(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	t.Setenv(models.BillingEnabledEnv, "yes")
+	require.NoError(t, db.Model(&models.BillingPlan{}).Where("key = ?", "trial").Update("parallel_task_limit", 1).Error)
+	unavailable := createTestFleetWithSlug(t, "unavailable-fleet")
+	healthy := createTestFleetWithSlug(t, "healthy-fleet")
+	first := createTestTask(t, r.Organization.ID, unavailable.ID, []byte("encrypted"))
+	second := createTestTask(t, r.Organization.ID, healthy.ID, []byte("encrypted"))
+	service := newTestRunnerService()
+	create := func(fleet *models.RunnerFleet, job *models.RunnerTask) (*pb.CreateRunnerResponse, error) {
+		return service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{FleetId: fleet.Slug,
+			TaskId: stringPointer(job.ID.String()), IdempotencyKey: job.ID.String(), Ephemeral: true})
+	}
+	created, err := create(unavailable, first)
+	require.NoError(t, err)
+	reason := models.RunnerTerminationProvisioningFailed
+	_, err = service.DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{FleetId: unavailable.Slug,
+		RunnerId: created.Runner.Id, States: []string{models.RunnerStatePending}, Reason: &reason})
+	require.NoError(t, err)
+	queued, err := models.FindRunnerTask(db, first.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.RunnerTaskStateQueued, queued.State)
+	require.Nil(t, queued.RunnerID)
+	cooldown, err := service.DescribeFleet(t.Context(), &pb.DescribeFleetRequest{FleetId: unavailable.Slug})
+	require.NoError(t, err)
+	require.WithinDuration(t, time.Now().Add(time.Minute), cooldown.Fleet.ProvisioningCooldownUntil.AsTime(), 2*time.Second)
+	_, err = create(unavailable, first)
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	_, err = create(healthy, second)
+	require.NoError(t, err)
+	var failedFleetRunners int64
+	require.NoError(t, db.Model(&models.Runner{}).Where("fleet_id = ?", unavailable.ID).Count(&failedFleetRunners).Error)
+	require.EqualValues(t, 1, failedFleetRunners)
+}
+
+func TestConditionalScaleDownRejectsReservedRunner(t *testing.T) {
+	r := support.Setup(t)
+	fleet := createTestFleetWithSlug(t, "reserved-scale-down")
+	job := createTestTask(t, r.Organization.ID, fleet.ID, []byte("encrypted"))
+	service := newTestRunnerService()
+	created, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{FleetId: fleet.Slug,
+		TaskId: stringPointer(job.ID.String()), IdempotencyKey: job.ID.String(), Ephemeral: true})
+	require.NoError(t, err)
+	require.Equal(t, job.ID.String(), created.Runner.GetReservedTaskId())
+	_, err = service.DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{FleetId: fleet.Slug,
+		RunnerId: created.Runner.Id, States: []string{models.RunnerStatePending}, RequireUnassigned: true})
+	require.Equal(t, codes.Aborted, grpcerrors.Code(err))
+	runner, err := service.DescribeRunner(t.Context(), &pb.DescribeRunnerRequest{FleetId: fleet.Slug, RunnerId: created.Runner.Id})
+	require.NoError(t, err)
+	require.Equal(t, models.RunnerStatePending, runner.Runner.State)
+	require.Equal(t, job.ID.String(), runner.Runner.GetReservedTaskId())
+}
+
+func TestConcurrentDemandCreationEnforcesFleetMaximum(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(models.BillingEnabledEnv, "no")
+	fleet := createTestFleetWithSlug(t, "managed-maximum")
+	service := newTestRunnerService()
+	warm, maximum := int32(0), int32(1)
+	var jobs []*models.RunnerTask
+	for range 6 {
+		jobs = append(jobs, createTestTask(t, r.Organization.ID, fleet.ID, []byte("encrypted")))
+	}
+	ready := make(chan struct{})
+	results := make(chan error, len(jobs))
+	for _, job := range jobs {
+		go func() {
+			<-ready
+			_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{FleetId: fleet.Slug,
+				TaskId: stringPointer(job.ID.String()), IdempotencyKey: job.ID.String(), Ephemeral: true,
+				WarmCapacity: &warm, MaxCapacity: &maximum})
+			results <- err
+		}()
+	}
+	close(ready)
+	created := 0
+	for range jobs {
+		err := <-results
+		if err == nil {
+			created++
+			continue
+		}
+		require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	}
+	require.Equal(t, 1, created)
+	var count int64
+	require.NoError(t, database.DB(t.Context()).Model(&models.Runner{}).Where("fleet_id = ?", fleet.ID).Count(&count).Error)
+	require.EqualValues(t, 1, count)
+}
+
+func TestCanceledProvisioningReservationCanRegisterUnusedRunner(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := createTestFleetWithSlug(t, "canceled-provisioning")
+	job := createTestTask(t, r.Organization.ID, fleet.ID, []byte("encrypted"))
+	created, err := newTestRunnerService().CreateRunner(t.Context(), &pb.CreateRunnerRequest{FleetId: fleet.Slug,
+		TaskId: stringPointer(job.ID.String()), IdempotencyKey: job.ID.String(), Ephemeral: true})
+	require.NoError(t, err)
+	require.NoError(t, job.RequestCancel(db, time.Now()))
+	runnerID := uuid.MustParse(created.Runner.Id)
+	runner, err := models.FindRunner(db, runnerID)
+	require.NoError(t, err)
+	registration, err := models.FindRunnerRegistration(db, runnerID)
+	require.NoError(t, err)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return runner.Register(tx, registration.JTI, fleet.Slug, &job.ID, runner.RunnerVersion,
+			models.RunnerHost{OS: "linux", Arch: "amd64"}, uuid.NewString(), time.Now())
+	}))
+	require.Equal(t, models.RunnerStateIdle, runner.State)
+	_, err = runner.FindActiveTask(db)
+	require.ErrorIs(t, err, models.ErrRunnerTaskNotFound)
+}
+
+func TestManagedCreationSkipsLockedOrganizationWithoutAllocatingRunner(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := createTestFleetWithSlug(t, "locked-organization")
+	blocked := createTestTask(t, r.Organization.ID, fleet.ID, []byte("encrypted"))
+	other, err := models.CreateOrganization("Eligible fleet organization", "")
+	require.NoError(t, err)
+	eligible := createTestTask(t, other.ID, fleet.ID, []byte("encrypted"))
+	locked := db.Begin()
+	require.NoError(t, locked.Error)
+	t.Cleanup(func() { _ = locked.Rollback().Error })
+	require.NoError(t, models.LockOrganizationRunnerAdmission(locked, r.Organization.ID))
+	warm, maximum := int32(0), int32(2)
+	service := newTestRunnerService()
+	create := func(job *models.RunnerTask) error {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		_, err := service.CreateRunner(ctx, &pb.CreateRunnerRequest{FleetId: fleet.Slug,
+			TaskId: stringPointer(job.ID.String()), IdempotencyKey: job.ID.String(), Ephemeral: true,
+			WarmCapacity: &warm, MaxCapacity: &maximum})
+		return err
+	}
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(create(blocked)))
+	require.NoError(t, create(eligible))
+	var runners int64
+	require.NoError(t, db.Model(&models.Runner{}).Where("fleet_id = ?", fleet.ID).Count(&runners).Error)
+	require.EqualValues(t, 1, runners)
 }

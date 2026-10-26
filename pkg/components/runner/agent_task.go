@@ -16,7 +16,7 @@ var attachmentSetupScripts embed.FS
 
 type AgentPromptCommand func(promptName, model string) string
 
-type AgentBrokerTaskInput struct {
+type AgentTaskInput struct {
 	PrepareName      string
 	PrepareScript    string
 	RunScriptName    string
@@ -45,8 +45,8 @@ type TaskAttachment struct {
 	Kind        string
 }
 
-func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand, files []BrokerTaskFile) {
-	files = []BrokerTaskFile{
+func BuildAgentTask(input AgentTaskInput) (commands []TaskCommand, files []TaskFile) {
+	files = []TaskFile{
 		LLMUsageTaskFile(),
 		TurnTelemetryTaskFile(),
 		ActivityStreamTaskFile(),
@@ -58,8 +58,8 @@ func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand,
 	files = append(files, setupFiles...)
 
 	attachments := ResolveTaskAttachments(input)
-	commands = make([]BrokerCommand, 0, len(input.Steps)+len(setupCommands)+1)
-	commands = append(commands, BrokerCommand{
+	commands = make([]TaskCommand, 0, len(input.Steps)+len(setupCommands)+1)
+	commands = append(commands, TaskCommand{
 		Name:    input.PrepareName,
 		Command: WithTaskBinOnPath(`source "$SUPERPLANE_TASK_DIR/prepare.sh"`),
 		Kind:    LiveLogKindSetup,
@@ -107,7 +107,7 @@ func WithTaskBinOnPath(command string) string {
 ` + command
 }
 
-func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []BrokerCommand, files []BrokerTaskFile) {
+func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []TaskCommand, files []TaskFile) {
 	for i, setup := range setups {
 		if strings.TrimSpace(setup.Script) == "" {
 			continue
@@ -118,12 +118,12 @@ func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []Broker
 		}
 		scriptName := AgentStepSlug(i+1, name) + ".sh"
 		path := "setup/" + scriptName
-		files = append(files, BrokerTaskFile{
+		files = append(files, TaskFile{
 			Path:    path,
 			Content: setup.Script,
 			Mode:    "0644",
 		})
-		commands = append(commands, BrokerCommand{
+		commands = append(commands, TaskCommand{
 			Name:    name,
 			Command: WrapAgentStepCommand(fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/%s"`, path)),
 			Kind:    LiveLogKindSetup,
@@ -133,18 +133,18 @@ func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []Broker
 	return commands, files
 }
 
-func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand, attachments []TaskAttachment, inspectImages bool) (BrokerTaskFile, BrokerCommand) {
+func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand, attachments []TaskAttachment, inspectImages bool) (TaskFile, TaskCommand) {
 	stepSlug := AgentStepSlug(stepNumber, original.Name)
 	workingDirectory := EffectiveWorkingDirectory(nodeWorkingDirectory, original.WorkingDirectory)
 	switch NormalizeAgentStepType(original.Type) {
 	case AgentStepBash:
 		command := stringPtrValue(original.Command)
 		scriptName := stepSlug + ".sh"
-		return BrokerTaskFile{
+		return TaskFile{
 				Path:    "steps/" + scriptName,
 				Content: stringPtrValue(dispatched.Command),
 				Mode:    "0644",
-			}, BrokerCommand{
+			}, TaskCommand{
 				Name:    AgentStepLabel(original.Name, scriptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 				Kind:    LiveLogKindBash,
@@ -153,11 +153,11 @@ func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingD
 	default:
 		prompt := stringPtrValue(original.Prompt)
 		promptName := stepSlug + ".txt"
-		return BrokerTaskFile{
+		return TaskFile{
 				Path:    "prompts/" + promptName,
 				Content: FormatAgentPrompt(stringPtrValue(dispatched.Prompt), usage, attachments, inspectImages),
 				Mode:    "0644",
-			}, BrokerCommand{
+			}, TaskCommand{
 				Name:    AgentStepLabel(original.Name, promptName),
 				Command: WrapAgentStepCommand(WrapPromptCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
 				Kind:    LiveLogKindPrompt,
@@ -320,11 +320,11 @@ func CollectTaskAttachments(texts ...string) []TaskAttachment {
 	return uniqueTaskAttachments(append(attachments, HostedVideoAttachments(texts...)...))
 }
 
-func AttachmentSetup(attachments []TaskAttachment) (files []BrokerTaskFile, commands []BrokerCommand) {
+func AttachmentSetup(attachments []TaskAttachment) (files []TaskFile, commands []TaskCommand) {
 	if len(attachments) == 0 {
 		return nil, nil
 	}
-	files = append(AttachmentSetupFiles(), BrokerTaskFile{
+	files = append(AttachmentSetupFiles(), TaskFile{
 		Path:    AttachmentManifestPath,
 		Content: AttachmentManifestJSON(attachments),
 		Mode:    "0644",
@@ -336,11 +336,11 @@ func AttachmentSetup(attachments []TaskAttachment) (files []BrokerTaskFile, comm
 	return files, commands
 }
 
-func AttachmentFetchCommand(attachments []TaskAttachment) *BrokerCommand {
+func AttachmentFetchCommand(attachments []TaskAttachment) *TaskCommand {
 	if len(attachments) == 0 {
 		return nil
 	}
-	return &BrokerCommand{
+	return &TaskCommand{
 		Name:    "Fetch task attachments",
 		Command: WithTaskBinOnPath(`bash "$SUPERPLANE_TASK_DIR/fetch_task_attachments.sh"`),
 		Kind:    LiveLogKindSetup,
@@ -348,7 +348,7 @@ func AttachmentFetchCommand(attachments []TaskAttachment) *BrokerCommand {
 	}
 }
 
-func AttachmentSetupFiles() []BrokerTaskFile {
+func AttachmentSetupFiles() []TaskFile {
 	fetch, err := attachmentSetupScripts.ReadFile("fetch_task_attachments.sh")
 	if err != nil {
 		panic(err)
@@ -357,13 +357,13 @@ func AttachmentSetupFiles() []BrokerTaskFile {
 	if err != nil {
 		panic(err)
 	}
-	return []BrokerTaskFile{
+	return []TaskFile{
 		{Path: AttachmentFetchScriptPath, Content: string(fetch), Mode: "0755"},
 		{Path: AttachmentProcessScriptPath, Content: string(process), Mode: "0755"},
 	}
 }
 
-func AppendAttachmentSetupFiles(files []BrokerTaskFile) []BrokerTaskFile {
+func AppendAttachmentSetupFiles(files []TaskFile) []TaskFile {
 	for _, file := range files {
 		if file.Path == AttachmentFetchScriptPath {
 			return files
@@ -372,8 +372,8 @@ func AppendAttachmentSetupFiles(files []BrokerTaskFile) []BrokerTaskFile {
 	return append(files, AttachmentSetupFiles()...)
 }
 
-func VideoAttachmentCommand() BrokerCommand {
-	return BrokerCommand{
+func VideoAttachmentCommand() TaskCommand {
+	return TaskCommand{
 		Name:    "Process task attachments",
 		Command: WithTaskBinOnPath(`bash "$SUPERPLANE_TASK_DIR/process_video_attachments.sh"`),
 		Kind:    LiveLogKindSetup,
@@ -381,8 +381,8 @@ func VideoAttachmentCommand() BrokerCommand {
 	}
 }
 
-func VideoAttachmentCommands() []BrokerCommand {
-	return []BrokerCommand{VideoAttachmentCommand()}
+func VideoAttachmentCommands() []TaskCommand {
+	return []TaskCommand{VideoAttachmentCommand()}
 }
 
 func scrapeAttachmentFilename(raw string) string {

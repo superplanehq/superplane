@@ -28,6 +28,7 @@ const (
 
 	fleetManagerConfigEnvironment = "FLEET_MANAGER_CONFIG"
 	installationTokenEnvironment  = "INSTALLATION_ADMIN_TOKEN"
+	fleetManagerTokenEnvironment  = "FLEET_MANAGER_API_TOKEN"
 
 	ProviderAWS    = "aws"
 	ProviderAzure  = "azure"
@@ -160,6 +161,9 @@ type Docker struct {
 	Network      string   `json:"network"`
 	Volumes      []string `json:"volumes"`
 	ExtraHosts   []string `json:"extraHosts"`
+	Init         bool     `json:"init"`
+	User         string   `json:"user"`
+	Entrypoint   []string `json:"entrypoint"`
 }
 
 func Load(path string) (*Config, error) {
@@ -184,6 +188,9 @@ func Load(path string) (*Config, error) {
 		}
 	}
 	if token := strings.TrimSpace(os.Getenv(installationTokenEnvironment)); token != "" {
+		config.InstallationAdminToken = token
+	}
+	if token := strings.TrimSpace(os.Getenv(fleetManagerTokenEnvironment)); token != "" {
 		config.InstallationAdminToken = token
 	}
 	config.applyDefaults()
@@ -304,6 +311,7 @@ func (c *Config) applyDefaults() {
 		fleet.Docker.Network = strings.TrimSpace(fleet.Docker.Network)
 		fleet.Docker.Volumes = nonEmpty(fleet.Docker.Volumes)
 		fleet.Docker.ExtraHosts = nonEmpty(fleet.Docker.ExtraHosts)
+		fleet.Docker.User = strings.TrimSpace(fleet.Docker.User)
 	}
 }
 

@@ -36,6 +36,7 @@ function listedPlan(overrides: Partial<BillingPlanListItem>): BillingPlanListIte
     markup_bps: null,
     features: [],
     delete_disabled_reason: null,
+    assigned: false,
     ...overrides,
   };
 }
@@ -234,7 +235,9 @@ it("edits a linked plan in a dialog, preserves locked pricing and credit policie
       }
       return new Response(
         JSON.stringify(
-          String(input).endsWith("feature-definitions") ? [] : [{ ...plan, delete_disabled_reason: null }],
+          String(input).endsWith("feature-definitions")
+            ? []
+            : [{ ...plan, delete_disabled_reason: null, assigned: true }],
         ),
       );
     }),
@@ -258,6 +261,7 @@ it("edits a linked plan in a dialog, preserves locked pricing and credit policie
   await user.clear(screen.getByLabelText("Markup (%)", { exact: true }));
   expect(screen.getByRole("switch", { name: "Per seat" })).toBeDisabled();
   expect(screen.getByRole("combobox", { name: "Polar product" })).toBeDisabled();
+  expect(screen.getByText(/Create a new plan to change the product or price/)).toBeInTheDocument();
   await waitFor(() =>
     expect(screen.getByRole("combobox", { name: "Polar product" })).toHaveTextContent("Starter subscription"),
   );
@@ -265,8 +269,8 @@ it("edits a linked plan in a dialog, preserves locked pricing and credit policie
   expect(maximum).toHaveValue(10);
   await user.clear(maximum);
   await user.type(maximum, "75");
-  await user.clear(screen.getByLabelText("Parallel task limit", { exact: true }));
-  await user.type(screen.getByLabelText("Parallel task limit", { exact: true }), "2");
+  await user.clear(screen.getByLabelText("Parallel runner limit", { exact: true }));
+  await user.type(screen.getByLabelText("Parallel runner limit", { exact: true }), "2");
   // Happy DOM incorrectly rejects decimal steps, so submit the form directly.
   fireEvent.submit(screen.getByRole("button", { name: "Save plan" }).closest("form")!);
   await waitFor(() =>
@@ -324,7 +328,7 @@ it("locks legacy Business pricing and usage limits in the editor", async () => {
   await user.click(await screen.findByRole("button", { name: "Edit Business" }));
   expect(screen.getByLabelText("Price (USD)", { exact: true })).toBeDisabled();
   expect(screen.getByLabelText("Seat limit", { exact: true })).toBeDisabled();
-  expect(screen.getByLabelText("Parallel task limit", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Parallel runner limit", { exact: true })).toBeDisabled();
 });
 
 it("protects Business Manual from deletion and unsupported catalog edits", async () => {
@@ -415,6 +419,7 @@ it("shows every blocked delete action with its reason on hover and keyboard focu
   await user.keyboard("{Enter}");
   await user.keyboard(" ");
   await user.click(assignedDelete);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(deleteRequests(requests)).toEqual([]);
 });
 
@@ -438,8 +443,19 @@ it("explains a Polar-linked plan that cannot be deleted on hover", async () => {
   expect(await screen.findByRole("tooltip")).toHaveTextContent(polarReason);
 });
 
-it("deletes an enabled plan and removes it after the list reloads", async () => {
-  const { requests } = stubBillingCatalog([listedPlan({ id: "spare", key: "spare", name: "Spare" })]);
+// confirmPlanDeletion opens the row delete confirmation and confirms it.
+async function confirmPlanDeletion(user: ReturnType<typeof userEvent.setup>, planName: string) {
+  await user.click(await screen.findByRole("button", { name: `Delete ${planName}` }));
+  const dialog = await screen.findByRole("dialog", { name: "Delete plan?" });
+  await user.click(within(dialog).getByRole("button", { name: "Delete plan" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+}
+
+it("confirms the selected plan before deleting only that row after the list reloads", async () => {
+  const { requests } = stubBillingCatalog([
+    listedPlan({ id: "spare", key: "spare", name: "Spare" }),
+    listedPlan({ id: "keep-me", key: "keep_me", name: "Keep me" }),
+  ]);
   const user = userEvent.setup();
   render(
     <MemoryRouter>
@@ -447,8 +463,89 @@ it("deletes an enabled plan and removes it after the list reloads", async () => 
     </MemoryRouter>,
   );
   await user.click(await screen.findByRole("button", { name: "Delete Spare" }));
+  const dialog = await screen.findByRole("dialog", { name: "Delete plan?" });
+  expect(dialog).toHaveTextContent("Delete “Spare” (spare)? This removes the plan from the billing catalog.");
+  expect(deleteRequests(requests)).toEqual([]);
+
+  await user.click(within(dialog).getByRole("button", { name: "Delete plan" }));
   await waitFor(() => expect(screen.queryByText("Spare")).not.toBeInTheDocument());
+  expect(screen.getByText("Keep me")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(deleteRequests(requests)).toEqual([{ method: "DELETE", path: "/admin/api/billing-plans/spare" }]);
+});
+
+it("keeps the plan when the administrator cancels with the keyboard and restores focus", async () => {
+  const { requests } = stubBillingCatalog([
+    listedPlan({ id: "spare", key: "spare", name: "Spare" }),
+    listedPlan({ id: "keep-me", key: "keep_me", name: "Keep me" }),
+  ]);
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  const spareDelete = await screen.findByRole("button", { name: "Delete Spare" });
+  act(() => screen.getByRole("button", { name: "Edit Spare" }).focus());
+  await user.tab();
+  expect(spareDelete).toHaveFocus();
+
+  await user.keyboard("{Enter}");
+  const dialog = await screen.findByRole("dialog", { name: "Delete plan?" });
+  expect(within(dialog).getByRole("button", { name: "Keep plan" })).toHaveFocus();
+  await user.keyboard("{Enter}");
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(spareDelete).toHaveFocus();
+  expect(screen.getByText("Spare")).toBeInTheDocument();
+  expect(deleteRequests(requests)).toEqual([]);
+});
+
+it("keeps the plan through every cancellation path and names the next plan it opens", async () => {
+  const { requests } = stubBillingCatalog([
+    listedPlan({ id: "spare", key: "spare", name: "Spare" }),
+    listedPlan({ id: "keep-me", key: "keep_me", name: "Keep me" }),
+  ]);
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  const spareDelete = await screen.findByRole("button", { name: "Delete Spare" });
+
+  await user.click(spareDelete);
+  await user.click(
+    within(await screen.findByRole("dialog", { name: "Delete plan?" })).getByRole("button", { name: "Keep plan" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(spareDelete).toHaveFocus();
+
+  await user.click(spareDelete);
+  await screen.findByRole("dialog", { name: "Delete plan?" });
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(spareDelete).toHaveFocus();
+
+  await user.click(spareDelete);
+  await screen.findByRole("dialog", { name: "Delete plan?" });
+  await user.click(screen.getByRole("button", { name: "Close" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+  await user.click(spareDelete);
+  await screen.findByRole("dialog", { name: "Delete plan?" });
+  await user.click(document.querySelector("[data-slot='dialog-overlay']")!);
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+  await user.click(await screen.findByRole("button", { name: "Delete Keep me" }));
+  const otherDialog = await screen.findByRole("dialog", { name: "Delete plan?" });
+  expect(otherDialog).toHaveTextContent("Delete “Keep me” (keep_me)?");
+  expect(otherDialog).not.toHaveTextContent("Spare");
+  await user.click(within(otherDialog).getByRole("button", { name: "Keep plan" }));
+
+  expect(deleteRequests(requests)).toEqual([]);
+  expect(screen.getByText("Spare")).toBeInTheDocument();
+  expect(screen.getByText("Keep me")).toBeInTheDocument();
 });
 
 it("shows a rejected delete, reloads, and disables the newly assigned plan", async () => {
@@ -464,7 +561,7 @@ it("shows a rejected delete, reloads, and disables the newly assigned plan", asy
       <BillingPlans />
     </MemoryRouter>,
   );
-  await user.click(await screen.findByRole("button", { name: "Delete Stale" }));
+  await confirmPlanDeletion(user, "Stale");
   await waitFor(() => expect(showErrorToast).toHaveBeenCalledWith(assignedReason));
   expect(await screen.findByRole("button", { name: "Delete Stale" })).toBeDisabled();
   expect(deleteRequests(requests)).toHaveLength(1);
@@ -489,10 +586,111 @@ it("keeps the delete error when the reload fails and recovers with Try again", a
   const deleteButton = await screen.findByRole("button", { name: "Delete Stale" });
   catalog.failNextRefresh();
   await user.click(deleteButton);
+  await user.click(
+    within(await screen.findByRole("dialog", { name: "Delete plan?" })).getByRole("button", { name: "Delete plan" }),
+  );
   await waitFor(() => expect(showErrorToast).toHaveBeenCalledWith(assignedReason));
   const alert = await screen.findByRole("alert");
   expect(alert).toHaveTextContent("Refresh failed");
   await user.click(within(alert).getByRole("button", { name: "Try again" }));
   expect(await screen.findByRole("button", { name: "Delete Stale" })).toBeDisabled();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("keeps a rejected create open with its values and saves a corrected retry", async () => {
+  const saves: unknown[] = [];
+  let plans: BillingPlanListItem[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.endsWith("feature-definitions")) return new Response("[]");
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        saves.push(body);
+        if (saves.length === 1) {
+          return Response.json({ message: "This plan key already exists. Enter a different key." }, { status: 400 });
+        }
+        plans = [listedPlan({ id: "team-two", key: body.key, name: body.name })];
+        return Response.json(plans[0]);
+      }
+      return Response.json(plans);
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(screen.getByRole("button", { name: "Create plan" })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: "Create plan" }));
+  await user.type(screen.getByLabelText("Name", { exact: true }), "Team");
+  await user.type(screen.getByLabelText("Key", { exact: true }), "team");
+  await user.click(screen.getByRole("button", { name: "Save plan" }));
+
+  const dialog = within(screen.getByRole("dialog"));
+  const alert = await dialog.findByRole("alert");
+  expect(alert).toHaveTextContent("This plan key already exists. Enter a different key.");
+  expect(alert).not.toHaveTextContent("{");
+  expect(dialog.getByLabelText("Name", { exact: true })).toHaveValue("Team");
+  expect(dialog.getByLabelText("Key", { exact: true })).toHaveValue("team");
+  expect(dialog.getByRole("button", { name: "Save plan" })).toBeEnabled();
+
+  await user.clear(dialog.getByLabelText("Key", { exact: true }));
+  await user.type(dialog.getByLabelText("Key", { exact: true }), "team_two");
+  await user.click(dialog.getByRole("button", { name: "Save plan" }));
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(saves).toEqual([
+    expect.objectContaining({ key: "team", name: "Team" }),
+    expect.objectContaining({ key: "team_two", name: "Team" }),
+  ]);
+  expect(await screen.findByRole("row", { name: /Team/ })).toBeInTheDocument();
+});
+
+it("keeps a rejected update open with its values and saves a corrected retry", async () => {
+  const plan = listedPlan({ id: "custom-plan", key: "custom", name: "Custom" });
+  const updates: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.endsWith("feature-definitions")) return new Response("[]");
+      if (init?.method === "PUT") {
+        const body = JSON.parse(String(init.body));
+        updates.push(body);
+        if (updates.length === 1) {
+          return Response.json({ message: "Billing plan changes were rejected. Try again." }, { status: 400 });
+        }
+        return Response.json(plan);
+      }
+      return Response.json([plan]);
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BillingPlans />
+    </MemoryRouter>,
+  );
+  await user.click(await screen.findByRole("button", { name: "Edit Custom" }));
+  const dialog = within(screen.getByRole("dialog", { name: "Edit Custom" }));
+  fireEvent.change(dialog.getByLabelText("Name", { exact: true }), { target: { value: "Custom Pro" } });
+  fireEvent.change(dialog.getByLabelText("Parallel runner limit", { exact: true }), { target: { value: "3" } });
+  // Happy DOM incorrectly rejects decimal steps, so submit the form directly.
+  fireEvent.submit(dialog.getByRole("button", { name: "Save plan" }).closest("form")!);
+
+  const alert = await dialog.findByRole("alert");
+  expect(alert).toHaveTextContent("Billing plan changes were rejected. Try again.");
+  expect(alert).not.toHaveTextContent("{");
+  expect(dialog.getByLabelText("Name", { exact: true })).toHaveValue("Custom Pro");
+  expect(dialog.getByLabelText("Parallel runner limit", { exact: true })).toHaveValue(3);
+
+  fireEvent.submit(dialog.getByRole("button", { name: "Save plan" }).closest("form")!);
+  await waitFor(() => expect(updates).toHaveLength(2));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  for (const update of updates) {
+    expect(update).toMatchObject({ id: "custom-plan", name: "Custom Pro", parallel_task_limit: 3 });
+  }
 });

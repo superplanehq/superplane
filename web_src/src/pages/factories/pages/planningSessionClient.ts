@@ -1,3 +1,4 @@
+import { getResponseErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 import type { PlanningSessionPayload } from "./planningSessionView";
@@ -19,7 +20,7 @@ async function planningSessionRequest(
   }).headers as Record<string, string>;
   const response = await fetch(path, { ...init, headers, credentials: "include", keepalive: init.keepalive });
   if (!response.ok) {
-    throw new Error("Planning session request failed");
+    throw new Error(await getResponseErrorMessage(response, "The planning request failed. Try again."));
   }
   const body = (await response.json()) as SessionEnvelope;
   if (!body.session) {
@@ -46,7 +47,7 @@ export async function findPlanningSessionByWorkOrder(
     return null;
   }
   if (!response.ok) {
-    throw new Error("Planning session request failed");
+    throw new Error(await getResponseErrorMessage(response, "The planning session did not load. Try again."));
   }
   const body = (await response.json()) as SessionEnvelope;
   return body.session ?? null;

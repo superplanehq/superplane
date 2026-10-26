@@ -44,11 +44,11 @@ The event processing system is the engine that drives workflow execution. It ope
 
 This architecture enables parallel execution of independent workflow branches, reliable event delivery, and scalable processing through worker queues.
 
-Factory tasks also pass organization admission before line steps or task root
-events start work. The organization limit counts distinct active work orders.
-Line steps and canvas nodes apply separate execution limits.
-See [Task queue and admission](../design/task-queue.md) for ordering, capacity,
-cancellation, task status, and recovery behavior.
+Runner assignment enforces the organization parallel runner limit across all
+workspaces and fleets. Each reserved or running integrated job uses one slot.
+Line steps and canvas nodes retain their separate execution limits.
+See [Runner queues and limits](../design/task-queue.md) for queue positions,
+cancellation, timeout accounting, and recovery behavior.
 
 ## Authentication & Authorization
 

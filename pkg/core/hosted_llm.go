@@ -7,10 +7,12 @@ import (
 
 // HostedLLMAccess is one SuperPlane-held provider key and allowlist.
 type HostedLLMAccess struct {
-	APIKey        string
-	ManagementKey string
-	BaseURL       string
-	AllowedModels []string
+	ResourceID         string
+	CredentialIdentity string
+	APIKey             string
+	ManagementKey      string
+	BaseURL            string
+	AllowedModels      []string
 }
 
 func (a HostedLLMAccess) AllowsModel(model string) bool {

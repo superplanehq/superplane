@@ -41,7 +41,7 @@ vi.mock("../pages/planningSessionClient", () => ({
 }));
 
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
-  useOrganizationWorkspaceUsage: () => ({ data: { activeTaskCount: 0, parallelTaskLimit: 1 } }),
+  useOrganizationWorkspaceUsage: () => ({ data: { activeRunnerCount: 0, parallelRunnerLimit: 1 } }),
 }));
 
 vi.mock("@/hooks/useBacklogAnalysisRuns", () => ({
@@ -85,7 +85,7 @@ vi.mock("@/contexts/usePermissions", () => ({
 }));
 
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
-  useFactoryLineRunnerModels: () => ({ data: [], isLoading: false }),
+  useFactoryLineRunnerModels: () => ({ data: { models: [] }, isLoading: false }),
 }));
 
 vi.mock("@/hooks/useOrganizationData", () => ({
@@ -171,7 +171,7 @@ describe("MobileTaskDetailPage missing refinement session", () => {
     useWorkOrder.mockReturnValue({
       data: {
         ...DRAFT_WORK_ORDER,
-        queuedTasks: [{ id: "analysis-queue", name: "Task analysis", position: 2 }],
+        queuedRunnerJobs: [{ id: "analysis-queue", automationName: "Task analysis", position: 2 }],
       },
       isLoading: false,
       isError: false,
@@ -181,7 +181,7 @@ describe("MobileTaskDetailPage missing refinement session", () => {
     );
 
     await screen.findByTestId("split-run-intent-composer");
-    expect(screen.getByRole("status")).toHaveTextContent("Queued #2");
+    expect(screen.getByRole("status")).toHaveTextContent("Runner queued #2");
     expect(screen.getByTestId("split-run-intent-composer")).toBeDisabled();
     expect(screen.queryByText("Analyzing task…")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^(Analyze|Queue analysis)$/ })).not.toBeInTheDocument();
@@ -194,11 +194,33 @@ describe("MobileTaskDetailPage stored phase log", () => {
     findPlanningSession.mockResolvedValue(null);
   });
 
+  it("shows an automation slot wait before a runner job exists", () => {
+    useWorkOrder.mockReturnValue({
+      data: {
+        ...RUNNING_WORK_ORDER,
+        queuedRunnerJobs: [],
+        lineDispatches: [
+          {
+            ...RUNNING_WORK_ORDER.lineDispatches?.[0],
+            queueItem: { id: "step-wait", stepName: "Verify", position: 1 },
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${RUNNING_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Waiting for automation slot");
+    expect(screen.queryByText(/Runner queued/)).not.toBeInTheDocument();
+  });
+
   it("keeps running status when another automation is queued on an active task", () => {
     useWorkOrder.mockReturnValue({
       data: {
         ...RUNNING_WORK_ORDER,
-        queuedTasks: [{ id: "queue-follow-up", name: "Review", position: 2, taskActive: true }],
+        queuedRunnerJobs: [{ id: "queue-follow-up", automationName: "Review", position: 2 }],
       },
       isLoading: false,
       isError: false,
@@ -208,7 +230,7 @@ describe("MobileTaskDetailPage stored phase log", () => {
     );
 
     expect(screen.getByTestId("mobile-task-status")).toHaveTextContent("Running");
-    expect(screen.getByRole("status")).toHaveTextContent("Queued #2");
+    expect(screen.getByRole("status")).toHaveTextContent("Runner queued #2");
   });
 
   it.each([

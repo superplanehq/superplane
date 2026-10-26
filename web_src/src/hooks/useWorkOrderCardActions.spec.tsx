@@ -88,10 +88,10 @@ describe("useWorkOrderCardActions", () => {
     const { result } = renderHook(() => useWorkOrderCardActions("org-1", "factory-1"));
 
     await act(async () => {
-      await result.current.onCancelQueuedTask("wo-1", "queue-1");
+      await result.current.onCancelQueuedRunnerJob("wo-1", "queue-1");
     });
 
-    expect(result.current.cancellingQueueOrderIds.has("wo-1")).toBe(false);
-    expect(showErrorToast).toHaveBeenCalledWith("Could not remove the task from the queue. Refresh and try again.");
+    expect(result.current.cancellingQueueJobIds.has("queue-1")).toBe(false);
+    expect(showErrorToast).toHaveBeenCalledWith("Could not cancel the runner job. Refresh and try again.");
   });
 });

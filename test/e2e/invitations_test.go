@@ -1,16 +1,11 @@
 package e2e
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"testing"
 
 	pw "github.com/mxschmitt/playwright-go"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -19,20 +14,28 @@ import (
 )
 
 func TestInvitations(t *testing.T) {
-	t.Run("accepting invite link assigns operator role", func(t *testing.T) {
+	t.Run("existing member can open an enabled invite link", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
-		token := steps.createInviteLink()
-		invitee := steps.createInviteeAccount()
-		steps.loginAs(invitee)
+		token := steps.seedInviteLink(true)
 		steps.acceptInvite(token)
-		steps.assertInviteeOperatorRole(invitee.Email)
 	})
 
-	t.Run("following invite link and creating password account", func(t *testing.T) {
+	t.Run("new account cannot join through an invite link", func(t *testing.T) {
+		steps := &invitationSteps{t: t}
+		steps.startLoggedIn()
+		token := steps.seedInviteLink(true)
+		invitee := steps.createInviteeAccount()
+		steps.loginAs(invitee)
+		steps.visitInviteLink(token)
+		steps.assertEmailInvitationRequired()
+		steps.assertNotOrganizationMember(invitee.Email)
+	})
+
+	t.Run("password signup from an invite link does not join the organization", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedOut()
-		token := steps.createInviteLink()
+		token := steps.seedInviteLink(true)
 
 		steps.followInviteLinkToLogin(token)
 		steps.openSignupForm()
@@ -44,28 +47,25 @@ func TestInvitations(t *testing.T) {
 
 		steps.fillSignupForm(firstName, lastName, email, password)
 		steps.submitSignup()
-		steps.waitForOrganizationRedirect()
-		steps.assertInviteeOperatorRole(email)
+		steps.assertEmailInvitationRequired()
+		steps.assertNotOrganizationMember(email)
 	})
 
 	t.Run("disabled invite link no longer works", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
-		token := steps.createInviteLink()
-		steps.disableInviteLink(token)
+		token := steps.seedInviteLink(false)
 		steps.visitInviteLink(token)
 		steps.assertInviteLinkDisabled()
 	})
 
-	t.Run("operator sees invite link access message", func(t *testing.T) {
+	t.Run("operator cannot invite members", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
-		token := steps.createInviteLink()
-		invitee := steps.createInviteeAccount()
-		steps.loginAs(invitee)
-		steps.acceptInvite(token)
+		loginAsOperator(steps.t, steps.session)
 		steps.visitMembersSettings()
-		steps.assertOperatorInviteLinkMessage()
+		steps.assertMemberVisible(steps.session.Account.Email)
+		steps.assertInviteMemberHidden()
 	})
 }
 
@@ -85,18 +85,8 @@ func (s *invitationSteps) startLoggedOut() {
 	s.session.Start()
 }
 
-func (s *invitationSteps) createInviteLink() string {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(s.t.Context()), s.session.OrgID.String())
-	if err == nil {
-		return inviteLink.Token.String()
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		require.NoError(s.t, err)
-	}
-
-	inviteLink, err = models.CreateInviteLink(database.DB(s.t.Context()), s.session.OrgID)
-	require.NoError(s.t, err)
-	return inviteLink.Token.String()
+func (s *invitationSteps) seedInviteLink(enabled bool) string {
+	return support.SeedHistoricalInviteLink(s.t, s.session.OrgID, enabled).Token.String()
 }
 
 func (s *invitationSteps) createInviteeAccount() *models.Account {
@@ -156,40 +146,25 @@ func (s *invitationSteps) submitSignup() {
 	s.session.Click(q.Text("Create account"))
 }
 
-func (s *invitationSteps) disableInviteLink(token string) {
-	tx := database.DB(s.t.Context())
-	inviteLink, err := models.FindInviteLinkByToken(tx, token)
-	require.NoError(s.t, err)
-	inviteLink.Enabled = false
-	require.NoError(s.t, models.SaveInviteLink(tx, inviteLink))
-}
-
 func (s *invitationSteps) assertInviteLinkDisabled() {
-	s.session.AssertText("Invite link not available")
+	s.session.AssertText("Invitation unavailable")
+	s.session.AssertText("invite link disabled")
 }
 
-func (s *invitationSteps) assertOperatorInviteLinkMessage() {
-	s.session.AssertText("Invite link to add members")
-	s.session.AssertText("You don't have permission to manage invite links.")
-
-	copyLinkVisible, err := s.session.Page().Locator("text=Copy link").IsVisible()
-	require.NoError(s.t, err)
-	require.False(s.t, copyLinkVisible)
+func (s *invitationSteps) assertEmailInvitationRequired() {
+	s.session.AssertText("Invitation unavailable")
+	s.session.AssertText("This organization uses email invitations. Ask an organization admin for an invitation.")
 }
 
-func (s *invitationSteps) assertInviteeOperatorRole(email string) {
-	user, err := models.FindActiveUserByEmail(s.session.OrgID.String(), email)
-	require.NoError(s.t, err)
+func (s *invitationSteps) assertInviteMemberHidden() {
+	s.session.AssertHidden(q.Text("Invite member"))
+}
 
-	authService, err := authorization.NewAuthService()
-	require.NoError(s.t, err)
+func (s *invitationSteps) assertMemberVisible(email string) {
+	s.session.AssertText(email)
+}
 
-	roles, err := authService.GetUserRolesForOrg(context.Background(), user.ID.String(), s.session.OrgID.String())
-	require.NoError(s.t, err)
-	require.NotEmpty(s.t, roles)
-
-	require.Equal(s.t, len(roles), 1)
-
-	role := roles[0]
-	assert.Equal(s.t, role.Name, models.RoleOrgOperator)
+func (s *invitationSteps) assertNotOrganizationMember(email string) {
+	_, err := models.FindActiveUserByEmail(s.session.OrgID.String(), email)
+	require.ErrorIs(s.t, err, gorm.ErrRecordNotFound)
 }

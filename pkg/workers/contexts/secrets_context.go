@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 	"gorm.io/gorm"
 )
 
@@ -21,11 +22,16 @@ import (
  * resolving organization secret key values for component execution.
  */
 type SecretsContext struct {
-	tx             *gorm.DB
-	registry       *registry.Registry
-	encryptor      crypto.Encryptor
-	organizationID uuid.UUID
+	tx                     *gorm.DB
+	registry               *registry.Registry
+	encryptor              crypto.Encryptor
+	organizationID         uuid.UUID
+	refreshes              []runnerapi.CredentialRefresh
+	deferRunnerCredentials bool
+	deferSecretValues      bool
 }
+
+func (c *SecretsContext) DeferRunnerSecretValues() { c.deferSecretValues = true }
 
 func NewSecretsContext(tx *gorm.DB, reg *registry.Registry, organizationID uuid.UUID, encryptor crypto.Encryptor) *SecretsContext {
 	return &SecretsContext{
@@ -55,6 +61,10 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 	if !ok || val == "" {
 		return nil, core.ErrSecretKeyNotFound
 	}
+	if c.deferSecretValues {
+		val = runnerSecretPlaceholder(secret.ID, keyName)
+	}
+	c.recordSecretRefresh(secret, keyName, val)
 
 	return []byte(val), nil
 }
@@ -81,7 +91,11 @@ func (c *SecretsContext) GetSecretKeys(secretName string) (map[string][]byte, er
 		if name == "" || value == "" {
 			continue
 		}
+		if c.deferSecretValues {
+			value = runnerSecretPlaceholder(secret.ID, name)
+		}
 		keys[name] = []byte(value)
+		c.recordSecretRefresh(secret, name, value)
 	}
 
 	if len(keys) == 0 {
@@ -122,7 +136,39 @@ func (c *SecretsContext) GetIntegrationSecrets(integrationName string) (core.Int
 		Integration: NewIntegrationContext(c.tx, nil, integration, c.encryptor, c.registry, nil),
 	}
 
-	return provider.ResolveSecrets(secretCtx)
+	var resolved core.IntegrationSecrets
+	if descriptor, ok := registry.UnwrapIntegration(integrationImpl).(core.IntegrationRunnerSecretDescriptor); c.deferRunnerCredentials && ok {
+		resolved, err = descriptor.DescribeRunnerSecrets(secretCtx)
+	} else {
+		resolved, err = provider.ResolveSecrets(secretCtx)
+	}
+	if err != nil {
+		return resolved, err
+	}
+	permittedScope, err := RunnerIntegrationScope(c.tx, integration)
+	if err != nil {
+		return resolved, err
+	}
+	keyIdentity, err := IntegrationCredentialKeyIdentity(c.tx, c.encryptor, integration)
+	if err != nil {
+		return resolved, err
+	}
+	for key, value := range resolved.Values {
+		if c.deferRunnerCredentials {
+			value = []byte(runnerSecretPlaceholder(integration.ID, key))
+			resolved.Values[key] = value
+		}
+		c.refreshes = append(c.refreshes, runnerapi.CredentialRefresh{Version: 1, Kind: "integration", OrganizationID: c.organizationID.String(), ResourceID: integration.ID.String(), Recipient: integration.AppName, Scope: map[string]string{"key": key, "identity": integrationCredentialIdentity(integration), "permitted_scope": permittedScope, "key_identity": keyIdentity}, Current: string(value)})
+	}
+	return resolved, nil
+}
+
+func runnerSecretPlaceholder(resourceID uuid.UUID, key string) string {
+	return "pending-runner-credential-" + resourceID.String() + "-" + key
+}
+
+func (c *SecretsContext) recordSecretRefresh(secret *models.Secret, key, value string) {
+	c.refreshes = append(c.refreshes, runnerapi.CredentialRefresh{Version: 1, Kind: "secret", OrganizationID: c.organizationID.String(), ResourceID: secret.ID.String(), Recipient: "organization", Scope: map[string]string{"key": key}, Current: value})
 }
 
 func (c *SecretsContext) decryptSecretData(secret *models.Secret) (map[string]string, error) {

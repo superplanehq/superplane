@@ -19,14 +19,14 @@ const (
 
 	// EnvExecutionTimeoutSeconds is the node wall-clock limit in seconds.
 	// OpenRouter wait/retry uses this so a 60s rate-limit pause cannot outlive
-	// the broker task timeout.
+	// the runner task timeout.
 	EnvExecutionTimeoutSeconds = "SUPERPLANE_EXECUTION_TIMEOUT_SECONDS"
 )
 
 // Runner tasks execute with a terminal attached, so commands like `git log`
 // send their output to a pager that then waits for a key press and blocks the
 // task until it times out. Task environments disable paging by default.
-var pagerDefaults = []BrokerEnvironmentVariable{
+var pagerDefaults = []TaskEnvironmentVariable{
 	{Name: "GIT_PAGER", Value: "cat"},
 	{Name: "PAGER", Value: "cat"},
 }
@@ -151,7 +151,7 @@ type IntegrationSetup struct {
 }
 
 type ResolvedEnvironment struct {
-	Variables []BrokerEnvironmentVariable
+	Variables []TaskEnvironmentVariable
 	Usage     string
 	Setups    []IntegrationSetup
 }
@@ -161,7 +161,10 @@ func ResolveEnvironment(
 	environmentFrom []EnvironmentFromEntry,
 	environment []EnvironmentVariable,
 ) (ResolvedEnvironment, error) {
-	resolved := make([]BrokerEnvironmentVariable, 0)
+	if deferred, ok := secrets.(interface{ DeferRunnerSecretValues() }); ok {
+		deferred.DeferRunnerSecretValues()
+	}
+	resolved := make([]TaskEnvironmentVariable, 0)
 	seen := make(map[string]struct{})
 	usages := make([]string, 0)
 	setups := make([]IntegrationSetup, 0)
@@ -242,10 +245,10 @@ func ResolveEnvironment(
 
 // prependPagerDefaults keeps the configured environment authoritative: a
 // variable set by the node, an integration, or a secret is never replaced.
-func prependPagerDefaults(environment []BrokerEnvironmentVariable) []BrokerEnvironmentVariable {
-	defaults := make([]BrokerEnvironmentVariable, 0, len(pagerDefaults))
+func prependPagerDefaults(environment []TaskEnvironmentVariable) []TaskEnvironmentVariable {
+	defaults := make([]TaskEnvironmentVariable, 0, len(pagerDefaults))
 	for _, variable := range pagerDefaults {
-		configured := slices.ContainsFunc(environment, func(existing BrokerEnvironmentVariable) bool {
+		configured := slices.ContainsFunc(environment, func(existing TaskEnvironmentVariable) bool {
 			return existing.Name == variable.Name
 		})
 		if configured {
@@ -259,7 +262,7 @@ func prependPagerDefaults(environment []BrokerEnvironmentVariable) []BrokerEnvir
 }
 
 func appendImportedEnvironmentVariables(
-	resolved *[]BrokerEnvironmentVariable,
+	resolved *[]TaskEnvironmentVariable,
 	seen map[string]struct{},
 	keys map[string][]byte,
 ) error {
@@ -278,7 +281,7 @@ func appendImportedEnvironmentVariables(
 		}
 
 		seen[name] = struct{}{}
-		*resolved = append(*resolved, BrokerEnvironmentVariable{
+		*resolved = append(*resolved, TaskEnvironmentVariable{
 			Name:  name,
 			Value: string(value),
 		})
@@ -327,18 +330,18 @@ func ValidateEnvironment(environment []EnvironmentVariable) error {
 	return nil
 }
 
-func resolveExplicitEnvironment(secrets core.SecretsContext, environment []EnvironmentVariable) ([]BrokerEnvironmentVariable, error) {
+func resolveExplicitEnvironment(secrets core.SecretsContext, environment []EnvironmentVariable) ([]TaskEnvironmentVariable, error) {
 	if len(environment) == 0 {
 		return nil, nil
 	}
 
-	resolved := make([]BrokerEnvironmentVariable, 0, len(environment))
+	resolved := make([]TaskEnvironmentVariable, 0, len(environment))
 	for _, variable := range environment {
 		name := strings.TrimSpace(variable.Name)
 
 		switch strings.TrimSpace(variable.ValueSource) {
 		case EnvironmentValueSourceLiteral:
-			resolved = append(resolved, BrokerEnvironmentVariable{
+			resolved = append(resolved, TaskEnvironmentVariable{
 				Name:  name,
 				Value: *variable.Value,
 			})
@@ -353,7 +356,7 @@ func resolveExplicitEnvironment(secrets core.SecretsContext, environment []Envir
 				return nil, fmt.Errorf("failed to resolve environment variable %s secret %s/%s: %w", name, variable.Secret.Secret, variable.Secret.Key, err)
 			}
 
-			resolved = append(resolved, BrokerEnvironmentVariable{
+			resolved = append(resolved, TaskEnvironmentVariable{
 				Name:  name,
 				Value: string(value),
 			})
@@ -364,12 +367,12 @@ func resolveExplicitEnvironment(secrets core.SecretsContext, environment []Envir
 }
 
 // AttachExecutionTimeoutEnv copies the node timeout into the task environment
-// so agent wrappers can cap waits before the broker kills the task.
-func AttachExecutionTimeoutEnv(environment []BrokerEnvironmentVariable, timeoutSeconds int) []BrokerEnvironmentVariable {
+// so agent wrappers can cap waits before the runner stops the task.
+func AttachExecutionTimeoutEnv(environment []TaskEnvironmentVariable, timeoutSeconds int) []TaskEnvironmentVariable {
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = DefaultExecutionTimeoutSeconds
 	}
-	return append(environment, BrokerEnvironmentVariable{
+	return append(environment, TaskEnvironmentVariable{
 		Name:  EnvExecutionTimeoutSeconds,
 		Value: strconv.Itoa(timeoutSeconds),
 	})

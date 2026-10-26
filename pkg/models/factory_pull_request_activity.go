@@ -199,8 +199,8 @@ func (p *FactoryPullRequest) createActivity(tx *gorm.DB, params FactoryPullReque
 	if !errors.Is(err, ErrFactoryPullRequestActivityNotFound) {
 		return nil, err
 	}
-	if err := checkOrganizationTaskAdmission(tx, p.OrganizationID, p.WorkOrderID); err != nil {
-		if errors.Is(err, ErrOrganizationTaskCapacity) {
+	if err := checkWorkOrderReady(tx, p.OrganizationID, p.WorkOrderID); err != nil {
+		if errors.Is(err, ErrWorkOrderBusy) {
 			return &FactoryPullRequestActivityResult{Outcome: FactoryPullRequestActivityOutcomeWaiting}, nil
 		}
 		return nil, err

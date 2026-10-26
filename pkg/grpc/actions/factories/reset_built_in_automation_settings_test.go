@@ -297,6 +297,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.JiraMoveOnComplete = false
 				settings.JiraCompletionColumn = "QA"
 			case models.FactoryIntakeSourceSentryExceptions:
+				settings.DefaultOwnerID = r.User.String()
 				settings.SentryNewIssues, settings.SentryRegressedIssues, settings.SentryAssignedIssues = false, false, true
 				settings.SentryLevels = []string{"fatal", "warning"}
 				settings.SentryProjectIDs = []string{"payments", "checkout"}
@@ -382,6 +383,12 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 			actual := intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 			assert.Equal(t, expected, serializeIntakeSettings(source, actual))
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				assert.Equal(t, r.User.String(), listed.Intakes[0].GetSettings().GetDefaultOwnerId())
+				create := findIntakeNode(version.Nodes, resolveIntakeGraph(source, spec).CreateNodeID)
+				require.NotNil(t, create)
+				assert.Equal(t, r.User.String(), create.Configuration["defaultOwnerId"])
+			}
 			if tc.restrictAuthors {
 				require.NotNil(t, findIntakeNode(version.Nodes, intakeAuthorPermissionNodeID))
 				assert.True(t, hasCanvasPath(spec.Edges, intakeFilterNodeID, intakeAuthorPermissionNodeID))
@@ -395,84 +402,88 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 }
 
 func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
-	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
-		for _, source := range []string{models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, models.FactoryPRFeedbackHandlerSourcePullRequestChecks} {
-			t.Run(provider+"/"+source, func(t *testing.T) {
-				r, factory := resetTestFactory(t)
-				require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
-				request := prFeedbackBuildRequest{
-					Repository: "acme/app", Mention: "@review", IgnoreBots: false, AddressAllBots: true, AllowedBots: []string{},
-					CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
-					Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent},
-				}
-				doc := buildDiscussionPRFeedbackCanvas(request)
-				if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
-					doc = buildChecksPRFeedbackCanvas(request)
-				}
-				canvas := support.CreateFactoryCanvas(t, r, factory.ID, source)
-				expected := map[string]int{}
-				evidence := map[string]bool{}
-				for i := range doc.Spec.Nodes {
-					node := &doc.Spec.Nodes[i]
-					if isFactoryAgentHarness(node.Component) {
-						node.Configuration["executionTimeoutSeconds"] = 1200 + i
-						node.Configuration["includeVisualEvidence"] = i%2 == 0
-						node.Configuration["model"] = ""
-						expected[node.ID] = 1200 + i
-						evidence[node.ID] = i%2 == 0
-						if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
-							original := node.ID
-							node.ID = "legacy-repair"
-							for j := range doc.Spec.Edges {
-								if doc.Spec.Edges[j].SourceID == original {
-									doc.Spec.Edges[j].SourceID = node.ID
-								}
-								if doc.Spec.Edges[j].TargetID == original {
-									doc.Spec.Edges[j].TargetID = node.ID
+	nonDefaultModel := models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-opus-5")
+	for _, model := range []string{nonDefaultModel, ""} {
+		for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+			for _, source := range []string{models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, models.FactoryPRFeedbackHandlerSourcePullRequestChecks} {
+				t.Run(model+"/"+provider+"/"+source, func(t *testing.T) {
+					r, factory := resetTestFactory(t)
+					require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
+					request := prFeedbackBuildRequest{
+						Repository: "acme/app", Mention: "@review", IgnoreBots: false, AddressAllBots: true, AllowedBots: []string{},
+						CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
+						Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent},
+					}
+					doc := buildDiscussionPRFeedbackCanvas(request)
+					if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+						doc = buildChecksPRFeedbackCanvas(request)
+					}
+					canvas := support.CreateFactoryCanvas(t, r, factory.ID, source)
+					expected := map[string]int{}
+					evidence := map[string]bool{}
+					for i := range doc.Spec.Nodes {
+						node := &doc.Spec.Nodes[i]
+						if isFactoryAgentHarness(node.Component) {
+							node.Configuration["executionTimeoutSeconds"] = 1200 + i
+							node.Configuration["includeVisualEvidence"] = i%2 == 0
+							node.Configuration["model"] = model
+							expected[node.ID] = 1200 + i
+							evidence[node.ID] = i%2 == 0
+							if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+								original := node.ID
+								node.ID = "legacy-repair"
+								for j := range doc.Spec.Edges {
+									if doc.Spec.Edges[j].SourceID == original {
+										doc.Spec.Edges[j].SourceID = node.ID
+									}
+									if doc.Spec.Edges[j].TargetID == original {
+										doc.Spec.Edges[j].TargetID = node.ID
+									}
 								}
 							}
 						}
 					}
-				}
-				resetTestPublishCanvas(t, r, canvas, doc)
-				handler, err := factory.CreatePRFeedbackHandler(database.DB(t.Context()), canvas.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, source)
-				require.NoError(t, err)
-				require.NoError(t, handler.SetMaximumAttempts(database.DB(t.Context()), 8))
-				require.NoError(t, resetTestOrganization(t, r))
-				version := resetTestLiveVersion(t, canvas)
-				spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
-				actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
-				assert.Equal(t, "acme/app", actual.Repository)
-				if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
-					assert.Equal(t, "@review", actual.Mention)
-					assert.False(t, actual.IgnoreBots)
-					assert.True(t, actual.AddressAllBots)
-					assert.Empty(t, actual.AllowedBots)
-					prompt := ""
-					runner := findIntakeNode(version.Nodes, prFeedbackRunnerNodeID)
-					require.NotNil(t, runner)
-					steps, _ := runner.Configuration["steps"].([]any)
-					for _, item := range steps {
-						step, _ := item.(map[string]any)
-						if step["name"] == "Address PR feedback" {
-							prompt, _ = step["prompt"].(string)
+					resetTestPublishCanvas(t, r, canvas, doc)
+					handler, err := factory.CreatePRFeedbackHandler(database.DB(t.Context()), canvas.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, source)
+					require.NoError(t, err)
+					require.NoError(t, handler.SetMaximumAttempts(database.DB(t.Context()), 8))
+					require.NoError(t, resetTestOrganization(t, r))
+					version := resetTestLiveVersion(t, canvas)
+					spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+					actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
+					assert.Equal(t, "acme/app", actual.Repository)
+					if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+						assert.Equal(t, "@review", actual.Mention)
+						assert.False(t, actual.IgnoreBots)
+						assert.True(t, actual.AddressAllBots)
+						assert.Empty(t, actual.AllowedBots)
+						prompt := ""
+						runner := findIntakeNode(version.Nodes, prFeedbackRunnerNodeID)
+						require.NotNil(t, runner)
+						steps, _ := runner.Configuration["steps"].([]any)
+						for _, item := range steps {
+							step, _ := item.(map[string]any)
+							if step["name"] == "Address PR feedback" {
+								prompt, _ = step["prompt"].(string)
+							}
 						}
+						assert.Contains(t, prompt, "Read every bot comment, including comments with no mention.")
+						assert.Contains(t, prompt, "Ignore comments SuperPlane already wrote.")
+					} else {
+						assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
 					}
-					assert.Contains(t, prompt, "Read every bot comment, including comments with no mention.")
-					assert.Contains(t, prompt, "Ignore comments SuperPlane already wrote.")
-				} else {
-					assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
-				}
-				reloaded, err := models.FindPRFeedbackHandlerByCanvasID(database.DB(t.Context()), canvas.ID)
-				require.NoError(t, err)
-				assert.Equal(t, 8, *reloaded.MaximumAttempts)
-				for id, timeout := range expected {
-					node := findIntakeNode(version.Nodes, id)
-					require.NotNil(t, node)
-					assert.EqualValues(t, timeout, node.Configuration["executionTimeoutSeconds"])
-					assert.Equal(t, evidence[id], node.Configuration["includeVisualEvidence"])
-				}
-			})
+					reloaded, err := models.FindPRFeedbackHandlerByCanvasID(database.DB(t.Context()), canvas.ID)
+					require.NoError(t, err)
+					assert.Equal(t, 8, *reloaded.MaximumAttempts)
+					for id, timeout := range expected {
+						node := findIntakeNode(version.Nodes, id)
+						require.NotNil(t, node)
+						assert.EqualValues(t, timeout, node.Configuration["executionTimeoutSeconds"])
+						assert.Equal(t, evidence[id], node.Configuration["includeVisualEvidence"])
+						assert.Equal(t, model, node.Configuration["model"])
+					}
+				})
+			}
 		}
 	}
 }

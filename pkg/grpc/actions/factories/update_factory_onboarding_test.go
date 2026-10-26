@@ -122,6 +122,11 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 	})
 
 	t.Run("complete without agent integration succeeds when hosted credit remains", func(t *testing.T) {
+		t.Setenv(models.BillingEnabledEnv, "yes")
+		require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+		before, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.Equal(t, models.BillingPlanTrial, before.Catalog.Key)
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
@@ -137,6 +142,11 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
+		after, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.Equal(t, before.PlanID, after.PlanID)
+		require.Equal(t, before.TrialEndsAt, after.TrialEndsAt)
+		require.Equal(t, before.PurchasedSeats, after.PurchasedSeats)
 	})
 
 	t.Run("complete without agent integration succeeds when hosted credit is empty", func(t *testing.T) {
@@ -568,7 +578,15 @@ func createReadyOnboardingIntegration(t *testing.T, organizationID uuid.UUID, ap
 
 func upsertHostedOnboardingProvider(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+	settings, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.Background()).Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+			"default_hosted_provider": settings.DefaultHostedProvider,
+			"default_hosted_model":    settings.DefaultHostedModel,
+		}).Error)
+	})
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider:      models.UsageProviderAnthropic,
 		Enabled:       true,
 		APIKey:        []byte("test-hosted-key"),
@@ -577,13 +595,10 @@ func upsertHostedOnboardingProvider(t *testing.T, db *gorm.DB) {
 	require.NoError(t, err)
 	provider := models.UsageProviderAnthropic
 	model := "sonnet"
-	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
-		DefaultHostedProvider: &provider,
-		DefaultHostedModel:    &model,
-	})
+	hostedSettings := *settings
+	hostedSettings.DefaultHostedProvider = &provider
+	hostedSettings.DefaultHostedModel = &model
+	_, err = models.UpdateInstallationLLMSettings(db, hostedSettings)
 	require.NoError(t, err)
 }
 
@@ -603,6 +618,7 @@ func clearHostedLLMProviders(t *testing.T, db *gorm.DB) {
 func TestFactoryOnboardingRejectsBYOKAfterRevocation(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")

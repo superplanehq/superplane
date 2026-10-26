@@ -22,6 +22,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -32,6 +33,10 @@ const (
 	maxCapacityLongPoll       = 30 * time.Second
 	capacityLongPollFrequency = time.Second
 )
+
+var errRunnerStatePrecondition = errors.New("runner state does not match the requested states")
+var errRunnerAssignedPrecondition = errors.New("runner has an assigned job")
+var errFleetProvisioningCooldown = errors.New("fleet provisioning cooldown is active")
 
 type Service struct {
 	signer       *jwt.Signer
@@ -248,6 +253,13 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 		return nil, err
 	}
 
+	if req.GetWarmCapacity() < 0 || req.GetMaxCapacity() < 0 ||
+		(req.GetMaxCapacity() > 0 && req.GetWarmCapacity() > req.GetMaxCapacity()) {
+		return nil, grpcerrors.InvalidArgument(nil, "invalid fleet capacity limits")
+	}
+	if (req.WarmCapacity == nil) != (req.MaxCapacity == nil) {
+		return nil, grpcerrors.InvalidArgument(nil, "warm and maximum capacities must be supplied together")
+	}
 	idempotencyKey := strings.TrimSpace(req.GetIdempotencyKey())
 	// Generic capacity can tolerate creating another pending runner after a
 	// lost response. A task-specific request cannot: its reservation must be
@@ -270,6 +282,7 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 		req.GetEphemeral(),
 		idempotencyKey,
 		requestHash,
+		req.WarmCapacity, req.MaxCapacity,
 	)
 	if err != nil {
 		return nil, err
@@ -338,6 +351,9 @@ func (s *Service) DescribeRunner(
 }
 
 func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest) (*pb.DeleteRunnerResponse, error) {
+	if err := validateRunnerStates(req.GetStates()); err != nil {
+		return nil, err
+	}
 	fleet, err := findFleet(ctx, req.GetFleetId())
 	if err != nil {
 		return nil, err
@@ -347,11 +363,36 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 		return nil, err
 	}
 
+	reason := req.GetReason()
+	if reason == "" {
+		reason = models.RunnerTerminationRequested
+	}
+	if reason != models.RunnerTerminationRequested && reason != models.RunnerTerminationProvisioningFailed {
+		return nil, grpcerrors.InvalidArgument(nil, "invalid runner termination reason")
+	}
+	var affectedOrganization uuid.UUID
 	var runner *models.Runner
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		runner, err = fleet.FindRunner(tx, runnerID)
+		runnerQuery := tx.Clauses(clause.Locking{Strength: "UPDATE"})
+		runner, err = fleet.FindRunner(runnerQuery, runnerID)
 		if err != nil {
 			return err
+		}
+		if len(req.GetStates()) > 0 && !slices.Contains(req.GetStates(), runner.State) {
+			return errRunnerStatePrecondition
+		}
+		active, activeErr := runner.FindActiveTask(tx)
+		if activeErr != nil && !errors.Is(activeErr, models.ErrRunnerTaskNotFound) {
+			return activeErr
+		}
+		if activeErr == nil {
+			affectedOrganization = active.OrganizationID
+			if req.GetRequireUnassigned() {
+				return errRunnerAssignedPrecondition
+			}
+			if active.State == models.RunnerTaskStateReserved && active.DispatchStartedAt != nil {
+				return active.RequestCancel(tx, time.Now())
+			}
 		}
 		if runner.State == models.RunnerStateBusy {
 			if !runner.Ephemeral {
@@ -366,10 +407,13 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 			}
 			return task.RequestCancel(tx, time.Now())
 		}
-		return runner.Terminate(tx, models.RunnerTerminationRequested)
+		return runner.Terminate(tx, reason)
 	})
 	if errors.Is(err, models.ErrRunnerNotFound) {
 		return nil, grpcerrors.NotFound(err, "runner not found")
+	}
+	if errors.Is(err, errRunnerStatePrecondition) || errors.Is(err, errRunnerAssignedPrecondition) {
+		return nil, grpcerrors.Conflict(err, "runner state does not match the requested states")
 	}
 	if errors.Is(err, models.ErrRunnerBusy) ||
 		errors.Is(err, models.ErrRunnerTaskNotCompletable) {
@@ -379,6 +423,9 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 		return nil, grpcerrors.Internal(err, "failed to terminate runner")
 	}
 	_ = runnercontrol.Publish(runnercontrol.Notification{RunnerID: runner.ID.String()})
+	if affectedOrganization != uuid.Nil {
+		_ = runnercontrol.PublishOrganizationCapacity(ctx, affectedOrganization)
+	}
 	return &pb.DeleteRunnerResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
 }
 
@@ -388,12 +435,33 @@ func (s *Service) createRunner(
 	taskID *uuid.UUID,
 	ephemeral bool,
 	idempotencyKey, requestHash string,
+	warmCapacity, maxCapacity *int32,
 ) (*models.Runner, *models.RunnerRegistration, error) {
 	var runner *models.Runner
 	var registration *models.RunnerRegistration
 	var reservedTask *models.RunnerTask
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if taskID != nil {
+			candidate, err := models.FindRunnerTask(tx, *taskID)
+			if err != nil {
+				return err
+			}
+			if maxCapacity != nil {
+				locked, err := models.TryLockOrganizationRunnerAdmission(tx, candidate.OrganizationID)
+				if err != nil {
+					return err
+				}
+				if !locked {
+					return models.ErrOrganizationRunnerCapacity
+				}
+			} else if err := models.LockOrganizationRunnerAdmission(tx, candidate.OrganizationID); err != nil {
+				return err
+			}
+		}
+		if err := models.LockRunnerFleetCreation(tx, fleetID); err != nil {
+			return err
+		}
 		if idempotencyKey != "" {
 			if releaseErr := models.ReleaseTerminatedRunnerCreationIdempotencyKey(
 				tx,
@@ -418,6 +486,14 @@ func (s *Service) createRunner(
 		}
 		if !fleet.Enabled {
 			return errFleetDisabled
+		}
+		if fleet.ProvisioningCooldownUntil != nil && fleet.ProvisioningCooldownUntil.After(time.Now()) {
+			return errFleetProvisioningCooldown
+		}
+		if maxCapacity != nil {
+			if err := fleet.CheckCreationCapacity(tx, taskID == nil, int(*warmCapacity), int(*maxCapacity)); err != nil {
+				return err
+			}
 		}
 
 		now := time.Now()
@@ -456,6 +532,7 @@ func (s *Service) createRunner(
 				return taskErr
 			}
 			reservedTask = task
+			runner.ReservedTaskID = &task.ID
 		}
 
 		registration = &models.RunnerRegistration{
@@ -468,6 +545,7 @@ func (s *Service) createRunner(
 	})
 	if err == nil && reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetID, models.RunnerFleetScopeInstallation)
+		_ = runnercontrol.PublishOrganizationCapacity(ctx, reservedTask.OrganizationID)
 	}
 	if idempotencyKey != "" && models.IsRunnerCreationIdempotencyKeyConflict(err) {
 		runner, err = loadIdempotentRunner(database.DB(ctx), idempotencyKey, requestHash)
@@ -481,6 +559,8 @@ func (s *Service) createRunner(
 		return nil, nil, grpcerrors.NotFound(err, "fleet not found")
 	case errors.Is(err, models.ErrRunnerTaskNotFound):
 		return nil, nil, grpcerrors.NotFound(err, "task not found")
+	case errors.Is(err, models.ErrRunnerFleetCreationCapacity), errors.Is(err, errFleetProvisioningCooldown), errors.Is(err, models.ErrOrganizationRunnerCapacity):
+		return nil, nil, grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, models.ErrRunnerTaskNotReservable),
 		errors.Is(err, models.ErrRunnerTaskFleetMismatch),
 		errors.Is(err, models.ErrRunnerTaskBackendMismatch):
@@ -514,6 +594,15 @@ var errFleetDisabled = errors.New("fleet is disabled")
 
 func loadFleetCapacity(ctx context.Context, fleet *models.RunnerFleet) (*pb.GetFleetCapacityResponse, error) {
 	db := database.DB(ctx)
+	current, err := models.FindRunnerFleet(db, fleet.ID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load fleet")
+	}
+	fleet = current
+	unassigned, err := fleet.CountUnassignedRunners(db)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to count unassigned runners")
+	}
 	runnable, err := fleet.CountTasks(db, models.RunnerTaskStateQueued)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to count runnable tasks")
@@ -524,24 +613,29 @@ func loadFleetCapacity(ctx context.Context, fleet *models.RunnerFleet) (*pb.GetF
 	}
 
 	generationSource := fmt.Sprintf(
-		"%d:%d:%d:%d:%d:%d",
+		"%d:%d:%d:%d:%d:%d:%d:%v",
 		fleet.UpdatedAt.UnixNano(),
 		runnable,
 		counts[models.RunnerStatePending],
 		counts[models.RunnerStateIdle],
 		counts[models.RunnerStateBusy],
-		counts[models.RunnerStateTerminated],
+		counts[models.RunnerStateTerminated], unassigned, fleet.ProvisioningCooldownUntil,
 	)
 	generationBytes := sha256.Sum256([]byte(generationSource))
 
-	return &pb.GetFleetCapacityResponse{
+	response := &pb.GetFleetCapacityResponse{
 		RunnableTasks:     runnable,
 		PendingRunners:    counts[models.RunnerStatePending],
 		IdleRunners:       counts[models.RunnerStateIdle],
 		BusyRunners:       counts[models.RunnerStateBusy],
 		TerminatedRunners: counts[models.RunnerStateTerminated],
 		Generation:        hex.EncodeToString(generationBytes[:]),
-	}, nil
+		UnassignedRunners: unassigned,
+	}
+	if fleet.ProvisioningCooldownUntil != nil {
+		response.ProvisioningCooldownUntil = timestamppb.New(*fleet.ProvisioningCooldownUntil)
+	}
+	return response, nil
 }
 
 func findFleet(ctx context.Context, rawID string) (*models.RunnerFleet, error) {

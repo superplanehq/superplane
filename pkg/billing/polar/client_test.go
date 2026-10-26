@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -209,29 +210,69 @@ func Test__GetCreditPackKeepsFixedPriceOnMixedProducts(t *testing.T) {
 	assert.False(t, pack.CustomPrice)
 }
 
-func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/checkouts/", r.URL.Path)
-		var body map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
-		assert.Equal(t, "org-1", body["external_customer_id"])
-		assert.NotContains(t, body, "prices")
-		assert.NotContains(t, body, "metadata")
-		_, hasCustomerEmail := body["customer_email"]
-		assert.False(t, hasCustomerEmail)
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
-			"url":         "https://buy.polar.sh/polar_c_test",
-			"customer_id": "cust_1",
-		}))
-	}))
-	t.Cleanup(server.Close)
+func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		seats    *int
+		metadata map[string]string
+	}{
+		{name: "Business"},
+		{name: "Team", seats: new(5), metadata: map[string]string{CheckoutIntentMetadataKey: "intent-1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			expiresAt := time.Now().Add(time.Hour).UTC()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/checkouts/", r.URL.Path)
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
+				assert.Equal(t, "org-1", body["external_customer_id"])
+				assert.NotContains(t, body, "prices")
+				assert.NotContains(t, body, "customer_email")
+				if tc.metadata == nil {
+					assert.NotContains(t, body, "metadata")
+				} else {
+					assert.Equal(t, map[string]any{CheckoutIntentMetadataKey: "intent-1"}, body["metadata"])
+				}
+				if tc.seats == nil {
+					assert.NotContains(t, body, "allow_discount_codes")
+					assert.NotContains(t, body, "seats")
+					assert.NotContains(t, body, "min_seats")
+					assert.NotContains(t, body, "max_seats")
+				}
+				if tc.seats != nil {
+					require.Contains(t, body, "allow_discount_codes")
+					assert.Equal(t, false, body["allow_discount_codes"])
+					for _, field := range []string{"seats", "min_seats", "max_seats"} {
+						assert.Equal(t, float64(*tc.seats), body[field], field)
+					}
+				}
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"id":          "chk_1",
+					"url":         "https://buy.polar.sh/polar_c_test",
+					"customer_id": "cust_1",
+					"status":      "open",
+					"expires_at":  expiresAt.Format(time.RFC3339Nano),
+					"seats":       tc.seats,
+					"metadata":    map[string]any{CheckoutIntentMetadataKey: "intent-1", "attempt": 2},
+				}))
+			}))
+			t.Cleanup(server.Close)
 
-	client := NewClient(server.URL, "oat_test", server.Client())
-	session, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "http://localhost:8000/return", "203.0.113.10")
-	require.NoError(t, err)
-	assert.Equal(t, "https://buy.polar.sh/polar_c_test", session.URL)
-	assert.Equal(t, "cust_1", session.CustomerID)
+			client := NewClient(server.URL, "oat_test", server.Client())
+			session, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost:8000/return", CustomerIP: "203.0.113.10", Seats: tc.seats, Metadata: tc.metadata})
+			require.NoError(t, err)
+			assert.Equal(t, "chk_1", session.ID)
+			assert.Equal(t, "https://buy.polar.sh/polar_c_test", session.URL)
+			assert.Equal(t, "cust_1", session.CustomerID)
+			assert.Equal(t, CheckoutStatusOpen, session.Status)
+			require.NotNil(t, session.ExpiresAt)
+			assert.True(t, session.ExpiresAt.Equal(expiresAt))
+			assert.Equal(t, tc.seats, session.Seats)
+			assert.Equal(t, "intent-1", session.IntentID())
+			assert.Equal(t, "2", session.Metadata["attempt"], "numeric metadata is read as text")
+		})
+	}
 }
 
 func TestCreateCreditCheckoutLocksChargeAndCreditMetadata(t *testing.T) {
@@ -424,6 +465,42 @@ func Test__EnsureCustomerDoesNotTreatValidationAsConflict(t *testing.T) {
 	assert.Contains(t, err.Error(), "not a valid email address")
 }
 
+func Test__CreateCheckoutClassifiesUncertainOutcomes(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		handler http.HandlerFunc
+		unknown bool
+	}{
+		{"server error", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "boom", http.StatusBadGateway) }, true},
+		{"dropped connection", func(w http.ResponseWriter, _ *http.Request) {
+			conn, _, err := w.(http.Hijacker).Hijack()
+			require.NoError(t, err)
+			require.NoError(t, conn.Close())
+		}, true},
+		{"created without id", func(w http.ResponseWriter, _ *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{"url": "https://buy.polar.sh/c"})
+		}, true},
+		{"created without url", func(w http.ResponseWriter, _ *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "chk_1"})
+		}, true},
+		{"validation rejection", func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "invalid", http.StatusUnprocessableEntity)
+		}, false},
+		{"bad request", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "bad", http.StatusBadRequest) }, false},
+		{"unauthorized", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "no", http.StatusUnauthorized) }, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(tc.handler)
+			t.Cleanup(server.Close)
+
+			client := NewClient(server.URL, "oat_test", server.Client())
+			_, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost/return"})
+			require.Error(t, err)
+			assert.Equal(t, tc.unknown, IsOutcomeUnknown(err))
+		})
+	}
+}
+
 func Test__CreateCheckoutReportsRateLimit(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", "30")
@@ -432,7 +509,7 @@ func Test__CreateCheckoutReportsRateLimit(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := NewClient(server.URL, "oat_test", server.Client())
-	_, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "http://localhost/return", "")
+	_, err := client.CreateCheckout(context.Background(), CheckoutInput{ProductID: "prod_1", ExternalCustomerID: "org-1", SuccessURL: "http://localhost/return"})
 	require.ErrorIs(t, err, ErrRateLimited)
 }
 
@@ -606,6 +683,215 @@ func Test__CancelSubscriptionAtPeriodEndRequiresID(t *testing.T) {
 	_, err := client.CancelSubscriptionAtPeriodEnd(context.Background(), "  ")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "subscription id is required")
+}
+
+func Test__UpdateSubscriptionSeatsInvoicesTheProratedChange(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/subscriptions/sub_team", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "sub_team", "status": "active", "seats": 5}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	updated, err := client.UpdateSubscriptionSeats(context.Background(), " sub_team ", 5)
+	require.NoError(t, err)
+	assert.Equal(t, 5, *updated.Seats)
+	assert.Equal(t, map[string]any{"seats": float64(5), "proration_behavior": "invoice"}, body)
+}
+
+func Test__ScheduleSubscriptionSeatsChangesOnlyTheNextPeriod(t *testing.T) {
+	appliesAt := time.Now().Add(10 * 24 * time.Hour).UTC().Truncate(time.Second)
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/subscriptions/sub_team", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id": "sub_team", "status": "active", "seats": 10,
+			"pending_update": map[string]any{"seats": 9, "applies_at": appliesAt.Format(time.RFC3339)},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	updated, err := client.ScheduleSubscriptionSeats(context.Background(), " sub_team ", 9)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"seats": float64(9), "proration_behavior": "next_period"}, body)
+	assert.Equal(t, 10, *updated.Seats, "the current period keeps its seats")
+	require.NotNil(t, updated.PendingUpdate)
+	assert.True(t, updated.PendingUpdate.AppliesAt.Time.Equal(appliesAt))
+	assert.Equal(t, 9, *updated.NextPeriodSeats())
+
+	_, err = client.ScheduleSubscriptionSeats(context.Background(), " ", 9)
+	require.ErrorContains(t, err, "subscription id is required")
+}
+
+func Test__NextPeriodSeatsPrefersTheScheduledSeatCount(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want *int
+	}{
+		{name: "no pending update", body: `{"id":"sub","seats":10}`, want: new(10)},
+		{name: "null pending update", body: `{"id":"sub","seats":10,"pending_update":null}`, want: new(10)},
+		{name: "pending update without seats", body: `{"id":"sub","seats":10,"pending_update":{"seats":null,"applies_at":"2026-12-01T00:00:00Z"}}`, want: new(10)},
+		{name: "no seats", body: `{"id":"sub"}`, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var data SubscriptionData
+			require.NoError(t, json.Unmarshal([]byte(tt.body), &data))
+			assert.Equal(t, tt.want, data.NextPeriodSeats())
+		})
+	}
+}
+
+func Test__UpdateSubscriptionSeatsRequiresIDInRequestAndResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"status": "active"}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.UpdateSubscriptionSeats(context.Background(), " ", 5)
+	require.ErrorContains(t, err, "subscription id is required")
+	_, err = client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+	require.ErrorContains(t, err, "did not return an id")
+	assert.True(t, IsOutcomeUnknown(err), "a 200 without a snapshot may still have charged the customer")
+}
+
+func Test__SubscriptionUpdateErrorsAreTyped(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		code   string
+		match  func(error) bool
+		also   func(error) bool
+		not    []func(error) bool
+	}{
+		{name: "payment failed", status: http.StatusPaymentRequired, code: "PaymentFailed", match: IsPaymentFailed,
+			not: []func(error) bool{IsOutcomeUnknown}},
+		{name: "payment action required", status: http.StatusPaymentRequired, code: "PaymentActionRequired", match: IsPaymentActionRequired,
+			not: []func(error) bool{IsPaymentFailed}},
+		{name: "locked", status: http.StatusConflict, code: "SubscriptionLocked", match: IsSubscriptionLocked, also: IsConflict},
+		{name: "already canceled", status: http.StatusForbidden, code: "AlreadyCanceledSubscription", match: IsSubscriptionInactive,
+			not: []func(error) bool{IsUnauthorized}},
+		{name: "inactive", status: http.StatusForbidden, code: "InactiveSubscription", match: IsSubscriptionInactive,
+			not: []func(error) bool{IsUnauthorized}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.status)
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"error": tt.code, "detail": "details"}))
+			}))
+			t.Cleanup(server.Close)
+
+			client := NewClient(server.URL, "oat_test", server.Client())
+			_, err := client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+			require.Error(t, err)
+			assert.True(t, tt.match(err))
+			if tt.also != nil {
+				assert.True(t, tt.also(err))
+			}
+			for _, other := range tt.not {
+				assert.False(t, other(err))
+			}
+		})
+	}
+}
+
+func Test__UntypedSubscriptionErrorsKeepExistingMapping(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		body   string
+		match  func(error) bool
+	}{
+		{name: "forbidden without a code", status: http.StatusForbidden, body: `{"error":"NotPermitted"}`, match: IsUnauthorized},
+		{name: "forbidden with plain text", status: http.StatusForbidden, body: "forbidden", match: IsUnauthorized},
+		{name: "conflict without a code", status: http.StatusConflict, body: `{"error":"ResourceAlreadyExists"}`, match: IsConflict},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			t.Cleanup(server.Close)
+
+			client := NewClient(server.URL, "oat_test", server.Client())
+			_, err := client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+			assert.True(t, tt.match(err))
+			assert.False(t, IsSubscriptionInactive(err) || IsSubscriptionLocked(err) || IsOutcomeUnknown(err))
+		})
+	}
+}
+
+func Test__UpdateSubscriptionSeatsReportsUnknownOutcome(t *testing.T) {
+	t.Run("server error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "boom", http.StatusBadGateway)
+		}))
+		t.Cleanup(server.Close)
+
+		client := NewClient(server.URL, "oat_test", server.Client())
+		_, err := client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+		assert.True(t, IsOutcomeUnknown(err))
+		assert.Contains(t, err.Error(), "502")
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		release := make(chan struct{})
+		server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			<-release
+		}))
+		t.Cleanup(server.Close)
+		t.Cleanup(func() { close(release) })
+
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		client := NewClient(server.URL, "oat_test", server.Client())
+		_, err := client.UpdateSubscriptionSeats(ctx, "sub_team", 5)
+		assert.True(t, IsOutcomeUnknown(err))
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("validation rejection", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "invalid seats", http.StatusUnprocessableEntity)
+		}))
+		t.Cleanup(server.Close)
+
+		client := NewClient(server.URL, "oat_test", server.Client())
+		_, err := client.UpdateSubscriptionSeats(context.Background(), "sub_team", 5)
+		require.Error(t, err)
+		assert.True(t, IsInvalidRequest(err))
+		assert.False(t, IsOutcomeUnknown(err), "a 422 means Polar did not apply the update")
+	})
+}
+
+func Test__GetSubscriptionReadsSnapshot(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/subscriptions/sub_team", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id": "sub_team", "status": "active", "seats": 7, "modified_at": "2026-11-08T00:00:00Z",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	snapshot, err := client.GetSubscription(context.Background(), "sub_team")
+	require.NoError(t, err)
+	assert.Equal(t, 7, *snapshot.Seats)
+	assert.False(t, snapshot.ModifiedAt.Time.IsZero())
+
+	_, err = client.GetSubscription(context.Background(), " ")
+	require.ErrorContains(t, err, "subscription id is required")
 }
 
 func Test__ListOrdersFiltersByExternalCustomerID(t *testing.T) {

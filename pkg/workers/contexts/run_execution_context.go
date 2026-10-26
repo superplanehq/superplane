@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/config"
@@ -52,6 +53,9 @@ func (c *RunExecutionContext) Cancel() error {
 
 	for i := range childRuns {
 		run := &childRuns[i]
+		if run.State == models.CanvasRunStateFinished {
+			continue
+		}
 		cancellation, err := run.RequestCancellation(c.tx, c.execution.CancelledBy)
 		if err != nil {
 			return fmt.Errorf("cancel child run %s: %w", run.ID, err)
@@ -63,6 +67,25 @@ func (c *RunExecutionContext) Cancel() error {
 	}
 
 	return nil
+}
+
+func (c *RunExecutionContext) QueueWait(rawID string, from, until time.Time) (*core.RunQueueWait, error) {
+	id, err := uuid.Parse(rawID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid child run ID: %w", err)
+	}
+	var run models.CanvasRun
+	if err := c.tx.Where("id = ? AND parent_execution_id = ? AND parent_workflow_id = ?", id, c.execution.ID, c.canvas.ID).First(&run).Error; err != nil {
+		return nil, err
+	}
+	if run.State == models.CanvasRunStateFinished {
+		return &core.RunQueueWait{Finished: true}, nil
+	}
+	duration, waiting, err := run.RunnerQueueWait(c.tx, from, until)
+	if err != nil {
+		return nil, err
+	}
+	return &core.RunQueueWait{Duration: duration, Waiting: waiting}, nil
 }
 
 func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {

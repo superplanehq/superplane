@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestResolveOrganizationParallelTaskLimitUsesEffectivePlanAndCallerTransaction(t *testing.T) {
+func TestResolveOrganizationParallelRunnerLimitUsesEffectivePlanAndCallerTransaction(t *testing.T) {
 	for _, state := range []string{"trial", "expired_trial", "expired_subscription", "unlimited", "disabled"} {
 		t.Run(state, func(t *testing.T) {
 			r := support.Setup(t)
@@ -41,7 +41,7 @@ func TestResolveOrganizationParallelTaskLimitUsesEffectivePlanAndCallerTransacti
 				case "disabled":
 					t.Setenv(models.BillingEnabledEnv, "no")
 				}
-				limit, err := models.ResolveOrganizationParallelTaskLimit(tx, r.Organization.ID)
+				limit, err := models.ResolveOrganizationParallelRunnerLimit(tx, r.Organization.ID)
 				require.NoError(t, err)
 				if state == "unlimited" || state == "disabled" {
 					require.Nil(t, limit)
@@ -55,11 +55,11 @@ func TestResolveOrganizationParallelTaskLimitUsesEffectivePlanAndCallerTransacti
 	}
 }
 
-func TestResolveOrganizationParallelTaskLimitPropagatesDatabaseErrors(t *testing.T) {
+func TestResolveOrganizationParallelRunnerLimitPropagatesDatabaseErrors(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv(models.BillingEnabledEnv, "yes")
 	tx := database.DB(t.Context()).Begin()
 	require.NoError(t, tx.Rollback().Error)
-	_, err := models.ResolveOrganizationParallelTaskLimit(tx, r.Organization.ID)
+	_, err := models.ResolveOrganizationParallelRunnerLimit(tx, r.Organization.ID)
 	require.Error(t, err)
 }

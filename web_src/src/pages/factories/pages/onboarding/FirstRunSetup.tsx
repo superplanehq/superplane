@@ -9,7 +9,6 @@ import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunAgentScreen } from "./first-run/FirstRunAgentScreen";
-import { FirstRunBillingScreen } from "./first-run/FirstRunBillingScreen";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
 import { FirstRunBitbucketChooseScreen } from "./first-run/FirstRunBitbucketChooseScreen";
 import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
@@ -23,6 +22,7 @@ import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
 import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
+import { ownerOfRepository, repositoriesInOrganization } from "./first-run/githubOrganizations";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
 import {
@@ -38,8 +38,8 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   connect: 1,
   choose: 2,
   tickets: 3,
-  billing: 4,
-  agent: 5,
+  complete: 4,
+  agent: 4,
 };
 
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
@@ -47,8 +47,8 @@ const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   connect: "host",
   choose: "connect",
   tickets: "choose",
-  billing: "tickets",
-  agent: "billing",
+  complete: "tickets",
+  agent: "tickets",
 };
 
 function firstNameOf(name: string | undefined): string | undefined {
@@ -62,7 +62,7 @@ function signOut() {
 }
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
-  const backScreen = target === "agent" && !flow.hasBillingStep ? "tickets" : BACK_SCREEN[target];
+  const backScreen = BACK_SCREEN[target];
   // Bitbucket has no separate connect screen.
   if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
     return () => flow.goToScreen("host");
@@ -83,17 +83,34 @@ function TicketsScreenHost({
   chrome: FirstRunChrome;
   sphere?: FirstRunSphereProps;
 }) {
+  const connecting =
+    flow.blockingAction === "opening-github" ||
+    flow.blockingAction === "connecting-jira" ||
+    flow.blockingAction === "connecting-linear";
+  // The backlog repository stays in the organization of the app repository,
+  // the same filter the Git host step applies.
+  const organization = ownerOfRepository(model.setup.selectedRepo);
+  const repositories = organization ? repositoriesInOrganization(flow.repositories, organization) : flow.repositories;
   return (
     <FirstRunTicketsScreen
-      initialImportLimit={initialWorkspace ? 3 : undefined}
+      initialImportLimit={3}
       skipInitialImport={model.setup.skipInitialImport}
+      // The first workspace always imports: that batch feeds the analysis.
       onSkipInitialImportChange={initialWorkspace ? undefined : model.setup.setSkipInitialImport}
+      automaticIntake={model.setup.automaticIntake}
+      onAutomaticIntakeChange={model.setup.setAutomaticIntake}
       githubAvailable={flow.vcsHost !== "bitbucket"}
       ticketSource={flow.ticketSource}
+      // GitHub is only a default until the user picks it on the list.
+      startOnSourceList={model.setup.issuesChoice == null}
+      repository={model.setup.issuesRepo ?? model.setup.selectedRepo ?? undefined}
+      repositories={repositories}
+      onSelectRepository={model.setup.selectIssuesRepo}
+      connecting={connecting}
       chrome={chrome}
       sphere={sphere}
       continueLabel={
-        flow.hasBillingStep || !flow.skipAgentScreen
+        !flow.skipAgentScreen
           ? FIRST_RUN_COPY.tickets.continue
           : !initialWorkspace && model.setup.skipInitialImport
             ? FIRST_RUN_COPY.finish.action
@@ -309,8 +326,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       onLogOut: signOut,
       organizationSwitch: otherOrganizations.length > 0 ? { currentOrganizationRouteId: organizationId } : undefined,
       workspaceSwitch: hasOtherWorkspace ? { organizationId, currentFactoryId: factoryId, factories } : undefined,
-      stepIndex: STEP_INDEX_FOR_SCREEN[target] - Number(target === "agent" && !flow.hasBillingStep),
-      stepCount: FIRST_RUN_STEP_COUNT - Number(flow.skipAgentScreen) + Number(flow.hasBillingStep),
+      stepIndex: STEP_INDEX_FOR_SCREEN[target] - Number(target === "complete" && flow.skipAgentScreen),
+      stepCount: FIRST_RUN_STEP_COUNT - Number(flow.skipAgentScreen),
       onBack: backActionFor(target, flow),
       busy: flow.busy,
     };
@@ -322,9 +339,9 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         organizationId={destination.organizationId}
         factoryId={factoryId}
         chrome={{
-          ...chromeFor("billing"),
+          ...chromeFor("complete"),
           onBack: undefined,
-          stepIndex: FIRST_RUN_STEP_COUNT - 1 - Number(flow.skipAgentScreen) + Number(flow.hasBillingStep),
+          stepIndex: FIRST_RUN_STEP_COUNT - 1 - Number(flow.skipAgentScreen),
         }}
         selectedRepo={setup.selectedRepo}
         onGoToBoard={() => navigate(afterOnboardingPath(destination), { replace: true })}
@@ -355,13 +372,12 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     );
   }
 
-  if (flow.screen === "billing") {
+  if (flow.screen === "complete") {
     return (
-      <OnboardingPlanScreen
+      <CompleteSetupScreen
         flow={flow}
-        organizationId={organizationId}
-        chrome={chromeFor("billing")}
-        sphere={sphereFor("billing", setup.selectedRepo, model.githubOwner)}
+        chrome={chromeFor("complete")}
+        sphere={sphereFor("complete", setup.selectedRepo, model.githubOwner)}
       />
     );
   }
@@ -386,7 +402,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
       saving={flow.busy}
       loading={model.agentLoading}
-      hasBillingStep={false}
       hostedAgentReady={model.hostedAgentReady}
       showCustomProvider={model.customProvider}
       modelSource={{
@@ -404,39 +419,27 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   );
 }
 
-function OnboardingPlanScreen({
+function CompleteSetupScreen({
   flow,
-  organizationId,
   chrome,
   sphere,
 }: {
   flow: FirstRunSetupFlow;
-  organizationId: string;
   chrome: FirstRunChrome;
   sphere?: FirstRunSphereProps;
 }) {
-  if (!flow.hasBillingStep)
-    return (
-      <FirstRunShell testId="first-run-complete" chrome={chrome} busy={flow.busy} visual="preview">
-        <FirstRunHeading headline="Complete workspace setup">
-          <p>
-            {flow.accessError
-              ? "SuperPlane could not verify model access. Try again."
-              : "Continue with the models available to your organization."}
-          </p>
-        </FirstRunHeading>
-        <Button disabled={flow.busy} onClick={() => void flow.finishSetup()}>
-          Continue
-        </Button>
-      </FirstRunShell>
-    );
   return (
-    <FirstRunBillingScreen
-      organizationId={organizationId}
-      chrome={chrome}
-      saving={flow.busy}
-      sphere={sphere}
-      onContinue={flow.finishSetup}
-    />
+    <FirstRunShell testId="first-run-complete" chrome={chrome} busy={flow.busy} sphere={sphere} visual="preview">
+      <FirstRunHeading headline="Complete workspace setup">
+        <p>
+          {flow.accessError
+            ? "SuperPlane could not verify model access. Try again."
+            : "Continue with the models available to your organization."}
+        </p>
+      </FirstRunHeading>
+      <Button disabled={flow.busy} onClick={() => void flow.finishSetup()}>
+        Continue
+      </Button>
+    </FirstRunShell>
   );
 }

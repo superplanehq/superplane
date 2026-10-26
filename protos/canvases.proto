@@ -648,6 +648,7 @@ message CanvasNodeExecutionRef {
   string component_name = 11;
   // Task identified by a recorded duplicate-task decision, not inferred from source identity.
   string existing_task_id = 12;
+  RunnerJob runner_job = 13;
 }
 
 //
@@ -693,6 +694,18 @@ message CanvasNodeExecution {
   UserRef cancelled_by = 15;
   string run_id = 16;
   google.protobuf.Timestamp cancelled_at = 17;
+  RunnerJob runner_job = 18;
+}
+
+// Durable runner state for this node execution. Reserved includes provisioning
+// and credential preparation; started_at marks actual runner execution.
+message RunnerJob {
+  string id = 1;
+  string state = 2;
+  google.protobuf.Timestamp queued_at = 3;
+  google.protobuf.Timestamp reserved_at = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp finished_at = 6;
 }
 
 message CanvasNodeQueueItem {

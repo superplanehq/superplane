@@ -60,24 +60,24 @@ func DescribeOrganizationWorkspaceUsage(
 		return nil, grpcerrors.Internal(err, "failed to describe organization workspace usage")
 	}
 
-	limit, err := models.ResolveOrganizationParallelTaskLimit(db, organizationID)
+	limit, err := models.ResolveOrganizationParallelRunnerLimit(db, organizationID)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to resolve organization task limit")
+		return nil, grpcerrors.Internal(err, "failed to resolve organization runner limit")
 	}
-	var parallelTaskLimit *int32
+	var parallelRunnerLimit *int32
 	if limit != nil {
 		value := int32(*limit)
-		parallelTaskLimit = &value
+		parallelRunnerLimit = &value
 	}
-	activeTasks, err := models.ListActiveOrganizationTaskIDs(db, organizationID)
+	activeRunners, err := models.CountActiveOrganizationRunnerJobs(db, organizationID)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to count active organization tasks")
+		return nil, grpcerrors.Internal(err, "failed to count active organization runners")
 	}
 
 	return &pb.DescribeOrganizationWorkspaceUsageResponse{
 		TotalTokens:            ledger.TotalTokens,
-		ActiveTaskCount:        int32(len(activeTasks)),
-		ParallelTaskLimit:      parallelTaskLimit,
+		ActiveRunnerCount:      int32(activeRunners),
+		ParallelRunnerLimit:    parallelRunnerLimit,
 		TotalCostCents:         ledger.CostCents(),
 		PeriodDays:             int32(period),
 		ByModel:                serializeUsageByModel(byModel),

@@ -68,6 +68,7 @@ func NormalizeLogUploadPolicy(policy *LogUploadPolicy) LogUploadPolicy {
 // TaskPayload is the encrypted task specification delivered through the v1
 // runner WebSocket.
 type TaskPayload struct {
+	CredentialRefreshes     []CredentialRefresh   `json:"credential_refreshes,omitempty"`
 	ID                      string                `json:"id"`
 	RunMode                 string                `json:"run_mode,omitempty"`
 	Script                  string                `json:"script,omitempty"`

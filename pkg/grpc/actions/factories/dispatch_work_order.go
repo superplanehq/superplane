@@ -197,7 +197,7 @@ func dispatchWorkOrderOnLineTx(
 
 	model = strings.TrimSpace(model)
 	if model != "" {
-		allowed, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name)
+		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name)
 		if err != nil {
 			return nil, err
 		}

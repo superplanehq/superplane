@@ -79,6 +79,7 @@ type NodeExecutionResources struct {
 	rootEventsByID            map[string]models.CanvasEvent
 	outputEventsByExecutionID map[string][]models.CanvasEvent
 	cancelledByUsersByID      map[uuid.UUID]models.User
+	runnerJobsByExecutionID   map[uuid.UUID]models.RunnerTask
 }
 
 func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecution) (*NodeExecutionResources, error) {
@@ -136,10 +137,19 @@ func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecu
 		}
 	}
 
+	ids := make([]uuid.UUID, 0, len(executions))
+	for _, execution := range executions {
+		ids = append(ids, execution.ID)
+	}
+	runnerJobs, err := models.ListRunnerJobsForExecutions(db, ids)
+	if err != nil {
+		return nil, fmt.Errorf("load execution runner jobs: %w", err)
+	}
 	return &NodeExecutionResources{
 		rootEventsByID:            rootEventsByID,
 		outputEventsByExecutionID: outputEventsByExecutionID,
 		cancelledByUsersByID:      cancelledByUsersByID,
+		runnerJobsByExecutionID:   runnerJobs,
 	}, nil
 }
 
@@ -185,6 +195,7 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, resources 
 			CancelledBy:         cancelledByRef(execution.CancelledBy, resources.cancelledByUsersByID),
 			RunId:               uuidStringOrEmpty(execution.RunID),
 			CancelledAt:         optionalTimestamp(execution.CancelledAt),
+			RunnerJob:           serializeRunnerJob(resources.runnerJobsByExecutionID[execution.ID]),
 		})
 	}
 
@@ -444,4 +455,15 @@ func optionalTimestamp(value *time.Time) *timestamppb.Timestamp {
 	}
 
 	return timestamppb.New(*value)
+}
+
+func serializeRunnerJob(job models.RunnerTask) *pb.RunnerJob {
+	if job.ID == uuid.Nil {
+		return nil
+	}
+	return &pb.RunnerJob{
+		Id: job.ID.String(), State: job.State, QueuedAt: timestamppb.New(job.QueuedAt),
+		ReservedAt: optionalTimestamp(job.ReservedAt), StartedAt: optionalTimestamp(job.StartedAt),
+		FinishedAt: optionalTimestamp(job.FinishedAt),
+	}
 }

@@ -87,7 +87,7 @@ const queuedEntry = buildWorkOrderListEntry(
     title: "Retry webhook delivery",
     state: "STATE_DRAFT",
     statusNotes: [],
-    queuedTasks: [{ id: "queue-1", position: 2 }],
+    queuedRunnerJobs: [{ id: "queue-1", position: 2 }],
     updatedAt: new Date(Date.now() - 36_000).toISOString(),
   }),
   factory,
@@ -99,9 +99,9 @@ function QueuedCardPreview(args: ComponentProps<typeof WorkOrderCard>) {
     <WorkOrderCard
       {...args}
       entry={entry}
-      onCancelQueuedTask={async (orderId, queueId) => {
+      onCancelQueuedRunnerJob={async (orderId, queueId) => {
         console.info("Remove from queue", orderId, queueId);
-        setEntry((current) => ({ ...current, order: { ...current.order, queuedTasks: undefined } }));
+        setEntry((current) => ({ ...current, order: { ...current.order, queuedRunnerJobs: undefined } }));
       }}
     />
   );
@@ -115,7 +115,7 @@ export const QueuedTask: Story = {
 
 export const CancellingQueuedTask: Story = {
   name: "Queue cancellation pending",
-  args: { ...QueuedTask.args, cancellingQueueOrderIds: new Set(["wo-queued"]) },
+  args: { ...QueuedTask.args, cancellingQueueJobIds: new Set(["queue-1"]) },
   render: (args) => <QueuedCardPreview {...args} />,
 };
 

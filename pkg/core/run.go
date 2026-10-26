@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -17,6 +18,13 @@ type RunExecutionContext interface {
 	Create(params RunCreationParams) (*Run, error)
 	Cancel() error
 	AddError(message string) error
+	QueueWait(runID string, from, until time.Time) (*RunQueueWait, error)
+}
+
+type RunQueueWait struct {
+	Duration time.Duration
+	Waiting  bool
+	Finished bool
 }
 
 type Run struct {

@@ -166,6 +166,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		executionUpdates = append(executionUpdates, executions...)
 	}
 
+	runnerChanges := &RunnerTaskChangeNotifier{}
 	stateUpdated := false
 	alreadyInitialized := false
 	failedBeforeStart := false
@@ -197,6 +198,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 
 		err = NewRunCallbackDispatcher(tx, w.registry, locked).
 			WithEventCollector(eventCollector).
+			WithRunnerTaskChangeCollector(runnerChanges.Record).
 			DispatchPending()
 
 		//
@@ -207,7 +209,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		if err != nil {
 			logger = logging.WithCanvasWorkspace(logger, unscopedCanvas(tx, locked.WorkflowID))
 			logger.WithError(err).Errorf("Error dispatching pending run callback")
-			admitted, failErr := w.failRun(tx, locked, eventCollector, executionCollector, err.Error())
+			admitted, failErr := w.failRun(tx, locked, eventCollector, executionCollector, err.Error(), runnerChanges)
 			if failErr != nil {
 				return failErr
 			}
@@ -238,6 +240,8 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 	if err != nil {
 		return err
 	}
+
+	runnerChanges.Publish()
 
 	if alreadyInitialized || failedBeforeStart {
 		rollUpFactoryUsageBestEffort(logger, database.Conn(), runID)
@@ -290,6 +294,7 @@ func (w *RunInitializer) failRun(
 	eventCollector func([]models.CanvasEvent),
 	executionCollector func([]models.CanvasNodeExecution),
 	resultMessage string,
+	runnerChanges *RunnerTaskChangeNotifier,
 ) ([]*models.FactoryLineStepResult, error) {
 	if err := run.AddError(tx, resultMessage, config.MaxPayloadSize()); err != nil {
 		return nil, fmt.Errorf("record run error: %w", err)
@@ -321,6 +326,7 @@ func (w *RunInitializer) failRun(
 	err = NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
+		WithRunnerTaskChangeCollector(runnerChanges.Record).
 		DispatchFinished()
 	if err != nil {
 		return nil, err

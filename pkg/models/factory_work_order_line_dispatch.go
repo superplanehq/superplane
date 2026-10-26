@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -226,33 +225,24 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return l.enqueueStep(tx, order, stepIndex)
 	}
 
-	activeTasks, err := continuableOrganizationTaskIDs(tx, l.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
-	if !slices.Contains(activeTasks, order.ID) {
-		full, err := organizationAtTaskCapacity(tx, l.OrganizationID)
-		if err != nil {
-			return nil, err
-		}
-		if full {
-			return l.enqueueStep(tx, order, stepIndex)
-		}
-		queued, err := hasEligibleQueuedTask(tx, l.OrganizationID)
-		if err != nil {
-			return nil, err
-		}
-		if queued {
-			return l.enqueueStep(tx, order, stepIndex)
-		}
-	}
-
 	step := admissionStep(line, l, stepIndex)
 	active, err := countActiveFactoryStepExecutions(tx, l.LineID, stepIndex)
 	if err != nil {
 		return nil, err
 	}
 	if active >= int64(step.EffectiveMaxParallelism()) {
+		return l.enqueueStep(tx, order, stepIndex)
+	}
+
+	var queued int64
+	waiters, err := eligibleQueuedTasks(tx, l.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	if err := waiters.Where("line_id = ? AND step_index = ?", l.LineID, stepIndex).Count(&queued).Error; err != nil {
+		return nil, err
+	}
+	if queued > 0 {
 		return l.enqueueStep(tx, order, stepIndex)
 	}
 

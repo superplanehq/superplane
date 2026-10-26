@@ -67,7 +67,7 @@ vi.mock("../pages/usePlanningSessionLiveRun", () => ({
 }));
 
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
-  useOrganizationWorkspaceUsage: () => ({ data: { activeTaskCount: 0, parallelTaskLimit: 1 } }),
+  useOrganizationWorkspaceUsage: () => ({ data: { activeRunnerCount: 0, parallelRunnerLimit: 1 } }),
 }));
 
 vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
@@ -108,10 +108,12 @@ vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   useFactoryLineRunnerModels: (...args: unknown[]) => {
     runnerModelCalls.push(args);
     return {
-      data: [
-        { id: "claude-opus-4-6", name: "claude-opus-4-6" },
-        { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
-      ],
+      data: {
+        models: [
+          { id: "claude-opus-4-6", name: "claude-opus-4-6" },
+          { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
+        ],
+      },
       isLoading: false,
     };
   },

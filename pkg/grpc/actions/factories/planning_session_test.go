@@ -217,7 +217,7 @@ func Test__SendPlanningSessionMessage__RecoversMissingSession(t *testing.T) {
 			require.NoError(t, err)
 			if test.cancelling {
 				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-					_, err := order.CancelQueuedTask(tx, before[0].ID)
+					_, err := run.RequestCancellation(tx, &r.User)
 					return err
 				}))
 			}

@@ -70,7 +70,7 @@ func TestFactoryComponentCallsDoNotHoldOrganizationAdmission(t *testing.T) {
 					Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{InvokeAction: &models.InvokeAction{ActionName: "wait"}})}
 				require.NoError(t, database.DB(t.Context()).Create(&request).Error)
 				process = func() error {
-					return NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService).LockAndProcessRequest(request)
+					return NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService).RunNow(request)
 				}
 			} else {
 				process = func() error { return newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID) }
@@ -565,6 +565,19 @@ func createFactoryStepNodeExecution(
 		ExecuteFunc: execute,
 	})
 
+	return createFactoryStepNodeExecutionForComponent(t, r, step, componentName)
+}
+
+// createFactoryStepNodeExecutionForComponent creates a node execution for a
+// registered component and links it to the factory step.
+func createFactoryStepNodeExecutionForComponent(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	step *models.FactoryWorkOrderExecution,
+	componentName string,
+) *models.CanvasNodeExecution {
+	t.Helper()
+
 	componentNode := "component-1"
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -706,6 +719,18 @@ func TestNodeExecutorRetriesWhenPaymentMethodVerificationFails(t *testing.T) {
 func TestNodeExecutorBYOKRevocation(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
+	settings, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+			"default_hosted_provider": settings.DefaultHostedProvider,
+			"default_hosted_model":    settings.DefaultHostedModel,
+		}).Error)
+	})
+	require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+		"default_hosted_provider": models.UsageProviderAnthropic,
+		"default_hosted_model":    "hosted-model",
+	}).Error)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	calls := 0
 	r.Registry.Actions["runnerCodex"] = impl.NewDummyAction(impl.DummyActionOptions{
@@ -755,4 +780,107 @@ func TestNodeExecutorBYOKRevocation(t *testing.T) {
 	require.Equal(t, models.CanvasNodeExecutionResultFailed, denied.Result)
 	require.Contains(t, denied.ResultMessage, "does not have access")
 	require.Equal(t, 2, calls)
+}
+
+type agentRunnerCase struct {
+	name          string
+	component     string
+	configuration map[string]any
+}
+
+var agentRunnerCases = []agentRunnerCase{
+	{name: "SuperPlane hosted runner", component: models.SuperPlaneRunnerComponent},
+	{
+		name:          "BYOK runner",
+		component:     "runnerClaudeCode",
+		configuration: map[string]any{"credentials": map[string]any{"source": "secret"}},
+	},
+}
+
+// processAgentRunnerStep runs a factory step node for the component and
+// returns the node result, the step, and the number of action calls.
+func processAgentRunnerStep(t *testing.T, r *support.ResourceRegistry, runner agentRunnerCase) (*models.CanvasNodeExecution, *models.FactoryWorkOrderExecution, int) {
+	t.Helper()
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	calls := 0
+	r.Registry.Actions[runner.component] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name:        runner.component,
+		ExecuteFunc: func(ctx core.ExecutionContext) error { calls++; return ctx.ExecutionState.Pass() },
+	})
+
+	step := dispatchFactoryExecutionForUsageTest(t, r)
+	execution := createFactoryStepNodeExecutionForComponent(t, r, step, runner.component)
+	if runner.configuration != nil {
+		require.NoError(t, database.Conn().Model(execution).
+			Update("configuration", datatypes.NewJSONType(runner.configuration)).Error)
+	}
+
+	require.NoError(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID))
+
+	saved, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+	require.NoError(t, err)
+	var savedStep models.FactoryWorkOrderExecution
+	require.NoError(t, database.Conn().Where("id = ?", step.ID).First(&savedStep).Error)
+	return saved, &savedStep, calls
+}
+
+func TestNodeExecutorBlocksAgentRunsWithoutActivePlan(t *testing.T) {
+	for _, polarToken := range []string{"", "oat_test"} {
+		for _, runner := range agentRunnerCases {
+			t.Run(fmt.Sprintf("%s with polar token %q", runner.name, polarToken), func(t *testing.T) {
+				r := support.Setup(t)
+				defer r.Close()
+				t.Setenv("POLAR_ACCESS_TOKEN", polarToken)
+				_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanNone, nil)
+				require.NoError(t, err)
+				credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), r.Organization.ID)
+				require.NoError(t, err)
+				require.Greater(t, credit.RemainingMicros, int64(0), "the org must keep leftover credit")
+
+				execution, step, calls := processAgentRunnerStep(t, r, runner)
+
+				assert.Equal(t, 0, calls)
+				assert.Equal(t, models.CanvasNodeExecutionResultFailed, execution.Result)
+				assert.Equal(t, models.SuperPlaneRunnerSubscribeMessage, execution.ResultMessage)
+				assert.Equal(t, stringPointer(models.WorkOrderExecutionFailureReasonHostedSubscriptionRequired), step.FailureReason)
+			})
+		}
+	}
+}
+
+func TestNodeExecutorRunsAgentsOnOpenTrial(t *testing.T) {
+	for _, runner := range agentRunnerCases {
+		t.Run(runner.name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			t.Setenv("POLAR_ACCESS_TOKEN", "")
+
+			execution, step, calls := processAgentRunnerStep(t, r, runner)
+
+			assert.Equal(t, 1, calls)
+			assert.Equal(t, models.CanvasNodeExecutionResultPassed, execution.Result)
+			assert.Nil(t, step.FailureReason)
+		})
+	}
+}
+
+func TestNodeExecutorPlanGateSkipsOtherComponents(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanNone, nil)
+	require.NoError(t, err)
+
+	step := dispatchFactoryExecutionForUsageTest(t, r)
+	calls := 0
+	execution := createFactoryStepNodeExecution(t, r, step, func(ctx core.ExecutionContext) error {
+		calls++
+		return ctx.ExecutionState.Pass()
+	})
+	require.NoError(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID))
+
+	saved, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, calls)
+	assert.Equal(t, models.CanvasNodeExecutionResultPassed, saved.Result)
 }

@@ -32,6 +32,10 @@ func attachExecutionSummaries(db *gorm.DB, runs []models.CanvasRun, serialized [
 		if len(executionIDs) == 0 {
 			continue
 		}
+		runnerJobs, err := models.ListRunnerJobsForExecutions(db, executionIDs)
+		if err != nil {
+			return fmt.Errorf("load execution runner jobs: %w", err)
+		}
 		versions, err := models.FindCanvasVersionsByIDsInTransaction(db, canvasID, versionIDs)
 		if err != nil {
 			return fmt.Errorf("load run versions: %w", err)
@@ -54,6 +58,7 @@ func attachExecutionSummaries(db *gorm.DB, runs []models.CanvasRun, serialized [
 			for _, execution := range serialized[i].Executions {
 				execution.OutputChannels = channelsByExecution[execution.Id]
 				execution.ComponentName = components[execution.NodeId]
+				execution.RunnerJob = serializeRunnerJob(runnerJobs[uuid.MustParse(execution.Id)])
 			}
 		}
 	}

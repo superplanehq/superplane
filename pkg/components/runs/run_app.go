@@ -39,7 +39,9 @@ func (c *RunAppConfiguration) TimeoutDuration() time.Duration {
 }
 
 type runAppExecutionMetadata struct {
-	Run *RunMetadata `json:"run" mapstructure:"run"`
+	Run                 *RunMetadata `json:"run" mapstructure:"run"`
+	QueueTimeoutVersion int          `json:"queueTimeoutVersion,omitempty" mapstructure:"queueTimeoutVersion"`
+	TimeoutStartedAt    string       `json:"timeoutStartedAt,omitempty" mapstructure:"timeoutStartedAt"`
 }
 
 type RunMetadata struct {
@@ -87,7 +89,7 @@ func (c *RunApp) Documentation() string {
 - **App**: The SuperPlane app to invoke
 - **Node**: The On Run trigger in the target app
 - **Parameters**: Values passed to the target app's On Run trigger
-- **Timeout**: Maximum wait time in seconds for the child run (default 3600). When the timeout expires before the child run finishes, the child run is cancelled and the parent continues through the Failed output channel.`
+- **Timeout**: Maximum time in seconds for the child run (default 3600). Runner queue waits in the child and its descendants pause this timeout. Provisioning, preparation, approvals, and automation slot waits count toward the timeout. When the timeout expires, SuperPlane cancels the child and uses the Failed output channel.`
 }
 
 func (c *RunApp) Description() string {
@@ -278,6 +280,8 @@ func (c *RunApp) Execute(ctx core.ExecutionContext) error {
 	}
 
 	executionMetadata := runAppExecutionMetadata{
+		QueueTimeoutVersion: 1,
+		TimeoutStartedAt:    time.Now().UTC().Format(time.RFC3339Nano),
 		Run: &RunMetadata{
 			ID: run.ID.String(),
 		},
@@ -311,6 +315,36 @@ func (c *RunApp) HandleHook(ctx core.ActionHookContext) error {
 func (c *RunApp) handleRunTimeout(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
+	}
+	var metadata runAppExecutionMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("run app: decode timeout metadata: %w", err)
+	}
+	// Invocations created before queue history was recorded retain their policy.
+	if metadata.QueueTimeoutVersion == 1 && metadata.Run != nil {
+		started, err := time.Parse(time.RFC3339Nano, metadata.TimeoutStartedAt)
+		if err != nil {
+			return fmt.Errorf("run app: invalid timeout start: %w", err)
+		}
+		now := time.Now()
+		wait, err := ctx.Runs.QueueWait(metadata.Run.ID, started, now)
+		if err != nil {
+			return fmt.Errorf("run app: measure runner queue wait: %w", err)
+		}
+		if wait.Finished {
+			return nil
+		}
+		var config RunAppConfiguration
+		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+			return fmt.Errorf("run app: decode timeout configuration: %w", err)
+		}
+		remaining := config.TimeoutDuration() - now.Sub(started) + wait.Duration
+		if remaining > 0 {
+			if wait.Waiting {
+				remaining = min(remaining, 15*time.Second)
+			}
+			return ctx.Requests.ScheduleActionCall(RunAppActionRunTimeout, map[string]any{}, remaining)
+		}
 	}
 
 	return ctx.Runs.Cancel()

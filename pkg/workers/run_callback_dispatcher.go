@@ -2,6 +2,7 @@ package workers
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"slices"
 
 	log "github.com/sirupsen/logrus"
@@ -14,12 +15,13 @@ import (
 )
 
 type RunCallbackDispatcher struct {
-	tx                 *gorm.DB
-	logger             *log.Entry
-	registry           *registry.Registry
-	run                *models.CanvasRun
-	eventCollector     func([]models.CanvasEvent)
-	executionCollector func([]models.CanvasNodeExecution)
+	tx                        *gorm.DB
+	logger                    *log.Entry
+	registry                  *registry.Registry
+	run                       *models.CanvasRun
+	eventCollector            func([]models.CanvasEvent)
+	executionCollector        func([]models.CanvasNodeExecution)
+	runnerTaskChangeCollector func(uuid.UUID, *uuid.UUID)
 }
 
 func NewRunCallbackDispatcher(tx *gorm.DB, registry *registry.Registry, run *models.CanvasRun) *RunCallbackDispatcher {
@@ -29,6 +31,11 @@ func NewRunCallbackDispatcher(tx *gorm.DB, registry *registry.Registry, run *mod
 		registry: registry,
 		run:      run,
 	}
+}
+
+func (d *RunCallbackDispatcher) WithRunnerTaskChangeCollector(fn func(uuid.UUID, *uuid.UUID)) *RunCallbackDispatcher {
+	d.runnerTaskChangeCollector = fn
+	return d
 }
 
 func (d *RunCallbackDispatcher) WithEventCollector(fn func([]models.CanvasEvent)) *RunCallbackDispatcher {
@@ -249,7 +256,7 @@ func (d *RunCallbackDispatcher) dispatchActionHook(
 		return fmt.Errorf("find parent canvas: %w", err)
 	}
 
-	err = action.HandleHook(core.ActionHookContext{
+	hookCtx := core.ActionHookContext{
 		Name:           callback.Hook,
 		Logger:         logging.ForNode(*node),
 		Configuration:  node.Configuration.Data(),
@@ -259,9 +266,14 @@ func (d *RunCallbackDispatcher) dispatchActionHook(
 		Requests:       contexts.NewExecutionRequestContext(d.tx, execution),
 		Runs:           contexts.NewRunExecutionContext(d.tx, parentCanvas, node, execution),
 		Usage:          contexts.NewUsageContext(parentCanvas.OrganizationID, execution),
-		RunnerTasks:    contexts.NewRunnerTaskContext(d.tx, d.registry.Encryptor, parentCanvas.OrganizationID),
+		RunnerTasks:    contexts.NewRunnerTaskContext(d.tx, d.registry.Encryptor, parentCanvas.OrganizationID).WithOnChanged(d.runnerTaskChangeCollector),
+		Secrets:        contexts.NewSecretsContext(d.tx, d.registry, parentCanvas.OrganizationID, d.registry.Encryptor),
 		Parameters:     params,
-	})
+	}
+	hookCtx.RunnerTasks.(*contexts.RunnerTaskContext).
+		WithRunScope(execution.RunID).
+		WithSecrets(hookCtx.Secrets.(*contexts.SecretsContext))
+	err = action.HandleHook(hookCtx)
 	if err != nil {
 		return fmt.Errorf("handle hook: %w", err)
 	}

@@ -1,5 +1,4 @@
 import type { FactoriesFactory, FactoriesWorkOrderArtifact } from "@/api-client";
-import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import type { ReactNode } from "react";
 
@@ -46,11 +45,6 @@ export function useMobileRefineChat({
   const refines = factoryPlanningEnabled(factory) && fixture.footer.kind === "draft";
   const analysisQueued = draftAnalysisQueued(fixture);
   const analysisActive = !analysisQueued && fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
-  const { data: workspaceUsage } = useOrganizationWorkspaceUsage(refines ? organizationId : "", 30, true);
-  const taskLimitReached =
-    workspaceUsage?.activeTaskCount != null
-      ? workspaceUsage.parallelTaskLimit != null && workspaceUsage.activeTaskCount >= workspaceUsage.parallelTaskLimit
-      : fixture.taskLimitReached;
   const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId, orderId });
   const analysis = useAnalysisPlanningSession({
     organizationId,
@@ -69,7 +63,7 @@ export function useMobileRefineChat({
     return { loadFailed: false };
   }
   return {
-    chat: draftStripAnalysis({ factory, organizationId, factoryKey, fixture, analysis, taskLimitReached }, modelSelect),
+    chat: draftStripAnalysis({ factory, organizationId, factoryKey, fixture, analysis }, modelSelect),
     loadFailed: Boolean(analysis.queryError),
   };
 }

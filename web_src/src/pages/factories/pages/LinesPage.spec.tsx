@@ -245,7 +245,7 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
     isAssigneesSaving: false,
     onDispatch: vi.fn(),
     onAssigneesSave: vi.fn(),
-    onCancelQueuedTask: cancelQueuedTask,
+    onCancelQueuedRunnerJob: cancelQueuedTask,
   }),
 }));
 
@@ -391,16 +391,16 @@ describe("LinesPage board", () => {
     await resetLinesBoardMocks();
   });
 
-  it("shows organization task capacity even when the board has no tasks", () => {
-    workspaceUsage.data = { activeTaskCount: 2, parallelTaskLimit: 5 };
+  it("shows organization runner usage even when the board has no tasks", () => {
+    workspaceUsage.data = { activeRunnerCount: 2, parallelRunnerLimit: 5 };
     renderLinesBoard();
-    expect(within(screen.getByTestId("lines-detail-header")).getByText("2 of 5 active tasks")).toBeInTheDocument();
+    expect(within(screen.getByTestId("lines-detail-header")).getByText("2 of 5 active runners")).toBeInTheDocument();
   });
 
-  it("hides task capacity for unlimited plans", () => {
-    workspaceUsage.data = { activeTaskCount: 2 };
+  it("hides runner usage for unlimited plans", () => {
+    workspaceUsage.data = { activeRunnerCount: 2 };
     renderLinesBoard();
-    expect(screen.queryByText(/of .* active tasks/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/of .* active runners/)).not.toBeInTheDocument();
   });
 
   it("does not show a back link to the lines list", () => {
@@ -2183,7 +2183,7 @@ describe("LinesPage Implement phase window", () => {
     restoreHeights = undefined;
   });
 
-  it("keeps a queued task in Backlog after unscheduling and moves it only when execution starts", async () => {
+  it("keeps an automation wait in Backlog until execution starts", async () => {
     const at = new Date().toISOString();
     const queued = dispatchDraftToImplement(kickoffDraft(0), at);
     queued.lineDispatches![0].stepExecutions = [];
@@ -2195,21 +2195,17 @@ describe("LinesPage Implement phase window", () => {
       position: 1,
       createdAt: at,
     };
-    queued.queuedTasks = [{ id: "queue-step-1", position: 1, name: "Implement", startsLine: true }];
     useFactoryWorkOrders.mockReturnValue({ data: [queued, dispatchDraftToImplement(kickoffDraft(1), at)] });
     const view = renderLinesBoard();
 
     const queuedCard = within(screen.getByTestId("lines-backlog-column")).getByTestId("work-order-card-wo-kickoff-0");
-    expect(within(queuedCard).getByRole("img", { name: "Queued #1" })).toBeVisible();
+    expect(within(queuedCard).getByRole("img", { name: "Waiting for automation slot" })).toBeVisible();
+    expect(within(queuedCard).getByRole("status")).toHaveTextContent("Waiting for automation slot");
+    expect(within(queuedCard).queryByText(/Runner queued/)).not.toBeInTheDocument();
     expect(queuedCard.querySelector(".animate-spin")).toBeNull();
     expect(within(queuedCard).queryByText(/waiting for a free slot/)).not.toBeInTheDocument();
     expect(implementPhaseCards()).toHaveLength(1);
     expect(screen.getByTestId("lines-phase-run-exec-wo-kickoff-1").querySelector(".animate-spin")).not.toBeNull();
-    await userEvent
-      .setup()
-      .click(within(queuedCard).getByRole("button", { name: "Remove Implement for Kickoff task 0 from queue" }));
-    expect(cancelQueuedTask).toHaveBeenCalledWith("wo-kickoff-0", "queue-step-1");
-
     const refresh = (order: FactoriesWorkOrder) => {
       useFactoryWorkOrders.mockReturnValue({ data: [order, dispatchDraftToImplement(kickoffDraft(1), at)] });
       view.rerender(
@@ -2218,20 +2214,6 @@ describe("LinesPage Implement phase window", () => {
         />,
       );
     };
-    refresh({
-      ...queued,
-      state: "STATE_DRAFT",
-      queuedTasks: [],
-      lineDispatches: [
-        { ...queued.lineDispatches![0], queueItem: undefined, state: "STATE_FINISHED", result: "RESULT_CANCELLED" },
-      ],
-    });
-    expect(
-      within(screen.getByTestId("lines-backlog-column")).getByTestId("work-order-card-wo-kickoff-0"),
-    ).toBeVisible();
-    expect(
-      screen.queryByRole("button", { name: "Remove Implement for Kickoff task 0 from queue" }),
-    ).not.toBeInTheDocument();
     refresh(dispatchDraftToImplement(kickoffDraft(0), at));
     expect(
       within(screen.getByTestId("lines-backlog-column")).queryByTestId("work-order-card-wo-kickoff-0"),
@@ -2248,11 +2230,11 @@ describe("LinesPage Implement phase window", () => {
     dispatch.stepExecutions![0].step = "Verify";
     dispatch.stepExecutions![0].stepIndex = 1;
     dispatch.stepExecutions![0].run!.appId = "app-refund-verifier";
-    order.queuedTasks = [{ id: "verify-queue", name: "Review", position: 1, taskActive: true }];
+    order.queuedRunnerJobs = [{ id: "verify-queue", automationName: "Review", position: 1 }];
     useFactoryWorkOrders.mockReturnValue({ data: [order] });
     renderLinesBoard();
     const card = within(screen.getByTestId("lines-verify-column")).getByTestId("work-order-card-wo-kickoff-0");
-    expect(within(card).getByRole("status")).toHaveTextContent("Queued #1");
+    expect(within(card).getByRole("status")).toHaveTextContent("Runner queued #1");
     expect(within(card).queryByRole("button", { name: /from queue/ })).not.toBeInTheDocument();
   });
 

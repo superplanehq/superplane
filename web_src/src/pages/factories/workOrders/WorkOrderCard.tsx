@@ -23,7 +23,7 @@ import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip, WorkOrderMergeableChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
-import { WorkOrderQueueStatus } from "./WorkOrderQueueStatus";
+import { WorkOrderQueueSummary } from "./WorkOrderQueueStatus";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
 import { WORK_ORDER_CARD_HOVER_SURFACE_CLASS } from "./workOrderCardSurface";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -49,8 +49,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   /** Tasks with a dispatch in flight. Only their controls show a busy state. */
   dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
-  onCancelQueuedTask?: (orderId: string, queueId: string) => Promise<void>;
-  cancellingQueueOrderIds?: ReadonlySet<string>;
+  onCancelQueuedRunnerJob?: (orderId: string, queueId: string) => Promise<void>;
+  cancellingQueueJobIds?: ReadonlySet<string>;
   /** Tasks with a queued or running discussion or exclusive-repair run. */
   addressingFeedbackOrderIds?: ReadonlySet<string>;
   /** Activity text for an addressing run, keyed by task id. */
@@ -155,11 +155,11 @@ export function WorkOrderCard(props: WorkOrderCardProps) {
     isAssigneesSaving,
     onAssigneesSave,
     canDispatch,
-    onCancelQueuedTask,
-    cancellingQueueOrderIds,
+    onCancelQueuedRunnerJob,
+    cancellingQueueJobIds,
   } = props;
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const queuedTasks = entry.order.queuedTasks ?? [];
+  const queue = getCardQueueState(entry.order, queuedLabel);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const updatedAt = entry.updatedAtMs > 0 ? new Date(entry.updatedAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
@@ -167,7 +167,7 @@ export function WorkOrderCard(props: WorkOrderCardProps) {
     isDraft,
     isAnalyzing,
     hasAgentQuestion,
-    queuedTasks.length > 0,
+    queue.queued,
   );
   const source = workOrderCardSource(entry.order);
   const {
@@ -197,7 +197,7 @@ export function WorkOrderCard(props: WorkOrderCardProps) {
           entryId={entry.id}
           displayStatus={entry.displayStatus}
           statusLabel={meta.label}
-          queuedLabel={queuedLabel}
+          queuedLabel={queue.automationQueued ? "Waiting for automation slot" : undefined}
           title={entry.title}
           showOwnerCorner
           organizationId={organizationId}
@@ -231,27 +231,29 @@ export function WorkOrderCard(props: WorkOrderCardProps) {
           reviewMetrics={reviewMetrics}
           isAnalyzing={agentWorking}
           queueStatus={
-            queuedTasks.length ? (
-              <span className="flex flex-wrap items-center justify-end gap-1.5">
-                {queuedTasks.map((queue) => (
-                  <WorkOrderQueueStatus
-                    key={queue.id}
-                    queue={queue}
-                    orderId={entry.id}
-                    title={entry.title}
-                    canCancel={interactive}
-                    canDispatch={canDispatch}
-                    cancellingOrderIds={cancellingQueueOrderIds}
-                    onCancel={onCancelQueuedTask}
-                  />
-                ))}
-              </span>
+            queue.queued ? (
+              <WorkOrderQueueSummary
+                queues={queue.jobs}
+                automationQueued={queue.automationQueued}
+                orderId={entry.id}
+                title={entry.title}
+                canCancel={interactive}
+                canDispatch={canDispatch}
+                cancellingJobIds={cancellingQueueJobIds}
+                onCancel={onCancelQueuedRunnerJob}
+              />
             ) : undefined
           }
         />
       </div>
     </article>
   );
+}
+
+function getCardQueueState(order: WorkOrderCardProps["entry"]["order"], queuedLabel?: string) {
+  const jobs = order.queuedRunnerJobs ?? [];
+  const automationQueued = Boolean(queuedLabel || order.lineDispatches?.some((dispatch) => dispatch.queueItem));
+  return { jobs, automationQueued, queued: jobs.length > 0 || automationQueued };
 }
 
 function WorkOrderCardTitleRow({
@@ -279,11 +281,7 @@ function WorkOrderCardTitleRow({
   isAssigneesSaving: boolean;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
 }) {
-  const firstQueued = entry.order.queuedTasks?.[0];
-  const hasRunningWork = entry.order.queuedTasks?.some((queue) => queue.taskActive);
-  const queueLabel = hasRunningWork
-    ? undefined
-    : (queuedLabel ?? (firstQueued ? `Queued #${firstQueued.position}` : undefined));
+  const queueLabel = queuedLabel;
   return (
     <div className="flex min-w-0 items-center gap-2">
       {queueLabel ? (
@@ -291,11 +289,7 @@ function WorkOrderCardTitleRow({
           <Clock3 className="size-3.5 shrink-0 text-muted-foreground" role="img" aria-label={queueLabel} />
         </span>
       ) : (
-        <WorkOrderStatusIcon
-          status={hasRunningWork ? "running" : displayStatus}
-          title={hasRunningWork ? "Running" : statusLabel}
-          aria-label={hasRunningWork ? "Running" : statusLabel}
-        />
+        <WorkOrderStatusIcon status={displayStatus} title={statusLabel} aria-label={statusLabel} />
       )}
       <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5 text-foreground">{title}</h3>
       {showOwnerCorner ? (

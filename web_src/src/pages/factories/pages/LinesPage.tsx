@@ -890,7 +890,7 @@ function LineDetailHeader({
 }) {
   const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
   const { data: workspaceUsage } = useOrganizationWorkspaceUsage(organizationId, 30, true);
-  const parallelTaskLimit = workspaceUsage?.parallelTaskLimit;
+  const parallelRunnerLimit = workspaceUsage?.parallelRunnerLimit;
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
@@ -916,14 +916,14 @@ function LineDetailHeader({
         data-testid="lines-detail-header"
         title={factory?.name?.trim() || "Workspace"}
         leading={
-          parallelTaskLimit != null || nextStepsRestore || hostedCreditHeaderKicker ? (
+          parallelRunnerLimit != null || nextStepsRestore || hostedCreditHeaderKicker ? (
             <>
-              {parallelTaskLimit != null ? (
+              {parallelRunnerLimit != null ? (
                 <span
                   className="whitespace-nowrap text-[13px] text-muted-foreground tabular-nums"
-                  title="Active tasks across the organization."
+                  title="Reserved and running jobs across the organization."
                 >
-                  {workspaceUsage?.activeTaskCount ?? 0} of {parallelTaskLimit} active tasks
+                  {workspaceUsage?.activeRunnerCount ?? 0} of {parallelRunnerLimit} active runners
                 </span>
               ) : null}
               {hostedCreditHeaderKicker}
@@ -1779,7 +1779,7 @@ function VerifyColumn({
           <li key={order.id}>
             <LineBoardOrderCard
               order={order}
-              workOrderCardContext={{ ...workOrderCardContext, onCancelQueuedTask: undefined }}
+              workOrderCardContext={{ ...workOrderCardContext, onCancelQueuedRunnerJob: undefined }}
               onOpenWorkOrder={onOpenWorkOrder}
             />
           </li>

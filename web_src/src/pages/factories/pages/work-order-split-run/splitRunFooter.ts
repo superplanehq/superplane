@@ -1,5 +1,4 @@
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
-import type { FactoriesWorkOrder } from "@/api-client";
 
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { DRAFT_READINESS_NOTES, draftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
@@ -204,19 +203,6 @@ export function classicSplitRunFooter(footer: SplitRunFooter): SplitRunFooter {
     scoreMax: undefined,
     actions: [ARCHIVE, START],
   };
-}
-
-export function withTaskQueueActions(
-  footer: SplitRunFooter,
-  task: Pick<FactoriesWorkOrder, "queuedTasks" | "taskLimitReached">,
-): SplitRunFooter {
-  const queuedStart = task.queuedTasks?.some((queue) => queue.startsLine);
-  const actions = footer.actions.flatMap((action) => {
-    if (action.kind !== "start") return [action];
-    if (queuedStart) return [];
-    return [{ ...action, label: task.taskLimitReached ? "Queue" : "Start" }];
-  });
-  return { ...footer, actions };
 }
 
 export const SPLIT_RUN_ANALYZING_NOTE: SplitRunFooterNote = { ...DRAFT_READINESS_NOTES.analyzing };

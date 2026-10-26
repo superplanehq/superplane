@@ -16,14 +16,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
+	"github.com/superplanehq/superplane/pkg/workers"
 )
 
 type Server struct {
-	router             *mux.Router
-	signer             *jwt.Signer
-	encryptor          crypto.Encryptor
-	activeLogStoreName string
+	router              *mux.Router
+	signer              *jwt.Signer
+	encryptor           crypto.Encryptor
+	activeLogStoreName  string
+	nodeRequestExecutor *workers.NodeRequestExecutor
+	registry            *registry.Registry
 
 	mu          sync.Mutex
 	httpServer  *http.Server
@@ -34,6 +38,8 @@ func NewServer(
 	signer *jwt.Signer,
 	encryptor crypto.Encryptor,
 	activeLogStoreName string,
+	nodeRequestExecutor *workers.NodeRequestExecutor,
+	registries ...*registry.Registry,
 ) (*Server, error) {
 	if signer == nil {
 		return nil, fmt.Errorf("JWT signer is required")
@@ -47,11 +53,22 @@ func NewServer(
 	}
 
 	server := &Server{
-		router:             mux.NewRouter(),
-		signer:             signer,
-		encryptor:          encryptor,
-		activeLogStoreName: activeLogStoreName,
-		connections:        map[uuid.UUID]*runnerConnection{},
+		router:              mux.NewRouter(),
+		signer:              signer,
+		encryptor:           encryptor,
+		activeLogStoreName:  activeLogStoreName,
+		nodeRequestExecutor: nodeRequestExecutor,
+		connections:         map[uuid.UUID]*runnerConnection{},
+	}
+	if len(registries) > 0 {
+		server.registry = registries[0]
+	}
+	if server.registry == nil {
+		var err error
+		server.registry, err = registry.NewRegistry(encryptor, registry.HTTPOptions{})
+		if err != nil {
+			return nil, err
+		}
 	}
 	server.registerRoutes()
 	return server, nil
@@ -148,6 +165,7 @@ func (s *Server) ConnectionCount() int {
 
 func (s *Server) StartControlNotifications(ctx context.Context, gatewayID string) {
 	go runnercontrol.ConsumeWithReconnect(ctx, gatewayID, s.wakeConnections)
+	go s.recoverPreparations(ctx)
 }
 
 func (s *Server) wakeConnections(notification runnercontrol.Notification) {

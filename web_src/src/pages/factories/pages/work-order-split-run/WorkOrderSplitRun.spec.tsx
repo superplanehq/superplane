@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
@@ -11,10 +11,17 @@ import { factoryQueryKeys } from "@/hooks/useFactoryData";
 import type * as FactoryData from "@/hooks/useFactoryData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
+import { organizationBillingQueryKey } from "@/hooks/useOrganizationBilling";
+import { factoryLineRunnerModelsQueryKey } from "@/hooks/useFactoryLineRunnerModels";
 
 import type { PlanningSessionPayload } from "../planningSessionView";
 
 const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
+const billingProductEnabled = { current: true };
+
+vi.mock("@/hooks/useBillingProductEnabled", () => ({
+  useBillingProductEnabled: () => billingProductEnabled.current,
+}));
 const { closeMutateAsync } = vi.hoisted(() => ({
   closeMutateAsync: vi.fn(),
 }));
@@ -58,7 +65,7 @@ vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
 const useLiveLogStreamMock = vi.fn();
 const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSessionPayload | null>>(async () => null);
 const sendWorkOrderPlanningMessageMock = vi.fn();
-const taskCapacity = { current: undefined as { activeTaskCount: number; parallelTaskLimit?: number } | undefined };
+const taskCapacity = { current: undefined as { activeRunnerCount: number; parallelRunnerLimit?: number } | undefined };
 
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
   useOrganizationWorkspaceUsage: () => ({ data: taskCapacity.current }),
@@ -208,6 +215,18 @@ function renderSplitRun() {
   return renderPopup({ fixture: SPLIT_RUN_RUNNING });
 }
 
+/**
+ * The draft fixture starts on "plan-and-implement"; mark its line as hosted.
+ * Hosted runnerClaudeCode, runnerCodex, and runnerOpenRouter lines return
+ * plain model IDs, so the footer must follow the response funding flag.
+ */
+function seedHostedLineModels(client: QueryClient) {
+  client.setQueryData(
+    factoryLineRunnerModelsQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, "plan-and-implement"),
+    { models: [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }], usesHostedFunding: true },
+  );
+}
+
 function liveUsageTelemetry(inputTokens: number, totalCostUsd: number) {
   return {
     num_turns: 1,
@@ -278,6 +297,7 @@ function runningImplementWithZeroSavedSpend(): SplitRunFixture {
 describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    billingProductEnabled.current = true;
     factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
     useLiveLogStreamMock.mockReset();
     useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
@@ -1754,26 +1774,26 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it.each([
     {
-      activeTaskCount: 0,
-      parallelTaskLimit: 1,
+      activeRunnerCount: 0,
+      parallelRunnerLimit: 1,
       label: "Analyze",
-      staleLimitReached: true,
+
       message: "Check the failure case.",
     },
-    { activeTaskCount: 1, parallelTaskLimit: 1, label: "Queue analysis", staleLimitReached: false, message: undefined },
-    { activeTaskCount: 1, parallelTaskLimit: undefined, label: "Analyze", staleLimitReached: true, message: undefined },
+    { activeRunnerCount: 1, parallelRunnerLimit: 1, label: "Analyze", message: undefined },
+    { activeRunnerCount: 1, parallelRunnerLimit: undefined, label: "Analyze", message: undefined },
   ])(
-    "offers $label with task limit $parallelTaskLimit after analysis is dequeued",
-    async ({ activeTaskCount, parallelTaskLimit, label, staleLimitReached, message }) => {
+    "offers Analyze with runner limit $parallelRunnerLimit after analysis is dequeued",
+    async ({ activeRunnerCount, parallelRunnerLimit, label, message }) => {
       const user = userEvent.setup();
-      taskCapacity.current = { activeTaskCount, parallelTaskLimit };
+      taskCapacity.current = { activeRunnerCount, parallelRunnerLimit };
       sendWorkOrderPlanningMessageMock.mockResolvedValue({ id: "recovered-session", state: "running" });
       renderPopup(
         {
           organizationId: FACTORIES_ORGANIZATION_ID,
           factoryId: PRIMARY_FACTORY_ID,
           orderId: DRAFT_WORK_ORDER.id,
-          fixture: splitRunFixtureForWorkOrder({ ...DRAFT_WORK_ORDER, taskLimitReached: staleLimitReached }),
+          fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
         },
         planningPopupClient(DRAFT_WORK_ORDER.id ?? ""),
       );
@@ -1804,13 +1824,13 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(
         {
           ...DRAFT_WORK_ORDER,
-          queuedTasks: [{ id: "analysis-queue", name: "Task analysis", position: 2 }],
+          queuedRunnerJobs: [{ id: "analysis-queue", automationName: "Task analysis", position: 2 }],
         },
         { isAnalyzing: true },
       ),
     };
     const view = renderPopup(props, planningPopupClient(DRAFT_WORK_ORDER.id ?? ""));
-    await screen.findByText("Queued #2");
+    await screen.findByText(/Runner queued #2/);
     expect(screen.queryByText("Analyzing task…")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^(Analyze|Queue analysis)$/ })).not.toBeInTheDocument();
 
@@ -1818,36 +1838,25 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(await screen.findByRole("button", { name: "Analyze" })).toBeEnabled();
     expect(screen.getByTestId("split-run-intent-composer")).toBeEnabled();
-    expect(screen.queryByText("Queued #2")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Runner queued #2/)).not.toBeInTheDocument();
     expect(screen.queryByText("Analyzing task…")).not.toBeInTheDocument();
   });
 
-  it("queues a draft at capacity and shows its position without another start action", async () => {
+  it("keeps Start available while runner jobs wait", async () => {
     const user = userEvent.setup();
     const onDispatch = vi.fn().mockResolvedValue(undefined);
-    const order = { ...REVIEW_CANDIDATE_WORK_ORDERS[0], taskLimitReached: true };
-    const props = {
+    const order = {
+      ...REVIEW_CANDIDATE_WORK_ORDERS[0],
+      queuedRunnerJobs: [{ id: "queue-1", position: 2, automationName: "Implement" }],
+    };
+    renderPopup({
       fixture: splitRunFixtureForWorkOrder(order, { checks: OPEN_WORK_ORDER_CHECKS }),
       canDispatch: true,
       onDispatch,
-    };
-    const view = renderPopup(props);
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Queue" }));
-    expect(onDispatch).toHaveBeenCalledTimes(1);
-    view.rerenderPopup({
-      ...props,
-      fixture: splitRunFixtureForWorkOrder(
-        {
-          ...order,
-          queuedTasks: [{ id: "queue-1", position: 2, name: "Implement", startsLine: true }],
-        },
-        { checks: OPEN_WORK_ORDER_CHECKS },
-      ),
     });
-    expect(screen.getByText("Queued #2")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Queue" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Runner queued #2/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenCalledTimes(1);
   });
 
   it("hides Refine on a backlog draft", () => {
@@ -1876,6 +1885,239 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(70rem");
     expect(screen.getByTestId("work-order-split-run").className).not.toContain("w-[min(72rem");
+  });
+
+  it.each([
+    {
+      name: "no plan despite remaining credit",
+      billing: { hostedExecutionAllowed: false, remainingCreditCents: "5000", hostedCreditAvailable: true },
+      usage: {},
+      message: "Agent runs need an active plan.",
+    },
+    {
+      name: "no organization credit",
+      billing: { hostedExecutionAllowed: true, remainingCreditCents: "0", hostedCreditAvailable: false },
+      usage: {},
+      message: "The organization has no SuperPlane hosted credit.",
+    },
+    {
+      name: "an exhausted workspace budget",
+      billing: { hostedExecutionAllowed: true, remainingCreditCents: "5000", hostedCreditAvailable: true },
+      usage: { hostedSpendBudgetCents: "1000", factoryRemainingCreditCents: "0", factoryHostedBudgetAvailable: false },
+      message: "This workspace has no hosted credit budget left.",
+    },
+    {
+      name: "a required payment method",
+      billing: { hostedExecutionAllowed: false, requirePaymentMethod: true, hasPaymentMethod: false },
+      usage: {},
+      message: "Add a payment method in Billing to start this task.",
+    },
+  ])("disables Start and explains $name before dispatch", async ({ billing, usage, message }) => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID), billing);
+    client.setQueryData(
+      [...factoryQueryKeys.detail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID), "usage", 30],
+      usage,
+    );
+    seedHostedLineModels(client);
+    const onDispatch = vi.fn();
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        canDispatch: true,
+        onDispatch,
+      },
+      client,
+    );
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).toHaveTextContent(message);
+    expect(note).not.toHaveTextContent("This task is ready to start");
+    const start = within(note).getByRole("button", { name: "Start" });
+    expect(start).toBeDisabled();
+    await userEvent.setup().click(start);
+    expect(onDispatch).not.toHaveBeenCalled();
+    expect(within(note).getByRole("link")).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+    );
+  });
+
+  it("keeps Start available when a sub-cent balance rounds down to zero cents", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID), {
+      hostedExecutionAllowed: true,
+      remainingCreditCents: "0",
+      hostedCreditAvailable: true,
+    });
+    client.setQueryData([...factoryQueryKeys.detail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID), "usage", 30], {
+      hostedSpendBudgetCents: "1000",
+      factoryRemainingCreditCents: "0",
+      factoryHostedBudgetAvailable: true,
+    });
+    seedHostedLineModels(client);
+    const onDispatch = vi.fn();
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        canDispatch: true,
+        onDispatch,
+      },
+      client,
+    );
+
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).toBeEnabled();
+    await userEvent.setup().click(start);
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps Start available on a line that runs on the organization's own keys", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID), {
+      hostedExecutionAllowed: true,
+      remainingCreditCents: "0",
+      hostedCreditAvailable: false,
+    });
+    client.setQueryData([...factoryQueryKeys.detail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID), "usage", 30], {
+      hostedSpendBudgetCents: "1000",
+      factoryRemainingCreditCents: "0",
+      factoryHostedBudgetAvailable: false,
+    });
+    client.setQueryData(
+      factoryLineRunnerModelsQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, "plan-and-implement"),
+      { models: [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }], usesHostedFunding: false },
+    );
+    const onDispatch = vi.fn();
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        canDispatch: true,
+        onDispatch,
+      },
+      client,
+    );
+
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).toBeEnabled();
+    await userEvent.setup().click(start);
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks Start on a line that runs on the organization's own keys when no plan is active", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID), {
+      hostedExecutionAllowed: false,
+      remainingCreditCents: "0",
+      hostedCreditAvailable: false,
+    });
+    client.setQueryData(
+      factoryLineRunnerModelsQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, "plan-and-implement"),
+      { models: [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }], usesHostedFunding: false },
+    );
+    const onDispatch = vi.fn();
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        canDispatch: true,
+        onDispatch,
+      },
+      client,
+    );
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).toHaveTextContent("Agent runs need an active plan.");
+    expect(within(note).getByRole("button", { name: "Start" })).toBeDisabled();
+    await userEvent.setup().click(within(note).getByRole("button", { name: "Start" }));
+    expect(onDispatch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: "credit is low but positive", enabled: true, credit: "1", allowed: true, creditAvailable: true },
+    { name: "product billing is off", enabled: false, credit: "0", allowed: false, creditAvailable: false },
+  ])("keeps Start available when $name", async ({ enabled, credit, allowed, creditAvailable }) => {
+    billingProductEnabled.current = enabled;
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    const client = new QueryClient();
+    client.setQueryData(organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID), {
+      hostedExecutionAllowed: allowed,
+      remainingCreditCents: credit,
+      hostedCreditAvailable: creditAvailable,
+    });
+    // Without a workspace cap, a zero workspace remainder does not block runs.
+    client.setQueryData([...factoryQueryKeys.detail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID), "usage", 30], {
+      factoryRemainingCreditCents: "0",
+      factoryHostedBudgetAvailable: true,
+    });
+    seedHostedLineModels(client);
+    const onDispatch = vi.fn();
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        canDispatch: true,
+        onDispatch,
+      },
+      client,
+    );
+
+    expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("enables Start when the current billing balance is restored", async () => {
+    factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
+    const client = new QueryClient();
+    const billingKey = organizationBillingQueryKey(FACTORIES_ORGANIZATION_ID);
+    client.setQueryData(billingKey, {
+      hostedExecutionAllowed: true,
+      remainingCreditCents: "0",
+      hostedCreditAvailable: false,
+    });
+    seedHostedLineModels(client);
+    const onDispatch = vi.fn();
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        canDispatch: true,
+        onDispatch,
+      },
+      client,
+    );
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+
+    act(() =>
+      client.setQueryData(billingKey, {
+        hostedExecutionAllowed: true,
+        remainingCreditCents: "5000",
+        hostedCreditAvailable: true,
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start" })).toBeEnabled());
+    expect(screen.getByTestId("split-run-attention-note")).toHaveTextContent("This task is ready to start");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenCalledTimes(1);
   });
 
   it("tells a draft is under analysis and keeps Archive in the header", () => {

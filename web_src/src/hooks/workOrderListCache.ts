@@ -62,8 +62,7 @@ export function patchedWorkOrder(
     ...order,
     ...summaryFromDescribedOrder(described),
     planningSession: described.planningSession,
-    queuedTasks: described.queuedTasks,
-    taskLimitReached: described.taskLimitReached,
+    queuedRunnerJobs: described.queuedRunnerJobs,
   };
 }
 

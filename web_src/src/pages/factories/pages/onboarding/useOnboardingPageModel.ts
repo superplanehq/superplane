@@ -6,7 +6,12 @@ import {
   useSelectFactoryVcsProviderRepository,
   useUpdateFactory,
 } from "@/hooks/useFactoryData";
-import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import {
+  fetchFactoryIntakes,
+  useCreateFactoryIntake,
+  useDeleteFactoryIntake,
+  useUpdateFactoryIntake,
+} from "@/hooks/useFactoryIntakeData";
 import { resolveGithubDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -175,6 +180,7 @@ function useOnboardingMutations(organizationId: string, factoryId: string) {
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),
     createIntake: useCreateFactoryIntake(organizationId, factoryId),
+    updateIntake: useUpdateFactoryIntake(organizationId, factoryId),
     deleteIntake: useDeleteFactoryIntake(organizationId, factoryId),
     installer: useInstallFactory({ organizationId }),
   };
@@ -218,13 +224,15 @@ async function rememberBitbucketInstallation(
   );
 }
 
+function readyIntegrationId(selection: { ready?: boolean; id: string } | undefined): string {
+  return selection?.ready ? selection.id : "";
+}
+
 function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishArgs) {
   const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, deleteIntake, installer } =
     args.mutations;
-  const githubIntegrationId = args.integrations.selections.github?.ready ? args.integrations.selections.github.id : "";
-  const bitbucketIntegrationId = args.integrations.selections.bitbucket?.ready
-    ? args.integrations.selections.bitbucket.id
-    : "";
+  const githubIntegrationId = readyIntegrationId(args.integrations.selections.github);
+  const bitbucketIntegrationId = readyIntegrationId(args.integrations.selections.bitbucket);
   const branchIntegrationId =
     args.setup.vcsHost === "bitbucket"
       ? (args.integrations.selections.bitbucket?.id ?? "")
@@ -257,6 +265,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     createLine: createLine.mutateAsync,
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
+    updateIntake: args.mutations.updateIntake.mutateAsync,
     deleteIntake: deleteIntake.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>

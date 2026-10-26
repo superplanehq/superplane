@@ -36,15 +36,16 @@ func TestCreateRunnerUsesFleetPathAndAdminBearer(t *testing.T) {
 		t.Fatal(err)
 	}
 	response, err := client.CreateRunner(context.Background(), "linux-amd64", CreateRunnerRequest{
-		IdempotencyKey: "fleet-manager/linux-amd64/generic/request-1",
+		IdempotencyKey: "fleet-manager/linux-amd64/task/job-1",
 		Ephemeral:      true,
+		TaskID:         "job-1",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if received.IdempotencyKey != "fleet-manager/linux-amd64/generic/request-1" ||
-		!received.Ephemeral {
+	if received.IdempotencyKey != "fleet-manager/linux-amd64/task/job-1" ||
+		!received.Ephemeral || received.TaskID != "job-1" {
 		t.Fatalf("request = %#v", received)
 	}
 	if response.Runner.ID != "runner-1" || response.Runner.RunnerVersion != "1.2.3" {
@@ -113,9 +114,36 @@ func TestHTTPErrorIncludesStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = client.DeleteRunner(context.Background(), "fleet-a", "runner-1")
+	_, err = client.DeleteRunner(context.Background(), "fleet-a", "runner-1", []string{RunnerStateIdle})
 	if !IsStatus(err, http.StatusConflict) {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestDeleteRunnerSendsStatePrecondition(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete || r.URL.Path != "/admin/api/installation/fleets/fleet-a/runners/runner-1" {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		if states := r.URL.Query()["states"]; len(states) != 2 || states[0] != RunnerStatePending || states[1] != RunnerStateIdle {
+			t.Errorf("state precondition = %q", r.URL.RawQuery)
+		}
+		if r.URL.Query().Get("requireUnassigned") != "true" {
+			t.Errorf("missing assignment precondition: %q", r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"runner":{"id":"runner-1","state":"terminated"}}`))
+	}))
+	defer server.Close()
+	client, err := New(server.URL, "personal-token", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := client.DeleteRunner(t.Context(), "fleet-a", "runner-1", []string{RunnerStatePending, RunnerStateIdle}, DeleteRunnerOptions{RequireUnassigned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runner.State != RunnerStateTerminated {
+		t.Fatalf("runner state = %q", runner.State)
 	}
 }
 

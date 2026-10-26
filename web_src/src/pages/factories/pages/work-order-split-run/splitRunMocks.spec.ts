@@ -911,7 +911,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       },
       {
         failureReason: "hosted_subscription_required",
-        text: "This agent run is blocked. SuperPlane hosted runs need an active plan.",
+        text: "This agent run is blocked. Agent runs need an active plan.",
         label: "View billing",
       },
       {

@@ -69,14 +69,14 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	return err
 }
 
-// CodexBrokerTask is the ordered broker commands and task files for a run.
-type CodexBrokerTask struct {
-	Commands []runner.BrokerCommand
-	Files    []runner.BrokerTaskFile
+// CodexTask is the ordered runner commands and task files for a run.
+type CodexTask struct {
+	Commands []runner.TaskCommand
+	Files    []runner.TaskFile
 }
 
-func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) CodexBrokerTask {
-	commands, files := runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
+func buildCodexTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) CodexTask {
+	commands, files := runner.BuildAgentTask(runner.AgentTaskInput{
 		PrepareName:      "Prepare Codex",
 		PrepareScript:    runner.NodePrepareScript("codex", "codex CLI not found on PATH; install Codex on the runner", spec.WorkingDirectory),
 		RunScriptName:    "run.js",
@@ -93,18 +93,18 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 			return runner.PromptNodeCommand(promptName, model, spec.ThinkingLevel)
 		},
 	})
-	return CodexBrokerTask{Commands: commands, Files: files}
+	return CodexTask{Commands: commands, Files: files}
 }
 
-func BuildBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup) CodexBrokerTask {
-	return buildCodexBrokerTask(spec, usage, setups, nil, nil, false)
+func BuildBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup) CodexTask {
+	return buildCodexTask(spec, usage, setups, nil, nil, false)
 }
 
-func BuildDispatchedBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) CodexBrokerTask {
-	return buildCodexBrokerTask(spec, usage, setups, dispatched, attachments, inspectImages)
+func BuildDispatchedBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) CodexTask {
+	return buildCodexTask(spec, usage, setups, dispatched, attachments, inspectImages)
 }
 
-func ApplyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunCodexSpec) CodexBrokerTask {
+func ApplyPlanningFollowUp(task CodexTask, environment []runner.TaskEnvironmentVariable, spec RunCodexSpec) CodexTask {
 	return applyPlanningFollowUp(task, environment, spec)
 }
 
@@ -113,7 +113,7 @@ func ApplyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvi
 // next user message, then exits so the run finishes and the session closes.
 // Line apps never attach a planning token, so they keep the default step list
 // and finish.
-func applyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunCodexSpec) CodexBrokerTask {
+func applyPlanningFollowUp(task CodexTask, environment []runner.TaskEnvironmentVariable, spec RunCodexSpec) CodexTask {
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
 	}
@@ -122,10 +122,10 @@ func applyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvi
 	return task
 }
 
-func planningFollowUpCommand(spec RunCodexSpec) runner.BrokerCommand {
+func planningFollowUpCommand(spec RunCodexSpec) runner.TaskCommand {
 	workdir := planningFollowUpWorkingDirectory(spec)
 	model := strings.TrimSpace(spec.Model)
-	return runner.BrokerCommand{
+	return runner.TaskCommand{
 		Name: "Wait for the next message",
 		Command: runner.WrapAgentStepCommand(
 			runner.WrapPromptCommandInWorkingDirectory(

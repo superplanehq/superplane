@@ -13,11 +13,10 @@ export type DraftStripAnalysisArgs = {
   factoryKey?: string;
   fixture: SplitRunFixture;
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
-  taskLimitReached?: boolean;
 };
 
-export function draftAnalysisQueued(fixture: Pick<SplitRunFixture, "footer" | "queuedTasks">): boolean {
-  return fixture.footer.kind === "draft" && Boolean(fixture.queuedTasks?.some((queue) => !queue.lineDispatchId));
+export function draftAnalysisQueued(fixture: Pick<SplitRunFixture, "footer" | "queuedRunnerJobs">): boolean {
+  return fixture.footer.kind === "draft" && Boolean(fixture.queuedRunnerJobs?.length);
 }
 
 /**
@@ -32,7 +31,7 @@ export function draftStripAnalysis(args: DraftStripAnalysisArgs, modelSelect: Re
   const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
   return {
     ...args.analysis,
-    analyzeLabel: (args.taskLimitReached ?? args.fixture.taskLimitReached) ? "Queue analysis" : "Analyze",
+    analyzeLabel: "Analyze",
     requestCreatedAt: args.fixture.phases.find((phase) => phase.id === "backlog")?.startedAt,
     modelSelect,
     showClarity: factoryShowsClarity(args.factory),

@@ -373,6 +373,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		executionUpdates = append(executionUpdates, executions...)
 	}
 
+	runnerChanges := &RunnerTaskChangeNotifier{}
 	var finalized bool
 	var skippedAsFinished bool
 	var nextFactoryLineRuns []factoryLinePendingRun
@@ -384,7 +385,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		}
 		var skipReason string
 		var err error
-		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger, eventCollector, executionCollector)
+		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger, eventCollector, executionCollector, runnerChanges)
 		if skipReason != "" {
 			outcome = executorOutcomeSkipped
 			reason = skipReason
@@ -419,6 +420,8 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		reason = classifyProcessError(err)
 		return err
 	}
+
+	runnerChanges.Publish()
 
 	// Retry cached spend after the finish transaction. A rollup error must not
 	// block the factory line, but a later pass still has to fill total_tokens
@@ -483,7 +486,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	return nil
 }
 
-func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, error) {
+func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution), runnerChanges *RunnerTaskChangeNotifier) (bool, string, error) {
 	run, err := models.LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
 		return false, "", err
@@ -540,6 +543,7 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 	err = NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
+		WithRunnerTaskChangeCollector(runnerChanges.Record).
 		DispatchFinished()
 
 	if err != nil {

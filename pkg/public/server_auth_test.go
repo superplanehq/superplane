@@ -204,18 +204,21 @@ func Test__ListAccountOrganizations(t *testing.T) {
 
 func TestServer_ProviderConfiguration(t *testing.T) {
 	// Test with no providers configured
-	os.Unsetenv("GITHUB_CLIENT_ID")
-	os.Unsetenv("GITHUB_CLIENT_SECRET")
-	os.Unsetenv("GOOGLE_CLIENT_ID")
-	os.Unsetenv("GOOGLE_CLIENT_SECRET")
+	for _, name := range []string{
+		"GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET",
+		"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
+		"BITBUCKET_CLIENT_ID", "BITBUCKET_CLIENT_SECRET",
+	} {
+		t.Setenv(name, "")
+	}
 
 	providers := getOAuthProviders()
 	assert.Empty(t, providers)
 
 	// Test with GitHub configured
-	os.Setenv("GITHUB_CLIENT_ID", "test-client-id")
-	os.Setenv("GITHUB_CLIENT_SECRET", "test-client-secret")
-	os.Setenv("BASE_URL", "http://localhost:8000")
+	t.Setenv("GITHUB_CLIENT_ID", "test-client-id")
+	t.Setenv("GITHUB_CLIENT_SECRET", "test-client-secret")
+	t.Setenv("BASE_URL", "http://localhost:8000")
 
 	providers = getOAuthProviders()
 	assert.Contains(t, providers, "github")
@@ -224,8 +227,8 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	assert.Equal(t, "http://localhost:8000/auth/github/callback", providers["github"].CallbackURL)
 
 	// Test with Google configured
-	os.Setenv("GOOGLE_CLIENT_ID", "test-google-client-id")
-	os.Setenv("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
+	t.Setenv("GOOGLE_CLIENT_ID", "test-google-client-id")
+	t.Setenv("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
 
 	providers = getOAuthProviders()
 	assert.Contains(t, providers, "google")

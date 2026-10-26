@@ -291,11 +291,11 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, models.FactoryPullRequestActivityOutcomeWaiting, access.Outcome)
 				err = db.Transaction(func(tx *gorm.DB) error {
-					return models.CheckTaskRootEventAdmission(tx, app, &models.CanvasEvent{
+					return models.CheckTaskRootEventReady(tx, app, &models.CanvasEvent{
 						Data: models.NewJSONValue(map[string]any{"work_order": map[string]any{"id": order.ID.String()}}),
 					})
 				})
-				assert.ErrorIs(t, err, models.ErrOrganizationTaskCapacity, "root events must wait during merge")
+				assert.ErrorIs(t, err, models.ErrWorkOrderBusy, "root events must wait during merge")
 				_, err = DispatchWorkOrder(ctx, orgID, &pb.DispatchWorkOrderRequest{
 					FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
 				})

@@ -43,7 +43,7 @@ func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 		Access: FactoryPullRequestAccessConcurrent,
 	})
 	if err == nil && result.Outcome == FactoryPullRequestActivityOutcomeWaiting {
-		return ErrOrganizationTaskCapacity
+		return ErrWorkOrderBusy
 	}
 	return err
 }

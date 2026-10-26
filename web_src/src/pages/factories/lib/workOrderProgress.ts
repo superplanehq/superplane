@@ -191,7 +191,7 @@ export function getWorkOrderDisplayKey(order: FactoriesWorkOrder, factoryKey?: s
 
 /** A scheduled start stays in Backlog until a line execution actually begins. */
 export function isWorkOrderQueuedForStart(order: FactoriesWorkOrder): boolean {
-  if (order.state !== "STATE_OPEN" || order.queuedTasks?.some((queue) => queue.taskActive)) {
+  if (order.state !== "STATE_OPEN") {
     return false;
   }
   const dispatches = order.lineDispatches ?? [];
@@ -225,7 +225,7 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "draft";
   }
 
-  if (hasActiveLineDispatch(order) || order.queuedTasks?.some((queue) => queue.taskActive)) {
+  if (hasActiveLineDispatch(order)) {
     return "running";
   }
 

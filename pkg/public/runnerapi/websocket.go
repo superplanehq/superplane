@@ -17,18 +17,21 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
-	runnerHelloTimeout = 15 * time.Second
-	runnerReadTimeout  = 60 * time.Second
-	runnerWriteTimeout = 10 * time.Second
-	runnerPingInterval = 20 * time.Second
-	runnerMessageLimit = 2 * 1024 * 1024
+	runnerHelloTimeout       = 15 * time.Second
+	runnerReadTimeout        = 60 * time.Second
+	runnerWriteTimeout       = 10 * time.Second
+	runnerPingInterval       = 20 * time.Second
+	runnerMessageLimit       = 2 * 1024 * 1024
+	runnerTaskCompletionWait = 5 * time.Second
 )
 
 var runnerUpgrader = websocket.Upgrader{
@@ -40,8 +43,9 @@ var runnerUpgrader = websocket.Upgrader{
 }
 
 type runnerConnection struct {
-	socket *websocket.Conn
-	mu     sync.Mutex
+	socket     *websocket.Conn
+	mu         sync.Mutex
+	deliveryMu sync.Mutex
 }
 
 func (c *runnerConnection) write(message any) error {
@@ -120,6 +124,7 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 		hello.CurrentTaskID,
 		fleet.Slug,
 		fleetScope,
+		true,
 	); err != nil {
 		s.writeConnectionError(connection, err, "")
 		return
@@ -128,6 +133,7 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 	stopPings := make(chan struct{})
 	defer close(stopPings)
 	go s.sendRunnerPings(connection, stopPings)
+	go s.dispatchWaitingRunner(r.Context(), connection, authenticatedRunner.ID, connectionID, fleet.Slug, fleetScope, stopPings)
 
 	_ = socket.SetReadDeadline(time.Now().Add(runnerReadTimeout))
 	for {
@@ -152,6 +158,11 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 			); err != nil {
 				return
 			}
+			latest, err := models.FindRunner(database.DB(r.Context()), authenticatedRunner.ID)
+			if err != nil {
+				return
+			}
+			*authenticatedRunner = *latest
 			if authenticatedRunner.State != models.RunnerStateBusy {
 				if err := s.reconcileRunnerConnection(
 					r.Context(),
@@ -257,7 +268,7 @@ func (s *Server) requestRunnerShutdown(
 	var taskID uuid.UUID
 	var shouldShutdown bool
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		current, err := models.FindRunner(tx, runner.ID)
+		current, err := models.FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
 		if err != nil {
 			return err
 		}
@@ -276,13 +287,16 @@ func (s *Server) requestRunnerShutdown(
 			shouldShutdown = true
 			return nil
 		}
-		if runner.State != models.RunnerStateBusy || !runner.Ephemeral {
+		if !runner.Ephemeral {
 			return errRunnerStateMismatch
 		}
 		task, err := runner.FindActiveTask(tx)
 		if err != nil ||
 			reportedTaskID == nil ||
 			task.ID != *reportedTaskID {
+			return errRunnerStateMismatch
+		}
+		if runner.State != models.RunnerStateBusy && (task.State != models.RunnerTaskStateReserved || task.DispatchStartedAt == nil) {
 			return errRunnerStateMismatch
 		}
 		if err := task.RequestCancel(tx, time.Now()); err != nil {
@@ -306,6 +320,7 @@ func (s *Server) reconcileRunnerConnection(
 	connectionID uuid.UUID,
 	reportedTaskID string,
 	fleetSlug, fleetScope string,
+	isHello ...bool,
 ) error {
 	var task *models.RunnerTask
 	var shouldSendTask bool
@@ -313,6 +328,7 @@ func (s *Server) reconcileRunnerConnection(
 	var shouldShutdown bool
 	var shouldCancel bool
 	var reservedTask *models.RunnerTask
+	var lostTask *models.RunnerTask
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		current, err := models.FindRunner(tx, runner.ID)
@@ -329,6 +345,23 @@ func (s *Server) reconcileRunnerConnection(
 			return errInvalidRunnerMessage
 		}
 		active, activeErr := runner.FindActiveTask(tx)
+		if len(isHello) > 0 && isHello[0] && reportedID == nil && activeErr == nil && active.DispatchStartedAt != nil {
+			locked, err := models.LockRunner(tx, runner.ID)
+			if err != nil {
+				return err
+			}
+			if locked.CurrentConnectionID == nil || *locked.CurrentConnectionID != connectionID {
+				return models.ErrRunnerConnectionReplaced
+			}
+			now := time.Now()
+			lostTask, err = locked.MarkLost(tx, now, now)
+			if err != nil {
+				return err
+			}
+			*runner = *locked
+			shouldShutdown = true
+			return nil
+		}
 
 		if runner.State == models.RunnerStateTerminated {
 			if reportedID == nil {
@@ -393,12 +426,16 @@ func (s *Server) reconcileRunnerConnection(
 	}
 	if reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug, fleetScope)
+		_ = runnercontrol.PublishOrganizationCapacity(ctx, reservedTask.OrganizationID)
+	}
+	if lostTask != nil {
+		_ = runnercontrol.PublishOrganizationCapacity(ctx, lostTask.OrganizationID)
+		if s.nodeRequestExecutor != nil {
+			s.waitForTaskExecutionRequest(ctx, lostTask)
+		}
 	}
 
 	if shouldStartTask {
-		if err := s.initializeTaskLogs(ctx, task.ID); err != nil {
-			return err
-		}
 		if err := s.startRunnerTask(ctx, runner, task.ID, connectionID); err != nil {
 			return err
 		}
@@ -413,24 +450,8 @@ func (s *Server) reconcileRunnerConnection(
 		return nil
 	}
 
-	if err := s.initializeTaskLogs(ctx, task.ID); err != nil {
-		return err
-	}
-	payload, err := s.encryptor.Decrypt(ctx, task.PayloadCiphertext, []byte(task.ID.String()))
-	if err != nil {
-		return fmt.Errorf("decrypt runner task payload: %w", err)
-	}
-	if !json.Valid(payload) {
-		return errors.New("runner task payload is invalid")
-	}
-	if err := connection.write(taskMessage{
-		Type: messageTypeTask,
-		Task: json.RawMessage(payload),
-	}); err != nil {
-		return err
-	}
-
-	return s.startRunnerTask(ctx, runner, task.ID, connectionID)
+	go s.prepareAndDeliver(ctx, connection, runner.ID, connectionID, task.ID)
+	return nil
 }
 
 func (s *Server) startRunnerTask(
@@ -439,8 +460,9 @@ func (s *Server) startRunnerTask(
 	taskID uuid.UUID,
 	connectionID uuid.UUID,
 ) error {
-	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		currentRunner, err := models.FindRunner(tx, runner.ID)
+	var startedTask *models.RunnerTask
+	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		currentRunner, err := models.FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
 		if err != nil {
 			return err
 		}
@@ -452,12 +474,20 @@ func (s *Server) startRunnerTask(
 			*currentRunner.CurrentConnectionID != connectionID {
 			return models.ErrRunnerConnectionReplaced
 		}
+		if currentTask.RunnerID != nil && *currentTask.RunnerID == runner.ID && (currentTask.State == models.RunnerTaskStateRunning || currentTask.IsTerminal()) {
+			return nil
+		}
 		if err := currentTask.Start(tx, currentRunner, s.activeLogStoreName, time.Now()); err != nil {
 			return err
 		}
 		*runner = *currentRunner
+		startedTask = currentTask
 		return nil
 	})
+	if err == nil && startedTask != nil {
+		_ = runnercontrol.PublishOrganizationCapacity(ctx, startedTask.OrganizationID)
+	}
+	return err
 }
 
 func (s *Server) initializeTaskLogs(ctx context.Context, taskID uuid.UUID) error {
@@ -492,8 +522,9 @@ func (s *Server) completeRunnerTask(
 	}
 
 	var completedTask *models.RunnerTask
+	var completedNow bool
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		currentRunner, err := models.FindRunner(tx, runner.ID)
+		currentRunner, err := models.FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
 		if err != nil {
 			return err
 		}
@@ -505,7 +536,12 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		completedNow, err := task.Complete(
+		if task.State == models.RunnerTaskStateReserved && task.DispatchStartedAt != nil {
+			if err := task.Start(tx, currentRunner, s.activeLogStoreName, time.Now()); err != nil {
+				return err
+			}
+		}
+		completedNow, err = task.Complete(
 			tx,
 			currentRunner,
 			hash,
@@ -518,16 +554,58 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		if completedNow {
-			completedTask = task
-		}
+		completedTask = task
 		*runner = *currentRunner
 		return nil
 	})
-	if err == nil && completedTask != nil {
-		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask, fleetSlug, fleetScope)
+	if err != nil {
+		return err
 	}
-	return err
+	if completedNow {
+		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask, fleetSlug, fleetScope)
+		_ = runnercontrol.PublishOrganizationCapacity(ctx, completedTask.OrganizationID)
+	}
+	// The task result must be committed before its execution request reads it.
+	// Failures leave the scheduled request available as a fallback.
+	if s.nodeRequestExecutor == nil {
+		return nil
+	}
+	s.waitForTaskExecutionRequest(ctx, completedTask)
+	return nil
+}
+
+func (s *Server) waitForTaskExecutionRequest(ctx context.Context, task *models.RunnerTask) {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Task completion is durable. Request processing must survive the runner
+		// disconnecting after its acknowledgement, including during slow cleanup.
+		if err := s.runTaskExecutionRequest(context.WithoutCancel(ctx), task); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.WithError(err).WithField("task", task.ID).Error("Failed to process runner task completion request")
+		}
+	}()
+
+	timer := time.NewTimer(runnerTaskCompletionWait)
+	defer timer.Stop()
+	select {
+	case <-done:
+	case <-ctx.Done():
+	case <-timer.C:
+		log.WithField("task", task.ID).Warn("Runner task completion request continues in the background")
+	}
+}
+
+func (s *Server) runTaskExecutionRequest(ctx context.Context, task *models.RunnerTask) error {
+	db := database.DB(ctx)
+	execution, err := task.FindExecution(db)
+	if err != nil {
+		return fmt.Errorf("find task execution: %w", err)
+	}
+	request, err := execution.FindPendingRequest(db)
+	if err != nil {
+		return fmt.Errorf("find pending execution request: %w", err)
+	}
+	return s.nodeRequestExecutor.RunNow(*request)
 }
 
 func completionHash(complete completeMessage) (string, error) {

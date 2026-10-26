@@ -18,7 +18,7 @@ function member(id: string, name: string) {
 
 const members = [member(ALICE_ID, "Alice"), member("bob", "Bob")];
 
-function usersHandler(mode: "ready" | "loading" | "error") {
+export function usersHandler(mode: "ready" | "loading" | "error") {
   return http.get("/api/v1/users", async () => {
     if (mode === "error") {
       return new HttpResponse(null, { status: 500 });
@@ -59,6 +59,7 @@ function InteractiveOwnerField({
 const meta = {
   title: "Factories/Components/IntakeDefaultOwnerField",
   component: IntakeDefaultOwnerField,
+  excludeStories: ["usersHandler"],
   parameters: { layout: "padded", msw: { handlers: [usersHandler("ready")] } },
   args: {
     organizationId: "intake-owner-org",

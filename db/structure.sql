@@ -33,6 +33,36 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
 
 
+--
+-- Name: record_runner_task_queue_interval(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_runner_task_queue_interval() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    was_queued boolean := false;
+    is_queued boolean;
+    transition_at timestamptz;
+BEGIN
+    IF TG_OP = 'UPDATE' THEN
+        was_queued := OLD.backend = 'integrated' AND OLD.state = 'queued' AND OLD.runner_id IS NULL;
+    END IF;
+    is_queued := NEW.backend = 'integrated' AND NEW.state = 'queued' AND NEW.runner_id IS NULL;
+    transition_at := COALESCE(NEW.updated_at, statement_timestamp());
+    IF is_queued AND NOT was_queued THEN
+        INSERT INTO runner_task_queue_intervals(task_id, started_at)
+        VALUES (NEW.id, transition_at) ON CONFLICT DO NOTHING;
+    ELSIF was_queued AND NOT is_queued THEN
+        UPDATE runner_task_queue_intervals
+        SET ended_at = GREATEST(started_at, transition_at)
+        WHERE task_id = NEW.id AND ended_at IS NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -514,6 +544,18 @@ CREATE TABLE public.factories (
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text)),
     CONSTRAINT factories_url_id_format_check CHECK ((url_id ~ '^[a-z0-9]{8}$'::text))
+);
+
+
+--
+-- Name: factory_agent_resource_refreshes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_agent_resource_refreshes (
+    resource_id uuid NOT NULL,
+    attempt_id uuid NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
 );
 
 
@@ -1183,6 +1225,10 @@ CREATE TABLE public.installation_metadata (
     signups_enabled boolean DEFAULT true NOT NULL,
     owner_setup_step text,
     share_owner_identity boolean DEFAULT false NOT NULL,
+    invitation_duration_days integer DEFAULT 7 NOT NULL,
+    past_due_grace_days integer DEFAULT 0 NOT NULL,
+    CONSTRAINT installation_metadata_invitation_duration_days_check CHECK (((invitation_duration_days >= 1) AND (invitation_duration_days <= 365))),
+    CONSTRAINT installation_metadata_past_due_grace_days_check CHECK (((past_due_grace_days >= 0) AND (past_due_grace_days <= 21))),
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -1241,7 +1287,8 @@ CREATE TABLE public.mcp_oauth_codes (
     factory_id uuid NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     expires_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    factory_ids jsonb
 );
 
 
@@ -1259,7 +1306,33 @@ CREATE TABLE public.mcp_oauth_refresh_tokens (
     resource text NOT NULL,
     scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
     expires_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    factory_ids jsonb
+);
+
+
+--
+-- Name: organization_billing_checkouts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_billing_checkouts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    plan_key text NOT NULL,
+    polar_product_id text NOT NULL,
+    seats integer,
+    state text NOT NULL,
+    polar_checkout_id text,
+    checkout_url text,
+    polar_status text,
+    expires_at timestamp with time zone,
+    last_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    resolved_at timestamp with time zone,
+    CONSTRAINT organization_billing_checkouts_resolved_at CHECK (((state = ANY (ARRAY['creating'::text, 'ambiguous'::text, 'open'::text])) = (resolved_at IS NULL))),
+    CONSTRAINT organization_billing_checkouts_seats_check CHECK ((seats >= 1)),
+    CONSTRAINT organization_billing_checkouts_state CHECK ((state = ANY (ARRAY['creating'::text, 'ambiguous'::text, 'open'::text, 'succeeded'::text, 'expired'::text, 'failed'::text, 'released'::text])))
 );
 
 
@@ -1282,7 +1355,12 @@ CREATE TABLE public.organization_billing_plans (
     polar_modified_at timestamp with time zone,
     plan_id uuid NOT NULL,
     purchased_seats integer,
+    past_due_since timestamp with time zone,
+    over_capacity_since timestamp with time zone,
+    renewal_seats_scheduled integer,
+    renewal_seats_scheduled_at timestamp with time zone,
     CONSTRAINT organization_billing_plans_purchased_seats_check CHECK ((purchased_seats >= 0)),
+    CONSTRAINT organization_billing_plans_renewal_seats_scheduled_check CHECK ((renewal_seats_scheduled >= 1)),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
 
@@ -1325,6 +1403,28 @@ CREATE TABLE public.organization_hosted_model_allowlists (
 
 
 --
+-- Name: organization_invitation_replaced_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_invitation_replaced_tokens (
+    token_hash character varying(64) NOT NULL,
+    invitation_id uuid NOT NULL
+);
+
+
+--
+-- Name: organization_invitation_sends; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_invitation_sends (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    email character varying(255) NOT NULL,
+    sent_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1336,7 +1436,13 @@ CREATE TABLE public.organization_invitations (
     state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    canvas_ids jsonb DEFAULT '[]'::jsonb
+    canvas_ids jsonb DEFAULT '[]'::jsonb,
+    role character varying(255) DEFAULT 'org_operator'::character varying NOT NULL,
+    token_hash character varying(64),
+    expires_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    accepted_at timestamp without time zone,
+    accepted_by uuid,
+    sent_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -1399,6 +1505,33 @@ CREATE TABLE public.organization_seat_limit_overrides (
 
 
 --
+-- Name: organization_seat_purchases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_seat_purchases (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid,
+    polar_subscription_id text NOT NULL,
+    from_seats integer NOT NULL,
+    to_seats integer NOT NULL,
+    status text NOT NULL,
+    error_code text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    operation_key text,
+    request_fingerprint text,
+    period_start timestamp with time zone,
+    period_end timestamp with time zone,
+    CONSTRAINT organization_seat_purchases_adds_seats CHECK ((to_seats > from_seats)),
+    CONSTRAINT organization_seat_purchases_from_seats_check CHECK ((from_seats >= 0)),
+    CONSTRAINT organization_seat_purchases_operation_complete CHECK ((((operation_key IS NULL) AND (request_fingerprint IS NULL) AND (period_start IS NULL) AND (period_end IS NULL)) OR ((operation_key IS NOT NULL) AND (request_fingerprint IS NOT NULL) AND (period_start IS NOT NULL) AND (period_end IS NOT NULL)))),
+    CONSTRAINT organization_seat_purchases_operation_key_length CHECK (((operation_key IS NULL) OR ((char_length(operation_key) >= 1) AND (char_length(operation_key) <= 128)))),
+    CONSTRAINT organization_seat_purchases_status CHECK ((status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'action_required'::text, 'unknown'::text])))
+);
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1447,6 +1580,29 @@ CREATE TABLE public.role_metadata (
 
 
 --
+-- Name: runner_credential_cleanups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_credential_cleanups (
+    id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    attempt_id uuid NOT NULL,
+    provider text NOT NULL,
+    provider_resource_id uuid NOT NULL,
+    name text NOT NULL,
+    key_hash text DEFAULT ''::text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    accepted_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    next_retry_at timestamp with time zone NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    issuer_credential_identity text DEFAULT ''::text NOT NULL
+);
+
+
+--
 -- Name: runner_credentials; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1473,6 +1629,7 @@ CREATE TABLE public.runner_fleets (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at timestamp with time zone,
+    provisioning_cooldown_until timestamp with time zone,
     CONSTRAINT runner_fleets_runner_version_check CHECK ((runner_version <> ''::text)),
     CONSTRAINT runner_fleets_scope_check CHECK (((((scope_type)::text = 'installation'::text) AND (scope_id IS NULL)) OR (((scope_type)::text = 'organization'::text) AND (scope_id IS NOT NULL)))),
     CONSTRAINT runner_fleets_scope_type_check CHECK (((scope_type)::text = ANY ((ARRAY['installation'::character varying, 'organization'::character varying])::text[]))),
@@ -1516,6 +1673,37 @@ CREATE TABLE public.runner_task_log_lifecycles (
 
 
 --
+-- Name: runner_task_preparations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_task_preparations (
+    task_id uuid NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    deadline timestamp with time zone NOT NULL,
+    attempt_id uuid,
+    attempt_expires_at timestamp with time zone,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    next_retry_at timestamp with time zone NOT NULL,
+    prepared_at timestamp with time zone,
+    updated_at timestamp with time zone NOT NULL,
+    prepared_valid_until timestamp with time zone
+);
+
+
+--
+-- Name: runner_task_queue_intervals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_task_queue_intervals (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    task_id uuid NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    ended_at timestamp with time zone,
+    CONSTRAINT runner_task_queue_intervals_check CHECK (((ended_at IS NULL) OR (ended_at >= started_at)))
+);
+
+
+--
 -- Name: runner_tasks; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1538,6 +1726,7 @@ CREATE TABLE public.runner_tasks (
     finished_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    dispatch_started_at timestamp with time zone,
     CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
     CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
 );
@@ -2470,6 +2659,14 @@ ALTER TABLE ONLY public.factories
 
 
 --
+-- Name: factory_agent_resource_refreshes factory_agent_resource_refreshes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resource_refreshes
+    ADD CONSTRAINT factory_agent_resource_refreshes_pkey PRIMARY KEY (resource_id);
+
+
+--
 -- Name: factory_agent_resource_secrets factory_agent_resource_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2830,6 +3027,14 @@ ALTER TABLE ONLY public.mcp_oauth_refresh_tokens
 
 
 --
+-- Name: organization_billing_checkouts organization_billing_checkouts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_checkouts
+    ADD CONSTRAINT organization_billing_checkouts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_billing_plans organization_billing_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2862,11 +3067,35 @@ ALTER TABLE ONLY public.organization_hosted_model_allowlists
 
 
 --
+-- Name: organization_invitation_replaced_tokens organization_invitation_replaced_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_replaced_tokens
+    ADD CONSTRAINT organization_invitation_replaced_tokens_pkey PRIMARY KEY (token_hash);
+
+
+--
+-- Name: organization_invitation_sends organization_invitation_sends_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_sends
+    ADD CONSTRAINT organization_invitation_sends_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_invitations organization_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_invitations
     ADD CONSTRAINT organization_invitations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_invitations organization_invitations_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitations
+    ADD CONSTRAINT organization_invitations_token_hash_key UNIQUE (token_hash);
 
 
 --
@@ -2918,6 +3147,14 @@ ALTER TABLE ONLY public.organization_seat_limit_overrides
 
 
 --
+-- Name: organization_seat_purchases organization_seat_purchases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2939,6 +3176,22 @@ ALTER TABLE ONLY public.plan_feature_definitions
 
 ALTER TABLE ONLY public.role_metadata
     ADD CONSTRAINT role_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: runner_credential_cleanups runner_credential_cleanups_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_credential_cleanups
+    ADD CONSTRAINT runner_credential_cleanups_name_key UNIQUE (name);
+
+
+--
+-- Name: runner_credential_cleanups runner_credential_cleanups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_credential_cleanups
+    ADD CONSTRAINT runner_credential_cleanups_pkey PRIMARY KEY (id);
 
 
 --
@@ -2979,6 +3232,22 @@ ALTER TABLE ONLY public.runner_registrations
 
 ALTER TABLE ONLY public.runner_task_log_lifecycles
     ADD CONSTRAINT runner_task_log_lifecycles_pkey PRIMARY KEY (task_id);
+
+
+--
+-- Name: runner_task_preparations runner_task_preparations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_preparations
+    ADD CONSTRAINT runner_task_preparations_pkey PRIMARY KEY (task_id);
+
+
+--
+-- Name: runner_task_queue_intervals runner_task_queue_intervals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_queue_intervals
+    ADD CONSTRAINT runner_task_queue_intervals_pkey PRIMARY KEY (id);
 
 
 --
@@ -4117,6 +4386,20 @@ CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm
 
 
 --
+-- Name: idx_organization_billing_checkouts_organization_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_billing_checkouts_organization_created ON public.organization_billing_checkouts USING btree (organization_id, created_at);
+
+
+--
+-- Name: idx_organization_seat_purchases_organization_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_seat_purchases_organization_created ON public.organization_seat_purchases USING btree (organization_id, created_at);
+
+
+--
 -- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4544,10 +4827,52 @@ CREATE INDEX organization_billing_plans_catalog ON public.organization_billing_p
 
 
 --
+-- Name: organization_invitation_replaced_tokens_invitation_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_replaced_tokens_invitation_id_idx ON public.organization_invitation_replaced_tokens USING btree (invitation_id);
+
+
+--
+-- Name: organization_invitation_sends_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_email_sent_at_idx ON public.organization_invitation_sends USING btree (email, sent_at);
+
+
+--
+-- Name: organization_invitation_sends_organization_id_email_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_organization_id_email_sent_at_idx ON public.organization_invitation_sends USING btree (organization_id, email, sent_at);
+
+
+--
+-- Name: organization_invitation_sends_organization_id_sent_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_invitation_sends_organization_id_sent_at_idx ON public.organization_invitation_sends USING btree (organization_id, sent_at);
+
+
+--
+-- Name: organization_invitations_pending_email_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organization_invitations_pending_email_idx ON public.organization_invitations USING btree (organization_id, lower((email)::text)) WHERE ((state)::text = 'pending'::text);
+
+
+--
 -- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX organizations_slug_active_key ON public.organizations USING btree (slug) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: runner_credential_cleanup_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_credential_cleanup_pending ON public.runner_credential_cleanups USING btree (next_retry_at) WHERE (completed_at IS NULL);
 
 
 --
@@ -4586,10 +4911,45 @@ CREATE INDEX runner_task_log_lifecycles_archiving_idx ON public.runner_task_log_
 
 
 --
+-- Name: runner_task_preparation_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_task_preparation_expiry ON public.runner_task_preparations USING btree (deadline) WHERE (prepared_at IS NULL);
+
+
+--
+-- Name: runner_task_queue_intervals_open; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX runner_task_queue_intervals_open ON public.runner_task_queue_intervals USING btree (task_id) WHERE (ended_at IS NULL);
+
+
+--
+-- Name: runner_task_queue_intervals_task; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_task_queue_intervals_task ON public.runner_task_queue_intervals USING btree (task_id, started_at);
+
+
+--
+-- Name: runner_tasks_fleet_queued_creation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_fleet_queued_creation_idx ON public.runner_tasks USING btree (fleet_id, created_at, id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = 'queued'::text) AND (runner_id IS NULL));
+
+
+--
 -- Name: runner_tasks_fleet_state_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX runner_tasks_fleet_state_idx ON public.runner_tasks USING btree (fleet_id, state, queued_at);
+
+
+--
+-- Name: runner_tasks_organization_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING btree (organization_id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = ANY ((ARRAY['reserved'::character varying, 'running'::character varying])::text[])));
 
 
 --
@@ -4639,6 +4999,34 @@ CREATE UNIQUE INDEX unique_api_key_in_organization ON public.users USING btree (
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
+
+
+--
+-- Name: uq_organization_billing_checkouts_polar_checkout; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_billing_checkouts_polar_checkout ON public.organization_billing_checkouts USING btree (polar_checkout_id) WHERE (polar_checkout_id IS NOT NULL);
+
+
+--
+-- Name: uq_organization_billing_checkouts_unresolved; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_billing_checkouts_unresolved ON public.organization_billing_checkouts USING btree (organization_id) WHERE (state = ANY (ARRAY['creating'::text, 'ambiguous'::text, 'open'::text]));
+
+
+--
+-- Name: uq_organization_seat_purchases_in_flight; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_seat_purchases_in_flight ON public.organization_seat_purchases USING btree (organization_id) WHERE (status = ANY (ARRAY['pending'::text, 'unknown'::text]));
+
+
+--
+-- Name: uq_organization_seat_purchases_operation_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organization_seat_purchases_operation_key ON public.organization_seat_purchases USING btree (organization_id, operation_key) WHERE (operation_key IS NOT NULL);
 
 
 --
@@ -4737,6 +5125,13 @@ CREATE UNIQUE INDEX workflows_factory_id_name_active_key ON public.workflows USI
 --
 
 CREATE UNIQUE INDEX workflows_organization_id_name_active_key ON public.workflows USING btree (organization_id, name) WHERE ((factory_id IS NULL) AND (deleted_at IS NULL));
+
+
+--
+-- Name: runner_tasks runner_task_queue_history; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER runner_task_queue_history AFTER INSERT OR UPDATE OF state, runner_id ON public.runner_tasks FOR EACH ROW EXECUTE FUNCTION public.record_runner_task_queue_interval();
 
 
 --
@@ -4897,6 +5292,14 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 ALTER TABLE ONLY public.factories
     ADD CONSTRAINT factories_planning_auto_start_line_id_fkey FOREIGN KEY (planning_auto_start_line_id) REFERENCES public.factory_lines(id) ON DELETE SET NULL;
+
+
+--
+-- Name: factory_agent_resource_refreshes factory_agent_resource_refreshes_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resource_refreshes
+    ADD CONSTRAINT factory_agent_resource_refreshes_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES public.factory_agent_resources(id) ON DELETE CASCADE;
 
 
 --
@@ -5492,6 +5895,14 @@ ALTER TABLE ONLY public.installation_licenses
 
 
 --
+-- Name: organization_billing_checkouts organization_billing_checkouts_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_billing_checkouts
+    ADD CONSTRAINT organization_billing_checkouts_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_billing_plans organization_billing_plans_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5513,6 +5924,30 @@ ALTER TABLE ONLY public.organization_feature_grants
 
 ALTER TABLE ONLY public.organization_hosted_model_allowlists
     ADD CONSTRAINT organization_hosted_model_allowlists_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_invitation_replaced_tokens organization_invitation_replaced_tokens_invitation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_replaced_tokens
+    ADD CONSTRAINT organization_invitation_replaced_tokens_invitation_id_fkey FOREIGN KEY (invitation_id) REFERENCES public.organization_invitations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_invitation_sends organization_invitation_sends_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitation_sends
+    ADD CONSTRAINT organization_invitation_sends_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_invitations organization_invitations_accepted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitations
+    ADD CONSTRAINT organization_invitations_accepted_by_fkey FOREIGN KEY (accepted_by) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -5540,11 +5975,35 @@ ALTER TABLE ONLY public.organization_seat_limit_overrides
 
 
 --
+-- Name: organization_seat_purchases organization_seat_purchases_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_seat_purchases organization_seat_purchases_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_seat_purchases
+    ADD CONSTRAINT organization_seat_purchases_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: organizations organizations_created_by_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_created_by_account_id_fkey FOREIGN KEY (created_by_account_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: runner_credential_cleanups runner_credential_cleanups_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_credential_cleanups
+    ADD CONSTRAINT runner_credential_cleanups_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id);
 
 
 --
@@ -5577,6 +6036,22 @@ ALTER TABLE ONLY public.runner_registrations
 
 ALTER TABLE ONLY public.runner_task_log_lifecycles
     ADD CONSTRAINT runner_task_log_lifecycles_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id) ON DELETE CASCADE;
+
+
+--
+-- Name: runner_task_preparations runner_task_preparations_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_preparations
+    ADD CONSTRAINT runner_task_preparations_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id);
+
+
+--
+-- Name: runner_task_queue_intervals runner_task_queue_intervals_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_queue_intervals
+    ADD CONSTRAINT runner_task_queue_intervals_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id) ON DELETE CASCADE;
 
 
 --
@@ -6067,7 +6542,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261023174557	f
+20261026131736	f
 \.
 
 

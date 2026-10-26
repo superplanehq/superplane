@@ -44,6 +44,16 @@ vi.mock("@/hooks/useOrganizationBilling", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({
+    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+  }),
+}));
+
 vi.mock("@/hooks/usePageTitle", () => ({
   usePageTitle: vi.fn(),
 }));

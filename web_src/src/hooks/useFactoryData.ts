@@ -36,6 +36,7 @@ import type {
   FactoriesWorkOrderState,
   FactoryAutomation,
   FactoryLineStep,
+  OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
@@ -66,6 +67,7 @@ import {
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
 import { integrationKeys } from "./useIntegrations";
+import { organizationBillingQueryKey } from "./useOrganizationBilling";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -219,7 +221,7 @@ export function useFactoryWorkOrders(
     // Live via websocket; remount must refetch instead of serving 5m global stale cache.
     staleTime: 0,
     // Other workspaces can change organization queue positions without a local WebSocket event.
-    refetchInterval: (query) => (query.state.data?.some((order) => order.queuedTasks?.length) ? 5000 : false),
+    refetchInterval: (query) => (query.state.data?.some((order) => order.queuedRunnerJobs?.length) ? 5000 : false),
   });
 }
 
@@ -283,7 +285,9 @@ export function useFactoryWorkOrdersPage(
       (!options?.requireUser || Boolean(pageQuery.userId)),
     staleTime: 0,
     refetchInterval: (query) =>
-      query.state.data?.pages.some((page) => page.orders.some((order) => order.queuedTasks?.length)) ? 5000 : false,
+      query.state.data?.pages.some((page) => page.orders.some((order) => order.queuedRunnerJobs?.length))
+        ? 5000
+        : false,
     placeholderData: keepPreviousData,
   });
 
@@ -406,7 +410,7 @@ export function useWorkOrder(organizationId: string, factoryId: string, orderId:
     enabled: Boolean(organizationId && factoryId && orderId),
     staleTime: 0,
     refetchInterval: (query) =>
-      query.state.data?.queuedTasks?.length || query.state.data?.state === "STATE_DRAFT" ? 5000 : false,
+      query.state.data?.queuedRunnerJobs?.length || query.state.data?.state === "STATE_DRAFT" ? 5000 : false,
   });
 }
 
@@ -612,10 +616,13 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     },
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      // A Backlog run starts only when Planning is on. Show Analyzing until
-      // that run arrives. Missing factory data defaults to Planning on.
       const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
-      if (factoryPlanningEnabled(factory)) {
+      const billing = queryClient.getQueryData<OrganizationsDescribeOrganizationBillingResponse>(
+        organizationBillingQueryKey(organizationId),
+      );
+      // Predict analysis only when the server permits runs. Otherwise wait
+      // for a real run, including when billing has not loaded yet.
+      if (factoryPlanningEnabled(factory) && billing?.hostedExecutionAllowed === true) {
         markBacklogAnalysisPending(order.id);
       }
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
@@ -1119,7 +1126,7 @@ export function useCancelWorkOrderQueue(organizationId: string, factoryId: strin
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Could not remove the task from the queue");
+        throw new Error("Could not cancel the queued runner job");
       }
       return response.data.order;
     },

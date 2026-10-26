@@ -8,7 +8,7 @@ import { type DraftReadinessTone } from "../lib/draftReadiness";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { OutputList } from "../pages/work-order-popup-redesign/popupShared";
 import { SplitRunReview } from "../pages/work-order-split-run/SplitRunReview";
-import { withTaskQueueActions, type SplitRunStopChoice } from "../pages/work-order-split-run/splitRunFooter";
+import { type SplitRunStopChoice } from "../pages/work-order-split-run/splitRunFooter";
 import type { SplitRunFixture, SplitRunPhase } from "../pages/work-order-split-run/splitRunMocks";
 import { WorkOrderQueueStatus } from "../workOrders/WorkOrderQueueStatus";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
@@ -19,23 +19,25 @@ export function MobileTaskStatus({
   fixture,
 }: {
   order: FactoriesWorkOrder;
-  fixture: Pick<SplitRunFixture, "queuedTasks" | "title">;
+  fixture: Pick<SplitRunFixture, "queuedRunnerJobs" | "title">;
 }) {
-  const queuedTasks = fixture.queuedTasks ?? [];
-  const showTaskStatus = queuedTasks.length === 0 || queuedTasks.some((queue) => queue.taskActive);
+  const queuedRunnerJobs = fixture.queuedRunnerJobs ?? [];
   const statusMeta = getWorkOrderDisplayStatusMeta(getWorkOrderDisplayStatus(order));
   return (
     <>
-      {showTaskStatus ? (
-        <span
-          className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium", statusMeta.className)}
-          data-testid="mobile-task-status"
-        >
-          <span className={cn("size-1.5 rounded-full", statusMeta.dotClassName)} aria-hidden />
-          {statusMeta.label}
+      <span
+        className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium", statusMeta.className)}
+        data-testid="mobile-task-status"
+      >
+        <span className={cn("size-1.5 rounded-full", statusMeta.dotClassName)} aria-hidden />
+        {statusMeta.label}
+      </span>
+      {order.lineDispatches?.some((dispatch) => dispatch.queueItem) ? (
+        <span role="status" className="text-[11px] text-muted-foreground">
+          Waiting for automation slot
         </span>
       ) : null}
-      {queuedTasks.map((queue) => (
+      {queuedRunnerJobs.map((queue) => (
         <WorkOrderQueueStatus
           key={queue.id}
           queue={queue}
@@ -87,7 +89,7 @@ export function PhoneTaskReview({
   const { fixture, pullRequests, canUpdate, lineName } = model;
   return (
     <SplitRunReview
-      footer={withTaskQueueActions(fixture.footer, fixture)}
+      footer={fixture.footer}
       organizationId={scope.organizationId}
       factoryId={scope.factoryId}
       factoryKey={scope.factoryKey}

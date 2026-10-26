@@ -52,6 +52,7 @@ Do not reinvent these pieces:
 | --- | --- |
 | Billing unit | Ledger stores tokens by type and USD cents. Money is the source of truth. |
 | Welcome grant | Once per organization, not per user. |
+| Admin-assigned plans | Business Manual and custom admin-assigned plans can stay active without a Polar subscription. Billing sync and inactive subscription webhooks must preserve them. See the [locked plan rule](team-plan-seats-and-billing.md#admin-assigned-plans-without-a-polar-subscription). |
 | Hosted catalog | Admin picks one hosted provider and an allowlist of models. |
 | BYOK catalog | User connects keys. SuperPlane lists models. The list guides the picker. It does not gate a run. |
 | BYOK cost | Store estimated or provider-reported dollars. Mark `funding_source=byok`. |

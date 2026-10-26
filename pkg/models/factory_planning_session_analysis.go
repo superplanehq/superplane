@@ -81,7 +81,7 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 	if !errors.Is(err, ErrFactoryPlanningSessionNotFound) {
 		return nil, err
 	}
-	if err := checkOrganizationTaskAdmission(tx, f.OrganizationID, params.WorkOrderID); err != nil {
+	if err := checkWorkOrderReady(tx, f.OrganizationID, params.WorkOrderID); err != nil {
 		return nil, err
 	}
 
