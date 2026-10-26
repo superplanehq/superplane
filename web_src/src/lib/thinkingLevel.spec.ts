@@ -20,10 +20,12 @@ describe("draftStartThinkingPayload", () => {
 });
 
 describe("visibleThinkingLevelLabel", () => {
-  it("shows Low, Medium, High, and a stored Default", () => {
+  it("shows all stored Codex effort levels and Default", () => {
+    expect(visibleThinkingLevelLabel("minimal")).toBe("Minimal");
     expect(visibleThinkingLevelLabel("low")).toBe("Low");
     expect(visibleThinkingLevelLabel("medium")).toBe("Medium");
     expect(visibleThinkingLevelLabel("high")).toBe("High");
+    expect(visibleThinkingLevelLabel("xhigh")).toBe("Extra high");
     expect(visibleThinkingLevelLabel("default")).toBe("Default");
   });
 

@@ -6,10 +6,12 @@ import (
 )
 
 const (
-	ThinkingLevelKey    = "thinkingLevel"
-	ThinkingLevelLow    = "low"
-	ThinkingLevelMedium = "medium"
-	ThinkingLevelHigh   = "high"
+	ThinkingLevelKey     = "thinkingLevel"
+	ThinkingLevelMinimal = "minimal"
+	ThinkingLevelLow     = "low"
+	ThinkingLevelMedium  = "medium"
+	ThinkingLevelHigh    = "high"
+	ThinkingLevelXHigh   = "xhigh"
 	// DispatchThinkingDefault is the Start override that uses runner Default
 	// instead of the saved agent thinking level. Empty dispatch thinking means Auto.
 	DispatchThinkingDefault = "default"
@@ -25,13 +27,23 @@ func NormalizeThinkingLevel(value string) (string, error) {
 	}
 }
 
+func NormalizeCodexThinkingLevel(value string) (string, error) {
+	trimmed := strings.ToLower(strings.TrimSpace(value))
+	switch trimmed {
+	case "", ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh:
+		return trimmed, nil
+	default:
+		return "", fmt.Errorf("thinkingLevel must be empty, minimal, low, medium, high, or xhigh")
+	}
+}
+
 func NormalizeDispatchThinkingLevel(value string) (string, error) {
 	trimmed := strings.ToLower(strings.TrimSpace(value))
 	switch trimmed {
-	case "", DispatchThinkingDefault, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh:
+	case "", DispatchThinkingDefault, ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh:
 		return trimmed, nil
 	default:
-		return "", fmt.Errorf("thinking_level must be empty, default, low, medium, or high")
+		return "", fmt.Errorf("thinking_level must be empty, default, minimal, low, medium, high, or xhigh")
 	}
 }
 
