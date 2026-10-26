@@ -2,6 +2,7 @@ package polar
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -222,4 +223,72 @@ func usePolarHandler(t *testing.T, handler http.Handler) {
 	t.Cleanup(server.Close)
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	t.Setenv("POLAR_API_BASE_URL", server.URL)
+}
+
+// useCheckoutServer answers checkout reads with the given status.
+func useCheckoutServer(t *testing.T, checkoutID, status string, statusCode int) {
+	t.Helper()
+	usePolarHandler(t, echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
+		if statusCode != http.StatusOK {
+			w.WriteHeader(statusCode)
+			return
+		}
+		assert.Equal(t, "/checkouts/"+checkoutID, r.URL.Path)
+		payload := checkoutPayload(checkoutID, status)
+		require.NoError(t, json.NewEncoder(w).Encode(payload))
+	}))
+}
+
+func TestVerifyOrganizationDeletionRefusesACheckoutThatCanStillActivate(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		status     string
+		statusCode int
+		err        error
+	}{
+		{name: "open checkout", status: "open", statusCode: http.StatusOK, err: models.ErrOrganizationCheckoutPending},
+		{name: "confirmed checkout", status: "confirmed", statusCode: http.StatusOK, err: models.ErrOrganizationCheckoutPending},
+		{name: "Polar cannot answer", statusCode: http.StatusBadGateway, err: models.ErrOrganizationSubscriptionUnverified},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			org := setupBillingOrganization(t)
+			intent := openTeamCheckout(t, org, "chk_delete")
+			useCheckoutServer(t, "chk_delete", tc.status, tc.statusCode)
+
+			clearance, err := VerifyOrganizationDeletion(context.Background(), org.ID)
+
+			require.ErrorIs(t, err, tc.err)
+			assert.Nil(t, clearance)
+			stored := unresolvedCheckout(t, org)
+			require.NotNil(t, stored)
+			assert.Equal(t, intent.ID, stored.ID)
+		})
+	}
+}
+
+func TestVerifyOrganizationDeletionReleasesAVerifiedExpiredCheckout(t *testing.T) {
+	org := setupBillingOrganization(t)
+	openTeamCheckout(t, org, "chk_delete")
+	useCheckoutServer(t, "chk_delete", "expired", http.StatusOK)
+
+	clearance, err := VerifyOrganizationDeletion(context.Background(), org.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, org.SoftDelete(database.DB(t.Context()), clearance))
+	_, err = models.FindOrganizationByID(org.ID.String())
+	require.Error(t, err)
+}
+
+func TestSoftDeleteRefusesACheckoutClaimedAfterTheVerification(t *testing.T) {
+	org := setupBillingOrganization(t)
+	clearance, err := VerifyOrganizationDeletion(context.Background(), org.ID)
+	require.NoError(t, err)
+	// A checkout starts between the verification and the deletion.
+	openTeamCheckout(t, org, "chk_late")
+
+	err = org.SoftDelete(database.DB(t.Context()), clearance)
+
+	require.ErrorIs(t, err, models.ErrOrganizationCheckoutPending)
+	_, err = models.FindOrganizationByID(org.ID.String())
+	require.NoError(t, err, "the organization stays while its checkout can activate")
 }

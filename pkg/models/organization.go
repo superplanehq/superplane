@@ -30,6 +30,13 @@ var ErrOrganizationSubscriptionLive = errors.New("Cancel the subscription in Bil
 //revive:disable-next-line:error-strings
 var ErrOrganizationSubscriptionUnverified = errors.New("SuperPlane could not confirm with Polar that the subscription ended. Try again later.")
 
+// ErrOrganizationCheckoutPending stops a deletion while a subscription
+// checkout can still activate. A payment after the deletion would start a
+// subscription for a deleted organization.
+//
+//revive:disable-next-line:error-strings
+var ErrOrganizationCheckoutPending = errors.New("Finish the pending checkout or wait until it expires before you delete the organization.")
+
 // OrganizationDeletionClearance records the billing row that a deletion check
 // read before it took any lock. Organization.SoftDelete compares it with the
 // locked row, so a subscription change between the check and the delete stops
@@ -506,7 +513,9 @@ func SoftDeleteOrganizationInTransaction(tx *gorm.DB, id string) error {
 // The clearance must come from a check that read the billing row before the
 // transaction took these locks. A Polar call must not hold the organization
 // lock. SoftDelete refuses a missing clearance, a row that may still bill
-// without Polar verification, and a row that changed after the check.
+// without Polar verification, and a row that changed after the check. It
+// also refuses an unresolved checkout intent: checkout claims take the same
+// organization lock, so no checkout that can activate survives the delete.
 func (o *Organization) SoftDelete(tx *gorm.DB, clearance *OrganizationDeletionClearance) error {
 	return tx.Transaction(func(inner *gorm.DB) error {
 		if _, err := LockOrganization(inner, o.ID); err != nil {
@@ -518,6 +527,13 @@ func (o *Organization) SoftDelete(tx *gorm.DB, clearance *OrganizationDeletionCl
 		}
 		if err := clearance.permits(o.ID, plan, time.Now()); err != nil {
 			return err
+		}
+		checkout, err := FindUnresolvedOrganizationBillingCheckout(inner, o.ID)
+		if err != nil {
+			return err
+		}
+		if checkout != nil {
+			return ErrOrganizationCheckoutPending
 		}
 		return inner.Delete(o).Error
 	})

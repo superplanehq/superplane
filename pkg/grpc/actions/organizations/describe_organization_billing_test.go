@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -283,12 +282,6 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 					"external_id": r.Organization.ID.String(),
 				},
 			}
-			if req.URL.Path == "/subscriptions/sub_grpc_sync" {
-				// The renewal schedule after the sync reads the subscription.
-				assert.Equal(t, http.MethodGet, req.Method)
-				require.NoError(t, json.NewEncoder(w).Encode(subscription))
-				return
-			}
 			assert.Equal(t, "/subscriptions/", req.URL.Path)
 			assert.Equal(t, r.Organization.ID.String(), req.URL.Query().Get("external_customer_id"))
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
@@ -298,7 +291,6 @@ func Test__SyncOrganizationBilling(t *testing.T) {
 		})
 		usePolarTestServer(t, server)
 		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
-		t.Cleanup(seatrenewal.Wait)
 
 		resp, err := SyncOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
 		require.NoError(t, err)
@@ -433,7 +425,6 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 			if req.Method == http.MethodPatch {
 				patches.Add(1)
 			}
-			// The renewal schedule after the resume reads the subscription.
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"id":                   "sub_grpc_resume",
 				"status":               "active",
@@ -451,14 +442,11 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 		usePolarTestServer(t, server)
 		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
 
-		t.Cleanup(seatrenewal.Wait)
-
 		resp, err := ResumeOrganizationSubscription(context.Background(), r.Organization.ID.String(), &pb.ResumeOrganizationSubscriptionRequest{})
 		require.NoError(t, err)
 		assert.Equal(t, models.BillingPlanBusiness, resp.Plan)
 		assert.True(t, resp.CreditPurchaseAllowed)
 		assert.False(t, resp.CancelAtPeriodEnd)
-		seatrenewal.Wait()
 		assert.Equal(t, int32(1), patches.Load(), "only the resume updates the subscription")
 	})
 }

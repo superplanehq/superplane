@@ -41,7 +41,8 @@ func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client Subscription
 		return err
 	}
 
-	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	var alerts SeatCapacityAlerts
+	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if _, err := models.LockOrganization(tx, orgID); err != nil {
 			return err
 		}
@@ -52,10 +53,16 @@ func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client Subscription
 		if !current.SucceededBy(seatPurchaseEvidence(*snapshot)) {
 			return nil
 		}
-		// SettleSeatPurchase, inside ApplyOrganizationSubscription, records
-		// the success, so the plan, the period, and the purchase match.
-		return ApplyOrganizationSubscription(ctx, tx, orgID, *snapshot)
+		// SettleSeatPurchase, inside the subscription apply, records the
+		// success, so the plan, the period, and the purchase match.
+		alerts, err = StageOrganizationSubscription(ctx, tx, orgID, *snapshot)
+		return err
 	})
+	if err != nil {
+		return err
+	}
+	alerts.Emit()
+	return nil
 }
 
 // RefreshSeatPurchaseState reads the current Polar subscription before a new
@@ -69,13 +76,7 @@ func RefreshSeatPurchaseState(ctx context.Context, db *gorm.DB, client *Client, 
 	if err != nil {
 		return err
 	}
-
-	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if _, err := models.LockOrganization(tx, orgID); err != nil {
-			return err
-		}
-		return ApplyOrganizationSubscription(ctx, tx, orgID, *snapshot)
-	})
+	return ApplyOrganizationSubscription(ctx, db, orgID, *snapshot)
 }
 
 // SeatPurchaseResponseEvidence is the evidence in the snapshot that Polar

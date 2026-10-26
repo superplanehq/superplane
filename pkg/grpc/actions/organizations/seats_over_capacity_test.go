@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/services"
+	"gorm.io/gorm"
 )
 
 // seatLogs captures the process logger for one test.
@@ -126,7 +128,7 @@ func (f *seatPurchaseFixture) useCheckoutServer() {
 	newFakePolarCheckouts(f.t, f.r.Organization.ID).serve(f.serve)
 }
 
-func TestSeatsOverCapacityAfterCheckoutRaceAlertsOncePerTransition(t *testing.T) {
+func TestSeatsOverCapacityAfterActivationAlertsOncePerTransition(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 1, new(50))
 	logs := captureSeatLogs(t)
 	orgID := f.r.Organization.ID
@@ -137,24 +139,22 @@ func TestSeatsOverCapacityAfterCheckoutRaceAlertsOncePerTransition(t *testing.T)
 		return service.Create(context.Background(), orgID.String(), f.r.User.String(), &pb.CreateInvitationRequest{Email: email})
 	}
 
-	// The checkout covers the current member. Two members join on the old plan
-	// before the subscription activates.
+	// The checkout covers the current member only. While it can still be
+	// paid, nobody else can join, and the invitation stays pending.
 	_, err := SelectBillingPlan(context.Background(), orgID.String(), &pb.SelectBillingPlanRequest{PlanKey: f.catalog.Key, Seats: new(int32(1))}, f.r.Account.ID.String(), "http://localhost")
 	require.NoError(t, err)
-	var joined []*models.User
-	for range 2 {
-		account, err := models.CreateAccount("Invitee", uuid.NewString()+"@example.com")
-		require.NoError(t, err)
-		invitation, err := invite(account.Email)
-		require.NoError(t, err)
-		_, err = service.Accept(context.Background(), account.ID.String(), strings.TrimPrefix(invitation.AcceptanceUrl, "https://example.com/invitations/"))
-		require.NoError(t, err)
-		joined = append(joined, findMemberByAccount(t, orgID, account.ID))
-	}
 	waiting, err := models.CreateAccount("Waiting", uuid.NewString()+"@example.com")
 	require.NoError(t, err)
 	pending, err := invite(waiting.Email)
 	require.NoError(t, err)
+	_, err = service.Accept(context.Background(), waiting.ID.String(), strings.TrimPrefix(pending.AcceptanceUrl, "https://example.com/invitations/"))
+	requireInvitationReason(t, err, checkoutSeatLimitReason)
+	require.Equal(t, 1, f.seatUsage().PendingInvitations)
+	require.Zero(t, f.patchCount(), "a rejected acceptance charges nothing")
+
+	// Two members exist that the checkout does not cover, for example from
+	// before the checkout restrictions.
+	joined := f.addMembers(2)
 	logs.requireNone()
 
 	f.replay(models.PolarSubscriptionStatusActive, 1)
@@ -387,4 +387,54 @@ func TestSeatsOverCapacityIsSilentWhenBillingIsOff(t *testing.T) {
 
 	logs.requireNone()
 	require.Nil(t, f.overCapacitySince())
+}
+
+// failSeatPurchaseSuccess makes every local write of a succeeded purchase
+// fail, as a database failure after Polar charged would.
+func failSeatPurchaseSuccess(t *testing.T) {
+	t.Helper()
+	const name = "test:fail_seat_purchase_success"
+	callbacks := database.Conn().Callback().Update()
+	require.NoError(t, callbacks.Before("gorm:update").Register(name, func(db *gorm.DB) {
+		values, ok := db.Statement.Dest.(map[string]any)
+		if db.Statement.Table == "organization_seat_purchases" && ok && values["status"] == models.SeatPurchaseStatusSucceeded {
+			_ = db.AddError(errors.New("local settlement failed"))
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, callbacks.Remove(name)) })
+}
+
+func TestSeatPurchaseSettlementFailureReportsNoCapacityResolution(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 2, new(50))
+	f.addMembers(2)
+	f.updateBillingPlan(map[string]any{"over_capacity_since": time.Now().Add(-time.Hour)})
+	logs := captureSeatLogs(t)
+	// The refresh before the purchase reads a state from before the purchase.
+	f.modifiedAt = time.Now().Add(-2 * time.Hour)
+	failSeatPurchaseSuccess(t)
+
+	response, err := f.purchase(1, 2)
+
+	require.NoError(t, err)
+	require.Equal(t, seatPurchaseAwaitingConfirmation, response.Purchase.Status, "Polar charged, so the outcome stays open")
+	require.Equal(t, 1, f.patchCount())
+	logs.requireNone()
+	require.NotNil(t, f.overCapacitySince(), "the rolled back snapshot changed no capacity")
+	require.Equal(t, 2, f.purchasedSeats())
+	purchase := f.latestPurchase()
+	require.Equal(t, models.SeatPurchaseStatusUnknown, purchase.Status)
+	require.NotNil(t, purchase.OperationKey, "the purchase keeps its operation identity")
+
+	// A later verified read restores the paid capacity. Its modification is
+	// older than the purchase, so it cannot settle the purchase.
+	f.modifiedAt = time.Now().Add(-time.Hour)
+	_, err = SyncOrganizationBilling(t.Context(), f.r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
+	require.NoError(t, err)
+
+	require.Equal(t, 3, f.purchasedSeats())
+	require.Nil(t, f.overCapacitySince())
+	require.Len(t, logs.resolved(), 1, "only the committed resolution is reported")
+	require.Equal(t, models.SeatPurchaseStatusUnknown, f.latestPurchase().Status)
+	require.Equal(t, purchase.ID, f.latestPurchase().ID)
+	require.Equal(t, 1, f.patchCount(), "the recovery never charges again")
 }
