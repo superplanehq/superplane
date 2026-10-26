@@ -47,12 +47,13 @@ function renderCard(
   options: { isAnalyzing?: boolean; creditLabel?: string; showMergeConfidence?: boolean } = {},
 ) {
   const onOpenWorkOrder = vi.fn();
-  render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const card = (currentOrder: FactoriesWorkOrderSummary) => (
+    <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <FactoriesLayoutContext.Provider value={layout}>
           <LineBoardOrderCard
-            order={order}
+            order={currentOrder}
             workOrderCardContext={cardContext}
             onOpenWorkOrder={onOpenWorkOrder}
             isAnalyzing={options.isAnalyzing}
@@ -61,9 +62,10 @@ function renderCard(
           />
         </FactoriesLayoutContext.Provider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return onOpenWorkOrder;
+  const view = render(card(order));
+  return { rerenderOrder: (nextOrder: FactoriesWorkOrderSummary) => view.rerender(card(nextOrder)) };
 }
 
 function planningSessionRequests(fetchMock: ReturnType<typeof vi.spyOn>): string[] {
@@ -114,12 +116,59 @@ describe("LineBoardOrderCard", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     renderCard({
       ...draft,
-      planningSession: { id: "ps-1", state: "running", executionId: "exec-1" },
+      planningSession: { id: "ps-1", state: "running", executionId: "exec-1", runnerState: "running" },
       checkScores: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5 }],
     });
 
     expect(screen.getByTestId("work-order-card-analyzing-wo-1")).toBeInTheDocument();
+    expect(screen.getByText("Planning")).toBeVisible();
     expect(planningSessionRequests(fetchMock)).toEqual([]);
+  });
+
+  it("shows queued planning at the limit and switches to Planning when the runner starts", () => {
+    const queuedOrder: FactoriesWorkOrderSummary = {
+      ...draft,
+      planningSession: {
+        id: "ps-1",
+        state: "running",
+        executionId: "exec-1",
+        runnerState: "queued",
+        queueReason: "parallelism_limit",
+      },
+    };
+    const view = renderCard(queuedOrder, { isAnalyzing: true });
+
+    expect(screen.getByText("Queued for planning")).toBeVisible();
+    expect(screen.getByText("Parallelism limit reached.")).toBeVisible();
+    expect(screen.getByText("Starts automatically when a slot is free.")).toBeVisible();
+    expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
+
+    view.rerenderOrder({
+      ...queuedOrder,
+      planningSession: { ...queuedOrder.planningSession, runnerState: "running", queueReason: "" },
+    });
+
+    expect(screen.getByText("Planning")).toBeVisible();
+    expect(screen.queryByText("Queued for planning")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parallelism limit reached.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-analyzing-wo-1")).toBeInTheDocument();
+  });
+
+  it("shows a generic wait for queued planning without a parallelism reason", () => {
+    renderCard({
+      ...draft,
+      planningSession: {
+        id: "ps-1",
+        state: "running",
+        executionId: "exec-1",
+        runnerState: "queued",
+      },
+    });
+
+    expect(screen.getByText("Queued for planning")).toBeVisible();
+    expect(screen.getByText("Starts automatically when a runner is available.")).toBeVisible();
+    expect(screen.queryByText("Parallelism limit reached.")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
   });
 
   it("shows an agent question from the planning session summary", () => {
@@ -131,13 +180,32 @@ describe("LineBoardOrderCard", () => {
         state: "running",
         waitState: "pending",
         executionId: "exec-1",
+        runnerState: "running",
         survey: { id: "survey-1", questions: [{ prompt: "Which API?", options: ["REST"] }] },
       },
     });
 
     expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Planning")).not.toBeInTheDocument();
     expect(planningSessionRequests(fetchMock)).toEqual([]);
+  });
+
+  it("hides a stale queued runner after the planning session ends", () => {
+    renderCard({
+      ...draft,
+      planningSession: {
+        id: "ps-1",
+        state: "ended",
+        executionId: "exec-1",
+        runnerState: "queued",
+        queueReason: "parallelism_limit",
+      },
+    });
+
+    expect(screen.queryByText("Queued for planning")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parallelism limit reached.")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
   });
 
   it("shows merge confidence on a verify card with the Confidence prefix", () => {
