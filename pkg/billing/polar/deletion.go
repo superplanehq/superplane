@@ -23,7 +23,8 @@ import (
 // failure or an unclear answer returns
 // models.ErrOrganizationSubscriptionUnverified that wraps the cause.
 //
-// An unresolved checkout intent is verified first. A checkout that can still
+// A payable checkout from before intents existed is adopted first, and any
+// unresolved checkout intent is verified. A checkout that can still
 // activate returns models.ErrOrganizationCheckoutPending: a payment after the
 // deletion would start a subscription for a deleted organization. A paid
 // checkout applies its subscription before the billing row is read.
@@ -59,6 +60,9 @@ const maxDeletionCheckoutAttempts = 3
 // organization can still activate. SoftDelete checks again under the
 // organization lock that no unresolved intent exists.
 func settleCheckoutBeforeDeletion(ctx context.Context, orgID uuid.UUID) error {
+	if err := adoptPreexistingCheckoutBeforeDeletion(ctx, orgID); err != nil {
+		return err
+	}
 	for range maxDeletionCheckoutAttempts {
 		intent, err := models.FindUnresolvedOrganizationBillingCheckout(database.DB(ctx), orgID)
 		if err != nil || intent == nil {
@@ -81,6 +85,25 @@ func settleCheckoutBeforeDeletion(ctx context.Context, orgID uuid.UUID) error {
 		}
 	}
 	return models.ErrOrganizationCheckoutPending
+}
+
+func adoptPreexistingCheckoutBeforeDeletion(ctx context.Context, orgID uuid.UUID) error {
+	db := database.DB(ctx)
+	hasCustomer, err := models.OrganizationHasPolarCustomer(db, orgID)
+	if err != nil || !hasCustomer {
+		return err
+	}
+	known, err := models.OrganizationHasBillingCheckouts(db, orgID)
+	if err != nil || known {
+		return err
+	}
+	if !Configured() {
+		return unverifiedDeletion("Polar is not configured to verify preexisting checkouts")
+	}
+	if err := NewCheckoutLifecycle(NewClientFromEnv()).AdoptPreexisting(ctx, orgID); err != nil {
+		return fmt.Errorf("%w: verify preexisting checkouts: %w", models.ErrOrganizationSubscriptionUnverified, err)
+	}
+	return nil
 }
 
 func confirmSubscriptionEnded(ctx context.Context, orgID uuid.UUID, storedID string) error {

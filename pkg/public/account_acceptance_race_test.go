@@ -3,6 +3,7 @@ package public
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -164,5 +165,55 @@ func TestAcceptanceAndAccountDeletionRace_AcceptanceWins(t *testing.T) {
 
 	require.NoError(t, finished(t, acceptance))
 	require.NoError(t, finished(t, deletion), "the deletion removes the committed membership")
+	a.assertNoMembership()
+}
+
+func TestMemberRemovalAndAccountDeletionRace_RemovalWins(t *testing.T) {
+	a := newAcceptanceRace(t)
+	require.NoError(t, a.accept())
+	user, err := models.FindActiveHumanUserByAccountAndOrganization(database.Conn(), a.r.Organization.ID, a.invitee.ID)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+	paused := make(chan struct{})
+	resume := make(chan struct{})
+	var pauseOnce sync.Once
+	var resumeOnce sync.Once
+	release := func() { resumeOnce.Do(func() { close(resume) }) }
+	defer release()
+	callback := "pause_member_removal_" + uuid.NewString()
+	queries := database.Conn().Callback().Query()
+	// Pause the real RemoveUser request after it locks the organization,
+	// before it reads the user or removes grants. Deletion must wait without
+	// holding grants that RemoveUser still needs.
+	require.NoError(t, queries.Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Context != ctx || tx.Statement.Table != "users" {
+			return
+		}
+		pauseOnce.Do(func() {
+			close(paused)
+			select {
+			case <-resume:
+			case <-ctx.Done():
+			}
+		})
+	}))
+	defer func() { require.NoError(t, queries.Remove(callback)) }()
+	removal := run(func() error {
+		_, err := organizations.RemoveUser(ctx, a.r.AuthService, a.r.Organization.ID.String(), user.ID.String())
+		return err
+	})
+	select {
+	case <-paused:
+	case <-ctx.Done():
+		t.Fatal("member removal did not reach the locked organization")
+	}
+	deletion := run(a.deleteAccount)
+	a.waitForLockWaiters(1)
+	release()
+
+	require.NoError(t, finished(t, removal))
+	require.NoError(t, finished(t, deletion), "both requests must finish without a deadlock abort")
 	a.assertNoMembership()
 }

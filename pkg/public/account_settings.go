@@ -258,10 +258,12 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 		if err != nil {
 			return err
 		}
-		if err := s.removeAccountOrganizationGrants(tx, users); err != nil {
+		// SoftDelete locks all affected organizations in ID order. Keep
+		// those locks before removing grants, as member removal does.
+		if err := account.SoftDelete(tx, time.Now(), clearances); err != nil {
 			return err
 		}
-		if err := account.SoftDelete(tx, time.Now(), clearances); err != nil {
+		if err := s.removeAccountOrganizationGrants(tx, users); err != nil {
 			return err
 		}
 		capacityAlerts, err = recheckSeatCapacityAfterAccountDeletion(tx, survivingOrganizationIDs(users, deletedOrganizations))

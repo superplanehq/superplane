@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const deletionSubscriptionID = "sub_deletion"
@@ -291,4 +292,72 @@ func TestSoftDeleteRefusesACheckoutClaimedAfterTheVerification(t *testing.T) {
 	require.ErrorIs(t, err, models.ErrOrganizationCheckoutPending)
 	_, err = models.FindOrganizationByID(org.ID.String())
 	require.NoError(t, err, "the organization stays while its checkout can activate")
+}
+
+func TestVerifyOrganizationDeletionChecksPreexistingCheckouts(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		status       string
+		fails        bool
+		unconfigured bool
+		err          error
+	}{
+		{name: "open legacy checkout", status: "open", err: models.ErrOrganizationCheckoutPending},
+		{name: "confirmed legacy checkout", status: "confirmed", err: models.ErrOrganizationCheckoutPending},
+		{name: "checkout expires during verification", status: "expired"},
+		{name: "no legacy checkout"},
+		{name: "Polar cannot list legacy checkouts", fails: true, err: models.ErrOrganizationSubscriptionUnverified},
+		{name: "Polar is not configured", unconfigured: true, err: models.ErrOrganizationSubscriptionUnverified},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			org := setupBillingOrganization(t)
+			require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), org.ID, "cust_legacy"))
+			require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+			usePolarHandler(t, echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
+				if tc.fails {
+					w.WriteHeader(http.StatusBadGateway)
+					return
+				}
+				payload := checkoutPayload("chk_legacy", "open")
+				payload["product_id"] = "prod_business"
+				delete(payload, "metadata")
+				switch r.URL.Path {
+				case "/checkouts/":
+					assert.Equal(t, org.ID.String(), r.URL.Query().Get("external_customer_id"))
+					items := []any{}
+					if tc.status != "" {
+						items = append(items, payload)
+					}
+					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+						"items": items, "pagination": map[string]int{"max_page": 1},
+					}))
+				case "/checkouts/chk_legacy":
+					payload["status"] = tc.status
+					require.NoError(t, json.NewEncoder(w).Encode(payload))
+				default:
+					t.Errorf("unexpected Polar request %s", r.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			if tc.unconfigured {
+				t.Setenv("POLAR_ACCESS_TOKEN", "")
+			}
+
+			clearance, err := VerifyOrganizationDeletion(t.Context(), org.ID)
+			if tc.err != nil {
+				require.ErrorIs(t, err, tc.err)
+				assert.Nil(t, clearance)
+				if tc.status != "" {
+					intent := unresolvedCheckout(t, org)
+					require.NotNil(t, intent)
+					assert.Equal(t, "chk_legacy", intent.PolarCheckoutIDValue())
+				}
+				return
+			}
+			require.NoError(t, err)
+			require.NoError(t, org.SoftDelete(database.DB(t.Context()), clearance))
+			_, err = models.FindOrganizationByID(org.ID.String())
+			require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		})
+	}
 }
