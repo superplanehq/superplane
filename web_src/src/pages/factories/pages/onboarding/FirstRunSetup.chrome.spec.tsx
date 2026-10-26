@@ -383,6 +383,9 @@ describe("FirstRunSetup chrome", () => {
 
     await user.click(screen.getByTestId("first-run-back"));
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    // Back on the GitHub card returns to the source list, then to the repository.
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByRole("button", { name: /GitHub issues/ })).toHaveAttribute("aria-pressed", "true");
     await user.click(screen.getByTestId("first-run-back"));
     expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
   });

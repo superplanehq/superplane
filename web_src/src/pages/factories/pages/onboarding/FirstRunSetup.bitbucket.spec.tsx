@@ -349,11 +349,12 @@ describe("FirstRunSetup Bitbucket", () => {
     await waitFor(() => expect(selectBitbucketRepository).toHaveBeenCalledWith("acme-team/api"));
     expect(resources.calls).toContainEqual({ integrationId: "bitbucket-1", type: "repository", enabled: true });
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /GitHub Issues/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Connect GitHub" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /^Jira/ }));
-    expect(screen.getByRole("button", { name: /^Linear/ })).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /GitHub issues/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Linear issues/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Jira issues/ }));
+    // Jira is connected, so the card opens on the project step.
+    expect(screen.getByTestId("first-run-step-connect")).toHaveAttribute("data-state", "done");
+    expect(screen.getByTestId("first-run-jira-projects")).toBeInTheDocument();
     expect(requestConnect).not.toHaveBeenCalled();
   });
 

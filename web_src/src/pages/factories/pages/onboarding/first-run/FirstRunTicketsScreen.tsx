@@ -1,8 +1,10 @@
 import { LoadingButton } from "@/components/ui/loading-button";
+import { useState } from "react";
 
-import { IntakeSkipInitialImportField } from "../../IntakeSkipInitialImportField";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
-import { FirstRunTicketChoices } from "./firstRunTicketChoices";
+import { FirstRunTicketSourceList } from "./firstRunTicketChoices";
+import { FirstRunTicketIntakeStepper } from "./FirstRunTicketIntakeStepper";
+import { type FirstRunTicketProjectState, ticketSourceName } from "./firstRunTicketIntakeSteps";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import { canAnalyzeTicketSource } from "./firstRunTicketSource";
@@ -13,10 +15,16 @@ export type FirstRunJiraProject = { id?: string; name?: string };
 export type FirstRunFlaggedChoiceBlock = "loading" | "lookup-failed";
 
 type FirstRunTicketsScreenProps = {
+  /** How many existing issues the first import takes. */
   initialImportLimit?: number;
   skipInitialImport?: boolean;
+  /** Absent on the first workspace: that import always runs. */
   onSkipInitialImportChange?: (skip: boolean) => void;
+  automaticIntake?: boolean;
+  onAutomaticIntakeChange?: (on: boolean) => void;
   ticketSource: FirstRunTicketSource | null;
+  /** Repository the GitHub intake reads, e.g. "acme/payments". */
+  repository?: string;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   linearAvailable?: boolean;
@@ -28,6 +36,8 @@ type FirstRunTicketsScreenProps = {
   /** True while this screen provisions the workspace, on the last screen. */
   saving?: boolean;
   savingLabel?: string;
+  /** True while the connect redirect for the chosen source opens. */
+  connecting?: boolean;
   githubConnected?: boolean;
   githubAvailable?: boolean;
   jiraConnected?: boolean;
@@ -52,6 +62,9 @@ type FirstRunTicketsScreenProps = {
 };
 
 const TICKET_SCREEN_DEFAULTS = {
+  initialImportLimit: 3,
+  skipInitialImport: false,
+  automaticIntake: true,
   linearAvailable: true,
   linearFeatureLoading: false,
   linearChoiceBlock: null as FirstRunFlaggedChoiceBlock | null,
@@ -59,6 +72,7 @@ const TICKET_SCREEN_DEFAULTS = {
   continuePending: false,
   saving: false,
   savingLabel: FIRST_RUN_COPY.finish.saving,
+  connecting: false,
   githubConnected: false,
   githubAvailable: true,
   jiraConnected: false,
@@ -115,115 +129,174 @@ function ticketContinueButton(args: {
   };
 }
 
+function sourceConnected(
+  source: FirstRunTicketSource,
+  connected: { github: boolean; jira: boolean; linear: boolean },
+): boolean {
+  if (source === "jira") return connected.jira;
+  if (source === "linear") return connected.linear;
+  return connected.github;
+}
+
+/**
+ * Two parts on one screen. First the list of ticket sources. After a
+ * choice, the card with the steps for that source: connect, choose the
+ * project, set intake settings, then the final action. Back walks the
+ * card backwards and then returns to the list.
+ */
+function useTicketScreenPhase(ticketSource: FirstRunTicketSource | null) {
+  const [browsing, setBrowsing] = useState(false);
+  const [confirmedFor, setConfirmedFor] = useState<FirstRunTicketSource | null>(null);
+  const projectsConfirmed = confirmedFor !== null && confirmedFor === ticketSource;
+  const listPhase = ticketSource === null || browsing;
+  return {
+    listPhase,
+    projectsConfirmed,
+    choose: () => {
+      setBrowsing(false);
+      setConfirmedFor(null);
+    },
+    confirmProjects: () => setConfirmedFor(ticketSource),
+    back: () => {
+      if (projectsConfirmed) {
+        setConfirmedFor(null);
+        return;
+      }
+      setBrowsing(true);
+    },
+  };
+}
+
+type DefaultedTicketsProp = keyof typeof TICKET_SCREEN_DEFAULTS;
+
+type ResolvedTicketsProps = Omit<FirstRunTicketsScreenProps, DefaultedTicketsProp> &
+  Required<Pick<FirstRunTicketsScreenProps, DefaultedTicketsProp>>;
+
+type TicketScreenPhase = ReturnType<typeof useTicketScreenPhase>;
+
 export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
-  const {
-    ticketSource,
-    chrome,
-    sphere,
-    linearAvailable,
-    linearFeatureLoading,
-    linearChoiceBlock,
-    continueLabel,
-    continuePending,
-    saving,
-    savingLabel,
-    githubConnected,
-    githubAvailable,
-    jiraConnected,
-    jiraProjects,
-    jiraProjectsLoading,
-    jiraProjectsError,
-    jiraProjectId,
-    linearConnected,
-    linearProjects,
-    linearProjectsLoading,
-    linearProjectsError,
-    linearProjectIds,
-    onSelectTicketSource,
-    onAnalyzeTickets,
-    onConnectGitHub,
-    onConnectJira,
-    onSelectJiraProject,
-    onRetryJiraProjects,
-    onConnectLinear,
-    onToggleLinearProject,
-    onRetryLinearProjects,
-  } = { ...TICKET_SCREEN_DEFAULTS, ...props };
+  const resolved: ResolvedTicketsProps = { ...TICKET_SCREEN_DEFAULTS, ...props };
+  const { ticketSource, chrome, sphere, saving, linearChoiceBlock } = resolved;
   const copy = FIRST_RUN_COPY.tickets;
-  const canAnalyze = ticketScanAllowed({
-    ticketSource,
-    githubConnected,
-    jiraConnected,
-    jiraProjectId,
-    linearAvailable,
-    linearChoiceBlock,
-    linearConnected,
-    linearProjectIds,
-    linearProjectsLoading,
-    linearProjectsError,
-  });
-  const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
+  const phase = useTicketScreenPhase(ticketSource);
+  const stepperSource = phase.listPhase ? null : ticketSource;
+  // On the card, Back walks the steps and then returns to the list.
+  const screenChrome = chrome && stepperSource ? { ...chrome, onBack: phase.back } : chrome;
 
   return (
-    <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving} sphere={sphere} visual="preview">
-      <FirstRunHeading headline={copy.headline}>
-        <p className="text-[13px] text-muted-foreground">{copy.intro}</p>
+    <FirstRunShell testId="first-run-tickets" chrome={screenChrome} busy={saving} sphere={sphere} visual="preview">
+      <FirstRunHeading headline={stepperSource ? copy.setupHeadline(ticketSourceName(stepperSource)) : copy.headline}>
+        <p className="text-[13px] text-muted-foreground">{stepperSource ? copy.setupIntro : copy.intro}</p>
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
-        <FirstRunTicketChoices
-          githubAvailable={githubAvailable}
-          ticketSource={ticketSource}
-          saving={saving}
-          githubConnected={githubConnected}
-          jiraConnected={jiraConnected}
-          jiraProjects={jiraProjects}
-          jiraProjectsLoading={jiraProjectsLoading}
-          jiraProjectsError={jiraProjectsError}
-          jiraProjectId={jiraProjectId}
-          linearAvailable={linearAvailable}
-          linearFeatureLoading={linearFeatureLoading}
-          linearConnected={linearConnected}
-          linearProjects={linearProjects}
-          linearProjectsLoading={linearProjectsLoading}
-          linearProjectsError={linearProjectsError}
-          linearProjectIds={linearProjectIds}
-          onSelectTicketSource={onSelectTicketSource}
-          onConnectGitHub={onConnectGitHub}
-          onConnectJira={onConnectJira}
-          onSelectJiraProject={onSelectJiraProject}
-          onRetryJiraProjects={onRetryJiraProjects}
-          onConnectLinear={onConnectLinear}
-          onToggleLinearProject={onToggleLinearProject}
-          onRetryLinearProjects={onRetryLinearProjects}
-        />
+        {stepperSource ? (
+          <TicketIntakeCard source={stepperSource} phase={phase} {...resolved} />
+        ) : (
+          <FirstRunTicketSourceList
+            githubAvailable={resolved.githubAvailable}
+            ticketSource={ticketSource}
+            saving={saving}
+            githubConnected={resolved.githubConnected}
+            jiraConnected={resolved.jiraConnected}
+            linearAvailable={resolved.linearAvailable}
+            linearFeatureLoading={resolved.linearFeatureLoading}
+            linearConnected={resolved.linearConnected}
+            onSelectTicketSource={(source) => {
+              phase.choose();
+              resolved.onSelectTicketSource(source);
+            }}
+          />
+        )}
         <FirstRunChoiceNotice
           block={linearChoiceBlock}
           loading={copy.linearLookupLoading}
           failed={copy.linearLookupFailed}
           testId="first-run-linear-choice-notice"
         />
-        <FirstRunInitialImportChoice
-          initialImportLimit={props.initialImportLimit}
-          skipInitialImport={props.skipInitialImport}
-          onSkipInitialImportChange={props.onSkipInitialImportChange}
-          saving={saving}
-        />
-        <div className="space-y-3">
-          <LoadingButton
-            type="button"
-            className="w-full"
-            disabled={continueButton.disabled}
-            loading={continueButton.loading}
-            loadingText={continueButton.loadingText}
-            onClick={onAnalyzeTickets}
-            data-testid="first-run-analyze-tickets"
-          >
-            {continueLabel}
-          </LoadingButton>
-        </div>
       </div>
     </FirstRunShell>
+  );
+}
+
+function TicketIntakeCard({
+  source,
+  phase,
+  ...p
+}: ResolvedTicketsProps & { source: FirstRunTicketSource; phase: TicketScreenPhase }) {
+  const canAnalyze = ticketScanAllowed({
+    ticketSource: source,
+    githubConnected: p.githubConnected,
+    jiraConnected: p.jiraConnected,
+    jiraProjectId: p.jiraProjectId,
+    linearAvailable: p.linearAvailable,
+    linearChoiceBlock: p.linearChoiceBlock,
+    linearConnected: p.linearConnected,
+    linearProjectIds: p.linearProjectIds,
+    linearProjectsLoading: p.linearProjectsLoading,
+    linearProjectsError: p.linearProjectsError,
+  });
+  const continueButton = ticketContinueButton({
+    canAnalyze,
+    continuePending: p.continuePending,
+    saving: p.saving,
+    savingLabel: p.savingLabel,
+  });
+  const projects: FirstRunTicketProjectState = {
+    jiraProjects: p.jiraProjects,
+    jiraProjectsLoading: p.jiraProjectsLoading,
+    jiraProjectsError: p.jiraProjectsError,
+    jiraProjectId: p.jiraProjectId,
+    linearProjects: p.linearProjects,
+    linearProjectsLoading: p.linearProjectsLoading,
+    linearProjectsError: p.linearProjectsError,
+    linearProjectIds: p.linearProjectIds,
+  };
+  const connectFor: Record<FirstRunTicketSource, (() => void) | undefined> = {
+    "github-issues": p.onConnectGitHub,
+    jira: p.onConnectJira,
+    linear: p.onConnectLinear,
+  };
+  return (
+    <FirstRunTicketIntakeStepper
+      source={source}
+      connected={sourceConnected(source, {
+        github: p.githubConnected,
+        jira: p.jiraConnected,
+        linear: p.linearConnected,
+      })}
+      connecting={p.connecting}
+      repository={p.repository}
+      projects={projects}
+      projectsConfirmed={phase.projectsConfirmed}
+      saving={p.saving}
+      settings={{
+        initialImportLimit: p.initialImportLimit,
+        skipInitialImport: p.skipInitialImport,
+        onSkipInitialImportChange: p.onSkipInitialImportChange,
+        automaticIntake: p.automaticIntake,
+        onAutomaticIntakeChange: p.onAutomaticIntakeChange,
+      }}
+      finishButton={
+        <LoadingButton
+          type="button"
+          className="w-full"
+          disabled={continueButton.disabled}
+          loading={continueButton.loading}
+          loadingText={continueButton.loadingText}
+          onClick={p.onAnalyzeTickets}
+          data-testid="first-run-analyze-tickets"
+        >
+          {p.continueLabel}
+        </LoadingButton>
+      }
+      onConnect={connectFor[source]}
+      onSelectJiraProject={p.onSelectJiraProject}
+      onRetryJiraProjects={p.onRetryJiraProjects}
+      onToggleLinearProject={p.onToggleLinearProject}
+      onRetryLinearProjects={p.onRetryLinearProjects}
+      onConfirmProjects={phase.confirmProjects}
+    />
   );
 }
 
@@ -254,35 +327,6 @@ function FirstRunChoiceNotice({
       data-testid={testId}
     >
       {notice}
-    </p>
-  );
-}
-
-function FirstRunInitialImportChoice(
-  props: Pick<
-    FirstRunTicketsScreenProps,
-    "initialImportLimit" | "skipInitialImport" | "onSkipInitialImportChange" | "saving"
-  >,
-) {
-  if (props.onSkipInitialImportChange) {
-    return (
-      <IntakeSkipInitialImportField
-        checked={props.skipInitialImport ?? false}
-        onCheckedChange={props.onSkipInitialImportChange}
-        disabled={props.saving}
-        helper={
-          props.skipInitialImport
-            ? "Start with new issues only. Existing issues will stay in your issue tracker."
-            : "Import up to 3 existing issues to get started."
-        }
-        testId="onboarding-skip-initial-import"
-      />
-    );
-  }
-  if (!props.initialImportLimit) return null;
-  return (
-    <p className="text-xs text-muted-foreground">
-      Import up to {props.initialImportLimit} existing issues to get started.
     </p>
   );
 }

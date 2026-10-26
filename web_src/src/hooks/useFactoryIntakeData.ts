@@ -142,6 +142,8 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
       integrationId?: string;
       resourceId?: string;
       skipInitialImport?: boolean;
+      /** Start with automatic intake off. The initial import still runs. */
+      paused?: boolean;
       settings?: FactoriesFactoryIntakeSettings;
     }) => {
       const response = await factoriesCreateFactoryIntake(
@@ -155,6 +157,7 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
             integrationId: input.integrationId,
             resourceId: input.resourceId,
             skipInitialImport: input.skipInitialImport,
+            paused: input.paused,
             settings: input.settings,
           },
         }),
