@@ -223,10 +223,10 @@ func (w *NodeQueueWorker) tryProcessReadyNode(canvasID uuid.UUID, nodeID string,
 	}
 
 	//
-	// Nodes in error state have a broken configuration and never dispatch;
-	// items routed to them stay queued until the user fixes the node.
+	// Credit errors can recover after a grant. Other errors still require the
+	// user to repair the node through the publish lifecycle.
 	//
-	if node.State == models.CanvasNodeStateError {
+	if node.State == models.CanvasNodeStateError && !node.IsHostedCreditBlocked() {
 		w.logger.Infof("Node %s is in error state, skipping", node.NodeID)
 		telemetry.RecordQueueWorkerNodeProcessing(
 			context.Background(),
@@ -263,10 +263,32 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				metricOutcome = executorOutcomeFailed
+				metricReason = classifyProcessError(err)
+				return err
+			}
 			logger.Info("Node already being processed - skipping")
 			metricOutcome = executorOutcomeSkipped
 			metricReason = executorReasonLocked
 			return nil
+		}
+		if n.IsHostedCreditBlocked() {
+			canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, n.WorkflowID)
+			if err != nil {
+				metricOutcome = executorOutcomeFailed
+				metricReason = classifyProcessError(err)
+				return err
+			}
+			if err := recoverHostedCreditNode(tx, w.registry, canvas, n); err != nil {
+				metricOutcome = executorOutcomeFailed
+				metricReason = classifyProcessError(err)
+				return err
+			}
+			if n.State == models.CanvasNodeStateError {
+				metricOutcome = executorOutcomeSkipped
+				return nil
+			}
 		}
 
 		err = w.processNodeQueueItems(tx, logger, n, messageCollector)

@@ -295,7 +295,7 @@ func AnnotateSuperPlaneRunnerNodes(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid
 		if !checked {
 			readiness = SuperPlaneRunnerReadinessError(tx, orgID, factoryID)
 			checked = true
-			if readiness != nil && !isSuperPlaneReadinessError(readiness) {
+			if readiness != nil && !IsSuperPlaneRunnerReadinessError(readiness) {
 				return readiness
 			}
 		}
@@ -332,7 +332,9 @@ func SuperPlaneRunnerReadinessMessage(err error) string {
 	}
 }
 
-func isSuperPlaneReadinessError(err error) bool {
+// IsSuperPlaneRunnerReadinessError distinguishes an unavailable hosted runner
+// from an unexpected failure while checking its readiness.
+func IsSuperPlaneRunnerReadinessError(err error) bool {
 	return errors.Is(err, ErrHostedSubscriptionRequired) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoCredit) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget) ||

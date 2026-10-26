@@ -15,7 +15,8 @@ import (
 
 // Node states. The state column no longer acts as a dispatch mutex:
 // scheduling is derived from execution counts per queue. The error state
-// keeps its meaning (broken configuration blocks dispatch).
+// keeps its meaning (broken configuration blocks dispatch). Hosted runners
+// blocked only by credit can be revalidated before dispatch.
 const (
 	CanvasNodeStateReady = "ready"
 	CanvasNodeStateError = "error"
@@ -144,6 +145,15 @@ type DeleteCanvasNodeResult struct {
 
 func (c *CanvasNode) TableName() string {
 	return "workflow_nodes"
+}
+
+// IsHostedCreditBlocked identifies the persisted error that can be retried
+// when the organization's hosted credit changes.
+func (c *CanvasNode) IsHostedCreditBlocked() bool {
+	component := c.Ref.Data().Component
+	return c.Type == NodeTypeComponent && component != nil &&
+		component.Name == SuperPlaneRunnerComponent && c.State == CanvasNodeStateError &&
+		c.StateReason != nil && *c.StateReason == SuperPlaneRunnerNoCreditMessage
 }
 
 // ConcurrencySpec returns the node's inline concurrency configuration,
@@ -374,6 +384,8 @@ func CanvasHasFactoryAppTemplate(tx *gorm.DB, canvasID uuid.UUID, templateID str
 // Nodes whose entire backlog waits on full queues are excluded: they
 // become actionable again when an execution leaves an active state, so
 // the next poll returns them.
+// Hosted runners with credit errors are included for revalidation before
+// dispatch, so a credit grant can unblock an existing backlog.
 func ListCanvasNodesReady(tx *gorm.DB) ([]CanvasNode, error) {
 	var nodes []CanvasNode
 	err := tx.
@@ -382,7 +394,9 @@ func ListCanvasNodesReady(tx *gorm.DB) ([]CanvasNode, error) {
 			FROM workflow_nodes wn
 			JOIN workflows w ON w.id = wn.workflow_id
 			JOIN organizations o ON o.id = w.organization_id
-			WHERE wn.state <> ?
+			WHERE (wn.state <> ? OR (
+			  wn.ref->'component'->>'name' = ? AND wn.state_reason = ?
+			))
 			  AND wn.type = ?
 			  AND wn.deleted_at IS NULL
 			  AND w.deleted_at IS NULL
@@ -406,6 +420,8 @@ func ListCanvasNodesReady(tx *gorm.DB) ([]CanvasNode, error) {
 			  )
 		`,
 			CanvasNodeStateError,
+			SuperPlaneRunnerComponent,
+			SuperPlaneRunnerNoCreditMessage,
 			NodeTypeComponent,
 			CanvasNodeExecutionActiveStates,
 			DefaultConcurrencyMax,
@@ -435,6 +451,8 @@ func ListReadyTriggers() ([]CanvasNode, error) {
 	return nodes, nil
 }
 
+// LockCanvasNode locks an active node eligible for dispatch or hosted credit
+// revalidation. The caller must revalidate a credit error before dispatch.
 func LockCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNode, error) {
 	var node CanvasNode
 
@@ -448,7 +466,10 @@ func LockCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNo
 		}).
 		Where("workflow_nodes.workflow_id = ?", workflowID).
 		Where("workflow_nodes.node_id = ?", nodeId).
-		Where("workflow_nodes.state <> ?", CanvasNodeStateError).
+		Where(`(workflow_nodes.state <> ? OR (
+			workflow_nodes.type = ? AND workflow_nodes.ref->'component'->>'name' = ?
+			AND workflow_nodes.state_reason = ?
+		))`, CanvasNodeStateError, NodeTypeComponent, SuperPlaneRunnerComponent, SuperPlaneRunnerNoCreditMessage).
 		Where("workflow_nodes.deleted_at IS NULL")
 
 	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
@@ -522,6 +543,21 @@ func (c *CanvasNode) UpdateState(tx *gorm.DB, state string) error {
 		Update("state", state).
 		Update("updated_at", time.Now()).
 		Error
+}
+
+// MarkReady clears a node's error after its configuration and readiness have
+// been validated. The caller must hold the node lock.
+func (c *CanvasNode) MarkReady(tx *gorm.DB) error {
+	now := time.Now()
+	if err := tx.Model(c).Updates(map[string]any{
+		"state": CanvasNodeStateReady, "state_reason": nil, "updated_at": now,
+	}).Error; err != nil {
+		return err
+	}
+	c.State = CanvasNodeStateReady
+	c.StateReason = nil
+	c.UpdatedAt = &now
+	return nil
 }
 
 // ListPendingQueueItems returns the node's actionable backlog in FIFO
