@@ -1,7 +1,7 @@
 import { createContext } from "react";
 import type { AccountLicense } from "@/lib/license";
 
-interface AccountImpersonation {
+interface AccountSupportSession {
   active: boolean;
   user_name?: string;
 }
@@ -43,7 +43,7 @@ interface Account {
   organizations_pending_deletion?: AccountOrganizationPendingDeletion[];
   roles?: string[];
   groups?: string[];
-  impersonation?: AccountImpersonation;
+  support_session?: AccountSupportSession;
   license?: AccountLicense;
   /** Product billing. False hides Billing. Missing keeps Billing. */
   billing_enabled?: boolean;

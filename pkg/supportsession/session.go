@@ -1,4 +1,4 @@
-package impersonation
+package supportsession
 
 import (
 	"fmt"
@@ -9,23 +9,23 @@ import (
 )
 
 const (
-	CookieName = "impersonation_token"
-	TokenType  = "impersonation"
+	CookieName = "support_session_token"
+	TokenType  = "support_session"
 	TTL        = 1 * time.Hour
 
 	claimType    = "type"
 	claimAdmin   = "admin_account_id"
-	claimAccount = "impersonated_account_id"
+	claimAccount = "target_account_id"
 	claimSub     = "sub"
 )
 
 type Claims struct {
-	AdminAccountID        string
-	ImpersonatedAccountID string
-	IssuedAt              int64
+	AdminAccountID  string
+	TargetAccountID string
+	IssuedAt        int64
 }
 
-// GenerateToken creates a signed JWT for an impersonation session.
+// GenerateToken creates a signed JWT for a support session.
 func GenerateToken(signer *jwt.Signer, adminAccountID, targetAccountID string) (string, error) {
 	return signer.GenerateWithClaims(TTL, map[string]string{
 		claimType:    TokenType,
@@ -35,35 +35,35 @@ func GenerateToken(signer *jwt.Signer, adminAccountID, targetAccountID string) (
 	})
 }
 
-// ValidateToken parses and validates an impersonation token, returning its claims.
+// ValidateToken parses and validates a support session token, returning its claims.
 func ValidateToken(signer *jwt.Signer, tokenString string) (*Claims, error) {
 	jwtClaims, err := signer.ValidateAndGetClaims(tokenString)
 	if err != nil {
-		return nil, fmt.Errorf("invalid impersonation token: %w", err)
+		return nil, fmt.Errorf("invalid support session token: %w", err)
 	}
 
 	tokenType, _ := jwtClaims[claimType].(string)
 	if tokenType != TokenType {
-		return nil, fmt.Errorf("not an impersonation token")
+		return nil, fmt.Errorf("not a support session token")
 	}
 
 	adminID, _ := jwtClaims[claimAdmin].(string)
 	accountID, _ := jwtClaims[claimAccount].(string)
 
 	if adminID == "" || accountID == "" {
-		return nil, fmt.Errorf("incomplete impersonation claims")
+		return nil, fmt.Errorf("incomplete support session claims")
 	}
 
 	iat, _ := jwtClaims["iat"].(float64)
 
 	return &Claims{
-		AdminAccountID:        adminID,
-		ImpersonatedAccountID: accountID,
-		IssuedAt:              int64(iat),
+		AdminAccountID:  adminID,
+		TargetAccountID: accountID,
+		IssuedAt:        int64(iat),
 	}, nil
 }
 
-// SetCookie writes the impersonation cookie to the response.
+// SetCookie writes the support session cookie to the response.
 func SetCookie(w http.ResponseWriter, r *http.Request, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
@@ -76,7 +76,7 @@ func SetCookie(w http.ResponseWriter, r *http.Request, token string) {
 	})
 }
 
-// ClearCookie deletes the impersonation cookie.
+// ClearCookie deletes the support session cookie.
 func ClearCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
@@ -89,7 +89,7 @@ func ClearCookie(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ReadCookie extracts the impersonation token from the request, if present.
+// ReadCookie extracts the support session token from the request, if present.
 func ReadCookie(r *http.Request) (string, error) {
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {

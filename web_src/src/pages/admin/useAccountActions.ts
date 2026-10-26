@@ -1,3 +1,4 @@
+import { SUPPORT_SESSION_START_PATH } from "@/lib/supportSession";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 interface AdminAccount {
@@ -54,21 +55,21 @@ export async function deleteAccount(accountId: string, accountName: string): Pro
   }
 }
 
-export async function startImpersonation(accountId: string) {
+export async function startSupportSession(accountId: string) {
   try {
-    const res = await fetch("/admin/api/impersonate/start", {
+    const res = await fetch(SUPPORT_SESSION_START_PATH, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ account_id: accountId }),
     });
     if (!res.ok) {
-      showErrorToast((await res.text()) || "Failed");
+      showErrorToast((await res.text()) || "Could not start support session");
       return;
     }
-    showSuccessToast("Impersonation started");
+    showSuccessToast("Support session started");
     window.location.href = (await res.json()).redirect_url;
   } catch {
-    showErrorToast("Failed to start impersonation");
+    showErrorToast("Could not start support session");
   }
 }

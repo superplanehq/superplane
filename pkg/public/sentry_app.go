@@ -24,6 +24,10 @@ import (
 // CSRF state finds the pending SuperPlane connection, then the browser opens
 // Sentry.
 func (s *Server) HandleSentryAppInstall(w http.ResponseWriter, r *http.Request) {
+	if rejectInSupportSession(w, r) {
+		return
+	}
+
 	state := strings.TrimSpace(r.URL.Query().Get("state"))
 	if state == "" {
 		http.Error(w, "missing state", http.StatusBadRequest)
@@ -60,6 +64,10 @@ func (s *Server) HandleSentryAppInstall(w http.ResponseWriter, r *http.Request) 
 // Sentry sends every install to this one Redirect URL. The CSRF cookie or
 // the signed-in user finds the pending SuperPlane connection.
 func (s *Server) HandleSentryAppSetup(w http.ResponseWriter, r *http.Request) {
+	if rejectInSupportSession(w, r) {
+		return
+	}
+
 	integration, err := findSentryAppSetupIntegration(r)
 	if err != nil || integration == nil {
 		http.Error(w, "integration not found", http.StatusNotFound)

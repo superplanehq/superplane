@@ -22,6 +22,10 @@ type githubAppManifestResponse struct {
 }
 
 func (s *Server) HandleGitHubAppManifest(w http.ResponseWriter, r *http.Request) {
+	if rejectInSupportSession(w, r) {
+		return
+	}
+
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
