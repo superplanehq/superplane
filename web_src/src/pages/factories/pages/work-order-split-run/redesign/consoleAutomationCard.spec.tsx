@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, mock } from "bun:test";
+import { afterEach, describe, expect, it, mock, vi } from "bun:test";
 import { splitRunFixtureForWorkOrder, type SplitRunPhase } from "../splitRunMocks";
+import { agentRunnerQueue } from "../agentRunnerQueue";
 import { stageFromPhase } from "./automationsViewModel";
 import type { AutomationStage } from "./automationsViewModel";
 import * as canvasData from "@/hooks/useCanvasData";
@@ -58,6 +59,147 @@ function checksPhase(): SplitRunPhase {
 }
 
 const { ConsoleAutomationCard } = await import("./consoleAutomationCard");
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("automation run time", () => {
+  it("keeps the same duration basis while live, after finishing, and when reopened", async () => {
+    const now = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    let run = { ...captureRun("analysis"), duration: "28m 20s" };
+    let phase: SplitRunPhase = {
+      ...checksPhase(),
+      id: run.id,
+      name: "Analysis",
+      status: run.status,
+      duration: run.duration,
+      durationRunning: true,
+      // Analysis can combine attempts separated by a long wait.
+      startedAt: new Date(now - 6 * 60 * 60 * 1000).toISOString(),
+    };
+    useSplitRunLiveCanvas.mockImplementation(() => ({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      stream: [],
+      rootEventId: undefined,
+      agentQueue: agentRunnerQueue(
+        { spec: { nodes: [{ id: "agent", component: "runnerClaudeCode", type: "TYPE_ACTION" }] } },
+        {
+          state: run.status === "passed" ? "STATE_FINISHED" : "STATE_STARTED",
+          executions: [
+            {
+              nodeId: "agent",
+              state: run.status === "passed" ? "STATE_FINISHED" : "STATE_STARTED",
+              createdAt: new Date(now - 30 * 1000).toISOString(),
+              updatedAt: run.status === "passed" ? new Date(now + 3000).toISOString() : undefined,
+            },
+          ],
+        },
+      ),
+    }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const ui = () => (
+      <QueryClientProvider client={client}>
+        <ConsoleAutomationCard
+          automation={{ id: "analysis", name: "Backlog", latest: run, runs: [run] }}
+          phase={phase}
+          phases={[phase]}
+          organizationId="org-1"
+          expandIdle={false}
+          canStopRun={false}
+          actionBusy={false}
+        />
+      </QueryClientProvider>
+    );
+    const view = render(ui());
+    const header = screen.getByTestId("redesign-console-card-header-analysis");
+    expect(header).toHaveTextContent("28m 20s");
+    expect(header).toHaveTextContent("Run time");
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(header).toHaveTextContent("28m 22s");
+
+    view.rerender(ui());
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(header).toHaveTextContent("28m 23s");
+
+    run = { ...run, duration: "28m 30s" };
+    phase = { ...phase, duration: run.duration };
+    view.rerender(ui());
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(header).toHaveTextContent("28m 31s");
+
+    run = { ...run, status: "passed", duration: "28m 35s" };
+    phase = { ...phase, status: run.status, duration: run.duration, durationRunning: false };
+    view.rerender(ui());
+    await act(async () => {
+      vi.advanceTimersByTime(60000);
+    });
+    expect(header).toHaveTextContent("28m 35s");
+
+    view.unmount();
+    render(ui());
+    expect(screen.getByTestId("redesign-console-card-header-analysis")).toHaveTextContent("28m 35s");
+  });
+
+  it.each(["running", "waiting", "cancelled"] as const)(
+    "keeps a %s phase fixed when its duration has stopped",
+    async (status) => {
+      const now = Date.now();
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+      const run = { ...captureRun("analysis", status), duration: "5m" };
+      const phase = { ...checksPhase(), id: run.id, status, duration: run.duration, durationRunning: false };
+      useSplitRunLiveCanvas.mockImplementation(() => ({
+        enabled: true,
+        isError: false,
+        isLoading: false,
+        canvas: undefined,
+        stream: [],
+        rootEventId: undefined,
+        agentQueue: agentRunnerQueue(
+          { spec: { nodes: [{ id: "agent", component: "runnerClaudeCode", type: "TYPE_ACTION" }] } },
+          {
+            state: "STATE_STARTED",
+            executions: [{ nodeId: "agent", state: "STATE_STARTED", createdAt: new Date(now - 30000).toISOString() }],
+          },
+        ),
+      }));
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={client}>
+          <ConsoleAutomationCard
+            automation={{ id: "analysis", name: "Backlog", latest: run, runs: [run] }}
+            phase={phase}
+            phases={[phase]}
+            organizationId="org-1"
+            expandIdle={false}
+            canStopRun={false}
+            actionBusy={false}
+          />
+        </QueryClientProvider>,
+      );
+      const header = screen.getByTestId("redesign-console-card-header-analysis");
+      expect(header).toHaveTextContent("5m");
+      const fixedHeader = header.textContent;
+      await act(async () => {
+        vi.advanceTimersByTime(60000);
+      });
+      expect(header.textContent).toBe(fixedHeader);
+    },
+  );
+});
 
 describe("stopped automation card", () => {
   it("keeps the cancelled run neutral in the header and history row after the stop request finishes", () => {

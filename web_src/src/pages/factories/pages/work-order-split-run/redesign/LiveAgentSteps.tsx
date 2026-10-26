@@ -457,7 +457,9 @@ function liveLogFinishState(status: SplitRunPhaseStatus): "failed" | "passed" | 
 }
 
 function noteSignature(notes: SplitRunStreamLine[]): string {
-  return notes.map((note) => `${note.id}\0${note.status}\0${note.componentName}\0${note.detail ?? ""}`).join("\n");
+  return notes
+    .map((note) => `${note.id}\0${note.status}\0${note.componentName}\0${note.detail ?? ""}\0${note.duration ?? ""}`)
+    .join("\n");
 }
 
 function activitySignature(activities: AgentActivity[]): string {
