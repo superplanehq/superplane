@@ -13,7 +13,9 @@ import {
 } from "@/components/AgentSidebar/useImageAttachments";
 import { mimeToApiImageMediaType, type AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
 import { useSkillSlashCandidates } from "@/hooks/useSkillSlashCandidates";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 import type { SkillSlashCandidate } from "@/lib/skillSlash";
+import { SUPPORT_SESSION_READ_ONLY_MESSAGE } from "@/lib/supportSession";
 import { FactoryComposerToolbar } from "./FactoryComposerToolbar";
 import { FactoryImageAttachmentPreviews } from "./FactoryImageAttachmentPreviews";
 import { FactoryMentionTextarea } from "./FactoryMentionTextarea";
@@ -52,6 +54,17 @@ export function FactoryChatComposer({
   runs,
 }: ChatComposerProps) {
   const c = useComposerController({ canvasId, organizationId, factoryId, onSend, sendPending, nodes, runs });
+  const inSupportSession = useIsSupportSession();
+
+  if (inSupportSession) {
+    return (
+      <footer className="px-3 pb-3 pt-2">
+        <p className="mx-auto w-full max-w-[800px] rounded-lg bg-card px-3 py-2 text-xs text-muted-foreground outline outline-1 outline-border">
+          {SUPPORT_SESSION_READ_ONLY_MESSAGE}
+        </p>
+      </footer>
+    );
+  }
 
   return (
     <footer className="px-3 pb-3 pt-2">

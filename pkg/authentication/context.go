@@ -8,6 +8,18 @@ import (
 )
 
 const TokenScopesMetadataKey = "x-token-scopes"
+const SupportSessionMetadataKey = "x-support-session"
+
+func SetSupportSessionInMetadata(ctx context.Context) context.Context {
+	return metadata.NewIncomingContext(ctx, metadata.Pairs(SupportSessionMetadataKey, "true"))
+}
+
+// IsSupportSessionFromMetadata reports whether the gateway marked the
+// request as part of a read-only support session.
+func IsSupportSessionFromMetadata(ctx context.Context) bool {
+	value, ok := getFirstMetadataValue(ctx, SupportSessionMetadataKey)
+	return ok && value == "true"
+}
 
 func SetAccountIDInMetadata(ctx context.Context, accountID string) context.Context {
 	return metadata.NewIncomingContext(ctx, metadata.Pairs("x-account-id", accountID))

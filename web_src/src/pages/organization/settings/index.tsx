@@ -68,7 +68,7 @@ export function OrganizationSettings() {
   const isIntegrationSetupRoute = Boolean(
     matchPath({ path: "/:organizationId/settings/integrations/:integrationName/setup", end: true }, location.pathname),
   );
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
 
@@ -226,7 +226,7 @@ export function OrganizationSettings() {
   const canAccessLink = (link: NavLink) => {
     if (!link.permission) return true;
     if (permissionsLoading) return true;
-    return canAct(link.permission.resource, link.permission.action);
+    return hasPermission(link.permission.resource, link.permission.action);
   };
 
   const sectionMeta: Record<

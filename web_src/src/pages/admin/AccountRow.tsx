@@ -1,5 +1,6 @@
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 import { Ban, Shield, ShieldOff, ShieldCheck } from "lucide-react";
 import React from "react";
 import { formatDate } from "./formatDate";
@@ -19,7 +20,7 @@ interface AccountRowProps {
   toggling: boolean;
   onPromoteDemote: () => void;
   onBlockUnblock: () => void;
-  impersonateButton: React.ReactNode;
+  supportSessionButton: React.ReactNode;
 }
 
 export function AccountRow({
@@ -28,8 +29,10 @@ export function AccountRow({
   toggling,
   onPromoteDemote,
   onBlockUnblock,
-  impersonateButton,
+  supportSessionButton,
 }: AccountRowProps) {
+  const inSupportSession = useIsSupportSession();
+
   return (
     <tr className="border-b border-slate-50 last:border-0 dark:border-gray-800/70">
       <td className="px-4 py-2.5 text-gray-800 dark:text-gray-100">
@@ -64,7 +67,7 @@ export function AccountRow({
       </td>
       <td className="px-4 py-2.5 text-right">
         <div className="flex items-center justify-end gap-2">
-          {!isSelf && !acc.blocked && impersonateButton}
+          {!isSelf && !acc.blocked && !inSupportSession && supportSessionButton}
           {isSelf ? (
             <Text className="text-xs text-gray-400 dark:text-gray-500">Cannot change own access</Text>
           ) : (

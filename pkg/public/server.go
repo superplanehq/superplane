@@ -508,9 +508,9 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 func headersMatcher(key string) (string, bool) {
 	switch key {
-	case "Grpc-Metadata-X-User-Id", "Grpc-Metadata-X-Organization-Id", "Grpc-Metadata-X-Account-Id", "Grpc-Metadata-X-Token-Scopes":
+	case "Grpc-Metadata-X-User-Id", "Grpc-Metadata-X-Organization-Id", "Grpc-Metadata-X-Account-Id", "Grpc-Metadata-X-Token-Scopes", "Grpc-Metadata-X-Support-Session":
 		return "", false
-	case "X-User-Id", "X-Organization-Id", "X-Account-Id":
+	case "X-User-Id", "X-Organization-Id", "X-Account-Id", "X-Support-Session":
 		return key, true
 	case "X-Token-Scopes":
 		return key, true
@@ -539,6 +539,11 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		// to not allow them to be spoofed by the client.
 		//
 		r2.Header.Del("x-Token-Scopes")
+
+		r2.Header.Del("x-Support-Session")
+		if middleware.IsSupportSessionActive(r) {
+			r2.Header.Set("x-Support-Session", "true")
+		}
 
 		scopedClaims, ok := middleware.GetScopedTokenClaimsFromContext(r.Context())
 		if ok {
@@ -885,9 +890,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/price-books", s.adminDeletePriceBook).Methods("DELETE")
 	adminRoute.HandleFunc("/price-books/sync", s.adminSyncPriceBooks).Methods("POST")
 	adminRoute.HandleFunc("/price-books/current", s.adminActivatePriceBook).Methods("PUT")
-	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
-	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
-	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
+	adminRoute.HandleFunc("/support-session/start", s.startSupportSession).Methods("POST")
+	adminRoute.HandleFunc("/support-session/end", s.endSupportSession).Methods("POST")
+	adminRoute.HandleFunc("/support-session/status", s.supportSessionStatus).Methods("GET")
 	adminRoute.HandleFunc("/accounts/{accountId}/promote", s.promoteAdmin).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/block", s.blockAccount).Methods("POST")
@@ -1518,7 +1523,7 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	return organization, workspace, nil
 }
 
-type AccountImpersonation struct {
+type AccountSupportSession struct {
 	Active   bool   `json:"active"`
 	UserName string `json:"user_name,omitempty"`
 }
@@ -1555,7 +1560,7 @@ type AccountResponse struct {
 	Providers                    []AccountProviderResponse            `json:"providers"`
 	LinkedAccounts               []AccountLinkedAccountResponse       `json:"linked_accounts"`
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
-	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
+	SupportSession               *AccountSupportSession               `json:"support_session,omitempty"`
 	License                      AccountLicense                       `json:"license"`
 	BillingEnabled               bool                                 `json:"billing_enabled"`
 }
@@ -1675,8 +1680,8 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		BillingEnabled:               models.BillingEnabled(),
 	}
 
-	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
-		accountResponse.Impersonation = &AccountImpersonation{
+	if info, ok := middleware.GetSupportSessionFromContext(r.Context()); ok && info.Active {
+		accountResponse.SupportSession = &AccountSupportSession{
 			Active:   true,
 			UserName: info.UserName,
 		}

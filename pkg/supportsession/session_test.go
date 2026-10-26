@@ -1,4 +1,4 @@
-package impersonation
+package supportsession
 
 import (
 	"net/http"
@@ -22,7 +22,7 @@ func TestGenerateToken(t *testing.T) {
 		claims, err := ValidateToken(signer, token)
 		require.NoError(t, err)
 		assert.Equal(t, "admin-123", claims.AdminAccountID)
-		assert.Equal(t, "account-456", claims.ImpersonatedAccountID)
+		assert.Equal(t, "account-456", claims.TargetAccountID)
 	})
 }
 
@@ -41,10 +41,10 @@ func TestValidateToken(t *testing.T) {
 
 	t.Run("rejects expired token", func(t *testing.T) {
 		token, err := signer.GenerateWithClaims(0*time.Second, map[string]string{
-			"type":                    TokenType,
-			"admin_account_id":        "admin-1",
-			"impersonated_account_id": "account-2",
-			"sub":                     "admin-1",
+			"type":              TokenType,
+			"admin_account_id":  "admin-1",
+			"target_account_id": "account-2",
+			"sub":               "admin-1",
 		})
 		require.NoError(t, err)
 
@@ -62,7 +62,7 @@ func TestValidateToken(t *testing.T) {
 		claims, err := ValidateToken(signer, token)
 		assert.Error(t, err)
 		assert.Nil(t, claims)
-		assert.Contains(t, err.Error(), "not an impersonation token")
+		assert.Contains(t, err.Error(), "not a support session token")
 	})
 
 	t.Run("rejects token with missing claims", func(t *testing.T) {
@@ -75,7 +75,7 @@ func TestValidateToken(t *testing.T) {
 		claims, err := ValidateToken(signer, token)
 		assert.Error(t, err)
 		assert.Nil(t, claims)
-		assert.Contains(t, err.Error(), "incomplete impersonation claims")
+		assert.Contains(t, err.Error(), "incomplete support session claims")
 	})
 
 	t.Run("rejects completely invalid token string", func(t *testing.T) {
@@ -86,9 +86,9 @@ func TestValidateToken(t *testing.T) {
 }
 
 func TestSetCookie(t *testing.T) {
-	t.Run("sets impersonation cookie with correct attributes", func(t *testing.T) {
+	t.Run("sets support session cookie with correct attributes", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/admin/api/impersonate/start", nil)
+		r := httptest.NewRequest(http.MethodPost, "/admin/api/support-session/start", nil)
 
 		SetCookie(w, r, "test-token-value")
 
@@ -105,9 +105,9 @@ func TestSetCookie(t *testing.T) {
 }
 
 func TestClearCookie(t *testing.T) {
-	t.Run("deletes impersonation cookie", func(t *testing.T) {
+	t.Run("deletes support session cookie", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/admin/api/impersonate/end", nil)
+		r := httptest.NewRequest(http.MethodPost, "/admin/api/support-session/end", nil)
 
 		ClearCookie(w, r)
 
@@ -122,7 +122,7 @@ func TestClearCookie(t *testing.T) {
 }
 
 func TestReadCookie(t *testing.T) {
-	t.Run("reads impersonation cookie from request", func(t *testing.T) {
+	t.Run("reads support session cookie from request", func(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r.AddCookie(&http.Cookie{Name: CookieName, Value: "my-token"})
 

@@ -65,13 +65,17 @@ describe("signup conversion after account confirmation", () => {
     expect(json).not.toHaveBeenCalled();
     expect(window.dataLayer).toBeUndefined();
   });
-  it("does not count an impersonated account", async () => {
+  it("does not count an account in a support session", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         status: 200,
         headers: new Headers(),
-        json: async () => ({ id: "impersonated", email: "new@example.com", impersonation: { active: true } }),
+        json: async () => ({
+          id: "support-session-target",
+          email: "new@example.com",
+          support_session: { active: true },
+        }),
       }),
     );
     window.history.replaceState({}, "", "/welcome?auth_signup_result=created");

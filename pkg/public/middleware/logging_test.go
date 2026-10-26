@@ -155,7 +155,7 @@ func TestLoggingMiddleware_LogsIdentityFromRequest(t *testing.T) {
 
 	handler := LoggingMiddleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		SetRequestLogUser(r.Context(), user)
-		SetRequestLogImpersonator(r.Context(), "admin-account")
+		SetRequestLogSupportAdmin(r.Context(), "admin-account")
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -167,7 +167,7 @@ func TestLoggingMiddleware_LogsIdentityFromRequest(t *testing.T) {
 	assert.Equal(t, organizationID.String(), payload["organization_id"])
 	assert.Equal(t, userID.String(), payload["user_id"])
 	assert.Equal(t, accountID.String(), payload["account_id"])
-	assert.Equal(t, "admin-account", payload["impersonator_account_id"])
+	assert.Equal(t, "admin-account", payload["support_admin_account_id"])
 }
 
 func TestLoggingMiddleware_ServerErrorUsesErrorLevel(t *testing.T) {
