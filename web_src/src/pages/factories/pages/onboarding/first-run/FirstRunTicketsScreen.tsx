@@ -30,6 +30,8 @@ type FirstRunTicketsScreenProps = {
   startOnSourceList?: boolean;
   /** Repository the GitHub intake reads, e.g. "acme/payments". */
   repository?: string;
+  /** Repositories the user can switch the GitHub intake to. */
+  repositories?: string[];
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   linearAvailable?: boolean;
@@ -58,6 +60,7 @@ type FirstRunTicketsScreenProps = {
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
   onConnectGitHub?: () => void;
+  onSelectRepository?: (repository: string) => void;
   onConnectJira?: () => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
@@ -276,6 +279,7 @@ function TicketIntakeCard({
       })}
       connecting={p.connecting}
       repository={p.repository}
+      repositories={p.repositories}
       projects={projects}
       projectsConfirmed={phase.projectsConfirmed}
       saving={p.saving}
@@ -300,6 +304,7 @@ function TicketIntakeCard({
         </LoadingButton>
       }
       onConnect={connectFor[source]}
+      onSelectRepository={p.onSelectRepository}
       onSelectJiraProject={p.onSelectJiraProject}
       onRetryJiraProjects={p.onRetryJiraProjects}
       onToggleLinearProject={p.onToggleLinearProject}

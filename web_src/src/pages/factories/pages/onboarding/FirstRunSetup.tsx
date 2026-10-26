@@ -22,6 +22,7 @@ import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
 import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
+import { ownerOfRepository, repositoriesInOrganization } from "./first-run/githubOrganizations";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
 import {
@@ -86,6 +87,10 @@ function TicketsScreenHost({
     flow.blockingAction === "opening-github" ||
     flow.blockingAction === "connecting-jira" ||
     flow.blockingAction === "connecting-linear";
+  // The backlog repository stays in the organization of the app repository,
+  // the same filter the Git host step applies.
+  const organization = ownerOfRepository(model.setup.selectedRepo);
+  const repositories = organization ? repositoriesInOrganization(flow.repositories, organization) : flow.repositories;
   return (
     <FirstRunTicketsScreen
       initialImportLimit={3}
@@ -99,6 +104,8 @@ function TicketsScreenHost({
       // GitHub is only a default until the user picks it on the list.
       startOnSourceList={model.setup.issuesChoice == null}
       repository={model.setup.issuesRepo ?? model.setup.selectedRepo ?? undefined}
+      repositories={repositories}
+      onSelectRepository={model.setup.selectIssuesRepo}
       connecting={connecting}
       chrome={chrome}
       sphere={sphere}

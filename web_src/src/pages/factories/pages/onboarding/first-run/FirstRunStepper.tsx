@@ -7,6 +7,8 @@ export type FirstRunStepperStep<Id extends string = string> = {
   label: string;
   /** Replaces the label once the step is done, e.g. "Organization: acme". */
   doneLabel?: string;
+  /** Control on a finished row, e.g. a Change link. */
+  doneAction?: ReactNode;
 };
 
 export type FirstRunStepState = "done" | "active" | "upcoming";
@@ -88,6 +90,7 @@ export function FirstRunStepper<Id extends string>({
                 <span className="truncate">{done && step.doneLabel ? step.doneLabel : step.label}</span>
               </span>
               {active ? action : null}
+              {done ? step.doneAction : null}
             </div>
             {expanded ? <div className="w-full space-y-3">{children}</div> : null}
           </div>

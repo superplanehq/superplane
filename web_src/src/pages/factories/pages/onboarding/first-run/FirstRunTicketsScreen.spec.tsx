@@ -125,6 +125,60 @@ describe("FirstRunTicketsScreen", () => {
       expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
     });
 
+    it("lets the user reopen the repository step and pick another repository", async () => {
+      const user = userEvent.setup();
+      const onSelectRepository = vi.fn();
+
+      const { rerender } = render(
+        <FirstRunTicketsScreen
+          ticketSource="github-issues"
+          repository="acme/payments"
+          repositories={["acme/payments", "acme/billing"]}
+          githubConnected
+          onSelectRepository={onSelectRepository}
+          onSelectTicketSource={vi.fn()}
+          onAnalyzeTickets={vi.fn()}
+        />,
+      );
+
+      await user.click(screen.getByTestId("first-run-change-repository"));
+      expect(screen.getByTestId("first-run-step-project")).toHaveAttribute("data-state", "active");
+      expect(screen.queryByTestId("first-run-analyze-tickets")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("option", { name: /acme\/billing/ }));
+      expect(onSelectRepository).toHaveBeenCalledWith("acme/billing");
+
+      rerender(
+        <FirstRunTicketsScreen
+          ticketSource="github-issues"
+          repository="acme/billing"
+          repositories={["acme/payments", "acme/billing"]}
+          githubConnected
+          onSelectRepository={onSelectRepository}
+          onSelectTicketSource={vi.fn()}
+          onAnalyzeTickets={vi.fn()}
+        />,
+      );
+
+      await user.click(screen.getByTestId("first-run-confirm-projects"));
+      expect(screen.getByText(copy.stepRepositoryDone("acme/billing"))).toBeInTheDocument();
+      expect(screen.getByTestId("first-run-step-settings")).toHaveAttribute("data-state", "active");
+    });
+
+    it("offers no repository change when no repository list is available", () => {
+      render(
+        <FirstRunTicketsScreen
+          ticketSource="github-issues"
+          repository="acme/payments"
+          githubConnected
+          onSelectTicketSource={vi.fn()}
+          onAnalyzeTickets={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByTestId("first-run-change-repository")).not.toBeInTheDocument();
+    });
+
     it("asks to connect GitHub first when the account is not connected", async () => {
       const user = userEvent.setup();
       const onConnectGitHub = vi.fn();

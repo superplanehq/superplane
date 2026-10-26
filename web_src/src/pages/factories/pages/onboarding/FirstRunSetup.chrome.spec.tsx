@@ -20,24 +20,16 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 let factory: FactoriesFactory;
 let factories: FactoriesFactory[];
 
+const layoutIds = { organizationId: "org-1", factoryId: "factory-1", factoryKey: "PAY", routeSegment: "pay" };
 vi.mock("../../layout/factoriesLayoutContext", () => ({
-  useFactoriesLayout: () => ({
-    organizationId: "org-1",
-    factoryId: "factory-1",
-    factoryKey: "PAY",
-    routeSegment: "pay",
-    factory,
-    factories,
-  }),
+  useFactoriesLayout: () => ({ ...layoutIds, factory, factories }),
 }));
 
 vi.mock("@/contexts/useAccount", () => ({
   useAccount: () => ({ account: { id: "account-1", name: "Ada Lovelace", email: "ada@example.com" } }),
 }));
 
-vi.mock("@/hooks/useMe", () => ({
-  useMe: () => ({ data: { id: "user-1" } }),
-}));
+vi.mock("@/hooks/useMe", () => ({ useMe: () => ({ data: { id: "user-1" } }) }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
@@ -68,7 +60,12 @@ vi.mock("./useGitHubOnboarding", () => ({
       providerConfigured: true,
       accountConnectionRequired: true,
       identity: githubLinked ? { userId: "42", login: "octocat" } : undefined,
-      repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
+      repositories: ["acme/api", "acme/billing", "other/tools"].map((fullName, index) => ({
+        repositoryId: `${201 + index}`,
+        installationId: "101",
+        fullName,
+        defaultBranch: "main",
+      })),
       pendingRequests: [],
       synchronizing: false,
     },
@@ -80,12 +77,12 @@ vi.mock("./useGitHubOnboarding", () => ({
   useGitHubInstallationChecks: vi.fn(),
 }));
 
-const billingState = {
+type BillingState = { enabled: boolean; newBilling: boolean; byok: boolean; planActive: boolean };
+const billingState: BillingState & { availablePlans?: OrganizationsBillingPlanOption[] } = {
   enabled: false,
   newBilling: false,
   byok: false,
   planActive: false,
-  availablePlans: undefined as OrganizationsBillingPlanOption[] | undefined,
 };
 const billingData = () => ({
   billingEnabled: billingState.enabled,
@@ -97,21 +94,17 @@ const billingData = () => ({
 const refetchBilling = vi.fn(async () => ({ data: billingData() }));
 vi.mock("@/hooks/useOrganizationBilling", () => ({
   organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
-  useOrganizationBilling: () => ({
-    data: billingData(),
-    isPending: false,
-    isSuccess: true,
-    refetch: refetchBilling,
-  }),
+  useOrganizationBilling: () => ({ data: billingData(), isPending: false, isSuccess: true, refetch: refetchBilling }),
 }));
 
+const workspaceUsage = { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" };
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
   useOrganizationWorkspaceUsage: () => ({
-    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
+    data: workspaceUsage,
     isSuccess: true,
     isPending: false,
     isError: false,
-    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+    refetch: async () => ({ data: workspaceUsage }),
   }),
 }));
 vi.mock("./first-run/FirstRunBillingScreen", () => ({
@@ -377,6 +370,12 @@ describe("FirstRunSetup chrome", () => {
     const githubIssues = screen.getByRole("button", { name: /GitHub issues/ });
     expect(githubIssues).toHaveAttribute("aria-pressed", "false");
     await user.click(githubIssues);
+    // The backlog repository list keeps only the organization of the app repository.
+    await user.click(screen.getByTestId("first-run-change-repository"));
+    expect(screen.queryByRole("option", { name: /other\/tools/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: /acme\/billing/ }));
+    await user.click(screen.getByTestId("first-run-confirm-projects"));
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.stepRepositoryDone("acme/billing"))).toBeInTheDocument();
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.saveIssues).toHaveBeenCalledWith("vcs"));
     expect(await screen.findByTestId("first-run-model-source")).toBeInTheDocument();

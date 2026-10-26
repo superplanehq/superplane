@@ -2,10 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Switch } from "@/components/ui/switch";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import { JiraProjectStep } from "../../JiraIntakeSetupSteps";
 import { LinearProjectPicker } from "../../LinearProjectPicker";
+import { RepositoryPicker } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunStepper } from "./FirstRunStepper";
 import {
@@ -34,12 +35,14 @@ export function FirstRunTicketIntakeStepper({
   connected,
   connecting,
   repository,
+  repositories = [],
   projects,
   projectsConfirmed,
   saving,
   settings,
   finishButton,
   onConnect,
+  onSelectRepository,
   onSelectJiraProject,
   onRetryJiraProjects,
   onToggleLinearProject,
@@ -51,21 +54,37 @@ export function FirstRunTicketIntakeStepper({
   connecting: boolean;
   /** Repository the GitHub intake reads, e.g. "acme/payments". */
   repository?: string;
+  /** Repositories the user can switch the GitHub intake to. */
+  repositories?: string[];
   projects: FirstRunTicketProjectState;
   projectsConfirmed: boolean;
   saving: boolean;
   settings: FirstRunIntakeSettingsProps;
   finishButton: ReactNode;
   onConnect?: () => void;
+  onSelectRepository?: (repository: string) => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
   onToggleLinearProject?: (id: string) => void;
   onRetryLinearProjects?: () => void;
   onConfirmProjects: () => void;
 }) {
-  const current = currentTicketStep({ source, connected, projectsConfirmed });
-  const steps = ticketIntakeSteps(source, repository, projects);
+  const [changingRepository, setChangingRepository] = useState(false);
+  const current = currentTicketStep({ source, connected, projectsConfirmed, changingRepository });
+  const canChangeRepository = source === "github-issues" && Boolean(onSelectRepository) && repositories.length > 0;
+  const steps = ticketIntakeSteps(source, repository, projects).map((step) =>
+    step.id === "project" && canChangeRepository
+      ? {
+          ...step,
+          doneAction: <ChangeRepositoryButton disabled={saving} onClick={() => setChangingRepository(true)} />,
+        }
+      : step,
+  );
   const sourceName = ticketSourceName(source);
+  const confirmProjects = () => {
+    setChangingRepository(false);
+    onConfirmProjects();
+  };
 
   if (current === "connect") {
     return (
@@ -96,7 +115,10 @@ export function FirstRunTicketIntakeStepper({
         <TicketProjectFields
           source={source}
           saving={saving}
+          repository={repository}
+          repositories={repositories}
           projects={projects}
+          onSelectRepository={onSelectRepository}
           onSelectJiraProject={onSelectJiraProject}
           onRetryJiraProjects={onRetryJiraProjects}
           onToggleLinearProject={onToggleLinearProject}
@@ -105,8 +127,8 @@ export function FirstRunTicketIntakeStepper({
         <Button
           type="button"
           className="w-full"
-          disabled={saving || !ticketProjectChoiceComplete(source, projects)}
-          onClick={onConfirmProjects}
+          disabled={saving || !ticketProjectChoiceComplete(source, projects, repository)}
+          onClick={confirmProjects}
           data-testid="first-run-confirm-projects"
         >
           {copy.confirmProjects}
@@ -123,10 +145,29 @@ export function FirstRunTicketIntakeStepper({
   );
 }
 
+function ChangeRepositoryButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-auto px-0 text-[13px] font-normal text-[#9b9993] hover:bg-transparent hover:text-[#eeede9]"
+      disabled={disabled}
+      onClick={onClick}
+      data-testid="first-run-change-repository"
+    >
+      {copy.changeRepository}
+    </Button>
+  );
+}
+
 function TicketProjectFields({
   source,
   saving,
+  repository,
+  repositories,
   projects,
+  onSelectRepository,
   onSelectJiraProject,
   onRetryJiraProjects,
   onToggleLinearProject,
@@ -134,12 +175,29 @@ function TicketProjectFields({
 }: {
   source: FirstRunTicketSource;
   saving: boolean;
+  repository?: string;
+  repositories: string[];
   projects: FirstRunTicketProjectState;
+  onSelectRepository?: (repository: string) => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
   onToggleLinearProject?: (id: string) => void;
   onRetryLinearProjects?: () => void;
 }) {
+  if (source === "github-issues") {
+    return (
+      <div data-testid="first-run-github-repositories">
+        <RepositoryPicker
+          host="github"
+          repos={repositories}
+          selectedRepo={repository ?? null}
+          disabled={saving}
+          listClassName="max-h-48"
+          onSelect={(next) => onSelectRepository?.(next)}
+        />
+      </div>
+    );
+  }
   if (source === "jira") {
     return (
       <fieldset disabled={saving} className="contents" data-testid="first-run-jira-projects">

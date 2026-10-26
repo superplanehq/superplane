@@ -71,8 +71,13 @@ export function ticketIntakeSteps(
   ];
 }
 
-/** A project choice that the user can confirm. GitHub reuses the chosen repository. */
-export function ticketProjectChoiceComplete(source: FirstRunTicketSource, projects: FirstRunTicketProjectState) {
+/** A project choice that the user can confirm. GitHub needs a repository. */
+export function ticketProjectChoiceComplete(
+  source: FirstRunTicketSource,
+  projects: FirstRunTicketProjectState,
+  repository?: string,
+) {
+  if (source === "github-issues") return Boolean(repository);
   if (source === "jira") {
     return Boolean(projects.jiraProjectId) && !projects.jiraProjectsLoading && !projects.jiraProjectsError;
   }
@@ -86,8 +91,11 @@ export function currentTicketStep(args: {
   source: FirstRunTicketSource;
   connected: boolean;
   projectsConfirmed: boolean;
+  /** GitHub starts with the repository done; the user can reopen it. */
+  changingRepository?: boolean;
 }): FirstRunTicketStep {
   if (!args.connected) return "connect";
-  if (args.source !== "github-issues" && !args.projectsConfirmed) return "project";
+  if (args.source === "github-issues") return args.changingRepository ? "project" : "settings";
+  if (!args.projectsConfirmed) return "project";
   return "settings";
 }
