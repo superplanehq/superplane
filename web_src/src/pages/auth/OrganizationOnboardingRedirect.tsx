@@ -1,6 +1,8 @@
 import { useAccount } from "@/contexts/useAccount";
 import { integrationKeys } from "@/hooks/useIntegrations";
 import { meKeys } from "@/hooks/useMe";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
+import { SUPPORT_SESSION_READ_ONLY_MESSAGE } from "@/lib/supportSession";
 import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -49,6 +51,7 @@ interface OrganizationOnboardingRedirectProps {
 /** Provisions the internal workspace and renders its existing setup wizard at /onboarding. */
 export function OrganizationOnboardingRedirect({ renderWorkspace }: OrganizationOnboardingRedirectProps) {
   const { account } = useAccount();
+  const inSupportSession = useIsSupportSession();
   const queryClient = useQueryClient();
   const hasStartedProvisioning = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +86,10 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
 
   useEffect(() => {
     if (!account || hasStartedProvisioning.current) return;
+    if (inSupportSession) {
+      setError(SUPPORT_SESSION_READ_ONLY_MESSAGE);
+      return;
+    }
     if (!owner) {
       setError("Could not start workspace setup. Add a name to your SuperPlane account and try again.");
       return;
@@ -94,7 +101,7 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
       .catch((provisioningError: unknown) => {
         setError(provisioningError instanceof Error ? provisioningError.message : "Could not start workspace setup.");
       });
-  }, [account, owner, adoptWorkspace]);
+  }, [account, inSupportSession, owner, adoptWorkspace]);
 
   // Re-runs the retry-safe onboarding endpoint for the same attempt, so a
   // workspace can move to a new organization slug (for example, after the

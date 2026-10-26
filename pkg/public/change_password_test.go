@@ -14,9 +14,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -141,16 +141,16 @@ func TestChangePassword_AccountWithoutPasswordAuth(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, res.Code)
 }
 
-func TestChangePassword_RejectsImpersonation(t *testing.T) {
+func TestChangePassword_RejectsSupportSession(t *testing.T) {
 	server, r, token := setupChangePasswordTestServer(t)
 
 	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
 
-	target, err := models.CreateAccount("Target User", "target-impersonate@example.com")
+	target, err := models.CreateAccount("Target User", "target-support-session@example.com")
 	require.NoError(t, err)
 
 	signer := jwt.NewSigner("test-client-secret")
-	impToken, err := impersonation.GenerateToken(signer, r.Account.ID.String(), target.ID.String())
+	sessionToken, err := supportsession.GenerateToken(signer, r.Account.ID.String(), target.ID.String())
 	require.NoError(t, err)
 
 	body := mustMarshal(t, map[string]string{
@@ -160,7 +160,7 @@ func TestChangePassword_RejectsImpersonation(t *testing.T) {
 
 	res := sendChangePasswordRequest(server, body,
 		&http.Cookie{Name: "account_token", Value: token},
-		&http.Cookie{Name: impersonation.CookieName, Value: impToken},
+		&http.Cookie{Name: supportsession.CookieName, Value: sessionToken},
 	)
 	assert.Equal(t, http.StatusForbidden, res.Code)
 }
@@ -222,8 +222,8 @@ func TestChangePassword_Success(t *testing.T) {
 	personalToken := models.NewUserAPIToken(r.User, "CI token", crypto.HashToken("some-personal-token"))
 	require.NoError(t, models.CreateUserAPIToken(database.Conn(), personalToken))
 
-	// Drop a stale impersonation cookie on the request to verify it is cleared.
-	staleImpersonation := &http.Cookie{Name: impersonation.CookieName, Value: "stale-token-value"}
+	// Drop a stale support session cookie on the request to verify it is cleared.
+	staleSupportSession := &http.Cookie{Name: supportsession.CookieName, Value: "stale-token-value"}
 
 	body := mustMarshal(t, map[string]string{
 		"currentPassword": testCurrentPassword,
@@ -232,7 +232,7 @@ func TestChangePassword_Success(t *testing.T) {
 
 	res := sendChangePasswordRequest(server, body,
 		&http.Cookie{Name: "account_token", Value: token},
-		staleImpersonation,
+		staleSupportSession,
 	)
 	require.Equal(t, http.StatusNoContent, res.Code)
 
@@ -261,15 +261,15 @@ func TestChangePassword_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, tokens, "personal API tokens should have been revoked on password change")
 
-	// Cookies were set: a refreshed account_token AND a cleared impersonation_token.
+	// Cookies were set: a refreshed account_token AND a cleared support_session_token.
 	cookies := res.Result().Cookies()
-	var newAuthCookie, clearedImpCookie *http.Cookie
+	var newAuthCookie, clearedSessionCookie *http.Cookie
 	for _, c := range cookies {
 		switch c.Name {
 		case "account_token":
 			newAuthCookie = c
-		case impersonation.CookieName:
-			clearedImpCookie = c
+		case supportsession.CookieName:
+			clearedSessionCookie = c
 		}
 	}
 
@@ -278,9 +278,9 @@ func TestChangePassword_Success(t *testing.T) {
 	assert.True(t, newAuthCookie.HttpOnly)
 	assert.NotZero(t, newAuthCookie.MaxAge)
 
-	require.NotNil(t, clearedImpCookie, "the impersonation cookie should be cleared")
-	assert.Equal(t, "", clearedImpCookie.Value)
-	assert.Equal(t, -1, clearedImpCookie.MaxAge)
+	require.NotNil(t, clearedSessionCookie, "the support session cookie should be cleared")
+	assert.Equal(t, "", clearedSessionCookie.Value)
+	assert.Equal(t, -1, clearedSessionCookie.MaxAge)
 }
 
 func TestGetAccount_HasPassword(t *testing.T) {

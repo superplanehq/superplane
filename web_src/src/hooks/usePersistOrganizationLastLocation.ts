@@ -4,6 +4,7 @@ import { recordLastVisitedOrganization } from "@/lib/lastVisitedOrganization";
 
 import { useMe } from "./useMe";
 import { useRecordLastLocation } from "./useRecordLastLocation";
+import { useIsSupportSession } from "./useSupportSession";
 
 function canRecordOrganizationLocation(args: {
   resolvedSlug: string;
@@ -26,13 +27,16 @@ export function usePersistOrganizationLastLocation(args: {
   path: string;
 }): void {
   const { data: me, isSuccess: meReady } = useMe(true, args.resolvedSlug || null);
-  const canRecord = canRecordOrganizationLocation({
-    resolvedSlug: args.resolvedSlug,
-    isReserved: args.isReserved,
-    uidRedirectPath: args.uidRedirectPath,
-    meReady,
-    permissionCount: me?.permissions?.length ?? 0,
-  });
+  const inSupportSession = useIsSupportSession();
+  const canRecord =
+    !inSupportSession &&
+    canRecordOrganizationLocation({
+      resolvedSlug: args.resolvedSlug,
+      isReserved: args.isReserved,
+      uidRedirectPath: args.uidRedirectPath,
+      meReady,
+      permissionCount: me?.permissions?.length ?? 0,
+    });
 
   useEffect(() => {
     if (!args.accountId || !canRecord || !args.resolvedSlug) {

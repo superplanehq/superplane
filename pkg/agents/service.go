@@ -195,6 +195,12 @@ func (s *Service) GetSession(organizationID, userID, sessionID uuid.UUID) (*mode
 	return models.FindAgentSessionForUser(organizationID, userID, sessionID)
 }
 
+// FindCanvasSession returns the user's chat session for the given canvas
+// without provisioning or refreshing it. It returns nil when none exists.
+func (s *Service) FindCanvasSession(organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
+	return findCanvasSession(database.Conn(), organizationID, userID, canvasID)
+}
+
 func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error) {
 	if beforeID == uuid.Nil {
 		return models.ListAgentSessionMessagesPage(sessionID, nil, limit)

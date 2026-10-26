@@ -29,11 +29,11 @@ vi.mock("@/contexts/useAccount", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({
-    canAct: (resource: string, action: string) =>
-      resource === "factories" && action === "update" ? canUpdateFactories : true,
-    isLoading: permissionsLoading,
-  }),
+  usePermissions: () => {
+    const canAct = (resource: string, action: string) =>
+      resource === "factories" && action === "update" ? canUpdateFactories : true;
+    return { canAct, hasPermission: canAct, isLoading: permissionsLoading };
+  },
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({

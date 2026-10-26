@@ -10,16 +10,16 @@ type RefreshOrganization = () => Promise<{
 export function useIdentifyOrganizationGroup({
   accountId,
   organizationKey,
-  impersonating = false,
+  inSupportSession = false,
   refreshOrganization,
 }: {
   accountId?: string;
   organizationKey?: string;
-  impersonating?: boolean;
+  inSupportSession?: boolean;
   refreshOrganization?: RefreshOrganization;
 }): void {
   useEffect(() => {
-    if (impersonating || !accountId || !organizationKey || !refreshOrganization) {
+    if (inSupportSession || !accountId || !organizationKey || !refreshOrganization) {
       return;
     }
 
@@ -44,5 +44,5 @@ export function useIdentifyOrganizationGroup({
     return () => {
       cancelled = true;
     };
-  }, [accountId, organizationKey, impersonating, refreshOrganization]);
+  }, [accountId, organizationKey, inSupportSession, refreshOrganization]);
 }

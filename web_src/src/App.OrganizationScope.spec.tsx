@@ -217,7 +217,7 @@ describe("OrganizationScope", () => {
     expect(identifyOrganizationGroup).not.toHaveBeenCalledWith(expect.objectContaining({ name: "Old Name" }));
   });
 
-  it("does not identify the organization group during impersonation", async () => {
+  it("does not identify the organization group during a support session", async () => {
     let resolveRequest: (value: { data: { organization: OrganizationsOrganization } }) => void = () => undefined;
     const request = new Promise<{ data: { organization: OrganizationsOrganization } }>((resolve) => {
       resolveRequest = resolve;
@@ -233,7 +233,7 @@ describe("OrganizationScope", () => {
         ...accountContextValue,
         account: {
           id: "account-1",
-          impersonation: { active: true },
+          support_session: { active: true },
         } as AccountContextType["account"],
       },
     );

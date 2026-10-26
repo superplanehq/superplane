@@ -2,13 +2,14 @@ import { Text } from "@/components/Text/text";
 import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/useAccount";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 import { CopyButton } from "@/ui/CopyButton";
 import { Search, Trash2, User as UserIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import AdminPagination from "./AdminPagination";
 import { ConfirmDeleteAccountDialog } from "./ConfirmDeleteAccountDialog";
-import { deleteAccount, startImpersonation } from "./useAccountActions";
+import { deleteAccount, startSupportSession } from "./useAccountActions";
 
 interface OrgUser {
   id: string;
@@ -35,6 +36,7 @@ function CopyableId({ label, id }: { label: string; id: string }) {
 
 function UserRow({ user, onDelete }: { user: OrgUser; onDelete: (user: OrgUser) => void }) {
   const { account } = useAccount();
+  const inSupportSession = useIsSupportSession();
   const isSelf = user.account_id === account?.id;
   const accountId = user.account_id;
 
@@ -51,9 +53,11 @@ function UserRow({ user, onDelete }: { user: OrgUser; onDelete: (user: OrgUser) 
           <Text className="text-xs text-gray-400 dark:text-gray-500">You</Text>
         ) : accountId ? (
           <div className="flex items-center justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => startImpersonation(accountId)}>
-              Impersonate
-            </Button>
+            {inSupportSession ? null : (
+              <Button variant="outline" size="sm" onClick={() => startSupportSession(accountId)}>
+                Start support session
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => onDelete(user)}>
               <span className="flex items-center gap-1">
                 <Trash2 size={14} />
