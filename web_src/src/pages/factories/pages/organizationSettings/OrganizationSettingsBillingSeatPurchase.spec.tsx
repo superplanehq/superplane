@@ -179,9 +179,10 @@ describe("Organization billing seat purchases", () => {
     expect(within(dialog).queryByRole("button", { name: "Confirm purchase" })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(
-      await within(screen.getByTestId("billing-plans")).findByRole("button", { name: "Keep Team" }),
-    ).toBeInTheDocument();
+    // Query the live page on each retry while the modal restores background accessibility.
+    await waitFor(() =>
+      expect(within(screen.getByTestId("billing-plans")).getByRole("button", { name: "Keep Team" })).toBeVisible(),
+    );
     expect(purchaseRequests).toHaveLength(0);
   });
 
