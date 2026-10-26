@@ -43,6 +43,34 @@ async function previewAndConfirm(page: ReturnType<typeof mountPage>) {
   await act(async () => page.result.current.confirm());
 }
 
+// This tab cannot write storage until unblockWrites. The returned storage is
+// the shared same-origin storage that other tabs still write.
+function blockStorageWrites() {
+  const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+  const localStorage = window.localStorage;
+  let writesBlocked = true;
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: localStorage.getItem.bind(localStorage),
+      removeItem: localStorage.removeItem.bind(localStorage),
+      setItem: (key: string, value: string) => {
+        if (writesBlocked) throw new DOMException("Storage is full.", "QuotaExceededError");
+        localStorage.setItem(key, value);
+      },
+    },
+  });
+  return {
+    localStorage,
+    unblockWrites: () => {
+      writesBlocked = false;
+    },
+    restore: () => {
+      if (descriptor) Object.defineProperty(window, "localStorage", descriptor);
+    },
+  };
+}
+
 describe("seat purchase HTTP recovery", () => {
   const previousConfig = client.getConfig();
   let server: FakeBillingServer;
@@ -334,20 +362,7 @@ describe("seat purchase HTTP recovery", () => {
   it("merges another tab's unresolved key with failed writes and keeps retired keys out of later saves", async () => {
     const organizationId = "org-cross-tab-storage";
     const storageKey = `superplane:seat-purchase-operation:${organizationId}`;
-    const storage = Object.getOwnPropertyDescriptor(window, "localStorage");
-    const localStorage = window.localStorage;
-    let writesBlocked = true;
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      value: {
-        getItem: localStorage.getItem.bind(localStorage),
-        removeItem: localStorage.removeItem.bind(localStorage),
-        setItem: (key: string, value: string) => {
-          if (writesBlocked) throw new DOMException("Storage is full.", "QuotaExceededError");
-          localStorage.setItem(key, value);
-        },
-      },
-    });
+    const { localStorage, unblockWrites, restore } = blockStorageWrites();
     try {
       const page = await loadPage(organizationId);
       server.failNextPurchase("lost request");
@@ -395,7 +410,7 @@ describe("seat purchase HTTP recovery", () => {
 
       // Retirement also fails to persist. A later successful save must preserve
       // the first tab's key without restoring the retired key from storage.
-      writesBlocked = false;
+      unblockWrites();
       act(() => page.result.current.setAdditionalSeats("3"));
       server.failNextPurchase("lost request");
       await previewAndConfirm(page);
@@ -415,7 +430,66 @@ describe("seat purchase HTTP recovery", () => {
       expect(server.purchaseRequests[6].operationKey).not.toBe(other.operationKey);
       expect(server.charges).toBe(3);
     } finally {
-      if (storage) Object.defineProperty(window, "localStorage", storage);
+      restore();
+    }
+  });
+
+  it("charges a new confirmation after another tab settles the key that a failed write in this tab saw", async () => {
+    const organizationId = "org-cross-tab-settled";
+    const storageKey = `superplane:seat-purchase-operation:${organizationId}`;
+    const { localStorage, unblockWrites, restore } = blockStorageWrites();
+    try {
+      // Another tab stores its confirmed purchase before it sends the request.
+      const other = { additionalSeats: 2, expectedPurchasedSeats: 4, operationKey: crypto.randomUUID() };
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify([
+          {
+            version: 2,
+            organizationId,
+            confirmedAt: new Date().toISOString(),
+            ...other,
+            binding: {
+              subscriptionId: server.subscriptionId,
+              periodStart: server.periodStart,
+              periodEnd: server.periodEnd,
+            },
+          },
+        ]),
+      );
+      const otherBody = JSON.stringify({ ...other, ...server.confirmedContext() });
+
+      // This tab cannot save its own confirmation, and its request is lost.
+      const page = await loadPage(organizationId);
+      server.failNextPurchase("lost request");
+      await previewAndConfirm(page);
+      expect(server.charges).toBe(0);
+
+      // The other tab gets its answer and forgets its settled key.
+      const otherResponse = await server.fetch(
+        new Request(`http://localhost/api/v1/organizations/${organizationId}/billing/seats/purchase`, {
+          method: "POST",
+          body: otherBody,
+        }),
+      );
+      expect(otherResponse.status).toBe(200);
+      expect(server.charges).toBe(1);
+      localStorage.removeItem(storageKey);
+
+      // A new period starts at the same seat count. The user confirms the
+      // same counts again as a new purchase.
+      unblockWrites();
+      server.renew();
+      await act(async () => page.result.current.refreshBilling());
+      act(() => page.result.current.setAdditionalSeats("2"));
+      await previewAndConfirm(page);
+      const retry = server.purchaseRequests[2];
+      expect(retry.operationKey).not.toBe(other.operationKey);
+      expect(retry).toEqual(expect.objectContaining({ ...server.confirmedContext(), additionalSeats: 2 }));
+      expect(server.charges).toBe(2);
+      expect(page.result.current.purchase?.id).toBe("purchase-2");
+    } finally {
+      restore();
     }
   });
 
