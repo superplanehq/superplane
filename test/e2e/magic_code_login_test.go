@@ -41,7 +41,7 @@ func TestMagicCodeLogin(t *testing.T) {
 	t.Run("new user can sign up with magic code via invite link", func(t *testing.T) {
 		steps := &magicCodeSteps{t: t}
 		steps.start()
-		inviteToken := steps.createInviteLink()
+		inviteToken := steps.seedInviteLink()
 		email := support.RandomName("magic") + "@superplane.local"
 		steps.followInviteLinkToLogin(inviteToken)
 		steps.enterEmailAndRequestCode(email)
@@ -194,14 +194,8 @@ func (s *magicCodeSteps) clickMagicCodeToggle() {
 	s.session.Sleep(300)
 }
 
-func (s *magicCodeSteps) createInviteLink() string {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(s.t.Context()), s.session.OrgID.String())
-	if err == nil {
-		return inviteLink.Token.String()
-	}
-	inviteLink, err = models.CreateInviteLink(database.DB(s.t.Context()), s.session.OrgID)
-	require.NoError(s.t, err)
-	return inviteLink.Token.String()
+func (s *magicCodeSteps) seedInviteLink() string {
+	return support.SeedHistoricalInviteLink(s.t, s.session.OrgID, true).Token.String()
 }
 
 func (s *magicCodeSteps) followInviteLinkToLogin(token string) {
