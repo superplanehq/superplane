@@ -68,6 +68,9 @@ func SendWorkOrderToBacklog(
 
 	fromState := resolvedOrder.State
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, orgID); err != nil {
+			return err
+		}
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err

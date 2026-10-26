@@ -2,13 +2,14 @@ import { factoryQueryKeys } from "@/hooks/useFactoryData";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { emptyCreateWithAgentView } from "../createWithAgentDemo";
 import {
   answerPlanningSessionSurvey,
   findPlanningSessionByWorkOrder,
   sendPlanningSessionMessage,
+  sendWorkOrderPlanningMessage,
 } from "../planningSessionClient";
 import {
   createWithAgentViewFromSession,
@@ -42,6 +43,8 @@ type AnalysisPlanningSessionArgs = {
   canUpdate: boolean;
   /** Poll a missing session only when a refinement run can still start. */
   refinementCanStart?: boolean;
+  analysisActive?: boolean;
+  analysisQueued?: boolean;
   analysisDelivered?: boolean;
   isUploading?: boolean;
   uploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
@@ -153,9 +156,9 @@ export function analysisWorkOrderRefreshKey(session: PlanningSessionPayload | nu
   });
 }
 
-function analysisView(session: PlanningSessionPayload | null, composer: string) {
+function analysisView(session: PlanningSessionPayload | null, composer: string, active: boolean) {
   if (!session) {
-    return emptyCreateWithAgentView();
+    return { ...emptyCreateWithAgentView(), machineStatus: active ? ("starting" as const) : ("waiting" as const) };
   }
   return createWithAgentViewFromSession(session, {
     composer,
@@ -177,6 +180,26 @@ function analysisSendState(
   return { isLive, canSend: canUpdate && !sendPending && !isUploading && (isLive || canRestart) };
 }
 
+function canRecoverAnalysis(
+  args: AnalysisPlanningSessionArgs,
+  hasSession: boolean,
+  lookupPending: boolean,
+  sendPending: boolean,
+) {
+  return (
+    !hasSession &&
+    !args.analysisActive &&
+    !args.analysisQueued &&
+    args.enabled &&
+    args.refinementCanStart === true &&
+    args.canUpdate &&
+    !lookupPending &&
+    Boolean(args.organizationId && args.factoryId && args.workOrderId) &&
+    !args.isUploading &&
+    !sendPending
+  );
+}
+
 export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
   const {
     organizationId = "",
@@ -185,13 +208,18 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     enabled,
     canUpdate,
     refinementCanStart = false,
+    analysisActive = false,
+    analysisQueued = false,
     analysisDelivered = false,
     isUploading = false,
     uploadFiles,
   } = args;
   const queryClient = useQueryClient();
-  const [composer, setComposer] = useState("");
-  const [composerError, setComposerError] = useState("");
+  const { composer, composerError, setComposer, setComposerError } = useAnalysisComposer(
+    organizationId,
+    factoryId,
+    workOrderId,
+  );
   const queryKey = workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId);
   const query = usePlanningSessionLookup({
     organizationId,
@@ -204,51 +232,55 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     ),
   });
   const session = query.data ?? null;
-  useRefreshAnalysisWorkOrder({
-    queryClient,
+  useRefreshAnalysisWorkOrder({ queryClient, organizationId, factoryId, workOrderId, session });
+
+  const { sendMessage, answerSurvey } = useAnalysisPlanningMutations({
     organizationId,
     factoryId,
     workOrderId,
-    session,
+    queryClient,
+    onSuccess: () => {
+      setComposer("");
+      setComposerError("");
+    },
+    onError: (error) => setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend)),
+  });
+  const messageInput = (text: string): AnalysisMessageInput => ({
+    organizationId,
+    factoryId,
+    workOrderId,
+    sessionId: session?.id,
+    text,
   });
 
-  const onMutationSuccess = (next: PlanningSessionPayload) => {
-    queryClient.setQueryData<PlanningSessionPayload | null>(queryKey, (previous) =>
-      mergePlanningSessionHistory(previous, next),
-    );
-    setComposer("");
-    setComposerError("");
-  };
-  const onMutationError = (error: Error) => {
-    setComposerError(getApiErrorMessage(error, ANALYSIS_PLANNING_COPY.failedSend));
-  };
-
-  const sendMessage = useMutation({
-    mutationFn: (text: string) => sendPlanningSessionMessage(organizationId, factoryId, session?.id ?? "", text),
-    onSuccess: onMutationSuccess,
-    onError: onMutationError,
-  });
-  const answerSurvey = useMutation({
-    mutationFn: (text: string) => answerPlanningSessionSurvey(organizationId, factoryId, session?.id ?? "", text),
-    onSuccess: onMutationSuccess,
-    onError: onMutationError,
-  });
-
-  const view = usePlanningSessionLiveRun(organizationId, analysisView(session, composer), analysisDelivered);
-  const { isLive, canSend } = analysisSendState(
+  const liveView = usePlanningSessionLiveRun(
+    organizationId,
+    analysisView(session, composer, query.isLoading || analysisActive),
+    analysisDelivered,
+  );
+  const view = analysisQueued ? { ...liveView, machineStatus: "waiting" as const, survey: undefined } : liveView;
+  const { isLive, canSend: canSendToSession } = analysisSendState(
     session,
     view.machineStatus,
     canUpdate,
     sendMessage.isPending || answerSurvey.isPending,
     isUploading,
   );
-  const submit = (text: string, send: (body: string) => void) => {
+  const canRecover = canRecoverAnalysis(
+    args,
+    Boolean(session),
+    query.isLoading || Boolean(query.error),
+    sendMessage.isPending,
+  );
+  const canSend = !analysisQueued && (canSendToSession || canRecover);
+  const canAnalyze = canSend && !isLive && !analysisActive && refinementCanStart;
+  const submit = (text: string, send: (input: AnalysisMessageInput) => void) => {
     const trimmed = text.trim();
     if (!trimmed || !canSend) {
       return false;
     }
     setComposerError("");
-    send(trimmed);
+    send(messageInput(trimmed));
     return true;
   };
   const onSend = async (text?: string) => {
@@ -258,23 +290,11 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     }
     setComposerError("");
     try {
-      await sendMessage.mutateAsync(trimmed);
+      await sendMessage.mutateAsync(messageInput(trimmed));
       return true;
     } catch {
       return false;
     }
-  };
-  const onUploadFiles = async (files: FileList | File[]) => {
-    if (!uploadFiles) {
-      return [];
-    }
-    const uploaded = await uploadFiles(files);
-    if (uploaded.length > 0) {
-      await queryClient.invalidateQueries({
-        queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
-      });
-    }
-    return uploaded;
   };
 
   return {
@@ -288,14 +308,100 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     composer,
     composerError,
     canSend,
+    canAnalyze,
+    onAnalyze: () => (canAnalyze ? onSend(composer.trim() || "Analyze this task.") : Promise.resolve(false)),
     isUploading,
     isLive,
     showChat: Boolean(session?.id),
     onComposerChange: setComposer,
     onSend,
-    onUploadFiles: uploadFiles ? onUploadFiles : undefined,
+    onUploadFiles: uploadFiles
+      ? (files: FileList | File[]) => uploadAnalysisFiles(args, queryClient, files)
+      : undefined,
     onSubmitSurvey: (text: string) => {
       submit(text, answerSurvey.mutate);
     },
   };
+}
+
+function useAnalysisComposer(organizationId: string, factoryId: string, workOrderId: string) {
+  const [composer, setComposer] = useState("");
+  const [composerError, setComposerError] = useState("");
+  useEffect(() => {
+    setComposer("");
+    setComposerError("");
+  }, [organizationId, factoryId, workOrderId]);
+  return { composer, composerError, setComposer, setComposerError };
+}
+
+type AnalysisMessageInput = {
+  organizationId: string;
+  factoryId: string;
+  workOrderId: string;
+  sessionId?: string;
+  text: string;
+};
+
+function useAnalysisPlanningMutations(args: {
+  organizationId: string;
+  factoryId: string;
+  workOrderId: string;
+  queryClient: QueryClient;
+  onSuccess: () => void;
+  onError: (error: Error) => void;
+}) {
+  const currentScope = useRef(args);
+  currentScope.current = args;
+  const isCurrentScope = (scope: AnalysisMessageInput) =>
+    scope.organizationId === currentScope.current.organizationId &&
+    scope.factoryId === currentScope.current.factoryId &&
+    scope.workOrderId === currentScope.current.workOrderId;
+  const onSuccess = async (next: PlanningSessionPayload, scope: AnalysisMessageInput) => {
+    const responseKey = workOrderPlanningSessionQueryKey(scope.organizationId, scope.factoryId, scope.workOrderId);
+    await args.queryClient.cancelQueries({ queryKey: responseKey });
+    args.queryClient.setQueryData<PlanningSessionPayload | null>(responseKey, (previous) =>
+      mergePlanningSessionHistory(previous, next),
+    );
+    void args.queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", scope.organizationId] });
+    void args.queryClient.invalidateQueries({ queryKey: ["organizations", scope.organizationId, "workspace-usage"] });
+    if (isCurrentScope(scope)) args.onSuccess();
+  };
+  const onError = (error: Error, scope: AnalysisMessageInput) => {
+    if (isCurrentScope(scope)) args.onError(error);
+  };
+  const sendMessage = useMutation({
+    mutationFn: (input: AnalysisMessageInput) =>
+      input.sessionId
+        ? sendPlanningSessionMessage(input.organizationId, input.factoryId, input.sessionId, input.text)
+        : sendWorkOrderPlanningMessage(input.organizationId, input.factoryId, input.workOrderId, input.text),
+    onSuccess,
+    onError,
+  });
+  const answerSurvey = useMutation({
+    mutationFn: (input: AnalysisMessageInput) =>
+      answerPlanningSessionSurvey(input.organizationId, input.factoryId, input.sessionId ?? "", input.text),
+    onSuccess,
+    onError,
+  });
+
+  return { sendMessage, answerSurvey };
+}
+
+async function uploadAnalysisFiles(
+  args: AnalysisPlanningSessionArgs,
+  queryClient: QueryClient,
+  files: FileList | File[],
+) {
+  if (!args.uploadFiles) return [];
+  const uploaded = await args.uploadFiles(files);
+  if (uploaded.length > 0) {
+    await queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderDetail(
+        args.organizationId ?? "",
+        args.factoryId ?? "",
+        args.workOrderId ?? "",
+      ),
+    });
+  }
+  return uploaded;
 }

@@ -37,11 +37,14 @@ func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 		return err
 	}
 
-	_, err = pullRequest.CreateActivity(tx, FactoryPullRequestActivityParams{
+	result, err := pullRequest.CreateActivity(tx, FactoryPullRequestActivityParams{
 		RunID:  run.ID,
 		Title:  visualEvidenceRunTitle,
 		Access: FactoryPullRequestAccessConcurrent,
 	})
+	if err == nil && result.Outcome == FactoryPullRequestActivityOutcomeWaiting {
+		return ErrWorkOrderBusy
+	}
 	return err
 }
 

@@ -5,9 +5,11 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
@@ -55,6 +57,7 @@ func (w *RunnerCleanupWorker) Process() error {
 		return err
 	}
 	for _, id := range ids {
+		var organizationID uuid.UUID
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
 			runner, err := models.LockRunner(tx, id)
 			if errors.Is(err, models.ErrRunnerNotFound) {
@@ -63,12 +66,18 @@ func (w *RunnerCleanupWorker) Process() error {
 			if err != nil {
 				return err
 			}
+			if task, err := runner.FindActiveTask(tx); err == nil {
+				organizationID = task.OrganizationID
+			}
 			return runner.Expire(tx, now)
 		})
 		if err != nil {
 			w.logger.WithError(err).
 				WithField("runner_id", id).
 				Error("Failed to expire runner registration")
+		}
+		if err == nil && organizationID != uuid.Nil {
+			_ = runnercontrol.PublishOrganizationCapacity(context.Background(), organizationID)
 		}
 	}
 	staleRunners, err := models.ListStaleRunners(
@@ -80,6 +89,7 @@ func (w *RunnerCleanupWorker) Process() error {
 		return err
 	}
 	for _, staleRunner := range staleRunners {
+		var organizationID uuid.UUID
 		var lostRunningTask *models.RunnerTask
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
 			runner, err := models.LockRunner(tx, staleRunner.ID)
@@ -89,6 +99,9 @@ func (w *RunnerCleanupWorker) Process() error {
 			if err != nil {
 				return err
 			}
+			if task, err := runner.FindActiveTask(tx); err == nil {
+				organizationID = task.OrganizationID
+			}
 			lostRunningTask, err = runner.MarkLost(tx, now.Add(-runnerConnectionLossTimeout), now)
 			return err
 		})
@@ -97,6 +110,9 @@ func (w *RunnerCleanupWorker) Process() error {
 				WithField("runner_id", staleRunner.ID).
 				Error("Failed to mark disconnected runner as lost")
 			continue
+		}
+		if organizationID != uuid.Nil {
+			_ = runnercontrol.PublishOrganizationCapacity(context.Background(), organizationID)
 		}
 		if lostRunningTask != nil && telemetry.MetricsEnabled() {
 			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask, staleRunner.FleetSlug, staleRunner.FleetScope)

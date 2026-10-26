@@ -11,6 +11,7 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	githubauth "github.com/google/go-github/v75/github"
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -260,4 +261,36 @@ func appInstallationAccessToken(
 	}
 
 	return token, nil
+}
+
+// DescribeRunnerSecrets saves the exported environment and guidance without
+// minting temporary GitHub tokens while a runner job enters the queue.
+func (g *GitHub) DescribeRunnerSecrets(ctx core.IntegrationSecretContext) (core.IntegrationSecrets, error) {
+	values := map[string][]byte{integrationSecretGitHubToken: []byte("pending-github-credential-" + uuid.NewString())}
+	if !ctx.Integration.LegacySetup() {
+		return githubIntegrationSecrets(values), nil
+	}
+	var metadata common.Metadata
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return core.IntegrationSecrets{}, fmt.Errorf("decode GitHub metadata: %w", err)
+	}
+	if !metadata.HostedApp {
+		return githubIntegrationSecrets(values), nil
+	}
+	names, err := models.ListEnabledGitHubContextRepositoryNames(database.Conn(), ctx.Integration.ID())
+	if err != nil {
+		return core.IntegrationSecrets{}, fmt.Errorf("list GitHub context repositories: %w", err)
+	}
+	if len(names) > 0 {
+		values[integrationSecretGitHubContextToken] = []byte("pending-github-context-credential-" + uuid.NewString())
+	}
+	return githubIntegrationSecrets(values), nil
+}
+
+func githubIntegrationSecrets(values map[string][]byte) core.IntegrationSecrets {
+	usage := githubSecretUsage
+	if _, present := values[integrationSecretGitHubContextToken]; present {
+		usage += "\nContext repositories are checked out with a read-only token. GITHUB_TOKEN writes to the workspace repository."
+	}
+	return core.IntegrationSecrets{Values: values, Usage: usage, Setup: githubSetupScript, SetupName: githubSetupName}
 }

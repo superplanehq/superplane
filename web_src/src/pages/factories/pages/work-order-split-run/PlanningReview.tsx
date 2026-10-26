@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { ChevronDown, FileText } from "lucide-react";
 
@@ -39,6 +39,7 @@ export function PlanningReview({
   planStatus,
   onToggle,
   creditVerdict,
+  actions,
 }: {
   open: boolean;
   title?: string;
@@ -53,6 +54,7 @@ export function PlanningReview({
   planStatus?: PlanChipStatus;
   onToggle?: () => void;
   creditVerdict?: ComposerCreditVerdict;
+  actions?: ReactNode;
 }) {
   const analyzing = isAnalyzing && !creditVerdict;
   const metrics = reviewMetrics?.length ? reviewMetrics : undefined;
@@ -67,16 +69,21 @@ export function PlanningReview({
     >
       <FramePanel fit className="overflow-hidden p-0" data-testid="split-run-intent-plan-updated">
         <div className="px-3.5 py-2.5" data-testid="split-run-intent-composer-chips">
-          <PlanningReviewHeading
-            open={open}
-            title={title}
-            analyzing={analyzing}
-            canTogglePlan={canTogglePlan}
-            questionsPending={questionsPending}
-            planStatus={planStatus}
-            onToggle={onToggle}
-            creditVerdict={creditVerdict}
-          />
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <PlanningReviewHeading
+                open={open}
+                title={title}
+                analyzing={analyzing}
+                canTogglePlan={canTogglePlan}
+                questionsPending={questionsPending}
+                planStatus={planStatus}
+                onToggle={onToggle}
+                creditVerdict={creditVerdict}
+              />
+            </div>
+            {actions}
+          </div>
           <ScoreEvidenceRow
             clarity={clarity}
             confidence={confidence}

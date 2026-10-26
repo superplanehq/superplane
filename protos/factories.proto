@@ -569,6 +569,18 @@ service Factories {
     };
   }
 
+  rpc CancelWorkOrderQueue(CancelWorkOrderQueueRequest) returns (CancelWorkOrderQueueResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/queue/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel one queued runner job";
+      description: "Cancels one queued, unassigned runner job. Assigned jobs and sibling jobs continue.";
+      tags: "Factory";
+    };
+  }
+
   rpc CloseWorkOrder(CloseWorkOrderRequest) returns (CloseWorkOrderResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{factory_id}/orders/{order_id}/close"
@@ -871,6 +883,10 @@ service Factories {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"
       body: "*"
+      additional_bindings {
+        post: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session/messages"
+        body: "*"
+      }
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Send planning session message";
@@ -1947,6 +1963,8 @@ message WorkOrder {
   // MCP client that created this task through a hand-off. Empty for
   // tasks that did not come from an MCP client.
   WorkOrderMcpClient mcp_client = 26;
+  // Individual runner jobs waiting across the organization.
+  repeated QueuedRunnerJob queued_runner_jobs = 27;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -1981,6 +1999,32 @@ message WorkOrderSummary {
   WorkOrderMcpClient mcp_client = 21;
   // Canvas run that created this task. Needed to link intake history rows.
   string source_run_id = 22;
+  repeated QueuedRunnerJob queued_runner_jobs = 23;
+}
+
+message QueuedRunnerJob {
+  string id = 1;
+  // One-based position among all queued, unassigned organization runner jobs.
+  int32 position = 2;
+  string automation_name = 3;
+  string automation_id = 4;
+  string node_id = 5;
+  string node_name = 6;
+  string run_id = 7;
+  string execution_id = 8;
+  google.protobuf.Timestamp queued_at = 9;
+}
+
+message CancelWorkOrderQueueRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  // Identifies one queued runner job. Stale requests must not cancel an
+  // assigned job, another job, or the parent run.
+  string queue_id = 3;
+}
+
+message CancelWorkOrderQueueResponse {
+  WorkOrder order = 1;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -3051,6 +3095,8 @@ message SendPlanningSessionMessageRequest {
   string factory_id = 1;
   string session_id = 2;
   string text = 3;
+  // Use when the task has no planning session yet.
+  string work_order_id = 4;
 }
 
 message SendPlanningSessionMessageResponse {

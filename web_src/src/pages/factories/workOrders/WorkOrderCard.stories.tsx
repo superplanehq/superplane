@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState, type ComponentProps } from "react";
 
 import type {
   FactoriesFactory,
@@ -79,6 +80,49 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+const queuedEntry = buildWorkOrderListEntry(
+  waitingOrder({
+    id: "wo-queued",
+    title: "Retry webhook delivery",
+    state: "STATE_DRAFT",
+    statusNotes: [],
+    queuedRunnerJobs: [{ id: "queue-1", position: 2 }],
+    updatedAt: new Date(Date.now() - 36_000).toISOString(),
+  }),
+  factory,
+);
+
+function QueuedCardPreview(args: ComponentProps<typeof WorkOrderCard>) {
+  const [entry, setEntry] = useState(args.entry);
+  return (
+    <WorkOrderCard
+      {...args}
+      entry={entry}
+      onCancelQueuedRunnerJob={async (orderId, queueId) => {
+        console.info("Remove from queue", orderId, queueId);
+        setEntry((current) => ({ ...current, order: { ...current.order, queuedRunnerJobs: undefined } }));
+      }}
+    />
+  );
+}
+
+export const QueuedTask: Story = {
+  name: "Queued task with cancel action",
+  args: { entry: queuedEntry, pullRequests: [] },
+  render: (args) => <QueuedCardPreview {...args} />,
+};
+
+export const CancellingQueuedTask: Story = {
+  name: "Queue cancellation pending",
+  args: { ...QueuedTask.args, cancellingQueueJobIds: new Set(["queue-1"]) },
+  render: (args) => <QueuedCardPreview {...args} />,
+};
+
+export const ReadOnlyQueuedTask: Story = {
+  name: "Queued task without update permission",
+  args: { ...QueuedTask.args, canDispatch: false },
+};
 
 /**
  * Open pull request attached to the task. The pill replaces Waiting

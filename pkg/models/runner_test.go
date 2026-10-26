@@ -242,9 +242,20 @@ func TestRunnerTaskReservationAndRunnerTermination(t *testing.T) {
 }
 
 func TestBusyRunnerCannotBeTerminated(t *testing.T) {
-	runner := &models.Runner{ID: uuid.New(), State: models.RunnerStateBusy}
-	err := runner.Terminate(database.DB(t.Context()), models.RunnerTerminationRequested)
+	support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := newTestRunnerFleet()
+	require.NoError(t, fleet.Create(db))
+	runner := &models.Runner{ID: uuid.New(), FleetID: fleet.ID, State: models.RunnerStateBusy,
+		RunnerVersion: fleet.RunnerVersion, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	require.NoError(t, db.Create(runner).Error)
+	// Termination must use durable state even when a manager read idle earlier.
+	runner.State = models.RunnerStateIdle
+	err := runner.Terminate(db, models.RunnerTerminationRequested)
 	assert.ErrorIs(t, err, models.ErrRunnerBusy)
+	stored, err := models.FindRunner(db, runner.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerStateBusy, stored.State)
 }
 
 func TestListStaleRunnersIncludesFleetMetricLabels(t *testing.T) {

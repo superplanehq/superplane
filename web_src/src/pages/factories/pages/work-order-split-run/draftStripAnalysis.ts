@@ -15,6 +15,10 @@ export type DraftStripAnalysisArgs = {
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
 };
 
+export function draftAnalysisQueued(fixture: Pick<SplitRunFixture, "footer" | "queuedRunnerJobs">): boolean {
+  return fixture.footer.kind === "draft" && Boolean(fixture.queuedRunnerJobs?.length);
+}
+
 /**
  * Refine chat fields for a draft: the planning session, the model select,
  * the score toggles, and the credit verdict. A task that is not a draft has
@@ -27,6 +31,7 @@ export function draftStripAnalysis(args: DraftStripAnalysisArgs, modelSelect: Re
   const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
   return {
     ...args.analysis,
+    analyzeLabel: "Analyze",
     requestCreatedAt: args.fixture.phases.find((phase) => phase.id === "backlog")?.startedAt,
     modelSelect,
     showClarity: factoryShowsClarity(args.factory),

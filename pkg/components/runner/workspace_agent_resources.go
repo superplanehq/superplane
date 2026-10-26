@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 	"gorm.io/gorm"
 )
 
@@ -865,25 +866,38 @@ func assembleWorkspaceMCPServer(
 				return workspaceMCPServer{}, false
 			}
 			headers[header.Name] = string(value)
+			if recorder, ok := ctx.RunnerTasks.(runnerapi.CredentialRefreshRecorder); ok {
+				secret, err := models.FindSecretByNameInTransaction(db, models.DomainTypeOrganization, resource.OrganizationID, header.SecretName)
+				if err != nil {
+					return workspaceMCPServer{}, false
+				}
+				recorder.RecordCredentialRefresh(runnerapi.CredentialRefresh{Version: 1, Kind: "mcp_header", OrganizationID: resource.OrganizationID.String(), ResourceID: resource.ID.String(), Recipient: config.URL, Scope: map[string]string{"name": resource.Name, "factory_id": resource.FactoryID.String(), "secret_id": secret.ID.String(), "key": header.SecretKey, "header": header.Name, "auth": config.MCPAuth()}, Current: string(value)})
+			}
 		}
 	case models.FactoryAgentResourceAuthOAuth:
 		if encryptor == nil {
 			logger.WithField("mcp", resource.Name).Warn("skip workspace MCP: encryptor missing")
 			return workspaceMCPServer{}, false
 		}
-		token, err := mcp.MintFactoryAgentResourceAccessTokenWithLifetime(
-			context.Background(),
-			encryptor,
-			httpClient,
-			db,
-			resource,
-			tokenLifetime,
-		)
-		if err != nil || strings.TrimSpace(token) == "" {
-			logger.WithError(err).WithField("mcp", resource.Name).Warn("skip workspace MCP: sign-in required")
-			return workspaceMCPServer{}, false
+		token := "pending-mcp-" + resource.ID.String()
+		if _, deferred := ctx.RunnerTasks.(runnerapi.CredentialRefreshRecorder); !deferred {
+			var err error
+			token, err = mcp.MintFactoryAgentResourceAccessTokenWithLifetime(context.Background(), encryptor, httpClient, db, resource, tokenLifetime)
+			if err != nil || strings.TrimSpace(token) == "" {
+				logger.WithError(err).WithField("mcp", resource.Name).Warn("skip workspace MCP: sign-in required")
+				return workspaceMCPServer{}, false
+			}
 		}
+
 		headers["Authorization"] = "Bearer " + token
+		if recorder, ok := ctx.RunnerTasks.(runnerapi.CredentialRefreshRecorder); ok {
+			metadata := resource.OAuthMetadata.Data()
+			connectedAt := ""
+			if resource.OAuthConnectedAt != nil {
+				connectedAt = resource.OAuthConnectedAt.UTC().Truncate(time.Microsecond).Format(time.RFC3339Nano)
+			}
+			recorder.RecordCredentialRefresh(runnerapi.CredentialRefresh{Version: 1, Kind: "mcp_oauth", OrganizationID: resource.OrganizationID.String(), ResourceID: resource.ID.String(), Recipient: config.URL, Scope: map[string]string{"name": resource.Name, "factory_id": resource.FactoryID.String(), "auth": config.MCPAuth(), "client_id": metadata.ClientID, "token_endpoint": metadata.TokenEndpoint, "authorization_endpoint": metadata.AuthorizationEndpoint, "resource": metadata.Resource, "connected_at": connectedAt}, Current: token})
+		}
 	default:
 		return workspaceMCPServer{}, false
 	}

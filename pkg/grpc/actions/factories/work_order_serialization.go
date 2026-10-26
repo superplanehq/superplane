@@ -82,6 +82,13 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return err
 	})
 
+	var queued map[uuid.UUID][]*pb.QueuedRunnerJob
+	g.Go(func() error {
+		var err error
+		queued, err = loadWorkOrderQueuedRunnerJobs(db.WithContext(gctx), factory.OrganizationID)
+		return err
+	})
+
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
@@ -117,6 +124,7 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 	}
 	serialized.Checks = checks
 	serialized.PlanningSession = planningByOrder[order.ID]
+	serialized.QueuedRunnerJobs = queued[order.ID]
 	return serialized, nil
 }
 
@@ -183,6 +191,13 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		return err
 	})
 
+	var queued map[uuid.UUID][]*pb.QueuedRunnerJob
+	g.Go(func() error {
+		var err error
+		queued, err = loadWorkOrderQueuedRunnerJobs(db.WithContext(gctx), factory.OrganizationID)
+		return err
+	})
+
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
@@ -202,6 +217,7 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		serialized.PullRequests = pullRequestsByOrder[orders[i].ID]
 		serialized.CheckScores = serializeCheckScores(checksByOrder[orders[i].ID])
 		serialized.PlanningSession = planningByOrder[orders[i].ID]
+		serialized.QueuedRunnerJobs = queued[orders[i].ID]
 		result[i] = serialized
 	}
 
@@ -417,4 +433,24 @@ func executionIDsFromDispatches(
 		}
 	}
 	return ids
+}
+
+func loadWorkOrderQueuedRunnerJobs(db *gorm.DB, orgID uuid.UUID) (map[uuid.UUID][]*pb.QueuedRunnerJob, error) {
+	queued, err := models.ListOrganizationQueuedRunnerJobs(db, orgID)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[uuid.UUID][]*pb.QueuedRunnerJob)
+	for _, job := range queued {
+		if job.WorkOrderID == uuid.Nil {
+			continue
+		}
+		result[job.WorkOrderID] = append(result[job.WorkOrderID], &pb.QueuedRunnerJob{
+			Id: job.ID.String(), Position: int32(job.Position), AutomationName: job.AutomationName,
+			AutomationId: job.AutomationID.String(), NodeId: job.NodeID, NodeName: job.NodeName,
+			RunId: job.RunID.String(), ExecutionId: job.ExecutionID.String(),
+			QueuedAt: timestamppb.New(job.QueuedAt),
+		})
+	}
+	return result, nil
 }

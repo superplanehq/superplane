@@ -160,6 +160,9 @@ func dispatchWorkOrderOnLineTx(
 	}
 
 	orgID := factory.OrganizationID
+	if err := models.LockOrganizationTaskAdmission(tx, orgID); err != nil {
+		return nil, err
+	}
 	factoryID := factory.ID
 	lineID := line.ID
 
@@ -211,9 +214,6 @@ func dispatchWorkOrderOnLineTx(
 	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
 		return nil, err
 	}
-	if err := order.TransitionOnDispatch(tx, actor); err != nil {
-		return nil, err
-	}
 	if _, err := order.ClearAutoStart(tx); err != nil {
 		return nil, err
 	}
@@ -225,6 +225,9 @@ func dispatchWorkOrderOnLineTx(
 			return nil, err
 		}
 		startedSteps = started
+		if err := applyDispatchedWorkOrderState(tx, order, actor, startedSteps); err != nil {
+			return nil, err
+		}
 		return &workOrderLineDispatchResult{
 			factory:      factory,
 			order:        order,
@@ -253,6 +256,10 @@ func dispatchWorkOrderOnLineTx(
 		return nil, err
 	}
 
+	if err := applyDispatchedWorkOrderState(tx, order, actor, []*models.FactoryLineStepResult{result}); err != nil {
+		return nil, err
+	}
+
 	return &workOrderLineDispatchResult{
 		factory:      factory,
 		order:        order,
@@ -260,6 +267,20 @@ func dispatchWorkOrderOnLineTx(
 		fromState:    fromState,
 		logger:       logger,
 	}, nil
+}
+
+// A queued start stays a draft so Backlog pagination and filters agree with
+// the board. Assign its owner now; admission opens it when execution starts.
+func applyDispatchedWorkOrderState(tx *gorm.DB, order *models.FactoryWorkOrder, actor *uuid.UUID, results []*models.FactoryLineStepResult) error {
+	for _, result := range results {
+		if result != nil && result.Execution != nil && result.Execution.WorkOrderID == order.ID {
+			return order.TransitionOnDispatch(tx, actor)
+		}
+	}
+	if order.State == models.FactoryWorkOrderStateDraft && actor != nil {
+		return order.UpdateAssignees(tx, []uuid.UUID{*actor}, *actor)
+	}
+	return nil
 }
 
 func publishDispatchedWorkOrder(
@@ -272,6 +293,13 @@ func publishDispatchedWorkOrder(
 	startedSteps []*models.FactoryLineStepResult,
 ) {
 	for _, result := range startedSteps {
+		if result != nil && result.Cancellation != nil {
+			cancellation := result.Cancellation
+			messages.PublishRunCancellationDrain(cancellation.Run.WorkflowID, cancellation.Drain)
+			if err := messages.NewCanvasRunMessage(cancellation.Run.WorkflowID.String(), cancellation.Run.ID.String()).Publish(); err != nil {
+				logger.WithError(err).Warn("Failed to publish replaced run cancellation")
+			}
+		}
 		publishPendingStepRun(logger, result)
 	}
 
@@ -284,16 +312,23 @@ func publishDispatchedWorkOrder(
 		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
 	for _, result := range startedSteps {
-		if result == nil || result.Execution == nil {
+		if result == nil {
 			continue
 		}
-		extraID := result.Execution.WorkOrderID
+		var extraID, extraFactoryID uuid.UUID
+		if result.Execution != nil {
+			extraID, extraFactoryID = result.Execution.WorkOrderID, result.Execution.FactoryID
+		} else if result.QueueItem != nil {
+			extraID, extraFactoryID = result.QueueItem.WorkOrderID, result.QueueItem.FactoryID
+		} else {
+			continue
+		}
 		if _, seen := publishedOrders[extraID]; seen {
 			continue
 		}
 		publishedOrders[extraID] = struct{}{}
 		if err := messages.PublishFactoryWorkOrderUpdated(
-			factoryID.String(),
+			extraFactoryID.String(),
 			extraID.String(),
 			factoryevents.EventTypeLineStepExecutionCreated,
 		); err != nil {

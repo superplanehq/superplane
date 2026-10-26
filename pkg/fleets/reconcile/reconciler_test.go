@@ -33,6 +33,9 @@ type fakeAdmin struct {
 	deleteError       error
 	capacityWaits     []int
 	events            *[]string
+	queuedTasks       []adminclient.Task
+	createErrors      map[string]error
+	deleteOptions     []adminclient.DeleteRunnerOptions
 }
 
 func (f *fakeAdmin) DescribeFleet(ctx context.Context, _ string) (adminclient.Fleet, error) {
@@ -65,7 +68,16 @@ func (f *fakeAdmin) GetFleetCapacity(
 	waitSeconds int,
 ) (adminclient.Capacity, error) {
 	f.capacityWaits = append(f.capacityWaits, waitSeconds)
-	return f.capacity, nil
+	capacity := f.capacity
+	if capacity.UnassignedRunners == 0 {
+		capacity.UnassignedRunners = capacity.PendingRunners + capacity.IdleRunners
+		for _, runner := range f.activeRunners {
+			if runner.ReservedTaskID != nil {
+				capacity.UnassignedRunners--
+			}
+		}
+	}
+	return capacity, nil
 }
 
 func (f *fakeAdmin) CreateRunner(
@@ -77,7 +89,21 @@ func (f *fakeAdmin) CreateRunner(
 	if f.events != nil {
 		*f.events = append(*f.events, "admin-create")
 	}
+	if err := f.createErrors[request.TaskID]; err != nil {
+		return adminclient.CreateRunnerResponse{}, err
+	}
 	return f.createResponse, nil
+}
+
+func (f *fakeAdmin) ListQueuedTasks(_ context.Context, _ string) ([]adminclient.Task, error) {
+	if f.queuedTasks != nil {
+		return f.queuedTasks, nil
+	}
+	var tasks []adminclient.Task
+	for i := int64(0); i < f.capacity.RunnableTasks; i++ {
+		tasks = append(tasks, adminclient.Task{ID: fmt.Sprintf("task-%d", i+1)})
+	}
+	return tasks, nil
 }
 
 func (f *fakeAdmin) ListRunners(
@@ -101,10 +127,13 @@ func limitedRunners(runners []adminclient.Runner, limit int) []adminclient.Runne
 
 func (f *fakeAdmin) DeleteRunner(
 	_ context.Context,
-	_, runnerID string, states []string,
+	_, runnerID string, states []string, options ...adminclient.DeleteRunnerOptions,
 ) (adminclient.Runner, error) {
 	f.deletedRunnerIDs = append(f.deletedRunnerIDs, runnerID)
 	f.deleteStates = append(f.deleteStates, states)
+	if len(options) > 0 {
+		f.deleteOptions = append(f.deleteOptions, options[0])
+	}
 	if f.deleteError != nil {
 		return adminclient.Runner{}, f.deleteError
 	}
@@ -181,12 +210,12 @@ func (f *fakeProvider) Delete(_ context.Context, resource provider.Resource) err
 	return nil
 }
 
-func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
+func TestQueuedDemandReservesJobBeforeProviderCreation(t *testing.T) {
 	var events []string
 	admin := newFakeAdmin()
 	admin.events = &events
 	admin.capacity.RunnableTasks = 1
-	admin.capacity.IdleRunners = 1
+	admin.capacity.IdleRunners = 0
 	admin.activeRunners = []adminclient.Runner{{
 		ID:      "runner-idle",
 		FleetID: "fleet-a",
@@ -194,7 +223,7 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 	}}
 	resourceProvider := &fakeProvider{events: &events}
 	resolver := &fakeArtifactResolver{}
-	reconciler := newTestReconciler(t, admin, resolver, resourceProvider, 1, 0)
+	reconciler := newTestReconciler(t, admin, resolver, resourceProvider, 0, 0)
 
 	if err := reconciler.Reconcile(context.Background()); err != nil {
 		t.Fatal(err)
@@ -205,9 +234,9 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 	if len(admin.createRequests) != 1 ||
 		!strings.HasPrefix(
 			admin.createRequests[0].IdempotencyKey,
-			"fleet-manager/fleet-a/generic/",
+			"fleet-manager/fleet-a/task/",
 		) ||
-		!admin.createRequests[0].Ephemeral {
+		!admin.createRequests[0].Ephemeral || admin.createRequests[0].TaskID != "task-1" {
 		t.Fatalf("create request = %#v", admin.createRequests)
 	}
 	if len(admin.deletedRunnerIDs) != 0 {
@@ -734,4 +763,82 @@ func newTestReconciler(
 		t.Fatal(err)
 	}
 	return reconciler
+}
+
+func TestExistingUnassignedSupplyCoversQueuedDemand(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.capacity.RunnableTasks = 2
+	admin.capacity.PendingRunners = 1
+	admin.capacity.IdleRunners = 1
+	reconciler := newTestReconciler(t, admin, &fakeArtifactResolver{}, &fakeProvider{}, 1, 0)
+	if err := reconciler.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.createRequests) != 0 {
+		t.Fatalf("created runners despite unassigned supply: %#v", admin.createRequests)
+	}
+}
+
+func TestCappedOldestOrganizationDoesNotHideEligibleDemand(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.capacity.RunnableTasks = 2
+	admin.queuedTasks = []adminclient.Task{{ID: "capped-job"}, {ID: "eligible-job"}}
+	admin.createErrors = map[string]error{"capped-job": &adminclient.HTTPError{StatusCode: http.StatusBadRequest}}
+	resourceProvider := &fakeProvider{}
+	reconciler := newTestReconciler(t, admin, &fakeArtifactResolver{}, resourceProvider, 0, 0)
+	if err := reconciler.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.createRequests) != 2 || admin.createRequests[0].TaskID != "capped-job" || admin.createRequests[1].TaskID != "eligible-job" {
+		t.Fatalf("demand reservations = %#v", admin.createRequests)
+	}
+	if resourceProvider.createRequest.RunnerID == "" {
+		t.Fatal("eligible demand was not provisioned")
+	}
+}
+
+func TestReservedRunnersRemainDuringScaleDown(t *testing.T) {
+	admin := newFakeAdmin()
+	jobID := "reserved-job"
+	admin.capacity.PendingRunners = 1
+	admin.capacity.IdleRunners = 1
+	admin.activeRunners = []adminclient.Runner{
+		{ID: "reserved-runner", State: adminclient.RunnerStatePending, ReservedTaskID: &jobID, CreatedAt: time.Now().Add(-time.Hour)},
+		{ID: "unassigned-runner", State: adminclient.RunnerStateIdle, CreatedAt: time.Now()},
+	}
+	reconciler := newTestReconciler(t, admin, &fakeArtifactResolver{}, &fakeProvider{}, 0, 1)
+	if err := reconciler.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.deletedRunnerIDs) != 1 || admin.deletedRunnerIDs[0] != "unassigned-runner" || len(admin.deleteOptions) != 1 || !admin.deleteOptions[0].RequireUnassigned {
+		t.Fatalf("scale down requests = %#v options %#v", admin.deletedRunnerIDs, admin.deleteOptions)
+	}
+}
+
+func TestPersistedCooldownSurvivesManagerRestart(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.capacity.RunnableTasks = 1
+	until := time.Now().Add(60 * time.Second)
+	admin.capacity.ProvisioningCooldownUntil = &until
+	for range 2 {
+		reconciler := newTestReconciler(t, admin, &fakeArtifactResolver{}, &fakeProvider{}, 0, 0)
+		if err := reconciler.Reconcile(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(admin.createRequests) != 0 {
+		t.Fatalf("created during persisted cooldown: %#v", admin.createRequests)
+	}
+}
+
+func TestNewWarmSupplyCoversDemandBeforeAdditionalProvisioning(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.capacity.RunnableTasks = 1
+	reconciler := newTestReconciler(t, admin, &fakeArtifactResolver{}, &fakeProvider{}, 1, 0)
+	if err := reconciler.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.createRequests) != 1 || admin.createRequests[0].TaskID != "" {
+		t.Fatalf("expected one warm runner to cover queued demand: %#v", admin.createRequests)
+	}
 }

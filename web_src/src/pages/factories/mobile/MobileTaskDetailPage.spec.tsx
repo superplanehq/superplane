@@ -20,6 +20,8 @@ import {
   factoryWithPlanning,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
+import { SPEC_ARTIFACT_NAME } from "../lib/intentDocument";
+import { factoryPlanningEnabled } from "../pages/planningSettingsModel";
 import { MobileTaskDetailPage } from "./MobileTaskDetailPage";
 
 const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading: boolean; isError: boolean } => ({
@@ -60,6 +62,10 @@ vi.mock("../pages/usePlanningSessionLiveRun", () => ({
   usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => view,
 }));
 
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({ data: { activeRunnerCount: 0, parallelRunnerLimit: 1 } }),
+}));
+
 vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
   useSplitRunLiveCanvas: () =>
     liveCanvas.current ?? { enabled: false, isError: false, isLoading: false, canvas: undefined, stream: [] },
@@ -67,7 +73,15 @@ vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrder: () => useWorkOrder(),
-  useWorkOrderArtifacts: () => ({ data: [] }),
+  useWorkOrderArtifacts: () => ({
+    data: [
+      {
+        id: "plan-1",
+        type: "TYPE_MARKDOWN",
+        data: { name: SPEC_ARTIFACT_NAME, body: "# Plan\n\nFix refund rounding." },
+      },
+    ],
+  }),
   useFactoryAutomations: () => ({ data: [] }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -325,12 +339,16 @@ describe("MobileTaskDetailPage back link", () => {
 
 const PLAN_LINE_NAME = "plan-and-implement";
 
-function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?lineId=${REFUND_LINE_PLAN_ID}`) {
+async function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?lineId=${REFUND_LINE_PLAN_ID}`) {
   useWorkOrder.mockReturnValue({ data: DRAFT_WORK_ORDER, isLoading: false, isError: false });
-  return renderTask(
+  const rendered = renderTask(
     `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}${search}`,
     factory,
   );
+  if (factoryPlanningEnabled(factory)) {
+    await screen.findByTestId("split-run-intent-composer");
+  }
+  return rendered;
 }
 
 describe("MobileTaskDetailPage model select", () => {
@@ -345,16 +363,37 @@ describe("MobileTaskDetailPage model select", () => {
     updateAssignees.mockResolvedValue({ assignees: [] });
   });
 
-  it("shows a model control next to Start on a draft when planning is on", () => {
-    renderDraft();
+  it("shows a model control next to Start on a draft when planning is on", async () => {
+    await renderDraft();
 
     expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
   });
 
+  it("starts implementation through the automation flow", async () => {
+    useWorkOrder.mockReturnValue({
+      data: DRAFT_WORK_ORDER,
+      isLoading: false,
+      isError: false,
+    });
+    renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+
+    await screen.findByTestId("split-run-intent-composer");
+    const start = await screen.findByRole("button", { name: "Start" });
+    await userEvent.setup().click(start);
+
+    expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+      lineName: PLAN_LINE_NAME,
+      model: undefined,
+      thinkingLevel: "medium",
+    });
+  });
+
   it("opens model and thinking choices in one menu and updates the closed label", async () => {
     const user = userEvent.setup();
-    renderDraft();
+    await renderDraft();
 
     await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
 
@@ -371,7 +410,7 @@ describe("MobileTaskDetailPage model select", () => {
 
   it("keeps the full model name in the accessible label", async () => {
     const user = userEvent.setup();
-    renderDraft();
+    await renderDraft();
 
     await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
     await user.click(screen.getByRole("menuitem", { name: "Anthropic Claude Opus 4.6 with extended context" }));
@@ -383,7 +422,7 @@ describe("MobileTaskDetailPage model select", () => {
 
   it("starts on Auto without a model id and sends the thinking level", async () => {
     const user = userEvent.setup();
-    renderDraft();
+    await renderDraft();
 
     await user.click(screen.getByRole("button", { name: "Start" }));
 
@@ -396,7 +435,7 @@ describe("MobileTaskDetailPage model select", () => {
 
   it("sends the chosen model and thinking level when Start runs", async () => {
     const user = userEvent.setup();
-    renderDraft();
+    await renderDraft();
 
     await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
     await user.click(screen.getByRole("menuitem", { name: "High" }));
@@ -413,7 +452,7 @@ describe("MobileTaskDetailPage model select", () => {
 
   it("does not start with a model from the previous line", async () => {
     const user = userEvent.setup();
-    renderDraft();
+    await renderDraft();
 
     await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
     await user.click(screen.getByRole("menuitem", { name: "High" }));
@@ -442,7 +481,7 @@ describe("MobileTaskDetailPage model select", () => {
 
   it("hides the model control and omits thinking when planning is off", async () => {
     const user = userEvent.setup();
-    renderDraft(factoryWithPlanning(REFUND_FACTORY, { enabled: false, clarity: false, confidence: false }));
+    await renderDraft(factoryWithPlanning(REFUND_FACTORY, { enabled: false, clarity: false, confidence: false }));
 
     expect(screen.queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start" }));
@@ -454,16 +493,16 @@ describe("MobileTaskDetailPage model select", () => {
     });
   });
 
-  it("disables the model control while start is busy", () => {
+  it("disables the model control while start is busy", async () => {
     dispatchingIds.current = new Set([DRAFT_WORK_ORDER.id ?? ""]);
-    renderDraft();
+    await renderDraft();
 
     expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
   });
 
-  it("keeps Start disabled and does not list models from another line when the start line has no name", () => {
-    renderDraft(
+  it("keeps Start disabled and does not list models from another line when the start line has no name", async () => {
+    await renderDraft(
       {
         ...REFUND_FACTORY,
         lines: [

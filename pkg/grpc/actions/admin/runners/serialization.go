@@ -9,7 +9,7 @@ import (
 func serializeFleet(fleet *models.RunnerFleet) *pb.Fleet {
 	spec := fleet.Spec.Data()
 
-	return &pb.Fleet{
+	out := &pb.Fleet{
 		Id:      fleet.Slug,
 		Enabled: fleet.Enabled,
 		Spec: &pb.FleetSpec{
@@ -24,6 +24,10 @@ func serializeFleet(fleet *models.RunnerFleet) *pb.Fleet {
 		CreatedAt:     timestamppb.New(fleet.CreatedAt),
 		UpdatedAt:     timestamppb.New(fleet.UpdatedAt),
 	}
+	if fleet.ProvisioningCooldownUntil != nil {
+		out.ProvisioningCooldownUntil = timestamppb.New(*fleet.ProvisioningCooldownUntil)
+	}
+	return out
 }
 
 func fleetSpecFromProto(spec *pb.FleetSpec) models.RunnerFleetSpec {
@@ -51,6 +55,10 @@ func serializeRunner(runner *models.Runner, fleetID string) *pb.Runner {
 		Ephemeral:     runner.Ephemeral,
 		CreatedAt:     timestamppb.New(runner.CreatedAt),
 		UpdatedAt:     timestamppb.New(runner.UpdatedAt),
+	}
+	if runner.ReservedTaskID != nil {
+		taskID := runner.ReservedTaskID.String()
+		out.ReservedTaskId = &taskID
 	}
 	if runner.RegisteredAt != nil {
 		out.RegisteredAt = timestamppb.New(*runner.RegisteredAt)

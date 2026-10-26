@@ -386,6 +386,18 @@ groups Work Orders into:
 The list is ordered for actionability within each group and lets the user open
 the dedicated Work Order page.
 
+### Runner queue
+
+The [runner queue design](../design/task-queue.md) describes organization runner
+slots and individual job positions. Each reserved or running integrated job uses
+one slot across all workspaces and fleets. A task can have running work and
+several queued jobs together. Cards show each job's organization position and
+can cancel one exact queued job. Fleet availability can start later jobs first.
+
+Automation and line-step concurrency keep separate waiting states. Work does not
+receive a runner queue position before a runner job exists. Start continues
+through the automation flow when organization runner capacity is full.
+
 ## Automations Tab
 
 The Automations tab presents the Factory's Canvas-backed Automations as a

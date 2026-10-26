@@ -79,6 +79,7 @@ message Fleet {
   string runner_version = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+  optional google.protobuf.Timestamp provisioning_cooldown_until = 7;
 }
 
 message FleetSpec {
@@ -107,6 +108,7 @@ message Runner {
   string arch = 14;
   string hostname = 15;
   string ip = 16;
+  optional string reserved_task_id = 17;
 }
 
 message Task {
@@ -170,6 +172,8 @@ message GetFleetCapacityResponse {
   int64 busy_runners = 4;
   int64 terminated_runners = 5;
   string generation = 6;
+  int64 unassigned_runners = 7;
+  optional google.protobuf.Timestamp provisioning_cooldown_until = 8;
 }
 
 message ListFleetTasksRequest {
@@ -190,6 +194,8 @@ message CreateRunnerRequest {
   optional string task_id = 2;
   string idempotency_key = 3;
   bool ephemeral = 4;
+  optional int32 warm_capacity = 5;
+  optional int32 max_capacity = 6;
 }
 
 message CreateRunnerResponse {
@@ -228,6 +234,8 @@ message DeleteRunnerRequest {
   // When nonempty, delete only if the current state is in this list.
   // A mismatch returns a conflict without changing the runner or task.
   repeated string states = 3;
+  bool require_unassigned = 4;
+  optional string reason = 5;
 }
 
 message DeleteRunnerResponse {

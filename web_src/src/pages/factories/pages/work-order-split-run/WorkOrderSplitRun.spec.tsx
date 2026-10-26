@@ -6,8 +6,9 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import type * as FactoryData from "@/hooks/useFactoryData";
+import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
+import type * as FactoryData from "@/hooks/useFactoryData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 import { organizationBillingQueryKey } from "@/hooks/useOrganizationBilling";
@@ -63,6 +64,12 @@ vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
 
 const useLiveLogStreamMock = vi.fn();
 const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSessionPayload | null>>(async () => null);
+const sendWorkOrderPlanningMessageMock = vi.fn();
+const taskCapacity = { current: undefined as { activeRunnerCount: number; parallelRunnerLimit?: number } | undefined };
+
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({ data: taskCapacity.current }),
+}));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
@@ -83,6 +90,7 @@ vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
 vi.mock("../planningSessionClient", () => ({
   findPlanningSessionByWorkOrder: (...args: unknown[]) => findPlanningSessionMock(...args),
   sendPlanningSessionMessage: vi.fn(),
+  sendWorkOrderPlanningMessage: (...args: unknown[]) => sendWorkOrderPlanningMessageMock(...args),
   answerPlanningSessionSurvey: vi.fn(),
 }));
 
@@ -117,6 +125,7 @@ import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant"
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { workOrderPlanningSessionQueryKey } from "./useAnalysisPlanningSession";
 import { buildSplitRunFooter } from "./splitRunFooter";
+import { collectSplitRunArtifacts } from "./splitRunPopupModel";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunFixture } from "./splitRunMocks";
 import { WORK_ORDER_FULL_PAGE_STORAGE_KEY } from "./workOrderFullPagePreference";
 
@@ -191,6 +200,15 @@ function renderPopup(
     queryClient: client,
     rerenderPopup: (next: ComponentProps<typeof WorkOrderSplitRunPopup> = props) => view.rerender(ui(next)),
   };
+}
+
+function planningPopupClient(orderId: string, artifacts: FactoriesWorkOrderArtifact[] = []) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(
+    factoryQueryKeys.workOrderArtifacts(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, orderId),
+    artifacts,
+  );
+  return client;
 }
 
 function renderSplitRun() {
@@ -285,6 +303,8 @@ describe("WorkOrderSplitRunPopup", () => {
     useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
     findPlanningSessionMock.mockReset();
     findPlanningSessionMock.mockResolvedValue(null);
+    sendWorkOrderPlanningMessageMock.mockReset();
+    taskCapacity.current = undefined;
     closeMutateAsync.mockReset().mockResolvedValue({});
     vi.mocked(showSuccessToast).mockReset();
     mergeMutate.mockReset();
@@ -1730,7 +1750,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    expect(screen.queryByTestId("split-run-intent-verdict-analyzing")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
     const archive = screen.getByTestId("popup-work-order-archive-button");
     const share = screen.getByTestId("popup-work-order-copy-link-button");
@@ -1750,6 +1770,93 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Open plan" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-log-pane")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      activeRunnerCount: 0,
+      parallelRunnerLimit: 1,
+      label: "Analyze",
+
+      message: "Check the failure case.",
+    },
+    { activeRunnerCount: 1, parallelRunnerLimit: 1, label: "Analyze", message: undefined },
+    { activeRunnerCount: 1, parallelRunnerLimit: undefined, label: "Analyze", message: undefined },
+  ])(
+    "offers Analyze with runner limit $parallelRunnerLimit after analysis is dequeued",
+    async ({ activeRunnerCount, parallelRunnerLimit, label, message }) => {
+      const user = userEvent.setup();
+      taskCapacity.current = { activeRunnerCount, parallelRunnerLimit };
+      sendWorkOrderPlanningMessageMock.mockResolvedValue({ id: "recovered-session", state: "running" });
+      renderPopup(
+        {
+          organizationId: FACTORIES_ORGANIZATION_ID,
+          factoryId: PRIMARY_FACTORY_ID,
+          orderId: DRAFT_WORK_ORDER.id,
+          fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        },
+        planningPopupClient(DRAFT_WORK_ORDER.id ?? ""),
+      );
+
+      const analyze = await screen.findByRole("button", { name: label });
+      expect(screen.getByTestId("split-run-intent-composer")).toBeEnabled();
+      expect(screen.queryByText("Analyzing task…")).not.toBeInTheDocument();
+      if (message) await user.type(screen.getByTestId("split-run-intent-composer"), message);
+      await user.click(analyze);
+
+      await waitFor(() =>
+        expect(sendWorkOrderPlanningMessageMock).toHaveBeenCalledWith(
+          FACTORIES_ORGANIZATION_ID,
+          PRIMARY_FACTORY_ID,
+          DRAFT_WORK_ORDER.id,
+          message ?? "Analyze this task.",
+        ),
+      );
+      expect(screen.queryByRole("button", { name: label })).not.toBeInTheDocument();
+    },
+  );
+
+  it("restores Analyze after a queued analysis is removed", async () => {
+    const props = {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          ...DRAFT_WORK_ORDER,
+          queuedRunnerJobs: [{ id: "analysis-queue", automationName: "Task analysis", position: 2 }],
+        },
+        { isAnalyzing: true },
+      ),
+    };
+    const view = renderPopup(props, planningPopupClient(DRAFT_WORK_ORDER.id ?? ""));
+    await screen.findByText(/Runner queued #2/);
+    expect(screen.queryByText("Analyzing task…")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(Analyze|Queue analysis)$/ })).not.toBeInTheDocument();
+
+    view.rerenderPopup({ ...props, fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    expect(await screen.findByRole("button", { name: "Analyze" })).toBeEnabled();
+    expect(screen.getByTestId("split-run-intent-composer")).toBeEnabled();
+    expect(screen.queryByText(/Runner queued #2/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Analyzing task…")).not.toBeInTheDocument();
+  });
+
+  it("keeps Start available while runner jobs wait", async () => {
+    const user = userEvent.setup();
+    const onDispatch = vi.fn().mockResolvedValue(undefined);
+    const order = {
+      ...REVIEW_CANDIDATE_WORK_ORDERS[0],
+      queuedRunnerJobs: [{ id: "queue-1", position: 2, automationName: "Implement" }],
+    };
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(order, { checks: OPEN_WORK_ORDER_CHECKS }),
+      canDispatch: true,
+      onDispatch,
+    });
+    expect(screen.getByText(/Runner queued #2/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenCalledTimes(1);
   });
 
   it("hides Refine on a backlog draft", () => {
@@ -2108,7 +2215,19 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("keeps the verdict and both score slots on the matrix while a review draft is analyzed", () => {
-    renderPopup({ fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]) });
+    const order = REVIEW_CANDIDATE_WORK_ORDERS[0];
+    const fixture = splitRunFixtureForWorkOrder(order);
+    const session = { id: "session-1", state: "running", executionId: "execution-1" };
+    findPlanningSessionMock.mockResolvedValue(session);
+    const client = planningPopupClient(order.id ?? "", collectSplitRunArtifacts(fixture));
+    client.setQueryData(
+      workOrderPlanningSessionQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, order.id ?? ""),
+      session,
+    );
+    renderPopup(
+      { organizationId: FACTORIES_ORGANIZATION_ID, factoryId: PRIMARY_FACTORY_ID, orderId: order.id, fixture },
+      client,
+    );
 
     const tab = screen.getByTestId("split-run-work-order-tab");
     expect(within(tab).queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();

@@ -166,12 +166,16 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		executionUpdates = append(executionUpdates, executions...)
 	}
 
+	runnerChanges := &RunnerTaskChangeNotifier{}
 	stateUpdated := false
 	alreadyInitialized := false
 	failedBeforeStart := false
 	var pendingFactoryRuns []factoryLinePendingRun
 	var factoryOrderUpdates []factoryWorkOrderUpdate
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.LockRunOrganizationTaskAdmission(tx, runID); err != nil {
+			return err
+		}
 		locked, err := models.LockCanvasRunInTransaction(tx, runID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -194,6 +198,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 
 		err = NewRunCallbackDispatcher(tx, w.registry, locked).
 			WithEventCollector(eventCollector).
+			WithRunnerTaskChangeCollector(runnerChanges.Record).
 			DispatchPending()
 
 		//
@@ -204,7 +209,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		if err != nil {
 			logger = logging.WithCanvasWorkspace(logger, unscopedCanvas(tx, locked.WorkflowID))
 			logger.WithError(err).Errorf("Error dispatching pending run callback")
-			admitted, failErr := w.failRun(tx, locked, eventCollector, executionCollector, err.Error())
+			admitted, failErr := w.failRun(tx, locked, eventCollector, executionCollector, err.Error(), runnerChanges)
 			if failErr != nil {
 				return failErr
 			}
@@ -236,6 +241,8 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		return err
 	}
 
+	runnerChanges.Publish()
+
 	if alreadyInitialized || failedBeforeStart {
 		rollUpFactoryUsageBestEffort(logger, database.Conn(), runID)
 	}
@@ -243,18 +250,6 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 	if stateUpdated {
 		if err := messages.NewCanvasRunMessage(workflowID.String(), runID.String()).Publish(); err != nil {
 			logger.WithError(err).Warnf("Failed to publish run state message for run %s", runID)
-		}
-	}
-
-	for _, event := range newEvents {
-		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
-			return err
-		}
-	}
-
-	for _, execution := range executionUpdates {
-		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
-			return err
 		}
 	}
 
@@ -278,6 +273,18 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		}
 	}
 
+	for _, event := range newEvents {
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			return err
+		}
+	}
+
+	for _, execution := range executionUpdates {
+		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -287,6 +294,7 @@ func (w *RunInitializer) failRun(
 	eventCollector func([]models.CanvasEvent),
 	executionCollector func([]models.CanvasNodeExecution),
 	resultMessage string,
+	runnerChanges *RunnerTaskChangeNotifier,
 ) ([]*models.FactoryLineStepResult, error) {
 	if err := run.AddError(tx, resultMessage, config.MaxPayloadSize()); err != nil {
 		return nil, fmt.Errorf("record run error: %w", err)
@@ -318,6 +326,7 @@ func (w *RunInitializer) failRun(
 	err = NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
+		WithRunnerTaskChangeCollector(runnerChanges.Record).
 		DispatchFinished()
 	if err != nil {
 		return nil, err
@@ -376,9 +385,15 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 		return nil, err
 	}
 
-	if err := dispatch.Finish(tx, result); err != nil {
+	open, err := dispatch.HasOpenWork(tx)
+	if err != nil {
 		return nil, err
 	}
+	if !open {
+		if err := dispatch.Finish(tx, result); err != nil {
+			return nil, err
+		}
+	}
 
-	return models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
+	return models.AdmitQueuedForOrganization(tx, execution.OrganizationID)
 }

@@ -434,3 +434,16 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 	assert.Equal(t, secondDispatch.ID, admitted.LineDispatchID)
 	assertExecutionRunID(t, thirdPending[0].runID, admitted)
 }
+
+func setRunnerPlanLimit(t *testing.T, r *support.ResourceRegistry, limit int) *models.BillingPlan {
+	t.Helper()
+	db := database.DB(t.Context())
+	plan := &models.BillingPlan{
+		Key: "task_" + uuid.NewString()[:8], Name: "Task capacity", Category: "paid", Visibility: "private",
+		ParallelTaskLimit: &limit, CreditFrequency: "none", CreditExpiration: "never",
+	}
+	require.NoError(t, models.SaveBillingPlan(db, plan))
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	return plan
+}

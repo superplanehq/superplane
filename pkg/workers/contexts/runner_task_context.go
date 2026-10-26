@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
-	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
 	"gorm.io/gorm"
 )
 
@@ -21,6 +20,33 @@ type RunnerTaskContext struct {
 	tx             *gorm.DB
 	encryptor      crypto.Encryptor
 	organizationID uuid.UUID
+	runID          uuid.UUID
+	secrets        *SecretsContext
+	refreshes      []runnerapi.CredentialRefresh
+	onChanged      func(organizationID uuid.UUID, runnerID *uuid.UUID)
+}
+
+func (c *RunnerTaskContext) WithRunScope(runID uuid.UUID) *RunnerTaskContext {
+	c.runID = runID
+	return c
+}
+
+// WithOnChanged records mutations for publication after the owning transaction commits.
+func (c *RunnerTaskContext) WithOnChanged(fn func(organizationID uuid.UUID, runnerID *uuid.UUID)) *RunnerTaskContext {
+	c.onChanged = fn
+	return c
+}
+
+func (c *RunnerTaskContext) WithSecrets(secrets *SecretsContext) *RunnerTaskContext {
+	c.secrets = secrets
+	if secrets != nil {
+		secrets.deferRunnerCredentials = true
+	}
+	return c
+}
+
+func (c *RunnerTaskContext) RecordCredentialRefresh(descriptor runnerapi.CredentialRefresh) {
+	c.refreshes = append(c.refreshes, descriptor)
 }
 
 func NewRunnerTaskContext(
@@ -44,6 +70,10 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 		return fmt.Errorf("invalid runner task ID: %w", err)
 	}
 	payload, err = withDefaultLogUploadPolicy(payload)
+	if err != nil {
+		return err
+	}
+	payload, err = c.withCredentialRefreshes(payload)
 	if err != nil {
 		return err
 	}
@@ -75,7 +105,9 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 	if err := c.tx.Create(task).Error; err != nil {
 		return err
 	}
-	_ = runnercontrol.Publish(runnercontrol.Notification{FleetID: fleet.Slug})
+	if c.onChanged != nil {
+		c.onChanged(c.organizationID, nil)
+	}
 	return nil
 }
 
@@ -132,11 +164,10 @@ func (c *RunnerTaskContext) RequestCancel(rawID string) error {
 	if err := task.RequestCancel(c.tx, time.Now()); err != nil {
 		return err
 	}
-	if task.RunnerID != nil {
-		_ = runnercontrol.Publish(runnercontrol.Notification{
-			RunnerID: task.RunnerID.String(),
-		})
+	if c.onChanged != nil {
+		c.onChanged(c.organizationID, task.RunnerID)
 	}
+
 	return nil
 }
 

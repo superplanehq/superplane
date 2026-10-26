@@ -389,10 +389,10 @@ function planNumberFields(plan: BillingPlan, assigned: boolean) {
     },
     {
       key: "parallel_task_limit",
-      label: "Parallel task limit",
+      label: "Parallel runner limit",
       help: legacy
-        ? "Legacy Business parallel task limit cannot change."
-        : "Saved for future use. This limit does not restrict task execution.",
+        ? "Legacy Business parallel runner limit cannot change."
+        : "Maximum parallel runners across all workspaces in an organization. Leave empty for unlimited runners.",
       nullable: true,
       placeholder: "Unlimited",
       locked: legacy,

@@ -307,8 +307,13 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	runCancellations := &RunCancellationNotifier{}
+	runnerChanges := &RunnerTaskChangeNotifier{}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.LockTaskExecutionAdmission(tx, id); err != nil {
+			return err
+		}
+
 		//
 		// Try to lock the execution record for update.
 		// If we can't, it means another worker is already processing it.
@@ -344,7 +349,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations, runnerChanges)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -416,6 +421,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	runCancellations.Publish()
+	runnerChanges.Publish()
 
 	return nil
 }
@@ -433,6 +439,7 @@ func (w *NodeExecutor) executeActionNode(
 	onFileBindCleanup func(contexts.FileBindCleanup),
 	onProductAnalytics func(productanalytics.Event),
 	runCancellations *RunCancellationNotifier,
+	runnerChanges *RunnerTaskChangeNotifier,
 ) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
@@ -519,13 +526,16 @@ func (w *NodeExecutor) executeActionNode(
 			WithRemoteImageIngest(w.encryptor, w.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
-		RunnerTasks: contexts.NewRunnerTaskContext(
+		RunnerTasks: runnerChanges.Bind(contexts.NewRunnerTaskContext(
 			tx,
 			w.encryptor,
 			workflow.OrganizationID,
-		),
+		)),
 		Logger: logger,
 	}
+	ctx.RunnerTasks.(*contexts.RunnerTaskContext).
+		WithRunScope(execution.RunID).
+		WithSecrets(ctx.Secrets.(*contexts.SecretsContext))
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {

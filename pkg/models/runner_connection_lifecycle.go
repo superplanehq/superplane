@@ -22,17 +22,23 @@ func (r *Runner) MarkLost(tx *gorm.DB, lastSeenBefore, now time.Time) (*RunnerTa
 
 	var lostRunningTask *RunnerTask
 	if taskErr == nil {
-		wasRunning := task.State == RunnerTaskStateRunning
-		if err := tx.Model(task).Updates(map[string]any{
-			"state":       RunnerTaskStateLost,
-			"finished_at": now,
-			"updated_at":  now,
-		}).Error; err != nil {
-			return nil, err
-		}
-		if wasRunning {
-			if err := task.markLogsArchivable(tx, now); err != nil {
+		if task.State == RunnerTaskStateReserved && task.DispatchStartedAt == nil {
+			if err := task.ReleaseUndelivered(tx, r.ID, now); err != nil {
 				return nil, err
+			}
+		} else {
+			wasRunning := task.State == RunnerTaskStateRunning
+			if err := tx.Model(task).Updates(map[string]any{
+				"state":       RunnerTaskStateLost,
+				"finished_at": now,
+				"updated_at":  now,
+			}).Error; err != nil {
+				return nil, err
+			}
+			if wasRunning {
+				if err := task.markLogsArchivable(tx, now); err != nil {
+					return nil, err
+				}
 			}
 			lostRunningTask = task
 		}
