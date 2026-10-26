@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
@@ -55,6 +56,7 @@ func (w *RunnerCleanupWorker) Process() error {
 		return err
 	}
 	for _, id := range ids {
+		var releasedTask *models.RunnerTask
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
 			runner, err := models.LockRunner(tx, id)
 			if errors.Is(err, models.ErrRunnerNotFound) {
@@ -63,12 +65,26 @@ func (w *RunnerCleanupWorker) Process() error {
 			if err != nil {
 				return err
 			}
-			return runner.Expire(tx, now)
+			releasedTask, err = runner.FindActiveTask(tx)
+			if err != nil && !errors.Is(err, models.ErrRunnerTaskNotFound) {
+				return err
+			}
+			if err := runner.Expire(tx, now); err != nil {
+				return err
+			}
+			if runner.State != models.RunnerStateTerminated {
+				releasedTask = nil
+			}
+			return nil
 		})
 		if err != nil {
 			w.logger.WithError(err).
 				WithField("runner_id", id).
 				Error("Failed to expire runner registration")
+			continue
+		}
+		if releasedTask != nil {
+			messages.PublishPlanningRunnerStatus(database.DB(context.Background()), releasedTask)
 		}
 	}
 	staleRunners, err := models.ListStaleRunners(
@@ -81,6 +97,7 @@ func (w *RunnerCleanupWorker) Process() error {
 	}
 	for _, staleRunner := range staleRunners {
 		var lostRunningTask *models.RunnerTask
+		var lostTask *models.RunnerTask
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
 			runner, err := models.LockRunner(tx, staleRunner.ID)
 			if errors.Is(err, models.ErrRunnerNotFound) {
@@ -89,7 +106,14 @@ func (w *RunnerCleanupWorker) Process() error {
 			if err != nil {
 				return err
 			}
+			lostTask, err = runner.FindActiveTask(tx)
+			if err != nil && !errors.Is(err, models.ErrRunnerTaskNotFound) {
+				return err
+			}
 			lostRunningTask, err = runner.MarkLost(tx, now.Add(-runnerConnectionLossTimeout), now)
+			if runner.State != models.RunnerStateTerminated {
+				lostTask = nil
+			}
 			return err
 		})
 		if err != nil {
@@ -97,6 +121,9 @@ func (w *RunnerCleanupWorker) Process() error {
 				WithField("runner_id", staleRunner.ID).
 				Error("Failed to mark disconnected runner as lost")
 			continue
+		}
+		if lostTask != nil {
+			messages.PublishPlanningRunnerStatus(database.DB(context.Background()), lostTask)
 		}
 		if lostRunningTask != nil && telemetry.MetricsEnabled() {
 			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask, staleRunner.FleetSlug, staleRunner.FleetScope)

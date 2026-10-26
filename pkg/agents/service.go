@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -729,10 +729,10 @@ func (s *Service) checkAgentAccess(ctx context.Context, userID, organizationID u
 // a payment method when the plan needs one, and a plan that can run agents.
 func assertAgentRunsAllowed(ctx context.Context, organizationID uuid.UUID) error {
 	db := database.DB(ctx)
-	if err := polar.AssertOrganizationPaymentMethod(db, organizationID); err != nil {
+	if err := billing.AssertOrganizationPaymentMethod(db, organizationID); err != nil {
 		return err
 	}
-	return models.AssertOrganizationPlanAllowsRuns(db, organizationID)
+	return billing.AssertOrganizationPlanAllowsRuns(db, organizationID)
 }
 
 func findCanvasSession(tx *gorm.DB, orgID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {

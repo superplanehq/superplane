@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -23,13 +24,13 @@ func TestInvitationGatewayPermissionsAndCapacityDetails(t *testing.T) {
 	// Register gateway routes before the catch-all web routes, as the server does.
 	server.InitRouter()
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.Conn()
-	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+	plan := billingmodels.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: new("prod_" + uuid.NewString()), CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	_, err := billingmodels.ApplyPolarSubscription(db, r.Organization.ID, billingmodels.PolarSubscriptionApply{
 		ID: "sub_" + uuid.NewString(), ProductID: *plan.PolarProductID,
-		Status: models.PolarSubscriptionStatusActive, PurchasedSeats: new(1),
+		Status: billingmodels.PolarSubscriptionStatusActive, PurchasedSeats: new(1),
 	}, nil)
 	require.NoError(t, err)
 	path := "/api/v1/organizations/" + r.Organization.ID.String() + "/invitations"
@@ -45,7 +46,7 @@ func TestInvitationGatewayPermissionsAndCapacityDetails(t *testing.T) {
 	require.Len(t, body.Details, 1)
 	require.Equal(t, "type.googleapis.com/google.rpc.ErrorInfo", body.Details[0].Type)
 	require.Equal(t, "SEAT_PURCHASE_REQUIRED", body.Details[0].Reason)
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
 	response = execRequest(server, requestParams{method: http.MethodPost, path: path, authCookie: token, headers: map[string]string{"x-organization-id": r.Organization.ID.String()}, contentType: "application/json", body: []byte(`{"email":"recipient@example.com"}`)})
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 	var created struct {
@@ -83,7 +84,7 @@ func TestInvitationGatewayPermissionsAndCapacityDetails(t *testing.T) {
 	require.NoError(t, r.AuthService.AssignRole(member.ID.String(), "inviter", r.Organization.ID.String(), models.DomainTypeOrganization))
 	response = execRequest(server, requestParams{method: http.MethodPost, path: path, authCookie: token, headers: map[string]string{"x-organization-id": r.Organization.ID.String()}, contentType: "application/json", body: []byte(`{"email":"second@example.com"}`)})
 	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 4).Error)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 4).Error)
 	response = execRequest(server, requestParams{method: http.MethodPost, path: path, authCookie: token, headers: map[string]string{"x-organization-id": r.Organization.ID.String()}, contentType: "application/json", body: []byte(`{"email":"second@example.com","role":"org_admin"}`)})
 	require.Equal(t, http.StatusForbidden, response.Code, response.Body.String())
 	response = execRequest(server, requestParams{method: http.MethodPost, path: path, authCookie: token, headers: map[string]string{"x-organization-id": r.Organization.ID.String()}, contentType: "application/json", body: []byte(`{"email":"second@example.com","role":"org_operator"}`)})
@@ -91,7 +92,7 @@ func TestInvitationGatewayPermissionsAndCapacityDetails(t *testing.T) {
 	response = execRequest(server, requestParams{method: http.MethodGet, path: path, authCookie: token, headers: map[string]string{"x-organization-id": r.Organization.ID.String()}})
 	require.Equal(t, http.StatusNotFound, response.Code, response.Body.String())
 
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 6).Error)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 6).Error)
 	for _, scenario := range []struct {
 		name   string
 		scopes []string
@@ -121,7 +122,7 @@ func TestInvitationGatewayLimitReasons(t *testing.T) {
 	server, _, token := setupTestServer(r, t)
 	server.InitRouter()
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	path := "/api/v1/organizations/" + r.Organization.ID.String() + "/invitations"
 	invite := func(email string) *httptest.ResponseRecorder {
 		body := []byte(`{"email":"` + email + `"}`)

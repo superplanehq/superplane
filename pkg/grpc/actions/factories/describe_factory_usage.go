@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 )
 
 const (
@@ -35,7 +35,7 @@ func DescribeFactoryUsage(
 	}
 	factoryID := factory.ID
 
-	totals, byModel, err := models.SummarizeUsage(db, models.UsageReportFilter{
+	totals, byModel, err := billing.SummarizeUsage(db, billing.UsageReportFilter{
 		OrganizationID: orgID,
 		FactoryID:      &factoryID,
 		Since:          since,
@@ -44,7 +44,7 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
-	computeTotals, byMachine, err := models.SummarizeComputeUsage(db, models.UsageReportFilter{
+	computeTotals, byMachine, err := billing.SummarizeComputeUsage(db, billing.UsageReportFilter{
 		OrganizationID: orgID,
 		FactoryID:      &factoryID,
 		Since:          since,
@@ -53,12 +53,12 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
-	credit, err := models.DescribeOrganizationLLMCredit(db, orgID)
+	credit, err := billing.DescribeCredit(db, orgID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
-	budget, err := models.DescribeFactoryHostedBudget(db, factory)
+	budget, err := billing.DescribeFactoryBudget(db, factory.OrganizationID, factory.ID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
@@ -69,17 +69,17 @@ func DescribeFactoryUsage(
 		TotalCostCents:                ledger.CostCents(),
 		PeriodDays:                    int32(period),
 		ByModel:                       serializeUsageByModel(byModel),
-		RemainingCreditCents:          pricebook.MicrosToCents(credit.RemainingMicros),
-		GrantTotalCents:               pricebook.MicrosToCents(credit.GrantMicros),
-		HostedBilledCents:             pricebook.MicrosToCents(credit.BilledMicros),
+		RemainingCreditCents:          billing.MicrosToCents(credit.RemainingMicros),
+		GrantTotalCents:               billing.MicrosToCents(credit.GrantMicros),
+		HostedBilledCents:             billing.MicrosToCents(credit.BilledMicros),
 		RemainingCreditWarning:        credit.Warning,
-		FactoryHostedBilledCents:      pricebook.MicrosToCents(budget.BilledMicros),
-		FactoryRemainingCreditCents:   pricebook.MicrosToCents(budget.RemainingMicros),
+		FactoryHostedBilledCents:      billing.MicrosToCents(budget.BilledMicros),
+		FactoryRemainingCreditCents:   billing.MicrosToCents(budget.RemainingMicros),
 		FactoryRemainingCreditWarning: budget.Warning,
 		TotalDurationSeconds:          ledger.DurationSeconds,
 		ByMachineType:                 serializeUsageByMachineType(byMachine),
-		HostedCreditAvailable:         !models.BillingEnabled() || credit.RemainingMicros > 0,
-		FactoryHostedBudgetAvailable:  !models.BillingEnabled() || !budget.Capped || budget.RemainingMicros > 0,
+		HostedCreditAvailable:         !billing.Enabled() || credit.RemainingMicros > 0,
+		FactoryHostedBudgetAvailable:  !billing.Enabled() || !budget.Capped || budget.RemainingMicros > 0,
 	}
 	if budget.BudgetCents != nil {
 		resp.HostedSpendBudgetCents = budget.BudgetCents

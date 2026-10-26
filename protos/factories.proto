@@ -3126,6 +3126,10 @@ message PlanningSessionSummary {
   string wait_state = 3;
   string execution_id = 4;
   PlanningSessionSurvey survey = 5;
+  // Integrated runner task state, independent of the agent node state.
+  string runner_state = 6;
+  // "parallelism_limit" while a queued task waits for organization capacity.
+  string queue_reason = 7;
 }
 
 message PlanningSession {
@@ -3144,6 +3148,10 @@ message PlanningSession {
   string selectable_model_key = 13;
   PlanningSessionKind kind = 14;
   repeated PlanningSessionActivity activities = 15;
+  // Integrated runner task state, independent of the agent node state.
+  string runner_state = 16;
+  // "parallelism_limit" while a queued task waits for organization capacity.
+  string queue_reason = 17;
 }
 
 enum PlanningSessionKind {

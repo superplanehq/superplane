@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"gorm.io/gorm"
 )
 
@@ -33,7 +33,7 @@ func (a FactoryAutomationRuns) AverageDurationHours() float64 {
 }
 
 func (a FactoryAutomationRuns) CostCents() int64 {
-	return pricebook.MicrosToCents(a.CostMicros)
+	return billing.MicrosToCents(a.CostMicros)
 }
 
 // SummarizeFactoryAutomationRuns reports one row per automation of the

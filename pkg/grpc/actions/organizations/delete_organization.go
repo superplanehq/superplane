@@ -7,7 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -35,7 +35,7 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 
 	// Ask Polar before the transaction: the request must not hold the
 	// organization lock. SoftDelete checks the clearance again under the lock.
-	clearance, err := polar.VerifyOrganizationDeletion(ctx, organization.ID)
+	clearance, err := billing.PrepareDeletion(ctx, organization.ID)
 	if err != nil {
 		return nil, deleteOrganizationError(orgID, err)
 	}
@@ -62,16 +62,16 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 
 func deleteOrganizationError(orgID string, err error) error {
 	switch {
-	case errors.Is(err, models.ErrOrganizationSubscriptionLive):
+	case errors.Is(err, billing.ErrOrganizationSubscriptionLive):
 		log.WithError(err).WithField("organization_id", orgID).Info("organization deletion blocked by a live subscription")
-		return grpcerrors.FailedPreconditionWithReason(models.ErrOrganizationSubscriptionLive.Error(), liveSubscriptionDeleteReason)
-	case errors.Is(err, models.ErrOrganizationCheckoutPending):
+		return grpcerrors.FailedPreconditionWithReason(billing.ErrOrganizationSubscriptionLive.Error(), liveSubscriptionDeleteReason)
+	case errors.Is(err, billing.ErrOrganizationCheckoutPending):
 		log.WithError(err).WithField("organization_id", orgID).Info("organization deletion blocked by a pending checkout")
-		return grpcerrors.FailedPreconditionWithReason(models.ErrOrganizationCheckoutPending.Error(), pendingCheckoutDeleteReason)
-	case errors.Is(err, models.ErrOrganizationSubscriptionUnverified):
+		return grpcerrors.FailedPreconditionWithReason(billing.ErrOrganizationCheckoutPending.Error(), pendingCheckoutDeleteReason)
+	case errors.Is(err, billing.ErrOrganizationSubscriptionUnverified):
 		log.WithError(err).WithField("organization_id", orgID).Warn("organization deletion could not verify subscription termination")
-		return grpcerrors.UnavailableWithReason(models.ErrOrganizationSubscriptionUnverified.Error(), unverifiedSubscriptionDeleteReason)
-	case errors.Is(err, models.ErrBillingPlanChanged):
+		return grpcerrors.UnavailableWithReason(billing.ErrOrganizationSubscriptionUnverified.Error(), unverifiedSubscriptionDeleteReason)
+	case errors.Is(err, billing.ErrBillingPlanChanged):
 		log.WithField("organization_id", orgID).Info("organization deletion stopped by a billing change")
 		return grpcerrors.Conflict(err, billingChangedDeleteMessage)
 	case errors.Is(err, gorm.ErrRecordNotFound):
