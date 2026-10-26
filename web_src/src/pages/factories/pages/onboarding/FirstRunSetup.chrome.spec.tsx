@@ -5,8 +5,10 @@ import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, OrganizationsBillingPlanOption } from "@/api-client";
+import type { FactoriesFactory } from "@/api-client";
 import { unmockedPackage } from "@/test/unmockedModule";
+
+import { billingState, defaultBillingState, refetchBilling } from "./FirstRunSetup.chrome.spec.billing";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
@@ -74,30 +76,6 @@ vi.mock("./useGitHubOnboarding", () => ({
     configureInstallation: { mutateAsync: vi.fn() },
   }),
   useGitHubInstallationChecks: vi.fn(),
-}));
-
-const defaultBillingState = {
-  enabled: false,
-  newBilling: false,
-  byok: false,
-  planActive: false,
-  hasPaymentMethod: false,
-};
-const billingState: typeof defaultBillingState & { availablePlans?: OrganizationsBillingPlanOption[] } = {
-  ...defaultBillingState,
-};
-const billingData = () => ({
-  billingEnabled: billingState.enabled,
-  availablePlans: billingState.availablePlans,
-  productFeatures: { byo_key: true },
-  planCategory: billingState.planActive ? "paid" : "none",
-  creditPurchaseAllowed: billingState.planActive,
-  hasPaymentMethod: billingState.hasPaymentMethod,
-});
-const refetchBilling = vi.fn(async () => ({ data: billingData() }));
-vi.mock("@/hooks/useOrganizationBilling", () => ({
-  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
-  useOrganizationBilling: () => ({ data: billingData(), isPending: false, isSuccess: true, refetch: refetchBilling }),
 }));
 
 const workspaceUsage = { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" };
@@ -535,6 +513,30 @@ describe("FirstRunSetup chrome", () => {
       expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "pay_as_you_go", expect.any(Object)),
     );
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+  });
+
+  it("finishes a Starter checkout return after the saved GitHub connection restores", async () => {
+    Object.assign(billingState, { enabled: true, newBilling: true, planActive: true });
+    billingState.availablePlans = [{ key: "starter", name: "Starter", subscriptionRequired: true }];
+    const path = "/org-1/workspaces/PAY/setup?step=card&plan=starter&card_setup=1&subscribed=1";
+    const previousUrl = window.location.href;
+    window.history.replaceState({}, "", path);
+    try {
+      const model = hostedVcsModel({ setup: { ...setupState(), connected: new Set() } });
+      const { rerender } = renderSetup(model, path);
+      expect(model.finish).not.toHaveBeenCalled();
+
+      const restored = { ...model, setup: { ...model.setup, connected: new Set(["github"] as const) } };
+      rerender(
+        <MemoryRouter initialEntries={[path]}>
+          <FirstRunSetup model={restored} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+      expect(activateOnboardingPlan).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState({}, "", previousUrl);
+    }
   });
 
   it.each(
