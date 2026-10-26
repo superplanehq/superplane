@@ -113,70 +113,22 @@ type OrganizationLLMCreditSummary struct {
 	WelcomeCreditExpiresAt   *time.Time
 }
 
+// GrantWelcomeCredit grants signup credit once per account. New billing uses
+// the same $10 credit for either starter plan, independent of plan selection.
 func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
-	if accountID == uuid.Nil {
-		return errors.New("account is required for welcome credit")
-	}
-
-	var account coremodels.Account
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("id = ?", accountID).
-		First(&account).Error
-	if err != nil {
-		return err
-	}
-	if account.HasReceivedWelcomeCredit() {
-		return nil
-	}
-
 	settings, err := FindBillingPlan(tx, BillingPlanTrial)
 	if err != nil {
 		return err
 	}
-	amount := CentsToMicros(settings.TrialCreditCents)
-	if amount <= 0 {
-		return nil
-	}
-
-	now := time.Now()
-	var existing OrganizationLLMCreditGrant
-	err = tx.Where("organization_id = ? AND kind = ?", orgID, LLMCreditGrantKindWelcome).
-		First(&existing).Error
-	if err == nil {
-		return stampWelcomeCreditGrantedAt(tx, accountID, existing.CreatedAt)
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	newBilling, err := coremodels.OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureNewBilling)
+	if err != nil {
 		return err
 	}
-
-	if _, err := EnsureOrganizationBillingPlan(tx, orgID); err != nil {
-		return err
+	if newBilling {
+		settings.TrialCreditCents = 1000
+		settings.TrialLengthDays = 365
 	}
-
-	expiresAt := now.AddDate(0, 0, settings.TrialLengthDays)
-	grant := OrganizationLLMCreditGrant{
-		ID:             uuid.New(),
-		OrganizationID: orgID,
-		Kind:           LLMCreditGrantKindWelcome,
-		AmountMicros:   amount,
-		ActorAccountID: &accountID,
-		CreatedAt:      now,
-		ExpiresAt:      &expiresAt,
-	}
-	if err := tx.Create(&grant).Error; err != nil {
-		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return stampWelcomeCreditGrantedAt(tx, accountID, now)
-		}
-		return err
-	}
-
-	return stampWelcomeCreditGrantedAt(tx, accountID, now)
-}
-
-func stampWelcomeCreditGrantedAt(tx *gorm.DB, accountID uuid.UUID, grantedAt time.Time) error {
-	return tx.Model(&coremodels.Account{}).
-		Where("id = ? AND welcome_credit_granted_at IS NULL", accountID).
-		Update("welcome_credit_granted_at", grantedAt).Error
+	return grantWelcomeCredit(tx, orgID, accountID, settings)
 }
 
 func SetWelcomeGrantExpiresAt(tx *gorm.DB, orgID uuid.UUID, endsAt time.Time) error {
@@ -1043,6 +995,10 @@ func includedCreditDeltaForTarget(tx *gorm.DB, orgID uuid.UUID, target int64, no
 }
 
 func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingPlan) error {
+	// Starter plans share signup credit; switching plans does not add another grant.
+	if next.Catalog.Key == "pay_as_you_go" || next.Catalog.Key == "starter" {
+		return nil
+	}
 	if previous == nil || previous.PlanSource == BillingPlanSourceAdmin || previous.Catalog.Category != "trial" ||
 		next.Catalog.Category != "paid" || next.Catalog.Visibility != "public" || next.Catalog.TrialCreditCents == 0 {
 		return nil
@@ -1087,4 +1043,66 @@ func initialPlanTrialCreditGranted(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
 		Where("organization_id = ? AND kind = ? AND note = ?", orgID, LLMCreditGrantKindTrialAdjustment, initialPlanTrialCreditNote).
 		Count(&count).Error
 	return count > 0, err
+}
+
+func grantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID, settings *BillingPlan) error {
+	if accountID == uuid.Nil {
+		return errors.New("account is required for welcome credit")
+	}
+
+	var account coremodels.Account
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", accountID).
+		First(&account).Error
+	if err != nil {
+		return err
+	}
+	if account.HasReceivedWelcomeCredit() {
+		return nil
+	}
+
+	amount := CentsToMicros(settings.TrialCreditCents)
+	if amount <= 0 {
+		return nil
+	}
+
+	now := time.Now()
+	var existing OrganizationLLMCreditGrant
+	err = tx.Where("organization_id = ? AND kind = ?", orgID, LLMCreditGrantKindWelcome).
+		First(&existing).Error
+	if err == nil {
+		return stampWelcomeCreditGrantedAt(tx, accountID, existing.CreatedAt)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	if _, err := EnsureOrganizationBillingPlan(tx, orgID); err != nil {
+		return err
+	}
+
+	expiresAt := now.AddDate(0, 0, settings.TrialLengthDays)
+	grant := OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		Kind:           LLMCreditGrantKindWelcome,
+		AmountMicros:   amount,
+		ActorAccountID: &accountID,
+		CreatedAt:      now,
+		ExpiresAt:      &expiresAt,
+	}
+	if err := tx.Create(&grant).Error; err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return stampWelcomeCreditGrantedAt(tx, accountID, now)
+		}
+		return err
+	}
+
+	return stampWelcomeCreditGrantedAt(tx, accountID, now)
+}
+
+func stampWelcomeCreditGrantedAt(tx *gorm.DB, accountID uuid.UUID, grantedAt time.Time) error {
+	return tx.Model(&coremodels.Account{}).
+		Where("id = ? AND welcome_credit_granted_at IS NULL", accountID).
+		Update("welcome_credit_granted_at", grantedAt).Error
 }

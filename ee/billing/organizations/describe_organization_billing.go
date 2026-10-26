@@ -89,9 +89,13 @@ func DescribeOrganizationBilling(
 			if maximum != nil {
 				seatMaximum = new(int32(*maximum))
 			}
+			var parallelTaskLimit *int32
+			if item.ParallelTaskLimit != nil {
+				parallelTaskLimit = new(int32(*item.ParallelTaskLimit))
+			}
 			available = append(available, &pb.BillingPlanOption{
 				Key: item.Key, Name: item.Name, PriceCents: item.PriceCents,
-				PerSeat: item.PerSeat, SeatMaximum: seatMaximum,
+				PerSeat: item.PerSeat, SeatMaximum: seatMaximum, ParallelTaskLimit: parallelTaskLimit,
 				RequirePaymentMethod: item.RequirePaymentMethod,
 				SubscriptionRequired: item.PerSeat || item.PolarProductID != nil || item.PriceCents != 0,
 			})
