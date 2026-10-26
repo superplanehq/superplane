@@ -135,11 +135,13 @@ func TestApplyOrderPaidRejectsInvalidCreditPurchaseMetadata(t *testing.T) {
 
 func TestApplyOrderPaidGrantsQuotedCreditsForDiscountedPurchaseOnce(t *testing.T) {
 	for _, test := range []struct {
-		name     string
-		discount int64
+		name       string
+		discount   int64
+		concurrent bool
 	}{
 		{name: "partial discount", discount: 1000},
 		{name: "full discount", discount: 10579},
+		{name: "concurrent deliveries", discount: 1000, concurrent: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			org := setupBillingOrganization(t)
@@ -149,6 +151,16 @@ func TestApplyOrderPaidGrantsQuotedCreditsForDiscountedPurchaseOnce(t *testing.T
 			event := paidFeePackEvent(org.ID, uuid.NewString())
 			discountOrder(&event.Data, 10579, test.discount)
 
+			if test.concurrent {
+				errs := make(chan error, 2)
+				for range 2 {
+					go func() {
+						errs <- ApplyOrderPaid(t.Context(), db, event, nil)
+					}()
+				}
+				require.NoError(t, <-errs)
+				require.NoError(t, <-errs)
+			}
 			require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
 			require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
 
@@ -159,8 +171,9 @@ func TestApplyOrderPaidGrantsQuotedCreditsForDiscountedPurchaseOnce(t *testing.T
 			require.NoError(t, err)
 			assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(10000), summary.GrantMicros)
 
-			entry := logs.LastEntry()
-			require.NotNil(t, entry)
+			entries := logs.AllEntries()
+			require.Len(t, entries, 1, "webhook replays must not log another discounted grant")
+			entry := entries[0]
 			assert.Equal(t, event.Data.ID, entry.Data["polar_order_id"])
 			assert.Equal(t, "disc_1", entry.Data["polar_discount_id"])
 			assert.Equal(t, test.discount, entry.Data["discount_amount"])

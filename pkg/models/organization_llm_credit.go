@@ -469,20 +469,27 @@ func AddPolarLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, po
 }
 
 func AddTopupLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, polarOrderID string) (*OrganizationLLMCreditGrant, error) {
+	grant, _, err := EnsureTopupLLMCreditGrant(tx, orgID, amountMicros, polarOrderID)
+	return grant, err
+}
+
+// EnsureTopupLLMCreditGrant returns the order's grant and whether it was created.
+// Concurrent calls for the same order create only one grant.
+func EnsureTopupLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, polarOrderID string) (*OrganizationLLMCreditGrant, bool, error) {
 	if amountMicros <= 0 {
-		return nil, ErrCreditGrantNotPositive
+		return nil, false, ErrCreditGrantNotPositive
 	}
 	orderID := strings.TrimSpace(polarOrderID)
 	if orderID == "" {
-		return nil, ErrPolarOrderIDRequired
+		return nil, false, ErrPolarOrderIDRequired
 	}
 
 	existing, err := FindLLMCreditGrantByPolarOrderID(tx, orderID)
 	if err == nil {
-		return existing, nil
+		return existing, false, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 
 	now := time.Now()
@@ -496,13 +503,15 @@ func AddTopupLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, po
 		CreatedAt:      now,
 		ExpiresAt:      &expiresAt,
 	}
-	if err := tx.Create(&grant).Error; err != nil {
-		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return FindLLMCreditGrantByPolarOrderID(tx, orderID)
-		}
-		return nil, err
+	result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&grant)
+	if result.Error != nil {
+		return nil, false, result.Error
 	}
-	return &grant, nil
+	if result.RowsAffected == 0 {
+		existing, err := FindLLMCreditGrantByPolarOrderID(tx, orderID)
+		return existing, false, err
+	}
+	return &grant, true, nil
 }
 
 func FindLLMCreditGrantByPolarOrderID(tx *gorm.DB, polarOrderID string) (*OrganizationLLMCreditGrant, error) {

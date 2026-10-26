@@ -87,8 +87,11 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 		return permanentApplyError("credit pack face value is missing")
 	}
 
+	var created bool
 	err = tx.Transaction(func(inner *gorm.DB) error {
-		if _, err := models.AddPolarLLMCreditGrant(inner, orgID, models.CentsToMicros(amountCents), event.Data.ID); err != nil {
+		var err error
+		_, created, err = models.EnsureTopupLLMCreditGrant(inner, orgID, models.CentsToMicros(amountCents), event.Data.ID)
+		if err != nil {
 			return err
 		}
 		if customerID := event.Data.Customer.ID; customerID != "" {
@@ -101,7 +104,9 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 	if err != nil {
 		return err
 	}
-	logDiscountedCreditGrant(orgID, event.Data, amountCents)
+	if created {
+		logDiscountedCreditGrant(orgID, event.Data, amountCents)
+	}
 	return nil
 }
 
