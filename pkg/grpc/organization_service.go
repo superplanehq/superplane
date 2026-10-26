@@ -67,21 +67,6 @@ func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.De
 	return organizations.DeleteOrganization(ctx, s.authorizationService, orgID)
 }
 
-func (s *OrganizationService) GetInviteLink(ctx context.Context, req *pb.GetInviteLinkRequest) (*pb.GetInviteLinkResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.GetInviteLink(ctx, orgID)
-}
-
-func (s *OrganizationService) UpdateInviteLink(ctx context.Context, req *pb.UpdateInviteLinkRequest) (*pb.UpdateInviteLinkResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UpdateInviteLink(ctx, orgID, req.Enabled)
-}
-
-func (s *OrganizationService) ResetInviteLink(ctx context.Context, req *pb.ResetInviteLinkRequest) (*pb.ResetInviteLinkResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ResetInviteLink(ctx, orgID)
-}
-
 func (s *OrganizationService) DescribeOrganizationWorkspaceUsage(
 	ctx context.Context,
 	req *pb.DescribeOrganizationWorkspaceUsageRequest,
