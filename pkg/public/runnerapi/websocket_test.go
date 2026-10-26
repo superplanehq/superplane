@@ -80,7 +80,7 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 				&task.ID,
 			)
 			require.NoError(t, err)
-			server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StoreFS)
+			server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StoreFS, nil)
 			require.NoError(t, err)
 			httpServer := httptest.NewServer(server.Handler())
 			defer httpServer.Close()
@@ -164,6 +164,30 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 			require.NoError(t, err, "credential must remain valid for completion acknowledgement retries")
 
 		})
+	}
+	resource := support.Setup(t)
+	signer := jwt.NewSigner("registration-secret")
+	runner, registration, fleet := createRegistrationFixture(t)
+	db := database.DB(t.Context())
+
+	taskID := uuid.New()
+	payload, err := json.Marshal(map[string]any{
+		"id":             taskID.String(),
+		"run_mode":       "bash_script",
+		"script":         "echo hello",
+		"execution_mode": "host",
+	})
+	require.NoError(t, err)
+	task := &models.RunnerTask{
+		ID:                taskID,
+		OrganizationID:    resource.Organization.ID,
+		FleetID:           fleet.ID,
+		Backend:           models.RunnerTaskBackendIntegrated,
+		State:             models.RunnerTaskStateQueued,
+		PayloadCiphertext: payload,
+		QueuedAt:          time.Now(),
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
 	}
 	require.NoError(t, db.Create(task).Error)
 	require.NoError(t, task.Reserve(db, runner.ID))
