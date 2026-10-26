@@ -126,14 +126,14 @@ export function implementConfigGraph(
   };
 }
 
-export function confidenceGraph(): IntakeAutomationGraph {
+export function confidenceGraph(triggerId = "on-pr-risk"): IntakeAutomationGraph {
   const { nodes, edges } = prepareData({
     workflow: {
       metadata: { id: "merge-confidence", name: "Merge confidence", factoryId: "factory-1" },
       spec: {
         nodes: [
           {
-            id: "on-pr-risk",
+            id: triggerId,
             name: "On Pull Request",
             type: "TYPE_TRIGGER",
             component: "github.onPullRequest",
@@ -146,7 +146,7 @@ export function confidenceGraph(): IntakeAutomationGraph {
             configuration: { model: "sonnet" },
           },
         ],
-        edges: [{ channel: "default", sourceId: "on-pr-risk", targetId: "assess-risk" }],
+        edges: [{ channel: "default", sourceId: triggerId, targetId: "assess-risk" }],
       },
     },
     triggers: [{ name: "github.onPullRequest", label: "On Pull Request" }],
@@ -165,7 +165,7 @@ export function confidenceGraph(): IntakeAutomationGraph {
     factoryId: "factory-1",
     specNodes: [
       {
-        id: "on-pr-risk",
+        id: triggerId,
         name: "On Pull Request",
         type: "TYPE_TRIGGER",
         component: "github.onPullRequest",
