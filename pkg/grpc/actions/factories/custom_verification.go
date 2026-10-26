@@ -398,11 +398,17 @@ func customVerificationCheckoutEnvironment(factory *models.Factory) []any {
 	config := factory.OnboardingConfigValue()
 	repository := strings.TrimSpace(config.AppRepository)
 	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository)
-	return []any{
+	env := []any{
 		checkoutEnvironmentVar("REPO", repository),
 		checkoutEnvironmentVar("REPO_URL", url),
 		checkoutEnvironmentVar("SOURCE_REPO", repository),
+		checkoutEnvironmentVar("PR_NUMBER", prFeedbackPRNumberExpression()),
+		checkoutEnvironmentVar("PR_HEAD", prFeedbackPRHeadExpression()),
 	}
+	if branch := strings.TrimSpace(config.DefaultBranch); branch != "" {
+		env = append(env, checkoutEnvironmentVar("BASE", branch))
+	}
+	return env
 }
 
 func checkoutEnvironmentVar(name, value string) map[string]any {

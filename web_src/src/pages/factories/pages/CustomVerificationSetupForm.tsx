@@ -328,7 +328,7 @@ function TriggerEditor({
         factoryKey={factoryKey}
         appearance="fields"
         view="implementation"
-        showConcurrency
+        showConcurrency={false}
         showResources={false}
         showSteps={false}
         modelOnly

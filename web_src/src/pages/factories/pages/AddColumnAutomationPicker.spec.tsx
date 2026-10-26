@@ -30,7 +30,7 @@ describe("AddColumnAutomationPicker", () => {
       "Capture screenshots or a short video when a pull request changes the user interface.",
     );
     expect(screen.getByTestId("add-column-automation-template-custom-verification")).toHaveTextContent(
-      "Custom verification",
+      "Custom automation",
     );
   });
 

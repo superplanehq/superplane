@@ -159,6 +159,9 @@ func startCustomVerification(
 		return nil, err
 	}
 	if len(created) == 0 {
+		if automatic {
+			return nil, nil
+		}
 		return nil, grpcFailedPrecondition("SuperPlane could not start the automation.")
 	}
 	event := &created[0]
