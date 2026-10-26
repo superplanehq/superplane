@@ -30,6 +30,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
+  type CanvasRunsFilters,
   useCanvas,
   useCanvasMemoryEntries,
   useDescribeCanvasVersion,
@@ -83,7 +84,7 @@ import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEven
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
-import { ACTIVE_RUN_API_STATES, statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
+import { ACTIVE_RUN_API_STATES } from "@/ui/Runs/runPresentation";
 import type { CanvasEchoRelease, CanvasSaveResult, QueuedCanvasSaveRequest } from "./canvasSaveTypes";
 import { deriveConsoleNodeStatuses } from "./console/deriveNodeStatuses";
 import { useConsoleModeActions } from "./console/useConsoleModeActions";
@@ -552,11 +553,7 @@ export function AppPage({
   const canvasForPrep = canvas ?? ((isEditing || isEnteringEditSession) && liveCanvas ? liveCanvas : null);
   const canvasNodes = canvas?.spec?.nodes ?? EMPTY_CANVAS_SPEC_ITEMS;
 
-  const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
-  const runApiFilters = useMemo(
-    () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
-    [isRunInspectionMode, selectedRunId, runStatusFilters],
-  );
+  const [runApiFilters, setRunApiFilters] = useState<CanvasRunsFilters>({});
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
   const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
   const infiniteRunningRunsQuery = useInfiniteCanvasRuns(canvasId!, RUNNING_RUNS_FILTERS, isViewingLiveVersion);
@@ -628,7 +625,7 @@ export function AppPage({
     hasNextPage: infiniteRunsQuery.hasNextPage,
     workflowNodes: canvasNodes,
     componentIconMap,
-    onStatusFiltersChange: setRunStatusFilters,
+    onFiltersChange: setRunApiFilters,
   });
   const {
     data: canvasMemoryEntries = [],

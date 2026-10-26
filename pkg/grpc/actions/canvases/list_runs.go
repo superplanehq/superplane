@@ -20,13 +20,16 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result, includeTask bool) (*pb.ListRunsResponse, error) {
-	limit = getLimit(limit)
-	beforeTime := getBefore(before)
-	filters, err := buildCanvasRunFilters(states, results)
+func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, req *pb.ListRunsRequest) (*pb.ListRunsResponse, error) {
+	limit := getLimit(req.Limit)
+	beforeTime := getBefore(req.Before)
+	filters, err := buildCanvasRunFilters(req.States, req.Results)
 	if err != nil {
 		return nil, err
 	}
+
+	filters.Search = req.Search
+	filters.TriggerIDs = req.TriggerIds
 
 	runs, err := listCanvasRuns(ctx, db, canvas.ID, int(limit), beforeTime, filters)
 	if err != nil {
@@ -56,7 +59,7 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 		return nil, err
 	}
 	AttachCanvasRunUsage(db, serialized)
-	if includeTask {
+	if req.GetIncludeTask() {
 		if err := attachCanvasRunTasks(db, canvas, runs, serialized); err != nil {
 			return nil, err
 		}
@@ -217,6 +220,7 @@ func serializeCanvasRunWithQueueItemInputs(
 	serialized := &pb.CanvasRun{
 		Id:         run.ID.String(),
 		CanvasId:   run.WorkflowID.String(),
+		NodeId:     run.NodeID,
 		VersionId:  run.VersionID.String(),
 		RootEvent:  serializedRootEvent,
 		State:      RunStateToProto(run.State),
@@ -612,14 +616,14 @@ func listCanvasRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, limit 
 	ctx, done := telemetry.Span(ctx, "runs.list")
 	defer done(&err)
 
-	return models.ListCanvasRunsInTransaction(db, canvasID, limit, beforeTime, filters)
+	return models.ListCanvasRuns(db, canvasID, limit, beforeTime, filters)
 }
 
 func countCanvasRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, filters models.CanvasRunFilters) (count int64, err error) {
 	ctx, done := telemetry.Span(ctx, "runs.count")
 	defer done(&err)
 
-	return models.CountCanvasRunsInTransaction(db, canvasID, filters)
+	return models.CountCanvasRuns(db, canvasID, filters)
 }
 
 func loadRootEventsForRunsSpan(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (events map[string]models.CanvasEvent, err error) {
