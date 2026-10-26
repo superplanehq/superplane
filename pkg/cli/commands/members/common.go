@@ -152,17 +152,3 @@ func renderMemberText(stdout io.Writer, user openapi_client.SuperplaneUsersUser)
 
 	return nil
 }
-
-func renderInviteLinkText(stdout io.Writer, link openapi_client.OrganizationsInviteLink) error {
-	_, _ = fmt.Fprintf(stdout, "ID: %s\n", link.GetId())
-	_, _ = fmt.Fprintf(stdout, "Enabled: %t\n", link.GetEnabled())
-	_, _ = fmt.Fprintf(stdout, "Token: %s\n", link.GetToken())
-	_, _ = fmt.Fprintf(stdout, "Organization ID: %s\n", link.GetOrganizationId())
-	if link.HasCreatedAt() {
-		_, _ = fmt.Fprintf(stdout, "Created At: %s\n", link.GetCreatedAt().Format(time.RFC3339))
-	}
-	if link.HasUpdatedAt() {
-		_, _ = fmt.Fprintf(stdout, "Updated At: %s\n", link.GetUpdatedAt().Format(time.RFC3339))
-	}
-	return nil
-}

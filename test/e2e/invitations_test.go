@@ -1,13 +1,11 @@
 package e2e
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -19,14 +17,14 @@ func TestInvitations(t *testing.T) {
 	t.Run("existing member can open an enabled invite link", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
-		token := steps.createInviteLink()
+		token := steps.seedInviteLink(true)
 		steps.acceptInvite(token)
 	})
 
 	t.Run("new account cannot join through an invite link", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
-		token := steps.createInviteLink()
+		token := steps.seedInviteLink(true)
 		invitee := steps.createInviteeAccount()
 		steps.loginAs(invitee)
 		steps.visitInviteLink(token)
@@ -37,7 +35,7 @@ func TestInvitations(t *testing.T) {
 	t.Run("password signup from an invite link does not join the organization", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedOut()
-		token := steps.createInviteLink()
+		token := steps.seedInviteLink(true)
 
 		steps.followInviteLinkToLogin(token)
 		steps.openSignupForm()
@@ -56,8 +54,7 @@ func TestInvitations(t *testing.T) {
 	t.Run("disabled invite link no longer works", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
-		token := steps.createInviteLink()
-		steps.disableInviteLink(token)
+		token := steps.seedInviteLink(false)
 		steps.visitInviteLink(token)
 		steps.assertInviteLinkDisabled()
 	})
@@ -88,18 +85,8 @@ func (s *invitationSteps) startLoggedOut() {
 	s.session.Start()
 }
 
-func (s *invitationSteps) createInviteLink() string {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(s.t.Context()), s.session.OrgID.String())
-	if err == nil {
-		return inviteLink.Token.String()
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		require.NoError(s.t, err)
-	}
-
-	inviteLink, err = models.CreateInviteLink(database.DB(s.t.Context()), s.session.OrgID)
-	require.NoError(s.t, err)
-	return inviteLink.Token.String()
+func (s *invitationSteps) seedInviteLink(enabled bool) string {
+	return support.SeedHistoricalInviteLink(s.t, s.session.OrgID, enabled).Token.String()
 }
 
 func (s *invitationSteps) createInviteeAccount() *models.Account {
@@ -157,14 +144,6 @@ func (s *invitationSteps) fillSignupForm(firstName, lastName, email, password st
 
 func (s *invitationSteps) submitSignup() {
 	s.session.Click(q.Text("Create account"))
-}
-
-func (s *invitationSteps) disableInviteLink(token string) {
-	tx := database.DB(s.t.Context())
-	inviteLink, err := models.FindInviteLinkByToken(tx, token)
-	require.NoError(s.t, err)
-	inviteLink.Enabled = false
-	require.NoError(s.t, models.SaveInviteLink(tx, inviteLink))
 }
 
 func (s *invitationSteps) assertInviteLinkDisabled() {
