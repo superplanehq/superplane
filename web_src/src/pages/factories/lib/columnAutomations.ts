@@ -27,7 +27,7 @@ import {
   factoryPlanningPath,
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
-import { factoryCustomVerificationSetupPath } from "./customVerificationPaths";
+import { factoryCustomAutomationSetupPath } from "./customAutomationPaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
 
@@ -445,7 +445,7 @@ export function columnAutomationOpenPath(
     return factoryPlanningPath(args.organizationId, args.factoryKey, args.lineId);
   }
   if (automation.kind === "custom-verification" && automation.canvasId && args.lineId) {
-    return factoryCustomVerificationSetupPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
+    return factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
   }
   if (!automation.canvasId) {
     return undefined;

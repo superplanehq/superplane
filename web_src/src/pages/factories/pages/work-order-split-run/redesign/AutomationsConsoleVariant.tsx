@@ -14,8 +14,8 @@ import { Check, Circle, Clock, LoaderCircle, X } from "lucide-react";
 import { type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
-import type { ManualCustomVerification } from "../../../lib/customVerification";
-import { CustomVerificationRunAction } from "../../CustomVerificationRunAction";
+import type { ManualCustomAutomation } from "../../../lib/customAutomation";
+import { CustomAutomationRunAction } from "../../CustomAutomationRunAction";
 
 import { type SplitRunFixture, type SplitRunPhase } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
@@ -75,7 +75,7 @@ type AutomationsConsoleVariantProps = {
   panelReview?: ReactNode;
   /** True when this person can cancel a live canvas run. */
   canStopRun?: boolean;
-  manualCustomVerifications?: readonly ManualCustomVerification[];
+  manualCustomAutomations?: readonly ManualCustomAutomation[];
   actionBusy?: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   /** Reruns a failed line step. The card footer Retry uses this. */
@@ -104,7 +104,7 @@ export function AutomationsConsoleVariant({
   artifacts,
   panelReview,
   canStopRun = false,
-  manualCustomVerifications = [],
+  manualCustomAutomations = [],
   actionBusy = false,
   onStopRun,
   onRerunStep,
@@ -142,7 +142,7 @@ export function AutomationsConsoleVariant({
         factoryKey={factoryKey}
         orderNumber={orderNumber}
         canStopRun={canStopRun}
-        manualCustomVerifications={manualCustomVerifications}
+        manualCustomAutomations={manualCustomAutomations}
         actionBusy={actionBusy}
         onStopRun={onStopRun}
         onRerunStep={onRerunStep}
@@ -226,7 +226,7 @@ function ConsoleTimeline({
   factoryKey,
   orderNumber,
   canStopRun,
-  manualCustomVerifications,
+  manualCustomAutomations,
   actionBusy,
   onStopRun,
   onRerunStep,
@@ -249,7 +249,7 @@ function ConsoleTimeline({
   factoryKey?: string;
   orderNumber?: string;
   canStopRun: boolean;
-  manualCustomVerifications: readonly ManualCustomVerification[];
+  manualCustomAutomations: readonly ManualCustomAutomation[];
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
@@ -290,7 +290,7 @@ function ConsoleTimeline({
             orderNumber={orderNumber}
             expandIdle={expandIdleCards && index + 1 === currentColumn}
             canStopRun={canStopRun}
-            manualCustomVerifications={manualCustomVerifications}
+            manualCustomAutomations={manualCustomAutomations}
             actionBusy={actionBusy}
             onStopRun={onStopRun}
             onRerunStep={onRerunStep}
@@ -316,7 +316,7 @@ function ColumnTimelineItem({
   orderNumber,
   expandIdle,
   canStopRun,
-  manualCustomVerifications,
+  manualCustomAutomations,
   actionBusy,
   onStopRun,
   onRerunStep,
@@ -335,18 +335,18 @@ function ColumnTimelineItem({
   orderNumber?: string;
   expandIdle: boolean;
   canStopRun: boolean;
-  manualCustomVerifications: readonly ManualCustomVerification[];
+  manualCustomAutomations: readonly ManualCustomAutomation[];
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
 }) {
   const emptyCopy = emptyColumnCopy(column.id, index, currentColumn, fixture);
-  const manualById = new Map(manualCustomVerifications.map((automation) => [automation.id, automation]));
+  const manualById = new Map(manualCustomAutomations.map((automation) => [automation.id, automation]));
   const runAppIds = new Set(
     column.automations.flatMap((automation) => automation.runs.flatMap((run) => run.appId ?? [])),
   );
   const idleManualAutomations =
-    column.id === "verify" ? manualCustomVerifications.filter((automation) => !runAppIds.has(automation.id)) : [];
+    column.id === "verify" ? manualCustomAutomations.filter((automation) => !runAppIds.has(automation.id)) : [];
   const automationCount = column.automations.length + idleManualAutomations.length;
   return (
     <TimelineItem step={step} className="group/column" data-testid={`redesign-console-column-${column.id}`}>
@@ -405,11 +405,11 @@ function ColumnTimelineItem({
                   <NodeIcon iconSlug={automation.icon} />
                   <span className="truncate text-[13px] font-medium text-foreground">{automation.name}</span>
                   <span className="ml-auto">
-                    <CustomVerificationRunAction
+                    <CustomAutomationRunAction
                       organizationId={organizationId}
                       factoryId={factoryId}
                       workOrderId={orderId}
-                      verifications={[automation]}
+                      automations={[automation]}
                       placement="logs"
                     />
                   </span>

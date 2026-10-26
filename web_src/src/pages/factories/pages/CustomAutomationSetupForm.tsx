@@ -7,16 +7,16 @@ import { cn, resolveIcon } from "@/lib/utils";
 import { CircleAlert, GitCommitHorizontal, MousePointerClick } from "lucide-react";
 import { useState } from "react";
 
-import type { CustomVerificationMode } from "../lib/customVerification";
-import { AutomationFlow } from "./customVerificationSetupFlow";
-import { StepEditor } from "./customVerificationStepEditor";
+import type { CustomAutomationMode } from "../lib/customAutomation";
+import { AutomationFlow } from "./customAutomationSetupFlow";
+import { StepEditor } from "./customAutomationStepEditor";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
-type CustomVerificationSetupFormProps = {
+type CustomAutomationSetupFormProps = {
   name: string;
   icon: string;
-  mode: CustomVerificationMode;
+  mode: CustomAutomationMode;
   draft: PlanningReviewDraft;
   organizationId: string;
   factoryId: string;
@@ -26,14 +26,14 @@ type CustomVerificationSetupFormProps = {
   error: string;
   onNameChange: (name: string) => void;
   onIconChange: (icon: string) => void;
-  onModeChange: (mode: CustomVerificationMode) => void;
+  onModeChange: (mode: CustomAutomationMode) => void;
   onDraftChange: (draft: PlanningReviewDraft) => void;
   onSave: () => void;
   onDelete?: () => void;
   onClose: () => void;
 };
 
-export function CustomVerificationSetupForm(props: CustomVerificationSetupFormProps) {
+export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps) {
   const {
     name,
     icon,
@@ -67,7 +67,7 @@ export function CustomVerificationSetupForm(props: CustomVerificationSetupFormPr
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="custom-verification-setup">
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="custom-automation-setup">
       <div className="flex min-h-0 flex-1">
         <AutomationFlow
           mode={mode}
@@ -249,7 +249,7 @@ function SetupFormFooter({
             loadingText="Saving…"
             disabled={deleting}
             onClick={onSave}
-            data-testid="custom-verification-save"
+            data-testid="custom-automation-save"
           >
             Save
           </LoadingButton>
@@ -274,25 +274,25 @@ function TriggerEditor({
 }: {
   name: string;
   icon: string;
-  mode: CustomVerificationMode;
+  mode: CustomAutomationMode;
   draft: PlanningReviewDraft;
   organizationId: string;
   factoryId: string;
   factoryKey: string;
   onNameChange: (name: string) => void;
   onIconChange: (icon: string) => void;
-  onModeChange: (mode: CustomVerificationMode) => void;
+  onModeChange: (mode: CustomAutomationMode) => void;
   onDraftChange: (draft: PlanningReviewDraft) => void;
 }) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10">
       <h3 className="text-base font-semibold text-foreground">Edit Trigger</h3>
       <div>
-        <Label htmlFor="custom-verification-mode" className="sr-only">
+        <Label htmlFor="custom-automation-mode" className="sr-only">
           Trigger
         </Label>
         <Select value={mode} onValueChange={(value) => onModeChange(value === "automatic" ? "automatic" : "manual")}>
-          <SelectTrigger id="custom-verification-mode" className="min-h-14 w-full !h-auto py-2.5">
+          <SelectTrigger id="custom-automation-mode" className="min-h-14 w-full !h-auto py-2.5">
             <SelectValue>
               <TriggerOption mode={mode} />
             </SelectValue>
@@ -438,7 +438,7 @@ function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (ico
   );
 }
 
-function TriggerOption({ mode }: { mode: CustomVerificationMode }) {
+function TriggerOption({ mode }: { mode: CustomAutomationMode }) {
   const automatic = mode === "automatic";
   const Icon = automatic ? GitCommitHorizontal : MousePointerClick;
   return (

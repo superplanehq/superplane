@@ -252,7 +252,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/custom-verifications/{automation_id}"}: {
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"}: {
 			Resource:                     "factories",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
@@ -566,7 +566,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/custom-verifications/{automation_id}"}: {
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"}: {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
@@ -852,13 +852,13 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/custom-verifications"}: {
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/custom-automations"}: {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/custom-verifications/{automation_id}:run"}: {
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}:run"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,

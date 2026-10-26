@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { CustomVerificationMode } from "../lib/customVerification";
+import type { CustomAutomationMode } from "../lib/customAutomation";
 import { mergeCheckPromptBody } from "./mergeConfidenceSteps";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
 
@@ -17,7 +17,7 @@ export function AutomationFlow({
   onRemoveStep,
   onAddStep,
 }: {
-  mode: CustomVerificationMode;
+  mode: CustomAutomationMode;
   steps: PlanningReviewStep[];
   selectedStep: number | null;
   onSelectTrigger: () => void;

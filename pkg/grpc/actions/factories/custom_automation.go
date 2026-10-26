@@ -22,57 +22,57 @@ import (
 )
 
 const (
-	customVerificationDefaultName = "Custom verification"
-	customVerificationTriggerID   = "on-pull-request"
-	customVerificationRunnerID    = "verify"
-	customVerificationVersion     = 1
+	customAutomationDefaultName = "Custom automation"
+	customAutomationTriggerID   = "on-pull-request"
+	customAutomationRunnerID    = "verify"
+	customAutomationVersion     = 1
 )
 
-func CreateFactoryCustomVerification(
+func CreateFactoryCustomAutomation(
 	ctx context.Context,
 	deps IntakeDependencies,
 	organizationID string,
-	req *pb.CreateFactoryCustomVerificationRequest,
-) (*pb.CreateFactoryCustomVerificationResponse, error) {
+	req *pb.CreateFactoryCustomAutomationRequest,
+) (*pb.CreateFactoryCustomAutomationResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 
 	db := database.DB(ctx)
 	organization, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
-		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create custom verification")
+		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create custom automation")
 	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 
-	settings, err := parseCustomVerificationSettings(db, factory, req.GetSettings())
+	settings, err := parseCustomAutomationSettings(db, factory, req.GetSettings())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
-		name = customVerificationDefaultName
+		name = customAutomationDefaultName
 	}
 	factoryID := factory.ID
 	name, err = models.AvailableCanvasName(db, orgID, &factoryID, name)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 
-	doc, err := buildCustomVerificationCanvas(db, factory, name, settings)
+	doc, err := buildCustomAutomationCanvas(db, factory, name, settings)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 	nodes, edges, err := doc.Parse(deps.Registry, orgID.String())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to build custom verification")
+		return nil, factoryErrorToStatus(err, "failed to build custom automation")
 	}
 	created, err := canvases.CreateCanvas(
 		ctx,
@@ -92,58 +92,58 @@ func CreateFactoryCustomVerification(
 	}
 	canvasID, err := uuid.Parse(created.GetCanvas().GetMetadata().GetId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 	canvas, err := models.FindCanvasInTransaction(db, orgID, canvasID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 	if err := canvas.SetColumnKey(db, models.CanvasColumnKeyVerify); err != nil {
 		discardIntakeCanvas(db, orgID, canvasID)
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 
-	verification, err := serializeCustomVerification(db, factory, canvas)
+	automation, err := serializeCustomAutomation(db, factory, canvas)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom verification")
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
-	return &pb.CreateFactoryCustomVerificationResponse{Verification: verification}, nil
+	return &pb.CreateFactoryCustomAutomationResponse{CustomAutomation: automation}, nil
 }
 
-func DescribeFactoryCustomVerification(
+func DescribeFactoryCustomAutomation(
 	ctx context.Context,
 	organizationID string,
-	req *pb.DescribeFactoryCustomVerificationRequest,
-) (*pb.DescribeFactoryCustomVerificationResponse, error) {
+	req *pb.DescribeFactoryCustomAutomationRequest,
+) (*pb.DescribeFactoryCustomAutomationResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe custom verification")
+		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
 	}
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe custom verification")
+		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
 	}
-	canvas, err := findCustomVerificationCanvas(db, factory, req.GetAutomationId())
+	canvas, err := findCustomAutomationCanvas(db, factory, req.GetAutomationId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe custom verification")
+		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
 	}
-	verification, err := serializeCustomVerification(db, factory, canvas)
+	automation, err := serializeCustomAutomation(db, factory, canvas)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe custom verification")
+		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
 	}
-	return &pb.DescribeFactoryCustomVerificationResponse{Verification: verification}, nil
+	return &pb.DescribeFactoryCustomAutomationResponse{CustomAutomation: automation}, nil
 }
 
-func UpdateFactoryCustomVerification(
+func UpdateFactoryCustomAutomation(
 	ctx context.Context,
 	deps IntakeDependencies,
 	organizationID string,
-	req *pb.UpdateFactoryCustomVerificationRequest,
-) (*pb.UpdateFactoryCustomVerificationResponse, error) {
+	req *pb.UpdateFactoryCustomAutomationRequest,
+) (*pb.UpdateFactoryCustomAutomationResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom verification")
+		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -151,36 +151,36 @@ func UpdateFactoryCustomVerification(
 	}
 	ownerID, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to update custom verification")
+		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to update custom automation")
 	}
 
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom verification")
+		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
-	canvas, err := findCustomVerificationCanvas(db, factory, req.GetAutomationId())
+	canvas, err := findCustomAutomationCanvas(db, factory, req.GetAutomationId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom verification")
+		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
-	settings, err := parseCustomVerificationSettings(db, factory, req.GetSettings())
+	settings, err := parseCustomAutomationSettings(db, factory, req.GetSettings())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom verification")
+		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
-		return nil, factoryErrorToStatus(invalidArgument("name is required"), "failed to update custom verification")
+		return nil, factoryErrorToStatus(invalidArgument("name is required"), "failed to update custom automation")
 	}
-	doc, err := buildCustomVerificationCanvas(db, factory, name, settings)
+	doc, err := buildCustomAutomationCanvas(db, factory, name, settings)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom verification")
+		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
-	if err := preserveCustomVerificationRunnerIdentity(db, canvas, doc); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom verification")
+	if err := preserveCustomAutomationRunnerIdentity(db, canvas, doc); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
 	nodes, edges, err := doc.ParseInTransaction(deps.Registry, orgID.String(), db)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to build custom verification")
+		return nil, factoryErrorToStatus(err, "failed to build custom automation")
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -189,7 +189,7 @@ func UpdateFactoryCustomVerification(
 			tx,
 			canvas,
 			ownerID,
-			"Update custom verification",
+			"Update custom automation",
 			nodes,
 			edges,
 			intakePublisherOptions(deps, orgID),
@@ -199,38 +199,38 @@ func UpdateFactoryCustomVerification(
 		return canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil, nil)
 	})
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom verification")
+		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
 	canvases.PublishCanvasUpdated(canvas)
 
-	verification, err := serializeCustomVerification(db, factory, canvas)
+	automation, err := serializeCustomAutomation(db, factory, canvas)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom verification")
+		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
-	return &pb.UpdateFactoryCustomVerificationResponse{Verification: verification}, nil
+	return &pb.UpdateFactoryCustomAutomationResponse{CustomAutomation: automation}, nil
 }
 
-type customVerificationSettings struct {
-	StartMode pb.FactoryCustomVerification_StartMode
+type customAutomationSettings struct {
+	StartMode pb.FactoryCustomAutomation_StartMode
 	Agent     *intakeAgent
 	Steps     []runner.AgentStep
 	Icon      string
 }
 
-func parseCustomVerificationSettings(
+func parseCustomAutomationSettings(
 	tx *gorm.DB,
 	factory *models.Factory,
-	input *pb.FactoryCustomVerification_Settings,
-) (*customVerificationSettings, error) {
+	input *pb.FactoryCustomAutomation_Settings,
+) (*customAutomationSettings, error) {
 	if input == nil {
 		return nil, invalidArgument("settings are required")
 	}
-	if input.GetStartMode() != pb.FactoryCustomVerification_START_MODE_MANUAL &&
-		input.GetStartMode() != pb.FactoryCustomVerification_START_MODE_AUTOMATIC {
+	if input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_MANUAL &&
+		input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
 		return nil, invalidArgument("start mode must be manual or automatic")
 	}
 
-	agent, err := customVerificationAgent(tx, factory, input.GetAgent())
+	agent, err := customAutomationAgent(tx, factory, input.GetAgent())
 	if err != nil {
 		return nil, err
 	}
@@ -245,11 +245,11 @@ func parseCustomVerificationSettings(
 			Secrets:          step.GetSecrets(),
 		}
 		switch step.GetType() {
-		case pb.FactoryCustomVerification_Step_TYPE_PROMPT:
+		case pb.FactoryCustomAutomation_Step_TYPE_PROMPT:
 			parsed.Type = runner.AgentStepPrompt
 			value := step.GetPrompt()
 			parsed.Prompt = &value
-		case pb.FactoryCustomVerification_Step_TYPE_BASH:
+		case pb.FactoryCustomAutomation_Step_TYPE_BASH:
 			parsed.Type = runner.AgentStepBash
 			value := step.GetCommand()
 			parsed.Command = &value
@@ -261,7 +261,7 @@ func parseCustomVerificationSettings(
 	if err := runner.ValidateAgentSteps(steps); err != nil {
 		return nil, invalidArgument(err.Error())
 	}
-	return &customVerificationSettings{
+	return &customAutomationSettings{
 		StartMode: input.GetStartMode(),
 		Agent:     agent,
 		Steps:     steps,
@@ -269,7 +269,7 @@ func parseCustomVerificationSettings(
 	}, nil
 }
 
-func customVerificationAgent(tx *gorm.DB, factory *models.Factory, input *pb.FactoryAppTemplateAgent) (*intakeAgent, error) {
+func customAutomationAgent(tx *gorm.DB, factory *models.Factory, input *pb.FactoryAppTemplateAgent) (*intakeAgent, error) {
 	if input == nil || strings.TrimSpace(input.GetComponent()) == "" {
 		return resolveIntakeAgent(tx, factory), nil
 	}
@@ -296,11 +296,11 @@ func customVerificationAgent(tx *gorm.DB, factory *models.Factory, input *pb.Fac
 	return agent, nil
 }
 
-func buildCustomVerificationCanvas(
+func buildCustomAutomationCanvas(
 	tx *gorm.DB,
 	factory *models.Factory,
 	name string,
-	settings *customVerificationSettings,
+	settings *customAutomationSettings,
 ) (*yaml.Canvas, error) {
 	config := factory.OnboardingConfigValue()
 	repository := strings.TrimSpace(config.AppRepository)
@@ -312,10 +312,10 @@ func buildCustomVerificationCanvas(
 		return nil, invalidArgument("workspace VCS integration is required")
 	}
 	provider := config.EffectiveVCSProvider()
-	mode := customVerificationStartModeName(settings.StartMode)
+	mode := customAutomationStartModeName(settings.StartMode)
 	metadata := models.FactoryAppTemplateMetadataFor(
-		models.FactoryAppTemplateCustomVerifyID,
-		customVerificationVersion,
+		models.FactoryAppTemplateCustomAutomationID,
+		customAutomationVersion,
 		provider,
 	)
 	template := metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
@@ -338,7 +338,7 @@ func buildCustomVerificationCanvas(
 			"integration": map[string]any{"name": resolveVCSInstallationName(tx, factory)},
 		},
 	}
-	for _, secret := range customVerificationSecrets(settings.Steps) {
+	for _, secret := range customAutomationSecrets(settings.Steps) {
 		environmentFrom = append(environmentFrom, map[string]any{
 			"source": runner.EnvironmentFromSourceSecret,
 			"secret": map[string]any{"secret": secret},
@@ -347,9 +347,9 @@ func buildCustomVerificationCanvas(
 	runnerConfiguration := map[string]any{
 		"machineType":             runner.MachineTypeE1LargeAMD64,
 		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
-		"steps":                   customVerificationStepConfiguration(settings.Steps),
+		"steps":                   customAutomationStepConfiguration(settings.Steps),
 		"environmentFrom":         environmentFrom,
-		"environment":             customVerificationCheckoutEnvironment(factory),
+		"environment":             customAutomationCheckoutEnvironment(factory),
 	}
 	if credentials := settings.Agent.credentials(); credentials != nil {
 		runnerConfiguration["credentials"] = credentials
@@ -364,12 +364,12 @@ func buildCustomVerificationCanvas(
 		Kind:       yaml.KindCanvas,
 		Metadata: &yaml.CanvasMetadata{
 			Name:        name,
-			Description: "Run a focused prompt and bash verification for a task pull request.",
+			Description: "Run a focused prompt and Bash automation for a task pull request.",
 		},
 		Spec: &yaml.CanvasSpec{
 			Nodes: []yaml.Node{
 				{
-					ID:            customVerificationTriggerID,
+					ID:            customAutomationTriggerID,
 					Name:          "On Pull Request",
 					Type:          yaml.NodeTypeTrigger,
 					Component:     prFeedbackTriggerComponent(provider),
@@ -379,7 +379,7 @@ func buildCustomVerificationCanvas(
 					Position:      yaml.Position{X: 120, Y: 240},
 				},
 				{
-					ID:            customVerificationRunnerID,
+					ID:            customAutomationRunnerID,
 					Name:          "Verify",
 					Type:          yaml.NodeTypeAction,
 					Component:     settings.Agent.component(),
@@ -388,13 +388,13 @@ func buildCustomVerificationCanvas(
 				},
 			},
 			Edges: []yaml.Edge{
-				{SourceID: customVerificationTriggerID, TargetID: customVerificationRunnerID, Channel: "default"},
+				{SourceID: customAutomationTriggerID, TargetID: customAutomationRunnerID, Channel: "default"},
 			},
 		},
 	}, nil
 }
 
-func customVerificationCheckoutEnvironment(factory *models.Factory) []any {
+func customAutomationCheckoutEnvironment(factory *models.Factory) []any {
 	config := factory.OnboardingConfigValue()
 	repository := strings.TrimSpace(config.AppRepository)
 	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository)
@@ -419,8 +419,8 @@ func checkoutEnvironmentVar(name, value string) map[string]any {
 	}
 }
 
-func applyCustomVerificationCheckoutEnvironment(configuration map[string]any, factory *models.Factory) {
-	wanted := customVerificationCheckoutEnvironment(factory)
+func applyCustomAutomationCheckoutEnvironment(configuration map[string]any, factory *models.Factory) {
+	wanted := customAutomationCheckoutEnvironment(factory)
 	existing, _ := configuration["environment"].([]any)
 	replaced := make(map[string]struct{}, len(wanted))
 	for i, raw := range existing {
@@ -449,8 +449,8 @@ func applyCustomVerificationCheckoutEnvironment(configuration map[string]any, fa
 	configuration["environment"] = existing
 }
 
-func ensureCustomVerificationCheckoutEnvironment(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas) error {
-	node, err := findCustomVerificationAgentNode(tx, canvas)
+func ensureCustomAutomationCheckoutEnvironment(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas) error {
+	node, err := findCustomAutomationAgentNode(tx, canvas)
 	if err != nil {
 		return err
 	}
@@ -458,11 +458,11 @@ func ensureCustomVerificationCheckoutEnvironment(tx *gorm.DB, factory *models.Fa
 	if configuration == nil {
 		configuration = map[string]any{}
 	}
-	applyCustomVerificationCheckoutEnvironment(configuration, factory)
+	applyCustomAutomationCheckoutEnvironment(configuration, factory)
 	return tx.Model(node).Update("configuration", datatypes.NewJSONType(configuration)).Error
 }
 
-func findCustomVerificationAgentNode(tx *gorm.DB, canvas *models.Canvas) (*models.CanvasNode, error) {
+func findCustomAutomationAgentNode(tx *gorm.DB, canvas *models.Canvas) (*models.CanvasNode, error) {
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if err != nil {
 		return nil, err
@@ -474,10 +474,10 @@ func findCustomVerificationAgentNode(tx *gorm.DB, canvas *models.Canvas) (*model
 		}
 		return models.FindCanvasNode(tx, canvas.ID, node.ID)
 	}
-	return nil, errors.New("custom verification agent is missing")
+	return nil, errors.New("custom automation agent is missing")
 }
 
-func customVerificationStepConfiguration(steps []runner.AgentStep) []any {
+func customAutomationStepConfiguration(steps []runner.AgentStep) []any {
 	values := make([]any, 0, len(steps))
 	for _, step := range steps {
 		value := map[string]any{
@@ -503,7 +503,7 @@ func customVerificationStepConfiguration(steps []runner.AgentStep) []any {
 	return values
 }
 
-func customVerificationSecrets(steps []runner.AgentStep) []string {
+func customAutomationSecrets(steps []runner.AgentStep) []string {
 	seen := map[string]struct{}{}
 	var result []string
 	for _, step := range steps {
@@ -519,7 +519,7 @@ func customVerificationSecrets(steps []runner.AgentStep) []string {
 	return result
 }
 
-func findCustomVerificationCanvas(tx *gorm.DB, factory *models.Factory, rawID string) (*models.Canvas, error) {
+func findCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, rawID string) (*models.Canvas, error) {
 	id, err := uuid.Parse(strings.TrimSpace(rawID))
 	if err != nil {
 		return nil, invalidArgument("automation id must be a UUID")
@@ -535,13 +535,13 @@ func findCustomVerificationCanvas(tx *gorm.DB, factory *models.Factory, rawID st
 	if err != nil {
 		return nil, err
 	}
-	if models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomVerifyID {
-		return nil, invalidArgument("automation is not a custom verification")
+	if models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID {
+		return nil, invalidArgument("automation is not a custom automation")
 	}
 	return canvas, nil
 }
 
-func preserveCustomVerificationRunnerIdentity(tx *gorm.DB, canvas *models.Canvas, doc *yaml.Canvas) error {
+func preserveCustomAutomationRunnerIdentity(tx *gorm.DB, canvas *models.Canvas, doc *yaml.Canvas) error {
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if err != nil {
 		return err
@@ -554,33 +554,33 @@ func preserveCustomVerificationRunnerIdentity(tx *gorm.DB, canvas *models.Canvas
 		}
 	}
 	if current == nil {
-		return errors.New("custom verification agent is missing")
+		return errors.New("custom automation agent is missing")
 	}
 	for i := range doc.Spec.Nodes {
 		node := &doc.Spec.Nodes[i]
-		if node.ID != customVerificationRunnerID {
+		if node.ID != customAutomationRunnerID {
 			continue
 		}
 		targetID := current.ID
 		if current.ComponentName() != node.Component {
-			targetID = customVerificationRunnerID + "-" + strings.ToLower(strings.ReplaceAll(node.Component, ".", "-"))
+			targetID = customAutomationRunnerID + "-" + strings.ToLower(strings.ReplaceAll(node.Component, ".", "-"))
 		}
 		node.ID = targetID
 		for j := range doc.Spec.Edges {
-			if doc.Spec.Edges[j].TargetID == customVerificationRunnerID {
+			if doc.Spec.Edges[j].TargetID == customAutomationRunnerID {
 				doc.Spec.Edges[j].TargetID = targetID
 			}
 		}
 		return nil
 	}
-	return errors.New("custom verification agent is missing")
+	return errors.New("custom automation agent is missing")
 }
 
-func serializeCustomVerification(
+func serializeCustomAutomation(
 	tx *gorm.DB,
 	factory *models.Factory,
 	canvas *models.Canvas,
-) (*pb.FactoryCustomVerification, error) {
+) (*pb.FactoryCustomAutomation, error) {
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if err != nil {
 		return nil, err
@@ -589,25 +589,25 @@ func serializeCustomVerification(
 	var agent *models.Node
 	for i := range version.Nodes {
 		node := &version.Nodes[i]
-		if node.ID == customVerificationTriggerID {
+		if node.ID == customAutomationTriggerID {
 			trigger = node
 		}
 		if isFactoryAgentHarness(node.ComponentName()) {
 			agent = node
 		}
 	}
-	if trigger == nil || agent == nil || models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomVerifyID {
-		return nil, errors.New("custom verification graph is incomplete")
+	if trigger == nil || agent == nil || models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID {
+		return nil, errors.New("custom automation graph is incomplete")
 	}
 
-	steps, err := customVerificationProtoSteps(agent.Configuration["steps"])
+	steps, err := customAutomationProtoSteps(agent.Configuration["steps"])
 	if err != nil {
 		return nil, err
 	}
 	template, _ := trigger.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 	mode, _ := template["startMode"].(string)
-	settings := &pb.FactoryCustomVerification_Settings{
-		StartMode: customVerificationStartMode(mode),
+	settings := &pb.FactoryCustomAutomation_Settings{
+		StartMode: customAutomationStartMode(mode),
 		Agent: &pb.FactoryAppTemplateAgent{
 			Component: agent.ComponentName(),
 			Model:     configString(agent.Configuration, "model"),
@@ -622,33 +622,33 @@ func serializeCustomVerification(
 		}
 	}
 	automation := serializeFactoryAutomation(*canvas)
-	automation.TemplateId = models.FactoryAppTemplateCustomVerifyID
-	return &pb.FactoryCustomVerification{
+	automation.TemplateId = models.FactoryAppTemplateCustomAutomationID
+	return &pb.FactoryCustomAutomation{
 		Automation: automation,
 		Settings:   settings,
 		Provider:   factory.OnboardingConfigValue().EffectiveVCSProvider(),
 	}, nil
 }
 
-func customVerificationProtoSteps(raw any) ([]*pb.FactoryCustomVerification_Step, error) {
+func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, error) {
 	var steps []runner.AgentStep
 	if err := mapstructure.Decode(raw, &steps); err != nil {
-		return nil, fmt.Errorf("decode custom verification steps: %w", err)
+		return nil, fmt.Errorf("decode custom automation steps: %w", err)
 	}
-	result := make([]*pb.FactoryCustomVerification_Step, 0, len(steps))
+	result := make([]*pb.FactoryCustomAutomation_Step, 0, len(steps))
 	for _, step := range steps {
-		value := &pb.FactoryCustomVerification_Step{
+		value := &pb.FactoryCustomAutomation_Step{
 			Name:             step.Name,
 			WorkingDirectory: step.WorkingDirectory,
 			Secrets:          step.Secrets,
 		}
 		if runner.NormalizeAgentStepType(step.Type) == runner.AgentStepBash {
-			value.Type = pb.FactoryCustomVerification_Step_TYPE_BASH
+			value.Type = pb.FactoryCustomAutomation_Step_TYPE_BASH
 			if step.Command != nil {
 				value.Command = *step.Command
 			}
 		} else {
-			value.Type = pb.FactoryCustomVerification_Step_TYPE_PROMPT
+			value.Type = pb.FactoryCustomAutomation_Step_TYPE_PROMPT
 			if step.Prompt != nil {
 				value.Prompt = *step.Prompt
 			}
@@ -658,16 +658,16 @@ func customVerificationProtoSteps(raw any) ([]*pb.FactoryCustomVerification_Step
 	return result, nil
 }
 
-func customVerificationStartModeName(mode pb.FactoryCustomVerification_StartMode) string {
-	if mode == pb.FactoryCustomVerification_START_MODE_AUTOMATIC {
+func customAutomationStartModeName(mode pb.FactoryCustomAutomation_StartMode) string {
+	if mode == pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
 		return "automatic"
 	}
 	return "manual"
 }
 
-func customVerificationStartMode(mode string) pb.FactoryCustomVerification_StartMode {
+func customAutomationStartMode(mode string) pb.FactoryCustomAutomation_StartMode {
 	if strings.TrimSpace(mode) == "automatic" {
-		return pb.FactoryCustomVerification_START_MODE_AUTOMATIC
+		return pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
 	}
-	return pb.FactoryCustomVerification_START_MODE_MANUAL
+	return pb.FactoryCustomAutomation_START_MODE_MANUAL
 }

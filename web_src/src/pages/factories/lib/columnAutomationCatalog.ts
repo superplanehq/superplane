@@ -13,7 +13,7 @@ import type {
 export const ANALYSIS_CATALOG_ID = "analysis";
 export const AGENT_STEP_CATALOG_ID = "agent-step";
 export const CUSTOM_CATALOG_ID = "custom";
-export const CUSTOM_VERIFICATION_CATALOG_ID = "custom-verification";
+export const CUSTOM_AUTOMATION_CATALOG_ID = "custom-verification";
 export const PR_CLOSURE_CATALOG_ID = "pr-closure";
 export const RISK_SCORE_CATALOG_ID = "risk-score";
 export const VISUAL_EVIDENCE_CATALOG_ID = "visual-evidence";
@@ -66,13 +66,13 @@ export const EVENT_CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
   unique: false,
 };
 
-export const CUSTOM_VERIFICATION_ENTRY: ColumnAutomationCatalogEntry = {
-  id: CUSTOM_VERIFICATION_CATALOG_ID,
+export const CUSTOM_AUTOMATION_ENTRY: ColumnAutomationCatalogEntry = {
+  id: CUSTOM_AUTOMATION_CATALOG_ID,
   kind: "custom-verification",
   name: "Custom automation",
   description: "Run ordered prompt and Bash steps on a pull request.",
   trigger: "Manual or automatic",
-  action: "Verify the pull request",
+  action: "Run the automation",
   iconSrc: "",
   iconAlt: "",
   unique: false,
@@ -153,7 +153,7 @@ export function catalogForColumn(
       }),
       RISK_SCORE_ENTRY,
       ...(options?.vcsProvider === "bitbucket" ? [] : [VISUAL_EVIDENCE_ENTRY]),
-      ...(allowCustom ? [CUSTOM_VERIFICATION_ENTRY] : []),
+      ...(allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : []),
     ];
   }
   if (key === "done") {

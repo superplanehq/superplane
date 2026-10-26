@@ -8,7 +8,7 @@ import { CreateSecretDialog, type CreatedSecretSummary } from "@/ui/CreateSecret
 import { ArrowDown, ArrowUp, KeyRound, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
-import { FlowBadge } from "./customVerificationSetupFlow";
+import { FlowBadge } from "./customAutomationSetupFlow";
 import { ImplementSettingRow } from "./ImplementSettingRow";
 import { mergeCheckPromptBody, withMergeCheckHeader } from "./mergeConfidenceSteps";
 import { PlanningReviewStepBody } from "./PlanningReviewStepBody";
@@ -44,10 +44,10 @@ export function StepEditor({
       <ImplementSettingRow
         label="Name"
         description="The name shown in the automation flow."
-        htmlFor="custom-verification-step-name"
+        htmlFor="custom-automation-step-name"
       >
         <Input
-          id="custom-verification-step-name"
+          id="custom-automation-step-name"
           value={step.name}
           onChange={(event) => onChange({ ...step, name: event.target.value })}
           placeholder="Step name"
@@ -57,7 +57,7 @@ export function StepEditor({
       <ImplementSettingRow
         label="Type"
         description="Choose an agent prompt or shell commands."
-        htmlFor="custom-verification-step-kind"
+        htmlFor="custom-automation-step-kind"
       >
         <Select
           value={step.type}
@@ -71,7 +71,7 @@ export function StepEditor({
             })
           }
         >
-          <SelectTrigger id="custom-verification-step-kind" className="w-full">
+          <SelectTrigger id="custom-automation-step-kind" className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -98,7 +98,7 @@ export function StepEditor({
             )
           }
           label={`${step.type === "prompt" ? "Prompt" : "Commands"} for ${step.name || `Step ${position + 1}`}`}
-          testId={`custom-verification-step-body-${position}`}
+          testId={`custom-automation-step-body-${position}`}
         />
       </div>
       {step.type === "bash" ? (

@@ -17,56 +17,56 @@ import (
 	"gorm.io/gorm"
 )
 
-func RunFactoryCustomVerification(
+func RunFactoryCustomAutomation(
 	ctx context.Context,
 	deps IntakeDependencies,
 	organizationID string,
-	req *pb.RunFactoryCustomVerificationRequest,
-) (*pb.RunFactoryCustomVerificationResponse, error) {
+	req *pb.RunFactoryCustomAutomationRequest,
+) (*pb.RunFactoryCustomAutomationResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to run custom verification")
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to run custom verification")
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	canvas, err := findCustomVerificationCanvas(db, factory, req.GetAutomationId())
+	canvas, err := findCustomAutomationCanvas(db, factory, req.GetAutomationId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to run custom verification")
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
 	order, err := findWorkOrder(db, factory, req.GetWorkOrderId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to run custom verification")
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	mode, err := customVerificationCanvasMode(db, canvas)
+	mode, err := customAutomationCanvasMode(db, canvas)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to run custom verification")
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	if mode != pb.FactoryCustomVerification_START_MODE_MANUAL {
-		return nil, factoryErrorToStatus(invalidArgument("automation does not use manual start"), "failed to run custom verification")
+	if mode != pb.FactoryCustomAutomation_START_MODE_MANUAL {
+		return nil, factoryErrorToStatus(invalidArgument("automation does not use manual start"), "failed to run custom automation")
 	}
 
-	event, err := startCustomVerification(ctx, db, deps, factory, canvas, order, false)
+	event, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, false)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to run custom verification")
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
 	if event == nil {
-		return nil, factoryErrorToStatus(errors.New("custom verification did not create a run"), "failed to run custom verification")
+		return nil, factoryErrorToStatus(errors.New("custom automation did not create a run"), "failed to run custom automation")
 	}
 	if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
-		log.WithError(err).Warnf("custom verification: failed to publish event %s", event.ID)
+		log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
 	}
-	return &pb.RunFactoryCustomVerificationResponse{
+	return &pb.RunFactoryCustomAutomationResponse{
 		RunId:   event.RunID.String(),
 		EventId: event.ID.String(),
 	}, nil
 }
 
-// StartAutomaticCustomVerifications starts all automatic Verify automations
+// StartAutomaticCustomAutomations starts all automatic Verify automations
 // for the current pull request head. Webhook starts use the same dedup identity.
-func StartAutomaticCustomVerifications(
+func StartAutomaticCustomAutomations(
 	ctx context.Context,
 	deps IntakeDependencies,
 	factory *models.Factory,
@@ -92,27 +92,27 @@ func StartAutomaticCustomVerifications(
 			continue
 		}
 		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
-		if err != nil || models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomVerifyID {
+		if err != nil || models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID {
 			continue
 		}
-		mode, err := customVerificationCanvasModeFromVersion(version)
-		if err != nil || mode != pb.FactoryCustomVerification_START_MODE_AUTOMATIC {
+		mode, err := customAutomationCanvasModeFromVersion(version)
+		if err != nil || mode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
 			continue
 		}
-		event, err := startCustomVerification(ctx, db, deps, factory, canvas, order, true)
+		event, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, true)
 		if err != nil {
 			return err
 		}
 		if event != nil {
 			if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
-				log.WithError(err).Warnf("custom verification: failed to publish event %s", event.ID)
+				log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
 			}
 		}
 	}
 	return nil
 }
 
-func startCustomVerification(
+func startCustomAutomation(
 	ctx context.Context,
 	db *gorm.DB,
 	deps IntakeDependencies,
@@ -135,14 +135,14 @@ func startCustomVerification(
 		return nil, grpcFailedPrecondition("The pull request is not open.")
 	}
 
-	payload, revision, payloadType, err := customVerificationPullRequestPayload(ctx, db, deps, factory, order, pullRequest)
+	payload, revision, payloadType, err := customAutomationPullRequestPayload(ctx, db, deps, factory, order, pullRequest)
 	if err != nil {
 		return nil, err
 	}
-	if err := ensureCustomVerificationCheckoutEnvironment(db, factory, canvas); err != nil {
+	if err := ensureCustomAutomationCheckoutEnvironment(db, factory, canvas); err != nil {
 		return nil, err
 	}
-	trigger, err := models.FindCanvasNode(db, canvas.ID, customVerificationTriggerID)
+	trigger, err := models.FindCanvasNode(db, canvas.ID, customAutomationTriggerID)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func startCustomVerification(
 	if automatic {
 		err = events.EmitDeduplicated(payloadType, payload, pullRequest.ID.String()+"|"+revision)
 	} else {
-		err = events.Emit("factory.customVerification", payload)
+		err = events.Emit("factory.customAutomation", payload)
 	}
 	if err != nil {
 		return nil, err
@@ -169,13 +169,13 @@ func startCustomVerification(
 	if err != nil {
 		return nil, err
 	}
-	if err := models.MaybeLinkCustomVerificationRun(db, canvas, event, run); err != nil {
+	if err := models.MaybeLinkCustomAutomationRun(db, canvas, event, run); err != nil {
 		return nil, err
 	}
 	return event, nil
 }
 
-func customVerificationPullRequestPayload(
+func customAutomationPullRequestPayload(
 	ctx context.Context,
 	db *gorm.DB,
 	deps IntakeDependencies,
@@ -199,7 +199,7 @@ func customVerificationPullRequestPayload(
 		if revision == "" {
 			return nil, "", "", grpcFailedPrecondition("The pull request has no head revision.")
 		}
-		return bitbucketCustomVerificationEventData(pullRequest, order, current.SourceBr, revision), revision, "bitbucket.pullRequest", nil
+		return bitbucketCustomAutomationEventData(pullRequest, order, current.SourceBr, revision), revision, "bitbucket.pullRequest", nil
 	}
 
 	client, err := newFactoryGitHubAPI(db, deps, factory)
@@ -221,7 +221,7 @@ func customVerificationPullRequestPayload(
 	return payload, revision, "github.pullRequest", err
 }
 
-func bitbucketCustomVerificationEventData(
+func bitbucketCustomAutomationEventData(
 	pullRequest *models.FactoryPullRequest,
 	order *models.FactoryWorkOrder,
 	headBranch, revision string,
@@ -272,25 +272,25 @@ func requireWorkOrderInVerify(tx *gorm.DB, order *models.FactoryWorkOrder) error
 	return nil
 }
 
-func customVerificationCanvasMode(tx *gorm.DB, canvas *models.Canvas) (pb.FactoryCustomVerification_StartMode, error) {
+func customAutomationCanvasMode(tx *gorm.DB, canvas *models.Canvas) (pb.FactoryCustomAutomation_StartMode, error) {
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if err != nil {
-		return pb.FactoryCustomVerification_START_MODE_UNSPECIFIED, err
+		return pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED, err
 	}
-	return customVerificationCanvasModeFromVersion(version)
+	return customAutomationCanvasModeFromVersion(version)
 }
 
-func customVerificationCanvasModeFromVersion(version *models.CanvasVersion) (pb.FactoryCustomVerification_StartMode, error) {
+func customAutomationCanvasModeFromVersion(version *models.CanvasVersion) (pb.FactoryCustomAutomation_StartMode, error) {
 	for i := range version.Nodes {
 		node := version.Nodes[i]
-		if node.ID != customVerificationTriggerID {
+		if node.ID != customAutomationTriggerID {
 			continue
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 		mode, _ := template["startMode"].(string)
-		return customVerificationStartMode(mode), nil
+		return customAutomationStartMode(mode), nil
 	}
-	return pb.FactoryCustomVerification_START_MODE_UNSPECIFIED, errors.New("custom verification trigger is missing")
+	return pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED, errors.New("custom automation trigger is missing")
 }
 
 func grpcFailedPrecondition(message string) error {

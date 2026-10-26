@@ -106,24 +106,24 @@ func (s *FactoryService) CreateFactoryAutomation(ctx context.Context, req *pb.Cr
 	return actions.CreateFactoryAutomation(ctx, s.intakeDeps, organizationID, req)
 }
 
-func (s *FactoryService) CreateFactoryCustomVerification(ctx context.Context, req *pb.CreateFactoryCustomVerificationRequest) (*pb.CreateFactoryCustomVerificationResponse, error) {
+func (s *FactoryService) CreateFactoryCustomAutomation(ctx context.Context, req *pb.CreateFactoryCustomAutomationRequest) (*pb.CreateFactoryCustomAutomationResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.CreateFactoryCustomVerification(ctx, s.intakeDeps, organizationID, req)
+	return actions.CreateFactoryCustomAutomation(ctx, s.intakeDeps, organizationID, req)
 }
 
-func (s *FactoryService) DescribeFactoryCustomVerification(ctx context.Context, req *pb.DescribeFactoryCustomVerificationRequest) (*pb.DescribeFactoryCustomVerificationResponse, error) {
+func (s *FactoryService) DescribeFactoryCustomAutomation(ctx context.Context, req *pb.DescribeFactoryCustomAutomationRequest) (*pb.DescribeFactoryCustomAutomationResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.DescribeFactoryCustomVerification(ctx, organizationID, req)
+	return actions.DescribeFactoryCustomAutomation(ctx, organizationID, req)
 }
 
-func (s *FactoryService) UpdateFactoryCustomVerification(ctx context.Context, req *pb.UpdateFactoryCustomVerificationRequest) (*pb.UpdateFactoryCustomVerificationResponse, error) {
+func (s *FactoryService) UpdateFactoryCustomAutomation(ctx context.Context, req *pb.UpdateFactoryCustomAutomationRequest) (*pb.UpdateFactoryCustomAutomationResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.UpdateFactoryCustomVerification(ctx, s.intakeDeps, organizationID, req)
+	return actions.UpdateFactoryCustomAutomation(ctx, s.intakeDeps, organizationID, req)
 }
 
-func (s *FactoryService) RunFactoryCustomVerification(ctx context.Context, req *pb.RunFactoryCustomVerificationRequest) (*pb.RunFactoryCustomVerificationResponse, error) {
+func (s *FactoryService) RunFactoryCustomAutomation(ctx context.Context, req *pb.RunFactoryCustomAutomationRequest) (*pb.RunFactoryCustomAutomationResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.RunFactoryCustomVerification(ctx, s.intakeDeps, organizationID, req)
+	return actions.RunFactoryCustomAutomation(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) PreviewFactorySchedule(ctx context.Context, req *pb.PreviewFactoryScheduleRequest) (*pb.PreviewFactoryScheduleResponse, error) {

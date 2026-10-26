@@ -80,7 +80,7 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	created := true
 	if dedupKey == "" {
 		var suppress bool
-		dedupKey, suppress = customVerificationWebhookPolicy(s.tx, s.node, payloadType, payload)
+		dedupKey, suppress = customAutomationWebhookPolicy(s.tx, s.node, payloadType, payload)
 		if suppress {
 			return nil
 		}
@@ -117,7 +117,7 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	return nil
 }
 
-func customVerificationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (string, bool) {
+func customAutomationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (string, bool) {
 	if node == nil || node.Type != models.NodeTypeTrigger ||
 		(payloadType != "github.pullRequest" && payloadType != "bitbucket.pullRequest") {
 		return "", false
@@ -126,7 +126,7 @@ func customVerificationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, paylo
 	template, _ := node.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
 	templateID, _ := template["id"].(string)
 	startMode, _ := template["startMode"].(string)
-	if templateID != models.FactoryAppTemplateCustomVerifyID {
+	if templateID != models.FactoryAppTemplateCustomAutomationID {
 		return "", false
 	}
 	if startMode != "automatic" {

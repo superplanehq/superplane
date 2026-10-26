@@ -2,53 +2,53 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { CustomVerificationRunAction } from "./CustomVerificationRunAction";
+import { CustomAutomationRunAction } from "./CustomAutomationRunAction";
 
-const runVerification = vi.fn();
-const mutation = { mutateAsync: runVerification, isPending: false };
+const runAutomation = vi.fn();
+const mutation = { mutateAsync: runAutomation, isPending: false };
 
-vi.mock("@/hooks/useFactoryCustomVerificationData", () => ({
-  useRunFactoryCustomVerification: () => mutation,
+vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
+  useRunFactoryCustomAutomation: () => mutation,
 }));
 
 beforeEach(() => {
-  runVerification.mockReset();
+  runAutomation.mockReset();
   mutation.isPending = false;
 });
 
-describe("CustomVerificationRunAction", () => {
-  it("starts the only manual verification and confirms success", async () => {
+describe("CustomAutomationRunAction", () => {
+  it("starts the only manual automation and confirms success", async () => {
     const user = userEvent.setup();
-    runVerification.mockResolvedValue({ runId: "run-1" });
+    runAutomation.mockResolvedValue({ runId: "run-1" });
     render(
-      <CustomVerificationRunAction
+      <CustomAutomationRunAction
         organizationId="org-1"
         factoryId="factory-1"
         workOrderId="task-1"
-        verifications={[{ id: "verification-1", name: "Security review" }]}
+        automations={[{ id: "automation-1", name: "Security review" }]}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "Run automation" }));
 
-    expect(runVerification).toHaveBeenCalledWith({
-      automationId: "verification-1",
+    expect(runAutomation).toHaveBeenCalledWith({
+      automationId: "automation-1",
       workOrderId: "task-1",
     });
     expect(await screen.findByRole("status")).toHaveTextContent("Security review started.");
   });
 
-  it("lets the user choose one of multiple manual verifications", async () => {
+  it("lets the user choose one of multiple manual automations", async () => {
     const user = userEvent.setup();
-    runVerification.mockResolvedValue({ runId: "run-2" });
+    runAutomation.mockResolvedValue({ runId: "run-2" });
     render(
-      <CustomVerificationRunAction
+      <CustomAutomationRunAction
         organizationId="org-1"
         factoryId="factory-1"
         workOrderId="task-1"
-        verifications={[
-          { id: "verification-1", name: "Security review" },
-          { id: "verification-2", name: "License review" },
+        automations={[
+          { id: "automation-1", name: "Security review" },
+          { id: "automation-2", name: "License review" },
         ]}
       />,
     );
@@ -56,21 +56,21 @@ describe("CustomVerificationRunAction", () => {
     await user.click(screen.getByRole("button", { name: "Run automation" }));
     await user.click(screen.getByRole("menuitem", { name: "License review" }));
 
-    expect(runVerification).toHaveBeenCalledWith({
-      automationId: "verification-2",
+    expect(runAutomation).toHaveBeenCalledWith({
+      automationId: "automation-2",
       workOrderId: "task-1",
     });
   });
 
   it("shows an actionable error", async () => {
     const user = userEvent.setup();
-    runVerification.mockRejectedValue(new Error("The task has no pull request."));
+    runAutomation.mockRejectedValue(new Error("The task has no pull request."));
     render(
-      <CustomVerificationRunAction
+      <CustomAutomationRunAction
         organizationId="org-1"
         factoryId="factory-1"
         workOrderId="task-1"
-        verifications={[{ id: "verification-1", name: "Security review" }]}
+        automations={[{ id: "automation-1", name: "Security review" }]}
       />,
     );
 
@@ -82,14 +82,14 @@ describe("CustomVerificationRunAction", () => {
 
   it("shows the start error in the task log", async () => {
     const user = userEvent.setup();
-    runVerification.mockRejectedValue(new Error("The task is not in Verify."));
+    runAutomation.mockRejectedValue(new Error("The task is not in Verify."));
     render(
-      <CustomVerificationRunAction
+      <CustomAutomationRunAction
         organizationId="org-1"
         factoryId="factory-1"
         workOrderId="task-1"
         placement="logs"
-        verifications={[{ id: "verification-1", name: "Security review" }]}
+        automations={[{ id: "automation-1", name: "Security review" }]}
       />,
     );
 
@@ -100,20 +100,20 @@ describe("CustomVerificationRunAction", () => {
 
   it("does not confirm a started run in the task log", async () => {
     const user = userEvent.setup();
-    runVerification.mockResolvedValue({ runId: "run-1" });
+    runAutomation.mockResolvedValue({ runId: "run-1" });
     render(
-      <CustomVerificationRunAction
+      <CustomAutomationRunAction
         organizationId="org-1"
         factoryId="factory-1"
         workOrderId="task-1"
         placement="logs"
-        verifications={[{ id: "verification-1", name: "Deploy to staging" }]}
+        automations={[{ id: "automation-1", name: "Deploy to staging" }]}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "Run" }));
 
-    await waitFor(() => expect(runVerification).toHaveBeenCalled());
+    await waitFor(() => expect(runAutomation).toHaveBeenCalled());
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.queryByText("Deploy to staging started.")).not.toBeInTheDocument();
   });

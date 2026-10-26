@@ -5,10 +5,10 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { CustomVerificationSetupForm } from "./CustomVerificationSetupForm";
-import { useCustomVerificationSetupPage } from "./useCustomVerificationSetupPage";
+import { CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
+import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
 
-export function CustomVerificationSetupModal({
+export function CustomAutomationSetupModal({
   lineId,
   automationId,
   onClose,
@@ -18,7 +18,7 @@ export function CustomVerificationSetupModal({
   onClose: () => void;
 }) {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
-  const model = useCustomVerificationSetupPage({
+  const model = useCustomAutomationSetupPage({
     organizationId,
     factoryId,
     factoryKey: routeSegment,
@@ -55,7 +55,7 @@ export function CustomVerificationSetupModal({
         size="large"
         className="flex h-[min(52rem,calc(100vh-5rem))] w-[min(84rem,calc(100vw-5rem))] !max-w-none flex-col gap-0 overflow-hidden p-0"
         showCloseButton={!model.saving && !deleting}
-        data-testid="custom-verification-setup-modal"
+        data-testid="custom-automation-setup-modal"
       >
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
           <DialogTitle>{editing ? "Edit automation" : "Create automation"}</DialogTitle>
@@ -81,7 +81,7 @@ export function CustomVerificationSetupModal({
             </div>
           </div>
         ) : (
-          <CustomVerificationSetupForm
+          <CustomAutomationSetupForm
             name={model.name}
             icon={model.icon}
             mode={model.mode}

@@ -167,7 +167,7 @@ describe("add visual evidence", () => {
   });
 });
 
-describe("add custom verification", () => {
+describe("add custom automation", () => {
   it("opens the focused Verify setup route", async () => {
     const { result } = renderHook(
       () => ({
@@ -199,11 +199,11 @@ describe("add custom verification", () => {
     await act(async () => result.current.automation.onSelect(entry));
 
     expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
-    expect(result.current.location.search).toBe("?customVerification=new");
+    expect(result.current.location.search).toBe("?customAutomation=new");
     expect(result.current.automation.naming).toBe(false);
   });
 
-  it("opens focused setup when custom verification is the only available choice", () => {
+  it("opens focused setup when custom automation is the only available choice", () => {
     const configured = catalogForColumn("verify").map((entry) => catalogEntryToAutomation(entry, "Verify", entry.id));
     const { result } = renderHook(
       () => ({
@@ -233,7 +233,7 @@ describe("add custom verification", () => {
     act(() => result.current.automation.openPicker("verify"));
 
     expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
-    expect(result.current.location.search).toBe("?customVerification=new");
+    expect(result.current.location.search).toBe("?customAutomation=new");
     expect(result.current.automation.naming).toBe(false);
   });
 });

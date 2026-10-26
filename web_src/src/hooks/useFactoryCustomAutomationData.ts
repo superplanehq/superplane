@@ -1,88 +1,88 @@
 import {
-  factoriesCreateFactoryCustomVerification,
-  factoriesDescribeFactoryCustomVerification,
-  factoriesRunFactoryCustomVerification,
-  factoriesUpdateFactoryCustomVerification,
-  type FactoriesFactoryCustomVerification,
-  type FactoriesFactoryCustomVerificationSettings,
+  factoriesCreateFactoryCustomAutomation,
+  factoriesDescribeFactoryCustomAutomation,
+  factoriesRunFactoryCustomAutomation,
+  factoriesUpdateFactoryCustomAutomation,
+  type FactoriesFactoryCustomAutomation,
+  type FactoriesFactoryCustomAutomationSettings,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
 
-export const factoryCustomVerificationKey = (organizationId: string, factoryId: string, automationId: string) =>
-  ["factories", organizationId, factoryId, "custom-verifications", automationId] as const;
+export const factoryCustomAutomationKey = (organizationId: string, factoryId: string, automationId: string) =>
+  ["factories", organizationId, factoryId, "custom-automations", automationId] as const;
 
-async function fetchFactoryCustomVerification(
+async function fetchFactoryCustomAutomation(
   organizationId: string,
   factoryId: string,
   automationId: string,
-): Promise<FactoriesFactoryCustomVerification> {
-  const response = await factoriesDescribeFactoryCustomVerification(
+): Promise<FactoriesFactoryCustomAutomation> {
+  const response = await factoriesDescribeFactoryCustomAutomation(
     withOrganizationHeader({
       organizationId,
       path: { factoryId, automationId },
     }),
   );
-  if (!response.data?.verification) {
+  if (!response.data?.customAutomation) {
     throw new Error("Automation settings are unavailable.");
   }
-  return response.data.verification;
+  return response.data.customAutomation;
 }
 
-export function useFactoryCustomVerification(
+export function useFactoryCustomAutomation(
   organizationId: string,
   factoryId: string,
   automationId: string | undefined,
 ) {
   return useQuery({
-    queryKey: factoryCustomVerificationKey(organizationId, factoryId, automationId ?? ""),
-    queryFn: () => fetchFactoryCustomVerification(organizationId, factoryId, automationId ?? ""),
+    queryKey: factoryCustomAutomationKey(organizationId, factoryId, automationId ?? ""),
+    queryFn: () => fetchFactoryCustomAutomation(organizationId, factoryId, automationId ?? ""),
     enabled: Boolean(organizationId && factoryId && automationId),
   });
 }
 
-export function useFactoryCustomVerifications(
+export function useFactoryCustomAutomations(
   organizationId: string,
   factoryId: string,
   automationIds: readonly string[],
 ) {
   const queries = useQueries({
     queries: automationIds.map((automationId) => ({
-      queryKey: factoryCustomVerificationKey(organizationId, factoryId, automationId),
-      queryFn: () => fetchFactoryCustomVerification(organizationId, factoryId, automationId),
+      queryKey: factoryCustomAutomationKey(organizationId, factoryId, automationId),
+      queryFn: () => fetchFactoryCustomAutomation(organizationId, factoryId, automationId),
       enabled: Boolean(organizationId && factoryId && automationId),
       staleTime: 30_000,
     })),
   });
 
   return automationIds.flatMap((automationId, index) => {
-    const verification = queries[index]?.data;
-    return verification ? [{ automationId, verification }] : [];
+    const automation = queries[index]?.data;
+    return automation ? [{ automationId, automation }] : [];
   });
 }
 
-type CustomVerificationInput = {
+type CustomAutomationInput = {
   name: string;
-  settings: FactoriesFactoryCustomVerificationSettings;
+  settings: FactoriesFactoryCustomAutomationSettings;
 };
 
-export function useCreateFactoryCustomVerification(organizationId: string, factoryId: string) {
+export function useCreateFactoryCustomAutomation(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: CustomVerificationInput) => {
-      const response = await factoriesCreateFactoryCustomVerification(
+    mutationFn: async (input: CustomAutomationInput) => {
+      const response = await factoriesCreateFactoryCustomAutomation(
         withOrganizationHeader({
           organizationId,
           path: { factoryId },
           body: input,
         }),
       );
-      if (!response.data?.verification) {
+      if (!response.data?.customAutomation) {
         throw new Error("SuperPlane could not create the automation.");
       }
-      return response.data.verification;
+      return response.data.customAutomation;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
@@ -90,34 +90,34 @@ export function useCreateFactoryCustomVerification(organizationId: string, facto
   });
 }
 
-export function useUpdateFactoryCustomVerification(organizationId: string, factoryId: string, automationId: string) {
+export function useUpdateFactoryCustomAutomation(organizationId: string, factoryId: string, automationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: CustomVerificationInput) => {
-      const response = await factoriesUpdateFactoryCustomVerification(
+    mutationFn: async (input: CustomAutomationInput) => {
+      const response = await factoriesUpdateFactoryCustomAutomation(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, automationId },
           body: input,
         }),
       );
-      if (!response.data?.verification) {
+      if (!response.data?.customAutomation) {
         throw new Error("SuperPlane could not update the automation.");
       }
-      return response.data.verification;
+      return response.data.customAutomation;
     },
-    onSuccess: (verification) => {
-      queryClient.setQueryData(factoryCustomVerificationKey(organizationId, factoryId, automationId), verification);
+    onSuccess: (automation) => {
+      queryClient.setQueryData(factoryCustomAutomationKey(organizationId, factoryId, automationId), automation);
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
     },
   });
 }
 
-export function useRunFactoryCustomVerification(organizationId: string, factoryId: string) {
+export function useRunFactoryCustomAutomation(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ automationId, workOrderId }: { automationId: string; workOrderId: string }) => {
-      const response = await factoriesRunFactoryCustomVerification(
+      const response = await factoriesRunFactoryCustomAutomation(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, automationId },

@@ -44,7 +44,7 @@ import {
   factorySentryIntakeSetupPath,
   firstFactoryLineId,
 } from "../lib/factoryPagePaths";
-import { factoryCustomVerificationSetupPath } from "../lib/customVerificationPaths";
+import { factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT,
@@ -1140,7 +1140,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryCustomVerificationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+      factoryCustomAutomationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
   });
 
@@ -1154,7 +1154,7 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("add-column-automation-template-custom-verification"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryCustomVerificationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+      factoryCustomAutomationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
   });
 

@@ -11,7 +11,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestManualCustomVerificationIgnoresPullRequestWebhooks(t *testing.T) {
+func TestManualCustomAutomationIgnoresPullRequestWebhooks(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
@@ -23,7 +23,7 @@ func TestManualCustomVerificationIgnoresPullRequestWebhooks(t *testing.T) {
 			}),
 			Metadata: datatypes.NewJSONType(map[string]any{
 				models.FactoryAppTemplateMetadataKey: map[string]any{
-					"id":        models.FactoryAppTemplateCustomVerifyID,
+					"id":        models.FactoryAppTemplateCustomAutomationID,
 					"startMode": "manual",
 				},
 			}),
@@ -39,8 +39,8 @@ func TestManualCustomVerificationIgnoresPullRequestWebhooks(t *testing.T) {
 			"head": map[string]any{"sha": "abc123"},
 		},
 	}))
-	require.NoError(t, events.Emit("factory.customVerification", map[string]any{"manual": true}))
-	require.NoError(t, events.Emit("factory.customVerification", map[string]any{"manual": true}))
+	require.NoError(t, events.Emit("factory.customAutomation", map[string]any{"manual": true}))
+	require.NoError(t, events.Emit("factory.customAutomation", map[string]any{"manual": true}))
 
 	var count int64
 	require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&count).Error)

@@ -9,7 +9,7 @@ import (
 
 const visualEvidenceRunTitle = "Capture screenshots or a short video"
 
-const customVerificationRunTitle = "Custom automation"
+const customAutomationRunTitle = "Custom automation"
 
 // MaybeLinkVisualEvidenceRun attaches a Visual Evidence canvas run to the
 // factory pull request in the root event. The task Verify list shows a column
@@ -18,17 +18,17 @@ func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateVisualEvidenceID, visualEvidenceRunTitle)
 }
 
-// MaybeLinkCustomVerificationRun attaches a custom Verify automation run to
+// MaybeLinkCustomAutomationRun attaches a custom Verify automation run to
 // the factory pull request in the root event. The task log shows that
 // automation only after that link exists.
-func MaybeLinkCustomVerificationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
-	title := customVerificationRunTitle
+func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
+	title := customAutomationRunTitle
 	if canvas != nil {
 		if name := strings.TrimSpace(canvas.Name); name != "" {
 			title = name
 		}
 	}
-	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomVerifyID, title)
+	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
 }
 
 func maybeLinkFactoryColumnAppRun(

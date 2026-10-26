@@ -5,8 +5,8 @@ import { ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
-import type { ManualCustomVerification } from "../../../lib/customVerification";
-import { CustomVerificationRunAction } from "../../CustomVerificationRunAction";
+import type { ManualCustomAutomation } from "../../../lib/customAutomation";
+import { CustomAutomationRunAction } from "../../CustomAutomationRunAction";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import { AutomationCardBody } from "./AutomationCardBody";
 import {
@@ -56,7 +56,7 @@ export function ConsoleAutomationCard({
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
-  manualRun?: ManualCustomVerification;
+  manualRun?: ManualCustomAutomation;
 }) {
   const { latest } = automation;
   const { queuedIds, timing, report } = useAgentQueueReports();
@@ -146,7 +146,7 @@ export function ConsoleAutomationCard({
 }
 
 function logsRunAction(
-  manualRun: ManualCustomVerification | undefined,
+  manualRun: ManualCustomAutomation | undefined,
   organizationId?: string,
   factoryId?: string,
   orderId?: string,
@@ -155,11 +155,11 @@ function logsRunAction(
     return undefined;
   }
   return (
-    <CustomVerificationRunAction
+    <CustomAutomationRunAction
       organizationId={organizationId}
       factoryId={factoryId}
       workOrderId={orderId}
-      verifications={[manualRun]}
+      automations={[manualRun]}
       placement="logs"
     />
   );

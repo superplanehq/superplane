@@ -2,10 +2,10 @@ import { Navigate, useParams } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath } from "../lib/factoryPagePaths";
-import { factoryCustomVerificationSetupPath } from "../lib/customVerificationPaths";
+import { factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
 
 /** Redirect old setup URLs to the board modal URL. */
-export function CustomVerificationSetupPage() {
+export function CustomAutomationSetupPage() {
   const { organizationId, routeSegment, factory } = useFactoriesLayout();
   const { lineId, automationId } = useParams<{ lineId?: string; automationId?: string }>();
   const fallbackLineId = factory?.lines?.[0]?.id;
@@ -14,9 +14,6 @@ export function CustomVerificationSetupPage() {
     return <Navigate to={factoryHomePath(organizationId, routeSegment)} replace />;
   }
   return (
-    <Navigate
-      to={factoryCustomVerificationSetupPath(organizationId, routeSegment, targetLineId, automationId)}
-      replace
-    />
+    <Navigate to={factoryCustomAutomationSetupPath(organizationId, routeSegment, targetLineId, automationId)} replace />
   );
 }

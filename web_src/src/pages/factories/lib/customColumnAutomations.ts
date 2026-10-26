@@ -2,16 +2,16 @@ import type { FactoriesWorkOrder } from "@/api-client";
 
 import { CUSTOM_CATALOG_ID, EVENT_CUSTOM_ENTRY } from "./columnAutomationCatalog";
 import type { ColumnAutomation } from "./columnAutomations";
-import { CUSTOM_VERIFICATION_TEMPLATE_ID, type CustomVerificationMode } from "./customVerification";
-import { customVerificationColumnAutomation } from "./customVerificationColumnAutomation";
+import { CUSTOM_AUTOMATION_TEMPLATE_ID, type CustomAutomationMode } from "./customAutomation";
+import { customAutomationColumnAutomation } from "./customAutomationColumnAutomation";
 
 export type ColumnAutomationApp = {
   id?: string;
   name?: string;
   columnKey?: string;
   templateId?: string;
-  customVerificationMode?: CustomVerificationMode;
-  customVerificationIcon?: string;
+  customAutomationMode?: CustomAutomationMode;
+  customAutomationIcon?: string;
 };
 
 export function customColumnAutomations(
@@ -26,8 +26,8 @@ export function customColumnAutomations(
     if (!id || skipIds.has(id) || app.columnKey !== columnKey) {
       return [];
     }
-    if (columnKey === "verify" && app.templateId === CUSTOM_VERIFICATION_TEMPLATE_ID) {
-      const automation = customVerificationColumnAutomation(app, workOrders, runningCountForApp);
+    if (columnKey === "verify" && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID) {
+      const automation = customAutomationColumnAutomation(app, workOrders, runningCountForApp);
       return automation ? [automation] : [];
     }
     return [

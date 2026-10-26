@@ -1,23 +1,23 @@
 import {
-  useCreateFactoryCustomVerification,
-  useFactoryCustomVerification,
-  useUpdateFactoryCustomVerification,
-} from "@/hooks/useFactoryCustomVerificationData";
+  useCreateFactoryCustomAutomation,
+  useFactoryCustomAutomation,
+  useUpdateFactoryCustomAutomation,
+} from "@/hooks/useFactoryCustomAutomationData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useEffect, useMemo, useState } from "react";
 
 import type { FactoriesFactory } from "@/api-client";
 import {
-  customVerificationDraft,
-  customVerificationMode,
-  customVerificationSettings,
-  DEFAULT_CUSTOM_VERIFICATION_ICON,
-  type CustomVerificationMode,
-} from "../lib/customVerification";
+  customAutomationDraft,
+  customAutomationMode,
+  customAutomationSettings,
+  DEFAULT_CUSTOM_AUTOMATION_ICON,
+  type CustomAutomationMode,
+} from "../lib/customAutomation";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
-export function useCustomVerificationSetupPage(args: {
+export function useCustomAutomationSetupPage(args: {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
@@ -25,15 +25,15 @@ export function useCustomVerificationSetupPage(args: {
   lineId?: string;
   automationId?: string;
 }) {
-  const described = useFactoryCustomVerification(args.organizationId, args.factoryId, args.automationId);
-  const create = useCreateFactoryCustomVerification(args.organizationId, args.factoryId);
-  const update = useUpdateFactoryCustomVerification(args.organizationId, args.factoryId, args.automationId ?? "");
+  const described = useFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId);
+  const create = useCreateFactoryCustomAutomation(args.organizationId, args.factoryId);
+  const update = useUpdateFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId ?? "");
   const [name, setName] = useState("Custom automation");
-  const [mode, setMode] = useState<CustomVerificationMode>("manual");
-  const [icon, setIcon] = useState(DEFAULT_CUSTOM_VERIFICATION_ICON);
-  const [draft, setDraft] = useState<PlanningReviewDraft>(() => customVerificationDraft());
+  const [mode, setMode] = useState<CustomAutomationMode>("manual");
+  const [icon, setIcon] = useState(DEFAULT_CUSTOM_AUTOMATION_ICON);
+  const [draft, setDraft] = useState<PlanningReviewDraft>(() => customAutomationDraft());
   const [saveError, setSaveError] = useState("");
-  const verification = described.data;
+  const automation = described.data;
 
   useEffect(() => {
     if (args.automationId) {
@@ -41,20 +41,20 @@ export function useCustomVerificationSetupPage(args: {
     }
     setName("Custom automation");
     setMode("manual");
-    setIcon(DEFAULT_CUSTOM_VERIFICATION_ICON);
-    setDraft(customVerificationDraft());
+    setIcon(DEFAULT_CUSTOM_AUTOMATION_ICON);
+    setDraft(customAutomationDraft());
     setSaveError("");
   }, [args.automationId]);
 
   useEffect(() => {
-    if (!verification) {
+    if (!automation) {
       return;
     }
-    setName(verification.automation?.name?.trim() || "Custom automation");
-    setMode(customVerificationMode(verification.settings?.startMode));
-    setIcon(verification.settings?.icon?.trim() || DEFAULT_CUSTOM_VERIFICATION_ICON);
-    setDraft(customVerificationDraft(verification));
-  }, [verification]);
+    setName(automation.automation?.name?.trim() || "Custom automation");
+    setMode(customAutomationMode(automation.settings?.startMode));
+    setIcon(automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON);
+    setDraft(customAutomationDraft(automation));
+  }, [automation]);
 
   const boardHref = factoryHomePath(args.organizationId, args.factoryKey, firstFactoryLineId(args.factory));
   const line = args.factory?.lines?.find((entry) => entry.id === args.lineId);
@@ -69,7 +69,7 @@ export function useCustomVerificationSetupPage(args: {
     setSaveError("");
     const input = {
       name: name.trim(),
-      settings: customVerificationSettings(mode, draft, Boolean(args.automationId), icon),
+      settings: customAutomationSettings(mode, draft, Boolean(args.automationId), icon),
     };
     try {
       if (args.automationId) {

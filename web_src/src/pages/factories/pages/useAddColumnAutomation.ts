@@ -24,7 +24,7 @@ import {
   factoryRiskScoreSetupPath,
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
-import { factoryCustomVerificationSetupPath } from "../lib/customVerificationPaths";
+import { factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
 
 export function useAddColumnAutomation(args: {
   organizationId: string;
@@ -60,7 +60,7 @@ export function useAddColumnAutomation(args: {
     const nextCatalog = catalogForColumn(key, catalogOptions);
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
     if (key === "verify" && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
-      navigate(factoryCustomVerificationSetupPath(args.organizationId, args.factoryKey, args.lineId));
+      navigate(factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId));
       return;
     }
     setColumn(key);
@@ -161,7 +161,7 @@ function focusedVerifySetupPath(
     return undefined;
   }
   if (entry.kind === "custom-verification") {
-    return factoryCustomVerificationSetupPath(args.organizationId, args.factoryKey, args.lineId);
+    return factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId);
   }
   return factoryPRFeedbackSetupPath(
     args.organizationId,

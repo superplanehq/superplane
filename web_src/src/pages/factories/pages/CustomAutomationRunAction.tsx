@@ -1,40 +1,40 @@
 import { Button } from "@/components/ui/button";
-import { useRunFactoryCustomVerification } from "@/hooks/useFactoryCustomVerificationData";
+import { useRunFactoryCustomAutomation } from "@/hooks/useFactoryCustomAutomationData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { AlertCircle, CheckCircle2, ChevronDown, Loader2, Play } from "lucide-react";
 import { useState } from "react";
 
-import type { ManualCustomVerification } from "../lib/customVerification";
+import type { ManualCustomAutomation } from "../lib/customAutomation";
 
-export function CustomVerificationRunAction({
+export function CustomAutomationRunAction({
   organizationId,
   factoryId,
   workOrderId,
-  verifications,
+  automations,
   placement = "board",
 }: {
   organizationId: string;
   factoryId: string;
   workOrderId: string;
-  verifications: readonly ManualCustomVerification[];
+  automations: readonly ManualCustomAutomation[];
   placement?: "board" | "logs";
 }) {
-  const run = useRunFactoryCustomVerification(organizationId, factoryId);
+  const run = useRunFactoryCustomAutomation(organizationId, factoryId);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [lastAutomationId, setLastAutomationId] = useState("");
 
-  if (verifications.length === 0) {
+  if (automations.length === 0) {
     return null;
   }
 
-  const start = async (verification: ManualCustomVerification) => {
+  const start = async (automation: ManualCustomAutomation) => {
     setStatus(null);
-    setLastAutomationId(verification.id);
+    setLastAutomationId(automation.id);
     try {
-      await run.mutateAsync({ automationId: verification.id, workOrderId });
+      await run.mutateAsync({ automationId: automation.id, workOrderId });
       if (placement === "board") {
-        setStatus({ type: "success", message: `${verification.name} started.` });
+        setStatus({ type: "success", message: `${automation.name} started.` });
       }
     } catch (error) {
       setStatus({
@@ -54,15 +54,10 @@ export function CustomVerificationRunAction({
           ? "relative z-20 flex max-w-[16rem] flex-col items-end gap-1"
           : "mt-1.5 flex flex-col gap-1"
       }
-      data-testid={`custom-verification-action-${workOrderId}`}
+      data-testid={`custom-automation-action-${workOrderId}`}
     >
-      <RunActionControls placement={placement} pending={run.isPending} verifications={verifications} onStart={start} />
-      <RunActionStatus
-        status={status}
-        lastAutomationId={lastAutomationId}
-        verifications={verifications}
-        onRetry={start}
-      />
+      <RunActionControls placement={placement} pending={run.isPending} automations={automations} onStart={start} />
+      <RunActionStatus status={status} lastAutomationId={lastAutomationId} automations={automations} onRetry={start} />
     </div>
   );
 }
@@ -70,19 +65,19 @@ export function CustomVerificationRunAction({
 function RunActionControls({
   placement,
   pending,
-  verifications,
+  automations,
   onStart,
 }: {
   placement: "board" | "logs";
   pending: boolean;
-  verifications: readonly ManualCustomVerification[];
-  onStart: (verification: ManualCustomVerification) => Promise<void>;
+  automations: readonly ManualCustomAutomation[];
+  onStart: (automation: ManualCustomAutomation) => Promise<void>;
 }) {
-  const one = verifications[0];
+  const one = automations[0];
   const compact = placement === "logs";
   const label = pending ? "Starting…" : compact ? "Run" : "Run automation";
   const className = compact ? "h-7 px-2.5 text-xs" : "h-7 w-full justify-center text-xs";
-  if (verifications.length === 1 && one) {
+  if (automations.length === 1 && one) {
     return (
       <Button
         type="button"
@@ -115,9 +110,9 @@ function RunActionControls({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
-        {verifications.map((verification) => (
-          <DropdownMenuItem key={verification.id} onClick={() => void onStart(verification)}>
-            {verification.name}
+        {automations.map((automation) => (
+          <DropdownMenuItem key={automation.id} onClick={() => void onStart(automation)}>
+            {automation.name}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -128,13 +123,13 @@ function RunActionControls({
 function RunActionStatus({
   status,
   lastAutomationId,
-  verifications,
+  automations,
   onRetry,
 }: {
   status: { type: "success" | "error"; message: string } | null;
   lastAutomationId: string;
-  verifications: readonly ManualCustomVerification[];
-  onRetry: (verification: ManualCustomVerification) => Promise<void>;
+  automations: readonly ManualCustomAutomation[];
+  onRetry: (automation: ManualCustomAutomation) => Promise<void>;
 }) {
   if (!status) {
     return null;
@@ -162,9 +157,9 @@ function RunActionStatus({
           size="sm"
           className="h-auto shrink-0 p-0 text-[11px] text-destructive"
           onClick={() => {
-            const verification = verifications.find((entry) => entry.id === lastAutomationId);
-            if (verification) {
-              void onRetry(verification);
+            const automation = automations.find((entry) => entry.id === lastAutomationId);
+            if (automation) {
+              void onRetry(automation);
             }
           }}
         >

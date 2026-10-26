@@ -14,15 +14,15 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func TestCustomVerificationSettingsAllowBashOnly(t *testing.T) {
+func TestCustomAutomationSettingsAllowBashOnly(t *testing.T) {
 	r := support.Setup(t)
 	factory := seedHandOffFactory(t, r, database.DB(t.Context()))
 
-	settings, err := parseCustomVerificationSettings(database.DB(t.Context()), factory, &pb.FactoryCustomVerification_Settings{
-		StartMode: pb.FactoryCustomVerification_START_MODE_MANUAL,
+	settings, err := parseCustomAutomationSettings(database.DB(t.Context()), factory, &pb.FactoryCustomAutomation_Settings{
+		StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
 		Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
-		Steps: []*pb.FactoryCustomVerification_Step{
-			{Name: "Lint", Type: pb.FactoryCustomVerification_Step_TYPE_BASH, Command: "make lint"},
+		Steps: []*pb.FactoryCustomAutomation_Step{
+			{Name: "Lint", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make lint"},
 		},
 	})
 	require.NoError(t, err)
@@ -30,7 +30,7 @@ func TestCustomVerificationSettingsAllowBashOnly(t *testing.T) {
 	assert.Equal(t, runner.AgentStepBash, settings.Steps[0].Type)
 }
 
-func TestCustomVerificationGraphUsesProviderAndFocusedSettings(t *testing.T) {
+func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		t.Run(provider, func(t *testing.T) {
 			r := support.Setup(t)
@@ -43,19 +43,19 @@ func TestCustomVerificationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			}))
 			prompt := "Review the pull request."
 			command := "make test"
-			settings, err := parseCustomVerificationSettings(db, factory, &pb.FactoryCustomVerification_Settings{
-				StartMode: pb.FactoryCustomVerification_START_MODE_AUTOMATIC,
+			settings, err := parseCustomAutomationSettings(db, factory, &pb.FactoryCustomAutomation_Settings{
+				StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
 				Agent: &pb.FactoryAppTemplateAgent{
 					Component:                 "runnerClaudeCode",
 					Model:                     "claude-sonnet-4-6",
 					CredentialSource:          runner.CredentialsSourceIntegration,
 					CredentialIntegrationName: "Claude",
 				},
-				Steps: []*pb.FactoryCustomVerification_Step{
-					{Name: "Review", Type: pb.FactoryCustomVerification_Step_TYPE_PROMPT, Prompt: prompt, WorkingDirectory: "repo"},
+				Steps: []*pb.FactoryCustomAutomation_Step{
+					{Name: "Review", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: prompt, WorkingDirectory: "repo"},
 					{
 						Name:             "Test",
-						Type:             pb.FactoryCustomVerification_Step_TYPE_BASH,
+						Type:             pb.FactoryCustomAutomation_Step_TYPE_BASH,
 						Command:          command,
 						WorkingDirectory: "repo",
 						Secrets:          []string{"deploy-credentials"},
@@ -64,7 +64,7 @@ func TestCustomVerificationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			doc, err := buildCustomVerificationCanvas(db, factory, "Verify changes", settings)
+			doc, err := buildCustomAutomationCanvas(db, factory, "Verify changes", settings)
 			require.NoError(t, err)
 			require.Len(t, doc.Spec.Nodes, 2)
 			trigger := doc.Spec.Nodes[0]
@@ -74,11 +74,11 @@ func TestCustomVerificationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			assert.Equal(t, prFeedbackTriggerActions(provider), trigger.Configuration["actions"])
 			assert.Equal(t, integrationID, trigger.Integration.ID)
 			template := trigger.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
-			assert.Equal(t, models.FactoryAppTemplateCustomVerifyID, template["id"])
+			assert.Equal(t, models.FactoryAppTemplateCustomAutomationID, template["id"])
 			assert.Equal(t, "automatic", template["startMode"])
 			assert.Equal(t, "runnerClaudeCode", agent.Component)
 			assert.Equal(t, "claude-sonnet-4-6", agent.Configuration["model"])
-			assert.Equal(t, customVerificationStepConfiguration(settings.Steps), agent.Configuration["steps"])
+			assert.Equal(t, customAutomationStepConfiguration(settings.Steps), agent.Configuration["steps"])
 			environmentFrom := agent.Configuration["environmentFrom"].([]any)
 			require.Len(t, environmentFrom, 2)
 			secretSource := environmentFrom[1].(map[string]any)

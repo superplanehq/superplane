@@ -47,7 +47,7 @@ export {
   WorkOrdersPage,
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
-  CustomVerificationSetupPage,
+  CustomAutomationSetupPage,
   DatadogIntakeSetupPage,
   DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,

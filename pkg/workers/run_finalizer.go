@@ -474,31 +474,31 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		)
 	}
 
-	w.startAutomaticCustomVerificationsForRun(runID)
+	w.startAutomaticCustomAutomationsForRun(runID)
 	return nil
 }
 
-func (w *RunFinalizer) startAutomaticCustomVerificationsForRun(runID uuid.UUID) {
+func (w *RunFinalizer) startAutomaticCustomAutomationsForRun(runID uuid.UUID) {
 	db := database.Conn()
 	execution, err := models.FindWorkOrderExecutionByRunID(db, runID)
 	if err != nil {
 		if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-			w.logger.WithError(err).Warnf("custom verification: failed to load line step for run %s", runID)
+			w.logger.WithError(err).Warnf("custom automation: failed to load line step for run %s", runID)
 		}
 		return
 	}
 	factory, err := models.FindFactory(db, execution.OrganizationID, execution.FactoryID)
 	if err != nil {
-		w.logger.WithError(err).Warnf("custom verification: failed to load factory for run %s", runID)
+		w.logger.WithError(err).Warnf("custom automation: failed to load factory for run %s", runID)
 		return
 	}
 	order, err := factory.FindWorkOrder(db, execution.WorkOrderID)
 	if err != nil {
-		w.logger.WithError(err).Warnf("custom verification: failed to load work order for run %s", runID)
+		w.logger.WithError(err).Warnf("custom automation: failed to load work order for run %s", runID)
 		return
 	}
-	if err := factoryactions.StartAutomaticCustomVerifications(context.Background(), w.factoryIntakeDeps(), factory, order); err != nil {
-		w.logger.WithError(err).Warnf("custom verification: failed to start automatic automations for order %s", order.ID)
+	if err := factoryactions.StartAutomaticCustomAutomations(context.Background(), w.factoryIntakeDeps(), factory, order); err != nil {
+		w.logger.WithError(err).Warnf("custom automation: failed to start automatic automations for order %s", order.ID)
 	}
 }
 

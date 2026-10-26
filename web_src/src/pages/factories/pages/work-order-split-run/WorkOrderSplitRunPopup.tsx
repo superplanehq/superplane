@@ -114,7 +114,7 @@ function AnalysisWorkOrderPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
-  manualCustomVerifications,
+  manualCustomAutomations,
   analysis,
   popupData,
   titlePrefix,
@@ -204,7 +204,7 @@ function AnalysisWorkOrderPopup({
           orderNumber={orderNumber}
           lineId={lineId}
           canUpdate={canUpdate}
-          manualCustomVerifications={manualCustomVerifications}
+          manualCustomAutomations={manualCustomAutomations}
           footerActions={footerActions}
           resultFooter={descriptionReview}
           sidebarNote={!unified && showSidebarNote ? review : undefined}

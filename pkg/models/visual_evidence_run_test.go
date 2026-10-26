@@ -103,7 +103,7 @@ func TestMaybeLinkVisualEvidenceRunIgnoresOtherCanvases(t *testing.T) {
 	assert.Empty(t, linked[pullRequest.ID])
 }
 
-func TestMaybeLinkCustomVerificationRunShowsTheRunOnThePullRequest(t *testing.T) {
+func TestMaybeLinkCustomAutomationRunShowsTheRunOnThePullRequest(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -125,7 +125,7 @@ func TestMaybeLinkCustomVerificationRunShowsTheRunOnThePullRequest(t *testing.T)
 		Name:   "On Pull Request",
 		Type:   models.NodeTypeTrigger,
 		Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(
-			models.FactoryAppTemplateCustomVerifyID,
+			models.FactoryAppTemplateCustomAutomationID,
 			1,
 		)),
 	}}, nil)
@@ -145,8 +145,8 @@ func TestMaybeLinkCustomVerificationRunShowsTheRunOnThePullRequest(t *testing.T)
 		}),
 	}
 
-	require.NoError(t, models.MaybeLinkCustomVerificationRun(db, canvas, event, run))
-	require.NoError(t, models.MaybeLinkCustomVerificationRun(db, canvas, event, run))
+	require.NoError(t, models.MaybeLinkCustomAutomationRun(db, canvas, event, run))
+	require.NoError(t, models.MaybeLinkCustomAutomationRun(db, canvas, event, run))
 
 	linked, err := models.ListPullRequestRuns(db, []uuid.UUID{pullRequest.ID})
 	require.NoError(t, err)

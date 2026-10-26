@@ -277,8 +277,8 @@ func HandOffWorkOrder(
 			)
 		}
 		if trackedPR != nil {
-			if err := StartAutomaticCustomVerifications(ctx, deps, factory, order); err != nil {
-				log.WithError(err).Warnf("Failed to start custom verification for order %s", order.ID)
+			if err := StartAutomaticCustomAutomations(ctx, deps, factory, order); err != nil {
+				log.WithError(err).Warnf("Failed to start custom automation for order %s", order.ID)
 			}
 		}
 		if err := messages.PublishFactoryWorkOrderUpdated(

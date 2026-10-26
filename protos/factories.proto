@@ -196,49 +196,49 @@ service Factories {
     };
   }
 
-  rpc CreateFactoryCustomVerification(CreateFactoryCustomVerificationRequest) returns (CreateFactoryCustomVerificationResponse) {
+  rpc CreateFactoryCustomAutomation(CreateFactoryCustomAutomationRequest) returns (CreateFactoryCustomAutomationResponse) {
     option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/custom-verifications"
+      post: "/api/v1/factories/{factory_id}/custom-automations"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create custom verification";
-      description: "Creates a managed Verify automation with prompt and bash steps";
+      summary: "Create custom automation";
+      description: "Creates a managed Verify-column automation with prompt and bash steps";
       tags: "Factory";
     };
   }
 
-  rpc DescribeFactoryCustomVerification(DescribeFactoryCustomVerificationRequest) returns (DescribeFactoryCustomVerificationResponse) {
+  rpc DescribeFactoryCustomAutomation(DescribeFactoryCustomAutomationRequest) returns (DescribeFactoryCustomAutomationResponse) {
     option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/custom-verifications/{automation_id}"
+      get: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe custom verification";
-      description: "Returns the focused settings for a managed Verify automation";
+      summary: "Describe custom automation";
+      description: "Returns the focused settings for a managed Verify-column automation";
       tags: "Factory";
     };
   }
 
-  rpc UpdateFactoryCustomVerification(UpdateFactoryCustomVerificationRequest) returns (UpdateFactoryCustomVerificationResponse) {
+  rpc UpdateFactoryCustomAutomation(UpdateFactoryCustomAutomationRequest) returns (UpdateFactoryCustomAutomationResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/factories/{factory_id}/custom-verifications/{automation_id}"
+      patch: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update custom verification";
-      description: "Updates the focused settings and managed graph for a Verify automation";
+      summary: "Update custom automation";
+      description: "Updates the focused settings and managed graph for a Verify-column automation";
       tags: "Factory";
     };
   }
 
-  rpc RunFactoryCustomVerification(RunFactoryCustomVerificationRequest) returns (RunFactoryCustomVerificationResponse) {
+  rpc RunFactoryCustomAutomation(RunFactoryCustomAutomationRequest) returns (RunFactoryCustomAutomationResponse) {
     option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/custom-verifications/{automation_id}:run"
+      post: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}:run"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Run custom verification";
-      description: "Starts one managed Verify automation for one task";
+      summary: "Run custom automation";
+      description: "Starts one managed Verify-column automation for one task";
       tags: "Factory";
     };
   }
@@ -1265,7 +1265,7 @@ message CreateFactoryAutomationResponse {
   Factory.Automation automation = 1;
 }
 
-message FactoryCustomVerification {
+message FactoryCustomAutomation {
   enum StartMode {
     START_MODE_UNSPECIFIED = 0;
     START_MODE_MANUAL = 1;
@@ -1299,43 +1299,43 @@ message FactoryCustomVerification {
   string provider = 3;
 }
 
-message CreateFactoryCustomVerificationRequest {
+message CreateFactoryCustomAutomationRequest {
   string factory_id = 1;
   string name = 2;
-  FactoryCustomVerification.Settings settings = 3;
+  FactoryCustomAutomation.Settings settings = 3;
 }
 
-message CreateFactoryCustomVerificationResponse {
-  FactoryCustomVerification verification = 1;
+message CreateFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
 }
 
-message DescribeFactoryCustomVerificationRequest {
+message DescribeFactoryCustomAutomationRequest {
   string factory_id = 1;
   string automation_id = 2;
 }
 
-message DescribeFactoryCustomVerificationResponse {
-  FactoryCustomVerification verification = 1;
+message DescribeFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
 }
 
-message UpdateFactoryCustomVerificationRequest {
+message UpdateFactoryCustomAutomationRequest {
   string factory_id = 1;
   string automation_id = 2;
   string name = 3;
-  FactoryCustomVerification.Settings settings = 4;
+  FactoryCustomAutomation.Settings settings = 4;
 }
 
-message UpdateFactoryCustomVerificationResponse {
-  FactoryCustomVerification verification = 1;
+message UpdateFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
 }
 
-message RunFactoryCustomVerificationRequest {
+message RunFactoryCustomAutomationRequest {
   string factory_id = 1;
   string automation_id = 2;
   string work_order_id = 3;
 }
 
-message RunFactoryCustomVerificationResponse {
+message RunFactoryCustomAutomationResponse {
   string run_id = 1;
   string event_id = 2;
 }

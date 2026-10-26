@@ -1,12 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
 import { buildColumnAutomations, columnAutomationOpenPath } from "./columnAutomations";
-import { customVerificationDraft, customVerificationModeCopy, customVerificationSettings } from "./customVerification";
+import { customAutomationDraft, customAutomationModeCopy, customAutomationSettings } from "./customAutomation";
+import { customAutomationIdFromSearch } from "./customAutomationPaths";
 
-describe("custom verification settings", () => {
+describe("custom automation settings", () => {
   it("maps saved agent and ordered steps into the shared editor and back", () => {
-    const draft = customVerificationDraft({
-      automation: { id: "verification-1", name: "Security review" },
+    const draft = customAutomationDraft({
+      automation: { id: "review-1", name: "Security review" },
       provider: "bitbucket",
       settings: {
         startMode: "START_MODE_AUTOMATIC",
@@ -27,7 +28,7 @@ describe("custom verification settings", () => {
       { name: "Review", type: "prompt", prompt: "Review this change.", command: undefined, workingDirectory: "repo" },
       { name: "Test", type: "bash", prompt: undefined, command: "make test", workingDirectory: "repo" },
     ]);
-    expect(customVerificationSettings("automatic", draft, true)).toEqual({
+    expect(customAutomationSettings("automatic", draft, true)).toEqual({
       startMode: "START_MODE_AUTOMATIC",
       icon: "sparkles",
       agent: {
@@ -58,7 +59,7 @@ describe("custom verification settings", () => {
   });
 
   it("does not override the workspace agent during creation", () => {
-    const settings = customVerificationSettings("manual", customVerificationDraft(), false);
+    const settings = customAutomationSettings("manual", customAutomationDraft(), false);
 
     expect(settings.agent).toBeUndefined();
     expect(settings.startMode).toBe("START_MODE_MANUAL");
@@ -66,8 +67,8 @@ describe("custom verification settings", () => {
   });
 
   it("uses concise mode copy for board rows", () => {
-    expect(customVerificationModeCopy("manual").trigger).toBe("Manual start on a Verify task");
-    expect(customVerificationModeCopy("automatic").action).toBe("Run automation automatically");
+    expect(customAutomationModeCopy("manual").trigger).toBe("Manual start on a Verify task");
+    expect(customAutomationModeCopy("automatic").action).toBe("Run automation automatically");
   });
 
   it("classifies managed rows by template id and start mode", () => {
@@ -79,14 +80,14 @@ describe("custom verification settings", () => {
           name: "Security review",
           columnKey: "verify",
           templateId: "custom-verification",
-          customVerificationMode: "manual",
+          customAutomationMode: "manual",
         },
         {
           id: "automatic-review",
           name: "Policy review",
           columnKey: "verify",
           templateId: "custom-verification",
-          customVerificationMode: "automatic",
+          customAutomationMode: "automatic",
         },
       ],
     });
@@ -110,7 +111,7 @@ describe("custom verification settings", () => {
       columnTitle: "Verify",
       apps: [
         {
-          id: "verification-1",
+          id: "review-1",
           name: "Security review",
           columnKey: "verify",
           templateId: "custom-verification",
@@ -124,6 +125,13 @@ describe("custom verification settings", () => {
         factoryKey: "workspace",
         lineId: "line",
       }),
-    ).toBe("/org/workspaces/workspace/lines/line?customVerification=verification-1");
+    ).toBe("/org/workspaces/workspace/lines/line?customAutomation=review-1");
+  });
+
+  it("reads the setup query and accepts the previous name", () => {
+    expect(customAutomationIdFromSearch("?customAutomation=new")).toBeNull();
+    expect(customAutomationIdFromSearch("?customAutomation=review-1")).toBe("review-1");
+    expect(customAutomationIdFromSearch("?customVerification=review-1")).toBe("review-1");
+    expect(customAutomationIdFromSearch("")).toBeUndefined();
   });
 });

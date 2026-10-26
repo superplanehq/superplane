@@ -18,7 +18,7 @@ import {
   useWorkOrderArtifacts,
 } from "@/hooks/useFactoryData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
-import { useFactoryCustomVerifications } from "@/hooks/useFactoryCustomVerificationData";
+import { useFactoryCustomAutomations } from "@/hooks/useFactoryCustomAutomationData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -40,13 +40,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import {
-  customVerificationMode,
-  CUSTOM_VERIFICATION_TEMPLATE_ID,
-  DEFAULT_CUSTOM_VERIFICATION_ICON,
-  type CustomVerificationMode,
-  type ManualCustomVerification,
-} from "../lib/customVerification";
-import { customVerificationAutomationIdFromSearch } from "../lib/customVerificationPaths";
+  customAutomationMode,
+  CUSTOM_AUTOMATION_TEMPLATE_ID,
+  DEFAULT_CUSTOM_AUTOMATION_ICON,
+  type CustomAutomationMode,
+  type ManualCustomAutomation,
+} from "../lib/customAutomation";
+import { customAutomationIdFromSearch } from "../lib/customAutomationPaths";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
@@ -57,7 +57,7 @@ import {
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
-import { CustomVerificationSetupModal } from "./CustomVerificationSetupModal";
+import { CustomAutomationSetupModal } from "./CustomAutomationSetupModal";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { ScheduledIntakeSetupDialog } from "./ScheduledIntakeSetupDialog";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
@@ -334,7 +334,7 @@ export function LinesPage() {
   const intakeId = intakeIdFromSearch(search);
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const automationViewCanvasId = columnAutomationViewCanvasIdFromSearch(search);
-  const customVerificationAutomationId = customVerificationAutomationIdFromSearch(search);
+  const customAutomationAutomationId = customAutomationIdFromSearch(search);
   const prFeedbackOpen = isPRFeedbackSearchOpen(search);
   const planningOpen = isPlanningSearchOpen(search);
   const planningSettingsTab = planningSettingsTabFromSearch(search);
@@ -725,10 +725,10 @@ export function LinesPage() {
           deletePending={deleteAutomation.isPending}
         />
       ) : null}
-      {customVerificationAutomationId !== undefined && canUpdate && selectedLine.id ? (
-        <CustomVerificationSetupModal
+      {customAutomationAutomationId !== undefined && canUpdate && selectedLine.id ? (
+        <CustomAutomationSetupModal
           lineId={selectedLine.id}
-          automationId={customVerificationAutomationId ?? undefined}
+          automationId={customAutomationAutomationId ?? undefined}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
@@ -1061,57 +1061,57 @@ function LineDetail({
     () => backlogAnalysisCreditLabels(backlogAnalysis.runsByWorkOrder),
     [backlogAnalysis.runsByWorkOrder],
   );
-  const customVerificationIds = useMemo(
+  const customAutomationIds = useMemo(
     () =>
       apps.flatMap((app) =>
-        app.id && app.templateId === CUSTOM_VERIFICATION_TEMPLATE_ID && app.columnKey === "verify" ? [app.id] : [],
+        app.id && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID && app.columnKey === "verify" ? [app.id] : [],
       ),
     [apps],
   );
-  const customVerificationDetails = useFactoryCustomVerifications(organizationId, factoryId, customVerificationIds);
-  const customVerificationModes = useMemo(
+  const customAutomationDetails = useFactoryCustomAutomations(organizationId, factoryId, customAutomationIds);
+  const customAutomationModes = useMemo(
     () =>
-      new Map<string, CustomVerificationMode>(
-        customVerificationDetails.map(({ automationId, verification }) => [
+      new Map<string, CustomAutomationMode>(
+        customAutomationDetails.map(({ automationId, automation }) => [
           automationId,
-          customVerificationMode(verification.settings?.startMode),
+          customAutomationMode(automation.settings?.startMode),
         ]),
       ),
-    [customVerificationDetails],
+    [customAutomationDetails],
   );
-  const customVerificationIcons = useMemo(
+  const customAutomationIcons = useMemo(
     () =>
       new Map<string, string>(
-        customVerificationDetails.map(({ automationId, verification }) => [
+        customAutomationDetails.map(({ automationId, automation }) => [
           automationId,
-          verification.settings?.icon?.trim() || DEFAULT_CUSTOM_VERIFICATION_ICON,
+          automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON,
         ]),
       ),
-    [customVerificationDetails],
+    [customAutomationDetails],
   );
   const automationApps = useMemo(
     () =>
       apps.map((app) => ({
         ...app,
-        customVerificationMode: app.id ? customVerificationModes.get(app.id) : undefined,
-        customVerificationIcon: app.id ? customVerificationIcons.get(app.id) : undefined,
+        customAutomationMode: app.id ? customAutomationModes.get(app.id) : undefined,
+        customAutomationIcon: app.id ? customAutomationIcons.get(app.id) : undefined,
       })),
-    [apps, customVerificationIcons, customVerificationModes],
+    [apps, customAutomationIcons, customAutomationModes],
   );
-  const manualCustomVerifications = useMemo<ManualCustomVerification[]>(
+  const manualCustomAutomations = useMemo<ManualCustomAutomation[]>(
     () =>
-      customVerificationDetails.flatMap(({ automationId, verification }) =>
-        customVerificationMode(verification.settings?.startMode) === "manual"
+      customAutomationDetails.flatMap(({ automationId, automation }) =>
+        customAutomationMode(automation.settings?.startMode) === "manual"
           ? [
               {
                 id: automationId,
-                name: verification.automation?.name?.trim() || "Custom automation",
-                icon: verification.settings?.icon?.trim() || DEFAULT_CUSTOM_VERIFICATION_ICON,
+                name: automation.automation?.name?.trim() || "Custom automation",
+                icon: automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON,
               },
             ]
           : [],
       ),
-    [customVerificationDetails],
+    [customAutomationDetails],
   );
   const navigate = useNavigate();
   const [overlay, setOverlay] = useState<{
@@ -1249,7 +1249,7 @@ function LineDetail({
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
           factoryApps={apps}
-          manualCustomVerifications={manualCustomVerifications}
+          manualCustomAutomations={manualCustomAutomations}
           onClose={onClosePeek}
         />
       ) : null}
@@ -1272,7 +1272,7 @@ function LineBoardSplitRunPopup({
   analysisRuns,
   isAnalyzing,
   factoryApps,
-  manualCustomVerifications,
+  manualCustomAutomations,
   onClose,
 }: {
   organizationId: string;
@@ -1289,7 +1289,7 @@ function LineBoardSplitRunPopup({
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
   factoryApps: Array<{ id?: string; name?: string; columnKey?: string }>;
-  manualCustomVerifications: readonly ManualCustomVerification[];
+  manualCustomAutomations: readonly ManualCustomAutomation[];
   onClose: () => void;
 }) {
   const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
@@ -1338,7 +1338,7 @@ function LineBoardSplitRunPopup({
             : undefined
         }
         onClose={onClose}
-        manualCustomVerifications={manualCustomVerifications}
+        manualCustomAutomations={manualCustomAutomations}
         fixed
       />
     </>

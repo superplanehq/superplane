@@ -1,28 +1,28 @@
 import type {
-  FactoriesFactoryCustomVerification,
-  FactoriesFactoryCustomVerificationSettings,
-  FactoriesFactoryCustomVerificationStep,
-  FactoryCustomVerificationStartMode,
+  FactoriesFactoryCustomAutomation,
+  FactoriesFactoryCustomAutomationSettings,
+  FactoriesFactoryCustomAutomationStep,
+  FactoryCustomAutomationStartMode,
 } from "@/api-client";
 
 import type { PlanningReviewDraft, PlanningReviewStep } from "../pages/planningReviewMockup";
 
-export const CUSTOM_VERIFICATION_TEMPLATE_ID = "custom-verification";
+export const CUSTOM_AUTOMATION_TEMPLATE_ID = "custom-verification";
 
-export type CustomVerificationMode = "manual" | "automatic";
-export type ManualCustomVerification = {
+export type CustomAutomationMode = "manual" | "automatic";
+export type ManualCustomAutomation = {
   id: string;
   name: string;
   icon?: string;
 };
 
-export const DEFAULT_CUSTOM_VERIFICATION_ICON = "sparkles";
+export const DEFAULT_CUSTOM_AUTOMATION_ICON = "sparkles";
 
-export function customVerificationMode(value: FactoryCustomVerificationStartMode | undefined): CustomVerificationMode {
+export function customAutomationMode(value: FactoryCustomAutomationStartMode | undefined): CustomAutomationMode {
   return value === "START_MODE_AUTOMATIC" ? "automatic" : "manual";
 }
 
-export function customVerificationModeCopy(mode: CustomVerificationMode): {
+export function customAutomationModeCopy(mode: CustomAutomationMode): {
   trigger: string;
   action: string;
 } {
@@ -38,8 +38,8 @@ export function customVerificationModeCopy(mode: CustomVerificationMode): {
   };
 }
 
-export function customVerificationDraft(verification?: FactoriesFactoryCustomVerification): PlanningReviewDraft {
-  const settings = verification?.settings;
+export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomation): PlanningReviewDraft {
+  const settings = automation?.settings;
   const agent = settings?.agent;
   const steps = settings
     ? (settings.steps ?? []).map(stepFromApi)
@@ -52,16 +52,16 @@ export function customVerificationDraft(verification?: FactoriesFactoryCustomVer
         },
       ];
   return {
-    title: verification?.automation?.name?.trim() || "Custom automation",
+    title: automation?.automation?.name?.trim() || "Custom automation",
     components: [
       {
-        id: "custom-verification-agent",
+        id: "custom-automation-agent",
         title: "Automation agent",
         description: "Run the configured automation steps.",
         expanded: true,
         component: agent?.component,
         configuration: {
-          ...customVerificationAgentConfiguration(agent),
+          ...customAutomationAgentConfiguration(agent),
           steps,
         },
         concurrency: { max: "5", key: "" },
@@ -70,8 +70,8 @@ export function customVerificationDraft(verification?: FactoriesFactoryCustomVer
   };
 }
 
-function customVerificationAgentConfiguration(
-  agent: FactoriesFactoryCustomVerificationSettings["agent"],
+function customAutomationAgentConfiguration(
+  agent: FactoriesFactoryCustomAutomationSettings["agent"],
 ): Record<string, string> {
   return {
     model: agent?.model ?? "",
@@ -80,12 +80,12 @@ function customVerificationAgentConfiguration(
   };
 }
 
-export function customVerificationSettings(
-  mode: CustomVerificationMode,
+export function customAutomationSettings(
+  mode: CustomAutomationMode,
   draft: PlanningReviewDraft,
   includeAgent: boolean,
-  icon = DEFAULT_CUSTOM_VERIFICATION_ICON,
-): FactoriesFactoryCustomVerificationSettings {
+  icon = DEFAULT_CUSTOM_AUTOMATION_ICON,
+): FactoriesFactoryCustomAutomationSettings {
   const component = draft.components[0];
   const configuration = component?.configuration ?? {};
   const steps = Array.isArray(configuration.steps) ? (configuration.steps as PlanningReviewStep[]) : [];
@@ -108,7 +108,7 @@ export function customVerificationSettings(
   };
 }
 
-function stepFromApi(step: FactoriesFactoryCustomVerificationStep): PlanningReviewStep {
+function stepFromApi(step: FactoriesFactoryCustomAutomationStep): PlanningReviewStep {
   return {
     name: step.name ?? "",
     type: step.type === "TYPE_BASH" ? "bash" : "prompt",
@@ -119,7 +119,7 @@ function stepFromApi(step: FactoriesFactoryCustomVerificationStep): PlanningRevi
   };
 }
 
-function stepToApi(step: PlanningReviewStep): FactoriesFactoryCustomVerificationStep {
+function stepToApi(step: PlanningReviewStep): FactoriesFactoryCustomAutomationStep {
   return {
     name: step.name,
     type: step.type === "bash" ? "TYPE_BASH" : "TYPE_PROMPT",
