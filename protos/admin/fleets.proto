@@ -199,6 +199,9 @@ message CreateRunnerRequest {
   optional string task_id = 2;
   string idempotency_key = 3;
   bool ephemeral = 4;
+  // Record ownership before provisioning, including runners that never register.
+  string fleet_manager_id = 5;
+  string provider = 6;
 }
 
 message CreateRunnerResponse {
@@ -246,6 +249,9 @@ message DeleteRunnerResponse {
 message MarkRunnerProviderDeletedRequest {
   string fleet_id = 1;
   string runner_id = 2;
+  // Must match the ownership recorded when the runner was created.
+  string fleet_manager_id = 3;
+  string provider = 4;
 }
 
 message MarkRunnerProviderDeletedResponse {

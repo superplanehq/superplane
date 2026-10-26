@@ -159,12 +159,12 @@ func (c *Client) DescribeRunner(ctx context.Context, fleetID, runnerID string) (
 	return response.Runner, err
 }
 
-func (c *Client) MarkRunnerProviderDeleted(ctx context.Context, fleetID, runnerID string) (Runner, error) {
+func (c *Client) MarkRunnerProviderDeleted(ctx context.Context, fleetID, runnerID string, request ProviderDeletionRequest) (Runner, error) {
 	var response struct {
 		Runner Runner `json:"runner"`
 	}
 	path := fleetPath(fleetID) + "/runners/" + url.PathEscape(strings.TrimSpace(runnerID)) + ":provider-deleted"
-	err := c.do(ctx, http.MethodPost, path, nil, map[string]any{}, &response)
+	err := c.do(ctx, http.MethodPost, path, nil, request, &response)
 	return response.Runner, err
 }
 

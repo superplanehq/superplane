@@ -124,6 +124,7 @@ func (f *fakeAdmin) ListRunnersPage(
 func (f *fakeAdmin) MarkRunnerProviderDeleted(
 	_ context.Context,
 	_, runnerID string,
+	_ adminclient.ProviderDeletionRequest,
 ) (adminclient.Runner, error) {
 	f.providerDeleted = append(f.providerDeleted, runnerID)
 	return adminclient.Runner{ID: runnerID, State: adminclient.RunnerStateTerminated}, nil
@@ -241,6 +242,9 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 		!admin.createRequests[0].Ephemeral {
 		t.Fatalf("create request = %#v", admin.createRequests)
 	}
+	if admin.createRequests[0].FleetManagerID != "manager-a" || admin.createRequests[0].Provider != "fake" {
+		t.Fatalf("create request ownership = %#v", admin.createRequests[0])
+	}
 	if len(admin.deletedRunnerIDs) != 0 {
 		t.Fatalf("deleted runners = %#v", admin.deletedRunnerIDs)
 	}
@@ -272,6 +276,7 @@ func TestReconcileLogsProvisioningActions(t *testing.T) {
 		&fakeProvider{},
 		Config{
 			FleetID:         "fleet-a",
+			FleetManagerID:  "manager-a",
 			OperatingSystem: "linux",
 			Architecture:    "amd64",
 		},
@@ -408,6 +413,7 @@ func TestProviderDeletionConfirmation(t *testing.T) {
 			admin.terminatedRunners = []adminclient.Runner{{
 				ID: "runner-terminated", FleetID: "fleet-a",
 				State: adminclient.RunnerStateTerminated, TerminatedAt: &terminatedAt,
+				Tags: map[string]string{"fleet_manager_id": "manager-a", "runner_provider": "fake"},
 			}}
 			resourceProvider := &fakeProvider{deleteError: test.deleteError}
 			if test.resourceExists {
@@ -468,9 +474,17 @@ func TestProviderDeletionConfirmationBeyondFirstPage(t *testing.T) {
 								http.Error(w, "page unavailable", http.StatusServiceUnavailable)
 								return
 							}
-							response = map[string]any{"runners": []adminclient.Runner{{
-								ID: "runner-new", State: adminclient.RunnerStateTerminated, TerminatedAt: &terminatedAt,
-							}}, "hasNextPage": false}
+							response = map[string]any{"runners": []map[string]any{
+								{"id": "runner-new", "state": adminclient.RunnerStateTerminated, "terminatedAt": terminatedAt,
+									"tags": map[string]string{"fleet_manager_id": "manager-a", "runner_provider": "fake"}},
+								{"id": "other-manager", "state": adminclient.RunnerStateTerminated, "terminatedAt": terminatedAt,
+									"tags": map[string]string{"fleet_manager_id": "manager-b", "runner_provider": "fake"}},
+								{"id": "other-provider", "state": adminclient.RunnerStateTerminated, "terminatedAt": terminatedAt,
+									"tags": map[string]string{"fleet_manager_id": "manager-a", "runner_provider": "aws"}},
+								{"id": "legacy-runner", "state": adminclient.RunnerStateTerminated, "terminatedAt": terminatedAt,
+									"tags": map[string]string{"fleet_manager_id": "manager-a"}},
+								{"id": "pending-never-registered", "state": adminclient.RunnerStateTerminated, "terminatedAt": terminatedAt},
+							}, "hasNextPage": false}
 						default:
 							t.Errorf("unexpected cursor = %q", cursor)
 							http.Error(w, "unexpected cursor", http.StatusBadRequest)
@@ -483,6 +497,13 @@ func TestProviderDeletionConfirmationBeyondFirstPage(t *testing.T) {
 							return
 						}
 						id := strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, fleetPath+"/runners/"), ":provider-deleted")
+						var owner adminclient.ProviderDeletionRequest
+						if err := json.NewDecoder(request.Body).Decode(&owner); err != nil {
+							t.Error(err)
+						}
+						if owner.FleetManagerID != "manager-a" || owner.Provider != "fake" {
+							t.Errorf("confirmation ownership = %#v", owner)
+						}
 						marked = append(marked, id)
 						response = map[string]any{"runner": adminclient.Runner{ID: id}}
 					}
@@ -539,6 +560,7 @@ func TestDisabledFleetLogsResourceDeletionReason(t *testing.T) {
 		resourceProvider,
 		Config{
 			FleetID:         "fleet-a",
+			FleetManagerID:  "manager-a",
 			OperatingSystem: "linux",
 			Architecture:    "amd64",
 		},
@@ -719,6 +741,7 @@ func TestConfiguredPollTimeoutAppliesAfterInitialCapacityRequest(t *testing.T) {
 		&fakeProvider{},
 		Config{
 			FleetID:         "fleet-a",
+			FleetManagerID:  "manager-a",
 			OperatingSystem: "linux",
 			Architecture:    "amd64",
 			PollTimeout:     20 * time.Second,
