@@ -6,6 +6,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ConfigurationField } from "@/api-client";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
+import { useFactoryCodexConnection } from "@/pages/factories/pages/onboarding/useFactoryCodexConnection";
 import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
 
 const useCanvasMock = vi.hoisted(() =>
@@ -26,6 +27,41 @@ vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: useCanvasMock,
 }));
+
+vi.mock("@/pages/factories/pages/onboarding/useFactoryCodexConnection", () => ({
+  useFactoryCodexConnection: vi.fn(),
+}));
+
+describe("subscription model picker", () => {
+  it("uses the subscription catalog instead of API-key models", async () => {
+    vi.mocked(useFactoryCodexConnection).mockReturnValue({
+      query: {
+        data: { status: "ready", availableModels: ["gpt-5.4", "gpt-5.3"] },
+        isLoading: false,
+        isError: false,
+      },
+    } as unknown as ReturnType<typeof useFactoryCodexConnection>);
+    mockSelectableModels([selectableModel("byok", "openai", "gpt-4o")]);
+    render(
+      <MemoryRouter>
+        <HostedModelFieldRenderer
+          field={createField("openai")}
+          value=""
+          onChange={vi.fn()}
+          organizationId="org-1"
+          factoryId="factory-1"
+          modelOnly
+          allValues={{ credentials: { source: "subscription" } }}
+        />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    expect(screen.getByRole("menuitem", { name: "gpt-5.4" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "gpt-5.3" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /gpt-4o/ })).not.toBeInTheDocument();
+  });
+});
 
 function createField(provider = "anthropic"): ConfigurationField {
   return {
@@ -427,6 +463,51 @@ describe("HostedModelFieldRenderer", () => {
     await user.click(screen.getByTestId("field-model-hosted-model"));
     await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
     expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
+  });
+
+  it("offers Codex effort levels for OpenAI models", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    mockSelectableModels([selectableModel("byok", "openai", "gpt-5.4")]);
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField("openai")}
+        value="gpt-5.4"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "gpt-5.4" }}
+        organizationId="org-1"
+      />,
+    );
+
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "Extra high");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-5.4", thinkingLevel: "xhigh" });
+  });
+
+  it("uses a flat model-only menu and preserves Codex effort when the model changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    mockSelectableModels([
+      selectableModel("byok", "openai", "gpt-5.4"),
+      selectableModel("byok", "openai", "gpt-5.3-codex"),
+    ]);
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField("openai")}
+        value="gpt-5.4"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "gpt-5.4", thinkingLevel: "xhigh" }}
+        organizationId="org-1"
+        modelOnly
+      />,
+    );
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    expect(screen.queryByTestId("field-model-hosted-thinking")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "openai/gpt-5.3-codex" }));
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-5.3-codex", thinkingLevel: "xhigh" });
   });
 
   it("clears thinkingLevel when Default is selected", async () => {

@@ -282,10 +282,11 @@ func ResolveSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	if subset == nil || !hasAllowedModel(subset.AllowedModels) {
-		return parent, nil
+	resolved := parent
+	if subset != nil && hasAllowedModel(subset.AllowedModels) {
+		resolved = IntersectModelIDs(parent, subset.AllowedModels)
 	}
-	return IntersectModelIDs(parent, subset.AllowedModels), nil
+	return resolved, nil
 }
 
 func ModelIsSelectable(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provider, fundingSource, model string) (bool, error) {
