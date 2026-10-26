@@ -20,7 +20,13 @@ Set the top-level `id` to a stable identifier for the Fleet Manager
 deployment. AWS and Azure providers apply it as the
 `superplane_fleet_manager_id` resource tag and use it with the fleet ID to
 find owned runners. GCP providers apply it as the
-`superplane_fleet_manager_id` instance label.
+`superplane_fleet_manager_id` instance label. Docker providers apply it as
+the `superplane.fleet-manager-id` container label. Give each Fleet Manager a
+stable unique `id`. List always returns containers with this Fleet Manager ID,
+including owned runners that remain on a previous network. When a Docker fleet
+sets `network`, List also returns unlabeled managed runners on that network.
+An upgrade can then clean up containers created before this label existed.
+List still ignores runners that carry a different Fleet Manager ID.
 
 Each AWS fleet can define additional `resourceTags`. Fleet Manager applies
 them to runner instances and root volumes. Additional tags cannot override the
