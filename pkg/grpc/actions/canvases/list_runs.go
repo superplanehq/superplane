@@ -220,6 +220,7 @@ func serializeCanvasRunWithQueueItemInputs(
 	serialized := &pb.CanvasRun{
 		Id:         run.ID.String(),
 		CanvasId:   run.WorkflowID.String(),
+		NodeId:     run.NodeID,
 		VersionId:  run.VersionID.String(),
 		RootEvent:  serializedRootEvent,
 		State:      RunStateToProto(run.State),

@@ -100,7 +100,8 @@ export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): Canv
 }
 
 export function runMatchesFilters(run: CanvasesCanvasRun, filters: CanvasRunsFilters): boolean {
-  if (filters.triggerIds?.length && (!run.rootEvent?.nodeId || !filters.triggerIds.includes(run.rootEvent.nodeId))) {
+  const nodeId = run.nodeId ?? run.rootEvent?.nodeId;
+  if (filters.triggerIds?.length && (!nodeId || !filters.triggerIds.includes(nodeId))) {
     return false;
   }
   if (filters.search && !run.rootEvent?.customName?.toLowerCase().includes(filters.search.trim().toLowerCase())) {
@@ -155,6 +156,7 @@ function mergeCanvasRunFields(existing: CanvasesCanvasRun, incoming: CanvasesCan
   return {
     id: incoming.id ?? existing.id,
     canvasId: incoming.canvasId ?? existing.canvasId,
+    nodeId: incoming.nodeId ?? existing.nodeId,
     rootEvent: incoming.rootEvent ?? existing.rootEvent,
     ...mergeRunOutcome(existing, incoming),
     executions: incoming.executions?.length ? incoming.executions : (existing.executions ?? incoming.executions),

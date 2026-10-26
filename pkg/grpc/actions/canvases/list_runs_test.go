@@ -350,10 +350,15 @@ func Test__ListRuns__ReturnsPendingSubRunWithoutRootEvent(t *testing.T) {
 		"",
 	)
 
-	childResponse, err := ListRuns(context.Background(), database.DB(t.Context()), childCanvas, &pb.ListRunsRequest{States: []pb.CanvasRun_State{pb.CanvasRun_STATE_PENDING}})
+	childResponse, err := ListRuns(context.Background(), database.DB(t.Context()), childCanvas, &pb.ListRunsRequest{
+		States:     []pb.CanvasRun_State{pb.CanvasRun_STATE_PENDING},
+		TriggerIds: []string{"onRun"},
+	})
 	require.NoError(t, err)
 	require.Len(t, childResponse.Runs, 1)
 	assert.Equal(t, childRun.ID.String(), childResponse.Runs[0].Id)
+	assert.Equal(t, "onRun", childResponse.Runs[0].GetNodeId())
+	assert.EqualValues(t, 1, childResponse.TotalCount)
 	assert.Equal(t, pb.CanvasRun_STATE_PENDING, childResponse.Runs[0].State)
 	assert.Nil(t, childResponse.Runs[0].RootEvent)
 

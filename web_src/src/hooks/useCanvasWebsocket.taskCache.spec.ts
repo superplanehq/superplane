@@ -43,6 +43,49 @@ afterEach(() => {
 });
 
 describe("useCanvasWebsocket task cache", () => {
+  it("keeps and inserts matching pending child runs before their root events exist", async () => {
+    const queryClient = new QueryClient();
+    const queryKey = canvasKeys.infiniteRuns(testCanvasId, {
+      triggerIds: ["onRun"],
+      states: ["STATE_PENDING"],
+    });
+    const updatedAt = Date.now();
+    const pendingRun = {
+      id: "cached-child",
+      canvasId: testCanvasId,
+      nodeId: "onRun",
+      state: "STATE_PENDING",
+      updatedAt: new Date(updatedAt).toISOString(),
+    };
+    queryClient.setQueryData(queryKey, {
+      pages: [{ runs: [pendingRun], totalCount: 1 }],
+      pageParams: [undefined],
+    });
+    const { unmount } = renderHook(() => useCanvasWebsocket({ canvasId: testCanvasId, organizationId: "org-1" }), {
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(QueryClientProvider, { client: queryClient }, children),
+    });
+
+    // A sparse lifecycle update must retain the node ID from the REST snapshot.
+    emitWebsocketMessage("run_pending", {
+      id: pendingRun.id,
+      canvasId: testCanvasId,
+      state: "STATE_PENDING",
+      updatedAt: new Date(updatedAt + 1).toISOString(),
+    });
+    emitWebsocketMessage("run_pending", { ...pendingRun, id: "new-child" });
+    emitWebsocketMessage("run_pending", { ...pendingRun, id: "other-trigger", nodeId: "other-node" });
+
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<InfiniteData<InfiniteRunsPage>>(queryKey);
+      expect(cached?.pages[0]?.runs?.map((run) => run.id).sort()).toEqual(["cached-child", "new-child"]);
+      expect(cached?.pages[0]?.totalCount).toBe(2);
+      expect(cached?.pages[0]?.runs?.find((run) => run.id === pendingRun.id)?.nodeId).toBe("onRun");
+    });
+    unmount();
+    queryClient.clear();
+  });
+
   it("keeps live runs inside the selected title, trigger, and status filters", () => {
     const queryClient = new QueryClient();
     const filters = {

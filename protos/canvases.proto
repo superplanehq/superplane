@@ -870,6 +870,8 @@ message CanvasRun {
   // Models that recorded spend on this run tree.
   repeated string models = 18;
   CanvasRunTask task = 19;
+  // Trigger node that starts this run, including before its root event exists.
+  string node_id = 20;
 }
 
 message CanvasRunRef {
