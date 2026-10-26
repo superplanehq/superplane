@@ -9,7 +9,7 @@ vi.mock("./MergeConfidenceConfigShell", () => ({
   MergeConfidenceConfigShell: (props: ComponentProps<typeof MergeConfidenceConfigShell>) => (
     <>
       <button data-testid="automation" onClick={() => props.onTabChange("automation")}>
-        Automation
+        Configuration
       </button>
       <button data-testid="runs" onClick={() => props.onTabChange("runs")}>
         Runs
