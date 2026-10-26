@@ -302,6 +302,9 @@ func buildProvider(
 			Network:        fleet.Docker.Network,
 			Volumes:        fleet.Docker.Volumes,
 			ExtraHosts:     fleet.Docker.ExtraHosts,
+			Init:           fleet.Docker.Init,
+			User:           fleet.Docker.User,
+			Entrypoint:     fleet.Docker.Entrypoint,
 		}, log)
 		return resourceProvider, emptyArtifactResolver{},
 			fleet.Docker.Architecture, err

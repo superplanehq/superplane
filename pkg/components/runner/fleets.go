@@ -2,7 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,9 +12,7 @@ const ComponentName = "runner"
 
 const configurationFieldMachineType = "machine_type"
 
-// Machine type names, which are also the default task-broker fleet IDs
-// (GET /v1/fleets) stored in node configuration and sent as fleet_id
-// unless TASK_BROKER_FLEET_ID is set.
+// Machine type names are runner fleet IDs stored in node configuration.
 const (
 	MachineTypeE1LargeAMD64 = "e1-large-amd64"
 	MachineTypeE1LargeARM64 = "e1-large-arm64"
@@ -38,21 +35,4 @@ func requireMachineType(machineType string) (string, error) {
 		return "", fmt.Errorf("machine type is required")
 	}
 	return fleet, nil
-}
-
-// resolveBrokerFleetID is the fleet_id sent to the task broker.
-// TASK_BROKER_FLEET_ID overrides the node machine type when set. When it is
-// empty, a local Docker broker URL uses fleet local so the sibling worker can
-// claim the task.
-func resolveBrokerFleetID(machineType string) (string, error) {
-	if _, err := requireMachineType(machineType); err != nil {
-		return "", err
-	}
-	if fleet := strings.TrimSpace(os.Getenv("TASK_BROKER_FLEET_ID")); fleet != "" {
-		return fleet, nil
-	}
-	if isLocalTaskBrokerURL(os.Getenv("TASK_BROKER_BASE_URL")) {
-		return localComposeFleetID, nil
-	}
-	return strings.TrimSpace(machineType), nil
 }

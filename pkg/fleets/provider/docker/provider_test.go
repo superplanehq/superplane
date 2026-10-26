@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 
@@ -118,6 +119,11 @@ func TestProviderLifecycle(t *testing.T) {
 	if strings.Contains(createArgs, "--tag ") {
 		t.Fatalf("create args pass an unsupported flag to older runners: %q", createArgs)
 	}
+	for _, option := range []string{"--init", "--user", "--entrypoint"} {
+		if slices.Contains(commands.calls[1].args, option) {
+			t.Fatalf("default runner unexpectedly overrides %s: %#v", option, commands.calls[1].args)
+		}
+	}
 
 	if err := p.Delete(context.Background(), created); err != nil {
 		t.Fatal(err)
@@ -210,5 +216,58 @@ func TestNewRequiresFleetManagerID(t *testing.T) {
 	if _, err := newProvider(Config{Image: "runner:dev"}, &fakeCommandRunner{}, nil); err == nil ||
 		!strings.Contains(err.Error(), "Fleet Manager ID is required") {
 		t.Fatalf("New error = %v", err)
+	}
+}
+
+func TestProviderRejectsBlankEntrypointExecutable(t *testing.T) {
+	for _, executable := range []string{"", "  "} {
+		_, err := New(Config{FleetManagerID: "coolify", Image: "runner:dev", Entrypoint: []string{executable, "argument"}}, nil)
+		if err == nil || !strings.Contains(err.Error(), "entrypoint executable is required") {
+			t.Fatalf("blank executable %q: %v", executable, err)
+		}
+	}
+}
+
+func TestProviderCreatesRunnerWithProcessOptions(t *testing.T) {
+	commands := &fakeCommandRunner{outputs: [][]byte{[]byte("container-options\n")}}
+	p, err := newProvider(Config{
+		FleetManagerID: "coolify",
+		Image:          "runner:dev",
+		Init:           true,
+		User:           "1000:1000",
+		Entrypoint:     []string{"/bin/sh", "-c", `exec /usr/local/bin/runner "$@"`, "", "argument with spaces"},
+	}, commands, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bootstrap, err := p.BuildBootstrap(provider.RunnerBootstrap{
+		RunnerAPIURL: "http://app:8000", RegistrationToken: "one-time-token",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Create(t.Context(), provider.CreateRequest{
+		RunnerID: "runner-options", FleetID: "fleet-a", RunnerVersion: "dev", Bootstrap: bootstrap,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	args := commands.calls[0].args
+	imageIndex := slices.Index(args, "runner:dev")
+	if imageIndex < 0 {
+		t.Fatalf("runner image missing from Docker arguments: %#v", args)
+	}
+	options := args[:imageIndex]
+	if !slices.Contains(options, "--init") {
+		t.Fatalf("init missing from Docker options: %#v", options)
+	}
+	for flag, want := range map[string]string{"--user": "1000:1000", "--entrypoint": "/bin/sh"} {
+		index := slices.Index(options, flag)
+		if index < 0 || index+1 >= len(options) || options[index+1] != want {
+			t.Fatalf("Docker option %s: %#v", flag, options)
+		}
+	}
+	wantCommand := []string{"-c", `exec /usr/local/bin/runner "$@"`, "", "argument with spaces", "--url", "http://app:8000", "--registration-token", "one-time-token"}
+	if !slices.Equal(wantCommand, args[imageIndex+1:]) {
+		t.Fatalf("runner command = %#v, want %#v", args[imageIndex+1:], wantCommand)
 	}
 }

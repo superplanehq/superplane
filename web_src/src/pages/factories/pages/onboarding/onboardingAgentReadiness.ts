@@ -1,4 +1,9 @@
-import { newestClaudeModelInFamily, pickHostedModel, pickNewestModelMatching } from "@/lib/hostedLLMModels";
+import {
+  hasHostedDefaultModel,
+  newestClaudeModelInFamily,
+  pickHostedModel,
+  pickNewestModelMatching,
+} from "@/lib/hostedLLMModels";
 import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 
 import type { IntegrationId } from "./onboardingFixtures";
@@ -135,13 +140,6 @@ function connectedProviderPlan(args: {
   return undefined;
 }
 
-/** True when the installation sets a default SuperPlane-hosted model. */
-export function hasHostedDefaultModel(args: { defaultHostedProvider?: string; defaultHostedModel?: string }): boolean {
-  const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
-  const defaultModel = args.defaultHostedModel?.trim() ?? "";
-  return Boolean(defaultProvider && defaultModel);
-}
-
 function hostedSuperPlanePlan(args: {
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
@@ -200,8 +198,8 @@ export function firstWorkOrderAgentError(args: {
   return "Ask an installation admin to set a SuperPlane agent model.";
 }
 
-export function shouldShowHostedCreditGrant(grantTotalCents: number): boolean {
-  return grantTotalCents > 0;
+export function shouldShowHostedCreditGrant(grantTotalCents: number, billingEnabled: boolean): boolean {
+  return billingEnabled && grantTotalCents > 0;
 }
 
 export function hostedCreditGrantCopy(remainingCreditCents: number): string {

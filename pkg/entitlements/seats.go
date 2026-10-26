@@ -1,6 +1,8 @@
 package entitlements
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -8,17 +10,26 @@ import (
 
 // SeatUsage separates purchased capacity from the maximum allowed purchase.
 type SeatUsage struct {
-	PerSeat         bool `json:"per_seat"`
-	Purchased       *int `json:"purchased"`
-	Occupied        int  `json:"occupied"`
-	Available       *int `json:"available"`
-	PlanMaximum     *int `json:"plan_maximum"`
-	Purchasable     *int `json:"purchasable"`
-	RenewalQuantity *int `json:"renewal_quantity"`
-	MemberLimit     *int `json:"member_limit"`
+	PendingInvitations int  `json:"pending_invitations"`
+	Invitable          *int `json:"invitable"`
+	PerSeat            bool `json:"per_seat"`
+	Purchased          *int `json:"purchased"`
+	Occupied           int  `json:"occupied"`
+	Available          *int `json:"available"`
+	PlanMaximum        *int `json:"plan_maximum"`
+	Purchasable        *int `json:"purchasable"`
+	RenewalQuantity    *int `json:"renewal_quantity"`
+	MemberLimit        *int `json:"member_limit"`
+	// PaymentBlocked is true while a seat-based subscription has a failed
+	// renewal payment or is paused. Seats stay locked at the current member count.
+	PaymentBlocked bool `json:"payment_blocked"`
 }
 
 func (s SeatUsage) JoinLimit() *int {
+	if s.PaymentBlocked {
+		occupied := s.Occupied
+		return &occupied
+	}
 	if s.PerSeat {
 		return s.Purchased
 	}
@@ -55,9 +66,27 @@ func ResolveSeatsForPlan(tx *gorm.DB, orgID uuid.UUID, plan *models.Organization
 
 func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBillingPlan, occupied int) (*SeatUsage, error) {
 	usage := &SeatUsage{Occupied: occupied}
+	pending, err := models.CountPendingOrganizationInvitations(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	usage.PendingInvitations = int(pending)
 	maximum, err := SeatMaximumForPlan(tx, orgID, &plan.Catalog)
 	if err != nil {
 		return nil, err
+	}
+	// A past_due snapshot moves the plan row to None or Trial after the grace
+	// period, and these are not per-seat. The lock must not depend on the catalog.
+	if paymentBlocked(plan) {
+		lockSeatsAtOccupied(usage, plan, maximum)
+		// The renewal count ignores the payment state, so the admin sees the
+		// same count that the renewal scheduler sends to Polar.
+		renewal, err := paidRenewalSeats(plan, usage.Occupied)
+		if err != nil {
+			return nil, err
+		}
+		usage.RenewalQuantity = renewal
+		return usage, nil
 	}
 	if !plan.Catalog.PerSeat {
 		usage.MemberLimit = maximum
@@ -69,17 +98,50 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBil
 		purchased = *plan.PurchasedSeats
 	}
 	available := max(purchased-usage.Occupied, 0)
-	renewal := max(usage.Occupied, 1)
+	invitable := max(purchased-usage.Occupied-usage.PendingInvitations, 0)
+	usage.Invitable = &invitable
 	usage.PerSeat = true
 	usage.Purchased = &purchased
 	usage.Available = &available
 	usage.PlanMaximum = maximum
-	usage.RenewalQuantity = &renewal
+	renewal, err := paidRenewalSeats(plan, usage.Occupied)
+	if err != nil {
+		return nil, err
+	}
+	usage.RenewalQuantity = renewal
 	if maximum != nil {
 		purchasable := max(*maximum-purchased, 0)
 		usage.Purchasable = &purchasable
 	}
 	return usage, nil
+}
+
+// paymentBlocked reports a seat-based subscription whose renewal payment failed
+// or that the customer paused. Stored purchased seats tell a seat-based
+// subscription from one without seats.
+func paymentBlocked(plan *models.OrganizationBillingPlan) bool {
+	return models.PolarSubscriptionIsPaymentBlocked(plan.PolarSubscriptionStatus) && plan.PurchasedSeats != nil
+}
+
+// paidRenewalSeats returns RenewalSeats for a seat summary. A plan without
+// paid seats needs repair and has no renewal count, so that state is nil and
+// not an error.
+func paidRenewalSeats(plan *models.OrganizationBillingPlan, occupied int) (*int, error) {
+	renewal, err := RenewalSeats(plan, occupied)
+	if errors.Is(err, ErrInvalidPaidSeats) {
+		return nil, nil
+	}
+	return renewal, err
+}
+
+func lockSeatsAtOccupied(usage *SeatUsage, plan *models.OrganizationBillingPlan, maximum *int) {
+	none := 0
+	usage.PaymentBlocked = true
+	usage.MemberLimit = maximum
+	usage.Invitable = &none
+	usage.Purchasable = &none
+	purchased := *plan.PurchasedSeats
+	usage.Purchased = &purchased
 }
 
 // SeatMaximumForPlan resolves the purchase maximum for a target catalog plan.

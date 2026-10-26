@@ -25,6 +25,7 @@ import { useOrganizationCreditGrants } from "@/hooks/useOrganizationCreditGrants
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import type { HostedCreditRefreshStatus } from "@/lib/hostedCredit";
+import { billingIsPastDue, billingPaymentBlocked } from "@/pages/factories/lib/billingPlans";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 
 type HostedCreditBillingActions = {
@@ -42,12 +43,19 @@ export type BillingSeatSummary = {
   purchased?: number;
   occupied?: number;
   available?: number;
+  pendingInvitations?: number;
+  invitable?: number;
   planMaximum?: number;
   purchasable?: number;
   expectedRenewalSeats?: number;
   currentMonthlyTotalCents?: string;
   expectedRenewalCents?: string;
+  /** Set while a failed or paused payment stops new members. */
+  paymentBlock?: BillingPaymentBlock;
 };
+
+/** Why payment stops new members: a failed renewal payment or a paused subscription. */
+export type BillingPaymentBlock = "past_due" | "paused";
 
 export type OrganizationBillingPageModel = {
   seats?: BillingSeatSummary;
@@ -105,6 +113,39 @@ function creditMetricsFromSpend(spend: OrganizationsDescribeOrganizationWorkspac
   };
 }
 
+function billingSeats(billing: OrganizationsDescribeOrganizationBillingResponse): BillingSeatSummary | undefined {
+  // The server sends stored seats for a seat-based plan while payment is blocked, even after the plan row changes.
+  const paymentBlock = billingSeatPaymentBlock(billing);
+  if (!billing.billingEnabled || !(billing.planPerSeat || paymentBlock)) {
+    return undefined;
+  }
+  return {
+    purchased: billing.purchasedSeats,
+    occupied: billing.occupiedSeats,
+    available: billing.availableSeats,
+    pendingInvitations: billing.pendingInvitationSeats,
+    invitable: billing.invitableSeats,
+    planMaximum: billing.planMaximumSeats,
+    purchasable: billing.purchasableSeats,
+    expectedRenewalSeats: billing.expectedRenewalSeats,
+    currentMonthlyTotalCents: billing.currentMonthlyTotalCents,
+    expectedRenewalCents: billing.expectedRenewalCents,
+    paymentBlock,
+  };
+}
+
+function billingSeatPaymentBlock(
+  billing: OrganizationsDescribeOrganizationBillingResponse,
+): BillingPaymentBlock | undefined {
+  if (billing.purchasedSeats === undefined) {
+    return undefined;
+  }
+  if (billingIsPastDue(billing.polarSubscriptionStatus)) {
+    return "past_due";
+  }
+  return billingPaymentBlocked(billing.polarSubscriptionStatus) ? "paused" : undefined;
+}
+
 function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse = {}) {
   return {
     plan: billing.plan,
@@ -112,19 +153,7 @@ function billingFlags(billing: OrganizationsDescribeOrganizationBillingResponse 
     planName: billing.planName,
     planPriceCents: billing.planPriceCents,
     planPerSeat: billing.planPerSeat,
-    seats:
-      billing.billingEnabled && billing.planPerSeat
-        ? {
-            purchased: billing.purchasedSeats,
-            occupied: billing.occupiedSeats,
-            available: billing.availableSeats,
-            planMaximum: billing.planMaximumSeats,
-            purchasable: billing.purchasableSeats,
-            expectedRenewalSeats: billing.expectedRenewalSeats,
-            currentMonthlyTotalCents: billing.currentMonthlyTotalCents,
-            expectedRenewalCents: billing.expectedRenewalCents,
-          }
-        : undefined,
+    seats: billingSeats(billing),
     trialEndsAt: billing.trialEndsAt,
     currentPeriodEnd: billing.currentPeriodEnd,
     includedRemaining: parseWorkOrderMetric(billing.includedRemainingCents),
@@ -143,7 +172,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   const [searchParams] = useSearchParams();
   const creditAdded = searchParams.get("credit") === "added";
   const subscribed = searchParams.get("subscribed") === "1";
-  const { canAct } = usePermissions();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canManageBilling = canAct("org", "update");
   const { data: organization } = useOrganization(organizationId);
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -209,7 +238,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     billing,
     creditRefreshStatus,
     billingContactMessage,
-    isLoading: spend.isLoading || grantsQuery.isLoading || orgBilling.isLoading,
+    isLoading: permissionsLoading || spend.isLoading || grantsQuery.isLoading || orgBilling.isLoading,
     error: spend.error ?? grantsQuery.error ?? orgBilling.error,
     billed: metrics.billed,
     purchased: metrics.purchased,

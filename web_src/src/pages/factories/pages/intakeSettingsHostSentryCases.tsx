@@ -21,11 +21,24 @@ describe("IntakeSettingsHost Sentry settings", () => {
 
   it("opens Sentry project settings alongside shared run history", async () => {
     useCanvas.mockReturnValue(sentryCanvasResult());
-    renderHost({ intake: SENTRY_INTAKE });
-    expect(screen.getByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("checkbox", { name: "A new issue is created" })).toBeChecked();
-    await userEvent.click(screen.getByRole("tab", { name: "Runs" }));
-    expect(screen.getByRole("table")).toBeInTheDocument();
+    const user = userEvent.setup();
+    renderHost({ intake: SENTRY_INTAKE, initialTab: "general" });
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Intake Sentry exceptions" })).toBeInTheDocument();
+    expect(
+      within(dialog)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["General", "Runs"]);
+    expect(within(dialog).getByTestId("sentry-project-picker")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Default task owner" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("checkbox", { name: "A new issue is created" })).toBeChecked();
+    expect(within(dialog).getByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "true");
+
+    await user.click(within(dialog).getByRole("tab", { name: "Runs" }));
+
+    expect(within(dialog).getByRole("button", { name: "Open run run-intake-1" })).toBeInTheDocument();
   });
 
   it("saves Sentry projects and rebinds the intake when projects change", async () => {
@@ -45,6 +58,25 @@ describe("IntakeSettingsHost Sentry settings", () => {
       }),
       integrationId: "sentry-1",
       resourceId: "payments,growth",
+    });
+  });
+
+  it("saves a default task owner with the Sentry intake settings", async () => {
+    useCanvas.mockReturnValue(sentryCanvasResult());
+    const user = userEvent.setup();
+    renderHost({ intake: SENTRY_INTAKE });
+
+    const form = within(screen.getByRole("dialog"));
+    await user.click(form.getByRole("button", { name: "Default task owner" }));
+    await user.click(await screen.findByRole("option", { name: "Alice" }));
+    await user.click(form.getByTestId("intake-source-settings-save"));
+
+    expect(updateIntake).toHaveBeenLastCalledWith({
+      intakeId: "intake-sentry",
+      settings: expect.objectContaining({
+        defaultOwnerId: "alice",
+        sentryProjectIds: ["payments"],
+      }),
     });
   });
 

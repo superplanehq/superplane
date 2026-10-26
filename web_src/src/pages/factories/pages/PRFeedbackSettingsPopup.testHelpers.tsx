@@ -11,7 +11,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
-import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
+import type { PRFeedbackDraftSettings, PRFeedbackSettingsTab } from "./prFeedbackSettingsModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 export function mockConnectedIntegrations(data: unknown[] = []) {
@@ -157,25 +157,49 @@ export function renderAutomationPopup(props: { canvasId?: string } = {}) {
   );
 }
 
-export function renderAgentSettingsPopup(settings: PRFeedbackDraftSettings, initialPath = "/", probe?: ReactNode) {
-  return render(
+export function renderAgentSettingsPopup(
+  settings: PRFeedbackDraftSettings,
+  {
+    initialPath = "/",
+    initialTab = "general",
+    withAgent = true,
+    agentLoading = false,
+    probe,
+  }: {
+    initialPath?: string;
+    initialTab?: PRFeedbackSettingsTab;
+    withAgent?: boolean;
+    agentLoading?: boolean;
+    probe?: ReactNode;
+  } = {},
+) {
+  const onAgentSave = vi.fn<(draft: typeof PLANNING_REVIEW_DRAFT) => Promise<void>>(async () => {});
+  const onSave = vi.fn();
+  const onClose = vi.fn();
+  render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter initialEntries={[initialPath]}>
         <PRFeedbackSettingsPopup
           settings={settings}
           automationGraph={automationGraph}
-          agent={{
-            draft: PLANNING_REVIEW_DRAFT,
-            organizationId: "org-1",
-            onSave: vi.fn(),
-          }}
-          onSave={vi.fn()}
-          onClose={vi.fn()}
-          initialTab="agent"
+          agent={
+            withAgent
+              ? {
+                  draft: agentLoading ? undefined : PLANNING_REVIEW_DRAFT,
+                  isLoading: agentLoading,
+                  organizationId: "org-1",
+                  onSave: onAgentSave,
+                }
+              : undefined
+          }
+          onSave={onSave}
+          onClose={onClose}
+          initialTab={initialTab}
           fixed={false}
         />
         {probe}
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { onAgentSave, onSave, onClose };
 }

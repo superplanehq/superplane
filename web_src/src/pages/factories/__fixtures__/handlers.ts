@@ -1,4 +1,11 @@
-import { ACTIVE_TRIAL_ENDS_AT, BUSINESS_ORGANIZATION_BILLING, EMPTY_USAGE_REPORT } from "./usageReportFixtures";
+import {
+  ACTIVE_BILLING_PERIOD_ENDS_AT,
+  ACTIVE_TRIAL_ENDS_AT,
+  BUSINESS_ORGANIZATION_BILLING,
+  EMPTY_USAGE_REPORT,
+  TEAM_ORGANIZATION_BILLING,
+} from "./usageReportFixtures";
+import { THIRTY_DAYS_AGO } from "./factoryPageIds";
 import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
@@ -32,6 +39,8 @@ import type {
   FactoriesWorkOrderLineDispatch,
   FactoriesWorkOrderRunUsageRow,
   MeDescribeVcsProviderOnboardingResponse,
+  OrganizationsPreviewSeatPurchaseResponse,
+  OrganizationsPurchaseSeatsResponse,
 } from "@/api-client";
 import { HOSTED_LLM_PROVIDERS } from "@/lib/hostedLLMModels";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
@@ -437,6 +446,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
             { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
             { id: "claude-opus-4-6", name: "claude-opus-4-6" },
           ],
+          usesHostedFunding: true,
         },
       }),
     },
@@ -1590,6 +1600,98 @@ function billingPlanSelectionRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+function seatPurchasePreview(
+  fixture: FactoriesFixture,
+  additionalSeats: number,
+): OrganizationsPreviewSeatPurchaseResponse {
+  if (fixture.seatPurchasePreview) return fixture.seatPurchasePreview;
+  const billing = fixture.organizationBilling ?? TEAM_ORGANIZATION_BILLING;
+  const purchasedSeats = billing.purchasedSeats ?? 10;
+  const seatPriceCents = billing.planPriceCents ?? "2900";
+  return {
+    purchasedSeats,
+    targetSeats: purchasedSeats + additionalSeats,
+    seatPriceCents,
+    proratedChargeCents: String(1234 * additionalSeats),
+    periodStart: new Date().toISOString(),
+    periodEnd: billing.currentPeriodEnd ?? ACTIVE_BILLING_PERIOD_ENDS_AT,
+    newMonthlyTotalCents: String((purchasedSeats + additionalSeats) * Number(seatPriceCents)),
+    purchasableSeats: billing.purchasableSeats,
+    estimate: true,
+    excludesTax: true,
+    subscriptionId: "sub_storybook_team",
+    billingPeriodStart: THIRTY_DAYS_AGO,
+  };
+}
+
+function successfulSeatPurchase(
+  fixture: FactoriesFixture,
+  additionalSeats: number,
+): OrganizationsPurchaseSeatsResponse {
+  const billing = fixture.organizationBilling ?? TEAM_ORGANIZATION_BILLING;
+  const fromSeats = billing.purchasedSeats ?? 10;
+  const purchase = {
+    id: `seat-purchase-storybook-${fixture.seatPurchaseCalls}`,
+    status: "succeeded",
+    fromSeats,
+    toSeats: fromSeats + additionalSeats,
+    createdAt: new Date().toISOString(),
+  };
+  return {
+    purchase,
+    billing: {
+      ...billing,
+      purchasedSeats: purchase.toSeats,
+      availableSeats: (billing.availableSeats ?? 0) + additionalSeats,
+      invitableSeats: (billing.invitableSeats ?? 0) + additionalSeats,
+      purchasableSeats:
+        billing.purchasableSeats == null ? undefined : Math.max(0, billing.purchasableSeats - additionalSeats),
+      currentMonthlyTotalCents: String(purchase.toSeats * Number(billing.planPriceCents ?? "2900")),
+      lastSeatPurchase: purchase,
+    },
+  };
+}
+
+function seatPurchaseRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/organizations/([^/]+)/billing/seats/preview"),
+      resolve: (_match, method, body) => {
+        if (method !== "POST") return null;
+        fixture.seatPurchasePreviewCalls = (fixture.seatPurchasePreviewCalls ?? 0) + 1;
+        if (fixture.seatPurchasePreviewError) {
+          return {
+            status: fixture.seatPurchasePreviewError.status,
+            json: { message: fixture.seatPurchasePreviewError.message },
+          };
+        }
+        const additionalSeats = Number(body?.additionalSeats ?? 1);
+        return { json: seatPurchasePreview(fixture, additionalSeats) };
+      },
+    },
+    {
+      pattern: re("/api/v1/organizations/([^/]+)/billing/seats/purchase"),
+      resolve: (_match, method, body) => {
+        if (method !== "POST") return null;
+        fixture.seatPurchaseCalls = (fixture.seatPurchaseCalls ?? 0) + 1;
+        if (fixture.seatPurchaseError) {
+          return { status: fixture.seatPurchaseError.status, json: { message: fixture.seatPurchaseError.message } };
+        }
+        const billing = fixture.organizationBilling ?? TEAM_ORGANIZATION_BILLING;
+        const additionalSeats = Number(body?.additionalSeats ?? 1);
+        const fromSeats = billing.purchasedSeats ?? 10;
+        if (body?.expectedPurchasedSeats !== fromSeats) {
+          return { status: 409, json: { message: "Seat capacity changed. Review the updated estimate." } };
+        }
+        const response = fixture.seatPurchaseResponse ?? successfulSeatPurchase(fixture, additionalSeats);
+        if (response.billing) fixture.organizationBilling = response.billing;
+        else if (response.purchase) fixture.organizationBilling = { ...billing, lastSeatPurchase: response.purchase };
+        return { json: response };
+      },
+    },
+  ];
+}
+
 function paymentMethodSessionRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/billing/payment-method-session"),
@@ -1709,6 +1811,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     businessCheckoutRoute(),
     billingPortalSessionRoute(),
     billingPlanSelectionRoute(fixture),
+    ...seatPurchaseRoutes(fixture),
     paymentMethodSessionRoute(),
   ];
 }

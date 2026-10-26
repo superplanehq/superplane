@@ -14,7 +14,7 @@ const (
 	executionKVAnalysisSession = "analysis_session"
 )
 
-func storeRunnerFleetKV(ctx core.ExecutionContext, machineType, backend string) error {
+func storeRunnerFleetKV(ctx core.ExecutionContext, machineType string) error {
 	machineType = strings.TrimSpace(machineType)
 	if machineType == "" {
 		machineType = configurationMachineType(ctx.Configuration)
@@ -23,18 +23,11 @@ func storeRunnerFleetKV(ctx core.ExecutionContext, machineType, backend string) 
 		return err
 	}
 
-	fleetID, err := runnerFleetID(machineType, backend)
+	fleetID, err := requireMachineType(machineType)
 	if err != nil {
 		fleetID = machineType
 	}
 	return ctx.ExecutionState.SetKV(executionKVFleetID, fleetID)
-}
-
-func runnerFleetID(machineType, backend string) (string, error) {
-	if normalizeTaskBackend(backend) == core.RunnerTaskBackendIntegrated {
-		return requireMachineType(machineType)
-	}
-	return resolveBrokerFleetID(machineType)
 }
 
 func RecordRunnerComputeUsage(
@@ -42,22 +35,26 @@ func RecordRunnerComputeUsage(
 	logger *log.Entry,
 	state core.ExecutionStateContext,
 	configuration any,
-	task *Task,
+	task *core.RunnerTask,
 ) {
 	if usage == nil || task == nil {
 		return
 	}
-	if task.ClaimedAt == nil || task.FinishedAt == nil {
+	startedAt := task.StartedAt
+	if startedAt == nil {
+		startedAt = task.ReservedAt
+	}
+	if startedAt == nil || task.FinishedAt == nil {
 		if logger != nil {
 			logger.Warn("runner: skip compute usage, claimed_at or finished_at is missing")
 		}
 		return
 	}
 
-	seconds := billableSeconds(task.FinishedAt.Sub(*task.ClaimedAt))
+	seconds := billableSeconds(task.FinishedAt.Sub(*startedAt))
 	machineType := resolveComputeMachineType(state, configuration)
 	fleetID := resolveComputeFleetID(state, machineType)
-	taskID := task.brokerTaskID()
+	taskID := task.ID
 
 	record := core.ComputeUsageRecord{
 		MachineType:     machineType,
@@ -85,14 +82,7 @@ func resolveComputeFleetID(state core.ExecutionStateContext, machineType string)
 	if fleetID := executionKV(state, executionKVFleetID); fleetID != "" {
 		return fleetID
 	}
-	if taskBackendFromState(state) == core.RunnerTaskBackendIntegrated {
-		return machineType
-	}
-	fleetID, err := resolveBrokerFleetID(machineType)
-	if err != nil {
-		return ""
-	}
-	return fleetID
+	return machineType
 }
 
 func executionKV(state core.ExecutionStateContext, key string) string {

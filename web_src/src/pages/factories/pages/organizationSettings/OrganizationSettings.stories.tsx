@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { userEvent, within } from "storybook/test";
+import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
 
 import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
@@ -153,7 +154,86 @@ export const BillingTeam: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
+      experimentalFeatures={[FEATURE_NEW_BILLING]}
       factoriesFixture={{ ...defaultFactoriesFixture, organizationBilling: { ...TEAM_ORGANIZATION_BILLING } }}
+    />
+  ),
+};
+
+export const BillingBuySeats: Story = {
+  ...BillingTeam,
+  name: "Billing (buy seats)",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
+    await userEvent.click(await canvas.findByRole("button", { name: "Buy seats" }));
+    await canvas.findByText("Estimated charge now: $12.34");
+  },
+};
+
+export const BillingTeamAtMaximum: Story = {
+  name: "Billing (Team plan maximum)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      experimentalFeatures={[FEATURE_NEW_BILLING]}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        organizationBilling: {
+          ...TEAM_ORGANIZATION_BILLING,
+          purchasedSeats: 50,
+          occupiedSeats: 48,
+          availableSeats: 2,
+          purchasableSeats: 0,
+          currentMonthlyTotalCents: "145000",
+        },
+      }}
+    />
+  ),
+};
+
+export const BillingSeatPurchasePending: Story = {
+  name: "Billing (seat payment pending)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      experimentalFeatures={[FEATURE_NEW_BILLING]}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        organizationBilling: {
+          ...TEAM_ORGANIZATION_BILLING,
+          lastSeatPurchase: {
+            id: "storybook-pending-seat-purchase",
+            status: "pending",
+            fromSeats: 10,
+            toSeats: 11,
+            createdAt: new Date().toISOString(),
+          },
+        },
+      }}
+    />
+  ),
+};
+
+export const BillingSeatPurchaseFailed: Story = {
+  name: "Billing (seat payment failed)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      experimentalFeatures={[FEATURE_NEW_BILLING]}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        organizationBilling: {
+          ...TEAM_ORGANIZATION_BILLING,
+          lastSeatPurchase: {
+            id: "storybook-failed-seat-purchase",
+            status: "failed",
+            fromSeats: 10,
+            toSeats: 11,
+            message: "The card was declined. Update the payment method and try again.",
+            createdAt: new Date().toISOString(),
+          },
+        },
+      }}
     />
   ),
 };
@@ -163,6 +243,7 @@ export const BillingTeamEnding: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
+      experimentalFeatures={[FEATURE_NEW_BILLING]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationBilling: { ...TEAM_ORGANIZATION_BILLING, cancelAtPeriodEnd: true },
@@ -176,6 +257,7 @@ export const BillingTeamLegacyCapacity: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
+      experimentalFeatures={[FEATURE_NEW_BILLING]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationBilling: {

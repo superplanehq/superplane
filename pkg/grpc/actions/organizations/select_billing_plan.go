@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
@@ -80,9 +81,25 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "Could not load the current plan.")
 	}
+	// While Polar retries a failed renewal, any selection would clear the
+	// stored subscription state and release the payment lock. Recovery comes
+	// from an updated payment method or a cancellation in the billing portal.
+	if models.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) {
+		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
+	}
+	// A live subscription can still charge, and a local plan change would
+	// clear its stored state. This covers billed states like paused that
+	// OrganizationBillingIsPolarManaged does not. The subscription must be
+	// canceled in the billing portal before any plan selection.
+	if current.HasLivePolarSubscription(time.Now()) {
+		return nil, grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
+	}
 	if strings.TrimSpace(req.GetPlanKey()) == models.BillingPlanNone {
 		if req.Seats != nil {
 			return nil, grpcerrors.InvalidArgument(nil, "Seats are only available for per-seat plans.")
+		}
+		if err := reconcileCheckoutBeforeLocalSelection(ctx, organizationID); err != nil {
+			return nil, err
 		}
 		if _, err := models.ActivateOrganizationBillingPlan(db, organizationID, models.BillingPlanNone); err != nil {
 			return nil, grpcerrors.FailedPrecondition(err, "Could not select this plan.")
@@ -118,14 +135,24 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		if err := ensureOrganizationBillingCustomer(ctx, organizationID, accountID); err != nil {
 			return nil, err
 		}
-		session, err := polar.NewClientFromEnv().CreateCheckout(ctx, polar.CheckoutInput{ProductID: *catalog.PolarProductID, ExternalCustomerID: organizationID.String(), SuccessURL: successURL, CustomerIP: clientIPFromContext(ctx), Seats: seats})
+		session, err := startSubscriptionCheckout(ctx, subscriptionCheckoutRequest{
+			OrganizationID: organizationID,
+			PlanKey:        catalog.Key,
+			ProductID:      *catalog.PolarProductID,
+			Seats:          seats,
+			SuccessURL:     successURL,
+			CustomerIP:     clientIPFromContext(ctx),
+		})
 		if err != nil {
-			return nil, polarBillingError(err, "Could not start subscription checkout.")
+			return nil, err
 		}
 		return &pb.CreateBusinessCheckoutResponse{CheckoutUrl: session.URL}, nil
 	}
 	if catalog.PriceCents != 0 {
 		return nil, grpcerrors.FailedPrecondition(nil, "Checkout is not available for this plan. Contact an organization admin.")
+	}
+	if err := reconcileCheckoutBeforeLocalSelection(ctx, organizationID); err != nil {
+		return nil, err
 	}
 	if catalog.RequirePaymentMethod {
 		hasCard, err := polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())

@@ -18,6 +18,10 @@ describe("resolvePageObservability", () => {
       pageKey: "inviteAccept",
       attributes: { invite_token: "abc123" },
     });
+    expect(resolvePageObservability("/invitations/private-token")).toEqual({
+      pageKey: "invitationAccept",
+      attributes: {},
+    });
   });
 
   it("maps admin routes", () => {

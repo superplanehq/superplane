@@ -38,17 +38,18 @@ const SignupDisabledError = "signup is currently disabled"
 var errGitHubSignInNotConfigured = errors.New("sign-in with GitHub is not configured: create the GitHub App again")
 
 const (
-	magicCodeLength            = 6
-	magicCodeTTL               = 10 * time.Minute
-	magicCodeRateLimit         = 5
-	magicCodeRateWindow        = 10 * time.Minute
-	magicCodeMaxVerifyAttempts = 3
-	authSignupStatePrefix      = "signup:"
-	authSignupResultParam      = "auth_signup_result"
-	authErrorParam             = "auth_error"
-	authErrorSignupDisabled    = "signup_disabled"
-	authProviderParam          = "provider"
-	jsonContentType            = "application/json"
+	magicCodeLength                    = 6
+	magicCodeTTL                       = 10 * time.Minute
+	magicCodeRateLimit                 = 5
+	magicCodeRateWindow                = 10 * time.Minute
+	magicCodeMaxVerifyAttempts         = 3
+	authSignupStatePrefix              = "signup:"
+	authSignupResultParam              = "auth_signup_result"
+	authErrorParam                     = "auth_error"
+	authErrorSignupDisabled            = "signup_disabled"
+	authErrorEmailVerificationRequired = "email_verification_required"
+	authProviderParam                  = "provider"
+	jsonContentType                    = "application/json"
 )
 
 type Handler struct {
@@ -417,7 +418,7 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.canCreateAccountFromRequest(r))
+	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.canCreateAccountFromRequest(r, gothUser.Email))
 	if err != nil {
 		a.handleProviderAuthError(w, r, gothUser, err)
 		return
@@ -607,17 +608,14 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !a.SignupsEnabled() && inviteToken == "" {
-		http.Error(w, SignupDisabledError, http.StatusForbidden)
+	invitedSignup := allowSignupFromInvite(r, email)
+	if inviteToken != "" && !invitedSignup {
+		http.Error(w, "The invitation is invalid or belongs to another email address.", http.StatusForbidden)
 		return
 	}
-
-	if inviteToken != "" {
-		inviteLink, err := models.FindInviteLinkByToken(database.DB(r.Context()), inviteToken)
-		if err != nil || !inviteLink.Enabled {
-			http.Error(w, "invite link not found or disabled", http.StatusForbidden)
-			return
-		}
+	if !invitedSignup && !a.SignupsEnabled() {
+		http.Error(w, SignupDisabledError, http.StatusForbidden)
+		return
 	}
 
 	if _, err := models.FindAccountByEmail(email); err == nil {
@@ -625,6 +623,12 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// The invitation link is also returned to the sender. A password alone does
+	// not prove that this person can read the invited mailbox.
+	if invitedSignup && !a.confirmInvitationEmailProof(w, r, utils.NormalizeEmail(email)) {
 		return
 	}
 
@@ -897,7 +901,6 @@ func errorStatusForCodeError(err error) int {
 }
 
 var errSignupDisabled = fmt.Errorf(SignupDisabledError)
-var errInviteLinkInvalid = fmt.Errorf("invite link not found or disabled")
 var errAccountError = fmt.Errorf("Internal server error")
 
 // checkSignupPolicy verifies account access and whether a new-user signup
@@ -915,7 +918,7 @@ func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
 		return errAccountError
 	}
 
-	if allowSignupFromInvite(r) {
+	if allowSignupFromInvite(r, email) {
 		return nil
 	}
 
@@ -958,7 +961,7 @@ func (a *Handler) findOrCreateAccountForMagicCode(email string, r *http.Request)
 
 func errorStatusForAccountError(err error) int {
 	switch err {
-	case errSignupDisabled, errInviteLinkInvalid, models.ErrAccountBlocked:
+	case errSignupDisabled, models.ErrAccountBlocked:
 		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
@@ -1186,8 +1189,8 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 	return account, true, nil
 }
 
-func (a *Handler) canCreateAccountFromRequest(r *http.Request) bool {
-	if allowSignupFromInvite(r) {
+func (a *Handler) canCreateAccountFromRequest(r *http.Request, email string) bool {
+	if allowSignupFromInvite(r, email) {
 		return true
 	}
 
@@ -1217,11 +1220,67 @@ func (a *Handler) SignupsBlockedByEnvironment() bool {
 }
 
 func writeAuthErrorJSON(w http.ResponseWriter, authError string) {
+	writeAuthStatusJSON(w, http.StatusForbidden, authError)
+}
+
+func writeAuthStatusJSON(w http.ResponseWriter, status int, authError string) {
 	w.Header().Set("Content-Type", jsonContentType)
-	w.WriteHeader(http.StatusForbidden)
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(map[string]string{"error": authError}); err != nil {
 		log.Errorf("Error encoding authentication error response: %v", err)
 	}
+}
+
+func (a *Handler) confirmInvitationEmailProof(w http.ResponseWriter, r *http.Request, email string) bool {
+	code := stripNonDigits(r.FormValue("email_code"))
+	if code == "" {
+		if err := a.issueInvitationEmailProof(r, email); err != nil {
+			log.Errorf("Failed to send invitation email proof for %s: %v", email, err)
+			http.Error(w, "Could not send the email code. Try again.", http.StatusInternalServerError)
+			return false
+		}
+		writeAuthStatusJSON(w, http.StatusUnauthorized, authErrorEmailVerificationRequired)
+		return false
+	}
+
+	magicCode, err := a.findValidCode(email, code)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
+			return false
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return false
+	}
+	if err := a.consumeCode(magicCode, email); err != nil {
+		http.Error(w, err.Error(), errorStatusForCodeError(err))
+		return false
+	}
+	return true
+}
+
+func (a *Handler) issueInvitationEmailProof(r *http.Request, email string) error {
+	count, err := models.CountRecentMagicCodes(email, time.Now().Add(-magicCodeRateWindow))
+	if err != nil {
+		return err
+	}
+	if count >= magicCodeRateLimit {
+		return nil
+	}
+
+	code, err := generateMagicCode()
+	if err != nil {
+		return err
+	}
+	if _, err := models.CreateAccountMagicCode(email, crypto.HashToken(code), time.Now().Add(magicCodeTTL)); err != nil {
+		return err
+	}
+	magicLinkToken, err := a.generateMagicLinkToken(email, code)
+	if err != nil {
+		return err
+	}
+
+	return messages.NewMagicCodeRequestedMessage(email, code, magicLinkToken, inviteRedirectPath(r), true).Publish()
 }
 
 func inviteRedirectPath(r *http.Request) string {
@@ -1233,28 +1292,35 @@ func inviteRedirectPath(r *http.Request) string {
 	return getRedirectURL(r)
 }
 
-func allowSignupFromInvite(r *http.Request) bool {
-	redirectURL := inviteRedirectPath(r)
-	if !strings.HasPrefix(redirectURL, "/invite/") {
+func allowSignupFromInvite(r *http.Request, email string) bool {
+	token := invitationTokenFromRequest(r)
+	if token == "" {
 		return false
 	}
+	invitation, err := models.FindOrganizationInvitationByToken(database.DB(r.Context()), token)
+	if err != nil || invitation.EffectiveState(time.Now()) != models.InvitationStatePending {
+		return false
+	}
+	return utils.NormalizeEmail(invitation.Email) == utils.NormalizeEmail(email)
+}
 
-	parsedURL, err := url.Parse(redirectURL)
+func invitationTokenFromRequest(r *http.Request) string {
+	if token := strings.TrimSpace(r.FormValue("invite_token")); token != "" {
+		return token
+	}
+	parsedURL, err := url.Parse(inviteRedirectPath(r))
 	if err != nil {
-		return false
+		return ""
 	}
-
-	inviteToken := strings.TrimPrefix(parsedURL.Path, "/invite/")
-	if inviteToken == "" || strings.Contains(inviteToken, "/") {
-		return false
+	const prefix = "/invitations/"
+	if !strings.HasPrefix(parsedURL.Path, prefix) {
+		return ""
 	}
-
-	inviteLink, err := models.FindInviteLinkByToken(database.DB(r.Context()), inviteToken)
-	if err != nil || !inviteLink.Enabled {
-		return false
+	token := strings.TrimPrefix(parsedURL.Path, prefix)
+	if token == "" || strings.Contains(token, "/") {
+		return ""
 	}
-
-	return true
+	return token
 }
 
 func isSignupIntentFromRequest(r *http.Request) bool {

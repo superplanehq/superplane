@@ -56,7 +56,7 @@ describe("validateOrganizationSlug", () => {
     expect(validateOrganizationSlug("Acme Corp")).toBe("invalid-format");
   });
 
-  it("flags a reserved slug", () => {
-    expect(validateOrganizationSlug("admin")).toBe("reserved");
+  it.each(["admin", "invitations"])("flags the reserved slug %s", (slug) => {
+    expect(validateOrganizationSlug(slug)).toBe("reserved");
   });
 });

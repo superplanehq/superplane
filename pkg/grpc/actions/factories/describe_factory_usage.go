@@ -78,6 +78,8 @@ func DescribeFactoryUsage(
 		FactoryRemainingCreditWarning: budget.Warning,
 		TotalDurationSeconds:          ledger.DurationSeconds,
 		ByMachineType:                 serializeUsageByMachineType(byMachine),
+		HostedCreditAvailable:         !models.BillingEnabled() || credit.RemainingMicros > 0,
+		FactoryHostedBudgetAvailable:  !models.BillingEnabled() || !budget.Capped || budget.RemainingMicros > 0,
 	}
 	if budget.BudgetCents != nil {
 		resp.HostedSpendBudgetCents = budget.BudgetCents

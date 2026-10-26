@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it, vi } from "bun:test";
 import { client } from "@/api-client/client.gen";
 import { FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
+import { HOSTED_DEFAULT_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
 import {
   ACME_ONBOARDING_FACTORY_ID,
   ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT,
@@ -433,7 +434,10 @@ describe("FactorySettingsLayout sidebar", () => {
       render(
         <FactoriesHarness
           pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
-          factoriesFixture={defaultFactoriesFixture}
+          factoriesFixture={{
+            ...defaultFactoriesFixture,
+            organizationWorkspaceUsage: HOSTED_DEFAULT_USAGE_REPORT,
+          }}
         />,
       );
 
@@ -447,6 +451,7 @@ describe("FactorySettingsLayout sidebar", () => {
           pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
           factoriesFixture={{
             ...defaultFactoriesFixture,
+            organizationWorkspaceUsage: HOSTED_DEFAULT_USAGE_REPORT,
             factories: defaultFactoriesFixture.factories.map((factory) => ({
               ...factory,
               onboarding: { ...factory.onboarding, agentHarness: "AGENT_HARNESS_CLAUDE_CODE" },

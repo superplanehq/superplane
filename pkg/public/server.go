@@ -491,6 +491,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
+	s.Router.PathPrefix("/api/v1/invitations").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
@@ -507,6 +508,8 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 func headersMatcher(key string) (string, bool) {
 	switch key {
+	case "Grpc-Metadata-X-User-Id", "Grpc-Metadata-X-Organization-Id", "Grpc-Metadata-X-Account-Id", "Grpc-Metadata-X-Token-Scopes":
+		return "", false
 	case "X-User-Id", "X-Organization-Id", "X-Account-Id":
 		return key, true
 	case "X-Token-Scopes":
@@ -871,7 +874,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/spending-report", s.adminGetOrganizationSpendingReport).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/velocity", s.adminGetOrganizationVelocity).Methods("GET")
-	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/endpoints", s.adminListPolarWebhookEndpoints).Methods("GET")
 	adminRoute.HandleFunc("/sentry/webhooks", s.adminListSentryWebhooks).Methods("GET")
