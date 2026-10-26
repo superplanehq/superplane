@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Switch } from "@/components/ui/switch";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 
 import { JiraProjectStep } from "../../JiraIntakeSetupSteps";
 import { LinearProjectPicker } from "../../LinearProjectPicker";
@@ -38,10 +38,12 @@ export function FirstRunTicketIntakeStepper({
   repositories = [],
   projects,
   projectsConfirmed,
+  changingRepository = false,
   saving,
   settings,
   finishButton,
   onConnect,
+  onChangeRepository,
   onSelectRepository,
   onSelectJiraProject,
   onRetryJiraProjects,
@@ -58,10 +60,13 @@ export function FirstRunTicketIntakeStepper({
   repositories?: string[];
   projects: FirstRunTicketProjectState;
   projectsConfirmed: boolean;
+  /** The GitHub repository picker is open again after a Change. */
+  changingRepository?: boolean;
   saving: boolean;
   settings: FirstRunIntakeSettingsProps;
   finishButton: ReactNode;
   onConnect?: () => void;
+  onChangeRepository?: () => void;
   onSelectRepository?: (repository: string) => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
@@ -69,22 +74,18 @@ export function FirstRunTicketIntakeStepper({
   onRetryLinearProjects?: () => void;
   onConfirmProjects: () => void;
 }) {
-  const [changingRepository, setChangingRepository] = useState(false);
   const current = currentTicketStep({ source, connected, projectsConfirmed, changingRepository });
-  const canChangeRepository = source === "github-issues" && Boolean(onSelectRepository) && repositories.length > 0;
+  const canChangeRepository =
+    source === "github-issues" && Boolean(onSelectRepository && onChangeRepository) && repositories.length > 0;
   const steps = ticketIntakeSteps(source, repository, projects).map((step) =>
     step.id === "project" && canChangeRepository
       ? {
           ...step,
-          doneAction: <ChangeRepositoryButton disabled={saving} onClick={() => setChangingRepository(true)} />,
+          doneAction: <ChangeRepositoryButton disabled={saving} onClick={onChangeRepository} />,
         }
       : step,
   );
   const sourceName = ticketSourceName(source);
-  const confirmProjects = () => {
-    setChangingRepository(false);
-    onConfirmProjects();
-  };
 
   if (current === "connect") {
     return (
@@ -128,7 +129,7 @@ export function FirstRunTicketIntakeStepper({
           type="button"
           className="w-full"
           disabled={saving || !ticketProjectChoiceComplete(source, projects, repository)}
-          onClick={confirmProjects}
+          onClick={onConfirmProjects}
           data-testid="first-run-confirm-projects"
         >
           {copy.confirmProjects}
@@ -145,7 +146,7 @@ export function FirstRunTicketIntakeStepper({
   );
 }
 
-function ChangeRepositoryButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+function ChangeRepositoryButton({ disabled, onClick }: { disabled: boolean; onClick?: () => void }) {
   return (
     <Button
       type="button"

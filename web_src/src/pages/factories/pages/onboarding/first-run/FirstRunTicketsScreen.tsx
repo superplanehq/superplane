@@ -157,20 +157,35 @@ function useTicketScreenPhase(ticketSource: FirstRunTicketSource | null, startOn
   // A default the user did not pick shows no highlighted row on the list.
   const [defaultOnly, setDefaultOnly] = useState(startOnSourceList);
   const [confirmedFor, setConfirmedFor] = useState<FirstRunTicketSource | null>(null);
+  // GitHub starts with the repository done. Change reopens the picker.
+  const [changingRepository, setChangingRepository] = useState(false);
   const projectsConfirmed = confirmedFor !== null && confirmedFor === ticketSource;
   const listPhase = ticketSource === null || browsing;
   return {
     listPhase,
     listSelection: defaultOnly ? null : ticketSource,
     projectsConfirmed,
+    changingRepository,
     choose: () => {
       setBrowsing(false);
       setDefaultOnly(false);
       setConfirmedFor(null);
+      setChangingRepository(false);
     },
-    confirmProjects: () => setConfirmedFor(ticketSource),
+    changeRepository: () => setChangingRepository(true),
+    confirmProjects: () => {
+      setChangingRepository(false);
+      setConfirmedFor(ticketSource);
+    },
     back: () => {
-      if (projectsConfirmed) {
+      // Back on the open picker cancels the change and returns to settings.
+      if (changingRepository) {
+        setChangingRepository(false);
+        return;
+      }
+      // The GitHub repository step is done from the start, so Back on
+      // settings returns to the list, with or without an earlier Change.
+      if (projectsConfirmed && ticketSource !== "github-issues") {
         setConfirmedFor(null);
         return;
       }
@@ -282,6 +297,7 @@ function TicketIntakeCard({
       repositories={p.repositories}
       projects={projects}
       projectsConfirmed={phase.projectsConfirmed}
+      changingRepository={phase.changingRepository}
       saving={p.saving}
       settings={{
         initialImportLimit: p.initialImportLimit,
@@ -304,6 +320,7 @@ function TicketIntakeCard({
         </LoadingButton>
       }
       onConnect={connectFor[source]}
+      onChangeRepository={phase.changeRepository}
       onSelectRepository={p.onSelectRepository}
       onSelectJiraProject={p.onSelectJiraProject}
       onRetryJiraProjects={p.onRetryJiraProjects}

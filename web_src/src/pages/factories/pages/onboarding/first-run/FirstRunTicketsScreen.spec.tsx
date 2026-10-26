@@ -125,21 +125,21 @@ describe("FirstRunTicketsScreen", () => {
       expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
     });
 
+    const changeProps = (repository: string, onSelectRepository = vi.fn(), onBack = vi.fn()) => ({
+      ticketSource: "github-issues" as const,
+      repository,
+      repositories: ["acme/payments", "acme/billing"],
+      githubConnected: true,
+      chrome: { stepIndex: 3, onBack },
+      onSelectRepository,
+      onSelectTicketSource: vi.fn(),
+      onAnalyzeTickets: vi.fn(),
+    });
+
     it("lets the user reopen the repository step and pick another repository", async () => {
       const user = userEvent.setup();
       const onSelectRepository = vi.fn();
-
-      const { rerender } = render(
-        <FirstRunTicketsScreen
-          ticketSource="github-issues"
-          repository="acme/payments"
-          repositories={["acme/payments", "acme/billing"]}
-          githubConnected
-          onSelectRepository={onSelectRepository}
-          onSelectTicketSource={vi.fn()}
-          onAnalyzeTickets={vi.fn()}
-        />,
-      );
+      const { rerender } = render(<FirstRunTicketsScreen {...changeProps("acme/payments", onSelectRepository)} />);
 
       await user.click(screen.getByTestId("first-run-change-repository"));
       expect(screen.getByTestId("first-run-step-project")).toHaveAttribute("data-state", "active");
@@ -148,21 +148,28 @@ describe("FirstRunTicketsScreen", () => {
       await user.click(screen.getByRole("option", { name: /acme\/billing/ }));
       expect(onSelectRepository).toHaveBeenCalledWith("acme/billing");
 
-      rerender(
-        <FirstRunTicketsScreen
-          ticketSource="github-issues"
-          repository="acme/billing"
-          repositories={["acme/payments", "acme/billing"]}
-          githubConnected
-          onSelectRepository={onSelectRepository}
-          onSelectTicketSource={vi.fn()}
-          onAnalyzeTickets={vi.fn()}
-        />,
-      );
-
+      rerender(<FirstRunTicketsScreen {...changeProps("acme/billing", onSelectRepository)} />);
       await user.click(screen.getByTestId("first-run-confirm-projects"));
       expect(screen.getByText(copy.stepRepositoryDone("acme/billing"))).toBeInTheDocument();
       expect(screen.getByTestId("first-run-step-settings")).toHaveAttribute("data-state", "active");
+    });
+
+    it("cancels an open repository change on Back and returns to the list from settings afterwards", async () => {
+      const user = userEvent.setup();
+      const onBack = vi.fn();
+      render(<FirstRunTicketsScreen {...changeProps("acme/payments", vi.fn(), onBack)} />);
+
+      await user.click(screen.getByTestId("first-run-change-repository"));
+      await user.click(screen.getByTestId("first-run-back"));
+      expect(onBack).not.toHaveBeenCalled();
+      expect(screen.getByTestId("first-run-step-settings")).toHaveAttribute("data-state", "active");
+
+      await user.click(screen.getByTestId("first-run-change-repository"));
+      await user.click(screen.getByTestId("first-run-confirm-projects"));
+      expect(screen.getByTestId("first-run-step-settings")).toHaveAttribute("data-state", "active");
+
+      await user.click(screen.getByTestId("first-run-back"));
+      expect(screen.getByRole("heading", { name: copy.headline })).toBeInTheDocument();
     });
 
     it("offers no repository change when no repository list is available", () => {
