@@ -11,7 +11,7 @@ const stages: { title: string; color: LineBoardColumnColorId; status: WorkOrderD
   { title: "Done", color: "lime", status: "completed", task: "Connect the issue tracker" },
 ];
 
-function WorkflowPalette() {
+function WorkflowPalette({ empty = false }: { empty?: boolean }) {
   return (
     <div className="space-y-6 p-6">
       {(["vivid", "dim", "borders"] as const).map((view) => (
@@ -27,9 +27,9 @@ function WorkflowPalette() {
                   <WorkOrderBoardLane
                     key={stage.title}
                     title={stage.title}
-                    count={1}
-                    emptyDescription="No tasks."
-                    subheader={<p className="text-xs text-muted-foreground">1 task</p>}
+                    count={empty ? 0 : 1}
+                    emptyDescription="Nothing here."
+                    subheader={<p className="text-xs text-muted-foreground">{empty ? "0 tasks" : "1 task"}</p>}
                     {...lineBoardColumnLaneProps(stage.color, view)}
                   >
                     <article className="rounded-md border border-border bg-card p-3">
@@ -62,3 +62,4 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Light: Story = { globals: { theme: "light" } };
 export const Dark: Story = { globals: { theme: "dark" } };
+export const EmptyDark: Story = { globals: { theme: "dark" }, args: { empty: true } };

@@ -432,35 +432,35 @@
   --workspace-markdown-h3-size: 1.2em;
   --workspace-markdown-h4-size: 1.05em;
 
-  --background: #ffffff;
-  --foreground: #26251e;
+  --background: #f7f8fa;
+  --foreground: #17202a;
   --card: #ffffff;
-  --card-foreground: #26251e;
+  --card-foreground: #17202a;
   --popover: #ffffff;
-  --popover-foreground: #26251e;
+  --popover-foreground: #17202a;
 
-  --primary: #26251e;
+  --primary: #17202a;
   --primary-foreground: #ffffff;
-  --secondary: #f3f3f3;
-  --secondary-foreground: #26251e;
-  --muted: #f7f7f7;
-  --muted-foreground: #737373;
-  --accent: #f3f3f3;
-  --accent-foreground: #26251e;
+  --secondary: #f1f3f5;
+  --secondary-foreground: #17202a;
+  --muted: #f1f3f5;
+  --muted-foreground: #6b7480;
+  --accent: #f1f3f5;
+  --accent-foreground: #17202a;
   --destructive: #e5484d;
   --destructive-foreground: #ffffff;
 
-  --border: #e5e5e5;
-  --input: #e5e5e5;
+  --border: #e0e5e9;
+  --input: #e0e5e9;
   /* Form fills. Light matches GitHub: white field, gray stroke. */
   --field: #ffffff;
   --ring: #a3a3a3;
 
-  --sidebar: #f7f7f7;
-  --sidebar-foreground: #26251e;
-  --sidebar-border: #e5e5e5;
-  --sidebar-accent: #e9e9e9;
-  --sidebar-accent-foreground: #26251e;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #17202a;
+  --sidebar-border: #dde2e7;
+  --sidebar-accent: #f1f3f5;
+  --sidebar-accent-foreground: #17202a;
   --status-success: #15803d;
   --status-success-dot: #16a34a;
   --status-running: var(--status-running-fg);
@@ -479,9 +479,7 @@
   --workflow-verify-accent: #e8b27f;
   --workflow-done-accent: #8ac9b0;
   --workflow-body-mix: 10%;
-  --workflow-header-mix: 16%;
   --workflow-border-mix: 48%;
-  --workflow-vivid-mix: 100%;
   --workflow-outline-mix: 72%;
   --workflow-fg-mix: 60%;
   --workflow-fg-contrast: #000;
@@ -559,30 +557,30 @@
 
 .theme-factories.dark,
 .dark .theme-factories {
-  --background: #14120b;
-  --foreground: #edecec;
-  --card: #1b1913;
-  --card-foreground: #edecec;
-  --popover: #1b1913;
-  --popover-foreground: #edecec;
+  --background: #0e1110;
+  --foreground: #e7ecea;
+  --card: #1e2421;
+  --card-foreground: #e7ecea;
+  --popover: #1e2421;
+  --popover-foreground: #e7ecea;
   --primary: #f7f7f4;
-  --primary-foreground: #26251e;
-  --secondary: #26251e;
-  --secondary-foreground: #edecec;
-  --muted: #26251e;
-  --muted-foreground: #a3a3a3;
-  --accent: #26251e;
-  --accent-foreground: #edecec;
-  --border: #33312b;
-  --input: #33312b;
-  /* Same warm hue as the canvas. Cool gray-800 is what clashed with this theme. */
-  --field: #221f18;
+  --primary-foreground: #202624;
+  --secondary: #202624;
+  --secondary-foreground: #e7ecea;
+  --muted: #202624;
+  --muted-foreground: #a1ada7;
+  --accent: #202624;
+  --accent-foreground: #e7ecea;
+  --border: #313934;
+  --input: #313934;
+  /* Fields share the cool neutral hue of the board. */
+  --field: #171c1b;
   --ring: #8a8578;
-  --sidebar: #1b1913;
-  --sidebar-foreground: #edecec;
-  --sidebar-border: #33312b;
-  --sidebar-accent: #26251e;
-  --sidebar-accent-foreground: #edecec;
+  --sidebar: #171b19;
+  --sidebar-foreground: #e7ecea;
+  --sidebar-border: #313934;
+  --sidebar-accent: #202624;
+  --sidebar-accent-foreground: #e7ecea;
   --status-success: #86efac;
   --status-success-dot: #4ade80;
   --status-running: var(--status-running-fg);
@@ -598,9 +596,7 @@
   --workflow-verify-accent: #d69c6e;
   --workflow-done-accent: #79b9a1;
   --workflow-body-mix: 15%;
-  --workflow-header-mix: 22%;
   --workflow-border-mix: 60%;
-  --workflow-vivid-mix: 43%;
   --workflow-outline-mix: 56%;
   --workflow-fg-mix: 98%;
   --workflow-fg-contrast: #fff;
@@ -631,8 +627,8 @@
   --status-failed-dot: #f87171;
 
   --status-cancelled-fg: #a1a1aa;
-  --status-cancelled-bg: #26251e;
-  --status-cancelled-border: #33312b;
+  --status-cancelled-bg: #202624;
+  --status-cancelled-border: #313934;
   --status-cancelled-dot: #71717a;
 
   --status-done-lane-bg: var(--status-completed-bg);
@@ -1446,43 +1442,150 @@
   }
 }
 
-/* Line-board colors share the workflow accents and theme-specific mixes. */
-.line-board-color-slate { --board-column-accent: var(--workflow-backlog-accent); }
-.line-board-color-sky { --board-column-accent: var(--workflow-implement-accent); }
-.line-board-color-yellow { --board-column-accent: var(--workflow-verify-accent); }
-.line-board-color-lime { --board-column-accent: var(--workflow-done-accent); }
+/* Board surface values taken from the rendered Option 4 Figma frames. */
+.theme-factories {
+  --workflow-board-bg: #f7f8fa;
+  --workflow-board-fg: #17202a;
+  --workflow-board-muted: #6b7480;
+  --workflow-card-bg: #ffffff;
+  --workflow-card-border: #e0e5e9;
+  --workflow-neutral-lane: #ffffff;
+  --workflow-neutral-header: #ffffff;
+  --workflow-vivid-card-bg: rgb(255 255 255 / 17%);
+  --workflow-vivid-card-border: rgb(255 255 255 / 20%);
+  --workflow-vivid-fg: #17212b;
+  --workflow-vivid-border-opacity: 50%;
+  --workflow-soft-border-opacity: 24%;
+  --workflow-backlog-vivid: #a7b0bc;
+  --workflow-backlog-vivid-header: #a7b0bc;
+  --workflow-backlog-soft: #f8f9fa;
+  --workflow-backlog-soft-header: #f4f5f6;
+  --workflow-implement-vivid: #8bd;
+  --workflow-implement-vivid-header: #8bd;
+  --workflow-implement-soft: #f6fafc;
+  --workflow-implement-soft-header: #f0f6fb;
+  --workflow-verify-vivid: #e8b27f;
+  --workflow-verify-vivid-header: #e8b27f;
+  --workflow-verify-soft: #fdf9f5;
+  --workflow-verify-soft-header: #fcf5ee;
+  --workflow-done-vivid: #8ac9b0;
+  --workflow-done-vivid-header: #8ac9b0;
+  --workflow-done-soft: #f6fbf9;
+  --workflow-done-soft-header: #f0f8f5;
+}
 
-:is(.line-board-color-slate, .line-board-color-sky, .line-board-color-yellow, .line-board-color-lime) {
-  --board-column-vivid: color-mix(in srgb, var(--board-column-accent) var(--workflow-vivid-mix), var(--background));
-  --board-column-soft: color-mix(in srgb, var(--board-column-accent) var(--workflow-body-mix), var(--background));
-  --board-column-header: color-mix(in srgb, var(--board-column-accent) var(--workflow-header-mix), var(--background));
-  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-border-mix), var(--background));
+.theme-factories.dark,
+.dark .theme-factories {
+  --workflow-board-bg: #0e1110;
+  --workflow-board-fg: #e7ecea;
+  --workflow-board-muted: #a1ada7;
+  --workflow-card-bg: #1e2421;
+  --workflow-card-border: #313934;
+  --workflow-neutral-lane: #171c1b;
+  --workflow-neutral-header: #202624;
+  --workflow-vivid-card-bg: rgb(255 255 255 / 10%);
+  --workflow-vivid-card-border: rgb(255 255 255 / 12%);
+  --workflow-vivid-fg: #f2f5f4;
+  --workflow-vivid-border-opacity: 34%;
+  --workflow-soft-border-opacity: 27%;
+  --workflow-backlog-vivid: #52595d;
+  --workflow-backlog-vivid-header: #646b6f;
+  --workflow-backlog-soft: #2b3131;
+  --workflow-backlog-soft-header: #3f4646;
+  --workflow-implement-vivid: #3c535f;
+  --workflow-implement-vivid-header: #486473;
+  --workflow-implement-soft: #242f32;
+  --workflow-implement-soft-header: #324248;
+  --workflow-verify-vivid: #604d3b;
+  --workflow-verify-vivid-header: #745c46;
+  --workflow-verify-soft: #302d26;
+  --workflow-verify-soft-header: #463f34;
+  --workflow-done-vivid: #3c584e;
+  --workflow-done-vivid-header: #496a5e;
+  --workflow-done-soft: #24302c;
+  --workflow-done-soft-header: #33453e;
+}
+
+.workflow-board {
+  --background: var(--workflow-board-bg);
+  --foreground: var(--workflow-board-fg);
+  --muted-foreground: var(--workflow-board-muted);
+  --card: var(--workflow-card-bg);
+  --card-foreground: var(--workflow-board-fg);
+  --border: var(--workflow-card-border);
+  background: var(--workflow-board-bg);
+  color: var(--workflow-board-fg);
+}
+
+.line-board-color-slate {
+  --board-column-accent: var(--workflow-backlog-accent);
+  --board-column-vivid: var(--workflow-backlog-vivid);
+  --board-column-vivid-header: var(--workflow-backlog-vivid-header);
+  --board-column-soft: var(--workflow-backlog-soft);
+  --board-column-header: var(--workflow-backlog-soft-header);
+  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-soft-border-opacity), transparent);
+}
+
+.line-board-color-sky {
+  --board-column-accent: var(--workflow-implement-accent);
+  --board-column-vivid: var(--workflow-implement-vivid);
+  --board-column-vivid-header: var(--workflow-implement-vivid-header);
+  --board-column-soft: var(--workflow-implement-soft);
+  --board-column-header: var(--workflow-implement-soft-header);
+  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-soft-border-opacity), transparent);
+}
+
+.line-board-color-yellow {
+  --board-column-accent: var(--workflow-verify-accent);
+  --board-column-vivid: var(--workflow-verify-vivid);
+  --board-column-vivid-header: var(--workflow-verify-vivid-header);
+  --board-column-soft: var(--workflow-verify-soft);
+  --board-column-header: var(--workflow-verify-soft-header);
+  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-soft-border-opacity), transparent);
+}
+
+.line-board-color-lime {
+  --board-column-accent: var(--workflow-done-accent);
+  --board-column-vivid: var(--workflow-done-vivid);
+  --board-column-vivid-header: var(--workflow-done-vivid-header);
+  --board-column-soft: var(--workflow-done-soft);
+  --board-column-header: var(--workflow-done-soft-header);
+  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-soft-border-opacity), transparent);
 }
 
 .line-board-column-soft,
-.line-board-column-vivid {
+.line-board-column-vivid,
+.line-board-column-bordered {
   border-color: var(--board-column-border);
+  border-radius: 6px;
 }
 
 .line-board-column-soft > header {
   background: var(--board-column-header);
-  border-color: var(--board-column-border);
+  border-bottom-width: 0;
 }
 
 .line-board-column-vivid {
+  --foreground: var(--workflow-vivid-fg);
+  --card-foreground: var(--workflow-vivid-fg);
+  --card: var(--workflow-vivid-card-bg);
+  --border: var(--workflow-vivid-card-border);
   --muted-foreground: color-mix(in srgb, var(--foreground) 85%, var(--board-column-vivid));
+  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-vivid-border-opacity), transparent);
 }
 
 .line-board-column-vivid > header {
-  background: var(--board-column-vivid);
-  border-color: var(--board-column-border);
+  --muted-foreground: var(--workflow-vivid-fg);
+  background: var(--board-column-vivid-header);
+  border-bottom-width: 0;
 }
 
 .line-board-column-bordered {
-  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-outline-mix), var(--background));
+  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-outline-mix), transparent);
+  background: var(--workflow-neutral-lane);
 }
 
 .line-board-column-bordered > header {
-  background: var(--card);
-  border-color: var(--board-column-border);
+  background: var(--workflow-neutral-header);
+  border-bottom-width: 0;
 }
