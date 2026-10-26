@@ -41,9 +41,18 @@ func Test__WebhookRestoresRenewalReductionAfterLostPurchaseResponse(t *testing.T
 	t.Cleanup(seatrenewal.Wait)
 	sub := provider.AddSeatPlan(db, r.Organization.ID, 3, time.Now().AddDate(0, 1, 0))
 	provider.Update(sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(1) })
+	preview, err := organizations.PreviewSeatPurchase(t.Context(), r.Organization.ID.String(), &pb.PreviewSeatPurchaseRequest{
+		AdditionalSeats: 1,
+	})
+	require.NoError(t, err)
 	provider.LoseNextPurchaseResponse()
 	response, err := organizations.PurchaseSeats(t.Context(), r.Organization.ID.String(), &pb.PurchaseSeatsRequest{
-		AdditionalSeats: 1, ExpectedPurchasedSeats: 3, OperationKey: uuid.NewString(),
+		AdditionalSeats:         1,
+		ExpectedPurchasedSeats:  preview.PurchasedSeats,
+		OperationKey:            uuid.NewString(),
+		ConfirmedSubscriptionId: preview.SubscriptionId,
+		ConfirmedPeriodStart:    preview.BillingPeriodStart,
+		ConfirmedPeriodEnd:      preview.PeriodEnd,
 	}, r.User.String())
 	require.NoError(t, err)
 	require.Equal(t, "awaiting_confirmation", response.Purchase.Status)
