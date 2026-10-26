@@ -497,6 +497,9 @@ func switchFactoryModelSource(
 	baseURL string,
 	apiType string,
 ) ([]uuid.UUID, string, error) {
+	if factory.OnboardingConfigValue().CodexSubscription {
+		return nil, "", grpcerrors.FailedPrecondition(nil, "This workspace uses a ChatGPT subscription. Model source cannot change.")
+	}
 	var integration *models.Integration
 	if strings.TrimSpace(source) != modelSourceHosted {
 		provider := strings.TrimSpace(source)

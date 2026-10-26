@@ -331,6 +331,20 @@ func Test__IntakeAgentModel(t *testing.T) {
 		agent := &intakeAgent{Component: "runnerBash"}
 		assert.Empty(t, agent.model())
 	})
+
+	t.Run("a ChatGPT subscription keeps the model unset", func(t *testing.T) {
+		agent := &intakeAgent{
+			Component:   "runnerCodex",
+			Credentials: map[string]any{"source": runner.CredentialsSourceSubscription},
+			Model:       "gpt-5",
+		}
+		assert.Empty(t, agent.model())
+		template := factoryTemplateAgentFromIntake(agent)
+		require.NotNil(t, template)
+		assert.Equal(t, "runnerCodex", template.component)
+		assert.Equal(t, runner.CredentialsSourceSubscription, template.credentialSource)
+		assert.Empty(t, template.model)
+	})
 }
 
 func enableHostedSuperPlaneAgent(t *testing.T, db *gorm.DB) {

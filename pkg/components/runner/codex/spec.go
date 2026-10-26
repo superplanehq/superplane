@@ -45,10 +45,7 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	if err := runner.ValidateAgentSteps(spec.Steps); err != nil {
 		return err
 	}
-	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {
-		return err
-	}
-	if err := runner.ValidateAgentCredentials(spec.Credentials, true); err != nil {
+	if err := validateCodexCredentials(spec); err != nil {
 		return err
 	}
 	if err := runner.ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
@@ -67,6 +64,16 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	}
 	_, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel)
 	return err
+}
+
+func validateCodexCredentials(spec RunCodexSpec) error {
+	if spec.Credentials.Source == runner.CredentialsSourceSubscription {
+		return nil
+	}
+	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {
+		return err
+	}
+	return runner.ValidateAgentCredentials(spec.Credentials, true)
 }
 
 // CodexTask is the ordered runner commands and task files for a run.
@@ -93,6 +100,18 @@ func buildCodexTask(spec RunCodexSpec, usage string, setups []runner.Integration
 			return runner.PromptNodeCommand(promptName, model, spec.ThinkingLevel)
 		},
 	})
+	if spec.Credentials.Source == runner.CredentialsSourceSubscription {
+		files = append(files, runner.TaskFile{
+			Path:    "codex_subscription.js",
+			Content: subscriptionScript,
+			Mode:    "0644",
+		})
+		commands = append([]runner.TaskCommand{commands[0], {
+			Name:    "Restore ChatGPT sign-in",
+			Command: `node "$SUPERPLANE_TASK_DIR/codex_subscription.js" restore`,
+			Kind:    runner.LiveLogKindSetup,
+		}}, commands[1:]...)
+	}
 	return CodexTask{Commands: commands, Files: files}
 }
 
@@ -118,7 +137,8 @@ func applyPlanningFollowUp(task CodexTask, environment []runner.TaskEnvironmentV
 		return task
 	}
 	task.Files = runner.AppendAttachmentSetupFiles(runner.AppendAttachmentLimitFile(append(task.Files, runner.FollowUpLoopFile())))
-	task.Commands = append(task.Commands, planningFollowUpCommand(spec))
+	followUp := planningFollowUpCommand(spec)
+	task.Commands = append(task.Commands, followUp)
 	return task
 }
 

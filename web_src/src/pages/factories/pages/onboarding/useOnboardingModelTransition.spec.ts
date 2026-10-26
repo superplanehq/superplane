@@ -10,12 +10,17 @@ beforeEach(() => {
   verify.mockReset().mockResolvedValue(true);
   toast.mockClear();
 });
-function mount(saving = false) {
+function mount(saving = false, codexSubscriptionLoading = false) {
   const finish = vi.fn(async () => {});
   const goToScreen = vi.fn();
   const hook = renderHook(
-    ({ saving }) => useOnboardingModelTransition({ saving, finish }, { screen: "tickets", goToScreen }, "org"),
-    { initialProps: { saving } },
+    ({ saving, codexSubscriptionLoading, codexSubscriptionOffered }) =>
+      useOnboardingModelTransition(
+        { saving, finish, codexSubscriptionLoading, codexSubscriptionOffered },
+        { screen: "tickets", goToScreen },
+        "org",
+      ),
+    { initialProps: { saving, codexSubscriptionLoading, codexSubscriptionOffered: false } },
   );
   return { ...hook, finish, goToScreen };
 }
@@ -39,8 +44,18 @@ it("waits for saved ticket state before completing setup", async () => {
   const { result, rerender, finish } = mount(true);
   await act(async () => result.current.afterTickets());
   expect(finish).not.toHaveBeenCalled();
-  rerender({ saving: false });
+  rerender({ saving: false, codexSubscriptionLoading: false, codexSubscriptionOffered: false });
   await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
+});
+
+it("waits for ChatGPT eligibility before it continues saved intake", async () => {
+  const { result, rerender, finish, goToScreen } = mount(false, true);
+  await act(async () => result.current.afterTickets());
+  expect(verify).not.toHaveBeenCalled();
+  expect(finish).not.toHaveBeenCalled();
+  rerender({ saving: false, codexSubscriptionLoading: false, codexSubscriptionOffered: true });
+  await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("agent"));
+  expect(finish).not.toHaveBeenCalled();
 });
 
 it("keeps setup open when model access cannot be verified", async () => {
