@@ -1,26 +1,40 @@
 import { useCallback, useState } from "react";
 
-/** Keep the import choice through reloads and integration redirects. */
-export function useOnboardingInitialImportChoice(options?: { persistInitialImportKey?: string }) {
-  const factoryId = options?.persistInitialImportKey;
-  const key = factoryId ? `superplane:onboarding-skip-initial-import:${factoryId}` : null;
-  const [skipInitialImport, setSkipInitialImport] = useState(() => {
+/** A yes/no setup choice that survives reloads and integration redirects. */
+function usePersistedOnboardingChoice(key: string | null, fallback: boolean) {
+  const [value, setValue] = useState(() => {
     try {
-      return key ? sessionStorage.getItem(key) === "true" : false;
+      const stored = key ? sessionStorage.getItem(key) : null;
+      return stored === null ? fallback : stored === "true";
     } catch {
-      return false;
+      return fallback;
     }
   });
-  const selectInitialImport = useCallback(
-    (skip: boolean) => {
+  const select = useCallback(
+    (next: boolean) => {
       try {
-        if (key) sessionStorage.setItem(key, String(skip));
+        if (key) sessionStorage.setItem(key, String(next));
       } catch {
         // Blocked or full storage must not prevent an in-memory selection.
       }
-      setSkipInitialImport(skip);
+      setValue(next);
     },
     [key],
   );
-  return [skipInitialImport, selectInitialImport] as const;
+  return [value, select] as const;
+}
+
+/** Keep the import choice through reloads and integration redirects. */
+export function useOnboardingInitialImportChoice(options?: { persistInitialImportKey?: string }) {
+  const factoryId = options?.persistInitialImportKey;
+  return usePersistedOnboardingChoice(
+    factoryId ? `superplane:onboarding-skip-initial-import:${factoryId}` : null,
+    false,
+  );
+}
+
+/** Keep the automatic intake choice through reloads and integration redirects. Defaults to on. */
+export function useOnboardingAutomaticIntakeChoice(options?: { persistInitialImportKey?: string }) {
+  const factoryId = options?.persistInitialImportKey;
+  return usePersistedOnboardingChoice(factoryId ? `superplane:onboarding-automatic-intake:${factoryId}` : null, true);
 }

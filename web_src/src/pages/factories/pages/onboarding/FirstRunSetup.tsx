@@ -82,13 +82,24 @@ function TicketsScreenHost({
   chrome: FirstRunChrome;
   sphere?: FirstRunSphereProps;
 }) {
+  const connecting =
+    flow.blockingAction === "opening-github" ||
+    flow.blockingAction === "connecting-jira" ||
+    flow.blockingAction === "connecting-linear";
   return (
     <FirstRunTicketsScreen
-      initialImportLimit={initialWorkspace ? 3 : undefined}
+      initialImportLimit={3}
       skipInitialImport={model.setup.skipInitialImport}
+      // The first workspace always imports: that batch feeds the analysis.
       onSkipInitialImportChange={initialWorkspace ? undefined : model.setup.setSkipInitialImport}
+      automaticIntake={model.setup.automaticIntake}
+      onAutomaticIntakeChange={model.setup.setAutomaticIntake}
       githubAvailable={flow.vcsHost !== "bitbucket"}
       ticketSource={flow.ticketSource}
+      // GitHub is only a default until the user picks it on the list.
+      startOnSourceList={model.setup.issuesChoice == null}
+      repository={model.setup.issuesRepo ?? model.setup.selectedRepo ?? undefined}
+      connecting={connecting}
       chrome={chrome}
       sphere={sphere}
       continueLabel={
