@@ -155,6 +155,38 @@ func (p *SeatPurchase) SettlementFor(periodStart *time.Time, seats *int, modifie
 	return "", false
 }
 
+// BlocksRenewalMaintenance reports that the purchase can still race a
+// next-period seat update on a subscription that the caller verified in
+// Polar. The caller passes the subscription and the period start of a Polar
+// snapshot that it read in this run, the current time, and how long a
+// purchase request can take to reach Polar.
+//
+// An in-flight purchase stops blocking only when all of these are true:
+//
+//   - The purchase request can no longer reach Polar: the submission window
+//     after the purchase passed.
+//   - A verified Polar snapshot with a period start exists.
+//   - The snapshot is on another subscription, or on a later period of the
+//     purchase subscription. The period of a keyed purchase ends at or
+//     before the verified period start. A purchase without a stored period
+//     closed its submission window before the verified period started.
+//
+// Elapsed time alone never releases the guard. The purchase keeps its status:
+// the release proves nothing about the charge.
+func (p *SeatPurchase) BlocksRenewalMaintenance(subscriptionID string, periodStart *time.Time, now time.Time, submissionWindow time.Duration) bool {
+	if !p.InFlight() {
+		return false
+	}
+	submissionClosedAt := p.CreatedAt.Add(submissionWindow)
+	if !now.After(submissionClosedAt) || periodStart == nil || subscriptionID == "" {
+		return true
+	}
+	if subscriptionID != p.PolarSubscriptionID {
+		return false
+	}
+	return !p.periodEndedBy(*periodStart, submissionClosedAt)
+}
+
 func (p *SeatPurchase) Create(tx *gorm.DB) error {
 	return tx.Create(p).Error
 }
@@ -215,6 +247,23 @@ func FindInFlightSeatPurchase(tx *gorm.DB, orgID uuid.UUID) (*SeatPurchase, erro
 	return &purchase, nil
 }
 
+// ListUnresolvedSeatPurchasesCreatedBefore returns the pending and unknown
+// purchases of all organizations that are not deleted and that started before
+// the cutoff, the oldest first. An organization has at most one such purchase.
+func ListUnresolvedSeatPurchasesCreatedBefore(tx *gorm.DB, cutoff time.Time) ([]SeatPurchase, error) {
+	var purchases []SeatPurchase
+	err := tx.
+		Where("status IN ?", []string{SeatPurchaseStatusPending, SeatPurchaseStatusUnknown}).
+		Where("created_at < ?", cutoff).
+		Where("organization_id IN (SELECT id FROM organizations WHERE deleted_at IS NULL)").
+		Order("created_at, id").
+		Find(&purchases).Error
+	if err != nil {
+		return nil, err
+	}
+	return purchases, nil
+}
+
 // FindLatestSeatPurchase returns the newest purchase of an organization, or nil.
 func FindLatestSeatPurchase(tx *gorm.DB, orgID uuid.UUID) (*SeatPurchase, error) {
 	var purchase SeatPurchase
@@ -271,4 +320,15 @@ func FindExpectedSeatCount(tx *gorm.DB, orgID uuid.UUID, subscriptionID string, 
 		return nil, err
 	}
 	return &purchase.ToSeats, nil
+}
+
+// periodEndedBy reports that the purchase period ended at or before a period
+// that starts at periodStart. A purchase without a stored period has only its
+// creation time: its period ended by then when the submission window closed
+// before that period started.
+func (p *SeatPurchase) periodEndedBy(periodStart, submissionClosedAt time.Time) bool {
+	if p.PeriodEnd != nil {
+		return !p.PeriodEnd.After(periodStart)
+	}
+	return periodStart.After(submissionClosedAt)
 }
