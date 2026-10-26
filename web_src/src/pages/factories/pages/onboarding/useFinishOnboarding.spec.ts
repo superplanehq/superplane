@@ -114,6 +114,7 @@ describe("provisionWorkspace", () => {
       createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
       listIntakes: vi.fn().mockResolvedValue([]),
       createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
+      updateIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
       deleteIntake: vi.fn().mockResolvedValue({}),
       listApps: vi.fn().mockResolvedValue([]),
       workspaceName: "Payments Service",
@@ -147,6 +148,24 @@ describe("provisionWorkspace", () => {
         }),
       );
       expect(createIntake).toHaveBeenCalledWith(expect.objectContaining({ skipInitialImport: true }));
+    },
+  );
+
+  it.each(["vcs", "jira", "linear"] as const)(
+    "starts the %s intake paused when automatic intake is off",
+    async (issuesChoice) => {
+      const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" });
+      await provisionWorkspace(
+        provisionArgs({
+          issuesChoice,
+          paused: true,
+          createIntake,
+          jira: { integrationId: "jira-1", projectId: "project-1" },
+          linear: { integrationId: "linear-1", projectIds: ["project-1"] },
+        }),
+      );
+      expect(createIntake).toHaveBeenCalledWith(expect.objectContaining({ paused: true }));
+      expect(createIntake).not.toHaveBeenCalledWith(expect.objectContaining({ skipInitialImport: true }));
     },
   );
 
