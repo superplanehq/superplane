@@ -21,11 +21,12 @@ var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
 
 // AgentStep is one ordered bash or prompt action for a fleet-runner agent node.
 type AgentStep struct {
-	Name             string  `mapstructure:"name"`
-	Type             string  `mapstructure:"type"`
-	Prompt           *string `mapstructure:"prompt,omitempty"`
-	Command          *string `mapstructure:"command,omitempty"`
-	WorkingDirectory string  `mapstructure:"workingDirectory,omitempty"`
+	Name             string   `mapstructure:"name"`
+	Type             string   `mapstructure:"type"`
+	Prompt           *string  `mapstructure:"prompt,omitempty"`
+	Command          *string  `mapstructure:"command,omitempty"`
+	WorkingDirectory string   `mapstructure:"workingDirectory,omitempty"`
+	Secrets          []string `mapstructure:"secrets,omitempty"`
 }
 
 func NormalizeAgentStepType(stepType string) string {
@@ -40,7 +41,6 @@ func ValidateAgentSteps(steps []AgentStep) error {
 		return fmt.Errorf("at least one step is required")
 	}
 
-	promptCount := 0
 	for i, step := range steps {
 		if strings.TrimSpace(step.Name) == "" {
 			return fmt.Errorf("steps[%d].name is required", i)
@@ -53,15 +53,22 @@ func ValidateAgentSteps(steps []AgentStep) error {
 			if step.Command == nil || strings.TrimSpace(*step.Command) == "" {
 				return fmt.Errorf("steps[%d].command is required for bash steps", i)
 			}
+			seenSecrets := make(map[string]struct{}, len(step.Secrets))
+			for j, secret := range step.Secrets {
+				name := strings.TrimSpace(secret)
+				if name == "" {
+					return fmt.Errorf("steps[%d].secrets[%d] is required", i, j)
+				}
+				if _, ok := seenSecrets[name]; ok {
+					return fmt.Errorf("steps[%d] has duplicate secret: %s", i, name)
+				}
+				seenSecrets[name] = struct{}{}
+			}
 		case AgentStepPrompt:
 			if step.Prompt == nil || strings.TrimSpace(*step.Prompt) == "" {
 				return fmt.Errorf("steps[%d].prompt is required for prompt steps", i)
 			}
-			promptCount++
 		}
-	}
-	if promptCount == 0 {
-		return fmt.Errorf("at least one prompt step is required")
 	}
 	return nil
 }

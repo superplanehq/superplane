@@ -118,7 +118,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-		created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds", DefaultOwnerID: r.User.String()})
 		require.NoError(t, err)
 		require.True(t, inserted)
 
@@ -127,6 +127,8 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.NotNil(t, persisted.Origin())
 		assert.Equal(t, "https://github.com/acme/payments/issues/12", persisted.Origin().URL)
 		assert.Equal(t, "acme/payments#12", persisted.Origin().Label)
+		require.Len(t, persisted.Assignees, 1)
+		assert.Equal(t, r.User, persisted.Assignees[0].UserID)
 	})
 
 	t.Run("rejects blank title", func(t *testing.T) {
@@ -619,29 +621,38 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateGitHubIssue(t *testing.T) 
 		return len(orders)
 	}
 
-	createFromPayload := func(t *testing.T, factoryModel *models.Factory, payload map[string]any) (*core.WorkOrder, bool) {
+	createFromPayload := func(t *testing.T, factoryModel *models.Factory, payload map[string]any) (*core.WorkOrder, bool, *models.CanvasNodeExecution) {
 		t.Helper()
 		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, payload)
 		_, err := factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
 		require.NoError(t, err)
 		order, created, err := NewFactoryContext(database.Conn(), canvas, nodeExecution).
-			CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+			CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds", DefaultOwnerID: r.User.String()})
 		require.NoError(t, err)
-		return order, created
+		return order, created, nodeExecution
 	}
 
 	t.Run("a second label on the same issue does not add a task", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		first, created := createFromPayload(t, factoryModel, issuePayload("labeled", "superplane", 12))
+		first, created, _ := createFromPayload(t, factoryModel, issuePayload("labeled", "superplane", 12))
 		require.True(t, created)
 		require.NotNil(t, first)
+		persisted, err := factoryModel.FindWorkOrder(database.Conn(), uuid.MustParse(first.ID))
+		require.NoError(t, err)
+		require.Len(t, persisted.Assignees, 1)
+		require.NoError(t, persisted.UpdateAssignees(database.Conn(), nil, r.User))
 
-		second, created := createFromPayload(t, factoryModel, issuePayload("labeled", "benchmark", 12))
+		second, created, duplicateExecution := createFromPayload(t, factoryModel, issuePayload("labeled", "benchmark", 12))
 		assert.False(t, created)
 		assert.Nil(t, second)
+		require.NoError(t, database.Conn().First(duplicateExecution, "id = ?", duplicateExecution.ID).Error)
+		assert.Equal(t, first.ID, duplicateExecution.Metadata.Data()["existing_task_id"])
 		assert.Equal(t, 1, countOrders(factoryModel))
+		persisted, err = factoryModel.FindWorkOrder(database.Conn(), persisted.ID)
+		require.NoError(t, err)
+		assert.Empty(t, persisted.Assignees, "a duplicate must not reapply the default after an explicit clear")
 	})
 
 	t.Run("a closed task does not stop a new task for the issue", func(t *testing.T) {
@@ -659,7 +670,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateGitHubIssue(t *testing.T) 
 		require.NoError(t, err)
 		require.NoError(t, database.Conn().Model(closed).Update("state", models.FactoryWorkOrderStateClosed).Error)
 
-		order, created := createFromPayload(t, factoryModel, issuePayload("reopened", "", 12))
+		order, created, _ := createFromPayload(t, factoryModel, issuePayload("reopened", "", 12))
 		require.True(t, created)
 		require.NotNil(t, order)
 		assert.Equal(t, 2, countOrders(factoryModel))
@@ -679,7 +690,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateGitHubIssue(t *testing.T) 
 		)
 		require.NoError(t, err)
 
-		order, created := createFromPayload(t, factoryModel, issuePayload("opened", "", 5))
+		order, created, _ := createFromPayload(t, factoryModel, issuePayload("opened", "", 5))
 		require.True(t, created)
 		require.NotNil(t, order)
 		assert.Equal(t, 2, countOrders(factoryModel))
@@ -2410,4 +2421,45 @@ func setupFactoryAppExecutionWithPayload(
 	require.NoError(t, database.Conn().Save(nodeExecution).Error)
 
 	return canvas, nodeExecution, run
+}
+
+func TestFactoryContextDefaultOwner(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	f, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	key, err := models.CreateAPIKey(database.Conn(), r.Organization.ID, support.RandomName("key"), nil, r.User, nil, nil)
+	require.NoError(t, err)
+	account, err := models.CreateAccount(support.RandomName("owner"), support.RandomName("owner")+"@example.com")
+	require.NoError(t, err)
+	member, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Delete(member).Error)
+	for _, tc := range []struct {
+		name, owner string
+		assigned    bool
+	}{
+		{name: "active member", owner: r.User.String(), assigned: true},
+		{name: "missing member", owner: uuid.NewString()},
+		{name: "removed member", owner: member.ID.String()},
+		{name: "non human", owner: key.ID.String()},
+		{name: "old configuration"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			canvas, execution, _ := setupFactoryAppExecution(t, r, f.ID)
+			ctx := NewFactoryContext(database.Conn(), canvas, execution)
+			order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: tc.name, DefaultOwnerID: tc.owner})
+			require.NoError(t, err)
+			require.True(t, created)
+			persisted, err := f.FindWorkOrder(database.Conn(), uuid.MustParse(order.ID))
+			require.NoError(t, err)
+			assert.Nil(t, persisted.CreatedBy)
+			if tc.assigned {
+				require.Len(t, persisted.Assignees, 1)
+				assert.Equal(t, r.User, persisted.Assignees[0].UserID)
+				return
+			}
+			assert.Empty(t, persisted.Assignees)
+		})
+	}
 }

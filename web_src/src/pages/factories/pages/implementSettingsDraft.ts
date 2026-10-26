@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SuperplaneComponentsNode } from "@/api-client";
 
 import {
@@ -95,8 +95,17 @@ function sameEditableSettings(left: ImplementSettingsDraft, right: ImplementSett
   );
 }
 
-export function useImplementSettingsDraft(nodes: SuperplaneComponentsNode[] | undefined, enabled: boolean) {
-  const agent = enabled ? nodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID) : undefined;
+function hasUnsavedSettings(draft: ImplementSettingsDraft): boolean {
+  return (
+    draft.durationInvalid ||
+    JSON.stringify(agentUpdateFromDraft(draft.agentBase, draft.agentDraft)) !== draft.savedAgent ||
+    (draft.pullRequestNode ? implementNodeSnapshot(draft.pullRequestNode) : undefined) !== draft.savedPullRequest
+  );
+}
+
+export function useImplementSettingsDraft(nodes: SuperplaneComponentsNode[] | undefined) {
+  const agent = nodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID);
+  const pullRequest = findImplementPullRequest(nodes ?? []);
   const [draft, setDraft] = useState<ImplementSettingsDraft | null>(() =>
     agent && nodes ? createImplementSettingsDraft(agent, nodes) : null,
   );
@@ -105,11 +114,12 @@ export function useImplementSettingsDraft(nodes: SuperplaneComponentsNode[] | un
   const draftRef = useRef<ImplementSettingsDraft | null>(draft);
   const savingRef = useRef(false);
 
-  if (agent && nodes && !draftRef.current) {
-    const initial = createImplementSettingsDraft(agent, nodes);
-    draftRef.current = initial;
-    setDraft(initial);
-  }
+  useEffect(() => {
+    if (!agent || savingRef.current || (draftRef.current && hasUnsavedSettings(draftRef.current))) return;
+    const incoming = createImplementSettingsDraft(agent, pullRequest ? [pullRequest] : []);
+    draftRef.current = incoming;
+    setDraft(incoming);
+  }, [agent, pullRequest]);
 
   const patchDraft = (patch: Partial<ImplementSettingsDraft>) => {
     if (!draftRef.current) return;

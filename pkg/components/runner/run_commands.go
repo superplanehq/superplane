@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -259,12 +260,7 @@ func (c *Runner) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if err := validateRunnerSpec(spec); err != nil {
-		return err
-	}
-
-	_, err = ctx.Webhook.Setup()
-	return err
+	return validateRunnerSpec(spec)
 }
 
 func (c *Runner) Execute(ctx core.ExecutionContext) error {
@@ -283,36 +279,24 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	}
 	environment := resolved.Variables
 
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("webhook setup: %w", err)
-	}
-
 	cmds := normalizeCommands(spec.Commands)
-
-	client, backend, err := NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
-	if err != nil {
-		return fmt.Errorf("new runner task client: %w", err)
-	}
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
-		Commands:       BrokerCommandsFromLines(cmds),
-		WebhookURL:     webhookURL,
+		Commands:       TaskCommandsFromLines(cmds),
 		Environment:    environment,
 		ExecutionMode:  mode,
 		DockerImage:    resolvedDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
-		Labels:         OriginLabelsForTask(ctx),
 	}
 
-	taskID, err := client.CreateTask(params)
+	taskID, err := CreateTask(ctx.RunnerTasks, params)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return afterRunnerTaskCreated(ctx, taskID, backend)
+	return afterRunnerTaskCreated(ctx, taskID)
 }
 
 func (c *Runner) Hooks() []core.Hook {
@@ -322,21 +306,21 @@ func (c *Runner) Hooks() []core.Hook {
 func (c *Runner) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case hookActionPoll:
-		return pollBrokerTask(ctx, RunnerFinishedEventType)
+		return pollTask(ctx, RunnerFinishedEventType)
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
 func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return handleBrokerWebhook(ctx, RunnerFinishedEventType)
+	return http.StatusNotFound, nil, nil
 }
 
-func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task, organizationID string) error {
-	return processBrokerTaskStatus(state, task, RunnerFinishedEventType, organizationID, nil, nil, nil)
+func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *core.RunnerTask, organizationID string) error {
+	return processTaskStatus(state, task, RunnerFinishedEventType, organizationID, nil, nil, nil)
 }
 
-func brokerResultAsAny(raw json.RawMessage) any {
+func taskResultAsAny(raw json.RawMessage) any {
 	b := bytes.TrimSpace(raw)
 	if len(b) == 0 || !json.Valid(b) {
 		return nil
@@ -349,7 +333,7 @@ func brokerResultAsAny(raw json.RawMessage) any {
 }
 
 func (c *Runner) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx, RunnerFinishedEventType)
+	return cancelTask(ctx, RunnerFinishedEventType)
 }
 
 func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }

@@ -17,7 +17,8 @@ const saveModels = vi.fn();
 const saveHostedModels = vi.fn();
 const switchSource = vi.fn();
 let canUpdate = true;
-let enabledFeatures: string[] = [];
+let enabledFeatures: string[] = ["organization_byok"];
+let productAllowed = true;
 let hostedModels: Array<{ key: string; label: string; provider: string }> = [];
 let selectedHostedModels: typeof hostedModels = [];
 
@@ -34,6 +35,24 @@ type BYOKQuery = {
 };
 
 const byokByProvider: Record<string, BYOKQuery> = {};
+
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  useOrganizationBilling: () => ({
+    data: { productFeatures: { byo_key: productAllowed } },
+    isSuccess: true,
+    isPending: false,
+  }),
+}));
+
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({
+    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+  }),
+}));
 
 vi.mock("@/hooks/usePageTitle", () => ({
   usePageTitle: vi.fn(),
@@ -129,7 +148,8 @@ function renderPage(agentHarness?: FactoryOnboardingAgentHarness) {
 describe("FactorySettingsOrganizationLLMModelsPage", () => {
   beforeEach(() => {
     canUpdate = true;
-    enabledFeatures = [];
+    enabledFeatures = ["organization_byok"];
+    productAllowed = true;
     hostedModels = [
       { key: "hosted::anthropic::claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6", provider: "anthropic" },
     ];
@@ -416,6 +436,26 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     await user.click(screen.getByRole("button", { name: "Use SuperPlane" }));
     expect(screen.getByRole("heading", { name: "Switch automations to SuperPlane?" })).toBeInTheDocument();
     expect(screen.queryByTestId("llm-models-switch-api-key")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
+    expect(switchSource).toHaveBeenCalledWith({ source: "hosted", apiKey: undefined });
+  });
+
+  it("hides provider controls when the product permission is denied", () => {
+    productAllowed = false;
+    renderPage("AGENT_HARNESS_SUPERPLANE");
+    expect(screen.queryByTestId("llm-models-connect-anthropic")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("llm-models-connect-custom")).not.toBeInTheDocument();
+  });
+
+  it.each(["rollout", "permission"])("switches an existing key to hosted models without BYOK %s", async (gate) => {
+    if (gate === "rollout") enabledFeatures = [];
+    if (gate === "permission") productAllowed = false;
+    setConnected("anthropic", ["claude-opus-4-6"]);
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+    expect(screen.queryByTestId("llm-models-provider-anthropic")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("llm-models-empty-banner")).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Use SuperPlane" }));
     await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
     expect(switchSource).toHaveBeenCalledWith({ source: "hosted", apiKey: undefined });
   });

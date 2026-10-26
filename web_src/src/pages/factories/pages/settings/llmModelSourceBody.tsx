@@ -86,9 +86,9 @@ export function ModelSourceBody({
           canUpdate={canUpdate}
           integrationsHref={integrationsHref}
         />
-      ) : (
+      ) : providers.length > 0 ? (
         <NoProviderNotice integrationsHref={integrationsHref} />
-      )}
+      ) : null}
       <div className="border-t border-border pt-4">{hostedModels}</div>
       <ChangeModelSource current={currentProvider} providers={providers} onChoose={onChoose} disabled={!canUpdate} />
     </div>
@@ -104,6 +104,7 @@ function ProviderChoices({
   onChoose: (target: LLMModelsSwitchTarget) => void;
   disabled: boolean;
 }) {
+  if (providers.length === 0) return null;
   return (
     <div className="space-y-3 border-t border-border pt-4" data-testid="llm-models-provider-choices">
       <div>

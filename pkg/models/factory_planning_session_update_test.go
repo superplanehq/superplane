@@ -52,6 +52,54 @@ func TestFactoryPlanningSession_ProposeUpdateWritesScoresSpecAndSurvey(t *testin
 	assert.Equal(t, "Which service?", session.CurrentSurvey().Questions[0].Prompt)
 }
 
+func TestFactoryPlanningSession_ProposeUpdateRejectsSurveyForReadyPlan(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-update-ready-survey-rejected")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
+	survey := &PlanningSessionSurvey{
+		Questions: []PlanningSessionSurveyQuestion{{
+			Prompt:  "Would you like to proceed with this plan?",
+			Options: []string{"Yes", "No"},
+		}},
+	}
+
+	err := session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 3, 3),
+		Spec:   "# Confirm billing plan deletion\n",
+		Survey: survey,
+	})
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	assert.Contains(t, err.Error(), "survey")
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	assert.Empty(t, checks)
+	spec, err := planningSpecBody(db, order)
+	require.NoError(t, err)
+	assert.Empty(t, spec)
+	assert.Empty(t, session.CurrentSurvey().Questions)
+
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 3, 3),
+		Spec:   "# Confirm billing plan deletion\n",
+	}))
+	err = session.ProposeUpdate(db, PlanningSessionUpdate{Survey: survey})
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	assert.Contains(t, err.Error(), "survey")
+	checks, err = order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 3)
+	for _, check := range checks {
+		assert.Equal(t, 3.0, check.Score)
+	}
+	spec, err = planningSpecBody(db, order)
+	require.NoError(t, err)
+	assert.Contains(t, spec, "Confirm billing plan deletion")
+	assert.Empty(t, session.CurrentSurvey().Questions)
+}
+
 func TestFactoryPlanningSession_ProposeUpdateWritesScoresAndSpecWhenWorkspaceIsHidden(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-update-hidden-workspace")
@@ -206,10 +254,10 @@ func TestAnalysisContinuationTextUsesProposeUpdateWhenReviewIsOn(t *testing.T) {
 
 	text, err := AnalysisContinuationText(db, session)
 	require.NoError(t, err)
-	assert.Contains(t, text, "Call propose_update with scores, spec, and survey in one call")
+	assert.Contains(t, text, "Call propose_update with scores and any updated spec in one call")
 	assert.Contains(t, text, "When every required score is 3")
 	assert.Contains(t, text, "include spec on propose_update")
-	assert.Contains(t, text, "Include survey on propose_update")
+	assert.Contains(t, text, "Omit survey when you do not ask a necessary question")
 	assert.Contains(t, text, "Current Clarity: 3/3")
 	assert.Contains(t, text, "Current Complexity: 2/3")
 	assert.Contains(t, text, "Current Verifiability: 3/3")

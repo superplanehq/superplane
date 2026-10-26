@@ -2,6 +2,7 @@ package superplane
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/components/runner/claude"
@@ -72,7 +73,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 ## Configuration
 - **Machine type**: Runner fleet available to the organization (required).
 - **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty. If the organization does not allow that model, SuperPlane uses another allowed model.
-- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Steps**: One or more ordered bash commands or agent prompts.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -97,6 +98,7 @@ func (c *RunSuperPlane) Configuration() []configuration.Field {
 			"git clone "+githubcommon.DotCom().CloneURL("org/repo")+" /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
+		runner.AgentAdditionalInstructionsField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(""),
 		runner.AgentSkipSetupCommandsField(),
@@ -117,11 +119,7 @@ func (c *RunSuperPlane) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	if err := validateRunSuperPlaneSpec(spec); err != nil {
-		return err
-	}
-	_, err = ctx.Webhook.Setup()
-	return err
+	return validateRunSuperPlaneSpec(spec)
 }
 
 func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
@@ -150,16 +148,6 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("webhook setup: %w", err)
-	}
-
-	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
-	if err != nil {
-		return fmt.Errorf("new runner task client: %w", err)
-	}
-
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
@@ -173,7 +161,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	}
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
-	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, dispatched.Steps, dispatched.Attachments)
+	commands, files, err := buildSuperPlaneTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, dispatched.Steps, dispatched.Attachments)
 	if err != nil {
 		return err
 	}
@@ -198,15 +186,13 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	taskID, err := client.CreateTask(runner.CreateTaskParams{
+	taskID, err := runner.CreateTask(ctx.RunnerTasks, runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       commands,
 		Files:          files,
-		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
-		Labels:         runner.OriginLabelsForTask(ctx),
 	})
 	if err != nil {
 		if runModel.Provider == models.UsageProviderOpenRouter {
@@ -214,7 +200,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		}
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
+	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
 func (c *RunSuperPlane) Hooks() []core.Hook {
@@ -223,17 +209,17 @@ func (c *RunSuperPlane) Hooks() []core.Hook {
 
 func (c *RunSuperPlane) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == runner.HookPoll {
-		return runner.PollBrokerTask(ctx, FinishedEventType)
+		return runner.PollTask(ctx, FinishedEventType)
 	}
 	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
 func (c *RunSuperPlane) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return runner.HandleBrokerWebhook(ctx, FinishedEventType)
+	return http.StatusNotFound, nil, nil
 }
 
 func (c *RunSuperPlane) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerTask(ctx, FinishedEventType)
+	return runner.CancelTask(ctx, FinishedEventType)
 }
 
 func (c *RunSuperPlane) Cleanup(ctx core.SetupContext) error { return nil }
@@ -274,10 +260,10 @@ func recordSuperPlaneRunOnConfiguration(configuration any, defaultModel core.Def
 }
 
 func injectSuperPlaneCredentials(
-	environment []runner.BrokerEnvironmentVariable,
+	environment []runner.TaskEnvironmentVariable,
 	provider string,
 	access core.HostedLLMAccess,
-) ([]runner.BrokerEnvironmentVariable, error) {
+) ([]runner.TaskEnvironmentVariable, error) {
 	switch provider {
 	case models.UsageProviderAnthropic:
 		return runner.InjectHostedCredentials(environment, envAnthropicAPIKey, access.APIKey, envAnthropicBaseURL, access.BaseURL), nil
@@ -290,16 +276,16 @@ func injectSuperPlaneCredentials(
 	}
 }
 
-func buildSuperPlaneBrokerTask(
+func buildSuperPlaneTask(
 	provider string,
 	spec RunSuperPlaneSpec,
 	model string,
 	usage string,
 	setups []runner.IntegrationSetup,
-	environment []runner.BrokerEnvironmentVariable,
+	environment []runner.TaskEnvironmentVariable,
 	dispatched []runner.AgentStep,
 	attachments []runner.TaskAttachment,
-) ([]runner.BrokerCommand, []runner.BrokerTaskFile, error) {
+) ([]runner.TaskCommand, []runner.TaskFile, error) {
 	switch provider {
 	case models.UsageProviderAnthropic:
 		claudeSpec := claude.RunClaudeCodeSpec{
@@ -344,10 +330,10 @@ func buildSuperPlaneBrokerTask(
 }
 
 func withPlanningSessionFiles(
-	commands []runner.BrokerCommand,
-	files []runner.BrokerTaskFile,
-	environment []runner.BrokerEnvironmentVariable,
-) ([]runner.BrokerCommand, []runner.BrokerTaskFile, error) {
+	commands []runner.TaskCommand,
+	files []runner.TaskFile,
+	environment []runner.TaskEnvironmentVariable,
+) ([]runner.TaskCommand, []runner.TaskFile, error) {
 	if runner.HasPlanningSessionToken(environment) {
 		files = runner.AppendPlanningSessionMCPFiles(files)
 	}

@@ -1,5 +1,5 @@
 ARG UBUNTU_VERSION=22.04
-ARG GO_VERSION=1.26.2
+ARG GO_VERSION=1.26.10
 ARG PLAYWRIGHT_GO_VERSION=v0.6100.0
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 
@@ -183,6 +183,7 @@ FROM ${RUNNER_IMAGE} AS runner
 
 ARG SUPERPLANE_VERSION=dev
 ARG SOURCE_REVISION=unknown
+ENV SUPERPLANE_VERSION=${SUPERPLANE_VERSION}
 
 LABEL org.opencontainers.image.title="superplane" \
   org.opencontainers.image.description="SuperPlane" \

@@ -277,6 +277,11 @@ func HandOffWorkOrder(
 				trackedPR.ID,
 			)
 		}
+		if trackedPR != nil {
+			if err := StartAutomaticCustomAutomations(ctx, deps, factory, order); err != nil {
+				log.WithError(err).Warnf("Failed to start custom automation for order %s", order.ID)
+			}
+		}
 		if err := messages.PublishFactoryWorkOrderUpdated(
 			factory.ID.String(),
 			order.ID.String(),

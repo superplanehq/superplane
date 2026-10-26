@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useOnboardingAutomaticIntakeChoice, useOnboardingInitialImportChoice } from "./onboardingInitialImportChoice";
 import { isAgentStepReady } from "./onboardingAgentReadiness";
 import {
   fixtureIssueCount,
@@ -101,6 +102,8 @@ export function useOnboardingSetupState(
     persistVcsHostKey?: string;
     /** Keeps the repository choice when the page reloads before that choice is saved. */
     persistRepoKey?: string;
+    /** Keeps the import and automatic intake choices across reloads and integration redirects for this workspace. */
+    persistInitialImportKey?: string;
   },
 ) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
@@ -124,6 +127,8 @@ export function useOnboardingSetupState(
   const [issuesRepo, setIssuesRepo] = useState<string | null>(() => options?.initial?.issuesRepo ?? null);
   const [issuesDiscovering, setIssuesDiscovering] = useState(false);
   const [issuesDiscovered, setIssuesDiscovered] = useState(() => Boolean(options?.initial?.issuesChoice));
+  const [skipInitialImport, setSkipInitialImport] = useOnboardingInitialImportChoice(options);
+  const [automaticIntake, setAutomaticIntake] = useOnboardingAutomaticIntakeChoice(options);
   const [issuesChoice, setIssuesChoice] = useState<IssuesChoiceId | null>(() => options?.initial?.issuesChoice ?? null);
   /** True after Continue to coding agent — starts backlog analysis. */
   const [issuesCommitted, setIssuesCommitted] = useState(false);
@@ -162,10 +167,8 @@ export function useOnboardingSetupState(
 
   const resetIssuesState = useCallback(() => {
     clearDiscoveryTimer();
-    setIssuesRepo(null);
     setIssuesDiscovering(false);
     setIssuesDiscovered(false);
-    setIssuesChoice(null);
     setIssuesCommitted(false);
   }, [clearDiscoveryTimer]);
 
@@ -176,30 +179,33 @@ export function useOnboardingSetupState(
       if (options?.persistVcsHostKey) writeOnboardingVcsHostChoice(options.persistVcsHostKey, host);
       rememberRepository(options?.persistRepoKey, null);
       setVcsHost(host);
+      setIssuesRepo((current) => (current === selectedRepo ? null : current));
       setSelectedRepo(null);
       setRepoCommitted(false);
       resetIssuesState();
     },
-    [options?.persistVcsHostKey, options?.persistRepoKey, vcsHost, resetIssuesState],
+    [options?.persistVcsHostKey, options?.persistRepoKey, vcsHost, selectedRepo, resetIssuesState],
   );
 
   const selectRepo = useCallback(
     (repo: string) => {
       rememberRepository(options?.persistRepoKey, repo);
+      setIssuesRepo((current) => (current === selectedRepo ? null : current));
       setSelectedRepo(repo);
       setRepoCommitted(false);
       resetIssuesState();
       suggestWorkspaceName(workspaceNameFromRepository(repo));
     },
-    [options?.persistRepoKey, resetIssuesState, suggestWorkspaceName],
+    [options?.persistRepoKey, resetIssuesState, suggestWorkspaceName, selectedRepo],
   );
 
   const clearRepository = useCallback(() => {
     rememberRepository(options?.persistRepoKey, null);
+    setIssuesRepo((current) => (current === selectedRepo ? null : current));
     setSelectedRepo(null);
     setRepoCommitted(false);
     resetIssuesState();
-  }, [options?.persistRepoKey, resetIssuesState]);
+  }, [options?.persistRepoKey, selectedRepo, resetIssuesState]);
 
   const commitRepoStep = useCallback(() => {
     setRepoCommitted(true);
@@ -291,6 +297,10 @@ export function useOnboardingSetupState(
     issuesDiscovered,
     startIssuesDiscovery,
     issuesChoice,
+    skipInitialImport,
+    setSkipInitialImport,
+    automaticIntake,
+    setAutomaticIntake,
     setIssuesChoice,
     issuesCommitted,
     commitIssuesStep,

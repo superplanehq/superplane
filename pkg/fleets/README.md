@@ -11,7 +11,10 @@ files with a `.json` extension and YAML files with a `.yml` or `.yaml`
 extension. The default file path is `/etc/superplane/fleet-manager.yaml`.
 
 `INSTALLATION_ADMIN_TOKEN` overrides `installationAdminToken` from either
-configuration source.
+configuration source. `FLEET_MANAGER_API_TOKEN` overrides that value when
+it is set. Single-host installations write the same generated token to
+both variables so current Fleet Manager releases can read it. The token
+has access only to the installation fleet API.
 
 Set the top-level `id` to a stable identifier for the Fleet Manager
 deployment. AWS and Azure providers apply it as the
@@ -26,9 +29,10 @@ tags. The legacy `superplane_managed_runner` tag is also reserved and omitted
 from new resources. A fleet can define at most 44 additional tags because EC2
 allows 50 tags per resource and Fleet Manager applies six reserved tags.
 
-Use a personal API token that belongs to an installation administrator. The
-Fleet Manager sends it as an HTTP bearer token. Runner instances receive only
-their short-lived registration token.
+Cloud installations use a personal API token that belongs to an installation
+administrator. Single-host installations use the generated fleet token.
+The Fleet Manager sends the token as an HTTP bearer token. Runner instances
+receive only their short-lived registration token.
 
 The local Compose service waits for owner setup and manages a development
 token automatically. It does not require `INSTALLATION_ADMIN_TOKEN`.
@@ -138,6 +142,42 @@ See `config.gcp.example.json` for a complete GCP fleet.
 Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich
 `superplane-runner-local:dev` image.
+
+Docker fleets can also configure the container process:
+
+| Field | Behavior |
+| --- | --- |
+| `docker.init` | Set `true` to add Docker's init process for signal forwarding and child process cleanup. |
+| `docker.user` | Override the image user with a username, UID, or `UID:GID`. An empty value keeps the image user. |
+| `docker.entrypoint` | Override the entrypoint with an executable and its arguments. An empty list keeps the image entrypoint. |
+
+Fleet Manager passes each entrypoint item as a separate argument. It appends
+the runner's `--url` and `--registration-token` arguments after the configured
+entrypoint arguments. It does not interpret shell expressions or remove
+empty arguments.
+
+For example, keep Docker's init process as root and run the released runner
+as `node` through `setpriv`:
+
+```yaml
+docker:
+  image: ghcr.io/superplanehq/runner:v0.2.1
+  architecture: amd64
+  network: superplane_default
+  runnerApiUrl: http://app:8000
+  init: true
+  user: "0:0"
+  entrypoint:
+    - /usr/bin/setpriv
+    - --reuid=node
+    - --regid=node
+    - --init-groups
+    - /usr/local/bin/runner
+```
+
+The init process runs as root. The runner and task commands use the image's
+`node` user. This configuration uses the released runner image without
+building another image.
 
 The runner sends OS, architecture, and hostname as registration fields. The
 server records the registration request's IP in the runner's `ip` field when available.

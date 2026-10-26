@@ -22,6 +22,7 @@ export interface IntakeSourceSettings {
   /** Show and apply the label chip list. Off means every issue matches. */
   filterByLabel: boolean;
   assignment: IntakeAssignmentFilter;
+  defaultOwnerId: string;
   /** Create a task when a GitHub issue is created. */
   newIssues: boolean;
   /** Create a task when a closed GitHub issue is re-opened. */
@@ -70,6 +71,7 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   labels: [],
   filterByLabel: false,
   assignment: "any",
+  defaultOwnerId: "",
   newIssues: true,
   reopenedIssues: true,
   superplaneLabelAdded: false,
@@ -362,6 +364,7 @@ export function intakeSettingsFromApi(
   const labels = settings?.labels ?? [];
   return {
     name,
+    defaultOwnerId: settings?.defaultOwnerId ?? "",
     confidencePct: settings?.confidencePct ?? DEFAULT_GITHUB_INTAKE_SETTINGS.confidencePct,
     labelFilterMode: settings?.labelFilterMode === "LABEL_FILTER_MODE_EXCLUDE" ? "exclude" : "include",
     labels,
@@ -400,6 +403,10 @@ export function githubIntakeLabelsForApi(settings: IntakeSourceSettings): string
   return [];
 }
 
+export function intakeSourceSupportsDefaultOwner(sourceId: string | undefined): boolean {
+  return sourceId === "github-issues" || sourceId === "sentry-exceptions";
+}
+
 export function intakeSettingsToApi(
   settings: IntakeSourceSettings,
   sourceId?: LineIntakeSourceId,
@@ -407,6 +414,7 @@ export function intakeSettingsToApi(
   const labels =
     sourceId === "github-issues" ? githubIntakeLabelsForApi(settings) : settings.filterByLabel ? settings.labels : [];
   return {
+    ...(intakeSourceSupportsDefaultOwner(sourceId) ? { defaultOwnerId: settings.defaultOwnerId } : {}),
     confidencePct: settings.confidencePct,
     labels,
     labelFilterMode: settings.labelFilterMode === "exclude" ? "LABEL_FILTER_MODE_EXCLUDE" : "LABEL_FILTER_MODE_INCLUDE",

@@ -53,6 +53,7 @@ type fakeFactoryContext struct {
 	updateResult     *core.PullRequestActivityResult
 	updateErr        error
 
+	createParams  core.WorkOrderParams
 	createCalls   int
 	createCreated bool
 	createOrder   *core.WorkOrder
@@ -71,7 +72,8 @@ func (f *fakeFactoryContext) GitHubHost() (string, error) {
 	return f.githubHost, f.vcsProviderErr
 }
 
-func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+func (f *fakeFactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+	f.createParams = params
 	f.createCalls++
 	if f.createErr != nil {
 		return nil, false, f.createErr
@@ -183,11 +185,12 @@ func TestCreateWorkOrder_Execute(t *testing.T) {
 		stateCtx := &contexts.ExecutionStateContext{}
 
 		err := component.Execute(core.ExecutionContext{
-			Configuration:  map[string]any{"title": "t"},
+			Configuration:  map[string]any{"title": "t", "defaultOwnerId": "member-1"},
 			ExecutionState: stateCtx,
 			Factory:        factoryCtx,
 		})
 		require.NoError(t, err)
+		assert.Equal(t, "member-1", factoryCtx.createParams.DefaultOwnerID)
 		assert.Equal(t, 1, factoryCtx.createCalls)
 		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 		assert.Equal(t, "workOrder.created", stateCtx.Type)

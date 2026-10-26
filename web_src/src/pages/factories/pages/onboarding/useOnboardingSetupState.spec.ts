@@ -11,6 +11,54 @@ describe("useOnboardingSetupState", () => {
     sessionStorage.clear();
   });
 
+  it("keeps the import choice through reloads without sharing it with another workspace", () => {
+    const mountSetup = (factoryId: string) =>
+      renderHook(() =>
+        useOnboardingSetupState("Payments", {
+          simulateDiscovery: false,
+          persistInitialImportKey: factoryId,
+          initial: { issuesChoice: "vcs" },
+        }),
+      );
+    const first = mountSetup("factory-1");
+    act(() => {
+      first.result.current.setSkipInitialImport(true);
+      first.result.current.commitIssuesStep();
+    });
+    first.unmount();
+
+    const resumed = mountSetup("factory-1");
+    expect(resumed.result.current.skipInitialImport).toBe(true);
+    const other = mountSetup("factory-2");
+    expect(other.result.current.skipInitialImport).toBe(false);
+    other.unmount();
+
+    act(() => resumed.result.current.setSkipInitialImport(false));
+    resumed.unmount();
+    const enabledAgain = mountSetup("factory-1");
+    expect(enabledAgain.result.current.skipInitialImport).toBe(false);
+  });
+
+  it("preserves intake and import choices when changing repositories", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        initial: { issuesChoice: "jira", issuesRepo: "acme/backlog" },
+      }),
+    );
+    act(() => {
+      result.current.setSkipInitialImport(true);
+      result.current.selectVcsHost("github");
+      result.current.selectRepo("acme/first");
+    });
+    act(() => result.current.selectRepo("acme/second"));
+    expect(result.current.issuesChoice).toBe("jira");
+    expect(result.current.issuesRepo).toBe("acme/backlog");
+    expect(result.current.skipInitialImport).toBe(true);
+    act(() => result.current.clearRepository());
+    expect(result.current.issuesChoice).toBe("jira");
+  });
+
   it("keeps a Bitbucket host when setup is created again before a repository is saved", () => {
     const first = renderHook(() =>
       useOnboardingSetupState("Payments", {
@@ -200,19 +248,23 @@ describe("useOnboardingSetupState", () => {
     expect(result.current.issueCount).toBeUndefined();
   });
 
-  it("clears the selected repository when the GitHub connection changes", () => {
+  it.each(["acme/payments", "acme/backlog"])("updates intake after an account switch with backlog %s", (backlog) => {
     const connected = new Set<IntegrationId>(["github"]);
-    const { result } = renderHook(() => useOnboardingSetupState("Payments", { connected, simulateDiscovery: false }));
-
-    act(() => {
-      result.current.selectVcsHost("github");
-      result.current.selectRepo("acme/payments");
-    });
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        connected,
+        simulateDiscovery: false,
+        initial: { vcsHost: "github", selectedRepo: "acme/payments", issuesRepo: backlog, issuesChoice: "vcs" },
+      }),
+    );
     expect(result.current.selectedRepo).toBe("acme/payments");
 
     act(() => result.current.clearRepository());
     expect(result.current.selectedRepo).toBeNull();
     expect(result.current.repoReady).toBe(false);
+    act(() => result.current.selectRepo("other/service"));
+    expect(result.current.summary.issuesRepo).toBe(backlog === "acme/payments" ? "other/service" : backlog);
+    expect(result.current.issuesChoice).toBe("vcs");
   });
 
   it("marks the agent step ready when remaining credit is greater than zero", () => {

@@ -104,10 +104,13 @@ describe("WorkOrderIntentDocument review metrics", () => {
     expect(metrics).toHaveTextContent("Existing tests cover the change.");
     expect(screen.queryByTestId("split-run-intent-composer-confidence-copy")).not.toBeInTheDocument();
     expect(confidence).toHaveAttribute("aria-expanded", "true");
+    expect(confidence).toHaveTextContent("Hide checks");
+    expect(confidence.querySelector(".lucide-chevron-down")).toHaveClass("rotate-180");
 
     await user.click(confidence);
     expect(confidence).toHaveAttribute("aria-expanded", "false");
     expect(confidence).toHaveTextContent("Show checks");
+    expect(confidence.querySelector(".lucide-chevron-down")).not.toHaveClass("rotate-180");
     expect(screen.queryByTestId("split-run-intent-review-metrics")).not.toBeInTheDocument();
 
     await user.click(confidence);
@@ -177,6 +180,7 @@ describe("WorkOrderIntentDocument review metrics", () => {
     expect(confidence).not.toHaveTextContent("3/3");
 
     expect(confidence).toHaveTextContent("Show checks");
+    expect(confidence.querySelector(".lucide-chevron-down")).not.toHaveClass("rotate-180");
     expect(confidence).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByTestId("split-run-intent-review-metrics")).not.toBeInTheDocument();
 

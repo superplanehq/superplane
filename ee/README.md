@@ -4,8 +4,12 @@ Code in this directory is subject to the SuperPlane Enterprise Edition License
 in [`LICENSE`](LICENSE). All other code is licensed under the Apache License,
 Version 2.0.
 
-SuperPlane is one binary. Enterprise code is always in the binary, but it runs
-only when the installation license grants its feature. For license sources,
+SuperPlane is one binary. Enterprise code is always in the binary. Licensed
+features run only when the installation license grants the feature. Billing
+code in `ee/billing` is covered by the Enterprise source license. Billing does
+not require an installation license or a runtime license feature. The server
+always installs the billing implementation, including when billing is disabled,
+so usage costs remain recorded. For installation license sources,
 verification, and the admin endpoints, see
 [`docs/contributing/enterprise-licensing.md`](../docs/contributing/enterprise-licensing.md).
 
@@ -13,11 +17,13 @@ verification, and the admin endpoints, see
 
 - Core code must not import `ee/`. Only `pkg/server` registers an Enterprise
   implementation.
+- Billing uses the interfaces in `pkg/billing` and the billing capability in
+  `pkg/enterprise`. It does not use the runtime license checks below.
 - `licensing.Service` answers whether a license grants a feature.
   `enterprise.Registry` answers which code runs. Keep those separate.
-- The core registers a Community implementation of each capability. It refuses
-  every Enterprise operation. `pkg/server` replaces that registration with the
-  `ee/` implementation.
+- For licensed capabilities, core registers a Community implementation that
+  refuses licensed operations. `pkg/server` replaces it with the EE implementation.
+  The billing capability has no fallback. A missing implementation is an error.
 - Check the license two times. Each `ee/` method checks the license, and the
   HTTP gateway rule checks `RequiredLicenseFeatures`. Do not remove one check
   because the other check exists.

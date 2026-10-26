@@ -77,10 +77,10 @@ func RevokeFactoryMCPClient(
 		if err != nil {
 			return err
 		}
-		if err := models.DeleteMCPOAuthRefreshTokensForClient(tx, orgID, factory.ID, locked.UserID, locked.ClientID); err != nil {
+		if err := models.DeleteMCPOAuthRefreshTokensForWorkspaceSet(tx, orgID, locked.UserID, locked.ClientID, locked.WorkspaceIDs()); err != nil {
 			return err
 		}
-		return models.DeleteMCPOAuthCodesForClient(tx, orgID, factory.ID, locked.UserID, locked.ClientID)
+		return models.DeleteMCPOAuthCodesForWorkspaceSet(tx, orgID, locked.UserID, locked.ClientID, locked.WorkspaceIDs())
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to revoke MCP client")
@@ -161,10 +161,11 @@ func serializeFactoryMCPClients(tx *gorm.DB, orgID uuid.UUID, tokens []models.MC
 	for i := range tokens {
 		token := tokens[i]
 		client := &pb.FactoryMCPClient{
-			Id:         token.ID.String(),
-			ClientName: mcpClientName(token.ClientID, clientsByID),
-			UserId:     token.UserID.String(),
-			CreatedAt:  timestamppb.New(token.CreatedAt),
+			Id:             token.ID.String(),
+			ClientName:     mcpClientName(token.ClientID, clientsByID),
+			UserId:         token.UserID.String(),
+			CreatedAt:      timestamppb.New(token.CreatedAt),
+			WorkspaceCount: token.WorkspaceCount(),
 		}
 		if user, ok := usersByID[token.UserID]; ok {
 			client.UserName = user.Name

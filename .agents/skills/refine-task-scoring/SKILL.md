@@ -53,13 +53,19 @@ Keep this task as one task. Do not create another task. Do not tell the user to 
 
 ## 5. Score Verifiability
 
-Verifiability is whether the run can prove the change works.
+Verifiability is whether the run can prove the change works against the agreed acceptance criteria.
 
-- 3: a test, a build, or another check the agent can run covers the change.
-- 2: a check the agent can run covers only part of the change.
-- 1: only a person can judge the result.
+- 3: checks the implementation agent can run cover all acceptance criteria.
+- 2: available checks verify part of the acceptance criteria. State what they cannot verify.
+- 1: no available check verifies a meaningful part of the outcome. Verification requires human judgment or evidence the agent cannot access.
 
-Missing tests alone drop Verifiability to 2 at most when the change is small and easy to check by hand.
+### Calibration
+
+Missing existing tests alone do not lower the score. Consider tests that the implementation agent can add and run.
+
+Follow the repository's testing requirements. Other checks can support verification, but must not replace required tests.
+
+Identify checks that the implementation agent can perform with the available tools and access. Put these checks in Acceptance. Assess what the checks can verify after implementation, not whether the planned change passes them now.
 
 ### Raise the scores through refinement
 

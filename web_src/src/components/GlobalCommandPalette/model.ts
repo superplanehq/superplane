@@ -23,7 +23,7 @@ export type CommandPaletteModel = {
   canvasId: string | null;
   canvasListProps: CanvasCommandListProps;
   canvasNodeSearchActions: PaletteAction[];
-  canManageInviteLink: boolean;
+  canInviteMembers: boolean;
   canReadAPIKeys: boolean;
   canReadIntegrations: boolean;
   currentCanvasName: string;
@@ -94,7 +94,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
 
 type PaletteData = {
   canCreateCanvas: boolean;
-  canManageInviteLink: boolean;
+  canInviteMembers: boolean;
   canReadAPIKeys: boolean;
   canReadCanvas: boolean;
   canReadIntegrations: boolean;
@@ -117,7 +117,7 @@ function useCommandPaletteData(
   const hasOrganization = organizationId !== null;
   const permissionState = usePalettePermissions(organizationId);
   const canCreateCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "create");
-  const canManageInviteLink = canUsePermission(hasOrganization, permissionState.canAct, "members", "create");
+  const canInviteMembers = canUsePermission(hasOrganization, permissionState.canAct, "members", "create");
   const canReadAPIKeys = canUsePermission(hasOrganization, permissionState.canAct, "api_keys", "read");
   const canReadCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "read");
   const canReadIntegrations = canUsePermission(hasOrganization, permissionState.canAct, "integrations", "read");
@@ -132,7 +132,7 @@ function useCommandPaletteData(
 
   return {
     canCreateCanvas,
-    canManageInviteLink,
+    canInviteMembers,
     canReadAPIKeys,
     canReadCanvas,
     canReadIntegrations,
@@ -261,7 +261,7 @@ function buildModel({
       provider: canvasNodeSearchProvider,
       query: search,
     }),
-    canManageInviteLink: data.canManageInviteLink,
+    canInviteMembers: data.canInviteMembers,
     canReadAPIKeys: data.canReadAPIKeys,
     canReadIntegrations: data.canReadIntegrations,
     currentCanvasName: data.currentCanvasName,
@@ -288,7 +288,7 @@ function buildModel({
     setPage,
     setSearch,
     settingsActions: buildOrganizationSettingsActions({
-      canAct: data.permissionState.canAct,
+      canAct: data.permissionState.hasPermission,
       goTo: navigation.goTo,
       organizationId,
     }),

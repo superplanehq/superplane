@@ -5,7 +5,7 @@ import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 
 import { PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS } from "../lib/columnCanvasAgent";
-import { agentCanvas, backlogCanvas, prFeedbackCanvas } from "./useColumnCanvasAgentEditor.testHelpers";
+import { backlogCanvas, prFeedbackCanvas } from "./useColumnCanvasAgentEditor.testHelpers";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 
 const hookState = vi.hoisted(() => ({
@@ -47,33 +47,17 @@ describe("useColumnCanvasAgentEditor", () => {
     expect(result.current.draft?.title).toBe("Refine Task");
   });
 
-  it("does not show the visual evidence setting for Implement", () => {
-    hookState.canvas.current = agentCanvas;
-
-    const { result, rerender } = renderHook(({ appId }) => useColumnCanvasAgentEditor("organization-1", appId), {
-      initialProps: { appId: "app-refund-implementer" },
-      wrapper: createWrapper(),
-    });
-
-    expect(result.current.showVisualEvidenceSetting).toBe(false);
-    hookState.canvas.current = backlogCanvas;
-    rerender({ appId: "backlog" });
-    expect(result.current.showVisualEvidenceSetting).toBe(false);
-  });
-
-  it("shows visual evidence for discussion feedback when requested", () => {
+  it("selects every discussion agent when synchronized node ids are set", () => {
     hookState.canvas.current = prFeedbackCanvas;
 
     const { result } = renderHook(
       () =>
         useColumnCanvasAgentEditor("organization-1", "pr-feedback", {
-          showVisualEvidenceSetting: true,
           synchronizedAgentNodeIds: PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS,
         }),
       { wrapper: createWrapper() },
     );
 
-    expect(result.current.showVisualEvidenceSetting).toBe(true);
     expect(result.current.agentNodeIds).toEqual([
       "address-pr-feedback",
       "address-pr-review-feedback",

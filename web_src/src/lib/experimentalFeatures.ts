@@ -13,12 +13,6 @@ export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 /** Organization experimental feature: Datadog Error Tracking intake from the Backlog column menu. */
 export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 
-/** Organization experimental feature: SuperPlane Agent page. */
-export const FEATURE_WORKSPACE_AGENT = "workspace_agent";
-
-/** Organization experimental feature: workspace MCP servers. */
-export const FEATURE_WORKSPACE_MCP = "workspace_mcp";
-
 /** Organization experimental feature: workspace skills. */
 export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 
@@ -28,7 +22,7 @@ export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
 /** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
 export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_custom_provider";
 
-/** Organization experimental feature: blank custom automations on Verify, Done, and phase columns. */
+/** Organization experimental feature: custom automations on Verify, Done, and phase columns. */
 export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
 
 /** Organization experimental feature: Mergeable chip on task cards and Merge button on pull request review. */
@@ -40,8 +34,8 @@ export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
 /** Organization experimental feature: scheduled task proposals in Backlog. */
 export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
 
-/** Organization experimental feature: new Implement run history and details. */
-export const FEATURE_FACTORY_RUN_HISTORY = "factory_run_history";
+/** Organization experimental feature: catalog billing and payment setup. */
+export const FEATURE_NEW_BILLING = "new_billing";
 
 /** Organization experimental feature: GitHub Enterprise Cloud (ghe.com) connections. */
 export const FEATURE_GITHUB_ENTERPRISE = "github_enterprise";

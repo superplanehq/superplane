@@ -37,14 +37,14 @@ blocks:
   - name: "Backend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
           # Only main stores these caches, so the keys carry no branch name.
           # See scripts/ci_cache_store_go.sh.
           - "cache restore go-mod-$(checksum go.sum),go-mod"
-          - "cache restore go-build-$(checksum go.sum),go-build"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
           - make dev.up
           - make dev.setup
       jobs:
@@ -73,6 +73,7 @@ blocks:
             - make check.proto.field.numbers
             - make check.configuration.fields
             - make check.grpc.actions.status
+            - make check.ee.imports
             - make check.models.tx.debt
             - make check.generated.artifacts
 
@@ -86,7 +87,7 @@ blocks:
   - name: "Security"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -115,12 +116,12 @@ blocks:
   - name: "Frontend Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
           - "cache restore go-mod-$(checksum go.sum),go-mod"
-          - "cache restore go-build-$(checksum go.sum),go-build"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
           - make dev.up
           - make dev.setup
       jobs:
@@ -159,7 +160,7 @@ blocks:
   - name: "Build Image"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       secrets:
         - name: ghcr-push-token
@@ -167,23 +168,13 @@ blocks:
       prologue:
         commands:
           - "cache restore go-mod-$(checksum go.sum),go-mod"
-          - "cache restore go-build-$(checksum go.sum),go-build"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
           - make dev.up
           - make dev.setup.npm
       jobs:
         - name: Build image
           commands:
             - bash scripts/build-image
-
-  - name: "Terraform"
-    dependencies: []
-    run:
-      when: "change_in('/release/terraform', {exclude: ['**/*.md'], default_branch: 'main'})"
-    task:
-      jobs:
-        - name: Format and validate
-          commands:
-            - make terraform.check
 
 after_pipeline:
   task:
@@ -241,4 +232,4 @@ promotions:
     pipeline_file: promote.yml
     deployment_target: production
     auto_promote:
-      when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"

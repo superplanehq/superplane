@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -9,12 +9,17 @@ import { organizationKeys } from "@/hooks/useOrganizationData";
 
 import { OrganizationScope } from "./App";
 
-const { organizationsDescribeOrganization } = vi.hoisted(() => ({
+const { organizationsDescribeOrganization, identifyOrganizationGroup } = vi.hoisted(() => ({
   organizationsDescribeOrganization: vi.fn(),
+  identifyOrganizationGroup: vi.fn(),
 }));
 
 vi.mock("@/api-client/sdk.gen", () => ({
   organizationsDescribeOrganization,
+}));
+
+vi.mock("@/posthog", () => ({
+  identifyOrganizationGroup,
 }));
 
 const accountContextValue: AccountContextType = {
@@ -45,6 +50,12 @@ function createQueryClient() {
 
 function hangOrganizationRequest() {
   organizationsDescribeOrganization.mockReturnValue(new Promise(() => undefined));
+}
+
+function resolveOrganization(organization: OrganizationsOrganization) {
+  organizationsDescribeOrganization.mockResolvedValue({
+    data: { organization },
+  });
 }
 
 function deferOrganizationDenial() {
@@ -94,6 +105,7 @@ describe("OrganizationScope", () => {
   beforeEach(() => {
     childRenderCount = 0;
     organizationsDescribeOrganization.mockReset();
+    identifyOrganizationGroup.mockReset();
     hangOrganizationRequest();
   });
 
@@ -167,6 +179,76 @@ describe("OrganizationScope", () => {
     } as OrganizationsOrganization);
 
     expect(screen.getByText("Org home: org-uid-123")).toBeInTheDocument();
+  });
+
+  it("identifies a resolved organization with its id, not the URL slug", async () => {
+    const organization = {
+      metadata: { id: "org-uid-123", name: "Acme", slug: "acme" },
+    } as OrganizationsOrganization;
+    resolveOrganization(organization);
+    renderScope("/acme", organization);
+
+    await waitFor(() => {
+      expect(identifyOrganizationGroup).toHaveBeenCalledWith({
+        id: "org-uid-123",
+        name: "Acme",
+        slug: "acme",
+      });
+    });
+    expect(identifyOrganizationGroup).not.toHaveBeenCalledWith(expect.objectContaining({ id: "acme" }));
+  });
+
+  it("publishes the refreshed organization name, not a stale cached name", async () => {
+    resolveOrganization({
+      metadata: { id: "org-uid-123", name: "New Name", slug: "acme" },
+    } as OrganizationsOrganization);
+    renderScope("/acme", {
+      metadata: { id: "org-uid-123", name: "Old Name", slug: "acme" },
+    } as OrganizationsOrganization);
+
+    expect(identifyOrganizationGroup).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(identifyOrganizationGroup).toHaveBeenCalledWith({
+        id: "org-uid-123",
+        name: "New Name",
+        slug: "acme",
+      });
+    });
+    expect(identifyOrganizationGroup).not.toHaveBeenCalledWith(expect.objectContaining({ name: "Old Name" }));
+  });
+
+  it("does not identify the organization group during a support session", async () => {
+    let resolveRequest: (value: { data: { organization: OrganizationsOrganization } }) => void = () => undefined;
+    const request = new Promise<{ data: { organization: OrganizationsOrganization } }>((resolve) => {
+      resolveRequest = resolve;
+    });
+    organizationsDescribeOrganization.mockReturnValue(request);
+    renderScope(
+      "/acme",
+      {
+        metadata: { id: "org-uid-123", name: "Acme", slug: "acme" },
+      } as OrganizationsOrganization,
+      createQueryClient(),
+      {
+        ...accountContextValue,
+        account: {
+          id: "account-1",
+          support_session: { active: true },
+        } as AccountContextType["account"],
+      },
+    );
+
+    expect(identifyOrganizationGroup).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveRequest({
+        data: {
+          organization: {
+            metadata: { id: "org-uid-123", name: "Acme", slug: "acme" },
+          } as OrganizationsOrganization,
+        },
+      });
+    });
+    expect(identifyOrganizationGroup).not.toHaveBeenCalled();
   });
 
   it("redirects reserved segments home instead of treating them as an organization", () => {

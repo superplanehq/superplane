@@ -33,26 +33,23 @@ func TestAdminDashboard(t *testing.T) {
 		steps.assertOrganizationVisible("e2e-org")
 	})
 
-	t.Run("admin user can start and end impersonation", func(t *testing.T) {
+	t.Run("admin user can start and end a read-only support session", func(t *testing.T) {
 		steps := &adminSteps{t: t}
 		steps.start()
-		steps.createImpersonationTarget()
+		steps.createSupportSessionTarget()
 		steps.promoteToAdmin()
 		steps.session.Login()
 
-		// Navigate to admin accounts page
 		steps.session.Visit("/admin/accounts")
 		steps.session.Sleep(500)
 
-		// Start impersonation on the other user
-		steps.clickImpersonate()
+		steps.clickStartSupportSession()
 		steps.session.Sleep(2000)
 
-		// Should land on org selector with the impersonation banner
-		steps.assertImpersonationBannerVisible()
+		steps.assertSupportSessionBannerVisible()
+		steps.assertServerRejectsWrites()
 
-		// End impersonation by clicking Exit
-		steps.clickExitImpersonation()
+		steps.clickEndSupportSession()
 		steps.session.Sleep(2000)
 
 		// Should be back on admin page
@@ -66,6 +63,7 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Login()
 		steps.session.Visit("/admin/settings")
 		steps.assertOnInstallationSettingsPage()
+		steps.openNetworkSettings()
 		steps.enablePrivateNetworkAccess()
 		steps.saveInstallationSettings()
 		steps.assertPrivateNetworkAccessEnabled()
@@ -78,6 +76,7 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Login()
 		steps.session.Visit("/admin/settings")
 		steps.assertOnInstallationSettingsPage()
+		steps.openEmailSettings()
 		steps.assertSMTPSettingsSaveDisabled()
 		steps.enableSMTPSettings()
 		steps.fillInSMTPSettings("smtp.example.com", "587", "smtp-user", "smtp-pass", "SuperPlane", "noreply@example.com", true)
@@ -122,7 +121,7 @@ func (s *adminSteps) start() {
 	s.session.Start()
 }
 
-func (s *adminSteps) createImpersonationTarget() {
+func (s *adminSteps) createSupportSessionTarget() {
 	account, err := models.CreateAccount("Other User", "other@superplane.local")
 	require.NoError(s.t, err)
 	_, err = models.CreateUser(s.session.OrgID, account.ID, account.Email, account.Name)
@@ -147,22 +146,52 @@ func (s *adminSteps) assertOrganizationVisible(name string) {
 	s.session.AssertText(name)
 }
 
-func (s *adminSteps) clickImpersonate() {
-	s.session.Click(q.Text("Impersonate"))
+func (s *adminSteps) clickStartSupportSession() {
+	s.session.Click(q.Text("Start support session"))
 }
 
-func (s *adminSteps) assertImpersonationBannerVisible() {
-	s.session.AssertText("You are viewing as")
-	s.session.AssertText("Exit Impersonation")
+func (s *adminSteps) assertSupportSessionBannerVisible() {
+	s.session.AssertText("Support session for")
+	s.session.AssertText("This session is read-only.")
+	s.session.AssertText("End support session")
 }
 
-func (s *adminSteps) clickExitImpersonation() {
-	s.session.Click(q.Text("Exit Impersonation"))
+// XMLHttpRequest bypasses the fetch guard in the UI, so the request
+// reaches the server with the support session cookie.
+func (s *adminSteps) assertServerRejectsWrites() {
+	const organizationName = "support-session-write"
+	status, err := s.session.Page().Evaluate(`(name) => new Promise((resolve) => {
+		const xhr = new XMLHttpRequest();
+		xhr.open("POST", "/organizations");
+		xhr.setRequestHeader("Content-Type", "application/json");
+		xhr.onload = () => resolve(xhr.status);
+		xhr.onerror = () => resolve(0);
+		xhr.send(JSON.stringify({ name }));
+	})`, organizationName)
+	require.NoError(s.t, err)
+	assert.EqualValues(s.t, 403, status)
+
+	var count int64
+	require.NoError(s.t, database.Conn().Model(&models.Organization{}).Where("name = ?", organizationName).Count(&count).Error)
+	assert.Zero(s.t, count)
+}
+
+func (s *adminSteps) clickEndSupportSession() {
+	s.session.Click(q.Text("End support session"))
 }
 
 func (s *adminSteps) assertOnInstallationSettingsPage() {
 	s.session.AssertText("Installation Settings")
+	s.session.AssertText("Reset one automation")
+}
+
+func (s *adminSteps) openNetworkSettings() {
+	s.session.Click(q.Locator("role=tab[name='Network']"))
 	s.session.AssertText("Private network access")
+}
+
+func (s *adminSteps) openEmailSettings() {
+	s.session.Click(q.Locator("role=tab[name='Email']"))
 	s.session.AssertText("SMTP configuration")
 }
 

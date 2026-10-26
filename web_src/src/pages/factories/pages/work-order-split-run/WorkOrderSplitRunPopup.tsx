@@ -21,7 +21,7 @@ import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
-import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
+import { useAnalysisPlanningSession, planningSessionCanStart } from "./useAnalysisPlanningSession";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
@@ -29,6 +29,7 @@ import { AnalysisPopupHeader, LoadingWorkOrderPopup } from "./workOrderPopupHead
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled } from "../planningSettingsModel";
 import { PopupShell } from "../work-order-popup-redesign/popupShared";
+import { useWorkOrderStartFooter } from "./useWorkOrderStartFooter";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -67,6 +68,12 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     workOrderId: orderId,
     enabled: canLookupSession,
     canUpdate,
+    refinementCanStart: planningSessionCanStart({
+      factoryLoaded: Boolean(factoryQuery.data),
+      planningEnabled: refinementEnabled,
+      isDraft: fixture.footer.kind === "draft",
+      analysisActive: isAnalyzing,
+    }),
     isUploading: fileUpload.isUploading,
     uploadFiles: fileUpload.uploadFiles,
     analysisDelivered: analysisFirstResultDelivered({
@@ -107,6 +114,7 @@ function AnalysisWorkOrderPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
+  manualCustomAutomations,
   analysis,
   popupData,
   titlePrefix,
@@ -123,15 +131,18 @@ function AnalysisWorkOrderPopup({
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
+  const { sourceOnly, viewFixture: originalViewFixture } = analysisPopupView(fixture, factory);
+  const footer = useWorkOrderStartFooter(originalViewFixture.footer, organizationId, factoryId, fixture.lineName);
+  const viewFixture = { ...originalViewFixture, footer };
+  const startAllowed = canDispatch && !footer.actions.some((action) => action.kind === "start" && action.disabled);
   const draftStart = draftStartAction(
     fixture.footer.kind,
-    onDispatch,
+    startAllowed ? onDispatch : undefined,
     draftModel,
     factoryPlanningEnabled(factory) ? draftThinking : undefined,
   );
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
-  const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
   const unified = refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
     factory,
@@ -147,7 +158,7 @@ function AnalysisWorkOrderPopup({
       setDraftModel(model);
       setDraftThinking(thinkingLevel);
     },
-    disabled: isDispatching || !canDispatch,
+    disabled: isDispatching || !startAllowed,
   });
   const reviewArgs = analysisReviewArgs({
     viewFixture,
@@ -162,7 +173,7 @@ function AnalysisWorkOrderPopup({
     mutations,
     isDispatching,
     footerBusy: footerActions.busy,
-    canDispatch,
+    canDispatch: startAllowed,
     compact: analysisReviewCompact(showSidebarNote, viewFixture.footer.kind, sourceOnly),
     modelSelect: draftChrome.footerModelSelect,
     factory,
@@ -193,6 +204,7 @@ function AnalysisWorkOrderPopup({
           orderNumber={orderNumber}
           lineId={lineId}
           canUpdate={canUpdate}
+          manualCustomAutomations={manualCustomAutomations}
           footerActions={footerActions}
           resultFooter={descriptionReview}
           sidebarNote={!unified && showSidebarNote ? review : undefined}
@@ -343,6 +355,7 @@ function analysisPopupReview(args: {
       onStart={args.draftStart}
       onArchive={args.mutations.onArchive}
       onReject={args.mutations.onReject}
+      onContinueFixes={args.mutations.onContinueFixes}
       onStop={args.mutations.onStop}
       startBusy={args.isDispatching}
       actionBusy={args.footerBusy}

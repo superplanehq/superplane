@@ -547,20 +547,16 @@ func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
 }
 
 func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {
-	var task RunnerTask
-	err := tx.Where("runner_id = ? AND state = ?", runnerID, RunnerTaskStateReserved).
-		First(&task).
-		Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	return tx.Model(&task).Updates(map[string]any{
-		"runner_id":   nil,
-		"state":       RunnerTaskStateQueued,
-		"reserved_at": nil,
-		"updated_at":  now,
-	}).Error
+	// Read cancellation in the update so a concurrent request cannot leave a
+	// canceled reservation queued without a runner to finish it.
+	return tx.Model(&RunnerTask{}).
+		Where("runner_id = ? AND state = ?", runnerID, RunnerTaskStateReserved).
+		Updates(map[string]any{
+			"runner_id": nil,
+			"state": gorm.Expr("CASE WHEN cancel_requested_at IS NULL THEN ? ELSE ? END",
+				RunnerTaskStateQueued, RunnerTaskStateCanceled),
+			"finished_at": gorm.Expr("CASE WHEN cancel_requested_at IS NOT NULL THEN ? ELSE finished_at END", now),
+			"reserved_at": nil,
+			"updated_at":  now,
+		}).Error
 }

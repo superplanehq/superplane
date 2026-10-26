@@ -7,7 +7,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 )
 
-func hasRequiredScopedTokenPermissionForScopes(
+// HasRequiredScopedTokenPermissionForScopes checks the scopes against an authorization rule.
+func HasRequiredScopedTokenPermissionForScopes(
 	tokenScopesJSON string,
 	pathParams map[string]string,
 	rule AuthorizationRule,

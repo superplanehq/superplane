@@ -8,9 +8,9 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -121,15 +121,15 @@ func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offse
 	for i, organization := range organizations {
 		ids[i] = organization.ID
 	}
-	remaining, err := RemainingHostedCreditMicros(tx, ids)
+	remaining, err := billing.RemainingCreditMicros(tx, ids)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	descending := sortDirection != "asc"
 	sort.SliceStable(organizations, func(i, j int) bool {
-		left := pricebook.MicrosToCents(remaining[organizations[i].ID])
-		right := pricebook.MicrosToCents(remaining[organizations[j].ID])
+		left := billing.MicrosToCents(remaining[organizations[i].ID])
+		right := billing.MicrosToCents(remaining[organizations[j].ID])
 		if left != right {
 			if descending {
 				return left > right
@@ -264,6 +264,16 @@ func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
 	}
 }
 
+// ListOrganizations returns every organization that is not deleted.
+func ListOrganizations(tx *gorm.DB) ([]Organization, error) {
+	var organizations []Organization
+	err := tx.Order("name ASC").Order("id ASC").Find(&organizations).Error
+	if err != nil {
+		return nil, err
+	}
+	return organizations, nil
+}
+
 func ListOrganizationsByIDs(ids []string) ([]Organization, error) {
 	var organizations []Organization
 
@@ -288,6 +298,23 @@ func FindOrganizationByIDInTransaction(tx *gorm.DB, id string) (*Organization, e
 	organization := Organization{}
 
 	err := tx.
+		Where("id = ?", id).
+		First(&organization).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &organization, nil
+}
+
+// FindOrganizationByIDIncludingDeleted finds an organization that can be soft-deleted.
+func FindOrganizationByIDIncludingDeleted(tx *gorm.DB, id string) (*Organization, error) {
+	organization := Organization{}
+
+	err := tx.
+		Unscoped().
 		Where("id = ?", id).
 		First(&organization).
 		Error
@@ -326,6 +353,9 @@ func CreateOrganization(name, description string) (*Organization, error) {
 }
 
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
+	if _, err := billing.Current(); err != nil {
+		return nil, err
+	}
 	slug, err := GenerateUniqueOrganizationSlug(tx, name, uuid.Nil)
 	if err != nil {
 		return nil, err
@@ -339,7 +369,6 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub},
 		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{
 			features.FeatureFactories,
-			features.FeatureWorkspaceAgent,
 		},
 		CreatedAt: &now,
 		UpdatedAt: &now,
@@ -351,14 +380,8 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		Error
 
 	if err == nil {
-		_, inviteErr := CreateInviteLink(tx, organization.ID)
-		if inviteErr != nil {
-			return nil, inviteErr
-		}
-		if BillingEnabled() {
-			if _, planErr := EnsureOrganizationBillingPlan(tx, organization.ID); planErr != nil {
-				return nil, planErr
-			}
+		if err := billing.InitializeOrganization(tx, organization.ID); err != nil {
+			return nil, err
 		}
 
 		return &organization, nil
@@ -392,15 +415,41 @@ func ListOrganizationsCreatedByAccount(tx *gorm.DB, accountID uuid.UUID) ([]Orga
 	return organizations, err
 }
 
+// SoftDeleteOrganization deletes an organization whose stored billing row
+// cannot bill. It refuses an organization that needs Polar verification.
 func SoftDeleteOrganization(id string) error {
 	return SoftDeleteOrganizationInTransaction(database.Conn(), id)
 }
 
 func SoftDeleteOrganizationInTransaction(tx *gorm.DB, id string) error {
-	return tx.
-		Where("id = ?", id).
-		Delete(&Organization{}).
-		Error
+	return tx.Transaction(func(inner *gorm.DB) error {
+		organization, err := FindOrganizationByIDInTransaction(inner, id)
+		if err != nil {
+			return err
+		}
+		guard, err := billing.LocalDeletionGuard(inner, organization.ID)
+		if err != nil {
+			return err
+		}
+		return organization.SoftDelete(inner, guard)
+	})
+}
+
+// SoftDelete validates the prepared billing snapshot under the organization lock.
+// The caller prepares provider verification before it opens the transaction.
+func (o *Organization) SoftDelete(tx *gorm.DB, guard billing.DeletionGuard) error {
+	if guard == nil {
+		return billing.ErrOrganizationSubscriptionUnverified
+	}
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if _, err := LockOrganization(inner, o.ID); err != nil {
+			return err
+		}
+		if err := guard.Validate(inner, o.ID); err != nil {
+			return err
+		}
+		return inner.Delete(o).Error
+	})
 }
 
 func HardDeleteOrganization(id string) error {

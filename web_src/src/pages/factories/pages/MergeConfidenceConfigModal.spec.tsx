@@ -7,24 +7,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
-import { organizationKeys } from "@/hooks/useOrganizationData";
-import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
-import {
-  FEATURE_FACTORY_RUN_HISTORY,
-  FEATURE_WORKSPACE_MCP,
-  FEATURE_WORKSPACE_SKILLS,
-} from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import {
-  confidenceGraph,
+  confidenceGraph as riskScoreGraph,
   implementConfigGraph,
   issueGraph,
   mergeConfidenceAvailableIntegrations,
 } from "./MergeConfidenceConfigModal.spec.fixtures";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
+import { MERGE_CONFIDENCE_CHECKS } from "./mergeConfidenceChecks";
+import { renderModal } from "./MergeConfidenceConfigModal.spec.helpers";
+
+// The shell also hosts split canvas settings for other column automations.
+function confidenceGraph() {
+  return riskScoreGraph("on-pr-feedback");
+}
 
 const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
   useInfiniteCanvasRuns: vi.fn(),
@@ -91,46 +91,6 @@ function emptyRunsQuery() {
   };
 }
 
-function renderModal(
-  onDelete: () => void = vi.fn(),
-  onSaveNode = vi.fn(),
-  graph: IntakeAutomationGraph = confidenceGraph(),
-  options: { initialNodeId?: string; runHistoryEnabled?: boolean; onClose?: () => void } = {},
-) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const features = [FEATURE_FACTORY_RUN_HISTORY, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
-  client.setQueryData(experimentalFeaturesKeys.registry(), {
-    features: features.map((id) => ({ id, released: false })),
-  });
-  if (graph.organizationId) {
-    client.setQueryData(organizationKeys.details(graph.organizationId), {
-      spec: { enabledExperimentalFeatures: options.runHistoryEnabled ? features : [] },
-    });
-  }
-  const element = (nextGraph: IntakeAutomationGraph = graph) => (
-    <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <ThemeProvider>
-          <TooltipProvider>
-            <MergeConfidenceConfigModal
-              title="Merge confidence"
-              graph={nextGraph}
-              canvasId="merge-confidence"
-              onClose={options.onClose ?? vi.fn()}
-              onSaveNode={onSaveNode}
-              onDelete={onDelete}
-              initialNodeId={options.initialNodeId}
-              factoryKey="SUPER"
-            />
-          </TooltipProvider>
-        </ThemeProvider>
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
-  const view = render(element());
-  return { ...view, rerenderGraph: (nextGraph: IntakeAutomationGraph) => view.rerender(element(nextGraph)) };
-}
-
 beforeEach(() => {
   useInfiniteCanvasRuns.mockReturnValue(emptyRunsQuery());
 });
@@ -140,7 +100,51 @@ afterEach(() => {
 });
 
 describe("MergeConfidenceConfigModal", () => {
-  it.each([true, false])("gates the Implement configuration layout with factory_run_history=%s", async (enabled) => {
+  it.each(["github.onPullRequest", "bitbucket.onPullRequest"])(
+    "shows score settings and retains the run list for %s",
+    async (triggerComponent) => {
+      const graph = riskScoreGraph();
+      graph.organizationId = "org-1";
+      graph.specNodes![0].component = triggerComponent;
+      graph.specNodes![1].configuration = {
+        model: "sonnet",
+        executionTimeoutSeconds: 3600,
+        steps: MERGE_CONFIDENCE_CHECKS.map((id) => ({
+          name: id,
+          type: "prompt",
+          prompt: `Merge check: ${id}.\nCheck rules.`,
+        })),
+      };
+      graph.specNodes![1].concurrency = { max: 5, key: "pr" };
+      const user = userEvent.setup();
+      const view = renderModal(vi.fn(), vi.fn(), graph);
+      expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
+      for (const label of ["Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"]) {
+        expect(screen.getByRole("switch", { name: label })).toBeChecked();
+      }
+      expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
+      expect(screen.getByText("The model used for each run.")).toBeInTheDocument();
+      expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(5);
+      const duration = screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" });
+      expect(duration).toHaveValue(60);
+      expect(duration.compareDocumentPosition(screen.getByRole("switch", { name: "Blast radius" }))).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(screen.queryByRole("textbox", { name: "Additional instructions" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Steps" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("switch", { name: "Security" }));
+      await user.click(screen.getByRole("tab", { name: "Runs" }));
+      expect(screen.getByTestId("implement-run-history")).toBeInTheDocument();
+      expect(screen.queryByTestId("merge-confidence-settings")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("tab", { name: "Configuration" }));
+      expect(screen.getByRole("switch", { name: "Security" })).not.toBeChecked();
+      view.rerenderGraph({ ...graph, specNodes: structuredClone(graph.specNodes) });
+      expect(screen.getByRole("switch", { name: "Security" })).not.toBeChecked();
+    },
+  );
+
+  it("saves Implement configuration without an experimental feature", async () => {
     const user = userEvent.setup();
     let finishSave = () => {};
     const saving = new Promise<void>((resolve) => {
@@ -151,85 +155,69 @@ describe("MergeConfidenceConfigModal", () => {
     const steps = [{ name: "Implementation", type: "prompt", prompt: "Built-in implementation instructions" }];
     const graph = implementConfigGraph(steps);
     const view = renderModal(vi.fn(), onSaveNode, graph, {
-      runHistoryEnabled: enabled,
       initialNodeId: "implementation-agent-no-issue",
       onClose,
     });
 
-    expect(Boolean(screen.queryByTestId("merge-confidence-config-canvas"))).toBe(!enabled);
-    expect(Boolean(screen.queryByRole("region", { name: "Steps" }))).toBe(!enabled);
-    expect(Boolean(screen.queryByRole("button", { name: "Collapse step" }))).toBe(!enabled);
+    expect(Boolean(screen.queryByTestId("merge-confidence-config-canvas"))).toBe(false);
+    expect(Boolean(screen.queryByRole("region", { name: "Steps" }))).toBe(false);
+    expect(Boolean(screen.queryByRole("button", { name: "Collapse step" }))).toBe(false);
     expect(screen.getByDisplayValue("sonnet")).toBeInTheDocument();
-    const concurrency = screen.getByRole("spinbutton", { name: enabled ? "Maximum simultaneous runs" : "Concurrency" });
+    const concurrency = screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" });
     expect(concurrency).toHaveValue(5);
     await user.clear(concurrency);
     await user.type(concurrency, "3");
     await user.tab();
 
-    if (enabled) {
-      expect(onSaveNode).not.toHaveBeenCalled();
-      expect(screen.queryByRole("navigation", { name: "Automation settings" })).not.toBeInTheDocument();
-      expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
-      expect(screen.queryByRole("textbox", { name: /^Name/ })).not.toBeInTheDocument();
-      expect(screen.queryByText("Key")).not.toBeInTheDocument();
-      expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "MCP servers" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Skills" })).not.toBeInTheDocument();
-      expect(screen.queryByText("Start implementation")).not.toBeInTheDocument();
-      expect(screen.queryByText("Implement From Task Description")).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Add step" })).not.toBeInTheDocument();
-      expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "false");
-      const draftPullRequest = screen.getByRole("switch", { name: "Create draft pull requests" });
-      expect(draftPullRequest).toBeChecked();
-      await user.click(draftPullRequest);
-      expect(draftPullRequest).not.toBeChecked();
-      expect(onSaveNode).not.toHaveBeenCalled();
-      await user.click(screen.getByRole("tab", { name: "Runs" }));
-      expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
-      expect(screen.queryByRole("group", { name: "Default model" })).not.toBeInTheDocument();
-      await user.click(screen.getByRole("tab", { name: "Configuration" }));
-      expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(3);
-      expect(screen.getByRole("switch", { name: "Create draft pull requests" })).not.toBeChecked();
-      view.rerenderGraph(implementConfigGraph(steps));
-      expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(3);
-      expect(onSaveNode).not.toHaveBeenCalled();
-      const save = screen.getByTestId("implement-settings-save");
-      await user.click(save);
-      expect(save).toHaveTextContent("Saving");
-      expect(save).toBeDisabled();
-      expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeDisabled();
-      expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toBeDisabled();
-      await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(1));
-      finishSave();
-      await waitFor(() => expect(onClose).toHaveBeenCalled());
-      expect(onSaveNode).toHaveBeenCalledWith([
-        expect.objectContaining({
-          nodeId: "implementation-agent-no-issue",
-          configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
-          concurrency: { max: 3, key: "implementation" },
-        }),
-        expect.objectContaining({
-          nodeId: "create-pr",
-          name: "Create Pull Request",
-          configuration: { draft: false, repository: "{{ install_params.appRepository }}" },
-          integration: { id: "github-connection" },
-          concurrency: { max: 1, key: "{{ $.data.branch }}" },
-        }),
-      ]);
-      return;
-    }
-
-    expect(screen.queryByTestId("implement-settings-save")).not.toBeInTheDocument();
+    expect(onSaveNode).not.toHaveBeenCalled();
+    expect(screen.queryByRole("navigation", { name: "Automation settings" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("textbox", { name: /^Name/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Key")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "MCP servers" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Skills" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Start implementation")).not.toBeInTheDocument();
+    expect(screen.queryByText("Implement From Task Description")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add step" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "false");
+    const draftPullRequest = screen.getByRole("switch", { name: "Create draft pull requests" });
+    expect(draftPullRequest).toBeChecked();
+    await user.click(draftPullRequest);
+    expect(draftPullRequest).not.toBeChecked();
+    expect(onSaveNode).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("tab", { name: "Runs" }));
+    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("group", { name: "Default model" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Configuration" }));
+    expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(3);
+    expect(screen.getByRole("switch", { name: "Create draft pull requests" })).not.toBeChecked();
+    view.rerenderGraph(implementConfigGraph(steps));
+    expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(3);
+    expect(onSaveNode).not.toHaveBeenCalled();
+    const save = screen.getByTestId("implement-settings-save");
+    await user.click(save);
+    expect(save).toHaveTextContent("Saving");
+    expect(save).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "Create draft pull requests" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toBeDisabled();
+    await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(1));
     finishSave();
-    await waitFor(() => {
-      expect(onSaveNode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          nodeId: "implementation-agent-no-issue",
-          configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
-          concurrency: { max: 3, key: "implementation" },
-        }),
-      );
-    });
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(onSaveNode).toHaveBeenCalledWith([
+      expect.objectContaining({
+        nodeId: "implementation-agent-no-issue",
+        configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps },
+        concurrency: { max: 3, key: "implementation" },
+      }),
+      expect.objectContaining({
+        nodeId: "create-pr",
+        name: "Create Pull Request",
+        configuration: { draft: false, repository: "{{ install_params.appRepository }}" },
+        integration: { id: "github-connection" },
+        concurrency: { max: 1, key: "{{ $.data.branch }}" },
+      }),
+    ]);
   });
 
   it("opens the first component beside the automation", () => {
@@ -517,7 +505,7 @@ describe("MergeConfidenceConfigModal", () => {
                 onClose={vi.fn()}
                 onSaveNode={vi.fn()}
                 renderNodeBody={(node) =>
-                  node.id === "on-pr-risk" ? <p data-testid="custom-trigger-body">Custom trigger settings</p> : null
+                  node.id === "on-pr-feedback" ? <p data-testid="custom-trigger-body">Custom trigger settings</p> : null
                 }
               />
             </TooltipProvider>

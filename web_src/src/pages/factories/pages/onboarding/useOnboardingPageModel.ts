@@ -1,29 +1,33 @@
 import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import {
   fetchFactoryAutomations,
   useCreateFactoryLine,
   useSelectFactoryVcsProviderRepository,
   useUpdateFactory,
 } from "@/hooks/useFactoryData";
-import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import {
+  fetchFactoryIntakes,
+  useCreateFactoryIntake,
+  useDeleteFactoryIntake,
+  useUpdateFactoryIntake,
+} from "@/hooks/useFactoryIntakeData";
 import { resolveGithubDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubHostFromIntegration } from "@/lib/githubHost";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER } from "@/lib/experimentalFeatures";
+import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
+import { selectReadyIntegrationInstance, useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { createElement, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
-import { isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
-import { requestOnboardingConnect, useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
+import { AGENT_PROVIDER_IDS, isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
 import { useOnboardingAgentPageState } from "./useOnboardingAgentPageState";
@@ -123,10 +127,9 @@ function useSectionSaves(args: {
   // is not readable from the setup state yet.
   const saveIssues = (source: IssuesChoiceId) => {
     const backlogRepository = args.setup.issuesRepo ?? args.setup.selectedRepo;
-    if (!backlogRepository) return Promise.resolve(false);
     return runSave(args.setSaving, () =>
       args.updateOnboarding({
-        backlogRepository,
+        ...(backlogRepository ? { backlogRepository } : {}),
         issuesSource: apiIssuesSource(source),
       }),
     );
@@ -175,6 +178,7 @@ function useOnboardingMutations(organizationId: string, factoryId: string) {
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),
     createIntake: useCreateFactoryIntake(organizationId, factoryId),
+    updateIntake: useUpdateFactoryIntake(organizationId, factoryId),
     deleteIntake: useDeleteFactoryIntake(organizationId, factoryId),
     installer: useInstallFactory({ organizationId }),
   };
@@ -241,6 +245,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     createLine: createLine.mutateAsync,
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
+    updateIntake: args.mutations.updateIntake.mutateAsync,
     deleteIntake: deleteIntake.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
@@ -301,6 +306,7 @@ function onboardingSetupOptions(
     initial: initialSetupState(onboarding),
     persistVcsHostKey: factoryId,
     persistRepoKey: factoryId,
+    persistInitialImportKey: factoryId,
   };
 }
 
@@ -338,9 +344,8 @@ export function useOnboardingPageModel(args: {
   reresolveWorkspace?: OnboardingWorkspaceResolution | null;
 }) {
   const { canAct } = usePermissions();
-  const bringYourOwnKey = useExperimentalFeature(args.organizationId);
-  const customProvider =
-    bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER);
+  const bringYourOwnKey = useBYOKAccess(args.organizationId);
+  const customProvider = bringYourOwnKey.customProviderAllowed;
   const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
@@ -400,24 +405,26 @@ export function useOnboardingPageModel(args: {
     agent,
   });
 
-  const requestConnect = (id: IntegrationId) =>
-    requestOnboardingConnect({
-      id,
-      customProvider,
-      requestConnect: connect.requestConnect,
-      connectedIntegrations,
-      selections: integrations.selections,
-      setSelections: integrations.setSelections,
-      setCustomProviderDialogOpen,
-    });
+  const requestConnect = (id: IntegrationId) => {
+    if (providerConnectionDenied(id, bringYourOwnKey)) return false;
+    if (id !== "customLlm" || !customProvider) return connect.requestConnect(id);
+    const existing = selectReadyIntegrationInstance(connectedIntegrations, integrations.selections, "customLlm");
+    if (existing) {
+      integrations.setSelections(existing);
+      // True means the browser left this page. A saved connection stays here.
+      return false;
+    }
+    setCustomProviderDialogOpen(true);
+    return false;
+  };
 
   return {
     setup,
     hostedAgentReady: isHostedAgentReady(agent.plan),
     hostedModelsAvailable: agent.hostedModelsAvailable,
     hostedModelsAvailableLoading: agent.hostedModelsAvailableLoading,
-    bringYourOwnKey: bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK),
-    bringYourOwnKeyLoading: bringYourOwnKey.isLoading,
+    bringYourOwnKey: bringYourOwnKey.allowed,
+    bringYourOwnKeyLoading: !bringYourOwnKey.ready,
     customProvider,
     agentCredentialChoice,
     setAgentCredentialChoice,
@@ -446,4 +453,11 @@ export function useOnboardingPageModel(args: {
     ...wired.jira,
     ...wired.linear,
   };
+}
+
+function providerConnectionDenied(id: IntegrationId, access: ReturnType<typeof useBYOKAccess>) {
+  const providerDenied = AGENT_PROVIDER_IDS.some((provider) => provider === id) && !access.allowed;
+  if (!providerDenied && (id !== "customLlm" || access.customProviderAllowed)) return false;
+  showErrorToast("Your organization does not have access to provider credentials. Contact your administrator.");
+  return true;
 }

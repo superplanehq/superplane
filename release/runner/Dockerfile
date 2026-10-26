@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=$BUILDPLATFORM golang:1.26.2-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.26.10-bookworm AS build
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -81,6 +81,12 @@ RUN apt-get update \
 ENV WHISPER_MODEL=/usr/local/share/whisper/ggml-tiny.bin
 
 COPY --from=build /runner /usr/local/bin/runner
+
+ARG RUNNER_VERSION=dev
+ARG SOURCE_REVISION=unknown
+LABEL org.opencontainers.image.source="https://github.com/superplanehq/superplane" \
+  org.opencontainers.image.revision="${SOURCE_REVISION}" \
+  org.opencontainers.image.version="${RUNNER_VERSION}"
 
 ENV HOME=/home/node
 WORKDIR /home/node

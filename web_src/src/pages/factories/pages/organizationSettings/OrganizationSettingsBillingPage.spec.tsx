@@ -26,15 +26,10 @@ const WELCOME_EXPIRY_LABEL = new Date(ACTIVE_TRIAL_ENDS_AT).toLocaleDateString()
 let canUpdateOrg = true;
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({
-    canAct: (resource: string, action: string) => {
-      if (resource === "org" && action === "update") {
-        return canUpdateOrg;
-      }
-      return true;
-    },
-    isLoading: false,
-  }),
+  usePermissions: () => {
+    const canAct = (resource: string, action: string) => resource !== "org" || action !== "update" || canUpdateOrg;
+    return { canAct, hasPermission: canAct, isLoading: false };
+  },
 }));
 
 describe("OrganizationSettingsBillingPage", () => {
@@ -248,41 +243,6 @@ describe("OrganizationSettingsBillingPage", () => {
     vi.unstubAllGlobals();
   }, 10000);
 
-  it("opens Polar checkout for a single hosted credit pack", async () => {
-    const assign = vi.fn();
-    vi.stubGlobal("location", { ...window.location, assign });
-    const user = userEvent.setup();
-
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
-        factoriesFixture={{
-          ...defaultFactoriesFixture,
-          hostedCreditProducts: [STORYBOOK_HOSTED_CREDIT_PRODUCTS[0]],
-          organizationBilling: BUSINESS_ORGANIZATION_BILLING,
-          organizationWorkspaceUsage: {
-            ...DEFAULT_FACTORY_USAGE,
-            billingEnabled: true,
-            hasBillingCustomer: false,
-          },
-        }}
-      />,
-    );
-
-    const balance = await screen.findByTestId("billing-credit-balance");
-    const topup = within(balance).getByTestId("billing-credit-topup");
-    await waitFor(() => {
-      expect(within(topup).getByRole("button", { name: "Top up" })).toBeEnabled();
-    });
-    expect(within(balance).queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
-    expect(within(topup).queryByRole("button", { name: "$50" })).not.toBeInTheDocument();
-    await user.click(within(topup).getByRole("button", { name: "Top up" }));
-    await user.click(await within(topup).findByRole("button", { name: "$50" }));
-
-    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook");
-    vi.unstubAllGlobals();
-  }, 10000);
-
   it("opens Polar checkout from Top up when billing already has a customer", async () => {
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });
@@ -337,14 +297,19 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(balance).not.toHaveTextContent("welcome credit");
 
     await user.click(within(topup).getByRole("button", { name: "Top up" }));
-    expect(await within(topup).findByRole("button", { name: "$50" })).toBeEnabled();
-    expect(within(topup).getByRole("button", { name: "$100" })).toBeEnabled();
-    expect(within(topup).getByRole("button", { name: "$500" })).toBeEnabled();
-    expect(within(topup).getByRole("button", { name: "Custom" })).toBeDisabled();
+    const dialog = await screen.findByRole("dialog", { name: "Add hosted credit" });
+    expect(within(dialog).getByRole("button", { name: "$50" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "$100" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "$500" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "Custom" })).toBeDisabled();
 
-    await user.click(within(topup).getByRole("button", { name: "$50" }));
-    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook");
+    await user.click(within(dialog).getByRole("button", { name: "$50" }));
+    const confirm = within(dialog).getByRole("button", { name: "Continue to checkout" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.click(confirm);
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_storybook"));
     vi.unstubAllGlobals();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
     const invoices = await screen.findByTestId("billing-polar-invoices");
     expect(within(invoices).getByText("Recent paid invoices for this organization.")).toBeInTheDocument();

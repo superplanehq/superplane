@@ -4,32 +4,30 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/public/middleware"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type installationLLMSettingsResponse struct {
-	WelcomeGrantCents     int64                       `json:"welcome_grant_cents"`
-	MarkupBPS             int                         `json:"markup_bps"`
-	WarningThresholdBPS   int                         `json:"warning_threshold_bps"`
-	DefaultHostedProvider string                      `json:"default_hosted_provider"`
-	DefaultHostedModel    string                      `json:"default_hosted_model"`
-	Providers             []hostedLLMProviderResponse `json:"providers"`
+	WelcomeGrantCents           int64                       `json:"welcome_grant_cents"`
+	MarkupBPS                   int                         `json:"markup_bps"`
+	WarningThresholdBPS         int                         `json:"warning_threshold_bps"`
+	CreditPurchaseFeeBPS        int                         `json:"credit_purchase_fee_bps"`
+	CreditPurchaseFixedFeeCents int64                       `json:"credit_purchase_fixed_fee_cents"`
+	DefaultHostedProvider       string                      `json:"default_hosted_provider"`
+	DefaultHostedModel          string                      `json:"default_hosted_model"`
+	Providers                   []hostedLLMProviderResponse `json:"providers"`
 }
 
 type hostedLLMProviderResponse struct {
@@ -42,11 +40,13 @@ type hostedLLMProviderResponse struct {
 }
 
 type installationLLMSettingsRequest struct {
-	WelcomeGrantCents     *int64  `json:"welcome_grant_cents"`
-	MarkupBPS             *int    `json:"markup_bps"`
-	WarningThresholdBPS   *int    `json:"warning_threshold_bps"`
-	DefaultHostedProvider *string `json:"default_hosted_provider"`
-	DefaultHostedModel    *string `json:"default_hosted_model"`
+	WelcomeGrantCents           *int64  `json:"welcome_grant_cents"`
+	MarkupBPS                   *int    `json:"markup_bps"`
+	WarningThresholdBPS         *int    `json:"warning_threshold_bps"`
+	CreditPurchaseFeeBPS        *int    `json:"credit_purchase_fee_bps"`
+	CreditPurchaseFixedFeeCents *int64  `json:"credit_purchase_fixed_fee_cents"`
+	DefaultHostedProvider       *string `json:"default_hosted_provider"`
+	DefaultHostedModel          *string `json:"default_hosted_model"`
 }
 
 type hostedLLMProviderRequest struct {
@@ -71,69 +71,6 @@ type hostedLLMModelResponse struct {
 	Name string `json:"name"`
 }
 
-type organizationLLMCreditResponse struct {
-	RemainingCreditCents    int64   `json:"remaining_credit_cents"`
-	GrantTotalCents         int64   `json:"grant_total_cents"`
-	SuperplaneGrantCents    int64   `json:"superplane_grant_cents"`
-	PurchasedCreditCents    int64   `json:"purchased_credit_cents"`
-	HostedBilledCents       int64   `json:"hosted_billed_cents"`
-	WelcomeRemainingCents   int64   `json:"welcome_remaining_cents"`
-	IncludedRemainingCents  int64   `json:"included_remaining_cents"`
-	PurchasedRemainingCents int64   `json:"purchased_remaining_cents"`
-	AdminRemainingCents     int64   `json:"admin_remaining_cents"`
-	WelcomeCreditExpiresAt  *string `json:"welcome_credit_expires_at"`
-	MarkupBPS               int     `json:"markup_bps"`
-	MarkupOverrideBPS       *int    `json:"markup_override_bps"`
-	Warning                 bool    `json:"warning"`
-}
-
-type addOrganizationLLMCreditRequest struct {
-	AmountCents int64  `json:"amount_cents"`
-	Note        string `json:"note"`
-}
-
-type setOrganizationCreditBalanceRequest struct {
-	Bucket                 string `json:"bucket"`
-	TargetCents            int64  `json:"target_cents"`
-	ExpectedRemainingCents int64  `json:"expected_remaining_cents"`
-	Note                   string `json:"note"`
-}
-
-// organizationCreditGrantResponse matches the OrganizationCreditGrant JSON
-// shape from the organization API so the UI renders both with one table.
-type organizationCreditGrantResponse struct {
-	ID           string  `json:"id"`
-	Kind         string  `json:"kind"`
-	AmountCents  int64   `json:"amountCents,string"`
-	Note         string  `json:"note"`
-	ActorName    string  `json:"actorName,omitempty"`
-	PolarOrderID string  `json:"polarOrderId,omitempty"`
-	CreatedAt    string  `json:"createdAt"`
-	ExpiresAt    *string `json:"expiresAt,omitempty"`
-}
-
-type listOrganizationCreditGrantsResponse struct {
-	Grants []organizationCreditGrantResponse `json:"grants"`
-}
-
-type organizationLLMMarkupRequest struct {
-	MarkupBPS *int `json:"markup_bps"`
-}
-
-type organizationBillingPlanResponse struct {
-	Plan                    string  `json:"plan"`
-	PlanSource              string  `json:"plan_source"`
-	PolarSubscriptionStatus string  `json:"polar_subscription_status"`
-	PolarManaged            bool    `json:"polar_managed"`
-	TrialEndsAt             *string `json:"trial_ends_at"`
-	CurrentPeriodEnd        *string `json:"current_period_end"`
-}
-
-type organizationBillingPlanRequest struct {
-	Plan        string  `json:"plan"`
-	TrialEndsAt *string `json:"trial_ends_at"`
-}
-
 func (s *Server) adminGetInstallationLLMSettings(w http.ResponseWriter, r *http.Request) {
 	response, err := s.buildInstallationLLMSettingsResponse()
 	if err != nil {
@@ -151,20 +88,35 @@ func (s *Server) adminUpdateInstallationLLMSettings(w http.ResponseWriter, r *ht
 		return
 	}
 
+	if req.WelcomeGrantCents != nil {
+		http.Error(w, "Edit trial credit in Billing plans", http.StatusBadRequest)
+		return
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		current, err := models.GetInstallationLLMSettings(tx)
 		if err != nil {
 			return err
 		}
 		next := *current
-		if req.WelcomeGrantCents != nil {
-			next.WelcomeGrantCents = *req.WelcomeGrantCents
+		billingSettings, err := billing.GetInstallationSettings(tx)
+		if err != nil {
+			return err
 		}
 		if req.MarkupBPS != nil {
-			next.MarkupBPS = *req.MarkupBPS
+			billingSettings.MarkupBPS = *req.MarkupBPS
 		}
 		if req.WarningThresholdBPS != nil {
-			next.WarningThresholdBPS = *req.WarningThresholdBPS
+			billingSettings.WarningThresholdBPS = *req.WarningThresholdBPS
+		}
+		if req.CreditPurchaseFeeBPS != nil {
+			billingSettings.CreditPurchaseFeeBPS = *req.CreditPurchaseFeeBPS
+		}
+		if req.CreditPurchaseFixedFeeCents != nil {
+			billingSettings.CreditPurchaseFixedFeeCents = *req.CreditPurchaseFixedFeeCents
+		}
+		if err := billing.UpdateInstallationSettings(tx, billingSettings); err != nil {
+			return err
 		}
 		if req.DefaultHostedProvider != nil {
 			next.DefaultHostedProvider = optionalTrimmedStringPointer(*req.DefaultHostedProvider)
@@ -352,309 +304,6 @@ func (s *Server) adminListHostedLLMProviderModels(w http.ResponseWriter, r *http
 	respondJSON(w, out)
 }
 
-func (s *Server) adminGetOrganizationLLMCredit(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := parseAdminOrgID(w, r)
-	if !ok {
-		return
-	}
-
-	response, err := describeOrganizationLLMCreditJSON(database.Conn(), orgID)
-	if err != nil {
-		log.Errorf("admin: failed to load organization LLM credit: %v", err)
-		http.Error(w, "Failed to load organization credit", http.StatusInternalServerError)
-		return
-	}
-	respondJSON(w, response)
-}
-
-func (s *Server) adminAddOrganizationLLMCredit(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := parseAdminOrgID(w, r)
-	if !ok {
-		return
-	}
-
-	var req addOrganizationLLMCreditRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	account, _ := middleware.GetAccountFromContext(r.Context())
-	var actor *uuid.UUID
-	if account != nil {
-		actor = &account.ID
-	}
-
-	_, err := models.AddAdminLLMCreditGrant(database.Conn(), orgID, models.CentsToMicros(req.AmountCents), req.Note, actor)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	response, err := describeOrganizationLLMCreditJSON(database.Conn(), orgID)
-	if err != nil {
-		log.Errorf("admin: failed to load organization LLM credit: %v", err)
-		http.Error(w, "Failed to load organization credit", http.StatusInternalServerError)
-		return
-	}
-	respondJSON(w, response)
-}
-
-func (s *Server) adminListOrganizationCreditGrants(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := parseAdminOrgID(w, r)
-	if !ok {
-		return
-	}
-
-	db := database.DB(r.Context())
-	grants, err := models.ListOrganizationLLMCreditGrants(db, orgID)
-	if err != nil {
-		log.Errorf("admin: failed to list organization credit grants: %v", err)
-		http.Error(w, "Failed to load credit history", http.StatusInternalServerError)
-		return
-	}
-	actorNames, err := models.CreditGrantActorNames(db, grants)
-	if err != nil {
-		log.Errorf("admin: failed to load credit grant actors: %v", err)
-		http.Error(w, "Failed to load credit history", http.StatusInternalServerError)
-		return
-	}
-
-	out := make([]organizationCreditGrantResponse, 0, len(grants))
-	for _, grant := range grants {
-		out = append(out, serializeAdminCreditGrant(grant, actorNames))
-	}
-	respondJSON(w, listOrganizationCreditGrantsResponse{Grants: out})
-}
-
-func (s *Server) adminSetOrganizationCreditBalance(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := parseAdminOrgID(w, r)
-	if !ok {
-		return
-	}
-
-	var req setOrganizationCreditBalanceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	account, _ := middleware.GetAccountFromContext(r.Context())
-	var actor *uuid.UUID
-	if account != nil {
-		actor = &account.ID
-	}
-
-	targetMicros, err := creditCentsToMicros(req.TargetCents)
-	if err != nil {
-		writeCreditBalanceError(w, err)
-		return
-	}
-	expectedMicros, err := creditCentsToMicros(req.ExpectedRemainingCents)
-	if err != nil {
-		writeCreditBalanceError(w, err)
-		return
-	}
-
-	db := database.DB(r.Context())
-	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
-		OrganizationID: orgID,
-		Bucket:         req.Bucket,
-		TargetMicros:   targetMicros,
-		ExpectedMicros: expectedMicros,
-		Note:           req.Note,
-		ActorAccountID: actor,
-	})
-	if err != nil {
-		writeCreditBalanceError(w, err)
-		return
-	}
-
-	response, err := describeOrganizationLLMCreditJSON(db, orgID)
-	if err != nil {
-		log.Errorf("admin: failed to load organization LLM credit: %v", err)
-		http.Error(w, "Failed to load organization credit", http.StatusInternalServerError)
-		return
-	}
-	respondJSON(w, response)
-}
-
-var errCreditCentsOutOfRange = errors.New("credit balance is out of range")
-
-func creditCentsToMicros(cents int64) (int64, error) {
-	if cents < 0 {
-		return 0, models.ErrCreditBalanceNegative
-	}
-	if cents > math.MaxInt64/models.MicrosPerCent {
-		return 0, errCreditCentsOutOfRange
-	}
-	return cents * models.MicrosPerCent, nil
-}
-
-func writeCreditBalanceError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, models.ErrCreditBalanceChanged):
-		http.Error(w, "The balance changed. Reload and try again.", http.StatusConflict)
-	case errors.Is(err, models.ErrCreditBalanceBucket),
-		errors.Is(err, models.ErrCreditBalanceNegative),
-		errors.Is(err, errCreditCentsOutOfRange):
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	case errors.Is(err, models.ErrTrialCreditNotActive):
-		http.Error(w, "This organization has no active trial credit.", http.StatusBadRequest)
-	default:
-		log.Errorf("admin: failed to set organization credit balance: %v", err)
-		http.Error(w, "Failed to set credit balance", http.StatusInternalServerError)
-	}
-}
-
-func serializeAdminCreditGrant(grant models.OrganizationLLMCreditGrant, actorNames map[uuid.UUID]string) organizationCreditGrantResponse {
-	item := organizationCreditGrantResponse{
-		ID:          grant.ID.String(),
-		Kind:        grant.Kind,
-		AmountCents: models.SignedMicrosToCents(grant.AmountMicros),
-		Note:        grant.Note,
-		CreatedAt:   grant.CreatedAt.UTC().Format(time.RFC3339),
-		ExpiresAt:   formatOptionalTime(grant.ExpiresAt),
-	}
-	if grant.ActorAccountID != nil {
-		item.ActorName = actorNames[*grant.ActorAccountID]
-	}
-	if grant.PolarOrderID != nil {
-		item.PolarOrderID = *grant.PolarOrderID
-	}
-	return item
-}
-
-func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := parseAdminOrgID(w, r)
-	if !ok {
-		return
-	}
-
-	var req organizationLLMMarkupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if err := models.UpsertOrganizationLLMMarkup(database.Conn(), orgID, req.MarkupBPS); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	response, err := describeOrganizationLLMCreditJSON(database.Conn(), orgID)
-	if err != nil {
-		log.Errorf("admin: failed to load organization LLM credit: %v", err)
-		http.Error(w, "Failed to load organization credit", http.StatusInternalServerError)
-		return
-	}
-	respondJSON(w, response)
-}
-
-func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
-	if !models.BillingEnabled() {
-		http.Error(w, "Billing is not available", http.StatusNotFound)
-		return
-	}
-	orgID, ok := parseAdminOrgID(w, r)
-	if !ok {
-		return
-	}
-	if err := polar.SyncOrganizationSubscription(r.Context(), database.Conn(), orgID); err != nil {
-		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
-	}
-	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
-	if err != nil {
-		log.Errorf("admin: failed to load organization billing plan: %v", err)
-		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
-		return
-	}
-	respondJSON(w, response)
-}
-
-func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
-	if !models.BillingEnabled() {
-		http.Error(w, "Billing is not available", http.StatusNotFound)
-		return
-	}
-	orgID, ok := parseAdminOrgID(w, r)
-	if !ok {
-		return
-	}
-
-	var req organizationBillingPlanRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if err := polar.SyncOrganizationSubscription(r.Context(), database.Conn(), orgID); err != nil {
-		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
-	}
-
-	planName := strings.TrimSpace(req.Plan)
-	trialEndsAt, err := trialEndForAdminPlan(planName, req.TrialEndsAt)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	_, err = models.SetAdminOrganizationPlan(database.Conn(), orgID, planName, trialEndsAt)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
-	if err != nil {
-		log.Errorf("admin: failed to load organization billing plan: %v", err)
-		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
-		return
-	}
-	respondJSON(w, response)
-}
-
-func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organizationBillingPlanResponse, error) {
-	plan, err := models.ResolveOrganizationBillingPlan(tx, orgID)
-	if err != nil {
-		return organizationBillingPlanResponse{}, err
-	}
-	return organizationBillingPlanResponse{
-		Plan:                    plan.Plan,
-		PlanSource:              plan.PlanSource,
-		PolarSubscriptionStatus: plan.PolarSubscriptionStatus,
-		PolarManaged:            models.OrganizationBillingIsPolarManaged(plan),
-		TrialEndsAt:             formatOptionalTime(plan.TrialEndsAt),
-		CurrentPeriodEnd:        formatOptionalTime(plan.CurrentPeriodEnd),
-	}, nil
-}
-
-func trialEndForAdminPlan(planName string, raw *string) (*time.Time, error) {
-	if planName != models.BillingPlanTrial {
-		return nil, nil
-	}
-	if raw == nil || strings.TrimSpace(*raw) == "" {
-		return nil, errors.New("trial end date is required")
-	}
-	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*raw))
-	if err != nil {
-		return nil, errors.New("trial end date is required")
-	}
-	if !parsed.After(time.Now()) {
-		return nil, errors.New("choose a future date")
-	}
-	end := parsed.UTC()
-	return &end, nil
-}
-
-func formatOptionalTime(value *time.Time) *string {
-	if value == nil || value.IsZero() {
-		return nil
-	}
-	formatted := value.UTC().Format(time.RFC3339)
-	return &formatted
-}
-
 func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettingsResponse, error) {
 	tx := database.Conn()
 	settings, err := models.GetInstallationLLMSettings(tx)
@@ -684,14 +333,20 @@ func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettings
 		})
 	}
 
+	billingSettings, err := billing.GetInstallationSettings(tx)
+	if err != nil {
+		return installationLLMSettingsResponse{}, err
+	}
 	defaultModel := models.InstallationDefaultHostedLLMModel(settings)
 	return installationLLMSettingsResponse{
-		WelcomeGrantCents:     settings.WelcomeGrantCents,
-		MarkupBPS:             settings.MarkupBPS,
-		WarningThresholdBPS:   settings.WarningThresholdBPS,
-		DefaultHostedProvider: defaultModel.Provider,
-		DefaultHostedModel:    defaultModel.Model,
-		Providers:             providers,
+		WelcomeGrantCents:           billingSettings.TrialCreditCents,
+		MarkupBPS:                   billingSettings.MarkupBPS,
+		WarningThresholdBPS:         billingSettings.WarningThresholdBPS,
+		CreditPurchaseFeeBPS:        billingSettings.CreditPurchaseFeeBPS,
+		CreditPurchaseFixedFeeCents: billingSettings.CreditPurchaseFixedFeeCents,
+		DefaultHostedProvider:       defaultModel.Provider,
+		DefaultHostedModel:          defaultModel.Model,
+		Providers:                   providers,
 	}, nil
 }
 
@@ -701,36 +356,6 @@ func optionalTrimmedStringPointer(value string) *string {
 		return nil
 	}
 	return &trimmed
-}
-
-func describeOrganizationLLMCreditJSON(tx *gorm.DB, orgID uuid.UUID) (organizationLLMCreditResponse, error) {
-	summary, err := models.DescribeOrganizationLLMCredit(tx, orgID)
-	if err != nil {
-		return organizationLLMCreditResponse{}, err
-	}
-	orgSettings, err := models.FindOrganizationLLMSettings(tx, orgID)
-	if err != nil {
-		return organizationLLMCreditResponse{}, err
-	}
-	var override *int
-	if orgSettings != nil {
-		override = orgSettings.MarkupBPS
-	}
-	return organizationLLMCreditResponse{
-		RemainingCreditCents:    pricebook.MicrosToCents(summary.RemainingMicros),
-		GrantTotalCents:         pricebook.MicrosToCents(summary.GrantMicros),
-		SuperplaneGrantCents:    pricebook.MicrosToCents(summary.SuperPlaneGrantMicros),
-		PurchasedCreditCents:    pricebook.MicrosToCents(summary.PurchasedCreditMicros),
-		HostedBilledCents:       pricebook.MicrosToCents(summary.BilledMicros),
-		WelcomeRemainingCents:   pricebook.MicrosToCents(summary.WelcomeRemainingMicros),
-		IncludedRemainingCents:  pricebook.MicrosToCents(summary.IncludedRemainingMicros),
-		PurchasedRemainingCents: pricebook.MicrosToCents(summary.PurchasedRemainingMicros),
-		AdminRemainingCents:     pricebook.MicrosToCents(summary.AdminRemainingMicros),
-		WelcomeCreditExpiresAt:  formatOptionalTime(summary.WelcomeCreditExpiresAt),
-		MarkupBPS:               summary.MarkupBPS,
-		MarkupOverrideBPS:       override,
-		Warning:                 summary.Warning,
-	}, nil
 }
 
 func parseAdminOrgID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
@@ -773,6 +398,8 @@ func isClientLLMSettingsError(err error) bool {
 		strings.Contains(msg, "markup cannot") ||
 		strings.Contains(msg, "welcome grant") ||
 		strings.Contains(msg, "warning threshold") ||
+		strings.Contains(msg, "credit purchase fee") ||
+		strings.Contains(msg, "credit purchase fixed fee") ||
 		strings.Contains(msg, "provisioning api key") ||
 		strings.Contains(msg, "llm base url") ||
 		strings.Contains(msg, "superplane agent model")

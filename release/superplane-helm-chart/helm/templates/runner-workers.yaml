@@ -66,8 +66,6 @@ spec:
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
           env:
-            - name: ENCRYPTION_WRITE_FORMAT
-              value: {{ .Values.encryption.writeFormat | quote }}
             {{- include "runner.processEnv" (dict "enabled" (list "START_RUNNER_LOG_COMPACTOR" "START_RUNNER_CLEANUP_WORKER")) | nindent 12 }}
             - name: PUBLIC_API_BASE_PATH
               value: "/api/v1"

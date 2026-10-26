@@ -18,6 +18,7 @@ import {
   useWorkOrderArtifacts,
 } from "@/hooks/useFactoryData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useFactoryCustomAutomations } from "@/hooks/useFactoryCustomAutomationData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { githubHostFromIntegration, isGitHubEnterpriseServerHost } from "@/lib/githubHost";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
@@ -39,6 +40,14 @@ import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
+import {
+  customAutomationMode,
+  CUSTOM_AUTOMATION_TEMPLATE_ID,
+  DEFAULT_CUSTOM_AUTOMATION_ICON,
+  type CustomAutomationMode,
+  type ManualCustomAutomation,
+} from "../lib/customAutomation";
+import { customAutomationIdFromSearch } from "../lib/customAutomationPaths";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
@@ -49,6 +58,7 @@ import {
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
+import { CustomAutomationSetupModal } from "./CustomAutomationSetupModal";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { ScheduledIntakeSetupDialog } from "./ScheduledIntakeSetupDialog";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
@@ -64,7 +74,6 @@ import {
   isWorkspaceNextStepsQueryReady,
   workspaceNextStepBanner,
   workspaceNextSteps,
-  workspaceNextStepsProgressCopy,
 } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
 
@@ -326,6 +335,7 @@ export function LinesPage() {
   const intakeId = intakeIdFromSearch(search);
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const automationViewCanvasId = columnAutomationViewCanvasIdFromSearch(search);
+  const customAutomationAutomationId = customAutomationIdFromSearch(search);
   const prFeedbackOpen = isPRFeedbackSearchOpen(search);
   const planningOpen = isPlanningSearchOpen(search);
   const planningSettingsTab = planningSettingsTabFromSearch(search);
@@ -722,6 +732,13 @@ export function LinesPage() {
           deletePending={deleteAutomation.isPending}
         />
       ) : null}
+      {customAutomationAutomationId !== undefined && canUpdate && selectedLine.id ? (
+        <CustomAutomationSetupModal
+          lineId={selectedLine.id}
+          automationId={customAutomationAutomationId ?? undefined}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
+        />
+      ) : null}
       {planningOpen ? (
         <PlanningSettingsHost
           organizationId={organizationId}
@@ -757,11 +774,7 @@ export function LinesPage() {
             hostedCreditHeaderKicker={hostedCreditHeaderKicker}
             nextStepsRestore={
               nextStepsCollapsed && nextStepBanner ? (
-                <WorkspaceNextStepsHeaderBadge
-                  progress={workspaceNextStepsProgressCopy(nextStepBanner.doneCount, nextStepBanner.totalCount)}
-                  title={nextStepBanner.badgeLabel}
-                  onOpen={nextStepDeferral.restore}
-                />
+                <WorkspaceNextStepsHeaderBadge title={nextStepBanner.badgeLabel} onOpen={nextStepDeferral.restore} />
               ) : undefined
             }
             intakes={factoryIntakes}
@@ -1014,7 +1027,7 @@ function LineDetail({
   factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
-  apps: Array<{ id?: string; name?: string; columnKey?: string }>;
+  apps: Array<{ id?: string; name?: string; columnKey?: string; templateId?: string }>;
   workOrders: FactoriesWorkOrder[];
   cardsPending: boolean;
   canCreateWorkOrder: boolean;
@@ -1056,6 +1069,58 @@ function LineDetail({
     () => backlogAnalysisCreditLabels(backlogAnalysis.runsByWorkOrder),
     [backlogAnalysis.runsByWorkOrder],
   );
+  const customAutomationIds = useMemo(
+    () =>
+      apps.flatMap((app) =>
+        app.id && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID && app.columnKey === "verify" ? [app.id] : [],
+      ),
+    [apps],
+  );
+  const customAutomationDetails = useFactoryCustomAutomations(organizationId, factoryId, customAutomationIds);
+  const customAutomationModes = useMemo(
+    () =>
+      new Map<string, CustomAutomationMode>(
+        customAutomationDetails.map(({ automationId, automation }) => [
+          automationId,
+          customAutomationMode(automation.settings?.startMode),
+        ]),
+      ),
+    [customAutomationDetails],
+  );
+  const customAutomationIcons = useMemo(
+    () =>
+      new Map<string, string>(
+        customAutomationDetails.map(({ automationId, automation }) => [
+          automationId,
+          automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON,
+        ]),
+      ),
+    [customAutomationDetails],
+  );
+  const automationApps = useMemo(
+    () =>
+      apps.map((app) => ({
+        ...app,
+        customAutomationMode: app.id ? customAutomationModes.get(app.id) : undefined,
+        customAutomationIcon: app.id ? customAutomationIcons.get(app.id) : undefined,
+      })),
+    [apps, customAutomationIcons, customAutomationModes],
+  );
+  const manualCustomAutomations = useMemo<ManualCustomAutomation[]>(
+    () =>
+      customAutomationDetails.flatMap(({ automationId, automation }) =>
+        customAutomationMode(automation.settings?.startMode) === "manual"
+          ? [
+              {
+                id: automationId,
+                name: automation.automation?.name?.trim() || "Custom automation",
+                icon: automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON,
+              },
+            ]
+          : [],
+      ),
+    [customAutomationDetails],
+  );
   const navigate = useNavigate();
   const [overlay, setOverlay] = useState<{
     disabledIds: string[];
@@ -1069,14 +1134,14 @@ function LineDetail({
         columns: board,
         intakes: factoryIntakes,
         prFeedbackHandlers,
-        apps,
+        apps: automationApps,
         workOrders,
         planningEnabled,
         vcsProvider,
       });
       return applyColumnAutomationsOverlay(base, undefined, overlay.disabledIds, overlay.removedIds);
     },
-    [apps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, vcsProvider, workOrders],
+    [automationApps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, vcsProvider, workOrders],
   );
 
   const addAutomation = useAddColumnAutomation({
@@ -1192,6 +1257,7 @@ function LineDetail({
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
           factoryApps={apps}
+          manualCustomAutomations={manualCustomAutomations}
           onClose={onClosePeek}
         />
       ) : null}
@@ -1214,6 +1280,7 @@ function LineBoardSplitRunPopup({
   analysisRuns,
   isAnalyzing,
   factoryApps,
+  manualCustomAutomations,
   onClose,
 }: {
   organizationId: string;
@@ -1230,6 +1297,7 @@ function LineBoardSplitRunPopup({
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
   factoryApps: Array<{ id?: string; name?: string; columnKey?: string }>;
+  manualCustomAutomations: readonly ManualCustomAutomation[];
   onClose: () => void;
 }) {
   const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
@@ -1278,6 +1346,7 @@ function LineBoardSplitRunPopup({
             : undefined
         }
         onClose={onClose}
+        manualCustomAutomations={manualCustomAutomations}
         fixed
       />
     </>
@@ -1779,11 +1848,13 @@ function VerifyColumn({
       >
         {orders.map((order) => (
           <li key={order.id}>
-            <LineBoardOrderCard
-              order={order}
-              workOrderCardContext={workOrderCardContext}
-              onOpenWorkOrder={onOpenWorkOrder}
-            />
+            <div>
+              <LineBoardOrderCard
+                order={order}
+                workOrderCardContext={workOrderCardContext}
+                onOpenWorkOrder={onOpenWorkOrder}
+              />
+            </div>
           </li>
         ))}
       </LineBoardColumnCardList>

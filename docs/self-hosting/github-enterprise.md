@@ -41,13 +41,3 @@ Kubernetes Secret with a CA bundle. Set Helm:
 - `githubEnterprise.extraCACertsKey` to the key, default `ca-certificates.crt`
 
 SuperPlane mounts the file as `SSL_CERT_FILE` on the API, workers, and runner.
-
-## Terraform
-
-Optional pass-through variables:
-
-- `github_enterprise_allowed_hosts`
-- `github_enterprise_extra_ca_certs_secret`
-
-Leave them empty to keep the chart defaults. Terraform escapes commas in
-`github_enterprise_allowed_hosts` so Helm does not split the list.

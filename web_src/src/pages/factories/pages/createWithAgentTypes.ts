@@ -1,4 +1,4 @@
-export type CreateWithAgentMachineStatus = "starting" | "running" | "waiting" | "passed" | "failed";
+export type CreateWithAgentMachineStatus = "queued" | "starting" | "running" | "waiting" | "passed" | "failed";
 
 export type CreateWithAgentCreatedOrder = {
   id: string;
@@ -48,6 +48,7 @@ export type CreateWithAgentMessage = CreateWithAgentTextMessage | CreateWithAgen
 export type CreateWithAgentSurveyQuestion = {
   prompt: string;
   options: string[];
+  recommendedOption?: string;
 };
 
 export type CreateWithAgentSurvey = {
@@ -58,6 +59,7 @@ export type CreateWithAgentSurvey = {
 export type CreateWithAgentView = {
   repository: string;
   machineStatus: CreateWithAgentMachineStatus;
+  queueReason?: string;
   /**
    * True when the agent run for this turn has finished. The chat still waits
    * for the next user message, which starts a new run with the rewind.

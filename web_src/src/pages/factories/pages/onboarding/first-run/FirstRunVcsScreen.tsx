@@ -1,4 +1,6 @@
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { FEATURE_GITHUB_ENTERPRISE } from "@/lib/experimentalFeatures";
 
 import type { FirstRunSetupFlow, OnboardingPageModel } from "../useFirstRunSetupFlow";
 import { FirstRunBitbucketChooseScreen } from "./FirstRunBitbucketChooseScreen";
@@ -100,15 +102,14 @@ export function FirstRunVcsScreen({
   flow,
   model,
   chrome,
-  showGitHubEnterprise,
 }: {
   screen: "host" | "connect" | "ghe-host" | "choose";
   organizationId: string;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
   chrome: FirstRunChrome;
-  showGitHubEnterprise: boolean;
 }) {
+  const showGitHubEnterprise = useExperimentalFeature(organizationId).has(FEATURE_GITHUB_ENTERPRISE);
   const setup = model.setup;
   if (screen === "host") {
     return (

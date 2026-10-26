@@ -7,18 +7,22 @@ import type * as ApiClient from "@/api-client";
 import type * as FactoryData from "@/hooks/useFactoryData";
 import { unmockedSrc } from "@/test/unmockedModule";
 
-const { closeMutateAsync, updateMutateAsync, dispatchMutateAsync, cancelRunMock } = vi.hoisted(() => ({
-  closeMutateAsync: vi.fn(),
-  updateMutateAsync: vi.fn(),
-  dispatchMutateAsync: vi.fn(),
-  cancelRunMock: vi.fn(),
-}));
+const { closeMutateAsync, updateMutateAsync, dispatchMutateAsync, cancelRunMock, continueFixesMock } = vi.hoisted(
+  () => ({
+    closeMutateAsync: vi.fn(),
+    updateMutateAsync: vi.fn(),
+    dispatchMutateAsync: vi.fn(),
+    cancelRunMock: vi.fn(),
+    continueFixesMock: vi.fn(),
+  }),
+);
 
 vi.mock("@/api-client", () => {
   const actual = unmockedSrc<typeof ApiClient>("api-client");
   return {
     ...actual,
     canvasesCancelRun: (...args: unknown[]) => cancelRunMock(...args),
+    factoriesContinueFactoryPullRequestFixes: (...args: unknown[]) => continueFixesMock(...args),
   };
 });
 
@@ -51,6 +55,7 @@ describe("useSplitRunFooterActions", () => {
     updateMutateAsync.mockReset().mockResolvedValue({});
     dispatchMutateAsync.mockReset().mockResolvedValue({});
     cancelRunMock.mockReset().mockResolvedValue({});
+    continueFixesMock.mockReset().mockResolvedValue({ data: { eventId: "event-1" } });
     vi.mocked(showSuccessToast).mockReset();
     vi.mocked(showErrorToast).mockReset();
   });
@@ -117,6 +122,32 @@ describe("useSplitRunFooterActions", () => {
 
     expect(updateMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", state: "STATE_OPEN" });
     expect(showSuccessToast).toHaveBeenCalledWith("Task reopened.");
+  });
+
+  it("continues paused fixes with the paused activity ids", async () => {
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    await result.current.handleContinueFixes({ pullRequestId: "pr-1", runId: "run-paused" });
+
+    expect(continueFixesMock).toHaveBeenCalledTimes(1);
+    expect(continueFixesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { factoryId: "factory-1", prId: "pr-1" },
+        body: { runId: "run-paused" },
+      }),
+    );
+    expect(closeMutateAsync).not.toHaveBeenCalled();
+    expect(showSuccessToast).toHaveBeenCalledWith("Automatic fixes started again.");
+  });
+
+  it("shows an error toast when fixes cannot continue", async () => {
+    continueFixesMock.mockRejectedValue(new Error("Automatic fixes are not paused for this pull request."));
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    await result.current.handleContinueFixes({ pullRequestId: "pr-1", runId: "run-paused" });
+
+    expect(showErrorToast).toHaveBeenCalledWith("Automatic fixes are not paused for this pull request.");
+    expect(showSuccessToast).not.toHaveBeenCalled();
   });
 
   it("stops a running automation without closing the task", async () => {

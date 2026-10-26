@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 import { client } from "@/api-client/client.gen";
+import { setSupportSessionActive, SUPPORT_SESSION_READ_ONLY_MESSAGE } from "@/lib/supportSession";
 
 describe("api-interceptor", () => {
   let originalFetch: typeof globalThis.fetch;
@@ -192,6 +193,86 @@ describe("api-interceptor", () => {
       await expect(failure).rejects.toMatchObject({ code: JSON.parse(body).code });
     }
     expect(locationHref).toBe("http://localhost/dashboard?tab=overview");
+  });
+
+  describe("in a support session", () => {
+    beforeEach(() => {
+      setSupportSessionActive(true);
+    });
+
+    afterEach(() => {
+      setSupportSessionActive(false);
+    });
+
+    it.each([
+      ["POST", "/api/v1/canvases"],
+      ["PUT", "/api/v1/canvases/c1"],
+      ["PATCH", "/account"],
+      ["DELETE", "/api/v1/secrets/s1"],
+      ["POST", "/admin/api/accounts/a1/block"],
+    ])("rejects %s %s before it reaches the server", async (method, path) => {
+      const baseFetch = mock().mockResolvedValue(new Response("", { status: 200 }));
+      globalThis.fetch = baseFetch;
+      const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+      setupApiInterceptor();
+
+      const response = await globalThis.fetch(path, { method });
+
+      expect(response.status).toBe(403);
+      expect(await response.text()).toBe(SUPPORT_SESSION_READ_ONLY_MESSAGE);
+      expect(baseFetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects a write passed as a Request object", async () => {
+      const baseFetch = mock().mockResolvedValue(new Response("", { status: 200 }));
+      globalThis.fetch = baseFetch;
+      const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+      setupApiInterceptor();
+
+      const response = await globalThis.fetch(new Request("http://localhost/api/v1/canvases", { method: "POST" }));
+
+      expect(response.status).toBe(403);
+      expect(baseFetch).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["GET", "/api/v1/canvases"],
+      ["POST", "/admin/api/support-session/end"],
+      ["POST", "/api/v1/factories/f1/scheduled-intake/preview"],
+    ])("allows %s %s", async (method, path) => {
+      const baseFetch = mock().mockResolvedValue(new Response("", { status: 200 }));
+      globalThis.fetch = baseFetch;
+      const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+      setupApiInterceptor();
+
+      const response = await globalThis.fetch(path, { method });
+
+      expect(response.status).toBe(200);
+      expect(baseFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not block writes to other origins", async () => {
+      const baseFetch = mock().mockResolvedValue(new Response("", { status: 200 }));
+      globalThis.fetch = baseFetch;
+      const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+      setupApiInterceptor();
+
+      await globalThis.fetch("https://example.com/collect", { method: "POST" });
+
+      expect(baseFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("allows writes when no support session is active", async () => {
+    const baseFetch = mock().mockResolvedValue(new Response("", { status: 200 }));
+    globalThis.fetch = baseFetch;
+    const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+    setupApiInterceptor();
+
+    const response = await globalThis.fetch("/api/v1/canvases", { method: "POST" });
+
+    expect(response.status).toBe(200);
+    expect(baseFetch).toHaveBeenCalledTimes(1);
   });
 
   it("preserves an existing network Error", async () => {

@@ -26,12 +26,14 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	cases := []struct {
-		provider string
-		max      int
-		canvas   *models.Canvas
+		provider     string
+		max          int
+		instructions string
+		canvas       *models.Canvas
 	}{
-		{provider: models.ProviderGitHub, max: 7},
-		{provider: models.ProviderBitbucket, max: 9},
+		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests."},
+		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request."},
+		{provider: models.ProviderGitHub, max: 3, instructions: ""},
 	}
 	for i := range cases {
 		tc := &cases[i]
@@ -42,6 +44,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Concurrency = &yaml.ConcurrencySpec{Max: &tc.max, Key: "team"}
 			agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 			agent.Configuration["thinkingLevel"] = "low"
+			agent.Configuration["additionalInstructions"] = tc.instructions
 			agent.Configuration["executionTimeoutSeconds"] = 0
 			agent.Configuration["disabledAgentResourceIds"] = []any{}
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
@@ -59,6 +62,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			assert.Equal(t, "runnerSuperPlane", agent.ComponentName())
 			assert.Equal(t, models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"), agent.Configuration["model"])
 			assert.Equal(t, "low", agent.Configuration["thinkingLevel"])
+			assert.Equal(t, tc.instructions, agent.Configuration["additionalInstructions"])
 			assert.EqualValues(t, 0, agent.Configuration["executionTimeoutSeconds"])
 			assert.Equal(t, []any{}, agent.Configuration["disabledAgentResourceIds"])
 			assert.Equal(t, map[string]any{"github-resource": []any{"delete_issue"}}, agent.Configuration["disabledAgentResourceTools"])
@@ -102,11 +106,11 @@ func resetTestPublishCanvas(t *testing.T, r *support.ResourceRegistry, canvas *m
 	t.Helper()
 	doc.Metadata.ID, doc.Metadata.Name = canvas.ID.String(), canvas.Name
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	nodes, edges, err := doc.Parse(r.Registry, r.Organization.ID.String())
+	nodes, edges, err := doc.Parse(r.Registry, canvas.OrganizationID.String())
 	require.NoError(t, err)
 	require.NoError(t, canvases.PublishGeneratedCanvasNodesWithOwner(ctx, database.DB(t.Context()), canvas, nil, "Install test template", nodes, edges,
-		changesets.CanvasPublisherOptions{Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
-	reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+		changesets.CanvasPublisherOptions{Registry: r.Registry, OrgID: canvas.OrganizationID, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
+	reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), canvas.OrganizationID, canvas.ID)
 	require.NoError(t, err)
 	*canvas = *reloaded
 }
@@ -251,9 +255,11 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 	cases := []struct {
 		source          string
 		restrictAuthors bool
+		paused          bool
 	}{
 		{source: models.FactoryIntakeSourceGitHubIssues},
 		{source: models.FactoryIntakeSourceGitHubIssues, restrictAuthors: true},
+		{source: models.FactoryIntakeSourceGitHubIssues, paused: true},
 		{source: models.FactoryIntakeSourceJiraIssues},
 		{source: models.FactoryIntakeSourceSentryExceptions},
 		{source: models.FactoryIntakeSourceDependabotAlerts},
@@ -268,11 +274,17 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		if tc.restrictAuthors {
 			name += "/authors-with-access"
 		}
+		if tc.paused {
+			name += "/paused"
+		}
 		t.Run(name, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
 			settings := intakeSettingsOrDefault(source, intakeSettings{})
 			switch source {
 			case models.FactoryIntakeSourceGitHubIssues:
+				if tc.restrictAuthors {
+					settings.DefaultOwnerID = r.User.String()
+				}
 				settings.Labels = []string{"urgent"}
 				settings.LabelFilterMode = intakeLabelFilterExclude
 				settings.Assignment = intakeAssignmentUnassigned
@@ -285,6 +297,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.JiraMoveOnComplete = false
 				settings.JiraCompletionColumn = "QA"
 			case models.FactoryIntakeSourceSentryExceptions:
+				settings.DefaultOwnerID = r.User.String()
 				settings.SentryNewIssues, settings.SentryRegressedIssues, settings.SentryAssignedIssues = false, false, true
 				settings.SentryLevels = []string{"fatal", "warning"}
 				settings.SentryProjectIDs = []string{"payments", "checkout"}
@@ -328,10 +341,15 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			intake, err := factory.CreateIntake(database.DB(t.Context()), canvas.ID, source)
 			require.NoError(t, err)
 			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			var paused *bool
+			if source == models.FactoryIntakeSourceGitHubIssues {
+				paused = &tc.paused
+			}
 			updated, err := UpdateFactoryIntake(ctx, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}, r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
-				FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), Settings: serializeIntakeSettings(source, settings),
+				FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), Settings: serializeIntakeSettings(source, settings), Paused: paused,
 			})
 			require.NoError(t, err)
+			assert.Equal(t, tc.paused, updated.Intake.GetPaused())
 			expected := updated.Intake.Settings
 			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceJiraIssues {
 				// The editor action historically retains filters, but restores
@@ -344,6 +362,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				require.NoError(t, err)
 				defaultSpec := models.LiveCanvasSpec{Nodes: defaults.Nodes(), Edges: defaults.Edges()}
 				restored := serializeIntakeSettings(source, intakeSettingsFromGraph(source, resolveIntakeGraph(source, defaultSpec), defaultSpec))
+				assert.Empty(t, restored.GetDefaultOwnerId())
 				assert.Equal(t, expected.GetLabels(), restored.GetLabels())
 				assert.Equal(t, expected.GetLabelFilterMode(), restored.GetLabelFilterMode())
 				assert.Equal(t, expected.GetAssignment(), restored.GetAssignment())
@@ -356,10 +375,20 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				}
 			}
 			require.NoError(t, resetTestOrganization(t, r))
+			listed, err := ListFactoryIntakes(ctx, r.Organization.ID.String(), &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+			require.NoError(t, err)
+			require.Len(t, listed.Intakes, 1)
+			assert.Equal(t, tc.paused, listed.Intakes[0].GetPaused())
 			version := resetTestLiveVersion(t, canvas)
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 			actual := intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 			assert.Equal(t, expected, serializeIntakeSettings(source, actual))
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				assert.Equal(t, r.User.String(), listed.Intakes[0].GetSettings().GetDefaultOwnerId())
+				create := findIntakeNode(version.Nodes, resolveIntakeGraph(source, spec).CreateNodeID)
+				require.NotNil(t, create)
+				assert.Equal(t, r.User.String(), create.Configuration["defaultOwnerId"])
+			}
 			if tc.restrictAuthors {
 				require.NotNil(t, findIntakeNode(version.Nodes, intakeAuthorPermissionNodeID))
 				assert.True(t, hasCanvasPath(spec.Edges, intakeFilterNodeID, intakeAuthorPermissionNodeID))
@@ -373,71 +402,88 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 }
 
 func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
-	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
-		for _, source := range []string{models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, models.FactoryPRFeedbackHandlerSourcePullRequestChecks} {
-			t.Run(provider+"/"+source, func(t *testing.T) {
-				r, factory := resetTestFactory(t)
-				require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
-				request := prFeedbackBuildRequest{
-					Repository: "acme/app", Mention: "@review", IgnoreBots: false, AllowedBots: []string{},
-					CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
-					Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent},
-				}
-				doc := buildDiscussionPRFeedbackCanvas(request)
-				if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
-					doc = buildChecksPRFeedbackCanvas(request)
-				}
-				canvas := support.CreateFactoryCanvas(t, r, factory.ID, source)
-				expected := map[string]int{}
-				evidence := map[string]bool{}
-				for i := range doc.Spec.Nodes {
-					node := &doc.Spec.Nodes[i]
-					if isFactoryAgentHarness(node.Component) {
-						node.Configuration["executionTimeoutSeconds"] = 1200 + i
-						node.Configuration["includeVisualEvidence"] = i%2 == 0
-						node.Configuration["model"] = ""
-						expected[node.ID] = 1200 + i
-						evidence[node.ID] = i%2 == 0
-						if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
-							original := node.ID
-							node.ID = "legacy-repair"
-							for j := range doc.Spec.Edges {
-								if doc.Spec.Edges[j].SourceID == original {
-									doc.Spec.Edges[j].SourceID = node.ID
-								}
-								if doc.Spec.Edges[j].TargetID == original {
-									doc.Spec.Edges[j].TargetID = node.ID
+	nonDefaultModel := models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-opus-5")
+	for _, model := range []string{nonDefaultModel, ""} {
+		for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+			for _, source := range []string{models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, models.FactoryPRFeedbackHandlerSourcePullRequestChecks} {
+				t.Run(model+"/"+provider+"/"+source, func(t *testing.T) {
+					r, factory := resetTestFactory(t)
+					require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
+					request := prFeedbackBuildRequest{
+						Repository: "acme/app", Mention: "@review", IgnoreBots: false, AddressAllBots: true, AllowedBots: []string{},
+						CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
+						Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent},
+					}
+					doc := buildDiscussionPRFeedbackCanvas(request)
+					if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+						doc = buildChecksPRFeedbackCanvas(request)
+					}
+					canvas := support.CreateFactoryCanvas(t, r, factory.ID, source)
+					expected := map[string]int{}
+					evidence := map[string]bool{}
+					for i := range doc.Spec.Nodes {
+						node := &doc.Spec.Nodes[i]
+						if isFactoryAgentHarness(node.Component) {
+							node.Configuration["executionTimeoutSeconds"] = 1200 + i
+							node.Configuration["includeVisualEvidence"] = i%2 == 0
+							node.Configuration["model"] = model
+							expected[node.ID] = 1200 + i
+							evidence[node.ID] = i%2 == 0
+							if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+								original := node.ID
+								node.ID = "legacy-repair"
+								for j := range doc.Spec.Edges {
+									if doc.Spec.Edges[j].SourceID == original {
+										doc.Spec.Edges[j].SourceID = node.ID
+									}
+									if doc.Spec.Edges[j].TargetID == original {
+										doc.Spec.Edges[j].TargetID = node.ID
+									}
 								}
 							}
 						}
 					}
-				}
-				resetTestPublishCanvas(t, r, canvas, doc)
-				handler, err := factory.CreatePRFeedbackHandler(database.DB(t.Context()), canvas.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, source)
-				require.NoError(t, err)
-				require.NoError(t, handler.SetMaximumAttempts(database.DB(t.Context()), 8))
-				require.NoError(t, resetTestOrganization(t, r))
-				version := resetTestLiveVersion(t, canvas)
-				spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
-				actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
-				assert.Equal(t, "acme/app", actual.Repository)
-				if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
-					assert.Equal(t, "@review", actual.Mention)
-					assert.False(t, actual.IgnoreBots)
-					assert.Empty(t, actual.AllowedBots)
-				} else {
-					assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
-				}
-				reloaded, err := models.FindPRFeedbackHandlerByCanvasID(database.DB(t.Context()), canvas.ID)
-				require.NoError(t, err)
-				assert.Equal(t, 8, *reloaded.MaximumAttempts)
-				for id, timeout := range expected {
-					node := findIntakeNode(version.Nodes, id)
-					require.NotNil(t, node)
-					assert.EqualValues(t, timeout, node.Configuration["executionTimeoutSeconds"])
-					assert.Equal(t, evidence[id], node.Configuration["includeVisualEvidence"])
-				}
-			})
+					resetTestPublishCanvas(t, r, canvas, doc)
+					handler, err := factory.CreatePRFeedbackHandler(database.DB(t.Context()), canvas.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, source)
+					require.NoError(t, err)
+					require.NoError(t, handler.SetMaximumAttempts(database.DB(t.Context()), 8))
+					require.NoError(t, resetTestOrganization(t, r))
+					version := resetTestLiveVersion(t, canvas)
+					spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+					actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
+					assert.Equal(t, "acme/app", actual.Repository)
+					if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+						assert.Equal(t, "@review", actual.Mention)
+						assert.False(t, actual.IgnoreBots)
+						assert.True(t, actual.AddressAllBots)
+						assert.Empty(t, actual.AllowedBots)
+						prompt := ""
+						runner := findIntakeNode(version.Nodes, prFeedbackRunnerNodeID)
+						require.NotNil(t, runner)
+						steps, _ := runner.Configuration["steps"].([]any)
+						for _, item := range steps {
+							step, _ := item.(map[string]any)
+							if step["name"] == "Address PR feedback" {
+								prompt, _ = step["prompt"].(string)
+							}
+						}
+						assert.Contains(t, prompt, "Read every bot comment, including comments with no mention.")
+						assert.Contains(t, prompt, "Ignore comments SuperPlane already wrote.")
+					} else {
+						assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
+					}
+					reloaded, err := models.FindPRFeedbackHandlerByCanvasID(database.DB(t.Context()), canvas.ID)
+					require.NoError(t, err)
+					assert.Equal(t, 8, *reloaded.MaximumAttempts)
+					for id, timeout := range expected {
+						node := findIntakeNode(version.Nodes, id)
+						require.NotNil(t, node)
+						assert.EqualValues(t, timeout, node.Configuration["executionTimeoutSeconds"])
+						assert.Equal(t, evidence[id], node.Configuration["includeVisualEvidence"])
+						assert.Equal(t, model, node.Configuration["model"])
+					}
+				})
+			}
 		}
 	}
 }
@@ -488,27 +534,51 @@ func TestResetPreservesRunnerProviderAndCredentials(t *testing.T) {
 }
 
 func TestResetPlannerKeepsSettingsWhenGeneratedIDsChange(t *testing.T) {
-	r, factory := resetTestFactory(t)
-	doc := buildBacklogCanvas(backlogCanvasRequest{Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent}})
-	agent := findYAMLNode(t, doc, backlogRefinementNodeID)
-	agent.ID = "legacy-refiner"
-	agent.Configuration["executionTimeoutSeconds"] = 1250
-	agent.Configuration["disabledAgentResourceIds"] = []any{"skill-to-disable"}
-	for i := range doc.Spec.Edges {
-		if doc.Spec.Edges[i].SourceID == backlogRefinementNodeID {
-			doc.Spec.Edges[i].SourceID = agent.ID
-		}
-		if doc.Spec.Edges[i].TargetID == backlogRefinementNodeID {
-			doc.Spec.Edges[i].TargetID = agent.ID
-		}
+	for _, tc := range []struct {
+		name         string
+		instructions string
+	}{
+		{name: "instructions", instructions: "Include rollout risks. Keep {{ example }} literal."},
+		{name: "cleared instructions", instructions: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			doc := buildBacklogCanvas(backlogCanvasRequest{Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent}})
+			agent := findYAMLNode(t, doc, backlogRefinementNodeID)
+			agent.ID = "legacy-refiner"
+			agent.Configuration["additionalInstructions"] = tc.instructions
+			agent.Configuration["steps"].([]any)[0].(map[string]any)["prompt"] = "Retired planning prompt"
+			max := 7
+			agent.Concurrency = &yaml.ConcurrencySpec{Max: &max, Key: "planning-team"}
+			model := models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
+			agent.Configuration["model"] = model
+			agent.Configuration["thinkingLevel"] = "low"
+			agent.Configuration["executionTimeoutSeconds"] = 1250
+			agent.Configuration["disabledAgentResourceIds"] = []any{"skill-to-disable"}
+			for i := range doc.Spec.Edges {
+				if doc.Spec.Edges[i].SourceID == backlogRefinementNodeID {
+					doc.Spec.Edges[i].SourceID = agent.ID
+				}
+				if doc.Spec.Edges[i].TargetID == backlogRefinementNodeID {
+					doc.Spec.Edges[i].TargetID = agent.ID
+				}
+			}
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Planner")
+			resetTestPublishCanvas(t, r, canvas, doc)
+			require.NoError(t, resetTestOrganization(t, r))
+			current := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, backlogRefinementNodeID)
+			require.NotNil(t, current)
+			assert.Equal(t, tc.instructions, current.Configuration["additionalInstructions"])
+			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired planning prompt")
+			assert.Equal(t, model, current.Configuration["model"])
+			assert.Equal(t, "low", current.Configuration["thinkingLevel"])
+			require.NotNil(t, current.Concurrency)
+			assert.Equal(t, max, current.Concurrency.EffectiveMax())
+			assert.Equal(t, "planning-team", current.Concurrency.Key)
+			assert.EqualValues(t, 1250, current.Configuration["executionTimeoutSeconds"])
+			assert.Equal(t, []any{"skill-to-disable"}, current.Configuration["disabledAgentResourceIds"])
+		})
 	}
-	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Planner")
-	resetTestPublishCanvas(t, r, canvas, doc)
-	require.NoError(t, resetTestOrganization(t, r))
-	current := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, backlogRefinementNodeID)
-	require.NotNil(t, current)
-	assert.EqualValues(t, 1250, current.Configuration["executionTimeoutSeconds"])
-	assert.Equal(t, []any{"skill-to-disable"}, current.Configuration["disabledAgentResourceIds"])
 }
 
 func TestResetSupportsLegacyHostedRunnerSettings(t *testing.T) {

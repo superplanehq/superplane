@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useId } from "react";
 
+import { AgentAdditionalInstructions } from "./AgentAdditionalInstructions";
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import { ImplementDurationDraftProvider } from "./ImplementDurationDraft";
 import { ImplementSettingRow } from "./ImplementSettingRow";
@@ -94,7 +95,7 @@ function OwnedImplementConfiguration({
   onSave: SaveSettings;
   onClose?: () => void;
 }) {
-  const settings = useImplementSettingsDraft([agent, ...nodes], true);
+  const settings = useImplementSettingsDraft([agent, ...nodes]);
   if (!settings.draft) return null;
   return (
     <ImplementConfigurationView
@@ -175,6 +176,13 @@ function ImplementConfigurationView({
             {pullRequest ? (
               <PullRequestSettings node={pullRequest} disabled={saving} onDraftChange={onPullRequestDraftChange} />
             ) : null}
+            <AgentAdditionalInstructions
+              draft={agentDraft}
+              disabled={saving}
+              onChange={onAgentDraftChange}
+              description="Add requirements for coding, testing, or pull request descriptions. Applies to future runs."
+              placeholder="For example: Avoid new production dependencies unless the task requires them."
+            />
           </div>
         </section>
         <ImplementSettingsFooter

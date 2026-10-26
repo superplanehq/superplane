@@ -1,14 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useByokRunnerModelDefault } from "@/hooks/useByokRunnerModelDefault";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
 import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { useComponent } from "@/hooks/useComponentData";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
-import { cn } from "@/lib/utils";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 
 import { factoryAgentSkillEditorPath } from "../lib/factoryPagePaths";
@@ -37,9 +35,12 @@ export function PlanningReviewForm({
   organizationId,
   factoryId,
   factoryKey,
-  showVisualEvidenceSetting = false,
   showResources = true,
   showConcurrency = true,
+  showSteps = true,
+  modelLabel,
+  modelDescription,
+  modelOnly = false,
   appearance = "card",
   view = "full",
   onRestoreDefaultPrompt,
@@ -48,24 +49,29 @@ export function PlanningReviewForm({
   onRetryRestore,
   restoreRetryDisabled = false,
   disabled = false,
+  beforeSteps,
 }: {
   draft: PlanningReviewDraft;
   onChange: (next: PlanningReviewDraft) => void;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
-  showVisualEvidenceSetting?: boolean;
   showResources?: boolean;
   showConcurrency?: boolean;
+  showSteps?: boolean;
+  modelLabel?: string;
+  modelDescription?: string;
+  modelOnly?: boolean;
   /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
   appearance?: "card" | "fields";
-  view?: "full" | "implementation";
+  view?: "full" | "implementation" | "planning" | "pr-feedback";
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled?: boolean;
   restoreError?: string;
   onRetryRestore?: () => void;
   restoreRetryDisabled?: boolean;
   disabled?: boolean;
+  beforeSteps?: ReactNode;
 }) {
   const updateComponent = (id: string, next: PlanningReviewComponent) => {
     onChange({
@@ -85,15 +91,19 @@ export function PlanningReviewForm({
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
-          showVisualEvidenceSetting={showVisualEvidenceSetting}
           showResources={showResources}
           showConcurrency={showConcurrency}
+          showSteps={showSteps}
+          modelLabel={modelLabel}
+          modelDescription={modelDescription}
+          modelOnly={modelOnly}
           onRestoreDefaultPrompt={onRestoreDefaultPrompt}
           restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
           restoreError={restoreError}
           onRetryRestore={onRetryRestore}
           restoreRetryDisabled={restoreRetryDisabled}
           disabled={disabled}
+          beforeSteps={beforeSteps}
           onChange={(next) => updateComponent(component.id, next)}
         />
       ))}
@@ -108,32 +118,40 @@ function AgentPanel({
   organizationId,
   factoryId,
   factoryKey,
-  showVisualEvidenceSetting,
   showResources,
   showConcurrency,
+  showSteps,
+  modelLabel,
+  modelDescription,
+  modelOnly,
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled,
   restoreError,
   onRetryRestore,
   restoreRetryDisabled,
   disabled,
+  beforeSteps,
   onChange,
 }: {
   appearance: "card" | "fields";
-  view: "full" | "implementation";
+  view: "full" | "implementation" | "planning" | "pr-feedback";
   component: PlanningReviewComponent;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
-  showVisualEvidenceSetting: boolean;
   showResources: boolean;
   showConcurrency: boolean;
+  showSteps: boolean;
+  modelLabel?: string;
+  modelDescription?: string;
+  modelOnly: boolean;
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled: boolean;
   restoreError?: string;
   onRetryRestore?: () => void;
   restoreRetryDisabled: boolean;
   disabled: boolean;
+  beforeSteps?: ReactNode;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
   const features = useExperimentalFeature(organizationId);
@@ -191,10 +209,10 @@ function AgentPanel({
 
   const modelControl = modelUsedField ? (
     <ConfigurationFieldRenderer
-      field={view === "implementation" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
+      field={view !== "full" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
       hideLabel={appearance === "fields"}
       triggerClassName={
-        view === "implementation" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
+        view !== "full" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
       }
       value={byokModelDefault ?? component.configuration.model}
       onChange={(value) => setConfigurationField("model", value)}
@@ -212,6 +230,7 @@ function AgentPanel({
       autocompleteExampleObj={EXPRESSION_CONTEXT}
       fieldPath="model"
       readOnly={disabled}
+      modelOnly={modelOnly}
     />
   ) : null;
 
@@ -227,8 +246,8 @@ function AgentPanel({
       onChange={(event) =>
         onChange({ ...component, concurrency: { ...component.concurrency, max: event.target.value } })
       }
-      className={view === "implementation" ? "w-24 tabular-nums shadow-none max-sm:text-base" : "shadow-none"}
-      aria-describedby={view === "implementation" ? `planning-review-concurrency-max-${component.id}-help` : undefined}
+      className={view !== "full" ? "w-24 tabular-nums shadow-none max-sm:text-base" : "shadow-none"}
+      aria-describedby={view !== "full" ? `planning-review-concurrency-max-${component.id}-help` : undefined}
     />
   );
 
@@ -240,28 +259,35 @@ function AgentPanel({
       <section
         className={
           appearance === "fields"
-            ? view === "implementation"
+            ? view !== "full"
               ? "flex flex-col gap-8"
               : "flex flex-col gap-6"
-            : cn(
-                "grid gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm",
-                showVisualEvidenceSetting ? "grid-cols-3" : "grid-cols-2",
-              )
+            : "grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm"
         }
         data-testid="planning-review-settings"
       >
-        {view === "implementation" && modelControl ? (
-          <div role="group" aria-label="Default model">
-            <ImplementSettingRow label="Default model" description="The model used to implement tasks.">
+        {view !== "full" && modelControl ? (
+          <div role="group" aria-label={modelLabel ?? "Default model"}>
+            <ImplementSettingRow
+              label={modelLabel ?? "Default model"}
+              description={
+                modelDescription ??
+                (view === "planning"
+                  ? "The model used to plan tasks."
+                  : view === "pr-feedback"
+                    ? "The model used to address pull request comments or failing checks."
+                    : "The model used to implement tasks.")
+              }
+            >
               <div className="w-full min-w-0">{modelControl}</div>
             </ImplementSettingRow>
           </div>
         ) : null}
         {showConcurrency ? (
-          view === "implementation" ? (
+          view !== "full" ? (
             <ImplementSettingRow
               label="Maximum simultaneous runs"
-              description="Extra runs wait until a running implementation finishes."
+              description="Extra runs wait until a running task finishes."
               htmlFor={`planning-review-concurrency-max-${component.id}`}
             >
               {concurrencyControl}
@@ -282,26 +308,15 @@ function AgentPanel({
             disabled={disabled}
             onChange={(seconds) => setConfigurationField("executionTimeoutSeconds", seconds)}
           />
-        ) : modelControl ? (
+        ) : view === "full" && modelControl ? (
           <div className={appearance === "fields" ? "flex flex-col gap-2" : undefined}>
             {appearance === "fields" ? <h3 className="workspace-section-title">Model</h3> : null}
             {modelControl}
           </div>
         ) : null}
-        {showVisualEvidenceSetting ? (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`planning-review-visual-evidence-${component.id}`}>Include visual evidence</Label>
-            <div className="flex h-9 items-center">
-              <Switch
-                id={`planning-review-visual-evidence-${component.id}`}
-                checked={component.configuration.includeVisualEvidence === true}
-                onCheckedChange={(checked) => setConfigurationField("includeVisualEvidence", checked)}
-              />
-            </div>
-          </div>
-        ) : null}
       </section>
-      {view === "full" ? (
+      {view === "full" && showSteps ? beforeSteps : null}
+      {view === "full" && showSteps ? (
         <PlanningReviewStepList
           skills={promptSkills}
           skillHref={(skill) =>

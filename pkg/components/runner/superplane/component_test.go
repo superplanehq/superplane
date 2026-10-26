@@ -2,6 +2,7 @@ package superplane
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,22 +10,74 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	openrouterapi "github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/models"
+	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 const testRunnerMachineType = runner.MachineTypeE1LargeAMD64
 
 type createTaskRequest struct {
-	Commands    []runner.BrokerCommand             `json:"commands,omitempty"`
-	Environment []runner.BrokerEnvironmentVariable `json:"environment,omitempty"`
-	Files       []runner.BrokerTaskFile            `json:"files,omitempty"`
+	Commands    []runner.TaskCommand             `json:"commands,omitempty"`
+	Environment []runner.TaskEnvironmentVariable `json:"environment,omitempty"`
+	Files       []runner.TaskFile                `json:"files,omitempty"`
+}
+
+func TestRunSuperPlaneDispatchesAdditionalInstructions(t *testing.T) {
+	planningPrompt := "Review and score this task\n\nTask details"
+	for _, instructions := range []string{"Avoid new dependencies. Document {{ example }} in the PR.", "", " \n "} {
+		t.Run(instructions, func(t *testing.T) {
+			configuration := map[string]any{
+				"machineType":            testRunnerMachineType,
+				"additionalInstructions": instructions,
+				"environment": []map[string]any{{
+					"name": runner.EnvSuperplanePlanningID, "value": "session-1", "valueSource": "literal",
+				}},
+				"steps": []map[string]any{
+					{"name": "Implementation", "type": "prompt", "prompt": "Implement the task"},
+					{"name": "Push", "type": "bash", "command": "git push"},
+					{"name": "Write PR", "type": "prompt", "prompt": "Write the PR"},
+					{"name": "Plan Task", "type": "prompt", "prompt": planningPrompt},
+				},
+			}
+			resolved, err := workercontexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
+				WithConfigurationFields((&RunSuperPlane{}).Configuration()).Build(configuration)
+			require.NoError(t, err)
+			req := executeSuperPlaneWithConfig(t, resolved, core.DefaultHostedLLMModel{
+				Provider: models.UsageProviderAnthropic, Model: "claude-sonnet-4-6",
+			}, core.HostedLLMAccess{APIKey: "sk-hosted", AllowedModels: []string{"claude-sonnet-4-6"}})
+			for _, path := range []string{"prompts/01-implementation.txt", "prompts/03-write-pr.txt", "prompts/04-plan-task.txt"} {
+				prompt := requireTaskFile(t, req.Files, path).Content
+				if strings.TrimSpace(instructions) == "" {
+					assert.NotContains(t, prompt, "Additional instructions")
+					continue
+				}
+				assert.Contains(t, prompt, instructions)
+				assert.Equal(t, 1, strings.Count(prompt, instructions))
+				assert.Contains(t, prompt, "repository instructions")
+				assert.Contains(t, prompt, "managed planning and scoring rules")
+				assert.NotContains(t, prompt, "Additional instructions for this implementation")
+			}
+			if strings.TrimSpace(instructions) != "" {
+				context := requireTaskFile(t, req.Files, "planning_additional_instructions.md").Content
+				assert.Contains(t, context, instructions)
+				assert.Contains(t, context, "managed planning and scoring rules")
+			} else {
+				assert.False(t, hasTaskFile(req.Files, "planning_additional_instructions.md"))
+			}
+			assert.Contains(t, requireTaskFile(t, req.Files, "prompts/04-plan-task.txt").Content, planningPrompt)
+			assert.Equal(t, "git push", requireTaskFile(t, req.Files, "steps/02-push.sh").Content)
+			assert.Equal(t, instructions, resolved["additionalInstructions"])
+			assert.Equal(t, "Implement the task", configuration["steps"].([]map[string]any)[0]["prompt"])
+		})
+	}
 }
 
 func TestRunSuperPlaneExecuteDispatchesClaude(t *testing.T) {
@@ -40,8 +93,8 @@ func TestRunSuperPlaneExecuteDispatchesClaude(t *testing.T) {
 		APIKey:        "sk-hosted",
 		AllowedModels: []string{"claude-sonnet-4-6"},
 	})
-	require.Len(t, httpContext.Requests, 1)
-	assert.Equal(t, "https://broker.example/v1/tasks", httpContext.Requests[0].URL.String())
+	assert.Empty(t, httpContext.Requests)
+
 	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 	assert.True(t, hasTaskFile(req.Files, "run.js"))
 }
@@ -59,8 +112,8 @@ func TestRunSuperPlaneExecuteDispatchesCodex(t *testing.T) {
 		APIKey:        "sk-openai",
 		AllowedModels: []string{"gpt-5"},
 	})
-	require.Len(t, httpContext.Requests, 1)
-	assert.Equal(t, "https://broker.example/v1/tasks", httpContext.Requests[0].URL.String())
+	assert.Empty(t, httpContext.Requests)
+
 	assert.Equal(t, "sk-openai", requireEnvironmentValue(t, req.Environment, envOpenAIAPIKey))
 }
 
@@ -108,7 +161,7 @@ func TestRunSuperPlaneExecuteMintsOpenRouterChildKey(t *testing.T) {
 		AllowedModels: []string{"anthropic/claude-sonnet-4-6"},
 	})
 
-	require.Len(t, httpContext.Requests, 2)
+	require.Len(t, httpContext.Requests, 1)
 	mintReq := httpContext.Requests[0]
 	assert.Equal(t, http.MethodPost, mintReq.Method)
 	assert.Equal(t, "https://openrouter.ai/api/v1/keys", mintReq.URL.String())
@@ -130,10 +183,11 @@ func TestRunSuperPlaneExecuteMintsOpenRouterChildKey(t *testing.T) {
 }
 
 func TestRunSuperPlaneExecuteFailsWhenOpenRouterManagementKeyIsMissing(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	tasks := &contexts.RunnerTaskContext{}
+
 	httpContext := &contexts.HTTPContext{}
 	err := (&RunSuperPlane{}).Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"model":       "openrouter::anthropic/claude-sonnet-4-6",
@@ -159,12 +213,13 @@ func TestRunSuperPlaneExecuteFailsWhenOpenRouterManagementKeyIsMissing(t *testin
 }
 
 func TestRunSuperPlaneExecuteFailsWhenOpenRouterCreateKeyErrors(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	tasks := &contexts.RunnerTaskContext{}
+
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		{StatusCode: http.StatusForbidden, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"Only management keys can perform this operation"}}`))},
 	}}
 	err := (&RunSuperPlane{}).Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"model":       "openrouter::anthropic/claude-sonnet-4-6",
@@ -192,14 +247,14 @@ func TestRunSuperPlaneExecuteFailsWhenOpenRouterCreateKeyErrors(t *testing.T) {
 }
 
 func TestRunSuperPlaneExecuteDeletesChildKeyWhenCreateTaskFails(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	tasks := &contexts.RunnerTaskContext{CreateErr: errors.New("task create failed")}
+
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"key":"sk-or-v1-child","data":{"hash":"or-hash-1"}}`))},
-		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":"broker down"}`))},
 		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"deleted":true}`))},
 	}}
 	err := (&RunSuperPlane{}).Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"model":       "openrouter::anthropic/claude-sonnet-4-6",
@@ -222,16 +277,16 @@ func TestRunSuperPlaneExecuteDeletesChildKeyWhenCreateTaskFails(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "create task")
-	require.Len(t, httpContext.Requests, 3)
+	require.Len(t, httpContext.Requests, 2)
 	assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
 	assert.Equal(t, "https://openrouter.ai/api/v1/keys", httpContext.Requests[0].URL.String())
-	assert.Equal(t, "https://broker.example/v1/tasks", httpContext.Requests[1].URL.String())
-	assert.Equal(t, http.MethodDelete, httpContext.Requests[2].Method)
-	assert.Equal(t, "https://openrouter.ai/api/v1/keys/or-hash-1", httpContext.Requests[2].URL.String())
-	assert.Equal(t, "Bearer sk-or-mgmt", httpContext.Requests[2].Header.Get("Authorization"))
+
+	assert.Equal(t, http.MethodDelete, httpContext.Requests[1].Method)
+	assert.Equal(t, "https://openrouter.ai/api/v1/keys/or-hash-1", httpContext.Requests[1].URL.String())
+	assert.Equal(t, "Bearer sk-or-mgmt", httpContext.Requests[1].Header.Get("Authorization"))
 }
 
-func TestBuildSuperPlaneBrokerTaskOpenRouterShipsPlanningMCP(t *testing.T) {
+func TestBuildSuperPlaneTaskOpenRouterShipsPlanningMCP(t *testing.T) {
 	prompt := "hello"
 	spec := RunSuperPlaneSpec{
 		MachineType: testRunnerMachineType,
@@ -239,13 +294,13 @@ func TestBuildSuperPlaneBrokerTaskOpenRouterShipsPlanningMCP(t *testing.T) {
 			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: &prompt},
 		},
 	}
-	_, files, err := buildSuperPlaneBrokerTask(
+	_, files, err := buildSuperPlaneTask(
 		models.UsageProviderOpenRouter,
 		spec,
 		"anthropic/claude-sonnet-4-6",
 		"",
 		nil,
-		[]runner.BrokerEnvironmentVariable{{Name: runner.EnvSuperplanePlanningID, Value: "session-1"}},
+		[]runner.TaskEnvironmentVariable{{Name: runner.EnvSuperplanePlanningID, Value: "session-1"}},
 		nil,
 		nil,
 	)
@@ -273,8 +328,10 @@ func TestRunSuperPlaneExecuteUsesNodeModelWhenDefaultIsMissing(t *testing.T) {
 }
 
 func TestRunSuperPlaneExecuteRejectsMissingDefaultModel(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
 	component := &RunSuperPlane{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"steps": []map[string]any{
@@ -293,8 +350,10 @@ func TestRunSuperPlaneExecuteRejectsMissingDefaultModel(t *testing.T) {
 }
 
 func TestRunSuperPlaneExecuteSoftBlocksWhenHostedCreditIsEmpty(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
 	component := &RunSuperPlane{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"steps": []map[string]any{
@@ -309,7 +368,7 @@ func TestRunSuperPlaneExecuteSoftBlocksWhenHostedCreditIsEmpty(t *testing.T) {
 				Provider: models.UsageProviderAnthropic,
 				Model:    "claude-sonnet-4-6",
 			},
-			CreditErr: models.ErrHostedCreditEmpty,
+			CreditErr: billingmodels.ErrHostedCreditEmpty,
 			Access: core.HostedLLMAccess{
 				APIKey:        "sk-hosted",
 				AllowedModels: []string{"claude-sonnet-4-6"},
@@ -319,7 +378,7 @@ func TestRunSuperPlaneExecuteSoftBlocksWhenHostedCreditIsEmpty(t *testing.T) {
 		Requests:       &contexts.RequestContext{},
 	})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, models.ErrHostedCreditEmpty)
+	assert.ErrorIs(t, err, billingmodels.ErrHostedCreditEmpty)
 }
 
 func executeSuperPlane(t *testing.T, defaultModel core.DefaultHostedLLMModel, access core.HostedLLMAccess) createTaskRequest {
@@ -349,14 +408,10 @@ func executeSuperPlaneRun(
 	defaultModel core.DefaultHostedLLMModel,
 	access core.HostedLLMAccess,
 ) (*contexts.HTTPContext, *contexts.ExecutionStateContext, createTaskRequest) {
+	tasks := &contexts.RunnerTaskContext{}
 	t.Helper()
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
-	responses := []*http.Response{
-		{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-superplane-1"}`))},
-	}
+	responses := []*http.Response{}
 	if strings.TrimSpace(access.ManagementKey) != "" {
 		responses = append([]*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"key":"sk-or-v1-child","data":{"hash":"or-hash-1"}}`))},
@@ -368,6 +423,7 @@ func executeSuperPlaneRun(
 
 	component := &RunSuperPlane{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks:   tasks,
 		Configuration: configuration,
 		HTTP:          httpContext,
 		Secrets:       &contexts.SecretsContext{Values: map[string][]byte{}},
@@ -380,10 +436,10 @@ func executeSuperPlaneRun(
 		Requests:       &contexts.RequestContext{},
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, httpContext.Requests)
+	require.NotEmpty(t, tasks.Payload)
 
-	body, err := io.ReadAll(httpContext.Requests[len(httpContext.Requests)-1].Body)
-	require.NoError(t, err)
+	body := tasks.Payload
+	require.NotEmpty(t, body)
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 	return httpContext, state, req
@@ -408,7 +464,7 @@ func TestRunSuperPlaneExecuteAcceptsPersistedUsageSidecar(t *testing.T) {
 	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 }
 
-func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {
+func requireEnvironmentValue(t *testing.T, environment []runner.TaskEnvironmentVariable, name string) string {
 	t.Helper()
 	for _, variable := range environment {
 		if variable.Name == name {
@@ -419,7 +475,7 @@ func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmen
 	return ""
 }
 
-func hasTaskFile(files []runner.BrokerTaskFile, path string) bool {
+func hasTaskFile(files []runner.TaskFile, path string) bool {
 	for _, file := range files {
 		if file.Path == path {
 			return true
@@ -428,7 +484,7 @@ func hasTaskFile(files []runner.BrokerTaskFile, path string) bool {
 	return false
 }
 
-func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {
+func requireTaskFile(t *testing.T, files []runner.TaskFile, path string) runner.TaskFile {
 	t.Helper()
 	for _, file := range files {
 		if file.Path == path {
@@ -436,10 +492,10 @@ func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) r
 		}
 	}
 	t.Fatalf("missing task file %q", path)
-	return runner.BrokerTaskFile{}
+	return runner.TaskFile{}
 }
 
-func commandStrings(commands []runner.BrokerCommand) []string {
+func commandStrings(commands []runner.TaskCommand) []string {
 	out := make([]string, 0, len(commands))
 	for _, command := range commands {
 		out = append(out, command.Command)
@@ -448,8 +504,10 @@ func commandStrings(commands []runner.BrokerCommand) []string {
 }
 
 func TestRunSuperPlaneExecuteRejectsPrivateHostedBaseURL(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
 	component := &RunSuperPlane{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"steps": []map[string]any{

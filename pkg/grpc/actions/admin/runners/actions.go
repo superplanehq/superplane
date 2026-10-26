@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -22,6 +23,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -32,6 +34,8 @@ const (
 	maxCapacityLongPoll       = 30 * time.Second
 	capacityLongPollFrequency = time.Second
 )
+
+var errRunnerStatePrecondition = errors.New("runner state does not match the requested states")
 
 type Service struct {
 	signer       *jwt.Signer
@@ -338,6 +342,9 @@ func (s *Service) DescribeRunner(
 }
 
 func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest) (*pb.DeleteRunnerResponse, error) {
+	if err := validateRunnerStates(req.GetStates()); err != nil {
+		return nil, err
+	}
 	fleet, err := findFleet(ctx, req.GetFleetId())
 	if err != nil {
 		return nil, err
@@ -348,10 +355,18 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 	}
 
 	var runner *models.Runner
+	var releasedTask *models.RunnerTask
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		runner, err = fleet.FindRunner(tx, runnerID)
+		runnerQuery := tx
+		if len(req.GetStates()) > 0 {
+			runnerQuery = runnerQuery.Clauses(clause.Locking{Strength: "UPDATE"})
+		}
+		runner, err = fleet.FindRunner(runnerQuery, runnerID)
 		if err != nil {
 			return err
+		}
+		if len(req.GetStates()) > 0 && !slices.Contains(req.GetStates(), runner.State) {
+			return errRunnerStatePrecondition
 		}
 		if runner.State == models.RunnerStateBusy {
 			if !runner.Ephemeral {
@@ -366,10 +381,17 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 			}
 			return task.RequestCancel(tx, time.Now())
 		}
+		releasedTask, err = runner.FindActiveTask(tx)
+		if err != nil && !errors.Is(err, models.ErrRunnerTaskNotFound) {
+			return err
+		}
 		return runner.Terminate(tx, models.RunnerTerminationRequested)
 	})
 	if errors.Is(err, models.ErrRunnerNotFound) {
 		return nil, grpcerrors.NotFound(err, "runner not found")
+	}
+	if errors.Is(err, errRunnerStatePrecondition) {
+		return nil, grpcerrors.Conflict(err, "runner state does not match the requested states")
 	}
 	if errors.Is(err, models.ErrRunnerBusy) ||
 		errors.Is(err, models.ErrRunnerTaskNotCompletable) {
@@ -377,6 +399,9 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 	}
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to terminate runner")
+	}
+	if releasedTask != nil {
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), releasedTask)
 	}
 	_ = runnercontrol.Publish(runnercontrol.Notification{RunnerID: runner.ID.String()})
 	return &pb.DeleteRunnerResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
@@ -468,6 +493,7 @@ func (s *Service) createRunner(
 	})
 	if err == nil && reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetID, models.RunnerFleetScopeInstallation)
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), reservedTask)
 	}
 	if idempotencyKey != "" && models.IsRunnerCreationIdempotencyKeyConflict(err) {
 		runner, err = loadIdempotentRunner(database.DB(ctx), idempotencyKey, requestHash)
@@ -481,6 +507,8 @@ func (s *Service) createRunner(
 		return nil, nil, grpcerrors.NotFound(err, "fleet not found")
 	case errors.Is(err, models.ErrRunnerTaskNotFound):
 		return nil, nil, grpcerrors.NotFound(err, "task not found")
+	case errors.Is(err, models.ErrOrganizationRunnerCapacity):
+		return nil, nil, grpcerrors.ResourceExhausted(err, "Organization parallel runner limit reached.")
 	case errors.Is(err, models.ErrRunnerTaskNotReservable),
 		errors.Is(err, models.ErrRunnerTaskFleetMismatch),
 		errors.Is(err, models.ErrRunnerTaskBackendMismatch):

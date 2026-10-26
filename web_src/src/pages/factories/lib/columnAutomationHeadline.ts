@@ -16,14 +16,14 @@ export function columnAutomationHeadline(automation: ColumnAutomation): string {
   if (automation.kind === "analysis") {
     return automation.health === "disabled" ? "Planning is off" : "Plans new tasks";
   }
-  if (automation.kind === "custom") {
+  if (automation.kind === "custom" || automation.kind === "custom-verification") {
     return automation.name;
   }
   return FIXED_HEADLINES[automation.kind];
 }
 
 const FIXED_HEADLINES: Record<
-  Exclude<ColumnAutomationKind, "intake" | "agent-step" | "custom" | "analysis">,
+  Exclude<ColumnAutomationKind, "intake" | "agent-step" | "custom" | "custom-verification" | "analysis">,
   string
 > = {
   "pr-discussion": "Addresses pull request comments",

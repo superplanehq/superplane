@@ -3,13 +3,16 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
 
@@ -21,10 +24,11 @@ const (
 )
 
 type SetupOwnerRequest struct {
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Password  string `json:"password"`
+	Email              string `json:"email"`
+	FirstName          string `json:"first_name"`
+	LastName           string `json:"last_name"`
+	Password           string `json:"password"`
+	ShareOwnerIdentity bool   `json:"share_owner_identity"`
 }
 
 type SetupOwnerResponse struct {
@@ -104,10 +108,14 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 			return err
 		}
-		if models.BillingEnabled() {
-			if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
+		if billing.Enabled() {
+			if err := billing.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
 				return err
 			}
+		}
+
+		if err := models.SetShareOwnerIdentity(tx, req.ShareOwnerIdentity); err != nil {
+			return err
 		}
 
 		// Account creation is not the end of the wizard: the owner still
@@ -140,8 +148,19 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 }
 
 type SetupOwnerStatusResponse struct {
-	Status string `json:"status"`
-	Step   string `json:"step,omitempty"`
+	Status           string `json:"status"`
+	Step             string `json:"step,omitempty"`
+	BeaconEnabled    bool   `json:"beacon_enabled"`
+	InstallationType string `json:"installation_type"`
+}
+
+func setupOwnerStatusResponse(status, step string) SetupOwnerStatusResponse {
+	return SetupOwnerStatusResponse{
+		Status:           status,
+		Step:             step,
+		BeaconEnabled:    telemetry.BeaconEnabled(),
+		InstallationType: os.Getenv("SUPERPLANE_INSTALLATION_TYPE"),
+	}
 }
 
 // setupOwnerStatus reports the owner setup wizard state to any caller.
@@ -149,12 +168,12 @@ type SetupOwnerStatusResponse struct {
 // whether the wizard is available, required, in progress, or closed.
 func (s *Server) setupOwnerStatus(w http.ResponseWriter, r *http.Request) {
 	if !middleware.OwnerSetupEnabled() {
-		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusDisabled})
+		respondJSON(w, setupOwnerStatusResponse(setupOwnerStatusDisabled, ""))
 		return
 	}
 
 	if middleware.IsOwnerSetupRequired() {
-		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusRequired})
+		respondJSON(w, setupOwnerStatusResponse(setupOwnerStatusRequired, ""))
 		return
 	}
 
@@ -166,11 +185,11 @@ func (s *Server) setupOwnerStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if step == "" {
-		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusComplete})
+		respondJSON(w, setupOwnerStatusResponse(setupOwnerStatusComplete, ""))
 		return
 	}
 
-	respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusInProgress, Step: step})
+	respondJSON(w, setupOwnerStatusResponse(setupOwnerStatusInProgress, step))
 }
 
 type SetupOwnerProgressRequest struct {
@@ -226,9 +245,9 @@ func (s *Server) updateSetupOwnerProgress(w http.ResponseWriter, r *http.Request
 	}
 
 	if req.Step == "" {
-		respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusComplete})
+		respondJSON(w, setupOwnerStatusResponse(setupOwnerStatusComplete, ""))
 		return
 	}
 
-	respondJSON(w, SetupOwnerStatusResponse{Status: setupOwnerStatusInProgress, Step: req.Step})
+	respondJSON(w, setupOwnerStatusResponse(setupOwnerStatusInProgress, req.Step))
 }

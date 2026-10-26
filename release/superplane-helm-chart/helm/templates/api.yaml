@@ -94,6 +94,8 @@ spec:
             - secretRef:
                 name: {{ include "secrets.jwt.name" . }}
             - secretRef:
+                name: {{ include "secrets.email.name" . }}
+            - secretRef:
                 name: {{ include "secrets.session.name" . }}
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
@@ -112,8 +114,6 @@ spec:
                 name: {{ include "secrets.linear.name" . }}
             {{- end }}
           env:
-            - name: ENCRYPTION_WRITE_FORMAT
-              value: {{ .Values.encryption.writeFormat | quote }}
             - name: START_PUBLIC_API
               value: "yes"
             - name: START_EVENT_DISTRIBUTER
@@ -152,6 +152,10 @@ spec:
               value: "{{ .Values.database.idleInTransactionSessionTimeout }}"
             - name: TEMPLATE_DIR
               value: /app/templates
+            - name: EMAIL_FROM_NAME
+              value: {{ .Values.email.fromName | quote }}
+            - name: EMAIL_FROM_ADDRESS
+              value: {{ .Values.email.fromAddress | quote }}
             - name: OIDC_KEYS_PATH
               value: /app/oidc-keys
             - name: BLOCK_SIGNUP
@@ -178,6 +182,8 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+            - name: SUPERPLANE_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
             {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
 {{- if .Values.fleetManagerSetup.enabled }}
             - name: FLEET_MANAGER_SETUP_CONFIG_PATH

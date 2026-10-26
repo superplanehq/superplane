@@ -7,13 +7,17 @@ import {
   organizationsCreateHostedCreditCheckout,
   organizationsListByokllmModels,
   organizationsListHostedCreditProducts,
+  organizationsQuoteHostedCreditCheckout,
   organizationsUpdateByokllmModels,
   organizationsListOrganizationHostedLlmModels,
   organizationsUpdateOrganizationHostedLlmModels,
   type OrganizationsListOrganizationHostedLlmModelsResponse,
+  type OrganizationsCreateHostedCreditCheckoutBody,
 } from "@/api-client";
 import { getResponseErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+
+import { useBYOKAccess } from "./useBYOKAccess";
 
 import { factoryQueryKeys } from "./useFactoryData";
 import { hostedLLMModelsQueryKey } from "./useHostedLLMModels";
@@ -79,6 +83,7 @@ export function useBYOKLLMModels(
   enabled: boolean,
   factoryId?: string,
 ) {
+  const access = useBYOKAccess(organizationId);
   return useQuery({
     queryKey: byokLLMModelsQueryKey(organizationId ?? "", provider ?? "", factoryId),
     queryFn: async () => {
@@ -91,7 +96,13 @@ export function useBYOKLLMModels(
       );
       return response.data ?? {};
     },
-    enabled: Boolean(organizationId && provider && enabled),
+    enabled: Boolean(
+      organizationId &&
+        provider &&
+        enabled &&
+        access.allowed &&
+        (provider !== "custom" || access.customProviderAllowed),
+    ),
     staleTime: 30 * 1000,
   });
 }
@@ -144,14 +155,42 @@ export function useHostedCreditProducts(organizationId: string | undefined, enab
   });
 }
 
+export function useHostedCreditCheckoutQuote(
+  organizationId: string,
+  input: { productId: string; creditAmountCents: string } | undefined,
+) {
+  return useQuery({
+    queryKey: [
+      "organizations",
+      organizationId,
+      "hosted-credit-checkout-quote",
+      input?.productId,
+      input?.creditAmountCents,
+    ],
+    queryFn: async ({ signal }) => {
+      const response = await organizationsQuoteHostedCreditCheckout(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: organizationId },
+          query: input!,
+          signal,
+        }),
+      );
+      return response.data ?? {};
+    },
+    enabled: Boolean(organizationId && input),
+    retry: false,
+  });
+}
+
 export function useCreateHostedCreditCheckout(organizationId: string) {
   return useMutation({
-    mutationFn: async (productId: string) => {
+    mutationFn: async (input: OrganizationsCreateHostedCreditCheckoutBody) => {
       const response = await organizationsCreateHostedCreditCheckout(
         withOrganizationHeader({
           organizationId,
           path: { id: organizationId },
-          body: { productId },
+          body: input,
         }),
       );
       const checkoutUrl = response.data?.checkoutUrl;

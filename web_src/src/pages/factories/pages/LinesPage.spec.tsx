@@ -17,10 +17,10 @@ import {
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
-  FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
+import { dematerializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
 
 vi.mock("@monaco-editor/react", () => {
   function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
@@ -29,7 +29,6 @@ vi.mock("@monaco-editor/react", () => {
   return { default: MockMonacoEditor, Editor: MockMonacoEditor };
 });
 import {
-  factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
   factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
@@ -45,6 +44,7 @@ import {
   factorySentryIntakeSetupPath,
   firstFactoryLineId,
 } from "../lib/factoryPagePaths";
+import { factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT,
@@ -53,7 +53,6 @@ import {
   DRAFT_WORK_ORDER,
   factoryWithPlanning,
   GITHUB_ISSUES_INTAKE,
-  GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
@@ -704,8 +703,7 @@ describe("LinesPage board", () => {
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
   });
 
-  it("opens an existing phase automation on the split config screen", async () => {
-    enabledExperimentalFeatures.add(FEATURE_WORKSPACE_MCP);
+  it("opens supported Implement settings from the phase automation row", async () => {
     enabledExperimentalFeatures.add(FEATURE_WORKSPACE_SKILLS);
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
@@ -730,8 +728,8 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("column-automation-view-tab-general")).not.toBeInTheDocument();
     const dialog = screen.getByTestId("merge-confidence-config");
     expect(within(dialog).getByRole("heading", { name: "Implement" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
-    expect(within(dialog).getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("implement-settings-save")).toBeInTheDocument();
     expect(within(dialog).getByTestId("merge-confidence-config-tab-automation")).toHaveAttribute(
       "data-state",
       "active",
@@ -741,9 +739,9 @@ describe("LinesPage board", () => {
     expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Concurrency")).toHaveValue(5);
-    expect(within(dialog).getByText("MCP servers")).toBeInTheDocument();
-    expect(within(dialog).getByText("Skills")).toBeInTheDocument();
+    expect(within(dialog).getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(5);
+    expect(within(dialog).queryByText("MCP servers")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Skills")).not.toBeInTheDocument();
   });
 
   it("opens Planning settings from the Task analysis row", async () => {
@@ -916,7 +914,9 @@ describe("LinesPage next steps", () => {
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "How should pull request comments be handled?",
     );
-    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("2/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-next-steps")).not.toHaveTextContent("2/4");
+    expect(screen.getByTestId("workspace-next-steps")).not.toHaveTextContent("3/4");
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
     );
@@ -934,7 +934,9 @@ describe("LinesPage next steps", () => {
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
       "How should failing status checks be handled?",
     );
-    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("3/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-next-steps")).not.toHaveTextContent("2/4");
+    expect(screen.getByTestId("workspace-next-steps")).not.toHaveTextContent("3/4");
     expect(screen.getByTestId("workspace-next-step-cta-pr-checks-handler")).toHaveTextContent("Configure");
     expect(screen.getByTestId("workspace-next-step-later")).toHaveTextContent("Later");
   });
@@ -950,7 +952,9 @@ describe("LinesPage next steps", () => {
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
     const restore = screen.getByTestId("workspace-next-steps-restore");
-    expect(restore).toHaveTextContent("3/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(restore).not.toHaveTextContent("2/4");
+    expect(restore).not.toHaveTextContent("3/4");
     expect(restore).toHaveTextContent("Configure status checks");
     expect(screen.getByTestId("lines-detail-header")).toContainElement(restore);
     const trial = screen.queryByTestId("hosted-credit-header-kicker");
@@ -973,14 +977,18 @@ describe("LinesPage next steps", () => {
     const user = userEvent.setup();
     const { unmount } = renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
     await user.click(screen.getByTestId("workspace-next-step-later"));
-    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-next-steps-restore")).not.toHaveTextContent("2/4");
+    expect(screen.getByTestId("workspace-next-steps-restore")).not.toHaveTextContent("3/4");
     expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
     unmount();
 
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
-    expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("3/4");
+    expect(screen.queryByTestId("workspace-next-steps-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-next-steps-restore")).not.toHaveTextContent("2/4");
+    expect(screen.getByTestId("workspace-next-steps-restore")).not.toHaveTextContent("3/4");
     expect(screen.getByTestId("workspace-next-steps-restore")).toHaveTextContent("Configure status checks");
   });
 
@@ -1109,7 +1117,7 @@ describe("LinesPage board extras", () => {
     );
   });
 
-  it("opens the name dialog when Verify only has custom automation left", async () => {
+  it("opens custom Verify setup when only custom automation remains", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
@@ -1131,32 +1139,23 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
 
     expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
-    expect(screen.getByTestId("factory-app-name-input")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryCustomAutomationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
   });
 
-  it("creates a custom Verify automation and opens the editor", async () => {
+  it("opens custom Verify setup from the catalog", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-    createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "canvas-custom", name: "Destroy ephemeral env" });
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-verify-menu"));
     await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
-    await user.click(screen.getByTestId("add-column-automation-template-custom"));
-    await user.type(screen.getByTestId("factory-app-name-input"), "Destroy ephemeral env");
-    await user.click(screen.getByTestId("factory-app-create-button"));
+    await user.click(screen.getByTestId("add-column-automation-template-custom-verification"));
 
-    await waitFor(() => {
-      expect(createFactoryAutomationMutateAsync).toHaveBeenCalledWith({
-        name: "Destroy ephemeral env",
-        columnKey: "verify",
-      });
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/automations/canvas-custom`,
-      );
-    });
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryCustomAutomationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
   });
 
   it("opens the created scheduled intake in the board automation view", async () => {
@@ -1472,21 +1471,19 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).not.toBeInTheDocument();
   });
 
-  it("opens intake settings from the row and links to the factory canvas editor", async () => {
+  it("opens intake run history from the row and shares the selected tab", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByRole("button", { name: `Open ${GITHUB_ISSUES_INTAKE.name} settings` }));
-    await user.click(screen.getByRole("tab", { name: "Automation" }));
+    await user.click(screen.getByRole("tab", { name: "Runs" }));
 
-    expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
-      "href",
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, GITHUB_ISSUES_INTAKE_APP.id!, {
-        from: "lines",
-        lineId: REFUND_LINE_PLAN_ID,
-      }),
-    );
+    expect(screen.getByRole("table", { name: "Runs" })).toBeInTheDocument();
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
+    expect(location).toHaveTextContent("settings=runs");
+    expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
   });
 
   it("opens the settings of the intake whose row was used", async () => {
@@ -1639,25 +1636,28 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByRole("menuitem", { name: "Edit Automation" })).not.toBeInTheDocument();
   });
 
-  it("saves the Implement agent when a choice changes", async () => {
+  it("saves supported Implement settings after the user confirms", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
-    const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
-    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
+    const dialog = await screen.findByTestId("merge-confidence-config");
+    const concurrency = within(dialog).getByRole("spinbutton", { name: "Maximum simultaneous runs" });
+    fireEvent.change(concurrency, { target: { value: "3" } });
     expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
-    expect(await screen.findByRole("heading", { name: "Implement From Task Description" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Add step" }));
+    expect(commitCanvasStagingMutateAsync).not.toHaveBeenCalled();
 
-    await waitFor(() => {
-      expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step");
-    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step"));
     const saved = updateCanvasVersionMutateAsync.mock.calls.at(-1)?.[0] as { canvasYaml?: string };
-    expect(saved.canvasYaml).toContain("implementation-agent-no-issue");
-    expect(saved.canvasYaml?.match(/type: bash/g)).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
-  });
+    const savedAgent = dematerializeCanvasSpec(saved.canvasYaml ?? "")?.nodes?.find(
+      (node) => node.id === "implementation-agent-no-issue",
+    );
+    expect(savedAgent?.concurrency?.max).toBe(3);
+    expect(savedAgent?.configuration?.steps).toEqual(implementerCanvas.spec.nodes[1].configuration.steps);
+    await waitFor(() => expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument());
+  }, 15000);
 
   it("keeps Backlog Edit as the only edit action", async () => {
     const user = userEvent.setup();

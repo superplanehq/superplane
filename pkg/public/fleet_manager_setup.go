@@ -19,8 +19,10 @@ import (
 )
 
 const (
-	defaultStableRunnerVersion       = "v0.1.0"
-	defaultStableFleetManagerVersion = "v0.1.4"
+	// Fallback when the chart does not set a version and GitHub lookup fails.
+	// Keep these equal to componentReleases in the SuperPlane Helm values.
+	defaultStableRunnerVersion       = "v0.2.1"
+	defaultStableFleetManagerVersion = "v0.1.5"
 	fleetManagerReleaseTagPrefix     = "fleet-manager/"
 	fleetManagerChartRepository      = "oci://ghcr.io/superplanehq/fleet-manager-chart"
 	fleetManagerImageRepository      = "ghcr.io/superplanehq/fleet-manager"
@@ -72,6 +74,8 @@ type fleetManagerSetupResponse struct {
 	ChartRepository            string                     `json:"chartRepository"`
 	ImageRepository            string                     `json:"imageRepository"`
 	RunnerVersions             []string                   `json:"runnerVersions"`
+	StableRunnerVersion        string                     `json:"stableRunnerVersion"`
+	InstallationType           string                     `json:"installationType"`
 	FleetPresets               []fleetManagerFleetPreset  `json:"fleetPresets"`
 	InfrastructureDefaults     fleetManagerInfrastructure `json:"infrastructureDefaults"`
 }
@@ -115,7 +119,8 @@ func (s *Server) adminGetFleetManagerSetup(w http.ResponseWriter, _ *http.Reques
 		return
 	}
 
-	runnerVersion := configuredVersion("RUNNER_STABLE_VERSION", defaultStableRunnerVersion)
+	stableRunnerVersion := configuredVersion("RUNNER_STABLE_VERSION", defaultStableRunnerVersion)
+	runnerVersion := stableRunnerVersion
 	fleetManagerVersion := installationFleetManagerVersion(configuredVersion(
 		"FLEET_MANAGER_STABLE_VERSION",
 		defaultStableFleetManagerVersion,
@@ -147,6 +152,8 @@ func (s *Server) adminGetFleetManagerSetup(w http.ResponseWriter, _ *http.Reques
 		ChartRepository:            fleetManagerChartRepository,
 		ImageRepository:            fleetManagerImageRepository,
 		RunnerVersions:             runnerVersions,
+		StableRunnerVersion:        stableRunnerVersion,
+		InstallationType:           os.Getenv("SUPERPLANE_INSTALLATION_TYPE"),
 		FleetPresets:               presets,
 		InfrastructureDefaults: fleetManagerInfrastructure{
 			Source:             setup.Source,

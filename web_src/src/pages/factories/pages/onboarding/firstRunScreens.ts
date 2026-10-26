@@ -1,7 +1,18 @@
-import type { OnboardingAgentCredentialChoice, OnboardingAgentGate } from "./onboardingAgentReadiness";
-import type { IssuesChoiceId, VcsHostId, WizardStepId } from "./onboardingFixtures";
+import type { VcsHostId, WizardStepId } from "./onboardingFixtures";
 
-export type FirstRunScreen = "welcome" | "host" | "connect" | "ghe-host" | "choose" | "tickets" | "agent";
+export type FirstRunScreen =
+  | "welcome"
+  | "host"
+  | "connect"
+  | "ghe-host"
+  | "choose"
+  | "tickets"
+  | "card"
+  | "agent"
+  | "complete";
+
+export const URL_ONLY_SCREENS: ReadonlySet<string> = new Set<FirstRunScreen>(["welcome", "host", "card", "complete"]);
+export const FINAL_SCREENS: ReadonlySet<FirstRunScreen> = new Set<FirstRunScreen>(["card", "agent", "complete"]);
 
 export const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   vcs: "connect",
@@ -29,6 +40,36 @@ export type GitHubScreenState = {
   accountConnectionRequired: boolean;
 };
 
+export function githubScreenState(args: {
+  githubEnterprise: boolean;
+  pending: boolean;
+  identity: boolean;
+  ready: boolean;
+  enterpriseReady: boolean;
+  stayOnConnect: boolean;
+  appConfigured: boolean;
+  accountConnectionRequired: boolean;
+}): GitHubScreenState {
+  if (args.githubEnterprise) {
+    return {
+      pending: false,
+      identity: args.identity,
+      ready: args.enterpriseReady,
+      stayOnConnect: args.stayOnConnect,
+      appConfigured: args.enterpriseReady,
+      accountConnectionRequired: false,
+    };
+  }
+  return {
+    pending: args.pending,
+    identity: args.identity,
+    ready: args.ready,
+    stayOnConnect: args.stayOnConnect,
+    appConfigured: args.appConfigured,
+    accountConnectionRequired: args.accountConnectionRequired,
+  };
+}
+
 export function screenWithGitHubConnection(screen: FirstRunScreen, github: GitHubScreenState): FirstRunScreen {
   if (github.pending) return screen;
   if (!github.accountConnectionRequired) {
@@ -43,6 +84,15 @@ export function screenWithGitHubConnection(screen: FirstRunScreen, github: GitHu
   return screen;
 }
 
+function screenWithGitHubEnterprise(screen: FirstRunScreen, github: GitHubScreenState): FirstRunScreen {
+  if (github.ready) {
+    if (screen === "welcome" || screen === "connect") return "choose";
+    return screen;
+  }
+  if (screen === "choose" || screen === "connect") return "ghe-host";
+  return screen;
+}
+
 export function screenWithVcsConnection(
   screen: FirstRunScreen,
   vcsHost: VcsHostId | null,
@@ -53,40 +103,7 @@ export function screenWithVcsConnection(
   if (vcsHost === "bitbucket") {
     return screen === "connect" ? "choose" : screen;
   }
-  if (githubEnterprise) {
-    if (github.ready) {
-      if (screen === "welcome" || screen === "connect") return "choose";
-      return screen;
-    }
-    if (screen === "choose" || screen === "connect") return "ghe-host";
-    return screen;
-  }
+  if (githubEnterprise) return screenWithGitHubEnterprise(screen, github);
+  if (screen !== "connect" && screen !== "choose") return screen;
   return screenWithGitHubConnection(screen, github);
-}
-
-export function screenWithoutAgent(screen: FirstRunScreen, agentGate: OnboardingAgentGate): FirstRunScreen {
-  if (screen !== "agent" || agentGate === "show" || agentGate === "first") return screen;
-  return "tickets";
-}
-
-export function screenWithModelSource(
-  screen: FirstRunScreen,
-  agentGate: OnboardingAgentGate,
-  credentialChoice: OnboardingAgentCredentialChoice | null,
-): FirstRunScreen {
-  if (screen !== "tickets" || agentGate !== "first" || credentialChoice) return screen;
-  return "agent";
-}
-
-export function screenWithoutIncompleteBacklog(
-  screen: FirstRunScreen,
-  agentGate: OnboardingAgentGate,
-  issuesChoice: IssuesChoiceId | null,
-  jiraProjectId: string,
-  linearProjectIds: string[],
-): FirstRunScreen {
-  if (screen !== "agent" || agentGate !== "show") return screen;
-  if (issuesChoice === "jira" && !jiraProjectId) return "tickets";
-  if (issuesChoice === "linear" && linearProjectIds.length === 0) return "tickets";
-  return screen;
 }

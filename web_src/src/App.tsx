@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams,
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
+import { useIdentifyOrganizationGroup } from "./hooks/useIdentifyOrganizationGroup";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
@@ -64,6 +65,7 @@ import {
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
   RiskScoreSetupPage,
+  CustomAutomationSetupPage,
   SentryIntakeSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
@@ -95,14 +97,17 @@ import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
+import { Credits as CreditsAdmin } from "./pages/admin/Credits";
 import { InstallationEncryption as InstallationEncryptionAdmin } from "./pages/admin/InstallationEncryption";
 import InstallationLicenseAdmin from "./pages/admin/InstallationLicense";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import { FleetManagerSetup as FleetManagerSetupAdmin } from "./pages/admin/FleetManagerSetup";
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
+import { BillingPlans } from "./pages/admin/BillingPlans";
+import { Features } from "./pages/admin/Features";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
-import ImpersonationBanner from "./components/ImpersonationBanner";
+import { SupportSessionBanner } from "./components/SupportSessionBanner";
 import LicenseExpiryBanner from "./components/LicenseExpiryBanner";
 import { usePageObservability } from "./hooks/usePageObservability";
 
@@ -187,6 +192,10 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/risk-score" element={<RiskScoreSetupPage />} />
+              <Route path=":lineId/setup/custom-automation" element={<CustomAutomationSetupPage />} />
+              <Route path=":lineId/setup/custom-automation/:automationId" element={<CustomAutomationSetupPage />} />
+              <Route path=":lineId/setup/custom-verification" element={<CustomAutomationSetupPage />} />
+              <Route path=":lineId/setup/custom-verification/:automationId" element={<CustomAutomationSetupPage />} />
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
               <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
@@ -258,7 +267,7 @@ function AppRouter() {
     <BrowserRouter>
       <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
-        <ImpersonationBanner />
+        <SupportSessionBanner />
         <LicenseExpiryBanner />
         {/* Phone shells read this region so a fixed shell stays below app banners. */}
         <div className="relative flex-1 overflow-auto" data-app-content-region="">
@@ -274,8 +283,11 @@ function AppRouter() {
                 <Route index element={<OrganizationsListAdmin />} />
                 <Route path="accounts" element={<AccountsListAdmin />} />
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
+                <Route path="credits" element={<CreditsAdmin />} />
                 <Route path="encryption" element={<InstallationEncryptionAdmin />} />
                 <Route path="license" element={<InstallationLicenseAdmin />} />
+                <Route path="billing-plans" element={<BillingPlans />} />
+                <Route path="features" element={<Features />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="fleet-manager-setup" element={<FleetManagerSetupAdmin />} />
@@ -286,6 +298,7 @@ function AppRouter() {
               </Route>
               <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
+              <Route path="invitations/:token" element={withAuthOnly(InviteLinkAccept)} />
               {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
               <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
               {organizationScopedRouteTree()}
@@ -320,10 +333,13 @@ function PageObservabilityScope() {
   return null;
 }
 
+function organizationScopeQueryEnabled(segment: string | undefined, isReserved: boolean, guestLine: boolean): boolean {
+  return !isReserved && !!segment && !guestLine;
+}
+
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account, loading: accountLoading } = useAccount();
-  const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
@@ -337,7 +353,8 @@ export function OrganizationScope() {
     data: organization,
     isLoading: organizationLoading,
     error: organizationError,
-  } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
+    refetch: refreshOrganization,
+  } = useOrganization(segment ?? "", organizationScopeQueryEnabled(segment, isReserved, guestLine));
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
   useRedirectIntegrationSetupReturn(segment, resolvedSlug);
@@ -355,11 +372,19 @@ export function OrganizationScope() {
         })
       : null;
   usePersistOrganizationLastLocation({
-    accountId,
+    accountId: account?.id,
     resolvedSlug,
     isReserved,
     uidRedirectPath,
     path: `${location.pathname}${location.search}`,
+  });
+  useIdentifyOrganizationGroup({
+    accountId: account?.id,
+    organizationKey: segment,
+    inSupportSession: account?.support_session?.active,
+    refreshOrganization: organizationScopeQueryEnabled(segment, isReserved, guestLine)
+      ? refreshOrganization
+      : undefined,
   });
 
   if (isReserved) {

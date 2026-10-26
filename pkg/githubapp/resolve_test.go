@@ -10,10 +10,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/encryption"
 )
 
 func testEncryptor() crypto.Encryptor {
-	return crypto.NewAESGCMEncryptor([]byte("0123456789abcdef0123456789abcdef"))
+	return encryption.NewEncryptor()
 }
 
 func TestResolvePrefersEnvironment(t *testing.T) {

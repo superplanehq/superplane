@@ -20,7 +20,7 @@ import (
 func TestAttachFactoryCommitIdentitySkipsCanvasWithoutFactory(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	original := []runner.BrokerEnvironmentVariable{{
+	original := []runner.TaskEnvironmentVariable{{
 		Name:  runner.EnvGitAuthorEmail,
 		Value: "agent@superplane.com",
 	}}
@@ -54,7 +54,7 @@ func TestAttachFactoryCommitIdentitySetsAuthorEnvironmentAndGitWrapper(t *testin
 	environment, files := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
-	}, []runner.BrokerEnvironmentVariable{
+	}, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvGitAuthorEmail, Value: "agent@superplane.com"},
 		{Name: "KEEP", Value: "yes"},
 	}, nil)
@@ -542,7 +542,7 @@ func withoutGitIdentity(env []string) []string {
 	return out
 }
 
-func envValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {
+func envValue(t *testing.T, environment []runner.TaskEnvironmentVariable, name string) string {
 	t.Helper()
 	for _, variable := range environment {
 		if variable.Name == name {
@@ -553,7 +553,7 @@ func envValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name
 	return ""
 }
 
-func taskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {
+func taskFile(t *testing.T, files []runner.TaskFile, path string) runner.TaskFile {
 	t.Helper()
 	for _, file := range files {
 		if file.Path == path {
@@ -561,7 +561,7 @@ func taskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.B
 		}
 	}
 	t.Fatalf("task has no file %s", path)
-	return runner.BrokerTaskFile{}
+	return runner.TaskFile{}
 }
 
 func readText(t *testing.T, path string) string {

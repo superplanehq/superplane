@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -75,9 +75,9 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 
 	organization, err := models.FindOrganizationByName("Demo")
 	require.NoError(t, err)
-	credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
+	credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), credit.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), credit.GrantMicros)
 
 	owner, err := models.FindAccountByEmail("owner@example.com")
 	require.NoError(t, err)
@@ -88,7 +88,6 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 		Where("scope_type = ?", models.RunnerFleetScopeInstallation).
 		Find(&fleets).Error)
 	require.Empty(t, fleets)
-	assert.True(t, organization.HasExperimentalFeature(features.FeatureNewRunners))
 }
 
 func setupOwnerTestServer(t *testing.T) *Server {
@@ -171,12 +170,48 @@ func patchSetupOwnerProgress(t *testing.T, server *Server, authCookie string, st
 }
 
 func TestSetupOwnerStatusRequired(t *testing.T) {
+	t.Setenv("SUPERPLANE_BEACON_ENABLED", "no")
 	server := setupOwnerTestServer(t)
 
 	status := getSetupOwnerStatus(t, server, "")
 	assert.Equal(t, setupOwnerStatusRequired, status["status"])
 	assert.NotContains(t, status, "step")
 	assert.NotContains(t, status, "organization_slug")
+	assert.Equal(t, false, status["beacon_enabled"])
+}
+
+func TestSetupOwnerStatusReportsBeacon(t *testing.T) {
+	t.Setenv("SUPERPLANE_BEACON_ENABLED", "yes")
+	t.Setenv("SUPERPLANE_INSTALLATION_TYPE", "kubernetes")
+	server := setupOwnerTestServer(t)
+
+	status := getSetupOwnerStatus(t, server, "")
+	assert.Equal(t, true, status["beacon_enabled"])
+	assert.Equal(t, "kubernetes", status["installation_type"])
+}
+
+func TestSetupOwnerPersistsShareOwnerIdentity(t *testing.T) {
+	server := setupOwnerTestServer(t)
+	body, err := json.Marshal(map[string]any{
+		"email":                "owner@example.com",
+		"first_name":           "Owner",
+		"last_name":            "User",
+		"password":             "Password1",
+		"share_owner_identity": true,
+	})
+	require.NoError(t, err)
+
+	response := execRequest(server, requestParams{
+		method:      http.MethodPost,
+		path:        "/api/v1/setup-owner",
+		body:        body,
+		contentType: "application/json",
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+
+	metadata, err := models.GetInstallationMetadata(database.Conn())
+	require.NoError(t, err)
+	assert.True(t, metadata.ShareOwnerIdentity)
 }
 
 func TestSetupOwnerStatusInProgress(t *testing.T) {
@@ -204,6 +239,17 @@ func TestSetupOwnerProgressUpdate(t *testing.T) {
 	status := getSetupOwnerStatus(t, server, authCookie)
 	assert.Equal(t, setupOwnerStatusInProgress, status["status"])
 	assert.Equal(t, models.OwnerSetupStepSMTP, status["step"])
+}
+
+func TestSetupOwnerProgressAcceptsDockerStep(t *testing.T) {
+	server := setupOwnerTestServer(t)
+	authCookie := submitOwnerForm(t, server)
+
+	response := patchSetupOwnerProgress(t, server, authCookie, models.OwnerSetupStepFleetDocker)
+	assert.Equal(t, http.StatusOK, response.Code)
+
+	status := getSetupOwnerStatus(t, server, authCookie)
+	assert.Equal(t, models.OwnerSetupStepFleetDocker, status["step"])
 }
 
 func TestSetupOwnerProgressRejectsUnknownStep(t *testing.T) {
@@ -262,17 +308,17 @@ func TestSetupOwnerProgressRejectsNonAdmin(t *testing.T) {
 }
 
 func TestSetupOwnerSkipsWelcomeCreditWhenBillingDisabled(t *testing.T) {
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	server := setupOwnerTestServer(t)
 	authCookie := submitOwnerForm(t, server)
 
 	organization, err := models.FindOrganizationByName("Demo")
 	require.NoError(t, err)
-	credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
+	credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
 	require.NoError(t, err)
 	assert.Zero(t, credit.GrantMicros)
 
-	plan, err := models.FindOrganizationBillingPlan(database.Conn(), organization.ID)
+	plan, err := billingmodels.FindOrganizationBillingPlan(database.Conn(), organization.ID)
 	require.NoError(t, err)
 	assert.Nil(t, plan)
 

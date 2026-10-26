@@ -2,12 +2,14 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -43,7 +45,7 @@ func FindPlanningSessionByWorkOrder(ctx context.Context, organizationID string, 
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to find planning session")
 	}
-	if session.State != models.PlanningSessionStateEnded {
+	if shouldHeartbeatPlanningSession(ctx, session) {
 		if err := session.Heartbeat(db); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to find planning session")
 		}
@@ -61,7 +63,7 @@ func DescribePlanningSession(ctx context.Context, organizationID string, req *pb
 		return nil, err
 	}
 	db := database.DB(ctx)
-	if session.State != models.PlanningSessionStateEnded {
+	if shouldHeartbeatPlanningSession(ctx, session) {
 		if err := session.Heartbeat(db); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to describe planning session")
 		}
@@ -71,6 +73,11 @@ func DescribePlanningSession(ctx context.Context, organizationID string, req *pb
 		return nil, factoryErrorToStatus(err, "failed to describe planning session")
 	}
 	return &pb.DescribePlanningSessionResponse{Session: serialized}, nil
+}
+
+// A read-only support session must not keep the planning session alive.
+func shouldHeartbeatPlanningSession(ctx context.Context, session *models.FactoryPlanningSession) bool {
+	return session.State != models.PlanningSessionStateEnded && !authentication.IsSupportSessionFromMetadata(ctx)
 }
 
 func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {
@@ -109,6 +116,18 @@ func sendPlanningSessionMessage(
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
 	db := database.DB(ctx)
+	if err := billing.AssertOrganizationPaymentMethod(db, session.OrganizationID); err != nil {
+		if errors.Is(err, billing.ErrPaymentMethodRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, err.Error())
+		}
+		return nil, grpcerrors.Internal(err, "Could not verify the payment method.")
+	}
+	if err := billing.AssertOrganizationPlanAllowsRuns(db, session.OrganizationID); err != nil {
+		if errors.Is(err, billing.ErrHostedSubscriptionRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
+		}
+		return nil, grpcerrors.Internal(err, "Could not verify the organization plan.")
+	}
 	assigned := false
 	firstRefinement := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
@@ -403,11 +422,14 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	if session.CanvasRunID != nil {
 		out.CanvasRunId = session.CanvasRunID.String()
 	}
-	executionID, err := planningSessionExecutionID(tx, session)
+	runtimeBySession, err := planningSessionRuntimes(tx, []*models.FactoryPlanningSession{session})
 	if err != nil {
 		return nil, err
 	}
-	out.ExecutionId = executionID
+	runtime := runtimeBySession[session.ID]
+	out.ExecutionId = runtime.executionID
+	out.RunnerState = runtime.runnerState
+	out.QueueReason = runtime.queueReason
 	out.SelectableModelKey = session.SelectableModelKey
 	if draft := session.Draft(); strings.TrimSpace(draft.Title) != "" {
 		out.Draft = &pb.PlanningSessionDraft{
@@ -425,7 +447,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	return out, nil
 }
 
-func serializePlanningSessionSummary(session *models.FactoryPlanningSession, executionID string) *pb.PlanningSessionSummary {
+func serializePlanningSessionSummary(session *models.FactoryPlanningSession, runtime planningSessionRuntime) *pb.PlanningSessionSummary {
 	if session == nil {
 		return nil
 	}
@@ -433,7 +455,9 @@ func serializePlanningSessionSummary(session *models.FactoryPlanningSession, exe
 		Id:          session.ID.String(),
 		State:       session.State,
 		WaitState:   session.WaitState,
-		ExecutionId: executionID,
+		ExecutionId: runtime.executionID,
+		RunnerState: runtime.runnerState,
+		QueueReason: runtime.queueReason,
 	}
 	if survey := session.CurrentSurvey(); session.SurveyID != nil && len(survey.Questions) > 0 {
 		out.Survey = &pb.PlanningSessionSurvey{
@@ -524,26 +548,22 @@ func planningSessionSurveyQuestions(survey models.PlanningSessionSurvey) []*pb.P
 	questions := make([]*pb.PlanningSessionSurveyQuestion, 0, len(survey.Questions))
 	for _, question := range survey.Questions {
 		questions = append(questions, &pb.PlanningSessionSurveyQuestion{
-			Prompt:  question.Prompt,
-			Options: question.Options,
+			Prompt:            question.Prompt,
+			Options:           question.Options,
+			RecommendedOption: question.RecommendedOption,
 		})
 	}
 	return questions
 }
 
-func planningSessionExecutionID(tx *gorm.DB, session *models.FactoryPlanningSession) (string, error) {
-	if session == nil {
-		return "", nil
-	}
-	ids, err := planningSessionExecutionIDs(tx, []*models.FactoryPlanningSession{session})
-	if err != nil {
-		return "", err
-	}
-	return ids[session.ID], nil
+type planningSessionRuntime struct {
+	executionID string
+	runnerState string
+	queueReason string
 }
 
-func planningSessionExecutionIDs(tx *gorm.DB, sessions []*models.FactoryPlanningSession) (map[uuid.UUID]string, error) {
-	executionBySession := make(map[uuid.UUID]string)
+func planningSessionRuntimes(tx *gorm.DB, sessions []*models.FactoryPlanningSession) (map[uuid.UUID]planningSessionRuntime, error) {
+	runtimeBySession := make(map[uuid.UUID]planningSessionRuntime)
 	runIDsByCanvas := make(map[uuid.UUID][]uuid.UUID)
 	for _, session := range sessions {
 		if session == nil || session.CanvasID == nil || session.CanvasRunID == nil {
@@ -552,7 +572,7 @@ func planningSessionExecutionIDs(tx *gorm.DB, sessions []*models.FactoryPlanning
 		runIDsByCanvas[*session.CanvasID] = append(runIDsByCanvas[*session.CanvasID], *session.CanvasRunID)
 	}
 
-	executionByRun := make(map[uuid.UUID]string)
+	executionByRun := make(map[uuid.UUID]uuid.UUID)
 	for canvasID, runIDs := range runIDsByCanvas {
 		executions, err := models.ListExecutionsForRunsInTransaction(tx, canvasID, runIDs)
 		if err != nil {
@@ -561,9 +581,18 @@ func planningSessionExecutionIDs(tx *gorm.DB, sessions []*models.FactoryPlanning
 		for i := range executions {
 			execution := executions[i]
 			if isPlanningSessionAgentNode(execution.NodeID) {
-				executionByRun[execution.RunID] = execution.ID.String()
+				executionByRun[execution.RunID] = execution.ID
 			}
 		}
+	}
+
+	executionIDs := make([]uuid.UUID, 0, len(executionByRun))
+	for _, executionID := range executionByRun {
+		executionIDs = append(executionIDs, executionID)
+	}
+	runnerStatuses, err := models.ListRunnerTaskExecutionStatuses(tx, executionIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, session := range sessions {
@@ -574,9 +603,14 @@ func planningSessionExecutionIDs(tx *gorm.DB, sessions []*models.FactoryPlanning
 		if !ok {
 			continue
 		}
-		executionBySession[session.ID] = executionID
+		runner := runnerStatuses[executionID]
+		runtimeBySession[session.ID] = planningSessionRuntime{
+			executionID: executionID.String(),
+			runnerState: runner.State,
+			queueReason: runner.QueueReason,
+		}
 	}
-	return executionBySession, nil
+	return runtimeBySession, nil
 }
 
 func isPlanningSessionAgentNode(nodeID string) bool {

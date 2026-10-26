@@ -47,23 +47,12 @@ const FeatureOrganizationBYOK = "organization_byok"
 // organization LLM Models page. It requires FeatureOrganizationBYOK as well.
 const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
 
-// FeatureFactoryCustomAutomations gates blank custom automations on Verify,
-// Done, and phase columns until the flow is generally available.
+// FeatureFactoryCustomAutomations gates custom automations on Verify, Done,
+// and phase columns until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
-
-// FeatureWorkspaceAgent gates the SuperPlane Agent page until it is ready
-// for general use.
-const FeatureWorkspaceAgent = "workspace_agent"
-
-// FeatureWorkspaceMCP gates workspace MCP settings, MCP APIs, and MCP attach.
-const FeatureWorkspaceMCP = "workspace_mcp"
 
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
-
-// FeatureNewRunners routes newly created runner tasks through SuperPlane's
-// integrated runner API. Existing executions keep their persisted backend.
-const FeatureNewRunners = "new_runners"
 
 // FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
 // the Merge button on pull request review until the feature is generally
@@ -75,8 +64,8 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
-// FeatureFactoryRunHistory gates the new Implement run history and details.
-const FeatureFactoryRunHistory = "factory_run_history"
+// FeatureNewBilling enables catalog plan selection and saved-card requirements.
+const FeatureNewBilling = "new_billing"
 
 // FeatureGitHubEnterprise gates GitHub Enterprise Cloud (ghe.com) connections.
 const FeatureGitHubEnterprise = "github_enterprise"
@@ -91,7 +80,7 @@ func released() *bool {
 }
 
 var registry = []Feature{
-	{ID: FeatureFactoryRunHistory, Label: "Factory Run History", Description: "Show the new Implement run history, activity, outputs, and logs"},
+	{ID: FeatureNewBilling, Label: "New Billing", Description: "Choose a billing plan and connect a payment card"},
 	{ID: FeatureGitHubEnterprise, Label: "GitHub Enterprise Cloud", Description: "Connect GitHub Enterprise Cloud (ghe.com) with a private GitHub App"},
 	{ID: FeatureGitHubEnterpriseServer, Label: "GitHub Enterprise Server", Description: "Connect GitHub Enterprise Server. This option is not available yet"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
@@ -103,11 +92,8 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
-	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
-	{ID: FeatureWorkspaceAgent, Label: "SuperPlane Agent", Description: "Show the SuperPlane Agent page"},
-	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
+	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add custom automations to board columns"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
-	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture", Released: released()},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 }

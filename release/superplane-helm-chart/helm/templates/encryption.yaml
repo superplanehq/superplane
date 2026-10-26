@@ -8,7 +8,4 @@ metadata:
 type: Opaque
 data:
   ENCRYPTION_MASTER_KEYS: {{ $masters | b64enc | quote }}
-  {{- if .Values.encryption.key }}
-  ENCRYPTION_KEY: {{ .Values.encryption.key | quote }}
-  {{- end }}
 {{- end }}

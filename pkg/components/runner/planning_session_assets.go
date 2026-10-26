@@ -51,28 +51,29 @@ func FollowUpLoopScript() string { return followUpLoopScript }
 
 // PlanningSessionMCPScriptFile is just the MCP server task file. Attach it
 // together with PlanningSessionMCPConfigFile for runners that speak MCP.
-func PlanningSessionMCPScriptFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "planning_session_mcp.js", Content: planningSessionMCPScript, Mode: "0644"}
+func PlanningSessionMCPScriptFile() TaskFile {
+	return TaskFile{Path: "planning_session_mcp.js", Content: planningSessionMCPScript, Mode: "0644"}
 }
 
 // PlanningSessionMCPConfigFile is the static mcp.json reference config file.
-func PlanningSessionMCPConfigFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "mcp.json", Content: planningSessionMCPConfig, Mode: "0644"}
+func PlanningSessionMCPConfigFile() TaskFile {
+	return TaskFile{Path: "mcp.json", Content: planningSessionMCPConfig, Mode: "0644"}
 }
 
-func PlanningSessionProtocolFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "analysis_protocol.js", Content: analysisProtocolScript, Mode: "0644"}
+func PlanningSessionProtocolFile() TaskFile {
+	return TaskFile{Path: "analysis_protocol.js", Content: analysisProtocolScript, Mode: "0644"}
 }
 
 // PlanningSessionProtocolMarkdown returns the hardcoded refinement system
 // protocol. Runners append this. The canvas prompt must not replace it.
 func PlanningSessionProtocolMarkdown() string {
-	return strings.TrimSpace(analysisProtocolReviewMarkdown)
+	return strings.TrimSpace(analysisProtocolReviewMarkdown) +
+		"\n\n# Managed refinement guidance\n\n" + PlanningSessionUserPromptMarkdown()
 }
 
-// PlanningSessionUserPromptMarkdown is the Refine Task prompt: tone, the
-// 1 through 3 sub-parameters, and plan shape. Factories can edit that node
-// prompt. A saved canvas prompt is not rewritten.
+// PlanningSessionUserPromptMarkdown supplies the full refinement guidance to
+// both the managed protocol and the optional system skill. The canvas prompt
+// only supplies the task. User additions are appended separately at dispatch.
 func PlanningSessionUserPromptMarkdown() string {
 	return strings.TrimSpace(analysisUserPromptReviewMarkdown)
 }
@@ -83,19 +84,19 @@ func PlanningSessionUserPromptReviewMarkdown() string {
 }
 
 // PlanningSessionProtocolMarkdownFile ships the review protocol to runners.
-func PlanningSessionProtocolMarkdownFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "analysis_protocol_review.md", Content: analysisProtocolReviewMarkdown, Mode: "0644"}
+func PlanningSessionProtocolMarkdownFile() TaskFile {
+	return TaskFile{Path: "analysis_protocol_review.md", Content: PlanningSessionProtocolMarkdown(), Mode: "0644"}
 }
 
-func PlanningSessionReviewProtocolMarkdownFile() BrokerTaskFile {
+func PlanningSessionReviewProtocolMarkdownFile() TaskFile {
 	return PlanningSessionProtocolMarkdownFile()
 }
 
 // PlanningSessionMCPFiles returns the MCP server, attachment limit, static
 // config, and analysis protocol task files. Only attach these when
 // HasPlanningSessionToken is true.
-func PlanningSessionMCPFiles() []BrokerTaskFile {
-	return []BrokerTaskFile{
+func PlanningSessionMCPFiles() []TaskFile {
+	return []TaskFile{
 		PlanningSessionMCPScriptFile(),
 		AttachmentLimitFile(),
 		PlanningSessionMCPConfigFile(),
@@ -104,19 +105,19 @@ func PlanningSessionMCPFiles() []BrokerTaskFile {
 	}
 }
 
-func AttachmentLimitFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "attachment_limit.js", Content: attachmentLimitScript, Mode: "0644"}
+func AttachmentLimitFile() TaskFile {
+	return TaskFile{Path: "attachment_limit.js", Content: attachmentLimitScript, Mode: "0644"}
 }
 
-func AppendAttachmentLimitFile(files []BrokerTaskFile) []BrokerTaskFile {
+func AppendAttachmentLimitFile(files []TaskFile) []TaskFile {
 	return appendUniqueTaskFiles(files, AttachmentLimitFile())
 }
 
-func AppendPlanningSessionMCPFiles(files []BrokerTaskFile) []BrokerTaskFile {
+func AppendPlanningSessionMCPFiles(files []TaskFile) []TaskFile {
 	return appendUniqueTaskFiles(files, PlanningSessionMCPFiles()...)
 }
 
-func appendUniqueTaskFiles(files []BrokerTaskFile, extra ...BrokerTaskFile) []BrokerTaskFile {
+func appendUniqueTaskFiles(files []TaskFile, extra ...TaskFile) []TaskFile {
 	seen := make(map[string]struct{}, len(files))
 	for _, file := range files {
 		seen[file.Path] = struct{}{}
@@ -133,13 +134,20 @@ func appendUniqueTaskFiles(files []BrokerTaskFile, extra ...BrokerTaskFile) []Br
 
 // FollowUpLoopFile returns the shared wait-loop task file. Only attach this
 // when HasPlanningSessionToken is true.
-func FollowUpLoopFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "follow_up_loop.js", Content: followUpLoopScript, Mode: "0644"}
+func FollowUpLoopFile() TaskFile {
+	return TaskFile{Path: "follow_up_loop.js", Content: followUpLoopScript, Mode: "0644"}
 }
 
-func AppendPlanningSessionContinuation(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, files []BrokerTaskFile) []BrokerTaskFile {
+func AppendPlanningSessionContinuation(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, files []TaskFile) []TaskFile {
 	if !HasPlanningSessionToken(environment) {
 		return files
+	}
+	// Follow-up turns start fresh agent conversations. Keep project instructions
+	// in a separate task file so every turn receives them, even without rewind text.
+	if instructions := additionalInstructionsText(ctx.Configuration); instructions != "" {
+		files = appendUniqueTaskFiles(files, TaskFile{
+			Path: "planning_additional_instructions.md", Content: instructions, Mode: "0644",
+		})
 	}
 	if file := PlanningSessionContinuationFile(ctx); file != nil {
 		return append(files, *file)
@@ -147,7 +155,7 @@ func AppendPlanningSessionContinuation(ctx core.ExecutionContext, environment []
 	return files
 }
 
-func PlanningSessionContinuationFile(ctx core.ExecutionContext) *BrokerTaskFile {
+func PlanningSessionContinuationFile(ctx core.ExecutionContext) *TaskFile {
 	if ctx.RunID == uuid.Nil {
 		return nil
 	}
@@ -160,5 +168,5 @@ func PlanningSessionContinuationFile(ctx core.ExecutionContext) *BrokerTaskFile 
 	if err != nil || strings.TrimSpace(text) == "" {
 		return nil
 	}
-	return &BrokerTaskFile{Path: "analysis_continuation.md", Content: text, Mode: "0644"}
+	return &TaskFile{Path: "analysis_continuation.md", Content: text, Mode: "0644"}
 }

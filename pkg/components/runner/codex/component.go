@@ -2,6 +2,7 @@ package codex
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -67,7 +68,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 
 ## Configuration
 - **Machine type**: Runner fleet available to the organization (required).
-- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Steps**: One or more ordered bash commands or agent prompts.
 - **Credentials**: SuperPlane secret or OpenAI integration used as ` + "`OPENAI_API_KEY`" + `.
 - **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
@@ -96,6 +97,7 @@ func (c *RunCodex) Configuration() []configuration.Field {
 			"git clone "+githubcommon.DotCom().CloneURL("org/repo")+" /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
+		runner.AgentAdditionalInstructionsField(),
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envOpenAIAPIKey),
 		runner.AgentSkipSetupCommandsField(),
@@ -116,11 +118,7 @@ func (c *RunCodex) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	if err := validateRunCodexSpec(spec); err != nil {
-		return err
-	}
-	_, err = ctx.Webhook.Setup()
-	return err
+	return validateRunCodexSpec(spec)
 }
 
 func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
@@ -141,16 +139,6 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("webhook setup: %w", err)
-	}
-
-	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
-	if err != nil {
-		return fmt.Errorf("new runner task client: %w", err)
-	}
-
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
@@ -164,7 +152,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	}
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
-	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
+	task := buildCodexTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = runner.AppendPlanningSessionMCPFiles(task.Files)
@@ -175,23 +163,21 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps)
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
-	taskID, err := client.CreateTask(runner.CreateTaskParams{
+	taskID, err := runner.CreateTask(ctx.RunnerTasks, runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		Files:          task.Files,
-		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
-		Labels:         runner.OriginLabelsForTask(ctx),
 	})
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
+	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
-func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {
+func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.TaskEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenAIAPIKey, credentials.Secret)
@@ -210,17 +196,17 @@ func (c *RunCodex) Hooks() []core.Hook {
 
 func (c *RunCodex) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == runner.HookPoll {
-		return runner.PollBrokerTask(ctx, FinishedEventType)
+		return runner.PollTask(ctx, FinishedEventType)
 	}
 	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
 func (c *RunCodex) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return runner.HandleBrokerWebhook(ctx, FinishedEventType)
+	return http.StatusNotFound, nil, nil
 }
 
 func (c *RunCodex) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerTask(ctx, FinishedEventType)
+	return runner.CancelTask(ctx, FinishedEventType)
 }
 
 func (c *RunCodex) Cleanup(ctx core.SetupContext) error { return nil }

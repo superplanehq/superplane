@@ -1,7 +1,7 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
+import { FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 
 import {
   type FactorySettingsNavGroup,
@@ -12,9 +12,6 @@ import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
 
 /** Nav item id for the SuperPlane MCP Server (inbound MCP clients). */
 const WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID = "workspace-superplane-mcp-server";
-
-/** Nav item id for the organization LLM Models settings page, gated behind `FEATURE_ORGANIZATION_BYOK`. */
-const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
 
 /**
  * Drops nav items whose experimental features are off, and skips any group
@@ -28,9 +25,6 @@ function visibleFactorySettingsNavGroups(
   const hiddenNavItemIds = new Set<string>();
   if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
     hiddenNavItemIds.add(WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID);
-  }
-  if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
-    hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);
   }
   if (hiddenNavItemIds.size === 0) {
     return groups;
@@ -50,10 +44,10 @@ function visibleFactorySettingsNavGroups(
  */
 export function useVisibleFactorySettingsNavGroups(organizationId: string): FactorySettingsNavGroup[] {
   const settingsNavGroups = useFactorySettingsNavGroups();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const billingProductEnabled = useBillingProductEnabled();
-  const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading);
+  const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, hasPermission, permissionsLoading);
   const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
   if (billingProductEnabled) {
     return visible;

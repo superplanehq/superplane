@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -83,6 +84,50 @@ func TestCode(t *testing.T) {
 	assert.Equal(t, codes.NotFound, Code(NotFound(gorm.ErrRecordNotFound, "user not found")))
 	assert.Equal(t, codes.Internal, Code(Internal(errors.New("db down"), "failed")))
 	assert.Equal(t, codes.PermissionDenied, Code(status.Error(codes.PermissionDenied, "nope")))
+}
+
+func TestFailedPreconditionWithReason(t *testing.T) {
+	err := FailedPreconditionWithReason("Purchase a seat before sending another invitation.", "SEAT_PURCHASE_REQUIRED")
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, st.Code())
+	assert.Equal(t, "Purchase a seat before sending another invitation.", st.Message())
+
+	require.Len(t, st.Details(), 1)
+	info, ok := st.Details()[0].(*errdetails.ErrorInfo)
+	require.True(t, ok)
+	assert.Equal(t, "SEAT_PURCHASE_REQUIRED", info.GetReason())
+	assert.Equal(t, "superplane.com", info.GetDomain())
+}
+
+func TestResourceExhaustedWithReason(t *testing.T) {
+	err := ResourceExhaustedWithReason("Too many invitations were sent. Try again later.", "INVITATION_RATE_LIMITED")
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.ResourceExhausted, st.Code())
+	assert.Equal(t, "Too many invitations were sent. Try again later.", st.Message())
+
+	require.Len(t, st.Details(), 1)
+	info, ok := st.Details()[0].(*errdetails.ErrorInfo)
+	require.True(t, ok)
+	assert.Equal(t, "INVITATION_RATE_LIMITED", info.GetReason())
+	assert.Equal(t, "superplane.com", info.GetDomain())
+}
+
+func TestPermissionDeniedWithReason(t *testing.T) {
+	metadata := map[string]string{"invited_email": "i***@example.com"}
+	err := PermissionDeniedWithReason("Use the invited account.", "INVITATION_EMAIL_MISMATCH", metadata)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, st.Code())
+	assert.Equal(t, "Use the invited account.", st.Message())
+
+	require.Len(t, st.Details(), 1)
+	info, ok := st.Details()[0].(*errdetails.ErrorInfo)
+	require.True(t, ok)
+	assert.Equal(t, "INVITATION_EMAIL_MISMATCH", info.GetReason())
+	assert.Equal(t, "superplane.com", info.GetDomain())
+	assert.Equal(t, metadata, info.GetMetadata())
 }
 
 func TestStatusMessage(t *testing.T) {

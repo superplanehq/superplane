@@ -8,11 +8,23 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
-import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import {
+  DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_SENTRY_INTAKE_SETTINGS,
+  type IntakeSourceSettings,
+} from "./intakeSourceSettingsModel";
+
+vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ currentUserId: "alice" }) }));
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-function popup(settings: IntakeSourceSettings, labelOptions: string[], onSave: (next: IntakeSourceSettings) => void) {
+function popup(
+  settings: IntakeSourceSettings,
+  labelOptions: string[],
+  onSave: (next: IntakeSourceSettings) => void,
+  organizationId?: string,
+  sourceId: "github-issues" | "dependabot-alerts" | "sentry-exceptions" = "github-issues",
+) {
   return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
@@ -20,6 +32,8 @@ function popup(settings: IntakeSourceSettings, labelOptions: string[], onSave: (
           <TooltipProvider>
             <IntakeSourceSettingsPopup
               settings={settings}
+              organizationId={organizationId}
+              sourceId={sourceId}
               labelOptions={labelOptions}
               onSave={onSave}
               onClose={vi.fn()}
@@ -40,6 +54,45 @@ async function pickLabel(name: string) {
 }
 
 describe("IntakeSourceSettingsPopup draft", () => {
+  it("does not offer a default owner for other intake sources", () => {
+    render(popup(DEFAULT_GITHUB_INTAKE_SETTINGS, [], vi.fn(), "org-owner", "dependabot-alerts"));
+    expect(screen.queryByRole("button", { name: "Default task owner" })).not.toBeInTheDocument();
+  });
+  it("keeps the selected Sentry owner in the draft until Save", async () => {
+    queryClient.setQueryData(["organization", "users", "org-owner"], {
+      users: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    });
+    const onSave = vi.fn();
+    render(
+      popup(
+        { ...DEFAULT_SENTRY_INTAKE_SETTINGS, sentryProjectIds: ["payments"] },
+        [],
+        onSave,
+        "org-owner",
+        "sentry-exceptions",
+      ),
+    );
+    const user = userEvent.setup();
+    expect(screen.getByRole("tab", { name: "General" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Default task owner" }));
+    await user.click(await screen.findByRole("option", { name: "Alice" }));
+    expect(onSave).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ defaultOwnerId: "alice" })));
+  });
+  it("keeps the selected owner in the draft until Save", async () => {
+    queryClient.setQueryData(["organization", "users", "org-owner"], {
+      users: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    });
+    const onSave = vi.fn();
+    render(popup(DEFAULT_GITHUB_INTAKE_SETTINGS, [], onSave, "org-owner"));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Default task owner" }));
+    await user.click(await screen.findByRole("option", { name: "Alice" }));
+    expect(onSave).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ defaultOwnerId: "alice" })));
+  });
   it("saves a label picked immediately before Save", async () => {
     const onSave = vi.fn();
     render(popup(DEFAULT_GITHUB_INTAKE_SETTINGS, ["bug"], onSave));

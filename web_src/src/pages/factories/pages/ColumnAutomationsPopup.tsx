@@ -1,6 +1,5 @@
-import { Icon as ComponentIcon } from "@/components/Icon";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
-import { cn } from "@/lib/utils";
+import { cn, resolveIcon } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Bot, Camera, LoaderCircle, Sparkles, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -98,7 +97,10 @@ export function ColumnAutomationGlyph({
   automation: Pick<ColumnAutomation, "iconSrc" | "iconAlt" | "iconName" | "kind">;
   className?: string;
 }) {
-  if (automation.iconName) return <ComponentIcon name={automation.iconName} className={className} />;
+  if (automation.iconName) {
+    const Icon = resolveIcon(automation.iconName);
+    return <Icon className={cn("shrink-0 text-muted-foreground", className)} aria-hidden />;
+  }
   if (automation.iconSrc) {
     return (
       <img

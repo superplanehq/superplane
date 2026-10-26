@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -23,12 +22,21 @@ func CreateFactoryPRFeedbackHandler(
 	organizationID string,
 	req *pb.CreateFactoryPRFeedbackHandlerRequest,
 ) (*pb.CreateFactoryPRFeedbackHandlerResponse, error) {
+	return createFactoryPRFeedbackHandler(ctx, deps, organizationID, database.DB(ctx), req)
+}
+
+func createFactoryPRFeedbackHandler(
+	ctx context.Context,
+	deps PRFeedbackDependencies,
+	organizationID string,
+	db *gorm.DB,
+	req *pb.CreateFactoryPRFeedbackHandlerRequest,
+) (*pb.CreateFactoryPRFeedbackHandlerResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
-	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
@@ -74,7 +82,7 @@ func CreateFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
-	canvasID, err := createPRFeedbackCanvas(ctx, deps, factory, source, name, settings)
+	canvasID, err := createPRFeedbackCanvas(ctx, deps, db, factory, source, name, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -109,17 +117,18 @@ func CreateFactoryPRFeedbackHandler(
 func createPRFeedbackCanvas(
 	ctx context.Context,
 	deps PRFeedbackDependencies,
+	db *gorm.DB,
 	factory *models.Factory,
 	source, name string,
 	settings prFeedbackSettings,
 ) (uuid.UUID, error) {
-	db := database.DB(ctx)
 	binding := resolvePRFeedbackBinding(db, factory, settings.Repository)
 	request := prFeedbackBuildRequest{
 		Name:                   name,
 		Repository:             settings.Repository,
 		Mention:                settings.Mention,
 		IgnoreBots:             settings.IgnoreBots,
+		AddressAllBots:         settings.AddressAllBots,
 		AllowedBots:            settings.AllowedBots,
 		CheckNames:             settings.CheckNames,
 		MaximumAttempts:        settings.MaximumAttempts,
@@ -127,12 +136,8 @@ func createPRFeedbackCanvas(
 		Binding:                binding,
 		Agent:                  resolveIntakeAgent(db, factory),
 		VCSProvider:            factory.OnboardingConfigValue().EffectiveVCSProvider(),
+		OmitCommitIdentity:     true,
 	}
-	omitIdentity, err := models.HasExperimentalFeature(factory.OrganizationID, features.FeatureWorkspaceAgent)
-	if err != nil {
-		return uuid.Nil, factoryErrorToStatus(err, "failed to build PR feedback automation")
-	}
-	request.OmitCommitIdentity = omitIdentity
 	var canvasDoc *yaml.Canvas
 	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
 		canvasDoc = buildChecksPRFeedbackCanvas(request)
@@ -140,13 +145,14 @@ func createPRFeedbackCanvas(
 		canvasDoc = buildDiscussionPRFeedbackCanvas(request)
 	}
 
-	nodes, edges, err := canvasDoc.Parse(deps.Registry, factory.OrganizationID.String())
+	nodes, edges, err := canvasDoc.ParseInTransaction(deps.Registry, factory.OrganizationID.String(), db)
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to build PR feedback automation")
 	}
 
-	response, err := canvases.CreateCanvas(
+	response, err := canvases.CreateCanvasInTransaction(
 		ctx,
+		db,
 		deps.Registry,
 		deps.Encryptor,
 		deps.AuthService,

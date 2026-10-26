@@ -1,20 +1,10 @@
-import type { SuperplaneComponentsNode } from "@/api-client";
 import { useDeleteFactoryIntake, useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
-import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomationsCopy";
 import { dependabotRepositoryValue } from "@/lib/dependabotRepository";
-import { DependabotIntakeConfigBody } from "./DependabotIntakeConfigBody";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
-import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
-import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
-import { SentryIntakeConfigBody } from "./SentryIntakeConfigBody";
-import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   INTAKE_SETTINGS_COPY,
@@ -43,84 +33,13 @@ interface IntakeSettingsHostProps {
 
 /** Settings for one intake, opened from its row at the foot of Backlog. */
 export function IntakeSettingsHost(props: IntakeSettingsHostProps) {
-  const features = useExperimentalFeature(props.organizationId);
-  if (features.has(FEATURE_FACTORY_RUN_HISTORY)) {
-    return <SourceIntakeSettings {...props} />;
-  }
-  if (props.intake.source.id === "dependabot-alerts") {
-    return <DependabotIntakeSettings {...props} />;
-  }
-  if (props.intake.source.id === "sentry-exceptions") {
-    return <SentryIntakeSettings {...props} />;
-  }
-  return <SourceIntakeSettings {...props} />;
-}
-
-function DependabotIntakeSettings(props: IntakeSettingsHostProps) {
-  const { intake, repository } = props;
-  const split = useIntakeSplitSettings(props);
-  const [severityDraft, setSeverityDraft] = useState(intake.settings);
-
-  useEffect(() => {
-    setSeverityDraft(intake.settings);
-  }, [intake.settings]);
-
-  return (
-    <MergeConfidenceConfigModal
-      {...split.modalProps}
-      fallbackNode={DEPENDABOT_SETTINGS_NODE}
-      renderNodeBody={(node) =>
-        node.component === "github.onDependabotAlert" ? (
-          <DependabotIntakeConfigBody
-            node={node}
-            fallbackRepository={repository}
-            settings={severityDraft}
-            savePending={split.updateIntake.isPending}
-            saveError={split.saveError}
-            onSettingsChange={setSeverityDraft}
-            onSave={split.actions.saveSettings}
-          />
-        ) : null
-      }
-    />
-  );
-}
-
-function SentryIntakeSettings(props: IntakeSettingsHostProps) {
-  const { organizationId, intake } = props;
-  const split = useIntakeSplitSettings(props);
-  const [settingsDraft, setSettingsDraft] = useState(intake.settings);
-
-  useEffect(() => {
-    setSettingsDraft(intake.settings);
-  }, [intake.settings]);
-
-  return (
-    <MergeConfidenceConfigModal
-      {...split.modalProps}
-      fallbackNode={SENTRY_SETTINGS_NODE}
-      renderNodeBody={(node) =>
-        node.component === "sentry.onIssue" ? (
-          <SentryIntakeConfigBody
-            settings={settingsDraft}
-            organizationId={organizationId}
-            integrationId={intake.integrationId}
-            savePending={split.updateIntake.isPending}
-            saveError={split.saveError}
-            onSettingsChange={setSettingsDraft}
-            onSave={split.actions.saveSettings}
-          />
-        ) : null
-      }
-    />
-  );
+  return <SourceIntakeSettings key={props.intake.intakeId} {...props} />;
 }
 
 function SourceIntakeSettings({
   organizationId,
   factoryId,
   factoryKey,
-  lineId,
   intake,
   repository,
   vcsIntegrationId,
@@ -151,12 +70,9 @@ function SourceIntakeSettings({
     () => (repositoryLabels.data ?? []).map((resource) => resource.name ?? "").filter((name) => name.length > 0),
     [repositoryLabels.data],
   );
-  const editAutomationHref = intake.appId
-    ? factoryAppConfigurePath(organizationId, factoryKey, intake.appId, { from: "lines", lineId })
-    : undefined;
-  const saveError = updateIntake.error
-    ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError)
-    : undefined;
+  const saveError =
+    actions.pauseError ??
+    (updateIntake.error ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError) : undefined);
   const watchedRepository =
     intake.source.id === "dependabot-alerts"
       ? dependabotRepositoryValue(
@@ -168,6 +84,8 @@ function SourceIntakeSettings({
   return (
     <IntakeSourceSettingsPopup
       settings={intake.settings}
+      paused={actions.paused}
+      onPausedChange={intake.source.id === "github-issues" ? actions.changePaused : undefined}
       sourceId={intake.source.id}
       organizationId={organizationId}
       factoryId={factoryId}
@@ -186,9 +104,7 @@ function SourceIntakeSettings({
       deletePending={deleteIntake.isPending}
       deleteError={actions.deleteError}
       onDelete={actions.removeIntake}
-      editAutomationHref={editAutomationHref}
       canvasId={intake.appId}
-      runHrefFor={intakeRunHref(organizationId, factoryKey, intake.appId, lineId)}
       agent={
         agent.agentNode
           ? {
@@ -210,86 +126,6 @@ function SourceIntakeSettings({
   );
 }
 
-const DEPENDABOT_SETTINGS_NODE: SuperplaneComponentsNode = {
-  id: "dependabot-alerts-settings",
-  name: "On Dependabot Alert",
-  type: "TYPE_TRIGGER",
-  component: "github.onDependabotAlert",
-};
-
-const SENTRY_SETTINGS_NODE: SuperplaneComponentsNode = {
-  id: "sentry-exceptions-settings",
-  name: "On Issue",
-  type: "TYPE_TRIGGER",
-  component: "sentry.onIssue",
-};
-
-const INTAKE_DELETE_COPY: SplitConfigDeleteCopy = {
-  menuLabel: INTAKE_SETTINGS_COPY.delete,
-  title: INTAKE_SETTINGS_COPY.deleteTitle,
-  description: INTAKE_SETTINGS_COPY.deleteDescription,
-  confirmLabel: INTAKE_SETTINGS_COPY.deleteConfirm,
-  pendingLabel: COLUMN_AUTOMATIONS_COPY.deletingLabel,
-  keepLabel: INTAKE_SETTINGS_COPY.deleteCancel,
-};
-
-function useIntakeSplitSettings({
-  organizationId,
-  factoryId,
-  factoryKey,
-  lineId,
-  intake,
-  page = false,
-  onClose,
-}: IntakeSettingsHostProps) {
-  const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
-  const agent = useColumnCanvasAgentEditor(organizationId, intake.appId);
-  const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
-  const deleteIntake = useDeleteFactoryIntake(organizationId, factoryId);
-  const actions = useIntakeSettingsActions({
-    intake,
-    updateIntake,
-    deleteIntake,
-    automationRefetch: automation.refetch,
-    onClose,
-  });
-  const saveError = updateIntake.error
-    ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError)
-    : undefined;
-
-  return {
-    actions,
-    saveError,
-    updateIntake,
-    modalProps: {
-      title: intake.settings.name.trim() || intake.source.name,
-      graph: automation.graph,
-      loading: automation.isLoading,
-      error: automation.isError,
-      onRetry: () => void automation.refetch(),
-      canvasId: intake.appId,
-      factoryId,
-      factoryKey,
-      runHrefFor: intakeRunHref(organizationId, factoryKey, intake.appId, lineId),
-      onClose,
-      onSaveNode: (update: NodeConfigurationSave) => agent.saveNode(update, { notify: false }),
-      onDelete: actions.removeIntake,
-      deletePending: deleteIntake.isPending,
-      deleteError: actions.deleteError,
-      deleteCopy: INTAKE_DELETE_COPY,
-      page,
-      showRunsTab: Boolean(intake.appId),
-    },
-  };
-}
-
-function intakeRunHref(organizationId: string, factoryKey: string, appId: string | undefined, lineId?: string) {
-  if (!appId) {
-    return undefined;
-  }
-  return (runId: string) => factoryAppRunPath(organizationId, factoryKey, appId, runId, { from: "lines", lineId });
-}
-
 function useIntakeSettingsActions({
   intake,
   updateIntake,
@@ -304,9 +140,26 @@ function useIntakeSettingsActions({
   onClose: () => void;
 }) {
   const [deleteError, setDeleteError] = useState<string>();
+  const [pauseError, setPauseError] = useState<string>();
+  const [paused, setPaused] = useState(intake.paused);
+  useEffect(() => setPaused(intake.paused), [intake.intakeId, intake.paused]);
+  const changePaused = useCallback(
+    async (next: boolean) => {
+      setPauseError(undefined);
+      try {
+        await updateIntake.mutateAsync({ intakeId: intake.intakeId, paused: next });
+        setPaused(next);
+      } catch (error) {
+        setPauseError(getApiErrorMessage(error, "SuperPlane could not update the intake. Try again."));
+        throw error;
+      }
+    },
+    [intake.intakeId, updateIntake],
+  );
 
   const saveSettings = useCallback(
     async (next: IntakeSourceSettings) => {
+      setPauseError(undefined);
       const normalized = normalizeIntakeSourceSettings(next, intake.source.id);
       await updateIntake.mutateAsync({
         intakeId: intake.intakeId,
@@ -331,7 +184,7 @@ function useIntakeSettingsActions({
     }
   }, [deleteIntake, intake.intakeId, onClose]);
 
-  return { deleteError, saveSettings, removeIntake };
+  return { deleteError, saveSettings, removeIntake, paused, changePaused, pauseError };
 }
 
 function datadogServiceRebind(

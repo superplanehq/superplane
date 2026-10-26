@@ -1,3 +1,4 @@
+import type { RunHistoryIntakeSource } from "./automationRunHistory/intakeRunData";
 import { AutomationRunHistory } from "@/ui/AutomationRunHistory/AutomationRunHistory";
 import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
 
@@ -5,6 +6,7 @@ export function FactoryAutomationHistory({
   organizationId,
   factoryId,
   canvasId,
+  intakeSource,
   selectedRunId,
   onSelectRun,
   loading,
@@ -14,6 +16,7 @@ export function FactoryAutomationHistory({
   organizationId?: string;
   factoryId?: string;
   canvasId?: string;
+  intakeSource?: RunHistoryIntakeSource;
   selectedRunId: string | null;
   onSelectRun: (id: string | null) => void;
   loading?: boolean;
@@ -38,6 +41,7 @@ export function FactoryAutomationHistory({
       organizationId={organizationId}
       factoryId={factoryId}
       canvasId={canvasId}
+      intakeSource={intakeSource}
       selectedRunId={selectedRunId}
       onSelectRun={onSelectRun}
     />

@@ -50,44 +50,10 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	removeCmd.Flags().StringVar(&removeEmail, "email", "", "identify member by email instead of id")
 	core.Bind(removeCmd, &removeCommand{email: &removeEmail}, options)
 
-	inviteLinkCmd := &cobra.Command{
-		Use:   "invite-link",
-		Short: "Manage the organization invite link",
-	}
-
-	inviteLinkGetCmd := &cobra.Command{
-		Use:   "get",
-		Short: "Get the organization invite link",
-		Args:  cobra.NoArgs,
-	}
-	core.Bind(inviteLinkGetCmd, &inviteLinkGetCommand{}, options)
-
-	var inviteLinkEnabled bool
-	inviteLinkUpdateCmd := &cobra.Command{
-		Use:   "update",
-		Short: "Enable or disable the invite link",
-		Args:  cobra.NoArgs,
-	}
-	inviteLinkUpdateCmd.Flags().BoolVar(&inviteLinkEnabled, "enabled", false, "whether the invite link is enabled")
-	_ = inviteLinkUpdateCmd.MarkFlagRequired("enabled")
-	core.Bind(inviteLinkUpdateCmd, &inviteLinkUpdateCommand{enabled: &inviteLinkEnabled}, options)
-
-	inviteLinkResetCmd := &cobra.Command{
-		Use:   "reset",
-		Short: "Rotate the invite link token",
-		Args:  cobra.NoArgs,
-	}
-	core.Bind(inviteLinkResetCmd, &inviteLinkResetCommand{}, options)
-
-	inviteLinkCmd.AddCommand(inviteLinkGetCmd)
-	inviteLinkCmd.AddCommand(inviteLinkUpdateCmd)
-	inviteLinkCmd.AddCommand(inviteLinkResetCmd)
-
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(updateCmd)
 	root.AddCommand(removeCmd)
-	root.AddCommand(inviteLinkCmd)
 
 	return root
 }

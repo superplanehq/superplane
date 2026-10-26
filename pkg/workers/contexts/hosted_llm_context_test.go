@@ -5,16 +5,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/datatypes"
-
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func Test__HostedLLMContext__AssertModelSelectable(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
@@ -38,6 +39,7 @@ func Test__HostedLLMContext__AssertModelSelectable(t *testing.T) {
 
 func Test__HostedLLMContext__ResolveOpenRouterRequiresManagementKey(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = db.Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
@@ -62,6 +64,7 @@ func Test__HostedLLMContext__ResolveOpenRouterRequiresManagementKey(t *testing.T
 
 func Test__HostedLLMContext__ResolveDecryptsOpenRouterManagementKey(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = db.Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
@@ -89,6 +92,7 @@ func Test__HostedLLMContext__ResolveDecryptsOpenRouterManagementKey(t *testing.T
 
 func Test__HostedLLMContext__ResolveLeavesAnthropicManagementKeyEmpty(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
@@ -113,15 +117,12 @@ func Test__HostedLLMContext__ResolveLeavesAnthropicManagementKeyEmpty(t *testing
 
 func Test__HostedLLMContext__DefaultModelUsesAnAllowedModelWhenInstallationDefaultIsExcluded(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
 		_ = db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
-		_, _ = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
-			MarkupBPS:           models.DefaultMarkupBPS,
-			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
-		})
+		_, _ = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{})
 	})
 
 	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
@@ -132,9 +133,6 @@ func Test__HostedLLMContext__DefaultModelUsesAnAllowedModelWhenInstallationDefau
 	})
 	require.NoError(t, err)
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
 		DefaultHostedProvider: stringPointer("anthropic"),
 		DefaultHostedModel:    stringPointer("claude-sonnet-4-6"),
 	})

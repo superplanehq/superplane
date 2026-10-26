@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
-func TestPRFeedbackOmitsCommitIdentityWhenWorkspaceAgentIsEnabled(t *testing.T) {
+func TestPRFeedbackOmitsCommitIdentity(t *testing.T) {
 	cases := []struct {
 		name     string
 		provider string
@@ -229,17 +229,17 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 
 		assert.Equal(t, []string{
 			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackFindNodeID,
-			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
+			"found:" + prFeedbackFindNodeID + "->" + prFeedbackAcknowledgeCommentNodeID,
+			"default:" + prFeedbackAcknowledgeCommentNodeID + "->" + prFeedbackActivityNodeID,
 			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackRunnerNodeID,
-			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackAcknowledgeCommentNodeID,
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackReviewFindNodeID,
-			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackReviewActivityNodeID,
+			"found:" + prFeedbackReviewFindNodeID + "->" + prFeedbackAcknowledgeReviewNodeID,
+			"default:" + prFeedbackAcknowledgeReviewNodeID + "->" + prFeedbackReviewActivityNodeID,
 			"default:" + prFeedbackReviewActivityNodeID + "->" + prFeedbackReviewRunnerNodeID,
-			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackAcknowledgeReviewNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackReplyFindNodeID,
-			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackReplyActivityNodeID,
+			"found:" + prFeedbackReplyFindNodeID + "->" + prFeedbackAcknowledgeReviewReplyNodeID,
+			"default:" + prFeedbackAcknowledgeReviewReplyNodeID + "->" + prFeedbackReplyActivityNodeID,
 			"default:" + prFeedbackReplyActivityNodeID + "->" + prFeedbackReplyRunnerNodeID,
-			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackAcknowledgeReviewReplyNodeID,
 		}, yamlEdgeChannels(canvas))
 
 		for _, node := range canvas.Spec.Nodes {
@@ -615,6 +615,14 @@ func runnerHasStep(t *testing.T, node yaml.Node, name string) bool {
 }
 
 func withoutPRFeedbackAcknowledgeComment(spec models.LiveCanvasSpec) models.LiveCanvasSpec {
+	nextID := ""
+	for _, edge := range spec.Edges {
+		if edge.SourceID == prFeedbackAcknowledgeCommentNodeID {
+			nextID = edge.TargetID
+			break
+		}
+	}
+
 	nodes := make([]models.Node, 0, len(spec.Nodes))
 	for _, node := range spec.Nodes {
 		if node.ID == prFeedbackAcknowledgeCommentNodeID {
@@ -624,8 +632,14 @@ func withoutPRFeedbackAcknowledgeComment(spec models.LiveCanvasSpec) models.Live
 	}
 	edges := make([]models.Edge, 0, len(spec.Edges))
 	for _, edge := range spec.Edges {
-		if edge.TargetID == prFeedbackAcknowledgeCommentNodeID {
+		if edge.SourceID == prFeedbackAcknowledgeCommentNodeID {
 			continue
+		}
+		if edge.TargetID == prFeedbackAcknowledgeCommentNodeID {
+			if nextID == "" {
+				continue
+			}
+			edge.TargetID = nextID
 		}
 		edges = append(edges, edge)
 	}

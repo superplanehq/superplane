@@ -196,6 +196,53 @@ service Factories {
     };
   }
 
+  rpc CreateFactoryCustomAutomation(CreateFactoryCustomAutomationRequest) returns (CreateFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/custom-automations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create custom automation";
+      description: "Creates a managed Verify-column automation with prompt and bash steps";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactoryCustomAutomation(DescribeFactoryCustomAutomationRequest) returns (DescribeFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe custom automation";
+      description: "Returns the focused settings for a managed Verify-column automation";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryCustomAutomation(UpdateFactoryCustomAutomationRequest) returns (UpdateFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update custom automation";
+      description: "Updates the focused settings and managed graph for a Verify-column automation";
+      tags: "Factory";
+    };
+  }
+
+  rpc RunFactoryCustomAutomation(RunFactoryCustomAutomationRequest) returns (RunFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}:run"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Run custom automation";
+      description: "Starts one managed Verify-column automation for one task";
+      tags: "Factory";
+    };
+  }
+
   rpc PreviewFactorySchedule(PreviewFactoryScheduleRequest) returns (PreviewFactoryScheduleResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/scheduled-intake/preview"
@@ -422,6 +469,20 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Merge factory pull request";
       description: "Merges a tracked GitHub pull request with a method the repository allows";
+      tags: "Factory";
+    };
+  }
+
+  rpc ContinueFactoryPullRequestFixes(
+    ContinueFactoryPullRequestFixesRequest
+  ) returns (ContinueFactoryPullRequestFixesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/continue-fixes"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Continue factory pull request fixes";
+      description: "Resumes paused automatic fixes for a tracked pull request with a fresh attempt budget";
       tags: "Factory";
     };
   }
@@ -1088,6 +1149,10 @@ message Factory {
     // automation is not attached to a board column. Allowed values:
     // "backlog", "verify", "done".
     string column_key = 6;
+    // Saved app template id. "backlog" also marks a Backlog graph that
+    // predates template metadata. Empty for a custom automation.
+    // The id does not change when the canvas name changes.
+    string template_id = 7;
   }
 
   string id = 1;
@@ -1198,6 +1263,82 @@ message CreateFactoryAutomationRequest {
 
 message CreateFactoryAutomationResponse {
   Factory.Automation automation = 1;
+}
+
+message FactoryCustomAutomation {
+  enum StartMode {
+    START_MODE_UNSPECIFIED = 0;
+    START_MODE_MANUAL = 1;
+    START_MODE_AUTOMATIC = 2;
+  }
+
+  message Step {
+    enum Type {
+      TYPE_UNSPECIFIED = 0;
+      TYPE_PROMPT = 1;
+      TYPE_BASH = 2;
+    }
+
+    string name = 1;
+    Type type = 2;
+    string prompt = 3;
+    string command = 4;
+    string working_directory = 5;
+    repeated string secrets = 6;
+  }
+
+  message Settings {
+    StartMode start_mode = 1;
+    FactoryAppTemplateAgent agent = 2;
+    repeated Step steps = 3;
+    string icon = 4;
+    int32 execution_timeout_seconds = 5;
+  }
+
+  Factory.Automation automation = 1;
+  Settings settings = 2;
+  string provider = 3;
+}
+
+message CreateFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string name = 2;
+  FactoryCustomAutomation.Settings settings = 3;
+}
+
+message CreateFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
+}
+
+message DescribeFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+}
+
+message DescribeFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
+}
+
+message UpdateFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+  string name = 3;
+  FactoryCustomAutomation.Settings settings = 4;
+}
+
+message UpdateFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
+}
+
+message RunFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+  string work_order_id = 3;
+}
+
+message RunFactoryCustomAutomationResponse {
+  string run_id = 1;
+  string event_id = 2;
 }
 
 message PreviewFactoryScheduleRequest {
@@ -1369,6 +1510,8 @@ message FactoryIntake {
     // Projects that still create a task. Required for a Sentry intake.
     // Sentry exception intakes only. Values are project slugs.
     repeated string sentry_project_ids = 23;
+    // Organization user ID. Omitted updates preserve the selection; empty clears it.
+    optional string default_owner_id = 24;
   }
 
   string id = 1;
@@ -1448,6 +1591,9 @@ message CreateFactoryIntakeRequest {
   // Optional intake settings applied when the canvas is created. Used by
   // the Jira wizard and first-run tickets step to store the completion column.
   optional FactoryIntake.Settings settings = 8;
+  // When true, the intake starts paused: live items are ignored until
+  // automatic intake is turned on. The initial import still runs.
+  bool paused = 9;
 }
 
 message CreateFactoryIntakeResponse {
@@ -1514,6 +1660,8 @@ message FactoryPRFeedbackHandler {
     bool ignore_bots = 2;
     // GitHub usernames of bots to react to even without the mention.
     repeated string allowed_bots = 3;
+    // Start a run for every bot comment except comments SuperPlane wrote.
+    bool address_all_bots = 4;
   }
 
   message CheckSettings {
@@ -1739,6 +1887,18 @@ message MergeFactoryPullRequestResponse {
   FactoryPullRequest pull_request = 1;
 }
 
+message ContinueFactoryPullRequestFixesRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  // Run of the paused activity that reached the attempt limit.
+  string run_id = 3;
+}
+
+message ContinueFactoryPullRequestFixesResponse {
+  // Root event that restarts the checks automation.
+  string event_id = 1;
+}
+
 message FactoryIntakeItem {
   string id = 1;
   string key = 2;
@@ -1746,6 +1906,8 @@ message FactoryIntakeItem {
   string body = 4;
   string url = 5;
   google.protobuf.Timestamp created_at = 6;
+  // Nonempty when an exact search match cannot be imported by this intake.
+  string disabled_reason = 7;
 }
 
 message SearchFactoryIntakeItemsRequest {
@@ -1818,6 +1980,7 @@ message CreateWorkOrderRequest {
   string title = 2;
   string description = 3;
   repeated string assignee_ids = 4;
+  string model = 5;
 }
 
 message CreateWorkOrderResponse {
@@ -2110,7 +2273,7 @@ message WorkOrderExecution {
   repeated string models = 13;
   // Why the step failed before it could run. Set only for SuperPlane
   // hosted credit failures: no_hosted_credit,
-  // hosted_subscription_required, or workspace_budget_empty.
+  // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
 }
 
@@ -2611,6 +2774,12 @@ message DescribeFactoryUsageResponse {
   bool factory_remaining_credit_warning = 12;
   int64 total_duration_seconds = 13;
   repeated UsageByMachineType by_machine_type = 14;
+  // Exact hosted credit gate for new runs. Whole-cent balances round down,
+  // so clients must use this flag instead of remaining_credit_cents.
+  bool hosted_credit_available = 15;
+  // Exact workspace hosted budget gate for new runs. True when the workspace
+  // has no cap or its capped remainder is still positive.
+  bool factory_hosted_budget_available = 16;
 }
 
 message ListFactoryWorkOrderRunUsageRequest {
@@ -2667,6 +2836,7 @@ message ListFactoryLineRunnerModelsRequest {
 
 message ListFactoryLineRunnerModelsResponse {
   repeated FactoryLLMModel models = 1;
+  bool uses_hosted_funding = 2;
 }
 
 message ListFactoryLLMModelsRequest {
@@ -2940,6 +3110,7 @@ message PlanningSessionActivity {
 message PlanningSessionSurveyQuestion {
   string prompt = 1;
   repeated string options = 2;
+  string recommended_option = 3;
 }
 
 message PlanningSessionSurvey {
@@ -2955,6 +3126,10 @@ message PlanningSessionSummary {
   string wait_state = 3;
   string execution_id = 4;
   PlanningSessionSurvey survey = 5;
+  // Integrated runner task state, independent of the agent node state.
+  string runner_state = 6;
+  // "parallelism_limit" while a queued task waits for organization capacity.
+  string queue_reason = 7;
 }
 
 message PlanningSession {
@@ -2973,6 +3148,10 @@ message PlanningSession {
   string selectable_model_key = 13;
   PlanningSessionKind kind = 14;
   repeated PlanningSessionActivity activities = 15;
+  // Integrated runner task state, independent of the agent node state.
+  string runner_state = 16;
+  // "parallelism_limit" while a queued task waits for organization capacity.
+  string queue_reason = 17;
 }
 
 enum PlanningSessionKind {
@@ -3036,6 +3215,7 @@ message FactoryMCPClient {
   string user_email = 5;
   google.protobuf.Timestamp created_at = 6;
   string user_avatar_url = 7;
+  int32 workspace_count = 8;
 }
 
 message ListFactoryMCPClientsRequest {

@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState, type ComponentProps } from "react";
 
+import { FirstRunTicketsScreen } from "./onboarding/first-run/FirstRunTicketsScreen";
+
 import { FIRST_RUN_COPY } from "./onboarding/first-run/firstRunCopy";
 import { firstRunStoryChrome } from "./onboarding/first-run/firstRunMocks";
 import { analysisSphereFor } from "./onboarding/first-run/firstRunSphereFor";
@@ -166,4 +168,42 @@ export const AnalysisFailed: Story = {
 export const Board: Story = {
   name: "6 Board",
   render: () => <FirstRunBoardExit />,
+};
+
+function ImportChoiceStory() {
+  const [skip, setSkip] = useState(false);
+  const [automaticIntake, setAutomaticIntake] = useState(true);
+  return (
+    <FirstRunTicketsScreen
+      ticketSource="github-issues"
+      repository="acme/payments-service"
+      githubConnected
+      skipInitialImport={skip}
+      onSkipInitialImportChange={setSkip}
+      automaticIntake={automaticIntake}
+      onAutomaticIntakeChange={setAutomaticIntake}
+      onSelectTicketSource={() => undefined}
+      onAnalyzeTickets={() => undefined}
+    />
+  );
+}
+
+export const FirstWorkspaceImport: Story = {
+  name: "4a First workspace import",
+  render: () => (
+    <FirstRunTicketsScreen
+      ticketSource="github-issues"
+      repository="acme/payments-service"
+      githubConnected
+      initialImportLimit={3}
+      onAutomaticIntakeChange={() => undefined}
+      onSelectTicketSource={() => undefined}
+      onAnalyzeTickets={() => undefined}
+    />
+  ),
+};
+
+export const LaterWorkspaceImport: Story = {
+  name: "4b Later workspace import",
+  render: () => <ImportChoiceStory />,
 };
