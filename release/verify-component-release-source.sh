@@ -26,9 +26,16 @@ for name in "${required_environment[@]}"; do
     exit 1
   fi
 done
-if [ "${SEMAPHORE_GIT_BRANCH}" != "main" ]; then
-  echo "Error: component releases must originate from main" >&2
-  exit 1
+SOURCE_BRANCH="${SEMAPHORE_GIT_BRANCH}"
+if [ "${SOURCE_BRANCH}" != "main" ]; then
+  if [ "${COMPONENT}" != "superplane" ]; then
+    echo "Error: component releases must originate from main" >&2
+    exit 1
+  fi
+  if [[ ! "${SOURCE_BRANCH}" =~ ^release/v[0-9]+\.[0-9]+\.x$ ]]; then
+    echo "Error: SuperPlane releases must originate from main or release/vMAJOR.MINOR.x" >&2
+    exit 1
+  fi
 fi
 if [ "${SEMAPHORE_PIPELINE_PROMOTION}" != "true" ]; then
   echo "Error: component releases must run as a manual promotion" >&2
@@ -45,10 +52,11 @@ if [ -n "${worktree_changes}" ]; then
   exit 1
 fi
 
-git -C "${REPO_ROOT}" fetch --quiet --tags origin main
+SOURCE_REF="origin/${SOURCE_BRANCH}"
+git -C "${REPO_ROOT}" fetch --quiet --tags origin "${SOURCE_BRANCH}"
 if ! git -C "${REPO_ROOT}" merge-base --is-ancestor \
-  "${SEMAPHORE_GIT_SHA}" origin/main; then
-  echo "Error: ${SEMAPHORE_GIT_SHA} is no longer reachable from origin/main" >&2
+  "${SEMAPHORE_GIT_SHA}" "${SOURCE_REF}"; then
+  echo "Error: ${SEMAPHORE_GIT_SHA} is no longer reachable from ${SOURCE_REF}" >&2
   exit 1
 fi
 if git -C "${REPO_ROOT}" ls-remote --exit-code --tags origin \
