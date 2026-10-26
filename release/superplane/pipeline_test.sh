@@ -37,8 +37,10 @@ ruby -ryaml -e '
   raise "candidate verification must verify the prepared manifest" unless candidate_verification.include?("verify-manifest")
   raise "candidate verification must export resolved component defaults" unless candidate_verification.include?("component-releases-${RELEASE_CANDIDATE_VERSION}.yaml")
   asset_build = blocks.fetch("Build Release Assets").dig("task", "jobs", 0, "commands").join("\n")
-  reuses_candidate_defaults = asset_build.include?("update-component-release-defaults.js") && asset_build.include?("COMPONENT_RELEASES_ALREADY_RESOLVED=yes")
-  raise "stable assets must reuse candidate component defaults" unless reuses_candidate_defaults
+  raise "stable assets must use the finalization build" unless asset_build.include?("build-finalized-assets.sh")
+  %w[$component_releases $RELEASE_VERSION $SEMAPHORE_GIT_SHA].each do |argument|
+    raise "finalization build must receive #{argument}" unless asset_build.include?(argument)
+  end
 
   publish = YAML.safe_load(File.read(ARGV[1]))
   publish_blocks = publish.fetch("blocks").to_h { |block| [block.fetch("name"), block] }

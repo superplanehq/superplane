@@ -127,12 +127,8 @@ blocks:
                 artifact pull workflow "$component_releases"
                 artifact pull workflow "$component_releases.sha256"
                 sha256sum --check "$component_releases.sha256"
-                node release/superplane-helm-chart/update-component-release-defaults.js \
-                  reuse \
+                bash release/superplane/build-finalized-assets.sh \
                   "$component_releases" \
-                  release/superplane-helm-chart/helm/values.yaml
-                COMPONENT_RELEASES_ALREADY_RESOLVED=yes \
-                  bash release/superplane/build-assets.sh \
                   "$RELEASE_VERSION" "$SEMAPHORE_GIT_SHA" \
                   "build/superplane-assets/$RELEASE_VERSION"
               else
