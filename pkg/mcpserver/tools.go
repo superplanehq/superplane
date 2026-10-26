@@ -22,6 +22,8 @@ import (
 type Runtime struct {
 	Auth   authorization.PermissionChecker
 	Intake factories.IntakeDependencies
+	// BaseURL is the installation's web app base URL. Task and workspace URLs are built from it.
+	BaseURL string
 }
 
 func Tools() []Tool {
@@ -244,7 +246,12 @@ func (rt *Runtime) listWorkspaces(ctx context.Context, claims *AccessClaims, _ m
 		if !OrganizationAllowsPublicMCP(factory.OrganizationID) || !organizationAllowsFactories(factory.OrganizationID) {
 			return ToolResult{}, ToolError("Not found")
 		}
-		rows = append(rows, workspaceRow{ID: factory.ID.String(), Name: factory.Name})
+		rows = append(rows, workspaceRow{
+			ID:   factory.ID.String(),
+			Name: factory.Name,
+			Slug: factory.RouteSegment(),
+			URL:  workspaceURL(rt.BaseURL, factory.OrganizationID, factory.RouteSegment()),
+		})
 	}
 	return TextResult(mustJSON(map[string]any{"workspaces": rows})), nil
 }
@@ -281,6 +288,10 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links, err := rt.taskLinksFor(ctx, claims, factoryID)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	type taskRow struct {
 		ID        string        `json:"id"`
 		Key       string        `json:"key"`
@@ -288,6 +299,7 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 		State     string        `json:"state"`
 		Assignees []assigneeRef `json:"assignees"`
 		SourceURL string        `json:"source_url"`
+		URL       string        `json:"url"`
 	}
 	rows := make([]taskRow, 0, len(resp.GetOrders()))
 	for _, order := range resp.GetOrders() {
@@ -302,6 +314,7 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 			State:     protoStateName(order.GetState()),
 			Assignees: assigneeRefs(order.GetAssignees()),
 			SourceURL: sourceURL,
+			URL:       links.url(order.GetNumber()),
 		})
 	}
 	payload := map[string]any{"tasks": rows, "has_next_page": resp.GetHasNextPage()}
@@ -327,6 +340,10 @@ func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[s
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links, err := rt.taskLinksFor(ctx, claims, factoryID)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	order := resp.GetOrder()
 	return TextResult(mustJSON(map[string]any{
 		"id":          order.GetId(),
@@ -335,6 +352,7 @@ func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[s
 		"description": order.GetDescription(),
 		"state":       protoStateName(order.GetState()),
 		"assignees":   assigneeRefs(order.GetAssignees()),
+		"url":         links.url(order.GetNumber()),
 	})), nil
 }
 
@@ -464,12 +482,17 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links, err := rt.taskLinksFor(ctx, claims, factoryID)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	order := resp.GetOrder()
 	return TextResult(mustJSON(map[string]any{
 		"id":    order.GetId(),
 		"key":   order.GetKey(),
 		"title": order.GetTitle(),
 		"state": protoStateName(order.GetState()),
+		"url":   links.url(order.GetNumber()),
 	})), nil
 }
 
@@ -515,12 +538,17 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links, err := rt.taskLinksFor(ctx, claims, factoryID)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	order := result.Order
 	payload := map[string]any{
 		"id":     order.GetId(),
 		"key":    order.GetKey(),
 		"state":  protoStateName(order.GetState()),
 		"column": result.Column,
+		"url":    links.url(order.GetNumber()),
 	}
 	if result.PullRequestURL != "" {
 		payload["pull_request_url"] = result.PullRequestURL
@@ -566,11 +594,16 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links, err := rt.taskLinksFor(ctx, claims, factoryID)
+	if err != nil {
+		return ToolResult{}, err
+	}
 	order := resp.GetOrder()
 	return TextResult(mustJSON(map[string]any{
 		"id":        order.GetId(),
 		"key":       order.GetKey(),
 		"assignees": assigneeRefs(order.GetAssignees()),
+		"url":       links.url(order.GetNumber()),
 	})), nil
 }
 
@@ -830,6 +863,8 @@ func sessionSummary(session *pb.PlanningSession) map[string]any {
 type workspaceRow struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	Slug string `json:"slug"`
+	URL  string `json:"url"`
 }
 
 func (rt *Runtime) beginWorkspaceCall(ctx context.Context, claims *AccessClaims, args map[string]any, scope string) (uuid.UUID, error) {
