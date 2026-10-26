@@ -27,8 +27,10 @@ const (
 	SeatPurchaseErrorSubscriptionLocked    = "subscription_locked"
 	SeatPurchaseErrorSubscriptionInactive  = "subscription_inactive"
 	SeatPurchaseErrorRejected              = "rejected"
-	SeatPurchaseErrorNotApplied            = "not_applied"
-	SeatPurchaseErrorRenewalBoundary       = "renewal_boundary"
+	// SeatPurchaseErrorNotApplied comes only from an operator repair with
+	// Polar evidence. No subscription snapshot can prove it.
+	SeatPurchaseErrorNotApplied      = "not_applied"
+	SeatPurchaseErrorRenewalBoundary = "renewal_boundary"
 )
 
 // seatPurchaseOperationKeyIndex is the unique index on the caller operation
@@ -66,6 +68,18 @@ type SeatPurchaseOperation struct {
 	Fingerprint string
 	PeriodStart time.Time
 	PeriodEnd   time.Time
+}
+
+// SeatPurchaseEvidence is a Polar subscription state that can describe the
+// outcome of a seat purchase.
+type SeatPurchaseEvidence struct {
+	SubscriptionID string
+	PeriodStart    *time.Time
+	Seats          *int
+	ModifiedAt     *time.Time
+	// Response marks the state that Polar returned for the update request of
+	// the purchase itself. Webhooks, syncs, and reads are not responses.
+	Response bool
 }
 
 // NewSeatPurchase builds a pending purchase. A nil operation builds a
@@ -166,25 +180,31 @@ func (p *SeatPurchase) StartedInPeriod(periodStart *time.Time) bool {
 	return !periodStart.After(p.CreatedAt)
 }
 
-// SettlementFor returns the final status that a Polar snapshot proves for an
-// in-flight purchase. It reports false when the snapshot proves nothing.
+// SucceededBy reports that the evidence proves that this in-flight purchase
+// succeeded. Only a successful result settles a purchase from Polar state.
+// The seat count, the modification time, or the time since the purchase
+// alone proves nothing: an outside change or a delayed event about another
+// update can report any of them. The evidence must describe this purchase:
 //
-//   - A snapshot from another billing period proves nothing.
-//   - Seats at or above the target prove the purchase succeeded.
-//   - The original seats with a modification time after the purchase prove
-//     that Polar did not apply an unknown purchase. A pending purchase can
-//     still be on its way to Polar, so only its own result can fail it.
-func (p *SeatPurchase) SettlementFor(periodStart *time.Time, seats *int, modifiedAt *time.Time) (string, bool) {
-	if !p.InFlight() || seats == nil || !p.StartedInPeriod(periodStart) {
-		return "", false
+//   - It is from the subscription of the purchase.
+//   - It is from the billing period in which the purchase started.
+//   - It reports exactly the target seats. A purchase sends an absolute
+//     seat count, so a different count describes another change.
+//   - It is the response to the update request of this purchase, or Polar
+//     modified the subscription after the purchase was recorded. A state
+//     from before the purchase cannot describe it.
+//
+// No snapshot proves that a purchase failed. A snapshot with fewer seats can
+// come from an update that Polar processed before the purchase, delivered
+// late. Only the rejection in the response of the purchase records a failure.
+func (p *SeatPurchase) SucceededBy(evidence SeatPurchaseEvidence) bool {
+	if !p.InFlight() || !p.describedBy(evidence) {
+		return false
 	}
-	if *seats >= p.ToSeats {
-		return SeatPurchaseStatusSucceeded, true
+	if evidence.Response {
+		return true
 	}
-	if p.Status == SeatPurchaseStatusUnknown && *seats == p.FromSeats && modifiedAt != nil && modifiedAt.After(p.CreatedAt) {
-		return SeatPurchaseStatusFailed, true
-	}
-	return "", false
+	return evidence.ModifiedAt != nil && evidence.ModifiedAt.After(p.CreatedAt)
 }
 
 // BlocksRenewalMaintenance reports that the purchase can still race a
@@ -224,8 +244,8 @@ func (p *SeatPurchase) Create(tx *gorm.DB) error {
 }
 
 // UpdateStatus moves an in-flight purchase to a new status.
-// It leaves a settled purchase unchanged, so a late result cannot overwrite
-// the outcome that a Polar snapshot already proved.
+// It leaves a settled purchase unchanged, so a late result, a duplicate
+// event, or a reordered event cannot overwrite a recorded outcome.
 func (p *SeatPurchase) UpdateStatus(tx *gorm.DB, status, errorCode string) error {
 	now := time.Now()
 	result := tx.Model(&SeatPurchase{}).
@@ -309,23 +329,16 @@ func FindLatestSeatPurchase(tx *gorm.DB, orgID uuid.UUID) (*SeatPurchase, error)
 	return &purchase, nil
 }
 
-// SettleSeatPurchase settles the in-flight purchase of a subscription when the
-// Polar snapshot proves its outcome. Only a snapshot from the period in which
-// the purchase started can prove it. The caller holds the organization lock.
-func SettleSeatPurchase(tx *gorm.DB, orgID uuid.UUID, subscriptionID string, periodStart *time.Time, seats *int, modifiedAt *time.Time) error {
+// SettleSeatPurchase records the success of the in-flight purchase of an
+// organization when the evidence proves it. Other evidence leaves the
+// purchase unchanged, so an unknown outcome stays unknown. The caller holds
+// the organization lock.
+func SettleSeatPurchase(tx *gorm.DB, orgID uuid.UUID, evidence SeatPurchaseEvidence) error {
 	purchase, err := FindInFlightSeatPurchase(tx, orgID)
-	if err != nil || purchase == nil || purchase.PolarSubscriptionID != subscriptionID {
+	if err != nil || purchase == nil || !purchase.SucceededBy(evidence) {
 		return err
 	}
-	status, settled := purchase.SettlementFor(periodStart, seats, modifiedAt)
-	if !settled {
-		return nil
-	}
-	errorCode := ""
-	if status == SeatPurchaseStatusFailed {
-		errorCode = SeatPurchaseErrorNotApplied
-	}
-	return purchase.UpdateStatus(tx, status, errorCode)
+	return purchase.UpdateStatus(tx, SeatPurchaseStatusSucceeded, "")
 }
 
 // FindExpectedSeatCount returns the seat count that SuperPlane itself asked
@@ -363,6 +376,14 @@ func (p *SeatPurchase) periodEndedBy(periodStart, submissionClosedAt time.Time) 
 		return !p.PeriodEnd.After(periodStart)
 	}
 	return periodStart.After(submissionClosedAt)
+}
+
+// describedBy reports that the evidence is about the subscription, the
+// billing period, and the seat count of the purchase.
+func (p *SeatPurchase) describedBy(evidence SeatPurchaseEvidence) bool {
+	return evidence.SubscriptionID == p.PolarSubscriptionID &&
+		p.StartedInPeriod(evidence.PeriodStart) &&
+		evidence.Seats != nil && *evidence.Seats == p.ToSeats
 }
 
 func seatPurchaseHash(canonical string) string {

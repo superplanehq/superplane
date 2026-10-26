@@ -255,19 +255,35 @@ does not remove seats that were added elsewhere.
 If Polar does not answer, the purchase has the status `awaiting_confirmation`.
 Capacity does not change. A `subscription.updated` webhook, a billing sync, the
 renewal seat schedule, or the next preview or purchase reads the subscription
-from Polar and settles the purchase.
-Only one purchase can be pending or unconfirmed for an organization at a time.
-A purchase that Polar never applied fails five minutes after it started, when the
-next preview, purchase, or renewal seat schedule checks Polar. The same rule
-applies when Polar reports fewer seats than the target after an outside change.
+from Polar. Only one purchase can be pending or unconfirmed for an
+organization at a time.
 
-Only a Polar snapshot from the billing period in which the purchase started can
-settle it. After a renewal, the seat count can return to the original count
-because of a scheduled reduction, so it proves nothing. An unconfirmed purchase
-that crosses a renewal stays `awaiting_confirmation` and blocks new purchases
-for the organization. SuperPlane does not retry the charge and does not settle
-the purchase because time passed. The worker reports the purchase after one
-hour. An operator repairs it from Polar evidence. See
+SuperPlane records an outcome only from evidence about that purchase:
+
+- The response to the purchase request records success, or the rejection
+  that Polar returned. A success response must name the purchase
+  subscription, the purchase period, and the target seats. Other success
+  responses leave the purchase unconfirmed.
+- A subscription snapshot records success only when all of these are true:
+  it is for the purchase subscription, it is from the billing period in which
+  the purchase started, it has exactly the target seats, and Polar modified
+  the subscription after SuperPlane recorded the purchase.
+- No snapshot records a failure. A snapshot with fewer seats can come from
+  another update, for example a renewal seat schedule that Polar processed
+  before the purchase and that arrived late. The time since the purchase also
+  proves nothing.
+
+A snapshot that proves nothing still updates the capacity. The purchase keeps
+its status. A duplicate, late, or reordered event never changes a recorded
+outcome.
+
+After a renewal, the seat count can return to the original count because of a
+scheduled reduction, so it proves nothing. A purchase that Polar never applied,
+or that crosses a renewal without evidence, stays `awaiting_confirmation` and
+blocks new purchases for the organization. SuperPlane does not retry the
+charge and does not settle the purchase because time passed. The worker
+reports the purchase after one hour. An operator repairs it from Polar
+evidence. See
 [Repair unresolved seat purchases](#repair-unresolved-seat-purchases).
 A purchase from before operation keys has no stored period. Only a snapshot
 whose period started before the purchase can settle it.
@@ -326,8 +342,8 @@ December 1. The freed seat stays usable until December 1. When a member joins
 before December 1, SuperPlane schedules 10 seats again.
 
 `seatrenewal.Schedule` in `pkg/billing/seatrenewal` does the work. It first
-settles or expires an old seat purchase from Polar, so an abandoned purchase
-cannot keep its organization unchecked forever. When Polar cannot return the
+settles an old seat purchase when a Polar snapshot proves its success. When
+Polar cannot return the
 subscription of a purchase on a different subscription than the stored plan,
 for example a replaced subscription, Schedule writes
 `billing.seat_purchase_reconcile_failed` (warning) and continues with the
@@ -543,11 +559,11 @@ capacity and admission stays blocked.
 
 A seat purchase is unresolved when its row in `organization_seat_purchases`
 has the status `pending` or `unknown`. The API shows both as
-`awaiting_confirmation`. A purchase that crosses a renewal with a lost
-response can stay unresolved forever, because only a snapshot from the
-purchase period can settle it. SuperPlane never settles a purchase because
-time passed and never repeats a charge. An operator settles it from Polar
-evidence.
+`awaiting_confirmation`. A purchase with a lost response stays unresolved
+when no evidence proves its success: for example, Polar did not apply it, or
+it crossed a renewal. No subscription snapshot can record a failure.
+SuperPlane never settles a purchase because time passed and never repeats a
+charge. An operator settles it from Polar evidence.
 
 An unresolved purchase blocks new purchases for the organization until it is
 repaired. It blocks the renewal seat schedule only while it can still race the

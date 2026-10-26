@@ -792,18 +792,21 @@ func (p *OrganizationBillingPlan) hasStoredPolarSubscription() bool {
 }
 
 // settleIgnoredForeignSeatPurchase settles the in-flight purchase of a
-// subscription whose snapshot cannot replace the stored one. The snapshot
-// must be newer than the purchase: an old seat count does not prove success.
-// Fresh snapshots unblock purchases without changing the replacement's state.
+// subscription whose snapshot cannot replace the stored one. A snapshot that
+// proves the purchase settles it without a change to the replacement's state.
 func settleIgnoredForeignSeatPurchase(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionApply) error {
-	if sub.ModifiedAt == nil {
-		return nil
+	return SettleSeatPurchase(tx, orgID, sub.seatPurchaseEvidence())
+}
+
+// seatPurchaseEvidence is the snapshot as evidence for a seat purchase. A
+// snapshot is never the response to a purchase request.
+func (s PolarSubscriptionApply) seatPurchaseEvidence() SeatPurchaseEvidence {
+	return SeatPurchaseEvidence{
+		SubscriptionID: s.ID,
+		PeriodStart:    s.PeriodStart,
+		Seats:          s.PurchasedSeats,
+		ModifiedAt:     s.ModifiedAt,
 	}
-	purchase, err := FindInFlightSeatPurchase(tx, orgID)
-	if err != nil || purchase == nil || !sub.ModifiedAt.After(purchase.CreatedAt) {
-		return err
-	}
-	return SettleSeatPurchase(tx, orgID, sub.ID, sub.PeriodStart, sub.PurchasedSeats, sub.ModifiedAt)
 }
 
 func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPlan, sub PolarSubscriptionApply) (*PolarSubscriptionApplyResult, error) {
@@ -816,11 +819,12 @@ func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPl
 		}).Warn("skipped stale polar subscription snapshot")
 		return &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}, nil
 	}
-	// Only a snapshot fresh enough to apply can prove the outcome of an
+	// Only a snapshot fresh enough to apply can prove the success of an
 	// in-flight seat purchase. A stale snapshot can report seats that
-	// Polar no longer has, so it must not settle a purchase. The settlement
-	// also ignores a snapshot from another billing period.
-	if err := SettleSeatPurchase(tx, orgID, sub.ID, sub.PeriodStart, sub.PurchasedSeats, sub.ModifiedAt); err != nil {
+	// Polar no longer has, so it must not settle a purchase. A snapshot
+	// that does not prove success still updates the capacity below, and the
+	// purchase keeps its status.
+	if err := SettleSeatPurchase(tx, orgID, sub.seatPurchaseEvidence()); err != nil {
 		return nil, err
 	}
 	// Lock the plan row before reading its fields and keep the lock through
