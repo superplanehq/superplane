@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -108,6 +109,17 @@ func TestApplyOrderPaidRejectsInvalidCreditPurchaseMetadata(t *testing.T) {
 		{name: "amount overflow", change: func(order *OrderData) { order.Metadata["superplane_credit_subtotal_cents"] = "9223372036854775808" }},
 		{name: "wrong paid amount", change: func(order *OrderData) { order.NetAmount = 10578 }},
 		{name: "wrong currency", change: func(order *OrderData) { order.Currency = "eur" }},
+		{name: "wrong subtotal", change: func(order *OrderData) { discountOrder(order, 10578, 0) }},
+		{name: "net ignores discount", change: func(order *OrderData) {
+			discountOrder(order, 10579, 1000)
+			order.NetAmount = 10579
+		}},
+		{name: "negative discount", change: func(order *OrderData) { discountOrder(order, 10579, -100) }},
+		{name: "discount exceeds subtotal", change: func(order *OrderData) { discountOrder(order, 10579, 10580) }},
+		{name: "discount without subtotal", change: func(order *OrderData) {
+			discountOrder(order, 10579, 1000)
+			order.SubtotalAmount = nil
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			event := paidFeePackEvent(org.ID, uuid.NewString())
@@ -119,6 +131,97 @@ func TestApplyOrderPaidRejectsInvalidCreditPurchaseMetadata(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
+}
+
+func TestApplyOrderPaidGrantsQuotedCreditsForDiscountedPurchaseOnce(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		discount int64
+	}{
+		{name: "partial discount", discount: 1000},
+		{name: "full discount", discount: 10579},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			org := setupBillingOrganization(t)
+			db := database.Conn()
+			logs := logtest.NewGlobal()
+			t.Cleanup(logs.Reset)
+			event := paidFeePackEvent(org.ID, uuid.NewString())
+			discountOrder(&event.Data, 10579, test.discount)
+
+			require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+			require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+
+			grant, err := models.FindLLMCreditGrantByPolarOrderID(db, event.Data.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.CentsToMicros(10000), grant.AmountMicros)
+			summary, err := models.DescribeOrganizationLLMCredit(db, org.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(10000), summary.GrantMicros)
+
+			entry := logs.LastEntry()
+			require.NotNil(t, entry)
+			assert.Equal(t, event.Data.ID, entry.Data["polar_order_id"])
+			assert.Equal(t, "disc_1", entry.Data["polar_discount_id"])
+			assert.Equal(t, test.discount, entry.Data["discount_amount"])
+		})
+	}
+}
+
+func TestApplyOrderPaidAcceptsUndiscountedOrderWithSubtotal(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	event := paidFeePackEvent(org.ID, uuid.NewString())
+	discountOrder(&event.Data, 10579, 0)
+
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, event.Data.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(10000), grant.AmountMicros)
+}
+
+func TestApplyOrderRefundedProratesDiscountedPurchaseAgainstPaidAmount(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	event := paidFeePackEvent(org.ID, uuid.NewString())
+	discountOrder(&event.Data, 10579, 579)
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+	event.Type = orderRefundedType
+
+	event.Data.Status = "partially_refunded"
+	event.Data.RefundedAmount = 5000
+	require.NoError(t, ApplyOrderRefunded(t.Context(), db, event, nil))
+	reversed, err := models.PolarRefundMicrosForOrder(db, event.Data.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(5000), reversed, "half of the paid amount reverses half of the grant")
+
+	event.Data.Status = "refunded"
+	require.NoError(t, ApplyOrderRefunded(t.Context(), db, event, nil))
+	reversed, err = models.PolarRefundMicrosForOrder(db, event.Data.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(10000), reversed)
+}
+
+func TestApplyOrderRefundedHandlesFullyDiscountedPurchase(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	event := paidFeePackEvent(org.ID, uuid.NewString())
+	discountOrder(&event.Data, 10579, 10579)
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+	event.Type = orderRefundedType
+
+	event.Data.Status = "partially_refunded"
+	event.Data.RefundedAmount = 1
+	require.NoError(t, ApplyOrderRefunded(t.Context(), db, event, nil))
+	reversed, err := models.PolarRefundMicrosForOrder(db, event.Data.ID)
+	require.NoError(t, err)
+	assert.Zero(t, reversed)
+
+	event.Data.Status = "refunded"
+	require.NoError(t, ApplyOrderRefunded(t.Context(), db, event, nil))
+	reversed, err = models.PolarRefundMicrosForOrder(db, event.Data.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(10000), reversed)
 }
 
 func TestApplyOrderRefundedProratesFeePurchaseCumulatively(t *testing.T) {
@@ -526,6 +629,13 @@ func paidFeePackEvent(orgID uuid.UUID, orderID string) *OrderWebhookEvent {
 		"superplane_credit_subtotal_cents":   "10579",
 	}
 	return event
+}
+
+func discountOrder(order *OrderData, subtotalCents, discountCents int64) {
+	order.SubtotalAmount = &subtotalCents
+	order.DiscountAmount = discountCents
+	order.DiscountID = "disc_1"
+	order.NetAmount = subtotalCents - discountCents
 }
 
 func paidCustomPackEvent(orgID uuid.UUID, orderID string, paidCents int64) *OrderWebhookEvent {
