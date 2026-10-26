@@ -76,7 +76,7 @@ Example:
 
 ## Configuration
 - **Machine type**: Runner fleet available to the organization (required).
-- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Steps**: One or more ordered bash commands or agent prompts.
 - **Anthropic API Key**: SuperPlane secret or Claude integration used as ` + "`ANTHROPIC_API_KEY`" + `.
 - **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
@@ -148,9 +148,12 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := c.injectCredentials(ctx, resolved.Variables, spec.Credentials)
-	if err != nil {
-		return err
+	environment := resolved.Variables
+	if claudeStepsNeedAPIKey(spec.Steps) {
+		environment, err = c.injectCredentials(ctx, environment, spec.Credentials)
+		if err != nil {
+			return err
+		}
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)

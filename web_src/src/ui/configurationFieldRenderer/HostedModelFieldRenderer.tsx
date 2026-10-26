@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/Text/text";
 import { preferredFactoryScope, useCanvasFactoryScope } from "@/hooks/useCanvasFactoryScope";
@@ -19,7 +19,7 @@ import {
 import { toTestId } from "@/lib/testID";
 import { THINKING_LEVEL_KEY, THINKING_LEVELS, normalizeThinkingLevel } from "@/lib/thinkingLevel";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 import type { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
@@ -45,6 +45,7 @@ function SuperPlaneModelField({
   factoryId,
   readOnly = false,
   triggerClassName,
+  modelOnly = false,
 }: FieldRendererProps) {
   const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_HOSTED], factoryId);
   const usage = useOrganizationWorkspaceUsage(organizationId ?? "");
@@ -77,6 +78,7 @@ function SuperPlaneModelField({
       placeholder={field.placeholder || "Instance SuperPlane agent model"}
       readOnly={readOnly}
       options={options}
+      modelOnly={modelOnly}
       triggerClassName={triggerClassName}
       onCommit={(nextModel, nextThinking) =>
         commitModelAndThinking(field.name, nextModel, nextThinking, onChange, onValuesChange)
@@ -105,6 +107,7 @@ function ProviderBYOKModelField({
   factoryId,
   readOnly = false,
   triggerClassName,
+  modelOnly = false,
 }: FieldRendererProps) {
   const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_BYOK], factoryId);
   const status = modelFieldStatus(organizationId, selection.isLoading, selection.isError);
@@ -143,6 +146,7 @@ function ProviderBYOKModelField({
       placeholder={field.placeholder || "Select a model"}
       readOnly={readOnly}
       options={options}
+      modelOnly={modelOnly}
       triggerClassName={triggerClassName}
       onCommit={(nextModel, nextThinking) =>
         commitModelAndThinking(field.name, nextModel, nextThinking, onChange, onValuesChange)
@@ -175,6 +179,7 @@ function ModelThinkingSelect({
   placeholder,
   readOnly,
   options,
+  modelOnly,
   triggerClassName,
   onCommit,
 }: {
@@ -185,6 +190,7 @@ function ModelThinkingSelect({
   placeholder: string;
   readOnly?: boolean;
   options: Array<{ value: string; label: string }>;
+  modelOnly: boolean;
   triggerClassName?: string;
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
@@ -207,25 +213,38 @@ function ModelThinkingSelect({
           )}
         >
           <span className="min-w-0 truncate">{selectedLabel}</span>
-          <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{thinkingLabel}</span>
+          {modelOnly ? null : (
+            <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{thinkingLabel}</span>
+          )}
           <ChevronDown className="size-4 opacity-50" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-44">
-        <DropdownMenuValueSub
-          label="Model"
-          testId={modelListTestId}
-          value={model}
-          options={options}
-          onValueChange={(nextModel) => onCommit(nextModel, thinkingLevel)}
-        />
-        <DropdownMenuValueSub
-          label="Thinking"
-          testId={thinkingTestId}
-          value={thinkingLevel}
-          options={[...THINKING_LEVELS]}
-          onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
-        />
+      <DropdownMenuContent align="start" className="min-w-44" data-testid={modelOnly ? modelListTestId : undefined}>
+        {modelOnly
+          ? options.map((option) => (
+              <DropdownMenuItem key={option.value} onSelect={() => onCommit(option.value, thinkingLevel)}>
+                {option.label}
+                {option.value === model ? <Check className="ml-auto size-4" aria-hidden /> : null}
+              </DropdownMenuItem>
+            ))
+          : [
+              <DropdownMenuValueSub
+                key="model"
+                label="Model"
+                testId={modelListTestId}
+                value={model}
+                options={options}
+                onValueChange={(nextModel) => onCommit(nextModel, thinkingLevel)}
+              />,
+              <DropdownMenuValueSub
+                key="thinking"
+                label="Thinking"
+                testId={thinkingTestId}
+                value={thinkingLevel}
+                options={[...THINKING_LEVELS]}
+                onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
+              />,
+            ]}
       </DropdownMenuContent>
     </DropdownMenu>
   );

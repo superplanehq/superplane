@@ -70,6 +70,9 @@ type OrderData struct {
 	Status             string          `json:"status"`
 	BillingReason      string          `json:"billing_reason"`
 	RefundedAmount     int64           `json:"refunded_amount"`
+	SubtotalAmount     *int64          `json:"subtotal_amount"`
+	DiscountAmount     int64           `json:"discount_amount"`
+	DiscountID         string          `json:"discount_id"`
 	NetAmount          int64           `json:"net_amount"`
 	Currency           string          `json:"currency"`
 	Metadata           map[string]any  `json:"metadata"`
@@ -154,26 +157,9 @@ type SubscriptionData struct {
 	CustomerID         string        `json:"customer_id"`
 	ExternalCustomerID string        `json:"external_customer_id"`
 	Customer           OrderCustomer `json:"customer"`
-
-	// PendingUpdate is a change that Polar applies at the next period, for
-	// example a seat count scheduled with proration_behavior next_period.
-	PendingUpdate *SubscriptionPendingUpdate `json:"pending_update"`
-}
-
-// SubscriptionPendingUpdate is a scheduled subscription change. Polar applies
-// it at AppliesAt, the start of the next billing period.
-type SubscriptionPendingUpdate struct {
-	Seats     *int      `json:"seats"`
-	AppliesAt polarTime `json:"applies_at"`
-}
-
-// NextPeriodSeats is the seat count that Polar renews with: the scheduled
-// seat count, or the current seats when no seat change is scheduled.
-func (d SubscriptionData) NextPeriodSeats() *int {
-	if d.PendingUpdate != nil && d.PendingUpdate.Seats != nil {
-		return d.PendingUpdate.Seats
-	}
-	return d.Seats
+	// CheckoutID names the Polar checkout that created the subscription. It
+	// is empty for a subscription that no checkout created.
+	CheckoutID string `json:"checkout_id"`
 }
 
 func (d SubscriptionData) organizationExternalID() string {

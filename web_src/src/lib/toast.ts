@@ -19,7 +19,8 @@ export const showSuccessToast = (message: string): void => {
 /**
  * Show a standardized informational toast notification (non-error, non-success)
  * @param message - The message to display
+ * @param options.id - Reuse one toast for repeated messages
  */
-export const showInfoToast = (message: string): void => {
-  toast.info(message);
+export const showInfoToast = (message: string, options?: { id?: string }): void => {
+  toast.info(message, options);
 };

@@ -35,7 +35,7 @@ import type {
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
   FactoryAutomation,
-  FactoryLineStep,
+  FactoriesFactoryLineStep,
   OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -1006,7 +1006,7 @@ export function useCreateFactoryLine(organizationId: string, factoryId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name: string; steps: FactoryLineStep[] }) => {
+    mutationFn: async (input: { name: string; steps: FactoriesFactoryLineStep[] }) => {
       const response = await factoriesCreateFactoryLine(
         withOrganizationHeader({
           organizationId,
@@ -1035,7 +1035,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
     mutationFn: async (input: {
       lineId: string;
       name?: string;
-      steps?: FactoryLineStep[];
+      steps?: FactoriesFactoryLineStep[];
       columnColors?: Record<string, string>;
     }) => {
       const response = await factoriesUpdateFactoryLine(
@@ -1069,7 +1069,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
   });
 }
 
-export type { FactoryAutomation, FactoriesFactoryLine, FactoryLineStep };
+export type { FactoryAutomation, FactoriesFactoryLine, FactoriesFactoryLineStep as FactoryLineStep };
 
 export function useFactorySchedulePreview(
   organizationId: string,

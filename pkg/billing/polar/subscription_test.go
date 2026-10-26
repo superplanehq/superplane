@@ -1392,18 +1392,19 @@ func Test__ApplySubscriptionReleasesLocksDuringPolarReads(t *testing.T) {
 					}
 					stored.Data.Status = "canceled"
 					stored.Data.ModifiedAt = polarTime{Time: now.Add(2 * time.Second)}
-					if err := ApplyOrganizationSubscription(req.Context(), tx, org.ID, stored.Data); err != nil {
+					if _, err := StageOrganizationSubscription(req.Context(), tx, org.ID, stored.Data); err != nil {
 						return err
 					}
 					concurrent := subscriptionEvent(org.ID, concurrentID, "active", now, end)
 					concurrent.Data.ModifiedAt = polarTime{Time: now.Add(3 * time.Second)}
-					if err := ApplyOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data); err != nil {
+					if _, err := StageOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data); err != nil {
 						return err
 					}
 					if tc.adoptIncoming {
 						concurrent.Data.Status = "canceled"
 						concurrent.Data.ModifiedAt = polarTime{Time: now.Add(4 * time.Second)}
-						return ApplyOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data)
+						_, err := StageOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data)
+						return err
 					}
 					return nil
 				})
@@ -1473,9 +1474,10 @@ func Test__ApplySubscriptionRequiresReadsOutsideCallerTransaction(t *testing.T) 
 			return err
 		}
 		incoming := subscriptionEvent(org.ID, "sub_foreign_"+uuid.NewString(), "active", now, end)
-		return ApplyOrganizationSubscription(t.Context(), tx, org.ID, incoming.Data)
+		_, err := StageOrganizationSubscription(t.Context(), tx, org.ID, incoming.Data)
+		return err
 	})
-	require.Error(t, err)
+	require.ErrorIs(t, err, models.ErrPolarSubscriptionRefreshFailed)
 	assert.NotErrorIs(t, err, ErrPermanentApply)
 	assert.Zero(t, requests)
 	assert.Equal(t, before, captureSubscriptionState(t, db, org.ID))

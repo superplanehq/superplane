@@ -16,6 +16,7 @@ let canManageBilling = true;
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: (resource: string, action: string) => resource !== "org" || action !== "update" || canManageBilling,
+    hasPermission: (resource: string, action: string) => resource !== "org" || action !== "update" || canManageBilling,
     isLoading: false,
   }),
 }));

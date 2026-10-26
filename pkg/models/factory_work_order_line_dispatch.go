@@ -853,3 +853,46 @@ func ListWorkOrderLineDispatchesByWorkOrderIDs(
 
 	return result, nil
 }
+
+// WorkOrderIsWaitingAfterPassedStage reports the backend invariant used by the
+// Verify board: an open task whose latest line traversal has no active step and
+// whose furthest step passed.
+func WorkOrderIsWaitingAfterPassedStage(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) {
+	var order FactoryWorkOrder
+	if err := tx.Where("id = ?", workOrderID).First(&order).Error; err != nil {
+		return false, err
+	}
+	if order.State != FactoryWorkOrderStateOpen {
+		return false, nil
+	}
+	grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{workOrderID})
+	if err != nil {
+		return false, err
+	}
+	dispatches := grouped[workOrderID]
+	if len(dispatches) == 0 {
+		return false, nil
+	}
+	current := dispatches[len(dispatches)-1]
+	if current.QueueItem != nil {
+		return false, nil
+	}
+	executions := current.Executions
+	if len(executions) == 0 {
+		return false, nil
+	}
+	furthest := executions[0].FactoryWorkOrderExecution
+	for i := range executions {
+		execution := executions[i].FactoryWorkOrderExecution
+		if execution.Status == FactoryWorkOrderExecutionStatusPending ||
+			execution.Status == FactoryWorkOrderExecutionStatusRunning {
+			return false, nil
+		}
+		if execution.StepIndex > furthest.StepIndex ||
+			(execution.StepIndex == furthest.StepIndex && execution.UpdatedAt.After(furthest.UpdatedAt)) {
+			furthest = execution
+		}
+	}
+	return furthest.Status == FactoryWorkOrderExecutionStatusFinished &&
+		furthest.Result == CanvasRunResultPassed, nil
+}

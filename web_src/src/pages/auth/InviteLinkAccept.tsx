@@ -132,6 +132,9 @@ const invitationReasonMessages: Record<string, string> = {
   PAYMENT_PAST_DUE: "This organization cannot add members until its payment is updated. Ask an organization admin.",
   NO_SEAT_AVAILABLE: "No seat is available. Ask an organization admin to free or buy a seat.",
   MEMBER_LIMIT_REACHED: "This organization reached its member limit. Ask an organization admin.",
+  CHECKOUT_SEAT_LIMIT:
+    "This organization is changing its plan. The new plan has no seat for you yet. Ask an organization admin to finish the plan change and buy a seat for you.",
+  BILLING_UNVERIFIED: "SuperPlane could not check the billing state of this organization. Try again later.",
   INVITATION_EXPIRED: "This invitation expired. Ask an organization admin for a new invitation.",
   INVITATION_CANCELED: "This invitation was canceled. Ask an organization admin for a new invitation.",
   INVITATION_ALREADY_ACCEPTED: "This invitation was already accepted. Ask an organization admin for a new invitation.",

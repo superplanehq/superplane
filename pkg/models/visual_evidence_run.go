@@ -1,16 +1,43 @@
 package models
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 const visualEvidenceRunTitle = "Capture screenshots or a short video"
 
+const customAutomationRunTitle = "Custom automation"
+
 // MaybeLinkVisualEvidenceRun attaches a Visual Evidence canvas run to the
 // factory pull request in the root event. The task Verify list shows a column
 // app only after that link exists.
 func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
+	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateVisualEvidenceID, visualEvidenceRunTitle)
+}
+
+// MaybeLinkCustomAutomationRun attaches a custom Verify automation run to
+// the factory pull request in the root event. The task log shows that
+// automation only after that link exists.
+func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
+	title := customAutomationRunTitle
+	if canvas != nil {
+		if name := strings.TrimSpace(canvas.Name); name != "" {
+			title = name
+		}
+	}
+	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
+}
+
+func maybeLinkFactoryColumnAppRun(
+	tx *gorm.DB,
+	canvas *Canvas,
+	event *CanvasEvent,
+	run *CanvasRun,
+	templateID, title string,
+) error {
 	if canvas == nil || event == nil || run == nil || canvas.FactoryID == nil {
 		return nil
 	}
@@ -18,7 +45,7 @@ func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 		return nil
 	}
 
-	matches, err := CanvasHasFactoryAppTemplate(tx, canvas.ID, FactoryAppTemplateVisualEvidenceID)
+	matches, err := CanvasHasFactoryAppTemplate(tx, canvas.ID, templateID)
 	if err != nil || !matches {
 		return err
 	}
@@ -39,7 +66,7 @@ func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 
 	result, err := pullRequest.CreateActivity(tx, FactoryPullRequestActivityParams{
 		RunID:  run.ID,
-		Title:  visualEvidenceRunTitle,
+		Title:  title,
 		Access: FactoryPullRequestAccessConcurrent,
 	})
 	if err == nil && result.Outcome == FactoryPullRequestActivityOutcomeWaiting {

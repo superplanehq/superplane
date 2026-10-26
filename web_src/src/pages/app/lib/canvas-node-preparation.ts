@@ -13,7 +13,8 @@ import {
 } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
+import { isSupportSessionActive, SUPPORT_SESSION_READ_ONLY_MESSAGE } from "@/lib/supportSession";
+import { showErrorToast, showInfoToast } from "@/lib/toast";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import type {
@@ -308,6 +309,10 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
 function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: string): ActionContext {
   return {
     invokeNodeExecutionHook: async (executionId: string, hookName: string, parameters: unknown) => {
+      if (isSupportSessionActive()) {
+        showInfoToast(SUPPORT_SESSION_READ_ONLY_MESSAGE);
+        return;
+      }
       try {
         await canvasesInvokeNodeExecutionHook(
           withOrganizationHeader({
@@ -338,6 +343,10 @@ function buildTriggerActionContext(
 ): TriggerActionContext {
   return {
     invokeNodeTriggerHook: async (hookName: string, parameters: unknown) => {
+      if (isSupportSessionActive()) {
+        showInfoToast(SUPPORT_SESSION_READ_ONLY_MESSAGE);
+        throw new Error(SUPPORT_SESSION_READ_ONLY_MESSAGE);
+      }
       try {
         await canvasesInvokeNodeTriggerHook(
           withOrganizationHeader({

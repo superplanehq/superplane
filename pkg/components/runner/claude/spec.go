@@ -218,6 +218,15 @@ func planningFollowUpWorkingDirectory(spec RunClaudeCodeSpec) string {
 	return strings.TrimSpace(spec.WorkingDirectory)
 }
 
+func claudeStepsNeedAPIKey(steps []ClaudeCodeStep) bool {
+	for _, step := range steps {
+		if runner.NormalizeAgentStepType(step.Type) == runner.AgentStepPrompt {
+			return true
+		}
+	}
+	return false
+}
+
 func buildClaudeCodeStep(stepNumber int, original, dispatched ClaudeCodeStep, usage, model, thinking, nodeWorkingDirectory string, attachments []runner.TaskAttachment, inspectImages bool) (runner.TaskFile, runner.TaskCommand) {
 	stepSlug := runner.AgentStepSlug(stepNumber, original.Name)
 	workingDirectory := runner.EffectiveWorkingDirectory(nodeWorkingDirectory, original.WorkingDirectory)

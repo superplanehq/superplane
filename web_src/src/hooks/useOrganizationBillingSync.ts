@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 
 export const BILLING_SUBSCRIPTION_SYNC_INTERVAL_MS = 2000;
 export const BILLING_SUBSCRIPTION_SYNC_TIMEOUT_MS = 30_000;
@@ -18,6 +19,7 @@ export function useOrganizationBillingSync({
   refetch: () => Promise<unknown>;
   returnRefreshPending?: boolean;
 }) {
+  const inSupportSession = useIsSupportSession();
   const inFlight = useRef<Promise<void> | null>(null);
   const run = useCallback(() => {
     if (inFlight.current) return inFlight.current;
@@ -40,14 +42,14 @@ export function useOrganizationBillingSync({
   }, [sync, refetch]);
 
   useEffect(() => {
-    if (!organizationId) {
+    if (!organizationId || inSupportSession) {
       return;
     }
     void run();
-  }, [organizationId, run]);
+  }, [organizationId, inSupportSession, run]);
 
   useEffect(() => {
-    if ((!returnRefreshPending && (!subscribed || creditPurchaseAllowed)) || !organizationId) {
+    if ((!returnRefreshPending && (!subscribed || creditPurchaseAllowed)) || !organizationId || inSupportSession) {
       return;
     }
 
@@ -60,5 +62,5 @@ export function useOrganizationBillingSync({
     }, BILLING_SUBSCRIPTION_SYNC_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [subscribed, creditPurchaseAllowed, organizationId, run, returnRefreshPending]);
+  }, [subscribed, creditPurchaseAllowed, organizationId, inSupportSession, run, returnRefreshPending]);
 }

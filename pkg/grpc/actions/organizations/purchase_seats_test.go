@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -40,17 +39,18 @@ type seatPurchaseFixture struct {
 	periodEnd      time.Time
 
 	mu sync.Mutex
-	// patchBodies are the seat purchase updates. Renewal schedules are in schedules.
+	// patchBodies are the seat purchase updates. Next-period updates are in
+	// schedules.
 	patchBodies []map[string]any
 	getCount    int
 	// onPatch writes the seat purchase response. The default applies the update.
 	onPatch func(w http.ResponseWriter, f *seatPurchaseFixture, seats int)
 	// polarSeats is the seat count that GET reports.
 	polarSeats int
-	// schedules are the next_period updates that schedule the renewal seat count.
+	// schedules are the next_period updates. SuperPlane must send none.
 	schedules []map[string]any
-	// pendingSeats is the seat count that Polar renews with, when it differs
-	// from polarSeats.
+	// pendingSeats is a next-period seat count that the retired automatic
+	// scheduler left in Polar, when it differs from polarSeats.
 	pendingSeats *int
 	// modifiedAt is the subscription modification time that snapshots report.
 	// The zero value makes each snapshot report the current time.
@@ -61,14 +61,6 @@ type seatPurchaseFixture struct {
 	pastDueAt *time.Time
 	// cancelAtPeriodEnd is the cancel_at_period_end that snapshots report.
 	cancelAtPeriodEnd bool
-	// scheduleRejection, when set, answers every next_period update with
-	// this Polar error.
-	scheduleRejection *polarRejection
-}
-
-type polarRejection struct {
-	status int
-	code   string
 }
 
 func newSeatPurchaseFixture(t *testing.T, purchased int, seatLimit *int) *seatPurchaseFixture {
@@ -109,9 +101,6 @@ func newSeatPurchaseFixture(t *testing.T, purchased int, seatLimit *int) *seatPu
 
 	server := polarAPIServer(t, f.serve)
 	usePolarTestServer(t, server)
-	// Background renewal schedules must end before the server and the
-	// database close.
-	t.Cleanup(seatrenewal.Wait)
 	return f
 }
 
@@ -119,6 +108,10 @@ func (f *seatPurchaseFixture) serve(w http.ResponseWriter, req *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if req.URL.Path == "/customers/external/"+f.r.Organization.ID.String()+"/payment-methods" {
+		f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
+		return
+	}
+	if req.URL.Path == "/checkouts/" && req.Method == http.MethodGet {
 		f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
 		return
 	}
@@ -146,15 +139,6 @@ func (f *seatPurchaseFixture) serve(w http.ResponseWriter, req *http.Request) {
 		seats := int(body["seats"].(float64))
 		if body["proration_behavior"] == "next_period" {
 			f.schedules = append(f.schedules, body)
-			if f.scheduleRejection != nil {
-				f.writeJSON(w, f.scheduleRejection.status, map[string]any{"error": f.scheduleRejection.code, "detail": "details"})
-				return
-			}
-			// Like Polar, an update back to the current seats clears the scheduled one.
-			f.pendingSeats = &seats
-			if seats == f.polarSeats {
-				f.pendingSeats = nil
-			}
 			f.writeJSON(w, http.StatusOK, f.snapshot(f.polarSeats))
 			return
 		}
@@ -702,7 +686,6 @@ func Test__DelayedScheduleEventLeavesALostPurchaseUnknownUntilPolarProvesIt(t *t
 	// the purchase was recorded.
 	_, err = f.preview(1)
 	require.NoError(t, err)
-	seatrenewal.Wait()
 
 	stored = f.latestPurchase()
 	assert.Equal(t, first.Purchase.Id, stored.ID.String(), "the original operation settles")
@@ -731,7 +714,7 @@ func Test__RetryAfterAnUnconfirmedPurchaseDoesNotChargeAgain(t *testing.T) {
 
 	requireGRPCCode(t, codes.Aborted, err)
 	assert.Equal(t, 1, f.patchCount(), "the retry must not send a second update")
-	assert.Equal(t, new(1), f.pendingRenewalSeats(), "reconciliation restores the reduction without another purchase")
+	assert.Zero(t, f.scheduleCount(), "reconciliation schedules no seat count")
 	assert.Equal(t, 4, f.purchasedSeats())
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
 }
@@ -991,8 +974,6 @@ func Test__ConcurrentIdenticalPurchaseReplaysBeforeReturningPreLockErrors(t *tes
 				f.serve(w, req)
 			})
 			usePolarTestServer(t, server)
-			// This server must remain available until background schedules end.
-			t.Cleanup(seatrenewal.Wait)
 			key := uuid.NewString()
 			confirmed := f.confirmation()
 
@@ -1023,7 +1004,6 @@ func Test__ConcurrentIdenticalPurchaseReplaysBeforeReturningPreLockErrors(t *tes
 
 			first, err := f.purchaseWithKey(key, 2, 3)
 			require.NoError(t, err)
-			seatrenewal.Wait()
 			rejectRefresh.Store(test.rejectRefresh)
 			release.Do(func() { close(resume) })
 			<-done
@@ -1283,10 +1263,8 @@ func Test__SyncBillingKeepsAnExpiredUnknownSeatPurchaseWithoutEvidence(t *testin
 				f.serve(w, req)
 			})
 			usePolarTestServer(t, server)
-			t.Cleanup(seatrenewal.Wait)
 
 			billing, err := SyncOrganizationBilling(t.Context(), f.r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
-			seatrenewal.Wait()
 
 			require.NoError(t, err)
 			require.NotNil(t, billing.LastSeatPurchase)
