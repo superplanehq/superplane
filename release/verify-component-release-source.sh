@@ -27,15 +27,11 @@ for name in "${required_environment[@]}"; do
   fi
 done
 SOURCE_BRANCH="${SEMAPHORE_GIT_BRANCH}"
-if [ "${SOURCE_BRANCH}" != "main" ]; then
-  if [ "${COMPONENT}" != "superplane" ]; then
-    echo "Error: component releases must originate from main" >&2
-    exit 1
-  fi
-  if [[ ! "${SOURCE_BRANCH}" =~ ^release/v[0-9]+\.[0-9]+\.x$ ]]; then
-    echo "Error: SuperPlane releases must originate from main or release/vMAJOR.MINOR.x" >&2
-    exit 1
-  fi
+if [ "${COMPONENT}" = "superplane" ]; then
+  bash "${REPO_ROOT}/release/verify-superplane-release-branch.sh" "${SOURCE_BRANCH}"
+elif [ "${SOURCE_BRANCH}" != "main" ]; then
+  echo "Error: component releases must originate from main" >&2
+  exit 1
 fi
 if [ "${SEMAPHORE_PIPELINE_PROMOTION}" != "true" ]; then
   echo "Error: component releases must run as a manual promotion" >&2

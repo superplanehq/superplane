@@ -35,6 +35,7 @@ bash -n \
   release/fetch-component-release-history.sh \
   release/fetch_component_release_history_test.sh \
   release/verify-component-release-source.sh \
+  release/verify-superplane-release-branch.sh \
   release/verify_component_release_source_test.sh \
   release/verify-public-assets.sh \
   release/runner/build.sh \
