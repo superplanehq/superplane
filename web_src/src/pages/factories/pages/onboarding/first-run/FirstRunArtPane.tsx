@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 
-import type { FirstRunArtScene } from "./firstRunArtScene";
+import { artInk, type FirstRunArtInk, type FirstRunArtScene } from "./firstRunArtScene";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import {
   loadOnboardingArt,
@@ -79,21 +79,33 @@ export function FirstRunArtPane({
     >
       <div ref={canvasRef} className="absolute inset-0" data-testid="first-run-art-canvas" />
       {art.badges ? <ArtBadges discover={art.badges.discover} verify={art.badges.verify} /> : null}
-      {!art.badges && art.pill ? <ArtPill pill={art.pill} /> : null}
+      {!art.badges && art.pill ? <ArtPill pill={art.pill} ink={artInk(art)} /> : null}
     </div>
   );
 }
 
-function ArtPill({ pill }: { pill: NonNullable<FirstRunArtScene["pill"]> }) {
+function pillTone(pill: NonNullable<FirstRunArtScene["pill"]>, ink: FirstRunArtInk) {
+  if (ink === "dark") {
+    return { box: "bg-[rgba(17,17,14,0.08)] text-[#11110e]", label: "text-[rgba(17,17,14,0.65)]" };
+  }
+  if (pill.light) {
+    return { box: "bg-[rgba(163,162,158,0.08)] text-[#a3a29e]", label: "text-[rgba(163,162,158,0.7)]" };
+  }
+  return { box: "bg-[rgba(255,255,255,0.08)] text-[#f9f9f3]", label: "text-[rgba(228,228,218,0.7)]" };
+}
+
+function ArtPill({ pill, ink }: { pill: NonNullable<FirstRunArtScene["pill"]>; ink: FirstRunArtInk }) {
+  const tone = pillTone(pill, ink);
   return (
     <div
       className={cn(
         "absolute bottom-[9%] left-1/2 z-10 flex -translate-x-1/2 items-center gap-[7px] whitespace-nowrap rounded-[4px] px-3 py-2 font-mono text-[13px] uppercase tracking-[1.3px]",
-        pill.light ? "bg-[rgba(163,162,158,0.08)] text-[#a3a29e]" : "bg-[rgba(255,255,255,0.08)] text-[#f9f9f3]",
+        tone.box,
       )}
       data-testid="first-run-art-pill"
+      data-ink={ink}
     >
-      <span className={pill.light ? "text-[rgba(163,162,158,0.7)]" : "text-[rgba(228,228,218,0.7)]"}>{pill.label}</span>
+      <span className={tone.label}>{pill.label}</span>
       <span aria-hidden>→</span>
       <span>{pill.value}</span>
     </div>
