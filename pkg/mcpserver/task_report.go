@@ -14,7 +14,7 @@ import (
 )
 
 func (rt *Runtime) getTaskReport(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -31,7 +31,7 @@ func (rt *Runtime) getTaskReport(ctx context.Context, claims *AccessClaims, args
 		return ToolResult{}, err
 	}
 
-	report, err := factories.BuildTaskReport(toolContext(ctx, claims), claims.OrgID.String(), factoryID.String(), task, models.TaskRunHistoryQuery{
+	report, err := factories.BuildTaskReport(toolContext(ctx, claims), claims.OrgID.String(), factory.ID.String(), task, models.TaskRunHistoryQuery{
 		Limit:  limit,
 		Before: before,
 	})

@@ -2,9 +2,11 @@ package mcpserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -103,7 +105,7 @@ func TestGetTaskRejectsOtherWorkspace(t *testing.T) {
 	assert.Equal(t, "Not found", err.Error())
 }
 
-func TestCreateTaskReturnsNewTask(t *testing.T) {
+func TestCreateTaskReturnsNewTaskWhenLaterWorkspaceReadsFail(t *testing.T) {
 	r := support.Setup(t)
 	enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
@@ -112,16 +114,38 @@ func TestCreateTaskReturnsNewTask(t *testing.T) {
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Create", "", "CRT")
 	require.NoError(t, err)
 
-	runtime := &Runtime{Auth: r.AuthService}
+	// Fail workspace reads after the task insert. The completed action must
+	// still return its result and URL from the workspace already authorized.
+	var inserted atomic.Bool
+	createCallback := "mcp_test:task_inserted"
+	queryCallback := "mcp_test:workspace_read_failure"
+	require.NoError(t, db.Callback().Create().After("gorm:create").Register(createCallback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "factory_work_orders" && tx.Error == nil {
+			inserted.Store(true)
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Create().Remove(createCallback)) })
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(queryCallback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "factories" && inserted.Load() {
+			tx.AddError(errors.New("workspace read failed after task creation"))
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(queryCallback)) })
+
+	runtime := &Runtime{Auth: r.AuthService, BaseURL: "https://app.example.test"}
 	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
 		"title":       "Ship MCP",
 		"description": "Expose the workspace tools.",
 	})
+	var saved models.FactoryWorkOrder
+	require.NoError(t, db.Where("factory_id = ? AND title = ?", factoryModel.ID, "Ship MCP").First(&saved).Error)
 	require.NoError(t, err)
 	payload := decodeToolJSON(t, result)
 	assert.Equal(t, "Ship MCP", payload["title"])
 	assert.Equal(t, "draft", payload["state"])
-	require.NotEmpty(t, payload["id"])
+	assert.Equal(t, saved.ID.String(), payload["id"])
+	assert.Equal(t, fmt.Sprintf("https://app.example.test/%s/workspaces/%s/task/%d",
+		r.Organization.ID, factoryModel.RouteSegment(), saved.Number), payload["url"])
 }
 
 func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {

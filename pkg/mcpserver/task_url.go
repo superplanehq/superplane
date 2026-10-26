@@ -1,13 +1,11 @@
 package mcpserver
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -28,13 +26,4 @@ func newTaskLinks(baseURL string, factory *models.Factory) taskLinks {
 
 func (links taskLinks) url(number int64) string {
 	return links.prefix + strconv.FormatInt(number, 10)
-}
-
-// taskLinksFor loads the workspace that a task call resolved and returns its task links.
-func (rt *Runtime) taskLinksFor(ctx context.Context, claims *AccessClaims, factoryID uuid.UUID) (taskLinks, error) {
-	factory, err := models.FindFactory(database.DB(ctx), claims.OrgID, factoryID)
-	if err != nil {
-		return taskLinks{}, ToolError("Not found")
-	}
-	return newTaskLinks(rt.BaseURL, factory), nil
 }
