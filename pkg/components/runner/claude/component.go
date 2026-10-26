@@ -148,9 +148,12 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := c.injectCredentials(ctx, resolved.Variables, spec.Credentials)
-	if err != nil {
-		return err
+	environment := resolved.Variables
+	if claudeStepsNeedAPIKey(spec.Steps) {
+		environment, err = c.injectCredentials(ctx, environment, spec.Credentials)
+		if err != nil {
+			return err
+		}
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)

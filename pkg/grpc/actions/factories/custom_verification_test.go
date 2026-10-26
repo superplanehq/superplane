@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestCustomVerificationSettingsAllowBashOnly(t *testing.T) {
@@ -83,6 +84,28 @@ func TestCustomVerificationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			secretSource := environmentFrom[1].(map[string]any)
 			assert.Equal(t, runner.EnvironmentFromSourceSecret, secretSource["source"])
 			assert.Equal(t, "deploy-credentials", secretSource["secret"].(map[string]any)["secret"])
+			got := environmentVars(t, agent.Configuration["environment"])
+			assert.Equal(t, "acme/app", got["REPO"])
+			assert.Equal(t, "acme/app", got["SOURCE_REPO"])
+			assert.Equal(t, runner.WorkspaceContextRepoURL(provider, "acme/app"), got["REPO_URL"])
+			_, err = structpb.NewStruct(agent.Configuration)
+			require.NoError(t, err)
 		})
 	}
+}
+
+func environmentVars(t *testing.T, raw any) map[string]string {
+	t.Helper()
+	entries, ok := raw.([]any)
+	require.True(t, ok)
+	got := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		item, ok := entry.(map[string]any)
+		require.True(t, ok)
+		name, _ := item["name"].(string)
+		value, _ := item["value"].(string)
+		require.NotEmpty(t, name)
+		got[name] = value
+	}
+	return got
 }

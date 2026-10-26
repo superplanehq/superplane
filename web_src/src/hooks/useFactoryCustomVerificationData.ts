@@ -9,7 +9,7 @@ import {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { factoryAppsKey } from "./useFactoryData";
+import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
 
 export const factoryCustomVerificationKey = (organizationId: string, factoryId: string, automationId: string) =>
   ["factories", organizationId, factoryId, "custom-verifications", automationId] as const;
@@ -114,6 +114,7 @@ export function useUpdateFactoryCustomVerification(organizationId: string, facto
 }
 
 export function useRunFactoryCustomVerification(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ automationId, workOrderId }: { automationId: string; workOrderId: string }) => {
       const response = await factoriesRunFactoryCustomVerification(
@@ -127,6 +128,15 @@ export function useRunFactoryCustomVerification(organizationId: string, factoryI
         throw new Error("SuperPlane could not start the automation.");
       }
       return response.data;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, variables.workOrderId),
+      });
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
+      });
     },
   });
 }

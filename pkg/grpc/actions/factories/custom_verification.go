@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -348,6 +349,7 @@ func buildCustomVerificationCanvas(
 		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
 		"steps":                   customVerificationStepConfiguration(settings.Steps),
 		"environmentFrom":         environmentFrom,
+		"environment":             customVerificationCheckoutEnvironment(factory),
 	}
 	if credentials := settings.Agent.credentials(); credentials != nil {
 		runnerConfiguration["credentials"] = credentials
@@ -392,6 +394,83 @@ func buildCustomVerificationCanvas(
 	}, nil
 }
 
+func customVerificationCheckoutEnvironment(factory *models.Factory) []any {
+	config := factory.OnboardingConfigValue()
+	repository := strings.TrimSpace(config.AppRepository)
+	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository)
+	return []any{
+		checkoutEnvironmentVar("REPO", repository),
+		checkoutEnvironmentVar("REPO_URL", url),
+		checkoutEnvironmentVar("SOURCE_REPO", repository),
+	}
+}
+
+func checkoutEnvironmentVar(name, value string) map[string]any {
+	return map[string]any{
+		"name":        name,
+		"value":       value,
+		"valueSource": runner.EnvironmentValueSourceLiteral,
+	}
+}
+
+func applyCustomVerificationCheckoutEnvironment(configuration map[string]any, factory *models.Factory) {
+	wanted := customVerificationCheckoutEnvironment(factory)
+	existing, _ := configuration["environment"].([]any)
+	replaced := make(map[string]struct{}, len(wanted))
+	for i, raw := range existing {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := entry["name"].(string)
+		for _, item := range wanted {
+			want := item.(map[string]any)
+			if want["name"] != name {
+				continue
+			}
+			existing[i] = want
+			replaced[name] = struct{}{}
+			break
+		}
+	}
+	for _, item := range wanted {
+		name := item.(map[string]any)["name"].(string)
+		if _, ok := replaced[name]; ok {
+			continue
+		}
+		existing = append(existing, item)
+	}
+	configuration["environment"] = existing
+}
+
+func ensureCustomVerificationCheckoutEnvironment(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas) error {
+	node, err := findCustomVerificationAgentNode(tx, canvas)
+	if err != nil {
+		return err
+	}
+	configuration := node.Configuration.Data()
+	if configuration == nil {
+		configuration = map[string]any{}
+	}
+	applyCustomVerificationCheckoutEnvironment(configuration, factory)
+	return tx.Model(node).Update("configuration", datatypes.NewJSONType(configuration)).Error
+}
+
+func findCustomVerificationAgentNode(tx *gorm.DB, canvas *models.Canvas) (*models.CanvasNode, error) {
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+	if err != nil {
+		return nil, err
+	}
+	for i := range version.Nodes {
+		node := version.Nodes[i]
+		if !isFactoryAgentHarness(node.ComponentName()) {
+			continue
+		}
+		return models.FindCanvasNode(tx, canvas.ID, node.ID)
+	}
+	return nil, errors.New("custom verification agent is missing")
+}
+
 func customVerificationStepConfiguration(steps []runner.AgentStep) []any {
 	values := make([]any, 0, len(steps))
 	for _, step := range steps {
@@ -407,7 +486,11 @@ func customVerificationStepConfiguration(steps []runner.AgentStep) []any {
 			value["command"] = *step.Command
 		}
 		if len(step.Secrets) > 0 {
-			value["secrets"] = step.Secrets
+			secrets := make([]any, 0, len(step.Secrets))
+			for _, secret := range step.Secrets {
+				secrets = append(secrets, secret)
+			}
+			value["secrets"] = secrets
 		}
 		values = append(values, value)
 	}

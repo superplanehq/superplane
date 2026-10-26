@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -78,5 +78,43 @@ describe("CustomVerificationRunAction", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The task has no pull request.");
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("shows the start error in the task log", async () => {
+    const user = userEvent.setup();
+    runVerification.mockRejectedValue(new Error("The task is not in Verify."));
+    render(
+      <CustomVerificationRunAction
+        organizationId="org-1"
+        factoryId="factory-1"
+        workOrderId="task-1"
+        placement="logs"
+        verifications={[{ id: "verification-1", name: "Security review" }]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Run" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The task is not in Verify.");
+  });
+
+  it("does not confirm a started run in the task log", async () => {
+    const user = userEvent.setup();
+    runVerification.mockResolvedValue({ runId: "run-1" });
+    render(
+      <CustomVerificationRunAction
+        organizationId="org-1"
+        factoryId="factory-1"
+        workOrderId="task-1"
+        placement="logs"
+        verifications={[{ id: "verification-1", name: "Deploy to staging" }]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Run" }));
+
+    await waitFor(() => expect(runVerification).toHaveBeenCalled());
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Deploy to staging started.")).not.toBeInTheDocument();
   });
 });

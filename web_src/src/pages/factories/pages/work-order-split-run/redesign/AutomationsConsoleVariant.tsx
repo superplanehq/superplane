@@ -404,13 +404,15 @@ function ColumnTimelineItem({
                 <FrameHeader className="flex min-w-0 flex-row items-center gap-2 py-2">
                   <NodeIcon iconSlug={automation.icon} />
                   <span className="truncate text-[13px] font-medium text-foreground">{automation.name}</span>
-                  <CustomVerificationRunAction
-                    organizationId={organizationId}
-                    factoryId={factoryId}
-                    workOrderId={orderId}
-                    verifications={[automation]}
-                    placement="logs"
-                  />
+                  <span className="ml-auto">
+                    <CustomVerificationRunAction
+                      organizationId={organizationId}
+                      factoryId={factoryId}
+                      workOrderId={orderId}
+                      verifications={[automation]}
+                      placement="logs"
+                    />
+                  </span>
                 </FrameHeader>
               </Frame>
             ))

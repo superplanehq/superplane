@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -77,7 +76,7 @@ func StartAutomaticCustomVerifications(
 		return nil
 	}
 	db := database.DB(ctx)
-	if err := requireWorkOrderInVerify(db, factory, order); err != nil {
+	if err := requireWorkOrderInVerify(db, order); err != nil {
 		if code, _, ok := grpcerrors.HandlerStatus(err); ok && code == codes.FailedPrecondition {
 			return nil
 		}
@@ -122,7 +121,7 @@ func startCustomVerification(
 	order *models.FactoryWorkOrder,
 	automatic bool,
 ) (*models.CanvasEvent, error) {
-	if err := requireWorkOrderInVerify(db, factory, order); err != nil {
+	if err := requireWorkOrderInVerify(db, order); err != nil {
 		return nil, err
 	}
 	pullRequest, err := latestTrackedPullRequest(db, order.ID)
@@ -140,6 +139,9 @@ func startCustomVerification(
 	if err != nil {
 		return nil, err
 	}
+	if err := ensureCustomVerificationCheckoutEnvironment(db, factory, canvas); err != nil {
+		return nil, err
+	}
 	trigger, err := models.FindCanvasNode(db, canvas.ID, customVerificationTriggerID)
 	if err != nil {
 		return nil, err
@@ -153,10 +155,21 @@ func startCustomVerification(
 	} else {
 		err = events.Emit("factory.customVerification", payload)
 	}
-	if err != nil || len(created) == 0 {
+	if err != nil {
 		return nil, err
 	}
-	return &created[0], nil
+	if len(created) == 0 {
+		return nil, grpcFailedPrecondition("SuperPlane could not start the automation.")
+	}
+	event := &created[0]
+	run, err := models.FindCanvasRunInTransaction(db, canvas.ID, event.RunID)
+	if err != nil {
+		return nil, err
+	}
+	if err := models.MaybeLinkCustomVerificationRun(db, canvas, event, run); err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
 func customVerificationPullRequestPayload(
@@ -242,43 +255,18 @@ func bitbucketCustomVerificationEventData(
 	}
 }
 
-func requireWorkOrderInVerify(tx *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder) error {
-	if order.State != models.FactoryWorkOrderStateOpen {
+func requireWorkOrderInVerify(tx *gorm.DB, order *models.FactoryWorkOrder) error {
+	if order == nil {
 		return grpcFailedPrecondition("The task is not in Verify.")
 	}
-	dispatches, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{order.ID})
+	inVerify, err := models.WorkOrderIsWaitingAfterPassedStage(tx, order.ID)
 	if err != nil {
 		return err
 	}
-	records := dispatches[order.ID]
-	if len(records) == 0 {
+	if !inVerify {
 		return grpcFailedPrecondition("The task is not in Verify.")
 	}
-	current := records[len(records)-1]
-	line, err := factory.FindLine(tx, current.LineID)
-	if err != nil {
-		return err
-	}
-	stages, err := classifyHandOffStages(tx, factory, line)
-	if err != nil {
-		return err
-	}
-	verifyIndex, err := resolveVerifyStageIndex(stages)
-	if err != nil {
-		return err
-	}
-	for i := len(current.Executions) - 1; i >= 0; i-- {
-		execution := current.Executions[i]
-		if execution.StepIndex != verifyIndex {
-			continue
-		}
-		if execution.Status == models.FactoryWorkOrderExecutionStatusFinished &&
-			execution.Result == models.CanvasRunResultPassed {
-			return nil
-		}
-		break
-	}
-	return grpcFailedPrecondition("The task is not in Verify.")
+	return nil
 }
 
 func customVerificationCanvasMode(tx *gorm.DB, canvas *models.Canvas) (pb.FactoryCustomVerification_StartMode, error) {
