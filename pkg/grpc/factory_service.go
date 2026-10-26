@@ -76,6 +76,26 @@ func (s *FactoryService) SwitchFactoryModelSource(ctx context.Context, req *pb.S
 	return actions.SwitchFactoryModelSource(ctx, s.registry, organizationID, req)
 }
 
+func (s *FactoryService) DescribeFactoryCodexConnection(ctx context.Context, req *pb.DescribeFactoryCodexConnectionRequest) (*pb.DescribeFactoryCodexConnectionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DescribeFactoryCodexConnection(ctx, organizationID, req)
+}
+
+func (s *FactoryService) StartFactoryCodexConnection(ctx context.Context, req *pb.StartFactoryCodexConnectionRequest) (*pb.StartFactoryCodexConnectionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.StartFactoryCodexConnection(ctx, s.intakeDeps.Encryptor, organizationID, req)
+}
+
+func (s *FactoryService) CancelFactoryCodexConnection(ctx context.Context, req *pb.CancelFactoryCodexConnectionRequest) (*pb.CancelFactoryCodexConnectionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CancelFactoryCodexConnection(ctx, s.intakeDeps.Encryptor, organizationID, req)
+}
+
+func (s *FactoryService) DisconnectFactoryCodexConnection(ctx context.Context, req *pb.DisconnectFactoryCodexConnectionRequest) (*pb.DisconnectFactoryCodexConnectionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DisconnectFactoryCodexConnection(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryRepository(ctx, s.intakeDeps, organizationID, req)

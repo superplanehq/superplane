@@ -54,6 +54,10 @@ const FeatureFactoryCustomAutomations = "factory_custom_automations"
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
 
+// FeatureCodexSubscriptions gates ChatGPT subscription sign-in for one
+// factory. The organization must enable it explicitly.
+const FeatureCodexSubscriptions = "codex_subscriptions"
+
 // FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
 // the Merge button on pull request review until the feature is generally
 // available.
@@ -85,6 +89,7 @@ var registry = []Feature{
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
+	{ID: FeatureCodexSubscriptions, Label: "ChatGPT Subscription", Description: "Sign in to ChatGPT once and reuse that subscription on factory Codex runs"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 }
