@@ -7,20 +7,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
-import { organizationKeys } from "@/hooks/useOrganizationData";
-import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
-import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import {
-  confidenceGraph,
+  confidenceGraph as riskScoreGraph,
   implementConfigGraph,
   issueGraph,
   mergeConfidenceAvailableIntegrations,
 } from "./MergeConfidenceConfigModal.spec.fixtures";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
+import { MERGE_CONFIDENCE_CHECKS } from "./mergeConfidenceChecks";
+import { renderModal } from "./MergeConfidenceConfigModal.spec.helpers";
+
+// The shell also hosts split canvas settings for other column automations.
+function confidenceGraph() {
+  return riskScoreGraph("on-pr-feedback");
+}
 
 const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
   useInfiniteCanvasRuns: vi.fn(),
@@ -87,46 +91,6 @@ function emptyRunsQuery() {
   };
 }
 
-function renderModal(
-  onDelete: () => void = vi.fn(),
-  onSaveNode = vi.fn(),
-  graph: IntakeAutomationGraph = confidenceGraph(),
-  options: { initialNodeId?: string; onClose?: () => void } = {},
-) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const features = [FEATURE_WORKSPACE_SKILLS];
-  client.setQueryData(experimentalFeaturesKeys.registry(), {
-    features: features.map((id) => ({ id, released: false })),
-  });
-  if (graph.organizationId) {
-    client.setQueryData(organizationKeys.details(graph.organizationId), {
-      spec: { enabledExperimentalFeatures: [] },
-    });
-  }
-  const element = (nextGraph: IntakeAutomationGraph = graph) => (
-    <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <ThemeProvider>
-          <TooltipProvider>
-            <MergeConfidenceConfigModal
-              title="Merge confidence"
-              graph={nextGraph}
-              canvasId="merge-confidence"
-              onClose={options.onClose ?? vi.fn()}
-              onSaveNode={onSaveNode}
-              onDelete={onDelete}
-              initialNodeId={options.initialNodeId}
-              factoryKey="SUPER"
-            />
-          </TooltipProvider>
-        </ThemeProvider>
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
-  const view = render(element());
-  return { ...view, rerenderGraph: (nextGraph: IntakeAutomationGraph) => view.rerender(element(nextGraph)) };
-}
-
 beforeEach(() => {
   useInfiniteCanvasRuns.mockReturnValue(emptyRunsQuery());
 });
@@ -136,6 +100,45 @@ afterEach(() => {
 });
 
 describe("MergeConfidenceConfigModal", () => {
+  it.each(["github.onPullRequest", "bitbucket.onPullRequest"])(
+    "shows score settings and retains the run list for %s",
+    async (triggerComponent) => {
+      const graph = riskScoreGraph();
+      graph.organizationId = "org-1";
+      graph.specNodes![0].component = triggerComponent;
+      graph.specNodes![1].configuration = {
+        model: "sonnet",
+        executionTimeoutSeconds: 3600,
+        steps: MERGE_CONFIDENCE_CHECKS.map((id) => ({
+          name: id,
+          type: "prompt",
+          prompt: `Merge check: ${id}.\nCheck rules.`,
+        })),
+      };
+      graph.specNodes![1].concurrency = { max: 5, key: "pr" };
+      const user = userEvent.setup();
+      const view = renderModal(vi.fn(), vi.fn(), graph);
+      expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
+      for (const label of ["Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"]) {
+        expect(screen.getByRole("switch", { name: label })).toBeChecked();
+      }
+      expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
+      expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(5);
+      expect(screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" })).toHaveValue(60);
+      expect(screen.getByRole("textbox", { name: "Additional instructions" })).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Steps" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("switch", { name: "Security" }));
+      await user.click(screen.getByRole("tab", { name: "Runs" }));
+      expect(screen.getByTestId("implement-run-history")).toBeInTheDocument();
+      expect(screen.queryByTestId("merge-confidence-settings")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("tab", { name: "Configuration" }));
+      expect(screen.getByRole("switch", { name: "Security" })).not.toBeChecked();
+      view.rerenderGraph({ ...graph, specNodes: structuredClone(graph.specNodes) });
+      expect(screen.getByRole("switch", { name: "Security" })).not.toBeChecked();
+    },
+  );
+
   it("saves Implement configuration without an experimental feature", async () => {
     const user = userEvent.setup();
     let finishSave = () => {};
@@ -497,7 +500,7 @@ describe("MergeConfidenceConfigModal", () => {
                 onClose={vi.fn()}
                 onSaveNode={vi.fn()}
                 renderNodeBody={(node) =>
-                  node.id === "on-pr-risk" ? <p data-testid="custom-trigger-body">Custom trigger settings</p> : null
+                  node.id === "on-pr-feedback" ? <p data-testid="custom-trigger-body">Custom trigger settings</p> : null
                 }
               />
             </TooltipProvider>

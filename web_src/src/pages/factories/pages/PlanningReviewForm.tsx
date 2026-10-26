@@ -249,7 +249,7 @@ function AgentPanel({
                   ? "The model used to plan tasks."
                   : view === "pr-feedback"
                     ? "The model used to address pull request comments or failing checks."
-                    : "The model used to implement tasks."
+                    : "The model used for each run."
               }
             >
               <div className="w-full min-w-0">{modelControl}</div>
