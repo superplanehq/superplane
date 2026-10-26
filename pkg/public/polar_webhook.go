@@ -8,7 +8,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -70,13 +69,6 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 			log.WithError(err).Error("failed to apply polar subscription")
 			http.Error(w, "unable to apply subscription", http.StatusInternalServerError)
 			return
-		}
-		// Activation, payment recovery, a new cycle, or an uncanceled
-		// subscription can each change the renewal seat count. Schedule sends
-		// no update when Polar already has the target, so a replayed webhook
-		// or the webhook that follows our own update does not loop.
-		if orgID, err := event.Subscription.Data.OrganizationID(); err == nil {
-			seatrenewal.ScheduleAsync(r.Context(), orgID)
 		}
 		acceptPolarWebhook(w)
 		return

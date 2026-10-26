@@ -55,11 +55,9 @@ var (
 	ErrInvalidRequest = errors.New("polar rejected the request values")
 )
 
-// Polar proration behaviors for a subscription seat update.
-const (
-	prorationInvoice    = "invoice"
-	prorationNextPeriod = "next_period"
-)
+// prorationInvoice makes Polar invoice a seat change at once. SuperPlane
+// never schedules a seat change for the next period.
+const prorationInvoice = "invoice"
 
 // Polar error codes in the "error" field of a response body.
 const (
@@ -583,18 +581,6 @@ func (c *Client) setSubscriptionCancelAtPeriodEnd(ctx context.Context, subscript
 // prorated difference at once. Polar applies the change only when that payment
 // succeeds. The renewal date does not change.
 func (c *Client) UpdateSubscriptionSeats(ctx context.Context, subscriptionID string, seats int) (*SubscriptionData, error) {
-	return c.patchSubscriptionSeats(ctx, subscriptionID, seats, prorationInvoice)
-}
-
-// ScheduleSubscriptionSeats sets the seat count of the next billing period.
-// The current period does not change: Polar charges and credits nothing now,
-// and the subscription reports the change in pending_update. A later seat
-// update replaces the scheduled one.
-func (c *Client) ScheduleSubscriptionSeats(ctx context.Context, subscriptionID string, seats int) (*SubscriptionData, error) {
-	return c.patchSubscriptionSeats(ctx, subscriptionID, seats, prorationNextPeriod)
-}
-
-func (c *Client) patchSubscriptionSeats(ctx context.Context, subscriptionID string, seats int, prorationBehavior string) (*SubscriptionData, error) {
 	id := strings.TrimSpace(subscriptionID)
 	if id == "" {
 		return nil, fmt.Errorf("subscription id is required")
@@ -603,7 +589,7 @@ func (c *Client) patchSubscriptionSeats(ctx context.Context, subscriptionID stri
 	var payload SubscriptionData
 	err := c.patch(ctx, "/subscriptions/"+url.PathEscape(id), map[string]any{
 		"seats":              seats,
-		"proration_behavior": prorationBehavior,
+		"proration_behavior": prorationInvoice,
 	}, &payload)
 	if err != nil {
 		return nil, err

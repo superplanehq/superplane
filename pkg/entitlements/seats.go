@@ -79,8 +79,8 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBil
 	// period, and these are not per-seat. The lock must not depend on the catalog.
 	if paymentBlocked(plan) {
 		lockSeatsAtOccupied(usage, plan, maximum)
-		// The renewal count ignores the payment state, so the admin sees the
-		// same count that the renewal scheduler sends to Polar.
+		// The renewal estimate ignores the payment state, so it does not
+		// change while the payment fails.
 		renewal, err := paidRenewalSeats(plan, usage.Occupied)
 		if err != nil {
 			return nil, err

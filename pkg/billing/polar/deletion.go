@@ -23,9 +23,18 @@ import (
 // failure or an unclear answer returns
 // models.ErrOrganizationSubscriptionUnverified that wraps the cause.
 //
-// The verifier does not write the Polar snapshot. Webhooks and the
-// subscription refresh own the billing row.
+// An unresolved checkout intent is verified first. A checkout that can still
+// activate returns models.ErrOrganizationCheckoutPending: a payment after the
+// deletion would start a subscription for a deleted organization. A paid
+// checkout applies its subscription before the billing row is read.
+//
+// The verifier does not write the Polar subscription snapshot outside the
+// checkout and subscription apply paths. Webhooks and the subscription
+// refresh own the billing row.
 func VerifyOrganizationDeletion(ctx context.Context, orgID uuid.UUID) (*models.OrganizationDeletionClearance, error) {
+	if err := settleCheckoutBeforeDeletion(ctx, orgID); err != nil {
+		return nil, err
+	}
 	plan, err := models.FindOrganizationBillingPlan(database.DB(ctx), orgID)
 	if err != nil {
 		return nil, err
@@ -40,6 +49,38 @@ func VerifyOrganizationDeletion(ctx context.Context, orgID uuid.UUID) (*models.O
 		return nil, err
 	}
 	return models.NewVerifiedDeletionClearance(plan), nil
+}
+
+// maxDeletionCheckoutAttempts bounds the verification loop. Each repeat means
+// that another writer changed the intent in between.
+const maxDeletionCheckoutAttempts = 3
+
+// settleCheckoutBeforeDeletion makes sure that no checkout of the
+// organization can still activate. SoftDelete checks again under the
+// organization lock that no unresolved intent exists.
+func settleCheckoutBeforeDeletion(ctx context.Context, orgID uuid.UUID) error {
+	for range maxDeletionCheckoutAttempts {
+		intent, err := models.FindUnresolvedOrganizationBillingCheckout(database.DB(ctx), orgID)
+		if err != nil || intent == nil {
+			return err
+		}
+		if !Configured() {
+			return unverifiedDeletion("Polar is not configured to verify checkout intent %s", intent.ID)
+		}
+		verification, err := NewCheckoutLifecycle(NewClientFromEnv()).Verify(ctx, intent)
+		if err != nil {
+			return fmt.Errorf("%w: verify checkout intent %s: %w", models.ErrOrganizationSubscriptionUnverified, intent.ID, err)
+		}
+		switch verification.Outcome {
+		case CheckoutResolved, CheckoutChanged:
+			continue
+		case CheckoutSubscriptionLive:
+			return fmt.Errorf("%w: checkout intent %s started a live subscription", models.ErrOrganizationSubscriptionLive, intent.ID)
+		default:
+			return fmt.Errorf("%w: checkout intent %s is %s", models.ErrOrganizationCheckoutPending, intent.ID, verification.Outcome)
+		}
+	}
+	return models.ErrOrganizationCheckoutPending
 }
 
 func confirmSubscriptionEnded(ctx context.Context, orgID uuid.UUID, storedID string) error {
