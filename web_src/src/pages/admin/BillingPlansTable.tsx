@@ -64,9 +64,12 @@ export function BillingPlansTable({
                 <code className="text-xs text-muted-foreground">{plan.key}</code>
               </TableCell>
               <TableCell>
-                <Badge variant="outline" className="capitalize">
-                  {plan.visibility}
-                </Badge>
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant="outline" className="capitalize">
+                    {plan.visibility}
+                  </Badge>
+                  {plan.onboarding_default && <Badge variant="secondary">Onboarding default</Badge>}
+                </div>
               </TableCell>
               <TableCell>
                 <span className="font-medium">

@@ -156,6 +156,20 @@ export const FIRST_RUN_COPY = {
     continue: "Continue",
     saving: "Saving ticket source…",
   },
+  card: {
+    headline: "Add a payment card",
+    body: "SuperPlane saves your card with Polar. Card setup does not charge you.",
+    plan: (planName: string, credit: string) =>
+      `Your organization starts on the ${planName} plan with ${credit} in credit from SuperPlane. You can upgrade later.`,
+    planWithoutCredit: (planName: string) => `Your organization starts on the ${planName} plan. You can upgrade later.`,
+    cardSaved: "Your card is saved.",
+    planActive: (planName: string) => `Your organization is on the ${planName} plan.`,
+    addCard: "Add card",
+    opening: "Opening card setup…",
+    waitingForCard: "Waiting for the card…",
+    continue: "Continue",
+    starting: "Starting the plan…",
+  },
   agent: {
     headline: "Connect agent",
     modelSourceBody: "Choose the models that run your agents.",

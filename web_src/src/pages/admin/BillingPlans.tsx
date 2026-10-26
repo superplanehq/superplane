@@ -32,6 +32,7 @@ const emptyPlan: BillingPlan = {
   trial_length_days: 14,
   markup_bps: null,
   features: [],
+  onboarding_default: false,
 };
 
 function seatLimitError(plan: BillingPlan) {

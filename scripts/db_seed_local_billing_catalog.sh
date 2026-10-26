@@ -43,6 +43,22 @@ VALUES
   )
 ON CONFLICT (key) DO NOTHING;
 
+-- Pay-as-you-go has no price and no Polar product. New organizations start on
+-- it after the onboarding card step and receive its trial credit.
+INSERT INTO billing_plans (
+  key, name, category, visibility, price_cents, per_seat,
+  trial_credit_cents, trial_length_days
+)
+VALUES ('pay_as_you_go', 'Pay-as-you-go', 'paid', 'public', 0, false, 1000, 365)
+ON CONFLICT (key) DO NOTHING;
+
+UPDATE billing_plans
+SET onboarding_default = true,
+    updated_at = NOW()
+WHERE key = 'pay_as_you_go'
+  AND NOT onboarding_default
+  AND NOT EXISTS (SELECT 1 FROM billing_plans WHERE onboarding_default);
+
 -- Enforce plan access locally. BYOS remains available through its plan feature.
 UPDATE plan_feature_definitions
 SET gated = true

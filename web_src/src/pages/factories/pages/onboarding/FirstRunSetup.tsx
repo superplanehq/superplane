@@ -23,6 +23,7 @@ import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
 import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
 import { ownerOfRepository, repositoriesInOrganization } from "./first-run/githubOrganizations";
+import { FirstRunCardScreenHost } from "./FirstRunCardScreenHost";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
 import {
@@ -38,8 +39,9 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   connect: 1,
   choose: 2,
   tickets: 3,
-  complete: 4,
-  agent: 4,
+  card: 4,
+  complete: 5,
+  agent: 5,
 };
 
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
@@ -47,9 +49,22 @@ const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   connect: "host",
   choose: "connect",
   tickets: "choose",
+  card: "tickets",
   complete: "tickets",
   agent: "tickets",
 };
+
+// Steps that this flow does not show. The card step is absent when billing
+// has no default plan or the organization already has a paid plan.
+function stepsSkipped(flow: FirstRunSetupFlow, target: FirstRunScreen): { before: number; total: number } {
+  const agent = Number(flow.skipAgentScreen);
+  const card = Number(!flow.hasCardStep);
+  return {
+    before:
+      Number(target === "complete") * agent + Number(STEP_INDEX_FOR_SCREEN[target] > STEP_INDEX_FOR_SCREEN.card) * card,
+    total: agent + card,
+  };
+}
 
 function firstNameOf(name: string | undefined): string | undefined {
   const first = name?.trim().split(/\s+/)[0];
@@ -320,14 +335,15 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   );
 
   const chromeFor = (target: FirstRunScreen): FirstRunChrome => {
+    const skipped = stepsSkipped(flow, target);
     return {
       displayName: firstNameOf(account?.name),
       email: account?.email,
       onLogOut: signOut,
       organizationSwitch: otherOrganizations.length > 0 ? { currentOrganizationRouteId: organizationId } : undefined,
       workspaceSwitch: hasOtherWorkspace ? { organizationId, currentFactoryId: factoryId, factories } : undefined,
-      stepIndex: STEP_INDEX_FOR_SCREEN[target] - Number(target === "complete" && flow.skipAgentScreen),
-      stepCount: FIRST_RUN_STEP_COUNT - Number(flow.skipAgentScreen),
+      stepIndex: STEP_INDEX_FOR_SCREEN[target] - skipped.before,
+      stepCount: FIRST_RUN_STEP_COUNT - skipped.total,
       onBack: backActionFor(target, flow),
       busy: flow.busy,
     };
@@ -341,7 +357,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         chrome={{
           ...chromeFor("complete"),
           onBack: undefined,
-          stepIndex: FIRST_RUN_STEP_COUNT - 1 - Number(flow.skipAgentScreen),
+          stepIndex: FIRST_RUN_STEP_COUNT - 1 - stepsSkipped(flow, "complete").total,
         }}
         selectedRepo={setup.selectedRepo}
         onGoToBoard={() => navigate(afterOnboardingPath(destination), { replace: true })}
@@ -372,6 +388,17 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     );
   }
 
+  if (flow.screen === "card") {
+    return (
+      <FirstRunCardScreenHost
+        organizationId={organizationId}
+        flow={flow}
+        chrome={chromeFor("card")}
+        sphere={sphereFor("card", setup.selectedRepo, model.githubOwner)}
+      />
+    );
+  }
+
   if (flow.screen === "complete") {
     return (
       <CompleteSetupScreen
@@ -395,11 +422,35 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   }
 
   return (
-    <FirstRunAgentScreen
+    <AgentScreenHost
       organizationId={organizationId}
-      setup={setup}
+      flow={flow}
+      model={model}
       chrome={chromeFor("agent")}
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
+    />
+  );
+}
+
+function AgentScreenHost({
+  organizationId,
+  flow,
+  model,
+  chrome,
+  sphere,
+}: {
+  organizationId: string;
+  flow: FirstRunSetupFlow;
+  model: OnboardingPageModel;
+  chrome: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
+}) {
+  return (
+    <FirstRunAgentScreen
+      organizationId={organizationId}
+      setup={model.setup}
+      chrome={chrome}
+      sphere={sphere}
       saving={flow.busy}
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}

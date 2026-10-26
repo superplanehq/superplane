@@ -78,12 +78,32 @@ The target requires the Docker `db` service and the Polar sandbox.
 | Pay-as-you-go | Usage-based | Existing setting | None |
 
 All three plans are public and require a payment card. Team includes every
-defined feature. Starter and Pay-as-you-go include only BYOS.
+defined feature. Starter and Pay-as-you-go include only BYOS. The seed
+creates Pay-as-you-go with a $10 trial credit for 365 days and marks it as
+the onboarding default when no other plan has that mark.
 The seed enables local gating for features other than BYOS to enforce plan access.
 Repeated runs refresh these settings and preserve existing prices, product links,
 seat limits, and credit policies.
 The seed does not assign plans to organizations or change subscriptions.
 Production migrations do not run this seed.
+
+## Onboarding card step and the default plan
+
+With **New Billing**, workspace onboarding shows a card step after the
+backlog step. The step cannot be skipped. The person saves a card in the
+Polar portal. SuperPlane then starts the organization on the plan marked
+**Default plan after onboarding** in the admin Billing plans editor, and
+continues setup.
+
+Only one plan can be the default. It must be a public paid plan with no
+price, no Polar product, and no seats, so SuperPlane can activate it with no
+checkout. The plan's **Trial credit** is the organization's welcome credit.
+It expires after the plan's **Trial length**. SuperPlane grants it when the
+plan starts, not at signup, and grants one welcome credit per account.
+
+Without a default plan, or for an organization that already has a paid plan,
+onboarding skips the card step. New organizations then receive the Trial
+plan credit at signup as before.
 
 ## Credit policy and follow-up work
 
@@ -120,7 +140,7 @@ an example. Use your catalog price for the actual estimates.
 
 1. Configure the sandbox product and public Team plan as described above.
 2. Enable **New Billing** for a new Trial organization with an owner and one active teammate.
-3. Complete workspace onboarding without selecting a plan or entering payment details.
+3. Clear **Default plan after onboarding** on every plan, then complete workspace onboarding. Confirm that onboarding shows no card step.
 4. Confirm that the organization remains on Trial with the original trial expiration.
 5. Open **Settings → Billing → Payment method** as a billing manager.
 6. Confirm that Team starts at two seats and shows the effective plan maximum.

@@ -111,7 +111,38 @@ type OrganizationLLMCreditSummary struct {
 	WelcomeCreditExpiresAt   *time.Time
 }
 
+// GrantWelcomeCredit grants the Trial plan credit to a new organization. When
+// a default onboarding plan exists and the organization uses new billing, the
+// welcome credit is that plan's trial credit instead. GrantPlanWelcomeCredit
+// grants it after the card step, so nothing is granted here.
 func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
+	waits, err := welcomeCreditWaitsForOnboardingPlan(tx, orgID)
+	if err != nil || waits {
+		return err
+	}
+	settings, err := FindBillingPlan(tx, BillingPlanTrial)
+	if err != nil {
+		return err
+	}
+	return grantWelcomeCredit(tx, orgID, accountID, settings)
+}
+
+// GrantPlanWelcomeCredit grants the trial credit of the plan that an
+// organization selected during onboarding. One welcome credit per account, as
+// for the Trial plan.
+func GrantPlanWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID, plan *BillingPlan) error {
+	return grantWelcomeCredit(tx, orgID, accountID, plan)
+}
+
+func welcomeCreditWaitsForOnboardingPlan(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	plan, err := FindOnboardingDefaultBillingPlan(tx)
+	if err != nil || plan == nil {
+		return false, err
+	}
+	return OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureNewBilling)
+}
+
+func grantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID, settings *BillingPlan) error {
 	if accountID == uuid.Nil {
 		return errors.New("account is required for welcome credit")
 	}
@@ -127,10 +158,6 @@ func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
 		return nil
 	}
 
-	settings, err := FindBillingPlan(tx, BillingPlanTrial)
-	if err != nil {
-		return err
-	}
 	amount := CentsToMicros(settings.TrialCreditCents)
 	if amount <= 0 {
 		return nil
