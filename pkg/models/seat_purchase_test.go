@@ -267,59 +267,6 @@ func Test__FindExpectedSeatCountIgnoresPurchasesFromAnEarlierPeriod(t *testing.T
 	assert.Nil(t, expected, "a renewal reduction back to 3 seats is not compared with the old target")
 }
 
-func Test__SeatPurchaseBlocksRenewalMaintenanceUntilVerifiedEvidenceReleasesIt(t *testing.T) {
-	const window = 5 * time.Minute
-	created := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
-	periodStart := created.Add(-10 * 24 * time.Hour)
-	periodEnd := created.Add(20 * 24 * time.Hour)
-	afterWindow := created.Add(window + time.Second)
-	keyed := func(status string) *models.SeatPurchase {
-		// A new purchase stores the bound subscription and period.
-		purchase := models.NewSeatPurchase(uuid.New(), nil, "sub_team", 9, 10, &models.SeatPurchaseOperation{
-			Key: "key", Fingerprint: models.SeatPurchaseBoundFingerprint(1, 9, "sub_team", periodStart, periodEnd),
-			PeriodStart: periodStart, PeriodEnd: periodEnd,
-		})
-		purchase.Status, purchase.CreatedAt = status, created
-		return purchase
-	}
-	legacy := func() *models.SeatPurchase {
-		purchase := models.NewSeatPurchase(uuid.New(), nil, "sub_team", 9, 10, nil)
-		purchase.Status, purchase.CreatedAt = models.SeatPurchaseStatusUnknown, created
-		return purchase
-	}
-
-	tests := []struct {
-		name           string
-		purchase       *models.SeatPurchase
-		subscriptionID string
-		periodStart    *time.Time
-		now            time.Time
-		blocks         bool
-	}{
-		{name: "later period of the purchase subscription", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", periodStart: &periodEnd, now: afterWindow},
-		{name: "pending purchase in a later period", purchase: keyed(models.SeatPurchaseStatusPending), subscriptionID: "sub_team", periodStart: &periodEnd, now: afterWindow},
-		{name: "replacement subscription", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_new", periodStart: &periodStart, now: afterWindow},
-		{name: "purchase period", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", periodStart: &periodStart, now: afterWindow, blocks: true},
-		{name: "period that starts before the purchase period ends", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", periodStart: new(periodEnd.Add(-time.Second)), now: afterWindow, blocks: true},
-		{name: "submission can still reach Polar", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", periodStart: &periodEnd, now: created.Add(window), blocks: true},
-		{name: "replacement subscription inside the submission window", purchase: keyed(models.SeatPurchaseStatusPending), subscriptionID: "sub_new", periodStart: &periodStart, now: created.Add(window), blocks: true},
-		{name: "no verified period", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", now: afterWindow.Add(90 * 24 * time.Hour), blocks: true},
-		{name: "no verified subscription", purchase: keyed(models.SeatPurchaseStatusUnknown), periodStart: &periodEnd, now: afterWindow, blocks: true},
-		{name: "legacy purchase in a period that started after its window", purchase: legacy(), subscriptionID: "sub_team", periodStart: new(created.Add(window + time.Second)), now: afterWindow},
-		{name: "legacy purchase in a period that started at its window end", purchase: legacy(), subscriptionID: "sub_team", periodStart: new(created.Add(window)), now: afterWindow, blocks: true},
-		{name: "legacy purchase in its creation period", purchase: legacy(), subscriptionID: "sub_team", periodStart: &periodStart, now: afterWindow, blocks: true},
-		{name: "settled purchase", purchase: keyed(models.SeatPurchaseStatusFailed), subscriptionID: "sub_team", periodStart: &periodStart, now: created},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			before := *tt.purchase
-
-			assert.Equal(t, tt.blocks, tt.purchase.BlocksRenewalMaintenance(tt.subscriptionID, tt.periodStart, tt.now, window))
-			assert.Equal(t, before, *tt.purchase, "the release rule changes no purchase state")
-		})
-	}
-}
-
 func Test__ListUnresolvedSeatPurchasesCreatedBeforeFindsAgedPurchasesOfAllOrganizations(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

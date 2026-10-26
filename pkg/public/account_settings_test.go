@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -802,7 +801,6 @@ func newAccountDeletionRenewalFixture(t *testing.T) *accountDeletionRenewalFixtu
 	addOrganizationMember(t, r.Organization.ID, false)
 
 	provider := polarfake.NewServer(t)
-	t.Cleanup(seatrenewal.Wait)
 	// Five paid seats, three members, and a renewal in one hour.
 	sub := provider.AddSeatPlan(db, r.Organization.ID, 5, time.Now().Add(time.Hour))
 	return &accountDeletionRenewalFixture{r: r, provider: provider, sub: sub}
@@ -826,7 +824,6 @@ func (f *accountDeletionRenewalFixture) deleteAccount(t *testing.T) *httptest.Re
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 	res := httptest.NewRecorder()
 	server.Router.ServeHTTP(res, req)
-	seatrenewal.Wait()
 	return res
 }
 
@@ -837,32 +834,18 @@ func (f *accountDeletionRenewalFixture) plan(t *testing.T) *models.OrganizationB
 	return plan
 }
 
-func requestsFor(requests []polarfake.Request, subscriptionID string) []polarfake.Request {
-	var matching []polarfake.Request
-	for _, request := range requests {
-		if request.SubscriptionID == subscriptionID {
-			matching = append(matching, request)
-		}
-	}
-	return matching
-}
-
-func TestDeleteAccount_SchedulesRenewalForSurvivingOrganization(t *testing.T) {
+func TestDeleteAccount_KeepsThePaidSeatsOfASurvivingOrganization(t *testing.T) {
 	f := newAccountDeletionRenewalFixture(t)
 
 	res := f.deleteAccount(t)
 
 	require.Equal(t, http.StatusNoContent, res.Code)
-	assert.Equal(t, []polarfake.Request{{
-		Method: http.MethodPatch, SubscriptionID: f.sub.ID,
-		Body: map[string]any{"seats": float64(2), "proration_behavior": "next_period"},
-	}}, f.provider.Patches())
-	assert.Equal(t, new(2), f.provider.Subscription(f.sub.ID).PendingSeats)
-	assert.Equal(t, 5, f.provider.Subscription(f.sub.ID).Seats, "the current period keeps every paid seat")
-	assert.Equal(t, new(2), f.plan(t).RenewalSeatsScheduled)
+	assert.Empty(t, f.provider.Requests(), "account deletion never changes a Polar seat count")
+	assert.Nil(t, f.provider.Subscription(f.sub.ID).PendingSeats)
+	assert.Equal(t, new(5), f.plan(t).PurchasedSeats, "the surviving organization keeps every paid seat")
 }
 
-func TestDeleteAccount_DoesNotScheduleRenewalForDeletedOrganization(t *testing.T) {
+func TestDeleteAccount_DoesNotReadTheEndedSubscriptionOfADeletedOrganization(t *testing.T) {
 	f := newAccountDeletionRenewalFixture(t)
 	db := database.Conn()
 	deleted, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), "")
@@ -872,7 +855,7 @@ func TestDeleteAccount_DoesNotScheduleRenewalForDeletedOrganization(t *testing.T
 	require.NoError(t, err)
 	require.NoError(t, models.SetUserIsOwner(db, user.ID, true))
 	// The subscription of the deleted organization ended, so deletion needs
-	// no Polar check. A schedule for it would still read it from Polar.
+	// no Polar check.
 	ended := f.provider.AddSeatPlan(db, deleted.ID, 2, time.Now().Add(time.Hour))
 	f.provider.Update(ended.ID, func(sub *polarfake.Subscription) { sub.Status = models.PolarSubscriptionStatusCanceled })
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", deleted.ID).
@@ -883,13 +866,12 @@ func TestDeleteAccount_DoesNotScheduleRenewalForDeletedOrganization(t *testing.T
 	require.Equal(t, http.StatusNoContent, res.Code)
 	_, err = models.FindOrganizationByID(deleted.ID.String())
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	assert.Empty(t, requestsFor(f.provider.Requests(), ended.ID))
-	assert.Len(t, requestsFor(f.provider.Patches(), f.sub.ID), 1, "the surviving organization still gets its schedule")
+	assert.Empty(t, f.provider.Requests())
 }
 
-func TestDeleteAccount_SucceedsWhenPolarRejectsTheRenewalSchedule(t *testing.T) {
+func TestDeleteAccount_SucceedsWhilePolarIsUnavailable(t *testing.T) {
 	f := newAccountDeletionRenewalFixture(t)
-	f.provider.FailNext(1, http.StatusUnprocessableEntity, "PolarRequestValidationError")
+	f.provider.FailNext(10, http.StatusServiceUnavailable, "")
 
 	res := f.deleteAccount(t)
 
@@ -898,7 +880,5 @@ func TestDeleteAccount_SucceedsWhenPolarRejectsTheRenewalSchedule(t *testing.T) 
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	_, err = models.FindActiveHumanUserByAccountAndOrganization(database.Conn(), f.r.Organization.ID, f.r.Account.ID)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	assert.Empty(t, f.provider.Patches())
-	assert.Nil(t, f.provider.Subscription(f.sub.ID).PendingSeats)
-	assert.Nil(t, f.plan(t).RenewalSeatsScheduled, "the seat renewal sync worker schedules it later")
+	assert.Empty(t, f.provider.Requests())
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -20,24 +19,17 @@ import (
 	"github.com/superplanehq/superplane/pkg/services"
 )
 
-func scheduledRenewal(seats int) map[string]any {
-	return map[string]any{"seats": float64(seats), "proration_behavior": "next_period"}
-}
-
-// renewalSchedules waits for the background renewal schedules and returns
-// the next_period updates that Polar received.
-func (f *seatPurchaseFixture) renewalSchedules() []map[string]any {
-	seatrenewal.Wait()
+// assertNoAutomaticQuantityWrite fails when SuperPlane scheduled a seat count
+// or sent a seat update other than the explicit purchases.
+func (f *seatPurchaseFixture) assertNoAutomaticQuantityWrite(purchases int) {
+	f.t.Helper()
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]map[string]any(nil), f.schedules...)
-}
-
-func (f *seatPurchaseFixture) pendingRenewalSeats() *int {
-	seatrenewal.Wait()
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.pendingSeats
+	assert.Empty(f.t, f.schedules, "SuperPlane never schedules a renewal seat count")
+	assert.Len(f.t, f.patchBodies, purchases, "only explicit purchases change the seat count")
+	for _, body := range f.patchBodies {
+		assert.Equal(f.t, "invoice", body["proration_behavior"])
+	}
 }
 
 func (f *seatPurchaseFixture) addMembers(count int) []*models.User {
@@ -105,28 +97,24 @@ func (f *seatPurchaseFixture) applyCycled(seats int) {
 	require.NoError(f.t, polar.ApplySubscriptionEvent(context.Background(), database.Conn(), &event))
 }
 
-func Test__RemovingAMemberSchedulesOneSeatLessForRenewal(t *testing.T) {
+func Test__RemovingAMemberKeepsThePaidSeatWithoutAQuantityWrite(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 10, new(50))
 	members := f.addMembers(9)
 
 	f.removeMember(members[0])
 
-	assert.Equal(t, []map[string]any{scheduledRenewal(9)}, f.renewalSchedules())
-	assert.Empty(t, f.patchBodies, "nothing is charged or credited now")
+	f.assertNoAutomaticQuantityWrite(0)
 	assert.Equal(t, 10, f.purchasedSeats())
 	assert.True(t, f.plan().CurrentPeriodEnd.Equal(f.periodEnd), "the renewal date does not change")
-	assert.Equal(t, new(1), f.seatUsage().Available, "the freed seat stays usable until renewal")
-	assert.Equal(t, new(9), f.plan().RenewalSeatsScheduled)
-	assert.NotNil(t, f.plan().RenewalSeatsScheduledAt)
+	assert.Equal(t, new(1), f.seatUsage().Available, "the freed seat stays paid and reusable")
 }
 
-func Test__AMemberWhoJoinsSchedulesTheFullSeatCountAgain(t *testing.T) {
+func Test__AMemberWhoJoinsReusesAPaidSeatWithoutAQuantityWrite(t *testing.T) {
 	for _, restore := range []bool{false, true} {
 		t.Run(map[bool]string{false: "new member", true: "restored former member"}[restore], func(t *testing.T) {
 			f := newSeatPurchaseFixture(t, 10, new(50))
 			members := f.addMembers(9)
 			f.removeMember(members[0])
-			require.Equal(t, new(9), f.pendingRenewalSeats())
 
 			email, accountID := members[0].GetEmail(), *members[0].AccountID
 			if !restore {
@@ -136,62 +124,55 @@ func Test__AMemberWhoJoinsSchedulesTheFullSeatCountAgain(t *testing.T) {
 			}
 			token := f.invite(email)
 			require.Equal(t, "joined", f.accept(accountID, token))
+			require.Equal(t, "already_member", f.accept(accountID, token))
 
-			assert.Equal(t, []map[string]any{scheduledRenewal(9), scheduledRenewal(10)}, f.renewalSchedules())
-			assert.Nil(t, f.pendingRenewalSeats(), "no reduction remains")
+			f.assertNoAutomaticQuantityWrite(0)
+			assert.Equal(t, 10, f.purchasedSeats())
+			assert.Equal(t, new(0), f.seatUsage().Available)
 			if restore {
 				restored, err := models.FindActiveUserByEmail(f.r.Organization.ID.String(), email)
 				require.NoError(t, err)
 				assert.Equal(t, members[0].ID, restored.ID)
 			}
-
-			require.Equal(t, "already_member", f.accept(accountID, token))
-			assert.Len(t, f.renewalSchedules(), 2, "a member who is already in the organization changes nothing")
 		})
 	}
 }
 
-func Test__PendingInvitationsDoNotRenewAndTheCycleKeepsOnlyOccupiedSeats(t *testing.T) {
+func Test__RenewalKeepsPaidSeatsAndPendingInvitations(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 5, new(50))
 	members := f.addMembers(2)
 	f.invite("first@example.com")
 	f.invite("second@example.com")
-	members = append(members, f.addMembers(1)...)
-
 	f.removeMember(members[0])
 
-	assert.Equal(t, []map[string]any{scheduledRenewal(3)}, f.renewalSchedules())
-	assert.Equal(t, 2, f.seatUsage().PendingInvitations)
+	// Polar renews the paid seats unchanged.
+	f.applyCycled(5)
 
-	f.applyCycled(3)
-
-	assert.Equal(t, 3, f.purchasedSeats())
-	plan := f.plan()
-	assert.Equal(t, new(3), plan.RenewalSeatsScheduled, "a subscription snapshot keeps the scheduled record")
-	assert.NotNil(t, plan.RenewalSeatsScheduledAt)
+	f.assertNoAutomaticQuantityWrite(0)
+	assert.Equal(t, 5, f.purchasedSeats(), "renewal keeps the spare paid seats")
+	usage := f.seatUsage()
+	assert.Equal(t, 2, usage.PendingInvitations, "pending invitations stay pending")
+	assert.Equal(t, new(1), usage.Invitable)
 }
 
-func Test__SeatPurchaseSchedulesTheRenewalSeatCountAgain(t *testing.T) {
-	// Only the owner is a member, and Polar renews one seat.
-	f := newSeatPurchaseFixture(t, 3, new(50))
-	f.pendingSeats = new(1)
+// Ten paid seats, seven members, and one purchased seat give eleven paid
+// seats. The purchase starts from the paid seats, not from the members.
+func Test__SeatPurchaseStartsFromThePaidSeats(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 10, new(50))
+	f.addMembers(6)
 
-	_, err := f.purchase(1, 3)
+	_, err := f.purchase(1, 10)
 	require.NoError(t, err)
 
-	assert.Equal(t, []map[string]any{{"seats": float64(4), "proration_behavior": "invoice"}}, f.patchBodies)
-	assert.Equal(t, []map[string]any{scheduledRenewal(1)}, f.renewalSchedules(),
-		"the purchase dropped the scheduled reduction, so it is scheduled again")
-	assert.Equal(t, new(1), f.pendingRenewalSeats())
-	assert.Equal(t, 4, f.purchasedSeats())
+	assert.Equal(t, []map[string]any{{"seats": float64(11), "proration_behavior": "invoice"}}, f.patchBodies)
+	f.assertNoAutomaticQuantityWrite(1)
+	assert.Equal(t, 11, f.purchasedSeats())
 }
 
-func Test__BillingSyncRestoresRenewalReductionAfterLostPurchaseResponse(t *testing.T) {
+func Test__PreviewAndSyncSettleALostPurchaseResponseWithoutAQuantityWrite(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 3, new(50))
-	f.pendingSeats = new(1)
 	f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
 		f.polarSeats = seats
-		f.pendingSeats = nil
 		conn, _, err := w.(http.Hijacker).Hijack()
 		require.NoError(t, err)
 		require.NoError(t, conn.Close())
@@ -199,22 +180,18 @@ func Test__BillingSyncRestoresRenewalReductionAfterLostPurchaseResponse(t *testi
 	response, err := f.purchase(1, 3)
 	require.NoError(t, err)
 	require.Equal(t, seatPurchaseAwaitingConfirmation, response.Purchase.Status)
-	require.Nil(t, f.pendingRenewalSeats(), "the purchase cleared the reduction")
-	f.mu.Lock()
-	readsBeforeSync := f.getCount
-	f.mu.Unlock()
 
+	_, err = f.preview(1)
+	require.NoError(t, err)
 	_, err = SyncOrganizationBilling(t.Context(), f.r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
 	require.NoError(t, err)
+
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
-	assert.Equal(t, new(1), f.pendingRenewalSeats())
-	assert.Equal(t, new(1), f.plan().RenewalSeatsScheduled)
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	assert.Equal(t, 1, f.getCount-readsBeforeSync, "billing sync reads Polar for only one renewal schedule")
+	assert.Equal(t, 4, f.purchasedSeats())
+	f.assertNoAutomaticQuantityWrite(1)
 }
 
-func Test__NoRenewalScheduleWhileASeatPurchaseIsInFlight(t *testing.T) {
+func Test__ASeatPurchaseInFlightBlocksNoRemoval(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 3, new(50))
 	members := f.addMembers(1)
 	f.dropConnection()
@@ -227,7 +204,7 @@ func Test__NoRenewalScheduleWhileASeatPurchaseIsInFlight(t *testing.T) {
 
 	f.removeMember(members[0])
 
-	assert.Empty(t, f.renewalSchedules(), "the purchase replaces any scheduled count when it settles")
+	f.assertNoAutomaticQuantityWrite(1)
 	assert.Equal(t, models.SeatPurchaseStatusUnknown, f.latestPurchase().Status,
 		"nothing proves the outcome yet, so the purchase stays in flight")
 }
@@ -242,40 +219,16 @@ func (f *seatPurchaseFixture) setToCancel() {
 	f.updateBillingPlan(map[string]any{"cancel_at_period_end": true})
 }
 
-func (f *seatPurchaseFixture) resume() *pb.DescribeOrganizationBillingResponse {
-	f.t.Helper()
+func Test__ResumeKeepsThePaidSeatsWithoutAQuantityWrite(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 5, new(50))
+	f.addMembers(1)
+	f.setPeriodEnd(time.Now().Add(time.Hour).UTC().Truncate(time.Second))
+	f.setToCancel()
+
 	response, err := ResumeOrganizationSubscription(context.Background(), f.r.Organization.ID.String(), &pb.ResumeOrganizationSubscriptionRequest{})
-	require.NoError(f.t, err)
-	return response
-}
-
-func Test__ResumeShortlyBeforeRenewalSchedulesTheMemberCount(t *testing.T) {
-	f := newSeatPurchaseFixture(t, 5, new(50))
-	f.addMembers(1)
-	f.setPeriodEnd(time.Now().Add(time.Hour).UTC().Truncate(time.Second))
-	f.setToCancel()
-
-	response := f.resume()
+	require.NoError(t, err)
 
 	assert.False(t, response.CancelAtPeriodEnd)
-	assert.Equal(t, []map[string]any{scheduledRenewal(2)}, f.renewalSchedules())
-	assert.Equal(t, new(2), f.pendingRenewalSeats())
-	assert.Equal(t, new(2), f.plan().RenewalSeatsScheduled)
-	assert.Equal(t, 5, f.purchasedSeats(), "the current period keeps every paid seat")
-}
-
-func Test__ResumeSucceedsWhenPolarRejectsTheRenewalSchedule(t *testing.T) {
-	f := newSeatPurchaseFixture(t, 5, new(50))
-	f.addMembers(1)
-	f.setPeriodEnd(time.Now().Add(time.Hour).UTC().Truncate(time.Second))
-	f.setToCancel()
-	f.scheduleRejection = &polarRejection{status: http.StatusUnprocessableEntity, code: "PolarRequestValidationError"}
-
-	response := f.resume()
-
-	assert.False(t, response.CancelAtPeriodEnd)
-	assert.Len(t, f.renewalSchedules(), 1, "the schedule was sent once and is left to the sync worker")
-	assert.False(t, f.plan().CancelAtPeriodEnd, "the resume stays applied")
-	assert.Nil(t, f.pendingRenewalSeats())
-	assert.Nil(t, f.plan().RenewalSeatsScheduled)
+	f.assertNoAutomaticQuantityWrite(0)
+	assert.Equal(t, 5, f.purchasedSeats(), "the subscription renews every paid seat")
 }
