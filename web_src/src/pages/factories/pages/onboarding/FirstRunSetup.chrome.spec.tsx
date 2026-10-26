@@ -373,6 +373,10 @@ describe("FirstRunSetup chrome", () => {
 
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
     expect(model.saveIssues).not.toHaveBeenCalled();
+    // GitHub is highlighted as the default, but the list stays until the user picks it.
+    const githubIssues = screen.getByRole("button", { name: /GitHub issues/ });
+    expect(githubIssues).toHaveAttribute("aria-pressed", "true");
+    await user.click(githubIssues);
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.saveIssues).toHaveBeenCalledWith("vcs"));
     expect(await screen.findByTestId("first-run-model-source")).toBeInTheDocument();
@@ -383,6 +387,9 @@ describe("FirstRunSetup chrome", () => {
 
     await user.click(screen.getByTestId("first-run-back"));
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    // Back on the GitHub card returns to the source list, then to the repository.
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByRole("button", { name: /GitHub issues/ })).toHaveAttribute("aria-pressed", "true");
     await user.click(screen.getByTestId("first-run-back"));
     expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
   });

@@ -150,6 +150,24 @@ describe("provisionWorkspace", () => {
     },
   );
 
+  it.each(["vcs", "jira", "linear"] as const)(
+    "starts the %s intake paused when automatic intake is off",
+    async (issuesChoice) => {
+      const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" });
+      await provisionWorkspace(
+        provisionArgs({
+          issuesChoice,
+          paused: true,
+          createIntake,
+          jira: { integrationId: "jira-1", projectId: "project-1" },
+          linear: { integrationId: "linear-1", projectIds: ["project-1"] },
+        }),
+      );
+      expect(createIntake).toHaveBeenCalledWith(expect.objectContaining({ paused: true }));
+      expect(createIntake).not.toHaveBeenCalledWith(expect.objectContaining({ skipInitialImport: true }));
+    },
+  );
+
   it("saves the issues choice it was given, not a value read off setup state", async () => {
     const updateOnboarding = vi.fn().mockResolvedValue({});
     const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" });
