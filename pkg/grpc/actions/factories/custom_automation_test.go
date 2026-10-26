@@ -28,6 +28,7 @@ func TestCustomAutomationSettingsAllowBashOnly(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, settings.Steps, 1)
 	assert.Equal(t, runner.AgentStepBash, settings.Steps[0].Type)
+	assert.Equal(t, prFeedbackTimeoutSeconds, settings.ExecutionTimeoutSeconds)
 }
 
 func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
@@ -51,6 +52,7 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 					CredentialSource:          runner.CredentialsSourceIntegration,
 					CredentialIntegrationName: "Claude",
 				},
+				ExecutionTimeoutSeconds: 7200,
 				Steps: []*pb.FactoryCustomAutomation_Step{
 					{Name: "Review", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: prompt, WorkingDirectory: "repo"},
 					{
@@ -78,6 +80,7 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			assert.Equal(t, "automatic", template["startMode"])
 			assert.Equal(t, "runnerClaudeCode", agent.Component)
 			assert.Equal(t, "claude-sonnet-4-6", agent.Configuration["model"])
+			assert.Equal(t, 7200, agent.Configuration["executionTimeoutSeconds"])
 			assert.Equal(t, customAutomationStepConfiguration(settings.Steps), agent.Configuration["steps"])
 			environmentFrom := agent.Configuration["environmentFrom"].([]any)
 			require.Len(t, environmentFrom, 2)

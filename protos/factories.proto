@@ -1292,6 +1292,7 @@ message FactoryCustomAutomation {
     FactoryAppTemplateAgent agent = 2;
     repeated Step steps = 3;
     string icon = 4;
+    int32 execution_timeout_seconds = 5;
   }
 
   Factory.Automation automation = 1;

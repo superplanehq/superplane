@@ -12,6 +12,7 @@ import {
   customAutomationMode,
   customAutomationSettings,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
+  workspaceAgentFromOnboarding,
   type CustomAutomationMode,
 } from "../lib/customAutomation";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
@@ -31,7 +32,10 @@ export function useCustomAutomationSetupPage(args: {
   const [name, setName] = useState("Custom automation");
   const [mode, setMode] = useState<CustomAutomationMode>("manual");
   const [icon, setIcon] = useState(DEFAULT_CUSTOM_AUTOMATION_ICON);
-  const [draft, setDraft] = useState<PlanningReviewDraft>(() => customAutomationDraft());
+  const agentHarness = args.factory?.onboarding?.agentHarness;
+  const [draft, setDraft] = useState<PlanningReviewDraft>(() =>
+    customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }),
+  );
   const [saveError, setSaveError] = useState("");
   const automation = described.data;
 
@@ -42,9 +46,9 @@ export function useCustomAutomationSetupPage(args: {
     setName("Custom automation");
     setMode("manual");
     setIcon(DEFAULT_CUSTOM_AUTOMATION_ICON);
-    setDraft(customAutomationDraft());
+    setDraft(customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }));
     setSaveError("");
-  }, [args.automationId]);
+  }, [args.automationId, agentHarness]);
 
   useEffect(() => {
     if (!automation) {
@@ -69,7 +73,7 @@ export function useCustomAutomationSetupPage(args: {
     setSaveError("");
     const input = {
       name: name.trim(),
-      settings: customAutomationSettings(mode, draft, Boolean(args.automationId), icon),
+      settings: customAutomationSettings(mode, draft, icon),
     };
     try {
       if (args.automationId) {

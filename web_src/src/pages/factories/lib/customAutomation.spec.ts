@@ -1,7 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
 import { buildColumnAutomations, columnAutomationOpenPath } from "./columnAutomations";
-import { customAutomationDraft, customAutomationModeCopy, customAutomationSettings } from "./customAutomation";
+import {
+  customAutomationDraft,
+  customAutomationModeCopy,
+  customAutomationSettings,
+  workspaceAgentFromOnboarding,
+} from "./customAutomation";
 import { customAutomationIdFromSearch } from "./customAutomationPaths";
 
 describe("custom automation settings", () => {
@@ -28,9 +33,10 @@ describe("custom automation settings", () => {
       { name: "Review", type: "prompt", prompt: "Review this change.", command: undefined, workingDirectory: "repo" },
       { name: "Test", type: "bash", prompt: undefined, command: "make test", workingDirectory: "repo" },
     ]);
-    expect(customAutomationSettings("automatic", draft, true)).toEqual({
+    expect(customAutomationSettings("automatic", draft)).toEqual({
       startMode: "START_MODE_AUTOMATIC",
       icon: "sparkles",
+      executionTimeoutSeconds: 3600,
       agent: {
         component: "runnerClaudeCode",
         model: "claude-sonnet",
@@ -58,12 +64,26 @@ describe("custom automation settings", () => {
     });
   });
 
-  it("does not override the workspace agent during creation", () => {
-    const settings = customAutomationSettings("manual", customAutomationDraft(), false);
+  it("saves the draft agent and run duration", () => {
+    const draft = customAutomationDraft();
+    draft.components[0]!.component = "runnerClaudeCode";
+    draft.components[0]!.configuration.model = "claude-opus";
+    draft.components[0]!.configuration.executionTimeoutSeconds = 7200;
 
-    expect(settings.agent).toBeUndefined();
-    expect(settings.startMode).toBe("START_MODE_MANUAL");
+    const settings = customAutomationSettings("manual", draft);
+
+    expect(settings.agent).toEqual({ component: "runnerClaudeCode", model: "claude-opus" });
+    expect(settings.executionTimeoutSeconds).toBe(7200);
     expect(settings.steps?.map((step) => step.type)).toEqual(["TYPE_BASH"]);
+  });
+
+  it("fills an empty create draft from the workspace agent", () => {
+    const draft = customAutomationDraft({
+      settings: { agent: workspaceAgentFromOnboarding({ agentHarness: "AGENT_HARNESS_CLAUDE_CODE" }) },
+    });
+
+    expect(draft.components[0]?.component).toBe("runnerClaudeCode");
+    expect(customAutomationSettings("manual", draft).agent?.component).toBe("runnerClaudeCode");
   });
 
   it("uses concise mode copy for board rows", () => {

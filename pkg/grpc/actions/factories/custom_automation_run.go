@@ -139,9 +139,6 @@ func startCustomAutomation(
 	if err != nil {
 		return nil, err
 	}
-	if err := ensureCustomAutomationCheckoutEnvironment(db, factory, canvas); err != nil {
-		return nil, err
-	}
 	trigger, err := models.FindCanvasNode(db, canvas.ID, customAutomationTriggerID)
 	if err != nil {
 		return nil, err

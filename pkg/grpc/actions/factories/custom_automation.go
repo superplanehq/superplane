@@ -17,7 +17,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -211,10 +210,11 @@ func UpdateFactoryCustomAutomation(
 }
 
 type customAutomationSettings struct {
-	StartMode pb.FactoryCustomAutomation_StartMode
-	Agent     *intakeAgent
-	Steps     []runner.AgentStep
-	Icon      string
+	StartMode               pb.FactoryCustomAutomation_StartMode
+	Agent                   *intakeAgent
+	Steps                   []runner.AgentStep
+	Icon                    string
+	ExecutionTimeoutSeconds int
 }
 
 func parseCustomAutomationSettings(
@@ -261,11 +261,16 @@ func parseCustomAutomationSettings(
 	if err := runner.ValidateAgentSteps(steps); err != nil {
 		return nil, invalidArgument(err.Error())
 	}
+	timeout := int(input.GetExecutionTimeoutSeconds())
+	if timeout <= 0 {
+		timeout = prFeedbackTimeoutSeconds
+	}
 	return &customAutomationSettings{
-		StartMode: input.GetStartMode(),
-		Agent:     agent,
-		Steps:     steps,
-		Icon:      strings.TrimSpace(input.GetIcon()),
+		StartMode:               input.GetStartMode(),
+		Agent:                   agent,
+		Steps:                   steps,
+		Icon:                    strings.TrimSpace(input.GetIcon()),
+		ExecutionTimeoutSeconds: timeout,
 	}, nil
 }
 
@@ -292,6 +297,18 @@ func customAutomationAgent(tx *gorm.DB, factory *models.Factory, input *pb.Facto
 		if integrationName != "" {
 			agent.Credentials["integration"] = map[string]any{"name": integrationName}
 		}
+	}
+	if agent.Credentials != nil {
+		return agent, nil
+	}
+	workspace := resolveIntakeAgent(tx, factory)
+	if workspace == nil || workspace.Component != agent.Component {
+		return agent, nil
+	}
+	agent.Credentials = workspace.Credentials
+	agent.LLMProvider = workspace.LLMProvider
+	if agent.Model == "" {
+		agent.Model = workspace.Model
 	}
 	return agent, nil
 }
@@ -346,7 +363,7 @@ func buildCustomAutomationCanvas(
 	}
 	runnerConfiguration := map[string]any{
 		"machineType":             runner.MachineTypeE1LargeAMD64,
-		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
+		"executionTimeoutSeconds": settings.ExecutionTimeoutSeconds,
 		"steps":                   customAutomationStepConfiguration(settings.Steps),
 		"environmentFrom":         environmentFrom,
 		"environment":             customAutomationCheckoutEnvironment(factory),
@@ -417,64 +434,6 @@ func checkoutEnvironmentVar(name, value string) map[string]any {
 		"value":       value,
 		"valueSource": runner.EnvironmentValueSourceLiteral,
 	}
-}
-
-func applyCustomAutomationCheckoutEnvironment(configuration map[string]any, factory *models.Factory) {
-	wanted := customAutomationCheckoutEnvironment(factory)
-	existing, _ := configuration["environment"].([]any)
-	replaced := make(map[string]struct{}, len(wanted))
-	for i, raw := range existing {
-		entry, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-		name, _ := entry["name"].(string)
-		for _, item := range wanted {
-			want := item.(map[string]any)
-			if want["name"] != name {
-				continue
-			}
-			existing[i] = want
-			replaced[name] = struct{}{}
-			break
-		}
-	}
-	for _, item := range wanted {
-		name := item.(map[string]any)["name"].(string)
-		if _, ok := replaced[name]; ok {
-			continue
-		}
-		existing = append(existing, item)
-	}
-	configuration["environment"] = existing
-}
-
-func ensureCustomAutomationCheckoutEnvironment(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas) error {
-	node, err := findCustomAutomationAgentNode(tx, canvas)
-	if err != nil {
-		return err
-	}
-	configuration := node.Configuration.Data()
-	if configuration == nil {
-		configuration = map[string]any{}
-	}
-	applyCustomAutomationCheckoutEnvironment(configuration, factory)
-	return tx.Model(node).Update("configuration", datatypes.NewJSONType(configuration)).Error
-}
-
-func findCustomAutomationAgentNode(tx *gorm.DB, canvas *models.Canvas) (*models.CanvasNode, error) {
-	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-	if err != nil {
-		return nil, err
-	}
-	for i := range version.Nodes {
-		node := version.Nodes[i]
-		if !isFactoryAgentHarness(node.ComponentName()) {
-			continue
-		}
-		return models.FindCanvasNode(tx, canvas.ID, node.ID)
-	}
-	return nil, errors.New("custom automation agent is missing")
 }
 
 func customAutomationStepConfiguration(steps []runner.AgentStep) []any {
@@ -612,8 +571,9 @@ func serializeCustomAutomation(
 			Component: agent.ComponentName(),
 			Model:     configString(agent.Configuration, "model"),
 		},
-		Steps: steps,
-		Icon:  configString(template, "icon"),
+		Steps:                   steps,
+		Icon:                    configString(template, "icon"),
+		ExecutionTimeoutSeconds: int32(configInt(agent.Configuration, "executionTimeoutSeconds")),
 	}
 	if credentials, ok := agent.Configuration["credentials"].(map[string]any); ok {
 		settings.Agent.CredentialSource = configString(credentials, "source")
@@ -656,6 +616,21 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 		result = append(result, value)
 	}
 	return result, nil
+}
+
+func configInt(configuration map[string]any, key string) int {
+	switch value := configuration[key].(type) {
+	case int:
+		return value
+	case int32:
+		return int(value)
+	case int64:
+		return int(value)
+	case float64:
+		return int(value)
+	default:
+		return 0
+	}
 }
 
 func customAutomationStartModeName(mode pb.FactoryCustomAutomation_StartMode) string {

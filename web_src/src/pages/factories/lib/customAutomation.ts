@@ -17,6 +17,7 @@ export type ManualCustomAutomation = {
 };
 
 export const DEFAULT_CUSTOM_AUTOMATION_ICON = "sparkles";
+export const DEFAULT_CUSTOM_AUTOMATION_TIMEOUT_SECONDS = 3600;
 
 export function customAutomationMode(value: FactoryCustomAutomationStartMode | undefined): CustomAutomationMode {
   return value === "START_MODE_AUTOMATIC" ? "automatic" : "manual";
@@ -36,6 +37,21 @@ export function customAutomationModeCopy(mode: CustomAutomationMode): {
     trigger: "Manual start on a Verify task",
     action: "Run automation on demand",
   };
+}
+
+export function workspaceAgentFromOnboarding(onboarding?: {
+  agentHarness?: string;
+}): FactoriesFactoryCustomAutomationSettings["agent"] | undefined {
+  switch (onboarding?.agentHarness) {
+    case "AGENT_HARNESS_SUPERPLANE":
+      return { component: "runnerSuperPlane", credentialSource: "hosted" };
+    case "AGENT_HARNESS_CODEX":
+      return { component: "runnerCodex" };
+    case "AGENT_HARNESS_CLAUDE_CODE":
+      return { component: "runnerClaudeCode" };
+    default:
+      return undefined;
+  }
 }
 
 export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomation): PlanningReviewDraft {
@@ -63,6 +79,7 @@ export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomat
         configuration: {
           ...customAutomationAgentConfiguration(agent),
           steps,
+          executionTimeoutSeconds: customAutomationTimeout(settings?.executionTimeoutSeconds),
         },
         concurrency: { max: "5", key: "" },
       },
@@ -83,29 +100,33 @@ function customAutomationAgentConfiguration(
 export function customAutomationSettings(
   mode: CustomAutomationMode,
   draft: PlanningReviewDraft,
-  includeAgent: boolean,
   icon = DEFAULT_CUSTOM_AUTOMATION_ICON,
 ): FactoriesFactoryCustomAutomationSettings {
   const component = draft.components[0];
   const configuration = component?.configuration ?? {};
   const steps = Array.isArray(configuration.steps) ? (configuration.steps as PlanningReviewStep[]) : [];
+  const credentialSource = typeof configuration.credentialSource === "string" ? configuration.credentialSource : "";
+  const credentialIntegrationName =
+    typeof configuration.credentialIntegrationName === "string" ? configuration.credentialIntegrationName : "";
   return {
     startMode: mode === "automatic" ? "START_MODE_AUTOMATIC" : "START_MODE_MANUAL",
     icon,
-    agent:
-      includeAgent && component?.component
-        ? {
-            component: component.component,
-            model: typeof configuration.model === "string" ? configuration.model : "",
-            credentialSource: typeof configuration.credentialSource === "string" ? configuration.credentialSource : "",
-            credentialIntegrationName:
-              typeof configuration.credentialIntegrationName === "string"
-                ? configuration.credentialIntegrationName
-                : "",
-          }
-        : undefined,
+    executionTimeoutSeconds: customAutomationTimeout(configuration.executionTimeoutSeconds),
+    agent: component?.component
+      ? {
+          component: component.component,
+          model: typeof configuration.model === "string" ? configuration.model : "",
+          ...(credentialSource
+            ? { credentialSource, credentialIntegrationName: credentialIntegrationName || undefined }
+            : {}),
+        }
+      : undefined,
     steps: steps.map(stepToApi),
   };
+}
+
+function customAutomationTimeout(value: unknown): number {
+  return typeof value === "number" && value > 0 ? value : DEFAULT_CUSTOM_AUTOMATION_TIMEOUT_SECONDS;
 }
 
 function stepFromApi(step: FactoriesFactoryCustomAutomationStep): PlanningReviewStep {
