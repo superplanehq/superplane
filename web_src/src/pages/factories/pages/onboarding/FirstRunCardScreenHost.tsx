@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useBillingCardSetup } from "@/hooks/useBillingCardSetup";
 import { getApiErrorMessage } from "@/lib/errors";
 
-import { FirstRunCardScreen, type FirstRunCardPhase } from "./first-run/FirstRunCardScreen";
+import { FirstRunCardScreen, type FirstRunCardPhase, type FirstRunCardSummary } from "./first-run/FirstRunCardScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
 import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { activateOnboardingPlan } from "./onboardingCardPlan";
@@ -39,11 +39,13 @@ export function FirstRunCardScreenHost({
   flow,
   chrome,
   sphere,
+  summary,
 }: {
   organizationId: string;
   flow: CardStepFlow;
   chrome: FirstRunChrome;
   sphere?: FirstRunSphereProps;
+  summary?: FirstRunCardSummary;
 }) {
   const cardSetup = useBillingCardSetup(organizationId);
   const [starting, setStarting] = useState(false);
@@ -75,6 +77,8 @@ export function FirstRunCardScreenHost({
     <FirstRunCardScreen
       planName={plan?.name ?? ""}
       trialCreditCents={Number(plan?.trialCreditCents ?? 0)}
+      checkout={Boolean(plan?.subscriptionRequired)}
+      summary={summary}
       phase={cardPhase({ cardStep, starting, opening: cardSetup.opening, waitingForCard: cardSetup.waitingForCard })}
       error={error || cardSetup.error || undefined}
       busy={flow.busy}

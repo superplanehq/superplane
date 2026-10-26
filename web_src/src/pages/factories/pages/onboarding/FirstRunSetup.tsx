@@ -44,6 +44,9 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   agent: 5,
 };
 
+/** How many existing issues the first import takes. */
+const INITIAL_IMPORT_LIMIT = 3;
+
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   host: "welcome",
   connect: "host",
@@ -74,6 +77,26 @@ function firstNameOf(name: string | undefined): string | undefined {
 function signOut() {
   posthog.reset();
   window.location.href = "/logout";
+}
+
+// The last action on the tickets step scans the backlog. When the card step
+// or the model step follows, the button only continues.
+function ticketsContinueLabel(flow: FirstRunSetupFlow, skipInitialImport: boolean, initialWorkspace: boolean) {
+  const cardStepNext = !flow.cardStep.ready || flow.cardStep.required;
+  if (cardStepNext || !flow.skipAgentScreen) return FIRST_RUN_COPY.tickets.continue;
+  if (!initialWorkspace && skipInitialImport) return FIRST_RUN_COPY.finish.action;
+  return FIRST_RUN_COPY.tickets.analyze;
+}
+
+// The card step shows the finished steps above the card row.
+function cardSummaryFor(flow: FirstRunSetupFlow, model: OnboardingPageModel, initialWorkspace: boolean) {
+  const importsExisting = initialWorkspace || !model.setup.skipInitialImport;
+  return {
+    repository: model.setup.selectedRepo ?? undefined,
+    ticketSource: flow.ticketSource,
+    initialImportCount: importsExisting ? INITIAL_IMPORT_LIMIT : 0,
+    automaticIntake: model.setup.automaticIntake,
+  };
 }
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
@@ -108,7 +131,7 @@ function TicketsScreenHost({
   const repositories = organization ? repositoriesInOrganization(flow.repositories, organization) : flow.repositories;
   return (
     <FirstRunTicketsScreen
-      initialImportLimit={3}
+      initialImportLimit={INITIAL_IMPORT_LIMIT}
       skipInitialImport={model.setup.skipInitialImport}
       // The first workspace always imports: that batch feeds the analysis.
       onSkipInitialImportChange={initialWorkspace ? undefined : model.setup.setSkipInitialImport}
@@ -124,13 +147,7 @@ function TicketsScreenHost({
       connecting={connecting}
       chrome={chrome}
       sphere={sphere}
-      continueLabel={
-        !flow.skipAgentScreen
-          ? FIRST_RUN_COPY.tickets.continue
-          : !initialWorkspace && model.setup.skipInitialImport
-            ? FIRST_RUN_COPY.finish.action
-            : FIRST_RUN_COPY.tickets.analyze
-      }
+      continueLabel={ticketsContinueLabel(flow, model.setup.skipInitialImport, initialWorkspace)}
       continuePending={false}
       saving={flow.busy}
       savingLabel={FIRST_RUN_COPY.tickets.saving}
@@ -324,6 +341,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   useGitHubInstallationChecks(organizationId, flow.screen === "choose" && flow.vcsHost !== "bitbucket" && !destination);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
+  const initialWorkspace = factory?.onboarding?.initial === true;
 
   // The placeholder workspace under setup is itself in `factories`, so
   // another workspace exists when any factory has a different id.
@@ -395,6 +413,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         flow={flow}
         chrome={chromeFor("card")}
         sphere={sphereFor("card", setup.selectedRepo, model.githubOwner)}
+        summary={cardSummaryFor(flow, model, initialWorkspace)}
       />
     );
   }
@@ -412,7 +431,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "tickets") {
     return (
       <TicketsScreenHost
-        initialWorkspace={factory?.onboarding?.initial === true}
+        initialWorkspace={initialWorkspace}
         flow={flow}
         model={model}
         chrome={chromeFor("tickets")}

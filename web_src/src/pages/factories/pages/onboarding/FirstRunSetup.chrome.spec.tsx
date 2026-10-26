@@ -524,7 +524,8 @@ describe("FirstRunSetup chrome", () => {
     const user = userEvent.setup();
     const model = hostedVcsModel();
     renderSetup(model);
-    await user.click(screen.getByTestId("first-run-analyze-tickets"));
+    // The card step follows, so the tickets button does not promise a scan.
+    await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByTestId("first-run-card")).toBeInTheDocument();
     expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", "Step 5 of 5");
     expect(model.finish).not.toHaveBeenCalled();
