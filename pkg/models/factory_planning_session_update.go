@@ -109,7 +109,13 @@ func (s *FactoryPlanningSession) ProposeUpdate(tx *gorm.DB, update PlanningSessi
 // sub-parameters, and any scores sent later must be complete and valid.
 func validatePlanningSessionUpdate(update PlanningSessionUpdate, checks []FactoryWorkOrderCheck) error {
 	if update.Scores != nil {
-		return validatePlanningReviewScores(*update.Scores)
+		if err := validatePlanningReviewScores(*update.Scores); err != nil {
+			return err
+		}
+		if update.Survey != nil && planningReviewScoresAtMaximum(*update.Scores) {
+			return fmt.Errorf("%w: a survey cannot be published when all review scores are 3; remove the survey or lower Clarity if a user decision is needed", ErrFactoryPlanningSessionInvalid)
+		}
+		return nil
 	}
 	if hasPlanningReviewScores(checks) {
 		return nil
@@ -125,6 +131,15 @@ func validatePlanningReviewScores(scores PlanningReviewScores) error {
 		}
 	}
 	return nil
+}
+
+func planningReviewScoresAtMaximum(scores PlanningReviewScores) bool {
+	for _, kind := range planningReviewScoreKinds {
+		if scores.value(kind.key).Score != kind.max {
+			return false
+		}
+	}
+	return true
 }
 
 func validatePlanningReviewScore(kind planningScoreKind, value PlanningScoreValue) error {
