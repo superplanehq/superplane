@@ -163,10 +163,26 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 			return nil, grpcerrors.FailedPrecondition(nil, "Add a payment method before selecting this plan.")
 		}
 	}
-	if _, err := models.ActivateOrganizationBillingPlan(db, organizationID, catalog.Key); err != nil {
+	if err := activatePlanWithWelcomeCredit(db, organizationID, accountID, catalog); err != nil {
 		return nil, grpcerrors.FailedPrecondition(err, "Could not select this plan.")
 	}
 	return &pb.CreateBusinessCheckoutResponse{}, nil
+}
+
+// activatePlanWithWelcomeCredit selects a plan that needs no checkout. The
+// plan's trial credit is the organization's welcome credit when it has none
+// yet, for example after the onboarding card step.
+func activatePlanWithWelcomeCredit(db *gorm.DB, organizationID uuid.UUID, accountID string, catalog *models.BillingPlan) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if _, err := models.ActivateOrganizationBillingPlan(tx, organizationID, catalog.Key); err != nil {
+			return err
+		}
+		account, err := uuid.Parse(accountID)
+		if err != nil {
+			return nil
+		}
+		return models.GrantPlanWelcomeCredit(tx, organizationID, account, catalog)
+	})
 }
 
 func requireNewBilling(ctx context.Context, orgID uuid.UUID) error {

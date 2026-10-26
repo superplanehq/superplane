@@ -67,6 +67,60 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
 }
 
+// A new organization gets the onboarding default plan's trial credit when the
+// card step activates the plan, and not before.
+func TestSelectOnboardingDefaultPlanGrantsItsTrialCredit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	plan := models.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: "Pay as you go", Category: "paid", Visibility: "public", RequirePaymentMethod: true, TrialCreditCents: 1000, TrialLengthDays: 365, CreditFrequency: "none", CreditExpiration: "never", OnboardingDefault: true}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	cleanupDB := database.DB(context.WithoutCancel(t.Context()))
+	t.Cleanup(func() {
+		require.NoError(t, cleanupDB.Where("plan_id = ?", plan.ID).Delete(&models.OrganizationBillingPlan{}).Error)
+		require.NoError(t, cleanupDB.Where("id = ?", plan.ID).Delete(&models.BillingPlan{}).Error)
+	})
+	account, err := models.CreateAccountInTransaction(db, support.RandomName("account"), support.RandomName("owner")+"@example.com")
+	require.NoError(t, err)
+	organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, organization.ID, features.FeatureNewBilling))
+	require.NoError(t, models.GrantWelcomeCredit(db, organization.ID, account.ID))
+	before, err := models.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Zero(t, before.GrantMicros, "the welcome credit waits for the plan")
+
+	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, http.MethodGet, req.Method)
+		if req.URL.Path == "/checkouts/" {
+			writeFakeJSON(t, w, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
+			return
+		}
+		items := []map[string]any{{"id": "pm_saved", "type": "card", "method_metadata": map[string]int{"exp_month": 12, "exp_year": time.Now().Year() + 1}}}
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": items, "pagination": map[string]int{"max_page": 1}}))
+	})
+	usePolarTestServer(t, server)
+	_, err = SelectBillingPlan(t.Context(), organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, account.ID.String(), "http://localhost")
+	require.NoError(t, err)
+
+	current, err := models.FindOrganizationBillingPlan(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, plan.ID, current.PlanID)
+	after, err := models.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CentsToMicros(1000), after.GrantMicros)
+	require.Equal(t, after.GrantMicros, after.RemainingMicros)
+	require.NotNil(t, after.WelcomeCreditExpiresAt)
+	require.WithinDuration(t, time.Now().AddDate(0, 0, 365), *after.WelcomeCreditExpiresAt, time.Minute)
+
+	// Selecting the plan again does not grant the credit twice.
+	_, err = SelectBillingPlan(t.Context(), organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, account.ID.String(), "http://localhost")
+	require.NoError(t, err)
+	again, err := models.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, after.GrantMicros, again.GrantMicros)
+}
+
 func TestSelectNoneBillingPlanWhenNoPublicPlansExist(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

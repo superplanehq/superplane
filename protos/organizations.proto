@@ -982,6 +982,10 @@ message BillingPlanOption {
   bool require_payment_method = 5;
   bool subscription_required = 6;
   optional int32 seat_maximum = 7;
+  // The plan that a new organization lands on after the onboarding card step.
+  bool onboarding_default = 8;
+  // Credit granted to the organization when it starts on this plan.
+  int64 trial_credit_cents = 9;
 }
 
 message SelectBillingPlanRequest {

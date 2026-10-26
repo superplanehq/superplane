@@ -54,8 +54,12 @@ type BillingPlan struct {
 	TrialLengthDays      int       `json:"trial_length_days"`
 	MarkupBPS            *int      `json:"markup_bps"`
 	Features             []string  `json:"features" gorm:"serializer:json;type:jsonb"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	// OnboardingDefault marks the plan that a new organization lands on after
+	// the onboarding card step. Its trial credit is the welcome credit. At most
+	// one plan has it.
+	OnboardingDefault bool      `json:"onboarding_default"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type OrganizationFeatureGrant struct {
@@ -134,6 +138,20 @@ func ListBillingPlans(tx *gorm.DB) ([]BillingPlan, error) {
 	return plans, err
 }
 
+// FindOnboardingDefaultBillingPlan returns the plan that new organizations
+// land on after the onboarding card step, or nil when no plan is marked.
+func FindOnboardingDefaultBillingPlan(tx *gorm.DB) (*BillingPlan, error) {
+	var plan BillingPlan
+	err := tx.Where("onboarding_default").First(&plan).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
 func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 	if err := validateBillingPlan(plan); err != nil {
 		return err
@@ -142,8 +160,14 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 		if err := lockPlanFeatureReferences(inner, plan.Features); err != nil {
 			return err
 		}
-		if plan.ID == uuid.Nil {
+		create := plan.ID == uuid.Nil
+		if create {
 			plan.ID = uuid.New()
+		}
+		if err := clearOtherOnboardingDefaults(inner, plan); err != nil {
+			return err
+		}
+		if create {
 			return inner.Create(plan).Error
 		}
 		var current BillingPlan
@@ -163,6 +187,17 @@ func SaveBillingPlan(tx *gorm.DB, plan *BillingPlan) error {
 		return inner.Save(plan).Error
 	})
 	return billingPlanConflictError(err)
+}
+
+// clearOtherOnboardingDefaults makes the saved plan the only onboarding
+// default. Plans without the mark leave other plans unchanged.
+func clearOtherOnboardingDefaults(tx *gorm.DB, plan *BillingPlan) error {
+	if !plan.OnboardingDefault {
+		return nil
+	}
+	return tx.Model(&BillingPlan{}).
+		Where("onboarding_default AND id <> ?", plan.ID).
+		Update("onboarding_default", false).Error
 }
 
 // billingPlanConflictError maps the unique constraints on plan keys and Polar
@@ -315,6 +350,9 @@ func validateBillingPlan(p *BillingPlan) error {
 	}
 	if p.Key == BillingPlanBusinessManual && p.PolarProductID != nil {
 		return invalid("Business Manual cannot use a Polar product")
+	}
+	if p.OnboardingDefault && (p.Category != "paid" || p.Visibility != "public") {
+		return invalid("the default onboarding plan must be a public paid plan")
 	}
 	return nil
 }

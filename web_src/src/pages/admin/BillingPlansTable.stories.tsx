@@ -28,6 +28,7 @@ const basePlan: BillingPlanListItem = {
   trial_length_days: 14,
   markup_bps: null,
   features: [],
+  onboarding_default: false,
   delete_disabled_reason: null,
   assigned: false,
 };

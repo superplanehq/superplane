@@ -27,6 +27,7 @@ it("unlocks the Polar product, price, and Per seat on a linked plan that no orga
     trial_length_days: 14,
     markup_bps: null,
     features: [],
+    onboarding_default: false,
   };
   const updates: unknown[] = [];
   vi.stubGlobal(

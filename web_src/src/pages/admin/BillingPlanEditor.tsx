@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { BillingHelp } from "./BillingHelp";
 import { PolarProductSelect } from "./PolarProductSelect";
-import type { BillingPlan, FeatureDefinition } from "./billingPlansApi";
+import { type BillingPlan, type FeatureDefinition, planCanBeOnboardingDefault } from "./billingPlansApi";
 type PlanFieldsProps = { plan: BillingPlan; onChange: (plan: BillingPlan) => void };
 type PlanPricingProps = PlanFieldsProps & { assigned: boolean };
 
@@ -157,6 +157,7 @@ function PlanAccessFields({
           Require a saved card before usage. Card setup does not charge the customer.
         </p>
       </div>
+      <OnboardingDefaultField plan={plan} onChange={(onboarding_default) => update({ onboarding_default })} />
       <fieldset className="space-y-3 border-t pt-5">
         <legend className="text-sm font-semibold">Plan features</legend>
         {features.length === 0 && (
@@ -191,6 +192,27 @@ function PlanAccessFields({
         ))}
       </fieldset>
     </>
+  );
+}
+
+function OnboardingDefaultField({ plan, onChange }: { plan: BillingPlan; onChange: (checked: boolean) => void }) {
+  const eligible = planCanBeOnboardingDefault(plan);
+  return (
+    <div className="space-y-2 border-t pt-5">
+      <Label className="flex items-center gap-2">
+        <Checkbox
+          checked={plan.onboarding_default}
+          disabled={!eligible && !plan.onboarding_default}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+        Default plan after onboarding
+      </Label>
+      <p className="text-sm text-muted-foreground">
+        {eligible
+          ? "New organizations start on this plan after they add a card. Only one plan can be the default."
+          : "Only a public paid plan can be the default."}
+      </p>
+    </div>
   );
 }
 
