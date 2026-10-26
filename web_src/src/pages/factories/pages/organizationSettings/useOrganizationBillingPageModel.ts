@@ -183,7 +183,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   const purchasePending = useGooglePurchaseTracking({
     checkoutID: searchParams.get("checkout_id") ?? "",
     invoices: metrics.invoices,
-    enabled: (creditAdded || subscribed) && canManageBilling && !account?.impersonation?.active,
+    enabled: (creditAdded || subscribed) && canManageBilling && !account?.support_session?.active,
   });
   const flags = billingFlags(orgBilling.data);
   const billing = useHostedCreditActions(

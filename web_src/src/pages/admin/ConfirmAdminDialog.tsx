@@ -45,7 +45,7 @@ const ConfirmAdminDialog: React.FC<ConfirmAdminDialogProps> = ({
           <p>This will allow them to:</p>
           <ul className="list-disc pl-5 space-y-1 text-gray-500 dark:text-gray-400">
             <li>View all organizations and their data across this installation</li>
-            <li>Impersonate any user in any organization</li>
+            <li>Start read-only support sessions for any user in any organization</li>
             <li>Promote or demote other installation admins</li>
           </ul>
         </>
@@ -54,7 +54,7 @@ const ConfirmAdminDialog: React.FC<ConfirmAdminDialogProps> = ({
           <p>
             You are about to remove installation admin access from <strong>{accountName}</strong> ({accountEmail}).
           </p>
-          <p>They will lose the ability to access the admin dashboard and impersonate users.</p>
+          <p>They will lose access to the admin dashboard and support sessions.</p>
         </>
       )}
     </DialogDescription>

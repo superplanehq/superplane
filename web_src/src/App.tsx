@@ -106,7 +106,7 @@ import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
 import { BillingPlans } from "./pages/admin/BillingPlans";
 import { Features } from "./pages/admin/Features";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
-import ImpersonationBanner from "./components/ImpersonationBanner";
+import { SupportSessionBanner } from "./components/SupportSessionBanner";
 import LicenseExpiryBanner from "./components/LicenseExpiryBanner";
 import { usePageObservability } from "./hooks/usePageObservability";
 
@@ -262,7 +262,7 @@ function AppRouter() {
     <BrowserRouter>
       <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
-        <ImpersonationBanner />
+        <SupportSessionBanner />
         <LicenseExpiryBanner />
         {/* Phone shells read this region so a fixed shell stays below app banners. */}
         <div className="relative flex-1 overflow-auto" data-app-content-region="">
@@ -376,7 +376,7 @@ export function OrganizationScope() {
   useIdentifyOrganizationGroup({
     accountId: account?.id,
     organizationKey: segment,
-    impersonating: account?.impersonation?.active,
+    inSupportSession: account?.support_session?.active,
     refreshOrganization: organizationScopeQueryEnabled(segment, isReserved, guestLine)
       ? refreshOrganization
       : undefined,

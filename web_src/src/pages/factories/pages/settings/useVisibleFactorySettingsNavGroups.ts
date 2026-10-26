@@ -44,10 +44,10 @@ function visibleFactorySettingsNavGroups(
  */
 export function useVisibleFactorySettingsNavGroups(organizationId: string): FactorySettingsNavGroup[] {
   const settingsNavGroups = useFactorySettingsNavGroups();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const billingProductEnabled = useBillingProductEnabled();
-  const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading);
+  const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, hasPermission, permissionsLoading);
   const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
   if (billingProductEnabled) {
     return visible;

@@ -16,9 +16,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
@@ -27,14 +27,14 @@ type contextKey string
 const AccountContextKey contextKey = "account"
 const EffectiveAccountContextKey contextKey = "effective_account"
 const UserContextKey contextKey = "user"
-const ImpersonationContextKey contextKey = "impersonation"
+const SupportSessionContextKey contextKey = "support_session"
 const ScopedTokenClaimsContextKey contextKey = "scopedTokenClaims"
 const OrganizationNotFoundError string = "organization_not_found_error"
 const AccountNotFoundError string = "account_not_found_error"
 
-// ImpersonationInfo is stored in the request context when an admin
-// is impersonating another user.
-type ImpersonationInfo struct {
+// SupportSessionInfo is stored in the request context when an admin
+// has a read-only support session for another user.
+type SupportSessionInfo struct {
 	AdminAccountID string
 	Active         bool
 	UserName       string
@@ -150,25 +150,29 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 
 			ctx := context.WithValue(r.Context(), AccountContextKey, account)
 
-			// If there's a valid impersonation session, resolve the
-			// impersonated user's account so that non-admin handlers
+			// If there's a valid support session, resolve the
+			// target user's account so that non-admin handlers
 			// (getAccount, listOrganizations, etc.) see the target
 			// user's data instead of the admin's.
-			impAccount, info, impersonationErr := resolveImpersonatedAccount(jwtSigner, r, account)
-			if errors.Is(impersonationErr, models.ErrAccountBlocked) {
-				impersonation.ClearCookie(w, r)
+			targetAccount, info, supportSessionErr := resolveSupportSessionAccount(jwtSigner, r, account)
+			if errors.Is(supportSessionErr, models.ErrAccountBlocked) {
+				supportsession.ClearCookie(w, r)
 			}
 			adminAccountID := ""
 			if info != nil {
 				adminAccountID = info.AdminAccountID
 			}
-			if impAccount != nil {
-				ctx = context.WithValue(ctx, EffectiveAccountContextKey, impAccount)
-				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
+			if targetAccount != nil {
+				ctx = context.WithValue(ctx, EffectiveAccountContextKey, targetAccount)
+				ctx = context.WithValue(ctx, SupportSessionContextKey, info)
 			}
-			loggedAccount, adminAccountID := requestLogAccountIdentity(account, impAccount, adminAccountID)
+			loggedAccount, adminAccountID := requestLogAccountIdentity(account, targetAccount, adminAccountID)
 			SetRequestLogAccount(ctx, loggedAccount)
-			SetRequestLogImpersonator(ctx, adminAccountID)
+			SetRequestLogSupportAdmin(ctx, adminAccountID)
+
+			if RejectSupportSessionWrite(w, r, info) {
+				return
+			}
 
 			authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
 
@@ -178,20 +182,20 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 	}
 }
 
-// resolveImpersonatedAccount checks for an impersonation cookie and,
-// if valid, returns the impersonated Account so it can be used as the
+// resolveSupportSessionAccount checks for a support session cookie and,
+// if valid, returns the target Account so it can be used as the
 // effective account for non-admin endpoints.
-func resolveImpersonatedAccount(
+func resolveSupportSessionAccount(
 	jwtSigner *jwt.Signer,
 	r *http.Request,
 	admin *models.Account,
-) (*models.Account, *ImpersonationInfo, error) {
-	tokenStr, err := impersonation.ReadCookie(r)
+) (*models.Account, *SupportSessionInfo, error) {
+	tokenStr, err := supportsession.ReadCookie(r)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	claims, err := impersonation.ValidateToken(jwtSigner, tokenStr)
+	claims, err := supportsession.ValidateToken(jwtSigner, tokenStr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -204,21 +208,21 @@ func resolveImpersonatedAccount(
 		return nil, nil, nil
 	}
 
-	impAccount, err := models.FindAccountByID(claims.ImpersonatedAccountID)
+	targetAccount, err := models.FindAccountByID(claims.TargetAccountID)
 	if err != nil {
 		return nil, nil, err
 	}
-	if impAccount.IsBlocked() {
+	if targetAccount.IsBlocked() {
 		return nil, nil, models.ErrAccountBlocked
 	}
 
-	info := &ImpersonationInfo{
+	info := &SupportSessionInfo{
 		AdminAccountID: claims.AdminAccountID,
 		Active:         true,
-		UserName:       impAccount.Name,
+		UserName:       targetAccount.Name,
 	}
 
-	return impAccount, info, nil
+	return targetAccount, info, nil
 }
 
 func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
@@ -258,7 +262,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// Otherwise, we authenticate the account with the cookie,
 			// and expect an organization ID in the header or query parameters.
 			//
-			user, impersonationInfo, err := authenticateUserByCookie(ctx, w, jwtSigner, r)
+			user, supportSessionInfo, err := authenticateUserByCookie(ctx, w, jwtSigner, r)
 			if err != nil {
 				if errors.Is(err, models.ErrAccountBlocked) {
 					http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
@@ -275,9 +279,13 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 
 			ctx = context.WithValue(ctx, UserContextKey, user)
 			SetRequestLogUser(ctx, user)
-			if impersonationInfo != nil {
-				ctx = context.WithValue(ctx, ImpersonationContextKey, impersonationInfo)
-				SetRequestLogImpersonator(ctx, impersonationInfo.AdminAccountID)
+			if supportSessionInfo != nil {
+				ctx = context.WithValue(ctx, SupportSessionContextKey, supportSessionInfo)
+				SetRequestLogSupportAdmin(ctx, supportSessionInfo.AdminAccountID)
+			}
+
+			if RejectSupportSessionWrite(w, r, supportSessionInfo) {
+				return
 			}
 
 			if account, err := getValidatedAccountFromCookie(r, jwtSigner); err == nil {
@@ -426,22 +434,22 @@ func authenticateUserByCookie(
 	w http.ResponseWriter,
 	jwtSigner *jwt.Signer,
 	r *http.Request,
-) (*models.User, *ImpersonationInfo, error) {
+) (*models.User, *SupportSessionInfo, error) {
 	ctx, span := telemetry.StartSpan(ctx, "auth.authenticate_by_cookie")
 	defer span.End()
 
-	// If a valid impersonation session exists, commit to it — never fall
+	// If a valid support session exists, commit to it — never fall
 	// through to the admin's own identity. This prevents silently showing
-	// admin data when the impersonated user isn't in the requested org.
-	user, info, err := resolveImpersonatedUser(ctx, jwtSigner, r)
+	// admin data when the target user isn't in the requested org.
+	user, info, err := resolveSupportSessionUser(ctx, jwtSigner, r)
 	if err == nil {
 		return user, info, nil
 	}
-	// Blocking an impersonated target invalidates that impersonated view.
+	// Blocking a support session target invalidates that support session view.
 	// Fall back to the real admin, matching AccountAuthMiddleware.
 	if errors.Is(err, models.ErrAccountBlocked) {
-		impersonation.ClearCookie(w, r)
-	} else if isActiveImpersonation(jwtSigner, r) {
+		supportsession.ClearCookie(w, r)
+	} else if isActiveSupportSession(jwtSigner, r) {
 		return nil, nil, err
 	}
 
@@ -484,16 +492,16 @@ func resolveOrganizationRef(ctx context.Context, ref string) (string, error) {
 	return organization.ID.String(), nil
 }
 
-// isActiveImpersonation returns true if there's a valid, non-expired
-// impersonation token belonging to the current admin. Used to decide
-// whether to commit to impersonation or fall through to normal auth.
-func isActiveImpersonation(jwtSigner *jwt.Signer, r *http.Request) bool {
-	tokenStr, err := impersonation.ReadCookie(r)
+// isActiveSupportSession returns true if there's a valid, non-expired
+// support session token belonging to the current admin. Used to decide
+// whether to commit to the support session or fall through to normal auth.
+func isActiveSupportSession(jwtSigner *jwt.Signer, r *http.Request) bool {
+	tokenStr, err := supportsession.ReadCookie(r)
 	if err != nil {
 		return false
 	}
 
-	claims, err := impersonation.ValidateToken(jwtSigner, tokenStr)
+	claims, err := supportsession.ValidateToken(jwtSigner, tokenStr)
 	if err != nil {
 		return false
 	}
@@ -518,18 +526,18 @@ func isActiveImpersonation(jwtSigner *jwt.Signer, r *http.Request) bool {
 	return true
 }
 
-// resolveImpersonatedUser checks if there's a valid impersonation session.
-// It validates the impersonation token AND the admin's account token, then
-// finds the impersonated user in the organization from the request header.
-func resolveImpersonatedUser(ctx context.Context, jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
-	tokenStr, err := impersonation.ReadCookie(r)
+// resolveSupportSessionUser checks if there's a valid support session.
+// It validates the support session token AND the admin's account token, then
+// finds the target user in the organization from the request header.
+func resolveSupportSessionUser(ctx context.Context, jwtSigner *jwt.Signer, r *http.Request) (*models.User, *SupportSessionInfo, error) {
+	tokenStr, err := supportsession.ReadCookie(r)
 	if err != nil {
-		return nil, nil, fmt.Errorf("no impersonation cookie")
+		return nil, nil, fmt.Errorf("no support session cookie")
 	}
 
-	claims, err := impersonation.ValidateToken(jwtSigner, tokenStr)
+	claims, err := supportsession.ValidateToken(jwtSigner, tokenStr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid impersonation token: %w", err)
+		return nil, nil, fmt.Errorf("invalid support session token: %w", err)
 	}
 
 	// Double-validate: the admin's regular session must also be valid
@@ -547,19 +555,19 @@ func resolveImpersonatedUser(ctx context.Context, jwtSigner *jwt.Signer, r *http
 		return nil, nil, fmt.Errorf("admin account no longer valid")
 	}
 
-	// Reject impersonation tokens minted before the admin's most recent
-	// password change so a password rotation also kills impersonation
+	// Reject support session tokens minted before the admin's most recent
+	// password change so a password rotation also kills support
 	// sessions opened from the same browser.
 	if !admin.IsSessionFresh(claims.IssuedAt) {
-		return nil, nil, fmt.Errorf("impersonation token invalidated by admin password change")
+		return nil, nil, fmt.Errorf("support session token invalidated by admin password change")
 	}
 
-	// Look up the impersonated account
-	impAccount, err := models.FindAccountByID(claims.ImpersonatedAccountID)
+	// Look up the target account
+	targetAccount, err := models.FindAccountByID(claims.TargetAccountID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("impersonated account not found: %w", err)
+		return nil, nil, fmt.Errorf("target account not found: %w", err)
 	}
-	if impAccount.IsBlocked() {
+	if targetAccount.IsBlocked() {
 		return nil, nil, models.ErrAccountBlocked
 	}
 
@@ -569,15 +577,15 @@ func resolveImpersonatedUser(ctx context.Context, jwtSigner *jwt.Signer, r *http
 		return nil, nil, err
 	}
 
-	user, err := models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, impAccount.Email)
+	user, err := models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, targetAccount.Email)
 	if err != nil {
 		return nil, nil, errors.New(OrganizationNotFoundError)
 	}
 
-	info := &ImpersonationInfo{
+	info := &SupportSessionInfo{
 		AdminAccountID: claims.AdminAccountID,
 		Active:         true,
-		UserName:       impAccount.Name,
+		UserName:       targetAccount.Name,
 	}
 
 	return user, info, nil
@@ -602,9 +610,9 @@ func GetAccountFromContext(ctx context.Context) (*models.Account, bool) {
 	return account, ok
 }
 
-// GetEffectiveAccountFromContext returns the impersonated account when
-// an impersonation session is active, otherwise the real account.
-// Use this in handlers that should reflect the impersonated user's data.
+// GetEffectiveAccountFromContext returns the target account when
+// a support session is active, otherwise the real account.
+// Use this in handlers that should reflect the target user's data.
 func GetEffectiveAccountFromContext(ctx context.Context) (*models.Account, bool) {
 	if eff, ok := ctx.Value(EffectiveAccountContextKey).(*models.Account); ok {
 		return eff, true
@@ -750,8 +758,8 @@ func GetUserFromContext(ctx context.Context) (*models.User, bool) {
 	return user, ok
 }
 
-func GetImpersonationFromContext(ctx context.Context) (*ImpersonationInfo, bool) {
-	info, ok := ctx.Value(ImpersonationContextKey).(*ImpersonationInfo)
+func GetSupportSessionFromContext(ctx context.Context) (*SupportSessionInfo, bool) {
+	info, ok := ctx.Value(SupportSessionContextKey).(*SupportSessionInfo)
 	return info, ok
 }
 
