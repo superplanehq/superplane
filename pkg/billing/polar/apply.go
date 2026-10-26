@@ -87,7 +87,7 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 		return permanentApplyError("credit pack face value is missing")
 	}
 
-	return tx.Transaction(func(inner *gorm.DB) error {
+	err = tx.Transaction(func(inner *gorm.DB) error {
 		if _, err := models.AddPolarLLMCreditGrant(inner, orgID, models.CentsToMicros(amountCents), event.Data.ID); err != nil {
 			return err
 		}
@@ -98,6 +98,27 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	logDiscountedCreditGrant(orgID, event.Data, amountCents)
+	return nil
+}
+
+// logDiscountedCreditGrant records discounted grants. The grant keeps the
+// quoted credits, so a discount reduces revenue and needs an audit trail.
+func logDiscountedCreditGrant(orgID uuid.UUID, order OrderData, grantedCents int64) {
+	if order.DiscountAmount <= 0 {
+		return
+	}
+	log.WithFields(log.Fields{
+		"organization_id":      orgID.String(),
+		"polar_order_id":       order.ID,
+		"polar_discount_id":    order.DiscountID,
+		"discount_amount":      order.DiscountAmount,
+		"net_amount":           order.NetAmount,
+		"granted_credit_cents": grantedCents,
+	}).Info("granted credits for discounted polar order")
 }
 
 // resyncSubscriptionAfterCycle refreshes the subscription from Polar when a
@@ -154,12 +175,15 @@ func creditPurchaseRefundMicros(grantMicros int64, order OrderData) (int64, erro
 	if strings.EqualFold(strings.TrimSpace(order.Status), "refunded") {
 		return grantMicros, nil
 	}
-	if order.RefundedAmount <= 0 {
+	// Prorate against the amount paid. Settlement checked that net_amount is
+	// the quoted subtotal less any discount.
+	paid := order.NetAmount
+	if order.RefundedAmount <= 0 || paid <= 0 {
 		return 0, nil
 	}
-	refunded := min(order.RefundedAmount, quote.SubtotalCents)
+	refunded := min(order.RefundedAmount, paid)
 	// Split division before multiplication to avoid overflowing large purchases.
-	return grantMicros/quote.SubtotalCents*refunded + grantMicros%quote.SubtotalCents*refunded/quote.SubtotalCents, nil
+	return grantMicros/paid*refunded + grantMicros%paid*refunded/paid, nil
 }
 
 func parseOrganizationID(data OrderData) (uuid.UUID, error) {

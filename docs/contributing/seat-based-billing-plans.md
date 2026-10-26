@@ -137,8 +137,11 @@ an example. Use your catalog price for the actual estimates.
 17. Repeat the flow with a separate two-member Trial organization, then abandon checkout before payment.
 18. Confirm that this organization remains on Trial and its purchased capacity and expiration stay unchanged.
 
-Team checkout sends `allow_discount_codes: false`. Legacy Business checkout omits
-this field.
+Team checkout accepts Polar discount codes. The request omits
+`allow_discount_codes`, so the Polar default applies. Legacy Business checkout
+also omits this field. In-app amounts, previews, and estimates show catalog
+prices, not discounted prices. Manage the eligible products, redemption limits,
+and amounts of a code in Polar.
 
 Each organization has at most one pending subscription checkout. The table
 `organization_billing_checkouts` stores its plan, seat count, and Polar status.

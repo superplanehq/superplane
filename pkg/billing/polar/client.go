@@ -400,7 +400,6 @@ func (c *Client) CreateCheckout(ctx context.Context, input CheckoutInput) (*Chec
 		body["seats"] = *input.Seats
 		body["min_seats"] = *input.Seats
 		body["max_seats"] = *input.Seats
-		body["allow_discount_codes"] = false
 	}
 	if len(input.Metadata) > 0 {
 		body["metadata"] = input.Metadata
@@ -426,7 +425,6 @@ func (c *Client) CreateCreditCheckout(ctx context.Context, productID, externalCu
 		"products":             []string{productID},
 		"external_customer_id": externalCustomerID,
 		"success_url":          successURL,
-		"allow_discount_codes": false,
 		"metadata":             quote.metadata(),
 		"prices": map[string]any{
 			productID: []map[string]any{{

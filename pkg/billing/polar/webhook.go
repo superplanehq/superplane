@@ -70,6 +70,9 @@ type OrderData struct {
 	Status             string          `json:"status"`
 	BillingReason      string          `json:"billing_reason"`
 	RefundedAmount     int64           `json:"refunded_amount"`
+	SubtotalAmount     *int64          `json:"subtotal_amount"`
+	DiscountAmount     int64           `json:"discount_amount"`
+	DiscountID         string          `json:"discount_id"`
 	NetAmount          int64           `json:"net_amount"`
 	Currency           string          `json:"currency"`
 	Metadata           map[string]any  `json:"metadata"`

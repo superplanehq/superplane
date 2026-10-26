@@ -234,15 +234,13 @@ func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
 				} else {
 					assert.Equal(t, map[string]any{CheckoutIntentMetadataKey: "intent-1"}, body["metadata"])
 				}
+				assert.NotContains(t, body, "allow_discount_codes", "Polar default allows discount codes")
 				if tc.seats == nil {
-					assert.NotContains(t, body, "allow_discount_codes")
 					assert.NotContains(t, body, "seats")
 					assert.NotContains(t, body, "min_seats")
 					assert.NotContains(t, body, "max_seats")
 				}
 				if tc.seats != nil {
-					require.Contains(t, body, "allow_discount_codes")
-					assert.Equal(t, false, body["allow_discount_codes"])
 					for _, field := range []string{"seats", "min_seats", "max_seats"} {
 						assert.Equal(t, float64(*tc.seats), body[field], field)
 					}
@@ -284,7 +282,7 @@ func TestCreateCreditCheckoutLocksChargeAndCreditMetadata(t *testing.T) {
 		assert.Equal(t, "org-1", body["external_customer_id"])
 		assert.Equal(t, "https://app.example/return", body["success_url"])
 		assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
-		assert.Equal(t, false, body["allow_discount_codes"])
+		assert.NotContains(t, body, "allow_discount_codes", "Polar default allows discount codes")
 		assert.Equal(t, map[string]any{
 			"prod_credits": []any{map[string]any{
 				"amount_type": "fixed", "price_amount": float64(10579),
