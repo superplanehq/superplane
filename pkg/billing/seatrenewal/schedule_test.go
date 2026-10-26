@@ -740,39 +740,39 @@ func Test__ScheduleMakesNoPolarRequestWhileTheOrganizationRowIsLocked(t *testing
 	assert.Equal(t, 2, calls, "the read and the update were both checked")
 }
 
-func Test__ScheduleFailsAnAbandonedPurchaseAndSchedules(t *testing.T) {
-	f := newScheduleFixture(t, 10, 9)
-	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12, nil)
-	require.NoError(t, purchase.Create(database.Conn()))
-	require.NoError(t, purchase.UpdateStatus(database.Conn(), models.SeatPurchaseStatusUnknown, ""))
+// Polar still reports the original seats after the purchase. That count and
+// the time since the purchase prove nothing about the charge, so the purchase
+// stays in flight and keeps the guard in its own period.
+func Test__ScheduleKeepsAPurchaseWithoutEvidenceInFlight(t *testing.T) {
+	tests := map[string]struct {
+		status    string
+		createdAt time.Duration
+	}{
+		"unknown purchase":                       {status: models.SeatPurchaseStatusUnknown},
+		"pending purchase after the time window": {status: models.SeatPurchaseStatusPending, createdAt: -polar.SeatPurchaseConfirmationWindow - time.Minute},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			f := newScheduleFixture(t, 10, 9)
+			purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12, nil)
+			purchase.Status = tt.status
+			require.NoError(t, purchase.Create(database.Conn()))
+			created := time.Now().Add(tt.createdAt)
+			require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("id = ?", purchase.ID).Update("created_at", created).Error)
 
-	result := f.schedule()
+			result := f.schedule()
 
-	// Polar still reports the original seats after the purchase, so the
-	// abandoned purchase failed and no longer blocks the renewal seat count.
-	assert.Equal(t, ActionFixed, result.Action)
-	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
-	stored, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.SeatPurchaseStatusFailed, stored.Status)
-	assert.Equal(t, models.SeatPurchaseErrorNotApplied, stored.ErrorCode)
-}
-
-func Test__ScheduleExpiresAPendingPurchaseAfterTheConfirmationWindow(t *testing.T) {
-	f := newScheduleFixture(t, 10, 9)
-	purchase := models.NewSeatPurchase(f.r.Organization.ID, nil, f.sub.ID, 10, 12, nil)
-	require.NoError(t, purchase.Create(database.Conn()))
-	created := time.Now().Add(-polar.SeatPurchaseConfirmationWindow - time.Minute)
-	require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("id = ?", purchase.ID).Update("created_at", created).Error)
-
-	result := f.schedule()
-
-	assert.Equal(t, ActionFixed, result.Action)
-	assert.Equal(t, []polarfake.Request{{Method: http.MethodPatch, SubscriptionID: f.sub.ID, Body: nextPeriod(9)}}, f.polar.Patches())
-	stored, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.SeatPurchaseStatusFailed, stored.Status)
-	assert.Equal(t, models.SeatPurchaseErrorNotApplied, stored.ErrorCode)
+			assert.Equal(t, ActionSkipped, result.Action)
+			assert.Equal(t, SkipSeatPurchaseInFlight, result.SkipReason)
+			assert.Equal(t, purchase.ID, result.SeatPurchaseID)
+			assert.Empty(t, f.polar.Patches())
+			stored, err := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+			require.NoError(t, err)
+			assert.Equal(t, purchase.ID, stored.ID)
+			assert.Equal(t, tt.status, stored.Status)
+			assert.Empty(t, stored.ErrorCode)
+		})
+	}
 }
 
 func Test__ScheduleAppliesTheSnapshotThatConfirmsAPurchase(t *testing.T) {

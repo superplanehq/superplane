@@ -9,9 +9,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// SeatPurchaseConfirmationWindow is how long a pending purchase can wait for
-// its own result, and how long Polar can take to apply an unknown purchase.
-// It is longer than the Polar request timeout.
+// SeatPurchaseConfirmationWindow is how long a pending purchase waits for
+// its own result before reconciliation reads Polar, and how long a purchase
+// request can take to reach Polar. It is longer than the Polar request
+// timeout. The end of the window proves nothing about the charge.
 const SeatPurchaseConfirmationWindow = 5 * time.Minute
 
 // SubscriptionReader is the part of the Polar API that purchase
@@ -25,12 +26,11 @@ type SubscriptionReader interface {
 // buys seats. Capacity changes only through the applied snapshot.
 //
 // A pending purchase is left to its own request until the confirmation window
-// passes. Polar can still be processing an unknown purchase inside the window,
-// so only an applied or clearly rejected update settles it before then.
-//
-// Only a snapshot from the billing period in which the purchase started is
-// evidence for it. A snapshot that proves the outcome is applied, so the plan,
-// the period, and the purchase match what Polar reports.
+// passes. The snapshot settles the purchase only when it proves success, see
+// models.SeatPurchase.SucceededBy. A snapshot that proves nothing leaves the
+// purchase in flight: neither the seat count nor the elapsed time can show
+// that Polar did not charge. The unresolved purchase monitor reports it, and
+// an operator repairs it from Polar evidence.
 func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client SubscriptionReader, orgID uuid.UUID) error {
 	purchase, err := models.FindInFlightSeatPurchase(db, orgID)
 	if err != nil || purchase == nil || !seatPurchaseNeedsReconciliation(purchase, time.Now()) {
@@ -49,13 +49,12 @@ func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client Subscription
 		if err != nil || current == nil || current.ID != purchase.ID {
 			return err
 		}
-
-		// A snapshot that proves the outcome is applied. SettleSeatPurchase,
-		// inside ApplyOrganizationSubscription, records the proved status.
-		if _, settled := current.SettlementFor(snapshot.CurrentPeriodStart.TimePtr(), snapshot.Seats, snapshot.ModifiedAt.TimePtr()); settled {
-			return ApplyOrganizationSubscription(ctx, tx, orgID, *snapshot)
+		if !current.SucceededBy(seatPurchaseEvidence(*snapshot)) {
+			return nil
 		}
-		return failExpiredSeatPurchase(tx, current, *snapshot, time.Now())
+		// SettleSeatPurchase, inside ApplyOrganizationSubscription, records
+		// the success, so the plan, the period, and the purchase match.
+		return ApplyOrganizationSubscription(ctx, tx, orgID, *snapshot)
 	})
 }
 
@@ -63,8 +62,8 @@ func ReconcileSeatPurchase(ctx context.Context, db *gorm.DB, client Subscription
 // purchase and applies the snapshot. A purchase sends an absolute seat count,
 // so it must start from the seats Polar reports. A stale local count would
 // send a count below the seats Polar has and remove seats that were added
-// elsewhere. Applying the snapshot also settles the in-flight purchase, and
-// an expired one fails so it cannot block new purchases forever.
+// elsewhere. The snapshot repairs the capacity also when it proves nothing
+// about an in-flight purchase. That purchase keeps its status.
 func RefreshSeatPurchaseState(ctx context.Context, db *gorm.DB, client *Client, orgID uuid.UUID, subscriptionID string) error {
 	snapshot, err := client.GetSubscription(ctx, subscriptionID)
 	if err != nil {
@@ -75,45 +74,28 @@ func RefreshSeatPurchaseState(ctx context.Context, db *gorm.DB, client *Client, 
 		if _, err := models.LockOrganization(tx, orgID); err != nil {
 			return err
 		}
-		if err := ApplyOrganizationSubscription(ctx, tx, orgID, *snapshot); err != nil {
-			return err
-		}
-		purchase, err := models.FindInFlightSeatPurchase(tx, orgID)
-		if err != nil || purchase == nil {
-			return err
-		}
-		return failExpiredSeatPurchase(tx, purchase, *snapshot, time.Now())
+		return ApplyOrganizationSubscription(ctx, tx, orgID, *snapshot)
 	})
 }
 
-// failExpiredSeatPurchase fails an in-flight purchase whose confirmation
-// window passed while Polar still reports fewer seats than the target. The
-// purchase can no longer reach its target, so it must not block new
-// purchases. Counts between the original and the target clear here too.
-//
-// Only a snapshot from the billing period in which the purchase started can
-// fail it. After a renewal, the seat count of the new period proves nothing:
-// Polar can have charged the purchase and then renewed with a scheduled
-// reduction back to the original count.
-func failExpiredSeatPurchase(tx *gorm.DB, purchase *models.SeatPurchase, snapshot SubscriptionData, now time.Time) error {
-	if !purchase.StartedInPeriod(snapshot.CurrentPeriodStart.TimePtr()) {
-		// No snapshot can settle this purchase any more, so it stays in
-		// flight and keeps blocking new purchases for the organization.
-		// SuperPlane never guesses the outcome of a possible charge: a
-		// person must check the purchase in Polar and resolve it by hand.
-		return nil
+// SeatPurchaseResponseEvidence is the evidence in the snapshot that Polar
+// returned for the update request of a purchase. Only the caller that sent
+// that request can name it a response.
+func SeatPurchaseResponseEvidence(snapshot SubscriptionData) models.SeatPurchaseEvidence {
+	evidence := seatPurchaseEvidence(snapshot)
+	evidence.Response = true
+	return evidence
+}
+
+func seatPurchaseEvidence(snapshot SubscriptionData) models.SeatPurchaseEvidence {
+	return models.SeatPurchaseEvidence{
+		SubscriptionID: snapshot.ID,
+		PeriodStart:    snapshot.CurrentPeriodStart.TimePtr(),
+		Seats:          snapshot.Seats,
+		ModifiedAt:     snapshot.ModifiedAt.TimePtr(),
 	}
-	seats := snapshot.Seats
-	if seats == nil || *seats >= purchase.ToSeats || !seatPurchaseWindowPassed(purchase, now) {
-		return nil
-	}
-	return purchase.UpdateStatus(tx, models.SeatPurchaseStatusFailed, models.SeatPurchaseErrorNotApplied)
 }
 
 func seatPurchaseNeedsReconciliation(purchase *models.SeatPurchase, now time.Time) bool {
-	return purchase.Status == models.SeatPurchaseStatusUnknown || seatPurchaseWindowPassed(purchase, now)
-}
-
-func seatPurchaseWindowPassed(purchase *models.SeatPurchase, now time.Time) bool {
-	return now.Sub(purchase.CreatedAt) > SeatPurchaseConfirmationWindow
+	return purchase.Status == models.SeatPurchaseStatusUnknown || now.Sub(purchase.CreatedAt) > SeatPurchaseConfirmationWindow
 }
