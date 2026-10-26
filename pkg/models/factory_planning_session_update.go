@@ -100,6 +100,10 @@ func (s *FactoryPlanningSession) ProposeUpdate(tx *gorm.DB, update PlanningSessi
 		if update.Survey == nil {
 			return nil
 		}
+		// A fully scored plan is ready without a confirmation survey.
+		if update.Scores != nil && planningReviewScoresAtMaximum(*update.Scores) {
+			return nil
+		}
 		return s.ProposeSurvey(inner, *update.Survey)
 	})
 }
@@ -125,6 +129,15 @@ func validatePlanningReviewScores(scores PlanningReviewScores) error {
 		}
 	}
 	return nil
+}
+
+func planningReviewScoresAtMaximum(scores PlanningReviewScores) bool {
+	for _, kind := range planningReviewScoreKinds {
+		if scores.value(kind.key).Score != kind.max {
+			return false
+		}
+	}
+	return true
 }
 
 func validatePlanningReviewScore(kind planningScoreKind, value PlanningScoreValue) error {
