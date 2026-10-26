@@ -27,6 +27,23 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Organizations {
+  rpc AcceptInvitation(AcceptInvitationRequest) returns (google.protobuf.Struct) {
+    option (google.api.http) = { post: "/api/v1/invitations/{token}/accept" };
+  }
+
+  rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
+    option (google.api.http) = { post: "/api/v1/organizations/{id}/invitations" body: "*" };
+  }
+  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
+    option (google.api.http) = { get: "/api/v1/organizations/{id}/invitations" };
+  }
+  rpc ResendInvitation(ResendInvitationRequest) returns (ResendInvitationResponse) {
+    option (google.api.http) = { post: "/api/v1/organizations/{id}/invitations/{invitation_id}/resend" body: "*" };
+  }
+  rpc CancelInvitation(CancelInvitationRequest) returns (CancelInvitationResponse) {
+    option (google.api.http) = { delete: "/api/v1/organizations/{id}/invitations/{invitation_id}" };
+  }
+
   rpc DescribeOrganization(DescribeOrganizationRequest) returns (DescribeOrganizationResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}"
@@ -230,6 +247,17 @@ service Organizations {
     };
   }
 
+  rpc QuoteHostedCreditCheckout(QuoteHostedCreditCheckoutRequest) returns (QuoteHostedCreditCheckoutResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/hosted-credit-checkout-quote"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Quote hosted credit checkout";
+      description: "Returns hosted credit, processing fee, and subtotal before tax";
+      tags: "Organization";
+    };
+  }
+
   rpc CreateHostedCreditCheckout(CreateHostedCreditCheckoutRequest) returns (CreateHostedCreditCheckoutResponse) {
     option (google.api.http) = {
       post: "/api/v1/organizations/{id}/hosted-credit-checkout"
@@ -308,6 +336,30 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Set up payment method";
       description: "Opens Polar payment settings without creating a charge or subscription";
+      tags: "Organization";
+    };
+  }
+
+  rpc PreviewSeatPurchase(PreviewSeatPurchaseRequest) returns (PreviewSeatPurchaseResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/seats/preview"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Preview seat purchase";
+      description: "Estimates the prorated charge for additional seats without charging or changing the subscription";
+      tags: "Organization";
+    };
+  }
+
+  rpc PurchaseSeats(PurchaseSeatsRequest) returns (PurchaseSeatsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing/seats/purchase"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Purchase seats";
+      description: "Charges the prorated amount for additional seats at once. Seats are added only after the payment succeeds";
       tags: "Organization";
     };
   }
@@ -789,6 +841,29 @@ message CreateHostedCreditCheckoutRequest {
   string product_id = 2;
   // Ignored. SuperPlane sends Polar the client IP from proxy headers only.
   string customer_ip_address = 3;
+  // The credit amount the buyer reviewed. Must match the catalog for a fixed pack.
+  int64 credit_amount_cents = 4;
+  // The pre-tax subtotal the buyer confirmed. Checkout rejects a changed quote.
+  int64 expected_subtotal_cents = 5;
+}
+
+message QuoteHostedCreditCheckoutRequest {
+  string id = 1;
+  string product_id = 2;
+  // Required for custom packs. Zero uses the catalog amount for a fixed pack.
+  int64 credit_amount_cents = 3;
+}
+
+message QuoteHostedCreditCheckoutResponse {
+  int64 credit_amount_cents = 1;
+  int64 processing_fee_cents = 2;
+  int64 subtotal_cents = 3;
+  string currency = 4;
+  int64 fixed_fee_cents = 5;
+  // Percentage of the pre-tax subtotal, in basis points (100 = 1%).
+  int32 percentage_fee_bps = 6;
+  // Rounded up to the nearest cent. Together with the fixed fee, equals the processing fee.
+  int64 percentage_fee_cents = 7;
 }
 
 message CreateHostedCreditCheckoutResponse {
@@ -876,6 +951,69 @@ message DescribeOrganizationBillingResponse {
   bool require_payment_method = 23;
   bool has_payment_method = 24;
   repeated BillingPlanOption available_plans = 25;
+  map<string, bool> product_features = 26;
+  optional int32 purchased_seats = 27;
+  optional int32 occupied_seats = 28;
+  optional int32 available_seats = 29;
+  optional int32 plan_maximum_seats = 30;
+  optional int32 purchasable_seats = 31;
+  optional int32 expected_renewal_seats = 32;
+  optional int64 current_monthly_total_cents = 33;
+  optional int64 expected_renewal_cents = 34;
+  // Exact hosted credit gate for new runs. Whole-cent balances round down,
+  // so clients must use this flag instead of remaining_credit_cents.
+  bool hosted_credit_available = 35;
+  SeatPurchase last_seat_purchase = 36;
+  optional int32 pending_invitation_seats = 37;
+  optional int32 invitable_seats = 38;
+  // When the current renewal payment failure started. Set only while the
+  // subscription is past due.
+  google.protobuf.Timestamp payment_failed_at = 39;
+  // When Team features end after a failed renewal payment. Set only while a
+  // grace period keeps them on.
+  google.protobuf.Timestamp paid_access_ends_at = 40;
+}
+
+message SeatPurchase {
+  string id = 1;
+  string status = 2;
+  int32 from_seats = 3;
+  int32 to_seats = 4;
+  string message = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message PreviewSeatPurchaseRequest {
+  string id = 1;
+  int32 additional_seats = 2;
+}
+
+message PreviewSeatPurchaseResponse {
+  int32 purchased_seats = 1;
+  int32 target_seats = 2;
+  int64 seat_price_cents = 3;
+  int64 prorated_charge_cents = 4;
+  google.protobuf.Timestamp period_start = 5;
+  google.protobuf.Timestamp period_end = 6;
+  int64 new_monthly_total_cents = 7;
+  optional int32 purchasable_seats = 8;
+  bool estimate = 9;
+  bool excludes_tax = 10;
+}
+
+message PurchaseSeatsRequest {
+  string id = 1;
+  int32 additional_seats = 2;
+  int32 expected_purchased_seats = 3;
+  // operation_key identifies one purchase within the organization. A repeat
+  // with the same key and request returns the stored purchase and does not
+  // charge again. A repeat with the same key and another request is rejected.
+  string operation_key = 4;
+}
+
+message PurchaseSeatsResponse {
+  SeatPurchase purchase = 1;
+  DescribeOrganizationBillingResponse billing = 2;
 }
 
 message BillingPlanOption {
@@ -885,12 +1023,14 @@ message BillingPlanOption {
   bool per_seat = 4;
   bool require_payment_method = 5;
   bool subscription_required = 6;
+  optional int32 seat_maximum = 7;
 }
 
 message SelectBillingPlanRequest {
   string id = 1;
   string plan_key = 2;
   string return_path = 3;
+  optional int32 seats = 4;
 }
 
 message CreatePaymentMethodSessionRequest {
@@ -1202,3 +1342,57 @@ message OrganizationDeleted {
   string organization_id = 1;
   google.protobuf.Timestamp timestamp = 2;
 }
+
+// Tokens and token hashes are never part of an invitation resource.
+message OrganizationInvitation {
+  string id = 1;
+  string email = 2;
+  string role = 3;
+  string invited_by = 4;
+  string inviter_name = 5;
+  string state = 6;
+  google.protobuf.Timestamp sent_at = 7;
+  google.protobuf.Timestamp expires_at = 8;
+}
+
+message InvitationSeatSummary {
+  bool per_seat = 1;
+  optional int64 purchased = 2;
+  int64 occupied = 3;
+  int64 pending_invitations = 4;
+  optional int64 invitable = 5;
+  optional int64 purchasable = 6;
+  optional int64 member_limit = 7;
+  bool payment_blocked = 8;
+}
+message CreateInvitationRequest {
+  string id = 1;
+  string email = 2;
+  // An organization role name. Defaults to Operator.
+  string role = 3;
+}
+message CreateInvitationResponse {
+  OrganizationInvitation invitation = 1;
+  string acceptance_url = 2;
+}
+message ListInvitationsRequest { string id = 1; }
+message ListInvitationsResponse {
+  repeated OrganizationInvitation invitations = 1;
+  InvitationSeatSummary seats = 2;
+  int32 invitation_duration_days = 3;
+}
+message ResendInvitationRequest {
+  string id = 1;
+  string invitation_id = 2;
+}
+message ResendInvitationResponse {
+  OrganizationInvitation invitation = 1;
+  string acceptance_url = 2;
+}
+message CancelInvitationRequest {
+  string id = 1;
+  string invitation_id = 2;
+}
+message CancelInvitationResponse {}
+
+message AcceptInvitationRequest { string token = 1; }

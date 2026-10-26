@@ -629,9 +629,56 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, result.AllowPrivateNetworkAccess)
 		assert.True(t, result.SignupsEnabled)
+		assert.Equal(t, 7, result.InvitationDurationDays)
 		assert.NotEmpty(t, result.EffectiveBlockedHTTPHosts)
 		assert.NotEmpty(t, result.EffectivePrivateIPRanges)
 		assert.False(t, result.SMTPEnabled)
+	})
+
+	t.Run("admin can configure invitation duration", func(t *testing.T) {
+		for _, days := range []int{0, -1, 366, 14} {
+			body, err := json.Marshal(map[string]int{"invitation_duration_days": days})
+			require.NoError(t, err)
+			response := execRequest(server, requestParams{
+				method: "PATCH", path: "/admin/api/installation/network-settings",
+				body: body, authCookie: token, contentType: "application/json",
+			})
+			if days != 14 {
+				require.Equal(t, http.StatusBadRequest, response.Code)
+				continue
+			}
+			require.Equal(t, http.StatusOK, response.Code)
+		}
+		response := execRequest(server, requestParams{
+			method: "GET", path: "/admin/api/installation/network-settings", authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		var result map[string]any
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		require.Equal(t, float64(14), result["invitation_duration_days"])
+	})
+
+	t.Run("admin can configure past due grace", func(t *testing.T) {
+		for _, days := range []int{-1, 22, 0, 21, 7} {
+			body, err := json.Marshal(map[string]int{"past_due_grace_days": days})
+			require.NoError(t, err)
+			response := execRequest(server, requestParams{
+				method: "PATCH", path: "/admin/api/installation/network-settings",
+				body: body, authCookie: token, contentType: "application/json",
+			})
+			if days < 0 || days > 21 {
+				require.Equal(t, http.StatusBadRequest, response.Code)
+				continue
+			}
+			require.Equal(t, http.StatusOK, response.Code)
+		}
+		response := execRequest(server, requestParams{
+			method: "GET", path: "/admin/api/installation/network-settings", authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		var result map[string]any
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		require.Equal(t, float64(7), result["past_due_grace_days"])
 	})
 
 	t.Run("admin can update installation network settings", func(t *testing.T) {
@@ -1493,63 +1540,6 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
-	})
-}
-
-func TestAdminListRunnerTasks(t *testing.T) {
-	server, _, token := setupAdminTestServer(t)
-
-	t.Run("broker not configured", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "")
-		t.Setenv("TASK_BROKER_FLEET_ID", "")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "")
-
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/admin/api/runner/tasks",
-			authCookie: token,
-		})
-		assert.Equal(t, http.StatusOK, response.Code)
-
-		var body map[string]any
-		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		assert.Equal(t, false, body["configured"])
-		assert.Equal(t, []any{}, body["tasks"])
-	})
-
-	t.Run("returns active tasks from broker", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, http.MethodGet, r.Method)
-			assert.Equal(t, "/v1/tasks", r.URL.Path)
-			assert.Equal(t, "Bearer broker-token", r.Header.Get("Authorization"))
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"tasks":[{"id":"active-1","status":"queued","fleet_id":"fleet-1","created_at":"2026-05-24T12:00:00Z"}]}`))
-		}))
-		defer upstream.Close()
-
-		t.Setenv("TASK_BROKER_BASE_URL", upstream.URL)
-		t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "broker-token")
-
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/admin/api/runner/tasks",
-			authCookie: token,
-		})
-		assert.Equal(t, http.StatusOK, response.Code)
-
-		var body struct {
-			Configured bool `json:"configured"`
-			Tasks      []struct {
-				ID     string `json:"id"`
-				Status string `json:"status"`
-			} `json:"tasks"`
-		}
-		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		assert.True(t, body.Configured)
-		require.Len(t, body.Tasks, 1)
-		assert.Equal(t, "active-1", body.Tasks[0].ID)
-		assert.Equal(t, "queued", body.Tasks[0].Status)
 	})
 }
 

@@ -180,7 +180,7 @@ func TestHasRequiredScopedTokenPermissionForScopes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			allowed := hasRequiredScopedTokenPermissionForScopes(tt.scopes, tt.pathParams, tt.rule)
+			allowed := HasRequiredScopedTokenPermissionForScopes(tt.scopes, tt.pathParams, tt.rule)
 			assert.Equal(t, tt.expectAllow, allowed)
 		})
 	}
@@ -316,6 +316,20 @@ func TestCreateFactoryAutomationUsesTemplateSpecificFeatureGuards(t *testing.T) 
 	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
 }
 
+func TestCreditPurchaseRoutesRequireOrganizationUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	for _, route := range []HTTPRoute{
+		{Method: http.MethodGet, Pattern: "/api/v1/organizations/{id}/hosted-credit-checkout-quote"},
+		{Method: http.MethodPost, Pattern: "/api/v1/organizations/{id}/hosted-credit-checkout"},
+	} {
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
+		assert.Equal(t, "org", rule.Resource)
+		assert.Equal(t, "update", rule.Action)
+		assert.Equal(t, models.DomainTypeOrganization, rule.DomainType)
+	}
+}
+
 func TestSchedulePreviewRequiresScheduledIntakeFeature(t *testing.T) {
 	rule, ok := DefaultAuthorizationRules()[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/scheduled-intake/preview"}]
 	require.True(t, ok)
@@ -341,6 +355,14 @@ func TestMergeRoutesRequirePullRequestMergeFeature(t *testing.T) {
 		}
 		assert.Equal(t, "update", rule.Action)
 	}
+}
+
+func TestContinueFixesRouteRequiresWorkOrderUpdate(t *testing.T) {
+	rule, ok := DefaultAuthorizationRules()[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/prs/{pr_id}/continue-fixes"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", rule.Resource)
+	assert.Equal(t, "update", rule.Action)
+	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
 }
 
 func TestAgentResourceRoutesRequireFactoriesFeature(t *testing.T) {
@@ -518,6 +540,8 @@ func TestBillingMutationsUseOrgUpdate(t *testing.T) {
 		"/api/v1/organizations/{id}/business-checkout",
 		"/api/v1/organizations/{id}/billing/select-plan",
 		"/api/v1/organizations/{id}/billing/payment-method-session",
+		"/api/v1/organizations/{id}/billing/seats/preview",
+		"/api/v1/organizations/{id}/billing/seats/purchase",
 	} {
 		t.Run(path, func(t *testing.T) {
 			rule, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: path}]
@@ -525,7 +549,7 @@ func TestBillingMutationsUseOrgUpdate(t *testing.T) {
 			assert.Equal(t, "org", rule.Resource)
 			assert.Equal(t, "update", rule.Action)
 			assert.Equal(t, models.DomainTypeOrganization, rule.DomainType)
-			if strings.HasSuffix(path, "/billing/select-plan") || strings.HasSuffix(path, "/billing/payment-method-session") {
+			if strings.Contains(path, "/billing/") {
 				assert.Equal(t, []string{features.FeatureNewBilling}, rule.RequiredExperimentalFeatures)
 			}
 		})

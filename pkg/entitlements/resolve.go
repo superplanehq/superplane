@@ -4,7 +4,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
-	"slices"
 	"time"
 )
 
@@ -46,33 +45,17 @@ func Resolve(tx *gorm.DB, orgID uuid.UUID) (*Entitlements, error) {
 	if err != nil {
 		return nil, err
 	}
-	grants, err := models.ListOrganizationFeatureGrants(tx, orgID)
+	productFeatures, err := plan.ResolveProductFeatures(tx)
 	if err != nil {
 		return nil, err
-	}
-	enabled := map[string]bool{}
-	for _, grant := range grants {
-		if grant.Enabled {
-			enabled[grant.FeatureKey] = true
-		}
 	}
 	result := &Entitlements{
 		PlanID: catalog.ID, PlanKey: catalog.Key, PlanName: catalog.Name,
-		PlanSeatLimit: catalog.SeatLimit, SeatLimitOverride: override, SeatLimit: catalog.SeatLimit, ParallelTaskLimit: catalog.ParallelTaskLimit,
-		Features:         map[string]bool{},
+		PlanSeatLimit: catalog.SeatLimit, SeatLimitOverride: override, SeatLimit: SeatMaximum(catalog.SeatLimit, override), ParallelTaskLimit: catalog.ParallelTaskLimit,
+		Features:         productFeatures,
 		CreditPolicy:     CreditPolicy{AmountCents: catalog.CreditAmountCents, Frequency: catalog.CreditFrequency, Expiration: catalog.CreditExpiration, ValidityDays: catalog.CreditValidityDays},
 		TrialCreditCents: catalog.TrialCreditCents, TrialLengthDays: catalog.TrialLengthDays, MarkupBPS: markup,
 		HostedExecutionAllowed: plan.AllowsHostedExecution(time.Now()), CreditPurchaseAllowed: plan.AllowsCreditPurchase(),
-	}
-	definitions, err := models.ListPlanFeatureDefinitions(tx)
-	if err != nil {
-		return nil, err
-	}
-	for _, feature := range definitions {
-		result.Features[feature.Key] = !models.BillingEnabled() || !feature.Gated || slices.Contains(catalog.Features, feature.Key) || enabled[feature.Key]
-	}
-	if override != nil {
-		result.SeatLimit = override.SeatLimit
 	}
 	if !models.BillingEnabled() {
 		result.SeatLimit = nil

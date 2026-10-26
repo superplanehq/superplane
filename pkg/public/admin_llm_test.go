@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -16,6 +17,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 )
+
+func setAdminBillingTestProduct(t *testing.T, productID string) {
+	t.Helper()
+	db := database.DB(t.Context())
+	catalog, err := models.FindBillingPlan(db, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	originalProduct := catalog.PolarProductID
+	if originalProduct != nil {
+		originalProduct = new(*originalProduct)
+	}
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.WithoutCancel(t.Context())).Model(catalog).Update("polar_product_id", originalProduct).Error)
+	})
+	require.NoError(t, db.Model(catalog).Update("polar_product_id", productID).Error)
+}
 
 func TestResolveHostedListModelsBaseURL(t *testing.T) {
 	proxy := "https://proxy.example/v1"
@@ -59,6 +75,14 @@ func TestAdminLLMSettings(t *testing.T) {
 			authCookie: regularToken,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
+		response = execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-settings",
+			authCookie:  regularToken,
+			body:        []byte(`{"credit_purchase_fee_bps":500}`),
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
 
 	t.Run("admin can load defaults and update markup", func(t *testing.T) {
@@ -73,6 +97,8 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
 		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
 		assert.Equal(t, models.DefaultMarkupBPS, settings.MarkupBPS)
+		assert.Zero(t, settings.CreditPurchaseFeeBPS)
+		assert.Zero(t, settings.CreditPurchaseFixedFeeCents)
 		assert.Empty(t, settings.DefaultHostedProvider)
 		assert.Empty(t, settings.DefaultHostedModel)
 		require.Len(t, settings.Providers, 3)
@@ -92,6 +118,53 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
 		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
 		assert.Equal(t, 1000, settings.MarkupBPS)
+	})
+
+	t.Run("credit fees persist through unrelated updates and allow explicit zero", func(t *testing.T) {
+		for _, tc := range []struct {
+			body  string
+			bps   int
+			fixed int64
+		}{
+			{`{"credit_purchase_fee_bps":500,"credit_purchase_fixed_fee_cents":50}`, 500, 50},
+			{`{"warning_threshold_bps":2500}`, 500, 50},
+			{`{"credit_purchase_fee_bps":0,"credit_purchase_fixed_fee_cents":0}`, 0, 0},
+		} {
+			response := execRequest(server, requestParams{
+				method:      "PATCH",
+				path:        "/admin/api/installation/llm-settings",
+				authCookie:  token,
+				body:        []byte(tc.body),
+				contentType: "application/json",
+			})
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+			var settings installationLLMSettingsResponse
+			require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+			assert.Equal(t, tc.bps, settings.CreditPurchaseFeeBPS)
+			assert.Equal(t, tc.fixed, settings.CreditPurchaseFixedFeeCents)
+			saved, err := models.GetInstallationLLMSettings(database.Conn())
+			require.NoError(t, err)
+			assert.Equal(t, tc.bps, saved.CreditPurchaseFeeBPS)
+			assert.Equal(t, tc.fixed, saved.CreditPurchaseFixedFeeCents)
+		}
+	})
+
+	t.Run("invalid credit fees return a client error", func(t *testing.T) {
+		for _, body := range []string{
+			`{"credit_purchase_fee_bps":-1}`,
+			`{"credit_purchase_fee_bps":10000}`,
+			`{"credit_purchase_fixed_fee_cents":-1}`,
+			`{"credit_purchase_fee_bps":500.5}`,
+		} {
+			response := execRequest(server, requestParams{
+				method:      "PATCH",
+				path:        "/admin/api/installation/llm-settings",
+				authCookie:  token,
+				body:        []byte(body),
+				contentType: "application/json",
+			})
+			assert.Equal(t, http.StatusBadRequest, response.Code, body)
+		}
 	})
 
 	t.Run("admin can save a hosted provider", func(t *testing.T) {
@@ -519,15 +592,15 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		}))
 		defer activeServer.Close()
 		t.Setenv("POLAR_API_BASE_URL", activeServer.URL)
-		require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+		setAdminBillingTestProduct(t, "prod_business")
 		now := time.Now()
 		end := now.AddDate(0, 1, 0)
-		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
+		_, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 			ID:          "sub_admin_put",
 			Status:      models.PolarSubscriptionStatusActive,
 			PeriodStart: &now,
 			PeriodEnd:   &end,
-		})
+		}, nil)
 		require.NoError(t, err)
 		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 
@@ -763,12 +836,15 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 		saveCode     int
 		concurrent   bool
 		paginate     bool
+		storedStatus string
 	}{
 		{name: "stale active", items: []map[string]any{}, verification: "none", saveCode: 200},
 		{name: "ended", items: []map[string]any{{"id": "sub_ended", "status": "active", "ended_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)}}, verification: "none", saveCode: 200},
 		{name: "ended with cancel flag", items: []map[string]any{{"id": "sub_ended", "status": "canceled", "ended_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339), "cancel_at_period_end": true, "current_period_end": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}}, verification: "none", saveCode: 200},
 		{name: "active unknown product", items: []map[string]any{{"id": "sub_unknown", "product_id": "unknown", "status": "active"}}, verification: "active", saveCode: 400},
 		{name: "trialing", items: []map[string]any{{"id": "sub_trial", "status": "trialing"}}, verification: "active", saveCode: 400},
+		{name: "paused without scheduled cancellation", items: []map[string]any{{"id": "sub_stored", "status": "paused", "cancel_at_period_end": false}}, verification: "active", saveCode: 400, storedStatus: "paused"},
+		{name: "ended paused", items: []map[string]any{{"id": "sub_stored", "status": "paused", "ended_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)}}, verification: "none", saveCode: 200, storedStatus: "paused"},
 		{name: "canceling", items: []map[string]any{{"id": "sub_canceling", "status": "canceled", "cancel_at_period_end": true, "current_period_end": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}}, verification: "active", saveCode: 400},
 		{name: "canceled", items: []map[string]any{{"id": "sub_canceled", "status": "canceled"}}, verification: "none", saveCode: 200},
 		{name: "pagination", items: []map[string]any{{"id": "sub_page2", "status": "active"}}, verification: "active", saveCode: 400, paginate: true},
@@ -786,12 +862,22 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 			server, r, token := setupAdminTestServer(t)
 			now := time.Now()
 			end := now.Add(time.Hour)
-			require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_verify"))
+			setAdminBillingTestProduct(t, "prod_verify")
 			catalog, err := models.FindBillingPlan(database.Conn(), models.BillingPlanBusiness)
 			require.NoError(t, err)
 			require.NotNil(t, catalog.PolarProductID)
-			_, _, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: "active", PeriodStart: &now, PeriodEnd: &end, CancelAtPeriodEnd: true})
+			storedStatus := tc.storedStatus
+			if storedStatus == "" {
+				storedStatus = "active"
+			}
+			_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: "active", PeriodStart: &now, PeriodEnd: &end, CancelAtPeriodEnd: storedStatus == "active"}, nil)
 			require.NoError(t, err)
+			if storedStatus == "paused" {
+				require.NoError(t, database.Conn().Model(&models.OrganizationBillingPlan{}).
+					Where("organization_id = ?", r.Organization.ID).Update("trial_ends_at", now.Add(-time.Hour)).Error)
+				_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{ID: "sub_stored", ProductID: *catalog.PolarProductID, Status: storedStatus, PeriodStart: &now, PeriodEnd: &end}, nil)
+				require.NoError(t, err)
+			}
 			saving := false
 			calls := 0
 			polarServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -838,7 +924,7 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 			assert.Equal(t, "sub_stored", plan.PolarSubscriptionID)
 			assert.Equal(t, "https://polar.sh/dashboard/superplane-inc/sales/subscriptions/sub_stored", plan.PolarSubscriptionURL)
 			assert.Equal(t, "polar", plan.PlanSource)
-			assert.Equal(t, "active", plan.PolarSubscriptionStatus)
+			assert.Equal(t, storedStatus, plan.PolarSubscriptionStatus)
 			beforeSave := calls
 			saving = true
 			response := execRequest(server, requestParams{method: "PUT", path: path, authCookie: token, body: []byte(`{"plan":"business_manual"}`), contentType: "application/json"})
@@ -858,7 +944,16 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 				assert.Equal(t, "sub_stored", after.PolarSubscriptionID)
 			} else {
 				assert.Equal(t, "polar", after.PlanSource)
-				assert.Equal(t, "active", after.PolarSubscriptionStatus)
+				assert.Equal(t, "sub_stored", after.PolarSubscriptionID)
+				assert.Equal(t, storedStatus, after.PolarSubscriptionStatus)
+				if storedStatus == "paused" {
+					stored, err := models.FindOrganizationBillingPlan(database.DB(t.Context()), r.Organization.ID)
+					require.NoError(t, err)
+					assert.False(t, stored.CancelAtPeriodEnd)
+					assert.False(t, stored.IsActiveBusiness())
+					assert.False(t, stored.AllowsHostedExecution(time.Now()))
+					assert.False(t, stored.AllowsCreditPurchase())
+				}
 			}
 		})
 	}

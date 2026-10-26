@@ -37,7 +37,6 @@ export function FirstRunAgentScreen({
   sphere,
   saving,
   loading,
-  hasBillingStep,
   hostedAgentReady,
   showCustomProvider,
   modelSource,
@@ -51,7 +50,6 @@ export function FirstRunAgentScreen({
   sphere?: FirstRunSphereProps;
   saving: boolean;
   loading: boolean;
-  hasBillingStep: boolean;
   hostedAgentReady: boolean;
   showCustomProvider: boolean;
   modelSource: AgentModelSource;
@@ -120,7 +118,7 @@ export function FirstRunAgentScreen({
             onClick={onContinue}
             data-testid="first-run-finish-setup"
           >
-            {modelSource.offered || hasBillingStep ? FIRST_RUN_COPY.tickets.continue : FIRST_RUN_COPY.finish.action}
+            {FIRST_RUN_COPY.finish.action}
           </LoadingButton>
         </div>
       </div>

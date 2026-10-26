@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -57,13 +58,25 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 	if event.Subscription != nil {
 		if err := polar.ApplySubscriptionEvent(r.Context(), database.DB(r.Context()), event.Subscription); err != nil {
 			if polar.IsPermanentApplyError(err) {
-				polar.LogPermanentApply(nil, err)
+				// A webhook for a deleted organization already wrote its own
+				// error log with the subscription details. The generic
+				// permanent-apply log would only duplicate it.
+				if !errors.Is(err, polar.ErrSubscriptionForDeletedOrganization) {
+					polar.LogPermanentApply(nil, err)
+				}
 				acceptPolarWebhook(w)
 				return
 			}
 			log.WithError(err).Error("failed to apply polar subscription")
 			http.Error(w, "unable to apply subscription", http.StatusInternalServerError)
 			return
+		}
+		// Activation, payment recovery, a new cycle, or an uncanceled
+		// subscription can each change the renewal seat count. Schedule sends
+		// no update when Polar already has the target, so a replayed webhook
+		// or the webhook that follows our own update does not loop.
+		if orgID, err := event.Subscription.Data.OrganizationID(); err == nil {
+			seatrenewal.ScheduleAsync(r.Context(), orgID)
 		}
 		acceptPolarWebhook(w)
 		return

@@ -17,27 +17,23 @@ func IntPtr(v int) *int { return intPtr(v) }
 
 func AfterRunnerTaskCreated(
 	ctx core.ExecutionContext,
-	taskID, backend string,
+	taskID string,
 ) error {
-	return afterRunnerTaskCreated(ctx, taskID, backend)
+	return afterRunnerTaskCreated(ctx, taskID)
 }
 
-func PollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error {
-	return pollBrokerTask(ctx, finishedEventType)
+func PollTask(ctx core.ActionHookContext, finishedEventType string) error {
+	return pollTask(ctx, finishedEventType)
 }
 
-func HandleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType string) (int, *core.WebhookResponseBody, error) {
-	return handleBrokerWebhook(ctx, finishedEventType)
-}
-
-func CancelBrokerTask(ctx core.ExecutionContext, finishedEventType string) error {
-	return cancelBrokerTask(ctx, finishedEventType)
+func CancelTask(ctx core.ExecutionContext, finishedEventType string) error {
+	return cancelTask(ctx, finishedEventType)
 }
 
 func RevokeOpenRouterChildKey(httpCtx core.HTTPContext, state core.ExecutionStateContext, hosted core.HostedLLMContext, logger *logrus.Entry) {
 	_ = revokeOpenRouterChildKey(httpCtx, state, hosted, logger)
 }
 
-func ProcessBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finishedEventType, organizationID string) error {
-	return processBrokerTaskStatus(state, task, finishedEventType, organizationID, nil, nil, nil)
+func ProcessTaskStatus(state core.ExecutionStateContext, task *core.RunnerTask, finishedEventType, organizationID string) error {
+	return processTaskStatus(state, task, finishedEventType, organizationID, nil, nil, nil)
 }

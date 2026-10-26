@@ -50,10 +50,6 @@ echo "* Injecting install.sh"
 inject "${TEMPLATES_DIR}/install.sh" "${TARGET_DIR}/install.sh"
 chmod +x "${TARGET_DIR}/install.sh"
 
-echo "* Injecting enable-runners.sh"
-inject "${TEMPLATES_DIR}/enable-runners.sh" "${TARGET_DIR}/enable-runners.sh"
-chmod +x "${TARGET_DIR}/enable-runners.sh"
-
 echo "* Injecting Caddyfile"
 cp "${TEMPLATES_DIR}/Caddyfile" "${TARGET_DIR}/Caddyfile"
 

@@ -24,6 +24,14 @@ import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useFinishOnboarding } from "./useFinishOnboarding";
 import { resolveOnboardingAgent } from "./onboardingAgentReadiness";
 
+let byokAllowed = true;
+vi.mock("@/hooks/useBYOKAccess", () => ({ useBYOKAccess: () => ({ verify: async () => byokAllowed }) }));
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({
+    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+  }),
+}));
+
 const readyPlan = {
   component: "runnerSuperPlane",
   credentialsSource: "hosted",
@@ -49,16 +57,20 @@ function setup(): OnboardingSetupApi {
 
 describe("useFinishOnboarding", () => {
   beforeEach(() => {
+    byokAllowed = true;
     organizationsDescribeIntegration.mockReset();
     vi.mocked(showErrorToast).mockReset();
   });
 
-  it.each(["pending", "connected", "hosted"] as const)(
+  it.each(["pending", "connected", "hosted", "denied"] as const)(
     "honors the model source when the Anthropic connection is %s",
     async (connection) => {
+      byokAllowed = connection !== "denied";
       organizationsDescribeIntegration.mockResolvedValue({
         data: { integration: { metadata: { name: "github-acme" } } },
       });
+      const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" });
+      const onProvisioned = vi.fn();
       const updateOnboarding = vi.fn().mockResolvedValue({});
       const installFactory = vi.fn().mockResolvedValue({ canvasId: "canvas-1", canvasName: "canvas-1" });
       const plan = resolveOnboardingAgent({
@@ -88,7 +100,8 @@ describe("useFinishOnboarding", () => {
             installFactory,
             createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
             listIntakes: vi.fn().mockResolvedValue([]),
-            createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
+            createIntake,
+            updateIntake: vi.fn(),
             deleteIntake: vi.fn().mockResolvedValue({}),
             listApps: vi.fn().mockResolvedValue([]),
             resolveDefaultBranch: vi.fn().mockResolvedValue("main"),
@@ -96,7 +109,7 @@ describe("useFinishOnboarding", () => {
             remainingCreditCents: 5000,
             hostedModelsLoading: false,
             plan,
-            onProvisioned: vi.fn(),
+            onProvisioned,
           }),
         { wrapper },
       );
@@ -117,6 +130,10 @@ describe("useFinishOnboarding", () => {
         }),
       );
       expect(installFactory).toHaveBeenCalled();
+      if (connection === "denied") {
+        expect(createIntake).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
+        expect(onProvisioned).not.toHaveBeenCalled();
+      }
       for (const [input] of installFactory.mock.calls) {
         expect(input.agentRewrite).toEqual(
           connection === "connected"
@@ -156,6 +173,7 @@ describe("useFinishOnboarding", () => {
           createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
           listIntakes: vi.fn().mockResolvedValue([]),
           createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
+          updateIntake: vi.fn(),
           deleteIntake: vi.fn().mockResolvedValue({}),
           listApps: vi.fn().mockResolvedValue([]),
           resolveDefaultBranch: vi.fn().mockResolvedValue("main"),

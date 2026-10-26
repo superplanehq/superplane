@@ -13,6 +13,34 @@ export function getApiErrorMessage(error: unknown, fallback = "An error occurred
   );
 }
 
+/**
+ * Extract the machine-readable reason from an API error.
+ * The gateway returns it in a google.rpc.ErrorInfo entry of `details`.
+ */
+export function getApiErrorReason(error: unknown): string | null {
+  const details = getErrorField(error, "details");
+  if (!Array.isArray(details)) {
+    return null;
+  }
+
+  for (const detail of details) {
+    const reason = getErrorField(detail, "reason");
+    if (getErrorField(detail, "domain") === "superplane.com" && typeof reason === "string" && reason) {
+      return reason;
+    }
+  }
+
+  return null;
+}
+
+function getErrorField(value: unknown, field: string): unknown {
+  if (!value || typeof value !== "object" || !(field in value)) {
+    return null;
+  }
+
+  return (value as Record<string, unknown>)[field];
+}
+
 export async function getResponseErrorMessage(response: Response, fallback = "An error occurred"): Promise<string> {
   const rawBody = await response.text();
   const trimmedBody = rawBody.trim();

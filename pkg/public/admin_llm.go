@@ -24,12 +24,14 @@ import (
 )
 
 type installationLLMSettingsResponse struct {
-	WelcomeGrantCents     int64                       `json:"welcome_grant_cents"`
-	MarkupBPS             int                         `json:"markup_bps"`
-	WarningThresholdBPS   int                         `json:"warning_threshold_bps"`
-	DefaultHostedProvider string                      `json:"default_hosted_provider"`
-	DefaultHostedModel    string                      `json:"default_hosted_model"`
-	Providers             []hostedLLMProviderResponse `json:"providers"`
+	WelcomeGrantCents           int64                       `json:"welcome_grant_cents"`
+	MarkupBPS                   int                         `json:"markup_bps"`
+	WarningThresholdBPS         int                         `json:"warning_threshold_bps"`
+	CreditPurchaseFeeBPS        int                         `json:"credit_purchase_fee_bps"`
+	CreditPurchaseFixedFeeCents int64                       `json:"credit_purchase_fixed_fee_cents"`
+	DefaultHostedProvider       string                      `json:"default_hosted_provider"`
+	DefaultHostedModel          string                      `json:"default_hosted_model"`
+	Providers                   []hostedLLMProviderResponse `json:"providers"`
 }
 
 type hostedLLMProviderResponse struct {
@@ -42,11 +44,13 @@ type hostedLLMProviderResponse struct {
 }
 
 type installationLLMSettingsRequest struct {
-	WelcomeGrantCents     *int64  `json:"welcome_grant_cents"`
-	MarkupBPS             *int    `json:"markup_bps"`
-	WarningThresholdBPS   *int    `json:"warning_threshold_bps"`
-	DefaultHostedProvider *string `json:"default_hosted_provider"`
-	DefaultHostedModel    *string `json:"default_hosted_model"`
+	WelcomeGrantCents           *int64  `json:"welcome_grant_cents"`
+	MarkupBPS                   *int    `json:"markup_bps"`
+	WarningThresholdBPS         *int    `json:"warning_threshold_bps"`
+	CreditPurchaseFeeBPS        *int    `json:"credit_purchase_fee_bps"`
+	CreditPurchaseFixedFeeCents *int64  `json:"credit_purchase_fixed_fee_cents"`
+	DefaultHostedProvider       *string `json:"default_hosted_provider"`
+	DefaultHostedModel          *string `json:"default_hosted_model"`
 }
 
 type hostedLLMProviderRequest struct {
@@ -178,6 +182,12 @@ func (s *Server) adminUpdateInstallationLLMSettings(w http.ResponseWriter, r *ht
 		}
 		if req.WarningThresholdBPS != nil {
 			next.WarningThresholdBPS = *req.WarningThresholdBPS
+		}
+		if req.CreditPurchaseFeeBPS != nil {
+			next.CreditPurchaseFeeBPS = *req.CreditPurchaseFeeBPS
+		}
+		if req.CreditPurchaseFixedFeeCents != nil {
+			next.CreditPurchaseFixedFeeCents = *req.CreditPurchaseFixedFeeCents
 		}
 		if req.DefaultHostedProvider != nil {
 			next.DefaultHostedProvider = optionalTrimmedStringPointer(*req.DefaultHostedProvider)
@@ -567,13 +577,40 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 	respondJSON(w, response)
 }
 
+// adminBillingPlanListItem is an admin list response item. It is not a
+// persisted model. The display fields are never accepted as authorization:
+// the server checks assignments again on save and delete.
+type adminBillingPlanListItem struct {
+	models.BillingPlan
+	Assigned             bool    `json:"assigned"`
+	DeleteDisabledReason *string `json:"delete_disabled_reason"`
+}
+
 func (s *Server) adminListBillingPlans(w http.ResponseWriter, r *http.Request) {
-	plans, err := models.ListBillingPlans(database.DB(r.Context()))
+	db := database.DB(r.Context())
+	plans, err := models.ListBillingPlans(db)
 	if err != nil {
-		http.Error(w, "Failed to load billing plans", http.StatusInternalServerError)
+		writeBillingPlanServerError(w, r, err, billingPlanLoadErrorMessage)
 		return
 	}
-	respondJSON(w, plans)
+	planIDs := make([]uuid.UUID, 0, len(plans))
+	for _, plan := range plans {
+		planIDs = append(planIDs, plan.ID)
+	}
+	assigned, err := models.ListAssignedBillingPlanIDs(db, planIDs)
+	if err != nil {
+		writeBillingPlanServerError(w, r, err, billingPlanLoadErrorMessage)
+		return
+	}
+	items := make([]adminBillingPlanListItem, 0, len(plans))
+	for _, plan := range plans {
+		item := adminBillingPlanListItem{BillingPlan: plan, Assigned: assigned.Contains(plan.ID)}
+		if reason := plan.DeleteBlockReason(assigned.Contains(plan.ID)); reason != "" {
+			item.DeleteDisabledReason = &reason
+		}
+		items = append(items, item)
+	}
+	respondJSON(w, items)
 }
 
 func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
@@ -752,12 +789,14 @@ func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettings
 	}
 	defaultModel := models.InstallationDefaultHostedLLMModel(settings)
 	return installationLLMSettingsResponse{
-		WelcomeGrantCents:     catalog.TrialCreditCents,
-		MarkupBPS:             settings.MarkupBPS,
-		WarningThresholdBPS:   settings.WarningThresholdBPS,
-		DefaultHostedProvider: defaultModel.Provider,
-		DefaultHostedModel:    defaultModel.Model,
-		Providers:             providers,
+		WelcomeGrantCents:           catalog.TrialCreditCents,
+		MarkupBPS:                   settings.MarkupBPS,
+		WarningThresholdBPS:         settings.WarningThresholdBPS,
+		CreditPurchaseFeeBPS:        settings.CreditPurchaseFeeBPS,
+		CreditPurchaseFixedFeeCents: settings.CreditPurchaseFixedFeeCents,
+		DefaultHostedProvider:       defaultModel.Provider,
+		DefaultHostedModel:          defaultModel.Model,
+		Providers:                   providers,
 	}, nil
 }
 
@@ -839,6 +878,8 @@ func isClientLLMSettingsError(err error) bool {
 		strings.Contains(msg, "markup cannot") ||
 		strings.Contains(msg, "welcome grant") ||
 		strings.Contains(msg, "warning threshold") ||
+		strings.Contains(msg, "credit purchase fee") ||
+		strings.Contains(msg, "credit purchase fixed fee") ||
 		strings.Contains(msg, "provisioning api key") ||
 		strings.Contains(msg, "llm base url") ||
 		strings.Contains(msg, "superplane agent model")

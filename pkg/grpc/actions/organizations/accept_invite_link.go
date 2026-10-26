@@ -6,14 +6,13 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
 
-func AcceptInviteLink(ctx context.Context, authService authorization.Authorization, accountID string, token string) (*structpb.Struct, error) {
+func AcceptInviteLink(ctx context.Context, _ authorization.Authorization, accountID string, token string) (*structpb.Struct, error) {
 	if token == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "invite link token is required")
 	}
@@ -37,43 +36,15 @@ func AcceptInviteLink(ctx context.Context, authService authorization.Authorizati
 		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
 
-	statusValue := "joined"
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if _, err := models.LockOrganization(tx, org.ID); err != nil {
 			return err
 		}
-		user, err := models.FindMaybeDeletedUserByEmailInTransaction(tx, org.ID.String(), account.Email)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
+		_, err := models.FindActiveHumanUserByAccountAndOrganization(tx, org.ID, account.ID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return grpcerrors.FailedPrecondition(nil, "This organization uses email invitations. Ask an organization admin for an invitation.")
 		}
-		if err == nil && !user.DeletedAt.Valid {
-			statusValue = "already_member"
-			return nil
-		}
-		if models.BillingEnabled() {
-			effective, err := entitlements.Resolve(tx, org.ID)
-			if err != nil {
-				return err
-			}
-			if effective.SeatLimit != nil {
-				used, err := models.CountActiveHumanUsersByOrganizationInTransaction(tx, org.ID.String())
-				if err != nil {
-					return err
-				}
-				if used >= int64(*effective.SeatLimit) {
-					return grpcerrors.FailedPrecondition(nil, "This organization has reached its seat limit. Contact an organization admin.")
-				}
-			}
-		}
-		if user == nil || errors.Is(err, gorm.ErrRecordNotFound) {
-			user, err = models.CreateUserInTransaction(tx, org.ID, account.ID, account.Email, account.Name)
-		} else {
-			err = user.RestoreInTransaction(tx)
-		}
-		if err != nil {
-			return err
-		}
-		return authService.AssignRole(user.ID.String(), models.RoleOrgOperator, org.ID.String(), models.DomainTypeOrganization)
+		return err
 	})
 	if err != nil {
 		if _, _, ok := grpcerrors.HandlerStatus(err); ok {
@@ -82,7 +53,7 @@ func AcceptInviteLink(ctx context.Context, authService authorization.Authorizati
 		return nil, grpcerrors.Internal(err, "failed to accept invite")
 	}
 
-	return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
+	return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, "already_member")
 }
 
 func inviteLinkAcceptResponse(organizationID, organizationSlug, organizationName, statusValue string) (*structpb.Struct, error) {

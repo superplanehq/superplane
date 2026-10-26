@@ -97,6 +97,7 @@ import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
+import { Credits as CreditsAdmin } from "./pages/admin/Credits";
 import { InstallationEncryption as InstallationEncryptionAdmin } from "./pages/admin/InstallationEncryption";
 import InstallationLicenseAdmin from "./pages/admin/InstallationLicense";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
@@ -280,6 +281,7 @@ function AppRouter() {
                 <Route index element={<OrganizationsListAdmin />} />
                 <Route path="accounts" element={<AccountsListAdmin />} />
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
+                <Route path="credits" element={<CreditsAdmin />} />
                 <Route path="encryption" element={<InstallationEncryptionAdmin />} />
                 <Route path="license" element={<InstallationLicenseAdmin />} />
                 <Route path="billing-plans" element={<BillingPlans />} />
@@ -294,6 +296,7 @@ function AppRouter() {
               </Route>
               <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
+              <Route path="invitations/:token" element={withAuthOnly(InviteLinkAccept)} />
               {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
               <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
               {organizationScopedRouteTree()}

@@ -30,6 +30,7 @@ services:
         condition: service_healthy
     environment:
       SUPERPLANE_VERSION: __SUPERPLANE_VERSION__
+      SUPERPLANE_BILLING_ENABLED: "no"
     env_file:
       - superplane.env
     volumes:
@@ -91,9 +92,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # Opt in with: docker compose --profile runners up -d
   fleet-manager:
-    profiles: ["runners"]
     image: ghcr.io/superplanehq/fleet-manager:__FLEET_MANAGER_VERSION__-docker
     logging: *default-logging
     restart: always

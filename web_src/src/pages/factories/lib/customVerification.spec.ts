@@ -29,6 +29,7 @@ describe("custom verification settings", () => {
     ]);
     expect(customVerificationSettings("automatic", draft, true)).toEqual({
       startMode: "START_MODE_AUTOMATIC",
+      icon: "sparkles",
       agent: {
         component: "runnerClaudeCode",
         model: "claude-sonnet",
@@ -42,6 +43,7 @@ describe("custom verification settings", () => {
           prompt: "Review this change.",
           command: undefined,
           workingDirectory: "repo",
+          secrets: undefined,
         },
         {
           name: "Test",
@@ -49,6 +51,7 @@ describe("custom verification settings", () => {
           prompt: undefined,
           command: "make test",
           workingDirectory: "repo",
+          secrets: undefined,
         },
       ],
     });
@@ -59,12 +62,12 @@ describe("custom verification settings", () => {
 
     expect(settings.agent).toBeUndefined();
     expect(settings.startMode).toBe("START_MODE_MANUAL");
-    expect(settings.steps?.map((step) => step.type)).toEqual(["TYPE_PROMPT", "TYPE_BASH"]);
+    expect(settings.steps?.map((step) => step.type)).toEqual(["TYPE_BASH"]);
   });
 
   it("uses concise mode copy for board rows", () => {
     expect(customVerificationModeCopy("manual").trigger).toBe("Manual start on a Verify task");
-    expect(customVerificationModeCopy("automatic").action).toBe("Run verification automatically");
+    expect(customVerificationModeCopy("automatic").action).toBe("Run automation automatically");
   });
 
   it("classifies managed rows by template id and start mode", () => {
@@ -97,7 +100,7 @@ describe("custom verification settings", () => {
       expect.objectContaining({
         kind: "custom-verification",
         name: "Policy review",
-        action: "Run verification automatically",
+        action: "Run automation automatically",
       }),
     ]);
   });

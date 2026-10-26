@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -88,7 +87,6 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 		Where("scope_type = ?", models.RunnerFleetScopeInstallation).
 		Find(&fleets).Error)
 	require.Empty(t, fleets)
-	assert.True(t, organization.HasExperimentalFeature(features.FeatureNewRunners))
 }
 
 func setupOwnerTestServer(t *testing.T) *Server {
@@ -188,6 +186,7 @@ func TestSetupOwnerStatusReportsBeacon(t *testing.T) {
 
 	status := getSetupOwnerStatus(t, server, "")
 	assert.Equal(t, true, status["beacon_enabled"])
+	assert.Equal(t, "kubernetes", status["installation_type"])
 }
 
 func TestSetupOwnerPersistsShareOwnerIdentity(t *testing.T) {

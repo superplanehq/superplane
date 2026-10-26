@@ -57,6 +57,7 @@ func Test__HostedLLMTechnicalName(t *testing.T) {
 
 func Test__ListSelectableLLMModels(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -114,6 +115,7 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 
 func Test__ListSelectableLLMModels__HidesCustomModelsWithoutFlags(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderCustom, datatypes.JSONSlice[string]{
 		"kimi-k3",
@@ -130,7 +132,7 @@ func Test__ListSelectableLLMModels__HidesCustomModelsWithoutFlags(t *testing.T) 
 	require.NoError(t, err)
 	assert.NotContains(t, selectableKeys(listed), customKey)
 	_, err = models.FindSelectableLLMModel(db, r.Organization.ID, nil, customKey)
-	assert.ErrorIs(t, err, models.ErrSelectableLLMModelNotAllowed)
+	assert.ErrorIs(t, err, models.ErrBYOKAccessDenied)
 
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	listed, err = models.ListSelectableLLMModels(db, r.Organization.ID, nil)
@@ -150,7 +152,7 @@ func Test__ListSelectableLLMModels__HidesCustomModelsWithoutFlags(t *testing.T) 
 	require.NoError(t, err)
 	assert.NotContains(t, selectableKeys(listed), customKey)
 	_, err = models.FindSelectableLLMModel(db, r.Organization.ID, nil, customKey)
-	assert.ErrorIs(t, err, models.ErrSelectableLLMModelNotAllowed)
+	assert.ErrorIs(t, err, models.ErrBYOKAccessDenied)
 }
 
 func Test__SelectableLLMRunnerComponent(t *testing.T) {
@@ -175,6 +177,7 @@ func Test__SelectableLLMRunnerComponent(t *testing.T) {
 
 func Test__SelectableLLMRunnerCredentialsUsesInstallationName(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	installationName := support.RandomName("claude")
 	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "claude", installationName, map[string]any{})

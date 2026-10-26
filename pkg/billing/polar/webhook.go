@@ -71,6 +71,8 @@ type OrderData struct {
 	BillingReason      string          `json:"billing_reason"`
 	RefundedAmount     int64           `json:"refunded_amount"`
 	NetAmount          int64           `json:"net_amount"`
+	Currency           string          `json:"currency"`
+	Metadata           map[string]any  `json:"metadata"`
 	ProductID          string          `json:"product_id"`
 	ExternalCustomerID string          `json:"external_customer_id"`
 	Customer           OrderCustomer   `json:"customer"`
@@ -141,14 +143,37 @@ type SubscriptionData struct {
 	ProductID          string        `json:"product_id"`
 	ID                 string        `json:"id"`
 	Status             string        `json:"status"`
+	Seats              *int          `json:"seats"`
 	CancelAtPeriodEnd  bool          `json:"cancel_at_period_end"`
+	CreatedAt          polarTime     `json:"created_at"`
 	ModifiedAt         polarTime     `json:"modified_at"`
 	CurrentPeriodStart polarTime     `json:"current_period_start"`
 	EndedAt            polarTime     `json:"ended_at"`
 	CurrentPeriodEnd   polarTime     `json:"current_period_end"`
+	PastDueAt          polarTime     `json:"past_due_at"`
 	CustomerID         string        `json:"customer_id"`
 	ExternalCustomerID string        `json:"external_customer_id"`
 	Customer           OrderCustomer `json:"customer"`
+
+	// PendingUpdate is a change that Polar applies at the next period, for
+	// example a seat count scheduled with proration_behavior next_period.
+	PendingUpdate *SubscriptionPendingUpdate `json:"pending_update"`
+}
+
+// SubscriptionPendingUpdate is a scheduled subscription change. Polar applies
+// it at AppliesAt, the start of the next billing period.
+type SubscriptionPendingUpdate struct {
+	Seats     *int      `json:"seats"`
+	AppliesAt polarTime `json:"applies_at"`
+}
+
+// NextPeriodSeats is the seat count that Polar renews with: the scheduled
+// seat count, or the current seats when no seat change is scheduled.
+func (d SubscriptionData) NextPeriodSeats() *int {
+	if d.PendingUpdate != nil && d.PendingUpdate.Seats != nil {
+		return d.PendingUpdate.Seats
+	}
+	return d.Seats
 }
 
 func (d SubscriptionData) organizationExternalID() string {

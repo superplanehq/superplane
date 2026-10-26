@@ -30,10 +30,11 @@ func Test__ListLineRunnerModels__ClaudeLineUsesAnthropicAllowlist(t *testing.T) 
 	})
 	require.NoError(t, err)
 
-	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	ids, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"claude-opus-4-6", "claude-sonnet-4-6"}, ids)
 	assert.NotContains(t, ids, "gpt-5")
+	assert.True(t, usesHostedFunding)
 }
 
 func Test__ListLineRunnerModels__CodexLineOmitsClaudeAliases(t *testing.T) {
@@ -50,11 +51,12 @@ func Test__ListLineRunnerModels__CodexLineOmitsClaudeAliases(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	ids, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"gpt-5", "gpt-5-mini"}, ids)
 	assert.NotContains(t, ids, "sonnet")
 	assert.NotContains(t, ids, "opus")
+	assert.True(t, usesHostedFunding)
 }
 
 func Test__ListLineRunnerModels__OpenRouterLineUsesOpenRouterIds(t *testing.T) {
@@ -70,9 +72,10 @@ func Test__ListLineRunnerModels__OpenRouterLineUsesOpenRouterIds(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	ids, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6", "openai/gpt-5"}, ids)
+	assert.True(t, usesHostedFunding)
 }
 
 func Test__ListLineRunnerModels__CustomProviderUsesItsAllowlistOnOpenCode(t *testing.T) {
@@ -102,10 +105,11 @@ func Test__ListLineRunnerModels__CustomProviderUsesItsAllowlistOnOpenCode(t *tes
 	})
 	require.NoError(t, err)
 
-	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	ids, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"alpha-model", "zeta-model"}, ids)
 	assert.NotContains(t, ids, "openrouter-only")
+	assert.False(t, usesHostedFunding)
 }
 
 func Test__ListLineRunnerModels__MixedLineUnionsProviders(t *testing.T) {
@@ -124,28 +128,122 @@ func Test__ListLineRunnerModels__MixedLineUnionsProviders(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	ids, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"claude-sonnet-4-6", "gpt-5"}, ids)
+	assert.True(t, usesHostedFunding)
 }
 
-func Test__ListLineRunnerModels__IncludesCanvasModelsWhenAllowlistEmpty(t *testing.T) {
+func Test__ListLineRunnerModels__MixedFundingLineUsesHostedFunding(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6")
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 
-	planning := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "opus")
-	implement := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "sonnet")
+	hostedApp := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "hosted", "claude-sonnet-4-6")
+	byokApp := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "claude-opus-4-6")
 	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
-		{Type: models.FactoryLineStepTypeRunApp, AppID: planning.ID, Entrypoint: "start"},
-		{Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: "start"},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: hostedApp.ID, Entrypoint: "start"},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: byokApp.ID, Entrypoint: "start"},
 	})
 	require.NoError(t, err)
 
-	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	_, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"claude-opus-5-5", "claude-sonnet-4-6"}, ids)
+	assert.True(t, usesHostedFunding)
+}
+
+func Test__ListLineRunnerModels__BYOKLineSkipsHostedFunding(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+
+	app := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "claude-sonnet-4-6")
+	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	_, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	require.NoError(t, err)
+	assert.False(t, usesHostedFunding)
+}
+
+func Test__ListLineRunnerModels__StoredBYOKModelsRespectAllowlists(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		organizationModels []string
+		factoryModels      []string
+		want               []string
+	}{
+		{name: "missing organization allowlist"},
+		{name: "empty organization allowlist", organizationModels: []string{}},
+		{
+			name:               "organization excludes stored model",
+			organizationModels: []string{"claude-sonnet-4-6"},
+			want:               []string{"claude-sonnet-4-6"},
+		},
+		{
+			name:               "factory excludes stored model",
+			organizationModels: []string{"claude-opus-4-6", "claude-sonnet-4-6"},
+			factoryModels:      []string{"claude-sonnet-4-6"},
+			want:               []string{"claude-sonnet-4-6"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+			factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			if tc.organizationModels != nil {
+				_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, tc.organizationModels)
+				require.NoError(t, err)
+			}
+			if tc.factoryModels != nil {
+				_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factoryModel.ID, models.UsageProviderAnthropic, models.UsageFundingSourceBYOK, tc.factoryModels)
+				require.NoError(t, err)
+			}
+
+			planning := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "claude-opus-4-6")
+			implement := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "claude-sonnet-4-6")
+			_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+				{Type: models.FactoryLineStepTypeRunApp, AppID: planning.ID, Entrypoint: "start"},
+				{Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: "start"},
+			})
+			require.NoError(t, err)
+
+			ids, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, ids)
+			assert.False(t, usesHostedFunding)
+		})
+	}
+}
+
+func Test__ListLineRunnerModels__DropsStoredBYOKModelWithoutAccess(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"opus"})
+	require.NoError(t, err)
+
+	planning := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "opus")
+	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: planning.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	ids, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	require.NoError(t, err)
+	assert.Empty(t, ids)
+	assert.False(t, usesHostedFunding)
 }
 
 func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testing.T) {
@@ -162,12 +260,13 @@ func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testi
 	})
 	require.NoError(t, err)
 
-	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	ids, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderAnthropic, "claude-sonnet-4-6"),
 		models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenRouter, "x-ai/grok-4.6"),
 	}, ids)
+	assert.True(t, usesHostedFunding)
 }
 
 func Test__SerializeLineRunnerModels__NamesHostedSelectableKeys(t *testing.T) {
@@ -195,9 +294,10 @@ func Test__ListLineRunnerModels__NoRunnerNodesReturnsEmpty(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	ids, usesHostedFunding, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
 	assert.Empty(t, ids)
+	assert.False(t, usesHostedFunding)
 }
 
 func seedHostedModels(t *testing.T, db *gorm.DB, provider string, modelsIDs ...string) {

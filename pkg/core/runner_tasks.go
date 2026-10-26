@@ -14,7 +14,6 @@ const (
 // without coupling component implementations to GORM or encryption details.
 // Implementations are bound to the current worker transaction.
 type RunnerTaskContext interface {
-	IntegratedBackendEnabled() (bool, error)
 	Create(id, fleetID string, payload []byte) error
 	Find(id string) (*RunnerTask, error)
 	RequestCancel(id string) error
@@ -30,4 +29,13 @@ type RunnerTask struct {
 	ReservedAt   *time.Time
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
+}
+
+func (t *RunnerTask) IsTerminal() bool {
+	switch t.State {
+	case "succeeded", "failed", "canceled", "lost":
+		return true
+	default:
+		return false
+	}
 }

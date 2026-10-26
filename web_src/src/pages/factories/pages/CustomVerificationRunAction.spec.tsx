@@ -29,7 +29,7 @@ describe("CustomVerificationRunAction", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Run verification" }));
+    await user.click(screen.getByRole("button", { name: "Run automation" }));
 
     expect(runVerification).toHaveBeenCalledWith({
       automationId: "verification-1",
@@ -53,7 +53,7 @@ describe("CustomVerificationRunAction", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Run verification" }));
+    await user.click(screen.getByRole("button", { name: "Run automation" }));
     await user.click(screen.getByRole("menuitem", { name: "License review" }));
 
     expect(runVerification).toHaveBeenCalledWith({
@@ -74,7 +74,7 @@ describe("CustomVerificationRunAction", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Run verification" }));
+    await user.click(screen.getByRole("button", { name: "Run automation" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The task has no pull request.");
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();

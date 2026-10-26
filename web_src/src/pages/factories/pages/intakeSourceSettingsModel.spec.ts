@@ -17,11 +17,13 @@ import {
 } from "./intakeSourceSettingsModel";
 
 describe("intakeSourceSettingsModel", () => {
-  it("round trips the default owner and sends an explicit clear only for GitHub", () => {
+  it("round trips the default owner for GitHub and Sentry and omits it for other intakes", () => {
     const selected = intakeSettingsFromApi("GitHub issues", { defaultOwnerId: "alice" });
     expect(intakeSettingsToApi(selected, "github-issues").defaultOwnerId).toBe("alice");
+    expect(intakeSettingsToApi(selected, "sentry-exceptions").defaultOwnerId).toBe("alice");
     const cleared = { ...selected, defaultOwnerId: "" };
     expect(intakeSettingsToApi(cleared, "github-issues").defaultOwnerId).toBe("");
+    expect(intakeSettingsToApi(cleared, "sentry-exceptions").defaultOwnerId).toBe("");
     expect(intakeSettingsToApi(selected, "jira-issues").defaultOwnerId).toBeUndefined();
     expect(intakeSettingsFromApi("GitHub issues", {}).defaultOwnerId).toBe("");
   });

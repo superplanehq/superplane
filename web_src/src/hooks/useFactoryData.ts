@@ -35,6 +35,7 @@ import type {
   FactoriesWorkOrderState,
   FactoryAutomation,
   FactoriesFactoryLineStep,
+  OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
@@ -65,6 +66,7 @@ import {
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
 import { integrationKeys } from "./useIntegrations";
+import { organizationBillingQueryKey } from "./useOrganizationBilling";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -605,10 +607,13 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     },
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      // A Backlog run starts only when Planning is on. Show Analyzing until
-      // that run arrives. Missing factory data defaults to Planning on.
       const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
-      if (factoryPlanningEnabled(factory)) {
+      const billing = queryClient.getQueryData<OrganizationsDescribeOrganizationBillingResponse>(
+        organizationBillingQueryKey(organizationId),
+      );
+      // Predict analysis only when the server permits runs. Otherwise wait
+      // for a real run, including when billing has not loaded yet.
+      if (factoryPlanningEnabled(factory) && billing?.hostedExecutionAllowed === true) {
         markBacklogAnalysisPending(order.id);
       }
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });

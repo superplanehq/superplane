@@ -64,7 +64,7 @@ export function PlanningReviewForm({
   modelOnly?: boolean;
   /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
   appearance?: "card" | "fields";
-  view?: "full" | "implementation" | "planning";
+  view?: "full" | "implementation" | "planning" | "pr-feedback";
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled?: boolean;
   restoreError?: string;
@@ -134,7 +134,7 @@ function AgentPanel({
   onChange,
 }: {
   appearance: "card" | "fields";
-  view: "full" | "implementation" | "planning";
+  view: "full" | "implementation" | "planning" | "pr-feedback";
   component: PlanningReviewComponent;
   organizationId?: string;
   factoryId?: string;
@@ -272,7 +272,11 @@ function AgentPanel({
               label={modelLabel ?? "Default model"}
               description={
                 modelDescription ??
-                (view === "planning" ? "The model used to plan tasks." : "The model used to implement tasks.")
+                (view === "planning"
+                  ? "The model used to plan tasks."
+                  : view === "pr-feedback"
+                    ? "The model used to address pull request comments or failing checks."
+                    : "The model used to implement tasks.")
               }
             >
               <div className="w-full min-w-0">{modelControl}</div>

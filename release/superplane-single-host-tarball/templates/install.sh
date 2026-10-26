@@ -12,10 +12,15 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cat "${PWD}/superplane-logo.txt"
 
 ENV_FILE="superplane.env"
+FLEET_MANAGER_ENV_FILE="fleet-manager.env"
 RUNNER_VERSION="__RUNNER_VERSION__"
 FLEET_MANAGER_VERSION="__FLEET_MANAGER_VERSION__"
 BLOB_PATH="/var/lib/superplane/blobs"
 RUNNER_LOG_PATH="/var/lib/superplane/runner-active-logs"
+DEFAULT_RUNNER_MAX_CAPACITY=5
+DEFAULT_RUNNER_WARM_CAPACITY=1
+REQUESTED_RUNNER_MAX_CAPACITY="${SUPERPLANE_RUNNER_MAX_CAPACITY:-}"
+REQUESTED_RUNNER_WARM_CAPACITY="${SUPERPLANE_RUNNER_WARM_CAPACITY:-}"
 
 echo "Running SuperPlane single-host installation."
 echo ""
@@ -94,6 +99,44 @@ require_docker_compose() {
   fi
 }
 
+resolve_runner_capacity() {
+  if [[ -n "${REQUESTED_RUNNER_MAX_CAPACITY}" ]]; then
+    RUNNER_MAX_CAPACITY="${REQUESTED_RUNNER_MAX_CAPACITY}"
+  elif [[ "${existing_env}" == "yes" ]] && env_has SUPERPLANE_RUNNER_MAX_CAPACITY; then
+    RUNNER_MAX_CAPACITY="$(env_value SUPERPLANE_RUNNER_MAX_CAPACITY)"
+  else
+    RUNNER_MAX_CAPACITY="${DEFAULT_RUNNER_MAX_CAPACITY}"
+  fi
+
+  if [[ -n "${REQUESTED_RUNNER_WARM_CAPACITY}" ]]; then
+    RUNNER_WARM_CAPACITY="${REQUESTED_RUNNER_WARM_CAPACITY}"
+  elif [[ "${existing_env}" == "yes" ]] && env_has SUPERPLANE_RUNNER_WARM_CAPACITY; then
+    RUNNER_WARM_CAPACITY="$(env_value SUPERPLANE_RUNNER_WARM_CAPACITY)"
+  else
+    RUNNER_WARM_CAPACITY="${DEFAULT_RUNNER_WARM_CAPACITY}"
+  fi
+
+  if [[ ! "${RUNNER_MAX_CAPACITY}" =~ ^[0-9]+$ ]]; then
+    echo "SUPERPLANE_RUNNER_MAX_CAPACITY must be a positive integer." >&2
+    exit 1
+  fi
+  if [[ ! "${RUNNER_WARM_CAPACITY}" =~ ^[0-9]+$ ]]; then
+    echo "SUPERPLANE_RUNNER_WARM_CAPACITY must be a non-negative integer." >&2
+    exit 1
+  fi
+  # 10# keeps values such as 08 in decimal. Bash otherwise treats them as octal.
+  RUNNER_MAX_CAPACITY="$((10#${RUNNER_MAX_CAPACITY}))"
+  RUNNER_WARM_CAPACITY="$((10#${RUNNER_WARM_CAPACITY}))"
+  if ((RUNNER_MAX_CAPACITY < 1)); then
+    echo "SUPERPLANE_RUNNER_MAX_CAPACITY must be a positive integer." >&2
+    exit 1
+  fi
+  if ((RUNNER_WARM_CAPACITY > RUNNER_MAX_CAPACITY)); then
+    echo "SUPERPLANE_RUNNER_WARM_CAPACITY must not exceed SUPERPLANE_RUNNER_MAX_CAPACITY." >&2
+    exit 1
+  fi
+}
+
 write_fleet_manager_config() {
   local architecture fleet_id
   case "$(uname -m)" in
@@ -123,7 +166,8 @@ fleets:
   - id: ${fleet_id}
     provider: docker
     runnerVersion: ${RUNNER_VERSION}
-    maxCapacity: 2
+    warmCapacity: ${RUNNER_WARM_CAPACITY}
+    maxCapacity: ${RUNNER_MAX_CAPACITY}
     spec:
       operatingSystem: linux
       architecture: ${architecture}
@@ -169,6 +213,27 @@ EOF
   chmod 600 rabbitmq.env
 }
 
+write_fleet_manager_env() {
+  if [[ -f "${FLEET_MANAGER_ENV_FILE}" ]] && grep -Eq '^(INSTALLATION_ADMIN_TOKEN|FLEET_MANAGER_API_TOKEN)=.+' "${FLEET_MANAGER_ENV_FILE}"; then
+    chmod 600 "${FLEET_MANAGER_ENV_FILE}"
+    return 0
+  fi
+
+  if ! env_has FLEET_MANAGER_API_TOKEN; then
+    ensure_key FLEET_MANAGER_API_TOKEN "$(random_hex 32)"
+  fi
+  # Current Fleet Manager releases read INSTALLATION_ADMIN_TOKEN.
+  # Newer releases prefer FLEET_MANAGER_API_TOKEN. Write the same value to both.
+  local token
+  token="$(env_value FLEET_MANAGER_API_TOKEN)"
+  umask 077
+  cat >"${FLEET_MANAGER_ENV_FILE}" <<EOF
+INSTALLATION_ADMIN_TOKEN=${token}
+FLEET_MANAGER_API_TOKEN=${token}
+EOF
+  chmod 600 "${FLEET_MANAGER_ENV_FILE}"
+}
+
 ensure_oidc_keys() {
   local oidc_dir="${PWD}/oidc"
   local existing_key key_file error_file
@@ -196,12 +261,13 @@ ensure_oidc_keys() {
 write_new_env() {
   local domain="$1"
   local base_url="https://${domain}"
-  local encryption_master_keys jwt_secret db_password rabbit_password signing_key
+  local encryption_master_keys jwt_secret db_password rabbit_password signing_key fleet_manager_token
   encryption_master_keys="env://host-v1:$(random_base64)"
   jwt_secret="$(random_hex 32)"
   db_password="$(random_hex 16)"
   rabbit_password="$(random_hex 16)"
   signing_key="$(random_hex 32)"
+  fleet_manager_token="$(random_hex 32)"
 
   umask 077
   cat >"${ENV_FILE}" <<EOF
@@ -240,6 +306,7 @@ TEMPLATE_DIR=/app/templates
 ENCRYPTION_MASTER_KEYS=${encryption_master_keys}
 JWT_SECRET=${jwt_secret}
 OIDC_KEYS_PATH=/app/oidc-keys
+FLEET_MANAGER_API_TOKEN=${fleet_manager_token}
 
 OWNER_SETUP_ENABLED=yes
 BLOCK_SIGNUP=yes
@@ -268,6 +335,7 @@ START_FACTORY_CLEANUP_WORKER=yes
 START_FILE_CLEANUP_WORKER=yes
 START_FACTORY_VELOCITY_SYNC_WORKER=yes
 START_PRICE_BOOK_SYNC_WORKER=yes
+START_SEAT_RENEWAL_SYNC_WORKER=yes
 START_PLANNING_SESSION_CLEANUP_WORKER=yes
 START_EVENT_RETENTION_WORKER=yes
 START_RUNNER_API=yes
@@ -275,12 +343,15 @@ START_RUNNER_LOG_COMPACTOR=yes
 START_RUNNER_CLEANUP_WORKER=yes
 RUNNER_ACTIVE_LOG_FS_PATH=${RUNNER_LOG_PATH}
 RUNNER_STABLE_VERSION=${RUNNER_VERSION}
+SUPERPLANE_RUNNER_MAX_CAPACITY=${RUNNER_MAX_CAPACITY}
+SUPERPLANE_RUNNER_WARM_CAPACITY=${RUNNER_WARM_CAPACITY}
 
 SENTRY_DSN=
 SENTRY_ENVIRONMENT=single-host
 
 SUPERPLANE_BEACON_ENABLED=yes
 SUPERPLANE_INSTALLATION_TYPE=single-host
+SUPERPLANE_BILLING_ENABLED=no
 OTEL_ENABLED=no
 
 # To enable email invitations, set:
@@ -324,13 +395,17 @@ upgrade_env() {
   ensure_key START_FILE_CLEANUP_WORKER yes
   ensure_key START_FACTORY_VELOCITY_SYNC_WORKER yes
   ensure_key START_PRICE_BOOK_SYNC_WORKER yes
+  ensure_key START_SEAT_RENEWAL_SYNC_WORKER yes
   ensure_key START_PLANNING_SESSION_CLEANUP_WORKER yes
   ensure_key START_EVENT_RETENTION_WORKER yes
   ensure_key START_RUNNER_API yes
   ensure_key START_RUNNER_LOG_COMPACTOR yes
   ensure_key START_RUNNER_CLEANUP_WORKER yes
   ensure_key RUNNER_ACTIVE_LOG_FS_PATH "${RUNNER_LOG_PATH}"
+  ensure_key SUPERPLANE_BILLING_ENABLED no
   set_key RUNNER_STABLE_VERSION "${RUNNER_VERSION}"
+  set_key SUPERPLANE_RUNNER_MAX_CAPACITY "${RUNNER_MAX_CAPACITY}"
+  set_key SUPERPLANE_RUNNER_WARM_CAPACITY "${RUNNER_WARM_CAPACITY}"
   chmod 600 "${ENV_FILE}"
 }
 
@@ -358,6 +433,8 @@ if [[ -z "${SANITIZED_DOMAIN}" ]]; then
   exit 1
 fi
 
+resolve_runner_capacity
+
 echo ""
 if [[ "${existing_env}" == "yes" ]]; then
   echo "Keeping existing secrets in ${ENV_FILE}."
@@ -371,12 +448,7 @@ ensure_oidc_keys
 write_fleet_manager_config
 write_caddyfile "${SANITIZED_DOMAIN}"
 write_rabbitmq_env
-
-if [[ ! -f fleet-manager.env ]]; then
-  umask 077
-  printf '%s\n' "# Open setup, select This VM, and run the command from that page." >fleet-manager.env
-  chmod 600 fleet-manager.env
-fi
+write_fleet_manager_env
 
 export OIDC_KEYS_HOST_PATH="${PWD}/oidc"
 export OIDC_KEYS_CONTAINER_PATH="/app/oidc-keys"
@@ -406,14 +478,21 @@ if [[ "${SUPERPLANE_SKIP_PULL:-no}" == "yes" ]]; then
   echo "Skipping image pull."
 else
   echo "Pulling Docker images (this may take a while)..."
-  docker compose pull --quiet db rabbitmq caddy app
+  docker compose pull --quiet db rabbitmq caddy app fleet-manager
+  docker pull --quiet "ghcr.io/superplanehq/runner:${RUNNER_VERSION}"
 fi
 
 echo "Running docker compose up --wait --detach..."
+fleet_manager_was_running="$(docker compose ps --status running --quiet fleet-manager)"
 docker compose up --wait --detach
+if [[ -n "${fleet_manager_was_running}" ]]; then
+  echo "Restarting Fleet Manager to apply its configuration..."
+  docker compose restart fleet-manager
+  docker compose up --wait --detach fleet-manager
+fi
 
 echo ""
 echo "SuperPlane is starting via docker compose."
 echo "Visit https://${SANITIZED_DOMAIN} in your browser."
 echo "Runners use runner ${RUNNER_VERSION} and Fleet Manager ${FLEET_MANAGER_VERSION}."
-echo "To start runners, open setup, select This VM, and run the command from that page."
+echo "Runner capacity: ${RUNNER_WARM_CAPACITY} warm, ${RUNNER_MAX_CAPACITY} maximum."

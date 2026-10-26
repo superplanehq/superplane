@@ -43,3 +43,19 @@ func TestPlanningFollowUpRequiresPaymentMethod(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, after, len(before), "a rejected prompt must not be queued")
 }
+
+func TestPlanningFollowUpRequiresActivePlan(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, nil)
+	require.NoError(t, err)
+	before, err := models.ListPlanningSessionMessages(db, session.ID)
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	_, err = SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{FactoryId: session.FactoryID.String(), SessionId: session.ID.String(), Text: "Continue work"})
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	after, err := models.ListPlanningSessionMessages(db, session.ID)
+	require.NoError(t, err)
+	require.Len(t, after, len(before), "a rejected prompt must not be queued")
+}

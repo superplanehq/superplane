@@ -71,7 +71,7 @@ func TestValidateRunCodexSpecRejectsReservedEnv(t *testing.T) {
 
 func strPtr(v string) *string { return &v }
 
-func TestBuildCodexBrokerTaskRunsOrderedSteps(t *testing.T) {
+func TestBuildCodexTaskRunsOrderedSteps(t *testing.T) {
 	t.Parallel()
 
 	spec := RunCodexSpec{
@@ -83,7 +83,7 @@ func TestBuildCodexBrokerTaskRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	task := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
+	task := buildCodexTask(spec, "", nil, nil, nil, false)
 	require.Len(t, task.Commands, 3)
 	assert.Equal(t, "Prepare Codex", task.Commands[0].Name)
 	assert.Equal(t, "Clone repo", task.Commands[1].Name)
@@ -93,7 +93,7 @@ func TestBuildCodexBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
 }
 
-func TestBuildCodexBrokerTaskPassesThinking(t *testing.T) {
+func TestBuildCodexTaskPassesThinking(t *testing.T) {
 	t.Parallel()
 
 	spec := RunCodexSpec{
@@ -103,7 +103,7 @@ func TestBuildCodexBrokerTaskPassesThinking(t *testing.T) {
 			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
 		},
 	}
-	task := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
+	task := buildCodexTask(spec, "", nil, nil, nil, false)
 	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" 'gpt-5' 'medium'`)
 }
 
@@ -116,7 +116,7 @@ func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("fix"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
+	base := buildCodexTask(spec, "", nil, nil, nil, false)
 	got := applyPlanningFollowUp(base, nil, spec)
 	assert.Len(t, got.Commands, len(base.Commands))
 	assert.Len(t, got.Files, len(base.Files))
@@ -132,8 +132,8 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
-	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
+	base := buildCodexTask(spec, "", nil, nil, nil, false)
+	got := applyPlanningFollowUp(base, []runner.TaskEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
 	}}, spec)
@@ -149,7 +149,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentProcessScriptPath).Content)
 }
 
-func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {
+func requireTaskFile(t *testing.T, files []runner.TaskFile, path string) runner.TaskFile {
 	t.Helper()
 	for _, file := range files {
 		if file.Path == path {
@@ -157,5 +157,5 @@ func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) r
 		}
 	}
 	t.Fatalf("missing task file %q", path)
-	return runner.BrokerTaskFile{}
+	return runner.TaskFile{}
 }
