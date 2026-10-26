@@ -177,11 +177,11 @@ describe("Organization billing seat purchases", () => {
     expect(dialog).toHaveTextContent("Resume the subscription before buying seats.");
     expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Confirm purchase" })).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(
-      await within(screen.getByTestId("billing-plans")).findByRole("button", { name: "Keep Team" }),
-    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(screen.getByTestId("billing-plans")).getByRole("button", { name: "Keep Team" })).toBeVisible(),
+    );
     expect(purchaseRequests).toHaveLength(0);
   });
 

@@ -13,6 +13,9 @@ const (
 	// RBAC is the custom role and group implementation. The license features
 	// custom_roles and groups are checked inside that implementation.
 	RBAC Key = "rbac"
+
+	// Billing is the backend billing capability. It has no runtime license check.
+	Billing Key = "billing"
 )
 
 // Registry maps a capability name to the code that implements it. Callers
@@ -23,8 +26,8 @@ type Registry struct {
 	values map[Key]any
 }
 
-// NewRegistry registers the Community implementation of each capability. A
-// Community implementation refuses the operation.
+// NewRegistry registers Community implementations for licensed capabilities.
+// Billing stays unbound until the server installs its implementation.
 func NewRegistry() *Registry {
 	registry := &Registry{values: map[Key]any{}}
 	registry.Register(RBAC, communityRbac{})

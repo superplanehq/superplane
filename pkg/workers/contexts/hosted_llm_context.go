@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -89,7 +90,7 @@ func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model 
 }
 
 func (c *HostedLLMContext) AssertCreditAvailable() error {
-	return models.AssertHostedRunAllowed(database.Conn(), c.organizationID, c.factoryID)
+	return billing.AssertHostedRunAllowed(database.Conn(), c.organizationID, c.factoryID)
 }
 
 func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {

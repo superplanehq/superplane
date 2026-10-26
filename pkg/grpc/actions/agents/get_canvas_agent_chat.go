@@ -8,8 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 )
 
@@ -32,7 +32,7 @@ func GetCanvasAgentChat(ctx context.Context, svc AgentsService, orgID, userID st
 
 	session, err := svc.EnsureSession(ctx, org, user, canvas)
 	if err != nil {
-		if errors.Is(err, models.ErrPaymentMethodRequired) || errors.Is(err, models.ErrHostedSubscriptionRequired) {
+		if errors.Is(err, billing.ErrPaymentMethodRequired) || errors.Is(err, billing.ErrHostedSubscriptionRequired) {
 			return nil, grpcerrors.FailedPrecondition(err, err.Error())
 		}
 		if errors.Is(err, agents.ErrSessionForbidden) {
