@@ -38,7 +38,19 @@ type Runner struct {
 	CreatedAt         time.Time  `json:"createdAt"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
 	TerminatedAt      *time.Time `json:"terminatedAt,omitempty"`
+	ProviderDeletedAt *time.Time `json:"providerDeletedAt,omitempty"`
 	Ephemeral         bool       `json:"ephemeral"`
+}
+
+type ListRunnersRequest struct {
+	States  []string
+	Limit   int
+	AfterID string
+}
+
+type RunnerListPage struct {
+	Runners     []Runner `json:"runners"`
+	HasNextPage bool     `json:"hasNextPage"`
 }
 
 type Capacity struct {

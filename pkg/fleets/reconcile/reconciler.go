@@ -34,8 +34,12 @@ type AdminClient interface {
 	) (adminclient.CreateRunnerResponse, error)
 	DescribeRunner(context.Context, string, string) (adminclient.Runner, error)
 	ListRunners(context.Context, string, []string, int) ([]adminclient.Runner, error)
+	ListRunnersPage(context.Context, string, adminclient.ListRunnersRequest) (adminclient.RunnerListPage, error)
 	DeleteRunner(context.Context, string, string, []string) (adminclient.Runner, error)
+	MarkRunnerProviderDeleted(context.Context, string, string) (adminclient.Runner, error)
 }
+
+const providerDeletionGrace = time.Minute
 
 type ArtifactResolver interface {
 	Resolve(context.Context, string, string, string) (artifact.Artifact, error)
@@ -186,6 +190,9 @@ func (r *Reconciler) Reconcile(ctx context.Context) error {
 		"cleaning up terminated provider resources",
 		slog.Int("provider_resources", len(resources)),
 	)
+	if err := r.confirmProviderDeletion(ctx, resourcesByRunner); err != nil {
+		reconcileErrors = append(reconcileErrors, err)
+	}
 	if err := r.deleteTerminatedResources(ctx, resourcesByRunner); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
@@ -247,6 +254,9 @@ func (r *Reconciler) reconcileDisabledFleet(ctx context.Context) error {
 		"cleaning up terminated provider resources",
 		slog.Int("provider_resources", len(resources)),
 	)
+	if err := r.confirmProviderDeletion(ctx, resourcesByRunner); err != nil {
+		reconcileErrors = append(reconcileErrors, err)
+	}
 	if err := r.deleteTerminatedResources(ctx, resourcesByRunner); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
@@ -512,6 +522,54 @@ func (r *Reconciler) deleteTerminatedResources(
 		}
 	}
 	return errors.Join(deleteErrors...)
+}
+
+func (r *Reconciler) confirmProviderDeletion(
+	ctx context.Context,
+	resourcesByRunner map[string][]provider.Resource,
+) error {
+	var markErrors []error
+	request := adminclient.ListRunnersRequest{
+		States: []string{adminclient.RunnerStateTerminated},
+		Limit:  listLimit,
+	}
+	for {
+		page, err := r.admin.ListRunnersPage(ctx, r.config.FleetID, request)
+		if err != nil {
+			return errors.Join(append(markErrors, fmt.Errorf("list terminated runners for fleet %s: %w", r.config.FleetID, err))...)
+		}
+		for _, runner := range page.Runners {
+			if runner.ProviderDeletedAt != nil || len(resourcesByRunner[runner.ID]) > 0 {
+				continue
+			}
+			if runner.TerminatedAt == nil || time.Since(*runner.TerminatedAt) < providerDeletionGrace {
+				continue
+			}
+			if err := r.markProviderDeleted(ctx, runner.ID); err != nil {
+				markErrors = append(markErrors, err)
+			}
+		}
+		if !page.HasNextPage {
+			return errors.Join(markErrors...)
+		}
+		nextID := ""
+		if len(page.Runners) > 0 {
+			nextID = page.Runners[len(page.Runners)-1].ID
+		}
+		if nextID == "" || nextID == request.AfterID {
+			return errors.Join(append(markErrors, fmt.Errorf("list terminated runners for fleet %s: pagination cursor did not advance", r.config.FleetID))...)
+		}
+		request.AfterID = nextID
+	}
+}
+
+func (r *Reconciler) markProviderDeleted(ctx context.Context, runnerID string) error {
+	r.logAction("confirming provider VM deletion", slog.String("runner_id", runnerID))
+	_, err := r.admin.MarkRunnerProviderDeleted(ctx, r.config.FleetID, runnerID)
+	if err == nil || adminclient.IsStatus(err, http.StatusNotFound) {
+		return nil
+	}
+	return fmt.Errorf("confirm provider deletion for runner %s: %w", runnerID, err)
 }
 
 func (r *Reconciler) terminateRunners(

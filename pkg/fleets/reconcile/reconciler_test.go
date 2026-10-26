@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -28,6 +29,7 @@ type fakeAdmin struct {
 	createResponse    adminclient.CreateRunnerResponse
 	createRequests    []adminclient.CreateRunnerRequest
 	deletedRunnerIDs  []string
+	providerDeleted   []string
 	deleteStates      [][]string
 	deleteResponse    *adminclient.Runner
 	deleteError       error
@@ -99,6 +101,34 @@ func limitedRunners(runners []adminclient.Runner, limit int) []adminclient.Runne
 	return runners[:limit]
 }
 
+func (f *fakeAdmin) ListRunnersPage(
+	_ context.Context,
+	_ string,
+	request adminclient.ListRunnersRequest,
+) (adminclient.RunnerListPage, error) {
+	runners := f.terminatedRunners
+	if request.AfterID != "" {
+		for i, runner := range runners {
+			if runner.ID == request.AfterID {
+				runners = runners[i+1:]
+				break
+			}
+		}
+	}
+	return adminclient.RunnerListPage{
+		Runners:     limitedRunners(runners, request.Limit),
+		HasNextPage: request.Limit > 0 && len(runners) > request.Limit,
+	}, nil
+}
+
+func (f *fakeAdmin) MarkRunnerProviderDeleted(
+	_ context.Context,
+	_, runnerID string,
+) (adminclient.Runner, error) {
+	f.providerDeleted = append(f.providerDeleted, runnerID)
+	return adminclient.Runner{ID: runnerID, State: adminclient.RunnerStateTerminated}, nil
+}
+
 func (f *fakeAdmin) DeleteRunner(
 	_ context.Context,
 	_, runnerID string, states []string,
@@ -141,6 +171,7 @@ type fakeProvider struct {
 	createRequest provider.CreateRequest
 	bootstrap     provider.RunnerBootstrap
 	createError   error
+	deleteError   error
 	deleted       []provider.Resource
 	events        *[]string
 }
@@ -178,7 +209,7 @@ func (f *fakeProvider) Create(
 
 func (f *fakeProvider) Delete(_ context.Context, resource provider.Resource) error {
 	f.deleted = append(f.deleted, resource)
-	return nil
+	return f.deleteError
 }
 
 func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
@@ -355,6 +386,134 @@ func TestTerminatedRunnerDeletesTaggedProviderResource(t *testing.T) {
 	if len(resourceProvider.deleted) != 1 ||
 		resourceProvider.deleted[0].ID != "resource-terminated" {
 		t.Fatalf("deleted resources = %#v", resourceProvider.deleted)
+	}
+}
+
+func TestProviderDeletionConfirmation(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		resourceExists bool
+		terminatedAgo  time.Duration
+		deleteError    error
+		wantConfirmed  bool
+	}{
+		{name: "deletion accepted but resource still listed", resourceExists: true, terminatedAgo: 2 * time.Minute},
+		{name: "failed deletion", resourceExists: true, deleteError: errors.New("provider unavailable")},
+		{name: "absent resource after grace", terminatedAgo: 2 * time.Minute, wantConfirmed: true},
+		{name: "absent resource during grace", terminatedAgo: time.Second},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			admin := newFakeAdmin()
+			terminatedAt := time.Now().Add(-test.terminatedAgo)
+			admin.terminatedRunners = []adminclient.Runner{{
+				ID: "runner-terminated", FleetID: "fleet-a",
+				State: adminclient.RunnerStateTerminated, TerminatedAt: &terminatedAt,
+			}}
+			resourceProvider := &fakeProvider{deleteError: test.deleteError}
+			if test.resourceExists {
+				resourceProvider.resources = []provider.Resource{{
+					ID: "resource-terminated", RunnerID: "runner-terminated", FleetID: "fleet-a",
+				}}
+			}
+			reconciler := newTestReconciler(t, admin, &fakeArtifactResolver{}, resourceProvider, 0, 0)
+			err := reconciler.Reconcile(context.Background())
+			if !errors.Is(err, test.deleteError) {
+				t.Fatalf("reconcile error = %v, want %v", err, test.deleteError)
+			}
+			confirmed := slices.Contains(admin.providerDeleted, "runner-terminated")
+			if confirmed != test.wantConfirmed {
+				t.Fatalf("provider deletion confirmed = %v, want %v", confirmed, test.wantConfirmed)
+			}
+		})
+	}
+}
+
+func TestProviderDeletionConfirmationBeyondFirstPage(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		for _, pageFails := range []bool{false, true} {
+			t.Run(fmt.Sprintf("enabled=%v/pageFails=%v", enabled, pageFails), func(t *testing.T) {
+				admin := newFakeAdmin()
+				admin.fleet.Enabled = enabled
+				terminatedAt := time.Now().Add(-2 * time.Minute)
+				confirmedAt := time.Now().Add(-time.Minute)
+				confirmed := make([]map[string]any, listLimit)
+				for i := range confirmed {
+					confirmed[i] = map[string]any{
+						"id": fmt.Sprintf("old-runner-%d", i), "state": adminclient.RunnerStateTerminated,
+						"terminatedAt": terminatedAt, "providerDeletedAt": confirmedAt,
+					}
+				}
+				var marked []string
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+					const fleetPath = "/admin/api/installation/fleets/fleet-a"
+					var response any
+					switch request.URL.Path {
+					case fleetPath:
+						response = map[string]any{"fleet": admin.fleet}
+					case fleetPath + "/capacity":
+						response = admin.capacity
+					case fleetPath + "/runners":
+						if request.URL.Query().Get("states") != adminclient.RunnerStateTerminated {
+							response = map[string]any{"runners": []adminclient.Runner{}}
+							break
+						}
+						if request.URL.Query().Get("limit") != "1000" {
+							t.Errorf("page limit = %q", request.URL.Query().Get("limit"))
+						}
+						switch cursor := request.URL.Query().Get("afterId"); cursor {
+						case "":
+							response = map[string]any{"runners": confirmed, "hasNextPage": true}
+						case "old-runner-999":
+							if pageFails {
+								http.Error(w, "page unavailable", http.StatusServiceUnavailable)
+								return
+							}
+							response = map[string]any{"runners": []adminclient.Runner{{
+								ID: "runner-new", State: adminclient.RunnerStateTerminated, TerminatedAt: &terminatedAt,
+							}}, "hasNextPage": false}
+						default:
+							t.Errorf("unexpected cursor = %q", cursor)
+							http.Error(w, "unexpected cursor", http.StatusBadRequest)
+							return
+						}
+					default:
+						if request.Method != http.MethodPost || !strings.HasSuffix(request.URL.Path, ":provider-deleted") {
+							t.Errorf("unexpected request = %s %s", request.Method, request.URL.Path)
+							http.NotFound(w, request)
+							return
+						}
+						id := strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, fleetPath+"/runners/"), ":provider-deleted")
+						marked = append(marked, id)
+						response = map[string]any{"runner": adminclient.Runner{ID: id}}
+					}
+					if err := json.NewEncoder(w).Encode(response); err != nil {
+						t.Error(err)
+					}
+				}))
+				defer server.Close()
+				client, err := adminclient.New(server.URL, "test-token", server.Client())
+				if err != nil {
+					t.Fatal(err)
+				}
+				reconciler := newTestReconciler(t, client, &fakeArtifactResolver{}, &fakeProvider{}, 0, 0)
+				err = reconciler.Reconcile(t.Context())
+				if pageFails {
+					if !adminclient.IsStatus(err, http.StatusServiceUnavailable) {
+						t.Fatalf("reconcile error = %v, want page failure", err)
+					}
+					if len(marked) != 0 {
+						t.Fatalf("confirmed runners = %v, want none", marked)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !slices.Equal(marked, []string{"runner-new"}) {
+					t.Fatalf("confirmed runners = %v, want only runner-new", marked)
+				}
+			})
+		}
 	}
 }
 
