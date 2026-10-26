@@ -196,6 +196,53 @@ service Factories {
     };
   }
 
+  rpc CreateFactoryCustomVerification(CreateFactoryCustomVerificationRequest) returns (CreateFactoryCustomVerificationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/custom-verifications"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create custom verification";
+      description: "Creates a managed Verify automation with prompt and bash steps";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactoryCustomVerification(DescribeFactoryCustomVerificationRequest) returns (DescribeFactoryCustomVerificationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/custom-verifications/{automation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe custom verification";
+      description: "Returns the focused settings for a managed Verify automation";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryCustomVerification(UpdateFactoryCustomVerificationRequest) returns (UpdateFactoryCustomVerificationResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/custom-verifications/{automation_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update custom verification";
+      description: "Updates the focused settings and managed graph for a Verify automation";
+      tags: "Factory";
+    };
+  }
+
+  rpc RunFactoryCustomVerification(RunFactoryCustomVerificationRequest) returns (RunFactoryCustomVerificationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/custom-verifications/{automation_id}:run"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Run custom verification";
+      description: "Starts one managed Verify automation for one task";
+      tags: "Factory";
+    };
+  }
+
   rpc PreviewFactorySchedule(PreviewFactoryScheduleRequest) returns (PreviewFactoryScheduleResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/scheduled-intake/preview"
@@ -1216,6 +1263,81 @@ message CreateFactoryAutomationRequest {
 
 message CreateFactoryAutomationResponse {
   Factory.Automation automation = 1;
+}
+
+message FactoryCustomVerification {
+  enum StartMode {
+    START_MODE_UNSPECIFIED = 0;
+    START_MODE_MANUAL = 1;
+    START_MODE_AUTOMATIC = 2;
+  }
+
+  message Step {
+    enum Type {
+      TYPE_UNSPECIFIED = 0;
+      TYPE_PROMPT = 1;
+      TYPE_BASH = 2;
+    }
+
+    string name = 1;
+    Type type = 2;
+    string prompt = 3;
+    string command = 4;
+    string working_directory = 5;
+    repeated string secrets = 6;
+  }
+
+  message Settings {
+    StartMode start_mode = 1;
+    FactoryAppTemplateAgent agent = 2;
+    repeated Step steps = 3;
+    string icon = 4;
+  }
+
+  Factory.Automation automation = 1;
+  Settings settings = 2;
+  string provider = 3;
+}
+
+message CreateFactoryCustomVerificationRequest {
+  string factory_id = 1;
+  string name = 2;
+  FactoryCustomVerification.Settings settings = 3;
+}
+
+message CreateFactoryCustomVerificationResponse {
+  FactoryCustomVerification verification = 1;
+}
+
+message DescribeFactoryCustomVerificationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+}
+
+message DescribeFactoryCustomVerificationResponse {
+  FactoryCustomVerification verification = 1;
+}
+
+message UpdateFactoryCustomVerificationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+  string name = 3;
+  FactoryCustomVerification.Settings settings = 4;
+}
+
+message UpdateFactoryCustomVerificationResponse {
+  FactoryCustomVerification verification = 1;
+}
+
+message RunFactoryCustomVerificationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+  string work_order_id = 3;
+}
+
+message RunFactoryCustomVerificationResponse {
+  string run_id = 1;
+  string event_id = 2;
 }
 
 message PreviewFactoryScheduleRequest {
