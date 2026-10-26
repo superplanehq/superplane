@@ -57,10 +57,12 @@ func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error
 	}
 
 	return core.HostedLLMAccess{
-		APIKey:        apiKey,
-		ManagementKey: managementKey,
-		BaseURL:       row.BaseURL,
-		AllowedModels: allowed,
+		ResourceID:         row.ID.String(),
+		CredentialIdentity: llm.CredentialIdentity(apiKey, managementKey, row.BaseURL),
+		APIKey:             apiKey,
+		ManagementKey:      managementKey,
+		BaseURL:            row.BaseURL,
+		AllowedModels:      allowed,
 	}, nil
 }
 

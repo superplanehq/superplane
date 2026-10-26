@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -172,6 +173,19 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var runID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		// Serialize task mutations before event, run, and planning-session
+		// locks, matching cancellation, merge, and line replacement.
+		if event.ExecutionID == nil {
+			canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
+			if err != nil {
+				return err
+			}
+			if canvas.FactoryID != nil {
+				if err := models.LockOrganizationTaskAdmission(tx, canvas.OrganizationID); err != nil {
+					return err
+				}
+			}
+		}
 		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
 			logger.Info("Event already being processed - skipping")
@@ -190,6 +204,13 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		return nil
 	})
 
+	if errors.Is(err, models.ErrWorkOrderBusy) {
+		// Keep replacement work pending until its earlier run subtree stops
+		// or the work order merge finishes.
+		outcome = executorOutcomeSkipped
+		reason = executorReasonNone
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -299,6 +320,9 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, run.ID, nil
 	}
 
+	if err := models.CheckTaskRootEventReady(tx, canvas, event); err != nil {
+		return nil, uuid.Nil, err
+	}
 	if err := models.MaybeAttachAnalysisSession(tx, canvas, event, run); err != nil {
 		return nil, uuid.Nil, fmt.Errorf("attach analysis session for run %s: %w", run.ID, err)
 	}

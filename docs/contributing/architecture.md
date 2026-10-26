@@ -36,13 +36,19 @@ The event processing system is the engine that drives workflow execution. It ope
 
 2. **Event Routing**: The WorkflowEventRouter worker periodically scans for pending events and routes them through the workflow graph. It identifies downstream nodes connected via edges and creates queue items for nodes that should execute.
 
-3. **Queue Processing**: Queue items are created for each node that should receive the event. These items are published to RabbitMQ for asynchronous processing.
+3. **Queue Processing**: The router saves node queue items in PostgreSQL and publishes change notifications through RabbitMQ. The node queue worker admits items when their node queue has capacity. Periodic database scans retry waiting work.
 
-4. **Component Execution**: Workers consume queue items and execute the corresponding components. Components process the event data, perform their actions, and emit new events upon completion.
+4. **Component Execution**: The node queue worker creates executions from admitted queue items. Execution workers run the components, which process event data, perform actions, and emit output events.
 
 5. **Event Propagation**: When a component finishes, it emits a new event that flows to its downstream nodes, continuing the workflow execution cycle.
 
 This architecture enables parallel execution of independent workflow branches, reliable event delivery, and scalable processing through worker queues.
+
+Runner assignment enforces the organization parallel runner limit across all
+workspaces and fleets. Each reserved or running integrated job uses one slot.
+Line steps and canvas nodes retain their separate execution limits.
+See [Runner queues and limits](../design/task-queue.md) for queue positions,
+cancellation, timeout accounting, and recovery behavior.
 
 ## Authentication & Authorization
 

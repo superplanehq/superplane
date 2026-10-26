@@ -166,6 +166,7 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 
 	finished := false
 	runCancellations := &RunCancellationNotifier{}
+	runnerChanges := &RunnerTaskChangeNotifier{}
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		execution, err := models.LockCancellingNodeExecutionInActiveCanvas(tx, execution.ID)
 		if err != nil {
@@ -178,7 +179,7 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 			return err
 		}
 
-		if err := w.cancelComponent(tx, logger, canvas, execution, runCancellations); err != nil {
+		if err := w.cancelComponent(tx, logger, canvas, execution, runCancellations, runnerChanges); err != nil {
 			return err
 		}
 
@@ -204,6 +205,7 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 	}
 
 	runCancellations.Publish()
+	runnerChanges.Publish()
 
 	if err := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); err != nil {
 		w.logger.Errorf("failed to publish execution finished RabbitMQ message: %v", err)
@@ -218,6 +220,7 @@ func (w *ExecutionTerminator) cancelComponent(
 	canvas *models.Canvas,
 	execution *models.CanvasNodeExecution,
 	runCancellations *RunCancellationNotifier,
+	runnerChanges *RunnerTaskChangeNotifier,
 ) error {
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
@@ -255,12 +258,17 @@ func (w *ExecutionTerminator) cancelComponent(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, orgUUID, w.authService, nil),
+		Secrets:        contexts.NewSecretsContext(tx, w.registry, orgUUID, w.encryptor),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, canvas, node, execution)),
 		Usage:          contexts.NewUsageContext(orgUUID, execution),
 		HostedLLM:      contexts.NewHostedLLMContext(tx, w.encryptor, orgUUID, canvas.FactoryID),
-		RunnerTasks:    contexts.NewRunnerTaskContext(tx, w.encryptor, orgUUID),
+		RunnerTasks:    runnerChanges.Bind(contexts.NewRunnerTaskContext(tx, w.encryptor, orgUUID)),
 	}
+
+	ctx.RunnerTasks.(*contexts.RunnerTaskContext).
+		WithRunScope(execution.RunID).
+		WithSecrets(ctx.Secrets.(*contexts.SecretsContext))
 
 	if node.AppInstallationID != nil {
 		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)

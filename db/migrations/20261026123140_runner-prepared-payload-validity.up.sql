@@ -1,0 +1,1 @@
+ALTER TABLE runner_task_preparations ADD COLUMN prepared_valid_until timestamptz;

@@ -116,8 +116,11 @@ export function getRunRefStatus(ref: CanvasesCanvasRunRef): RunStatusKey {
 }
 
 function getExecutionStatusLabel(execution: CanvasesCanvasNodeExecutionRef) {
-  if (execution.state === "STATE_PENDING") return "Pending";
   if (execution.state === "STATE_CANCELLING") return "Cancelling";
+  if (execution.runnerJob?.state === "queued") return "Waiting for runner";
+  if (execution.runnerJob?.state === "reserved") return "Starting runner";
+  if (execution.runnerJob?.state === "running") return "Running";
+  if (execution.state === "STATE_PENDING") return "Pending";
   if (execution.state === "STATE_STARTED") return "Running";
   if (execution.result === "RESULT_FAILED") return "Failed";
   if (execution.result === "RESULT_CANCELLED") return "Cancelled";

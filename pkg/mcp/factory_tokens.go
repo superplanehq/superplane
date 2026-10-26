@@ -3,9 +3,7 @@ package mcp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,8 +17,6 @@ import (
 // Providers such as Sentry keep only the current refresh token and the one
 // before it. Refreshing on every use rotates past the token we stored.
 const accessTokenRefreshSkew = 2 * time.Minute
-
-const factoryAgentResourceRefreshLockPrefix = "factory-mcp-oauth-refresh:"
 
 // EncryptResourceSecret encrypts a workspace MCP secret with the resource ID as AAD.
 func EncryptResourceSecret(ctx context.Context, encryptor crypto.Encryptor, resourceID uuid.UUID, plaintext string) ([]byte, error) {
@@ -47,24 +43,47 @@ func StoreOAuthTokens(
 	tokens *TokenResponse,
 ) error {
 	encryptor = encryption.ForDB(db, encryptor)
+	encrypted, err := encryptOAuthTokens(ctx, encryptor, resource, tokens)
+	if err != nil {
+		return err
+	}
+	return storeEncryptedOAuthTokens(db, resource, encrypted)
+}
+
+type encryptedOAuthTokens struct {
+	refresh   []byte
+	access    []byte
+	expiresAt time.Time
+}
+
+func encryptOAuthTokens(ctx context.Context, encryptor crypto.Encryptor, resource *models.FactoryAgentResource, tokens *TokenResponse) (*encryptedOAuthTokens, error) {
+	prepared := &encryptedOAuthTokens{expiresAt: time.Now().Add(TokenTTL(tokens))}
 	if refresh := strings.TrimSpace(tokens.RefreshToken); refresh != "" {
-		encrypted, err := EncryptResourceSecret(ctx, encryptor, resource.ID, refresh)
+		var err error
+		prepared.refresh, err = EncryptResourceSecret(ctx, encryptor, resource.ID, refresh)
 		if err != nil {
-			return err
-		}
-		if err := resource.UpsertSecret(db, models.FactoryAgentResourceSecretRefreshToken, encrypted); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	access, err := EncryptResourceSecret(ctx, encryptor, resource.ID, tokens.AccessToken)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if err := resource.UpsertSecret(db, models.FactoryAgentResourceSecretAccessToken, access); err != nil {
+	prepared.access = access
+	return prepared, nil
+}
+
+func storeEncryptedOAuthTokens(db *gorm.DB, resource *models.FactoryAgentResource, tokens *encryptedOAuthTokens) error {
+	if len(tokens.refresh) > 0 {
+		if err := resource.UpsertSecret(db, models.FactoryAgentResourceSecretRefreshToken, tokens.refresh); err != nil {
+			return err
+		}
+	}
+	if err := resource.UpsertSecret(db, models.FactoryAgentResourceSecretAccessToken, tokens.access); err != nil {
 		return err
 	}
 	metadata := resource.OAuthMetadata.Data()
-	metadata.AccessTokenExpiresAt = time.Now().Add(TokenTTL(tokens)).UTC().Format(time.RFC3339)
+	metadata.AccessTokenExpiresAt = tokens.expiresAt.UTC().Format(time.RFC3339)
 	return resource.SetOAuthMetadata(db, metadata)
 }
 
@@ -87,190 +106,11 @@ func DecryptedResourceSecret(
 	return DecryptResourceSecret(ctx, encryptor, resource.ID, secret.Value)
 }
 
-// MintFactoryAgentResourceAccessToken returns a usable OAuth access token for a workspace MCP server.
-// It reuses the stored access token until shortly before expiry, and refreshes under a database lock.
-func MintFactoryAgentResourceAccessToken(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
-	httpClient HTTPDoer,
-	db *gorm.DB,
-	resource *models.FactoryAgentResource,
-) (string, error) {
-	return mintFactoryAgentResourceAccessToken(ctx, encryptor, httpClient, db, resource, accessTokenRefreshSkew)
-}
-
-// MintFactoryAgentResourceAccessTokenWithLifetime returns a token that remains
-// valid for at least minRemaining. Agent runs pass the execution timeout
-// because they copy the token into fixed headers for the whole run.
-func MintFactoryAgentResourceAccessTokenWithLifetime(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
-	httpClient HTTPDoer,
-	db *gorm.DB,
-	resource *models.FactoryAgentResource,
-	minRemaining time.Duration,
-) (string, error) {
-	if minRemaining < accessTokenRefreshSkew {
-		minRemaining = accessTokenRefreshSkew
-	}
-	return mintFactoryAgentResourceAccessToken(ctx, encryptor, httpClient, db, resource, minRemaining)
-}
-
-func mintFactoryAgentResourceAccessToken(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
-	httpClient HTTPDoer,
-	db *gorm.DB,
-	resource *models.FactoryAgentResource,
-	minRemaining time.Duration,
-) (string, error) {
-	if resource.Config.Data().MCPAuth() != models.FactoryAgentResourceAuthOAuth {
-		return "", nil
-	}
-	unlock := lockFactoryAgentResourceRefresh(resource.ID)
-	defer unlock()
-
-	var accessToken string
-	var refreshFailure error
-	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := lockFactoryAgentResourceRefreshTx(tx, resource.ID); err != nil {
-			return err
-		}
-		if err := reloadFactoryAgentResource(tx, resource); err != nil {
-			return err
-		}
-
-		now := time.Now()
-		expiresAt := accessTokenExpiresAt(resource)
-		currentAccess, err := DecryptedResourceSecret(ctx, encryptor, tx, resource, models.FactoryAgentResourceSecretAccessToken)
-		if err != nil {
-			return err
-		}
-		if currentAccess != "" && accessTokenCurrent(expiresAt, now, minRemaining) {
-			accessToken = currentAccess
-			return markOAuthConnected(tx, resource)
-		}
-
-		refresh, err := DecryptedResourceSecret(ctx, encryptor, tx, resource, models.FactoryAgentResourceSecretRefreshToken)
-		if err != nil {
-			return err
-		}
-		if refresh == "" {
-			if err := resource.SetOAuthStatus(tx, models.FactoryAgentResourceOAuthNeedsReconnect, "sign in again", nil); err != nil {
-				return err
-			}
-			refreshFailure = fmt.Errorf("MCP connection %s is not signed in", resource.Name)
-			return nil
-		}
-
-		metadata := resource.OAuthMetadata.Data()
-		clientSecret, _ := DecryptedResourceSecret(ctx, encryptor, tx, resource, models.FactoryAgentResourceSecretClientSecret)
-		oauthCtx, cancel := TimeoutContext(ctx)
-		defer cancel()
-		tokens, err := RefreshAccessToken(oauthCtx, httpClient, metadata.TokenEndpoint, metadata.ClientID, clientSecret, refresh, metadata.Resource)
-		if err != nil {
-			minted, err := finishRefreshError(ctx, encryptor, tx, resource, refresh, currentAccess, expiresAt, err)
-			if err != nil {
-				return err
-			}
-			accessToken = minted.accessToken
-			refreshFailure = minted.failure
-			return nil
-		}
-		if err := StoreOAuthTokens(ctx, encryptor, tx, resource, tokens); err != nil {
-			return err
-		}
-		if err := markOAuthConnected(tx, resource); err != nil {
-			return err
-		}
-		accessToken = tokens.AccessToken
-		return nil
-	})
-	if err != nil {
-		return "", err
-	}
-	if refreshFailure != nil {
-		return "", refreshFailure
-	}
-	return accessToken, nil
-}
-
-type mintedToken struct {
-	accessToken string
-	failure     error
-}
-
-func finishRefreshError(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
-	tx *gorm.DB,
-	resource *models.FactoryAgentResource,
-	refresh string,
-	currentAccess string,
-	expiresAt time.Time,
-	cause error,
-) (mintedToken, error) {
-	var endpointErr *TokenEndpointError
-	if !errors.As(cause, &endpointErr) || !endpointErr.RejectsGrant() {
-		if currentAccess != "" && accessTokenUnexpired(expiresAt, time.Now()) {
-			return mintedToken{accessToken: currentAccess}, nil
-		}
-		return mintedToken{}, cause
-	}
-
-	latestRefresh, err := DecryptedResourceSecret(ctx, encryptor, tx, resource, models.FactoryAgentResourceSecretRefreshToken)
-	if err != nil {
-		return mintedToken{}, err
-	}
-	if latestRefresh != refresh {
-		return adoptRotatedAccessToken(ctx, encryptor, tx, resource, cause)
-	}
-
-	if err := resource.SetOAuthStatus(tx, models.FactoryAgentResourceOAuthNeedsReconnect, UserFacingOAuthError(cause), nil); err != nil {
-		return mintedToken{}, err
-	}
-	return mintedToken{failure: cause}, nil
-}
-
-func adoptRotatedAccessToken(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
-	tx *gorm.DB,
-	resource *models.FactoryAgentResource,
-	cause error,
-) (mintedToken, error) {
-	latestAccess, err := DecryptedResourceSecret(ctx, encryptor, tx, resource, models.FactoryAgentResourceSecretAccessToken)
-	if err != nil {
-		return mintedToken{}, err
-	}
-	if latestAccess == "" {
-		return mintedToken{}, cause
-	}
-	if err := markOAuthConnected(tx, resource); err != nil {
-		return mintedToken{}, err
-	}
-	return mintedToken{accessToken: latestAccess}, nil
-}
-
 func markOAuthConnected(tx *gorm.DB, resource *models.FactoryAgentResource) error {
 	if resource.OAuthStatus == models.FactoryAgentResourceOAuthConnected {
 		return nil
 	}
 	return resource.SetOAuthStatus(tx, models.FactoryAgentResourceOAuthConnected, "", resource.OAuthConnectedBy)
-}
-
-func reloadFactoryAgentResource(tx *gorm.DB, resource *models.FactoryAgentResource) error {
-	var fresh models.FactoryAgentResource
-	err := tx.Where("id = ?", resource.ID).First(&fresh).Error
-	if err != nil {
-		return err
-	}
-	resource.OAuthStatus = fresh.OAuthStatus
-	resource.OAuthError = fresh.OAuthError
-	resource.OAuthMetadata = fresh.OAuthMetadata
-	resource.OAuthConnectedBy = fresh.OAuthConnectedBy
-	resource.OAuthConnectedAt = fresh.OAuthConnectedAt
-	return nil
 }
 
 func accessTokenExpiresAt(resource *models.FactoryAgentResource) time.Time {
@@ -296,13 +136,6 @@ func accessTokenUnexpired(expiresAt, now time.Time) bool {
 	return !expiresAt.IsZero() && expiresAt.After(now)
 }
 
-func lockFactoryAgentResourceRefreshTx(tx *gorm.DB, id uuid.UUID) error {
-	return tx.Exec(
-		"SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
-		factoryAgentResourceRefreshLockPrefix+id.String(),
-	).Error
-}
-
 // UserFacingOAuthError returns a short error for the MCP servers page.
 func UserFacingOAuthError(err error) string {
 	if err == nil {
@@ -313,13 +146,4 @@ func UserFacingOAuthError(err error) string {
 		return "the MCP server refused the SuperPlane OAuth client"
 	}
 	return message
-}
-
-var factoryAgentResourceRefreshLocks sync.Map
-
-func lockFactoryAgentResourceRefresh(id uuid.UUID) func() {
-	value, _ := factoryAgentResourceRefreshLocks.LoadOrStore(id.String(), &sync.Mutex{})
-	lock := value.(*sync.Mutex)
-	lock.Lock()
-	return lock.Unlock
 }

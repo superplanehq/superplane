@@ -36,15 +36,16 @@ func TestCreateRunnerUsesFleetPathAndAdminBearer(t *testing.T) {
 		t.Fatal(err)
 	}
 	response, err := client.CreateRunner(context.Background(), "linux-amd64", CreateRunnerRequest{
-		IdempotencyKey: "fleet-manager/linux-amd64/generic/request-1",
+		IdempotencyKey: "fleet-manager/linux-amd64/task/job-1",
 		Ephemeral:      true,
+		TaskID:         "job-1",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if received.IdempotencyKey != "fleet-manager/linux-amd64/generic/request-1" ||
-		!received.Ephemeral {
+	if received.IdempotencyKey != "fleet-manager/linux-amd64/task/job-1" ||
+		!received.Ephemeral || received.TaskID != "job-1" {
 		t.Fatalf("request = %#v", received)
 	}
 	if response.Runner.ID != "runner-1" || response.Runner.RunnerVersion != "1.2.3" {
@@ -127,6 +128,9 @@ func TestDeleteRunnerSendsStatePrecondition(t *testing.T) {
 		if states := r.URL.Query()["states"]; len(states) != 2 || states[0] != RunnerStatePending || states[1] != RunnerStateIdle {
 			t.Errorf("state precondition = %q", r.URL.RawQuery)
 		}
+		if r.URL.Query().Get("requireUnassigned") != "true" {
+			t.Errorf("missing assignment precondition: %q", r.URL.RawQuery)
+		}
 		_, _ = w.Write([]byte(`{"runner":{"id":"runner-1","state":"terminated"}}`))
 	}))
 	defer server.Close()
@@ -134,7 +138,7 @@ func TestDeleteRunnerSendsStatePrecondition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	runner, err := client.DeleteRunner(t.Context(), "fleet-a", "runner-1", []string{RunnerStatePending, RunnerStateIdle})
+	runner, err := client.DeleteRunner(t.Context(), "fleet-a", "runner-1", []string{RunnerStatePending, RunnerStateIdle}, DeleteRunnerOptions{RequireUnassigned: true})
 	if err != nil {
 		t.Fatal(err)
 	}

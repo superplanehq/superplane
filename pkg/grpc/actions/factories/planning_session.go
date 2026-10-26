@@ -103,21 +103,18 @@ func sendPlanningSessionMessage(
 	req *pb.SendPlanningSessionMessageRequest,
 	interaction string,
 ) (*pb.SendPlanningSessionMessageResponse, error) {
-	session, factoryModel, userID, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	session, factoryModel, userID, err := loadMessagePlanningSession(ctx, organizationID, req)
 	if err != nil {
 		return nil, err
 	}
-	if err := requireAnalysisPlanningSession(session); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to send planning session message")
-	}
 	db := database.DB(ctx)
-	if err := polar.AssertOrganizationPaymentMethod(db, session.OrganizationID); err != nil {
+	if err := polar.AssertOrganizationPaymentMethod(db, factoryModel.OrganizationID); err != nil {
 		if errors.Is(err, models.ErrPaymentMethodRequired) {
 			return nil, grpcerrors.FailedPrecondition(err, err.Error())
 		}
 		return nil, grpcerrors.Internal(err, "Could not verify the payment method.")
 	}
-	if err := models.AssertOrganizationPlanAllowsRuns(db, session.OrganizationID); err != nil {
+	if err := models.AssertOrganizationPlanAllowsRuns(db, factoryModel.OrganizationID); err != nil {
 		if errors.Is(err, models.ErrHostedSubscriptionRequired) {
 			return nil, grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
 		}
@@ -126,6 +123,19 @@ func sendPlanningSessionMessage(
 	assigned := false
 	firstRefinement := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationTaskAdmission(tx, factoryModel.OrganizationID); err != nil {
+			return err
+		}
+		if session == nil {
+			workOrderID, err := parseOptionalPlanningWorkOrderID(req.GetWorkOrderId())
+			if err != nil {
+				return err
+			}
+			session, err = factoryModel.RecoverAnalysisSession(tx, workOrderID)
+			if err != nil {
+				return err
+			}
+		}
 		draft, err := lockAnalysisSessionAndDraft(tx, session)
 		if err != nil {
 			return err
@@ -169,6 +179,25 @@ func sendPlanningSessionMessage(
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
 	return &pb.SendPlanningSessionMessageResponse{Session: serialized}, nil
+}
+
+func loadMessagePlanningSession(ctx context.Context, organizationID string, req *pb.SendPlanningSessionMessageRequest) (*models.FactoryPlanningSession, *models.Factory, uuid.UUID, error) {
+	if req.GetWorkOrderId() == "" {
+		return loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	}
+	if req.GetSessionId() != "" {
+		return nil, nil, uuid.Nil, factoryErrorToStatus(invalidArgument("specify a session or a work order"), "failed to send planning session message")
+	}
+	orgID, factoryID, userID, err := planningSessionActor(ctx, organizationID, req.GetFactoryId())
+	if err != nil {
+		return nil, nil, uuid.Nil, err
+	}
+	db := database.DB(ctx)
+	factoryModel, err := models.FindFactory(db, orgID, factoryID)
+	if err != nil {
+		return nil, nil, uuid.Nil, factoryErrorToStatus(err, "failed to send planning session message")
+	}
+	return nil, factoryModel, userID, nil
 }
 
 func isFirstPlanningUserMessage(tx *gorm.DB, sessionID uuid.UUID) bool {
@@ -266,6 +295,10 @@ func lockAnalysisSessionAndDraft(tx *gorm.DB, session *models.FactoryPlanningSes
 func restartAnalysisCanvasRun(db *gorm.DB, factoryModel *models.Factory, session *models.FactoryPlanningSession) error {
 	if session.DraftWorkOrderID == nil || session.CanvasID == nil {
 		return models.ErrFactoryPlanningSessionInvalid
+	}
+	queued, err := session.HasQueuedAnalysisRun(db)
+	if err != nil || queued {
+		return err
 	}
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	if err != nil {

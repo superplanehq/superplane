@@ -955,7 +955,7 @@ export const useUpdateCanvasMemoryNamespace = (canvasId: string) => {
   });
 };
 
-export const useEventExecutions = (canvasId: string, eventId: string | null) => {
+export const useEventExecutions = (canvasId: string, eventId: string | null, pollRunnerJobs = false) => {
   return useQuery({
     queryKey: canvasKeys.eventExecution(canvasId, eventId!),
     queryFn: async () => {
@@ -970,6 +970,7 @@ export const useEventExecutions = (canvasId: string, eventId: string | null) => 
       return response.data;
     },
     refetchOnWindowFocus: false,
+    refetchInterval: pollRunnerJobs ? 5000 : false,
     enabled: !!canvasId && !!eventId,
   });
 };

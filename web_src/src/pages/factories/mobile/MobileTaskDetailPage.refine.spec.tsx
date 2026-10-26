@@ -66,6 +66,10 @@ vi.mock("../pages/usePlanningSessionLiveRun", () => ({
   usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => view,
 }));
 
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({ data: { activeRunnerCount: 0, parallelRunnerLimit: 1 } }),
+}));
+
 vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
   useSplitRunLiveCanvas: () =>
     liveCanvas.current ?? { enabled: false, isError: false, isLoading: false, canvas: undefined, stream: [] },

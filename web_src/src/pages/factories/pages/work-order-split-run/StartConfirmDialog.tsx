@@ -19,11 +19,13 @@ const ACTION_CLASS = "rounded-md";
 
 export function StartConfirmDialog({
   open,
+  queue = false,
   scores,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean;
+  queue?: boolean;
   scores: StartConfirmScores;
   onOpenChange: (open: boolean) => void;
   onConfirm: (skipNext: boolean) => void;
@@ -47,7 +49,9 @@ export function StartConfirmDialog({
                 <TriangleAlert className="size-5" aria-hidden />
               </div>
               <div className="flex flex-col justify-center gap-1">
-                <AlertDialogTitle className="text-sm font-semibold">{START_CONFIRM_COPY.title}</AlertDialogTitle>
+                <AlertDialogTitle className="text-sm font-semibold">
+                  {queue ? "Queue implementation?" : START_CONFIRM_COPY.title}
+                </AlertDialogTitle>
                 <AlertDialogDescription className="text-sm text-muted-foreground">{body}</AlertDialogDescription>
               </div>
             </div>
@@ -68,7 +72,7 @@ export function StartConfirmDialog({
               <div className="flex items-center gap-2">
                 <AlertDialogCancel className={ACTION_CLASS}>{START_CONFIRM_COPY.cancel}</AlertDialogCancel>
                 <AlertDialogAction className={ACTION_CLASS} onClick={() => onConfirm(skipNext)}>
-                  {START_CONFIRM_COPY.confirm}
+                  {queue ? "Queue anyway" : START_CONFIRM_COPY.confirm}
                 </AlertDialogAction>
               </div>
             </div>

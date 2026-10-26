@@ -1266,34 +1266,27 @@ func Test__SyncBillingKeepsAnExpiredUnknownSeatPurchaseWithoutEvidence(t *testin
 			purchase.Status = models.SeatPurchaseStatusUnknown
 			purchase.CreatedAt = time.Now().Add(-2 * polar.SeatPurchaseConfirmationWindow)
 			require.NoError(t, purchase.Create(database.DB(t.Context())))
-			unchanged := f.snapshot(3)
-			unchanged["modified_at"] = purchase.CreatedAt.Add(-time.Minute).UTC().Format(time.RFC3339)
+			f.modifiedAt = purchase.CreatedAt.Add(-time.Minute)
 			var purchaseUpdates atomic.Int32
+			f.onPatch = func(w http.ResponseWriter, _ *seatPurchaseFixture, _ int) {
+				purchaseUpdates.Add(1)
+				http.Error(w, "sync must not buy seats", http.StatusInternalServerError)
+			}
 			server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
-				if req.Method == http.MethodPatch {
-					purchaseUpdates.Add(1)
-					http.Error(w, "sync must not buy seats", http.StatusInternalServerError)
-					return
-				}
 				if !polarAvailable {
+					if req.Method == http.MethodPatch {
+						purchaseUpdates.Add(1)
+					}
 					http.Error(w, "Polar unavailable", http.StatusServiceUnavailable)
 					return
 				}
-				switch req.URL.Path {
-				case "/subscriptions/":
-					f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{unchanged}, "pagination": map[string]int{"max_page": 1}})
-				case "/subscriptions/" + f.subscriptionID:
-					f.writeJSON(w, http.StatusOK, unchanged)
-				case "/customers/external/" + f.r.Organization.ID.String() + "/payment-methods":
-					f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
-				default:
-					t.Errorf("unexpected Polar request %s %s", req.Method, req.URL.Path)
-					w.WriteHeader(http.StatusInternalServerError)
-				}
+				f.serve(w, req)
 			})
 			usePolarTestServer(t, server)
+			t.Cleanup(seatrenewal.Wait)
 
 			billing, err := SyncOrganizationBilling(t.Context(), f.r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
+			seatrenewal.Wait()
 
 			require.NoError(t, err)
 			require.NotNil(t, billing.LastSeatPurchase)

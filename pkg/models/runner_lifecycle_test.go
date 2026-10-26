@@ -55,4 +55,8 @@ func TestLockedPendingRunnerExpires(t *testing.T) {
 	require.NoError(t, db.Where("jti = ?", registration.JTI).First(&reloadedRegistration).Error)
 	require.NotNil(t, reloadedRegistration.RevokedAt)
 	assert.WithinDuration(t, now, *reloadedRegistration.RevokedAt, time.Millisecond)
+	reloadedFleet, err := models.FindRunnerFleet(db, fleet.ID)
+	require.NoError(t, err)
+	require.NotNil(t, reloadedFleet.ProvisioningCooldownUntil)
+	assert.WithinDuration(t, now.Add(time.Minute), *reloadedFleet.ProvisioningCooldownUntil, 2*time.Second)
 }

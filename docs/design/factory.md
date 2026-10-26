@@ -20,11 +20,16 @@ Lines are stored on `factory_lines`; steps are JSON on the line row. Work orders
 
 ## Dispatch flow
 
-1. User dispatches an **open** work order to a **line name** (`PATCH …/orders/{id}/dispatch`).
-2. Backend starts **step 0**: creates a pending canvas run on the step’s app entrypoint with work-order payload in run input.
-3. Run finalizer marks the execution finished from run result.
-4. If the run **passed**, the next step starts automatically; otherwise the line stops (work order stays open).
-5. Only one active execution per work order **per line** at a time.
+1. User dispatches a **draft** or **open** work order to a line (`PATCH …/orders/{id}/dispatch`).
+2. Backend creates a line dispatch and checks the line-step concurrency limit.
+3. If admission succeeds, the backend creates a pending canvas run and step execution. Otherwise, it saves a line queue item.
+4. A queued initial start remains in Backlog. Admission opens the draft work order when its execution starts.
+5. Run finalizer marks the execution finished from the run result.
+6. If the run **passed**, the next step uses the same admission checks. Otherwise, the traversal stops.
+7. A work order has one active line dispatch. That dispatch can have a running step or a queued step.
+
+See [Runner queue and organization limits](task-queue.md) for organization
+runner slots, individual job positions, cancellation, and timeout accounting.
 
 Run input shape (for app triggers):
 
@@ -83,7 +88,7 @@ States (persisted on `factory_work_orders.state`; `result` is set only on `close
 | Transition | How | Notes |
 | --- | --- | --- |
 | `→ draft` | `POST …/orders` | Every new work order starts as `draft`. |
-| `draft → open` | `PATCH …/orders/{id}/dispatch` **or** `PATCH …/status` (`STATE_OPEN`) | Dispatch auto-promotes `draft` → `open` and records a status event. Explicit `PATCH …/status` also works ("open it without a dispatch yet"). |
+| `draft → open` | Line admission after `PATCH …/orders/{id}/dispatch` **or** `PATCH …/status` (`STATE_OPEN`) | Dispatch promotes the draft when execution starts. A queued start remains draft. Explicit status updates can also open the work order. |
 | `open → closed` | `PATCH …/orders/{id}/close` (legacy) **or** `PATCH …/status` (`STATE_CLOSED` + result) | Close **requires** a result: `completed`, `rejected`, or `failed`. |
 | `draft → closed` | `PATCH …/status` (`STATE_CLOSED`, `RESULT_REJECTED`) | Abandon-before-dispatch. Only `rejected` is valid — `completed` / `failed` imply the order actually ran. |
 | `closed → open` | `PATCH …/status` (`STATE_OPEN`) | Reopens the order and clears its `result`. |
@@ -91,7 +96,7 @@ States (persisted on `factory_work_orders.state`; `result` is set only on `close
 
 Guardrails:
 
-- `dispatch` only works from `draft` or `open`, and still requires no active execution.
+- A normal dispatch requires `draft` or `open` state and no active line dispatch. Explicit replacement and retry actions handle existing traversals.
 - Valid close results depend on the source state (per `factoryWorkOrderCloseResultsByFromState`): `open → closed` accepts `completed`, `rejected`, `failed`; `draft → closed` accepts `rejected` only.
 - `UpdateStatus` is the single writer for the lifecycle; `Close(...)` is kept as a thin wrapper for the existing REST endpoint and canvas components.
 
@@ -103,12 +108,15 @@ this vocabulary — six statuses that map to four board lanes:
 
 | Persisted state | Derived UI status | Board lane | Notes |
 | --- | --- | --- | --- |
-| `draft` | Draft | Backlog | Being scoped. Dispatchable — the first dispatch promotes it to `open`. |
-| `open`, no active execution | Waiting | Review | Idle between runs. The row shows the last line and step separately from the pill. |
-| `open`, active execution | Running | Running | Line step in flight. |
+| `draft` | Draft | Backlog | Being scoped or queued for its initial line start. Admission promotes it to `open`. |
+| `open`, no active dispatch | Waiting | Review | Idle between runs. The row shows the last line and step separately from the pill. |
+| `open`, active dispatch | Running | Running | Includes a traversal waiting for a later step. |
 | `closed`, `result=completed` | Completed | Done | |
 | `closed`, `result=rejected` | Cancelled | Done | Abandoned before or during work. |
 | `closed`, `result=failed` | Failed | Done | Line execution did not pass. Same red styling as an in-flight failure. |
+
+An open task queued for its initial line start also appears in Backlog when
+it has no other active work. New queued initial starts remain draft in storage.
 
 The Work Orders page puts everything on one title-bar row: the page title
 and the scope pills (**All** / **Active** / **My**) on the left, and the

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,7 @@ import (
 )
 
 func Test__DescribeOrganizationWorkspaceUsage(t *testing.T) {
+	t.Setenv(models.BillingEnabledEnv, "yes")
 	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
 		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
 		MarkupBPS:           models.DefaultMarkupBPS,
@@ -80,6 +82,17 @@ func Test__DescribeOrganizationWorkspaceUsage(t *testing.T) {
 		IdempotencyKey:  "runner:compute:org-usage",
 	}))
 
+	fleet := &models.RunnerFleet{ID: uuid.New(), Slug: "usage-runners", RunnerVersion: "dev", ScopeType: models.RunnerFleetScopeInstallation, Enabled: true}
+	require.NoError(t, fleet.Create(db))
+	now := time.Now()
+	for _, state := range []string{models.RunnerTaskStateReserved, models.RunnerTaskStateRunning, models.RunnerTaskStateReserved, models.RunnerTaskStateRunning, models.RunnerTaskStateQueued} {
+		require.NoError(t, db.Create(&models.RunnerTask{
+			ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleet.ID,
+			Backend: models.RunnerTaskBackendIntegrated, State: state,
+			PayloadCiphertext: []byte("payload"), QueuedAt: now, CreatedAt: now, UpdatedAt: now,
+		}).Error)
+	}
+
 	resp, err := DescribeOrganizationWorkspaceUsage(
 		context.Background(),
 		r.Organization.ID.String(),
@@ -87,6 +100,7 @@ func Test__DescribeOrganizationWorkspaceUsage(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Equal(t, int32(30), resp.PeriodDays)
+	assert.Equal(t, int32(4), resp.ActiveRunnerCount)
 	assert.Equal(t, int64(1_000_000), resp.TotalTokens)
 	require.Len(t, resp.ByMachineType, 1)
 	assert.Equal(t, int64(250)+resp.ByMachineType[0].CostCents, resp.TotalCostCents)
@@ -105,6 +119,23 @@ func Test__DescribeOrganizationWorkspaceUsage(t *testing.T) {
 	assert.False(t, resp.RemainingCreditWarning)
 	assert.Empty(t, resp.Invoices)
 	require.NotNil(t, resp.WelcomeCreditExpiresAt)
+	limit := 3
+	plan := &models.BillingPlan{
+		Key: "usage_" + uuid.NewString()[:8], Name: "Runner capacity", Category: "paid", Visibility: "private",
+		ParallelTaskLimit: &limit, CreditFrequency: "none", CreditExpiration: "never",
+	}
+	require.NoError(t, models.SaveBillingPlan(db, plan))
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	limited, err := DescribeOrganizationWorkspaceUsage(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationWorkspaceUsageRequest{})
+	require.NoError(t, err)
+	require.NotNil(t, limited.ParallelRunnerLimit)
+	assert.Equal(t, int32(3), *limited.ParallelRunnerLimit)
+	assert.Equal(t, int32(4), limited.ActiveRunnerCount)
+	t.Setenv(models.BillingEnabledEnv, "no")
+	unlimited, err := DescribeOrganizationWorkspaceUsage(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationWorkspaceUsageRequest{})
+	require.NoError(t, err)
+	assert.Nil(t, unlimited.ParallelRunnerLimit)
 }
 
 func Test__DescribeOrganizationWorkspaceUsageListsPolarInvoices(t *testing.T) {

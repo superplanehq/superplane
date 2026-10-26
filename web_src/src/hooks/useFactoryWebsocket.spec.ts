@@ -79,6 +79,20 @@ describe("useFactoryWebsocket", () => {
       expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
     },
   );
+  it("refreshes organization usage and all workspace queues after a reservation changes", async () => {
+    const { queryClient } = renderFactoryWebsocket();
+    const usage = ["organizations", "org-1", "workspace-usage", 30];
+    const currentQueue = factoryQueryKeys.workOrders("org-1", "factory-1");
+    const otherQueue = factoryQueryKeys.workOrders("org-1", "factory-2");
+    const otherOrganization = factoryQueryKeys.workOrders("org-2", "factory-3");
+    for (const key of [usage, currentQueue, otherQueue, otherOrganization]) queryClient.setQueryData(key, []);
+    await emit({ event: "work_order_updated", payload: { factoryId: "factory-2", reason: "runner_capacity_updated" } });
+    expect(queryClient.getQueryState(usage)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(currentQueue)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherQueue)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherOrganization)?.isInvalidated).toBe(false);
+  });
+
   it("connects to the per-factory WebSocket URL with org id", () => {
     renderFactoryWebsocket();
     const [url, , enabled] = lastCall();

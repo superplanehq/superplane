@@ -19,12 +19,13 @@ type FleetSpec struct {
 }
 
 type Fleet struct {
-	ID            string    `json:"id"`
-	Enabled       bool      `json:"enabled"`
-	Spec          FleetSpec `json:"spec"`
-	RunnerVersion string    `json:"runnerVersion"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	ID                        string     `json:"id"`
+	Enabled                   bool       `json:"enabled"`
+	Spec                      FleetSpec  `json:"spec"`
+	RunnerVersion             string     `json:"runnerVersion"`
+	CreatedAt                 time.Time  `json:"createdAt"`
+	UpdatedAt                 time.Time  `json:"updatedAt"`
+	ProvisioningCooldownUntil *time.Time `json:"provisioningCooldownUntil,omitempty"`
 }
 
 type Runner struct {
@@ -39,20 +40,26 @@ type Runner struct {
 	UpdatedAt         time.Time  `json:"updatedAt"`
 	TerminatedAt      *time.Time `json:"terminatedAt,omitempty"`
 	Ephemeral         bool       `json:"ephemeral"`
+	ReservedTaskID    *string    `json:"reservedTaskId,omitempty"`
 }
 
 type Capacity struct {
-	RunnableTasks     int64  `json:"runnableTasks,string"`
-	PendingRunners    int64  `json:"pendingRunners,string"`
-	IdleRunners       int64  `json:"idleRunners,string"`
-	BusyRunners       int64  `json:"busyRunners,string"`
-	TerminatedRunners int64  `json:"terminatedRunners,string"`
-	Generation        string `json:"generation"`
+	RunnableTasks             int64      `json:"runnableTasks,string"`
+	PendingRunners            int64      `json:"pendingRunners,string"`
+	IdleRunners               int64      `json:"idleRunners,string"`
+	BusyRunners               int64      `json:"busyRunners,string"`
+	TerminatedRunners         int64      `json:"terminatedRunners,string"`
+	Generation                string     `json:"generation"`
+	UnassignedRunners         int64      `json:"unassignedRunners,string"`
+	ProvisioningCooldownUntil *time.Time `json:"provisioningCooldownUntil,omitempty"`
 }
 
 type CreateRunnerRequest struct {
 	IdempotencyKey string `json:"idempotencyKey,omitempty"`
 	Ephemeral      bool   `json:"ephemeral"`
+	TaskID         string `json:"taskId,omitempty"`
+	WarmCapacity   *int32 `json:"warmCapacity,omitempty"`
+	MaxCapacity    *int32 `json:"maxCapacity,omitempty"`
 }
 
 type CreateRunnerResponse struct {
@@ -72,4 +79,16 @@ type CreateFleetRequest struct {
 type UpdateFleetRequest struct {
 	RunnerVersion string    `json:"runnerVersion"`
 	Spec          FleetSpec `json:"spec"`
+}
+
+type Task struct {
+	ID             string    `json:"id"`
+	OrganizationID string    `json:"organizationId"`
+	State          string    `json:"state"`
+	QueuedAt       time.Time `json:"queuedAt"`
+}
+
+type DeleteRunnerOptions struct {
+	RequireUnassigned bool
+	Reason            string
 }

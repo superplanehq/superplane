@@ -166,3 +166,43 @@ func decodeRunAppExecutionMetadata(t *testing.T, metadataCtx *contexts.MetadataC
 	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &metadata))
 	return metadata
 }
+
+func TestRunAppTimeoutRechecksOpenQueueAndLeavesFinishedChild(t *testing.T) {
+	for _, scenario := range []struct {
+		name       string
+		wait       core.RunQueueWait
+		cancel     bool
+		reschedule bool
+	}{
+		{"open queue", core.RunQueueWait{Duration: 2 * time.Minute, Waiting: true}, false, true},
+		{"closed queue", core.RunQueueWait{Duration: 2 * time.Minute}, false, true},
+		{"spent budget", core.RunQueueWait{}, true, false},
+		{"finished child", core.RunQueueWait{Finished: true}, false, false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			requests := &contexts.RequestContext{}
+			runs := &contexts.RunExecutionContext{QueueWaitResult: scenario.wait}
+			metadata := &contexts.MetadataContext{Metadata: runAppExecutionMetadata{
+				Run: &RunMetadata{ID: uuid.NewString()}, QueueTimeoutVersion: 1,
+				TimeoutStartedAt: time.Now().Add(-2 * time.Minute).UTC().Format(time.RFC3339Nano),
+			}}
+			err := (&RunApp{}).handleRunTimeout(core.ActionHookContext{
+				Configuration: map[string]any{"timeout": 60}, Metadata: metadata,
+				ExecutionState: &contexts.ExecutionStateContext{}, Requests: requests, Runs: runs,
+			})
+			require.NoError(t, err)
+			require.Equal(t, scenario.cancel, runs.CancelCalled)
+			if scenario.reschedule {
+				require.Equal(t, RunAppActionRunTimeout, requests.Action)
+				if scenario.wait.Waiting {
+					require.Equal(t, 15*time.Second, requests.Duration)
+				} else {
+					require.Greater(t, requests.Duration, 59*time.Second)
+					require.LessOrEqual(t, requests.Duration, 60*time.Second)
+				}
+			} else {
+				require.Empty(t, requests.Action)
+			}
+		})
+	}
+}

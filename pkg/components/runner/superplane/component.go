@@ -2,7 +2,10 @@ package superplane
 
 import (
 	"fmt"
+	"github.com/google/uuid"
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 	"net/http"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/components/runner/claude"
@@ -139,6 +142,9 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	if runModel.Provider == models.UsageProviderOpenRouter && strings.TrimSpace(access.ManagementKey) == "" {
+		return fmt.Errorf("%w: %s", models.ErrHostedLLMProviderNoManagementKey, models.UsageProviderOpenRouter)
+	}
 
 	recordSuperPlaneRunOnConfiguration(ctx.Configuration, runModel)
 
@@ -171,17 +177,14 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	files = runner.AppendTaskArtifactMCP(environment, files)
 	files = runner.AppendMergeConfidenceMCP(environment, files)
 
-	if runModel.Provider == models.UsageProviderOpenRouter {
-		access, err = mintOpenRouterRunnerKey(ctx, access, spec.ExecutionTimeoutSeconds)
-		if err != nil {
-			return err
-		}
+	if _, deferred := ctx.RunnerTasks.(runnerapi.CredentialRefreshRecorder); deferred || runModel.Provider == models.UsageProviderOpenRouter {
+		access.APIKey = "pending-runner-key-" + uuid.NewString()
+	}
+	if recorder, ok := ctx.RunnerTasks.(runnerapi.CredentialRefreshRecorder); ok {
+		recorder.RecordCredentialRefresh(runnerapi.CredentialRefresh{Version: 1, Kind: "hosted_provider", OrganizationID: ctx.OrganizationID, ResourceID: access.ResourceID, Recipient: runModel.Provider, Scope: map[string]string{"identity": access.CredentialIdentity, "model": runModel.Model, "base_url": access.BaseURL, "run_id": ctx.RunID.String()}, Current: access.APIKey})
 	}
 	environment, err = injectSuperPlaneCredentials(environment, runModel.Provider, access)
 	if err != nil {
-		if runModel.Provider == models.UsageProviderOpenRouter {
-			revokeMintedOpenRouterRunnerKey(ctx)
-		}
 		return err
 	}
 
@@ -194,9 +197,6 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
 	})
 	if err != nil {
-		if runModel.Provider == models.UsageProviderOpenRouter {
-			revokeMintedOpenRouterRunnerKey(ctx)
-		}
 		return fmt.Errorf("create task: %w", err)
 	}
 	return runner.AfterRunnerTaskCreated(ctx, taskID)

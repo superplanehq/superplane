@@ -149,12 +149,20 @@ func (c *Client) DescribeRunner(ctx context.Context, fleetID, runnerID string) (
 	return response.Runner, err
 }
 
-func (c *Client) DeleteRunner(ctx context.Context, fleetID, runnerID string, states []string) (Runner, error) {
+func (c *Client) DeleteRunner(ctx context.Context, fleetID, runnerID string, states []string, options ...DeleteRunnerOptions) (Runner, error) {
 	var response struct {
 		Runner Runner `json:"runner"`
 	}
 	path := fleetPath(fleetID) + "/runners/" + url.PathEscape(strings.TrimSpace(runnerID))
 	query := listQuery(states, 0)
+	if len(options) > 0 {
+		if options[0].RequireUnassigned {
+			query.Set("requireUnassigned", "true")
+		}
+		if options[0].Reason != "" {
+			query.Set("reason", options[0].Reason)
+		}
+	}
 	err := c.do(ctx, http.MethodDelete, path, query, nil, &response)
 	return response.Runner, err
 }
@@ -252,4 +260,29 @@ func listQuery(states []string, limit int) url.Values {
 func retryable(err error) bool {
 	var httpErr *HTTPError
 	return !errors.As(err, &httpErr) || httpErr.StatusCode >= http.StatusInternalServerError
+}
+
+// ListQueuedTasks follows every page so capped organizations cannot hide demand
+// in other organizations behind a fixed candidate batch.
+func (c *Client) ListQueuedTasks(ctx context.Context, fleetID string) ([]Task, error) {
+	var tasks []Task
+	afterID := ""
+	for {
+		query := listQuery([]string{"queued"}, 1000)
+		if afterID != "" {
+			query.Set("afterId", afterID)
+		}
+		var response struct {
+			Tasks       []Task `json:"tasks"`
+			HasNextPage bool   `json:"hasNextPage"`
+		}
+		if err := c.do(ctx, http.MethodGet, fleetPath(fleetID)+"/tasks", query, nil, &response); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, response.Tasks...)
+		if !response.HasNextPage || len(response.Tasks) == 0 {
+			return tasks, nil
+		}
+		afterID = response.Tasks[len(response.Tasks)-1].ID
+	}
 }

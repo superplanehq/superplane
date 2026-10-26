@@ -48,16 +48,17 @@ type RunnerFleetSpec struct {
  * node and Fleet Manager configuration, for example "e1-large-amd64".
  */
 type RunnerFleet struct {
-	ID            uuid.UUID
-	Slug          string
-	ScopeType     string
-	ScopeID       *uuid.UUID
-	Enabled       bool
-	Spec          datatypes.JSONType[RunnerFleetSpec]
-	RunnerVersion string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	DeletedAt     gorm.DeletedAt
+	ID                        uuid.UUID
+	Slug                      string
+	ScopeType                 string
+	ScopeID                   *uuid.UUID
+	Enabled                   bool
+	Spec                      datatypes.JSONType[RunnerFleetSpec]
+	RunnerVersion             string
+	ProvisioningCooldownUntil *time.Time
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+	DeletedAt                 gorm.DeletedAt
 }
 
 // MetricScope distinguishes installation fleets from organization fleets that share a slug.
@@ -306,7 +307,7 @@ type FleetStateCount struct {
 
 func (f *RunnerFleet) FindRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
 	var runner Runner
-	err := tx.Where("id = ? AND fleet_id = ?", id, f.ID).First(&runner).Error
+	err := runnerSummaryQuery(tx).Where("runners.id = ? AND runners.fleet_id = ?", id, f.ID).First(&runner).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrRunnerNotFound
 	}
@@ -322,7 +323,7 @@ func (f *RunnerFleet) ListRunners(tx *gorm.DB, page ListPage) (RunnerListPage, e
 		return RunnerListPage{}, err
 	}
 
-	query := tx.Where("fleet_id = ?", f.ID)
+	query := runnerSummaryQuery(tx).Where("runners.fleet_id = ?", f.ID)
 	if len(page.States) > 0 {
 		query = query.Where("state IN ?", page.States)
 	}
@@ -368,10 +369,10 @@ func (f *RunnerFleet) ListTasks(tx *gorm.DB, page ListPage) (TaskListPage, error
 		if !found {
 			return TaskListPage{Tasks: []RunnerTask{}, TotalCount: total}, nil
 		}
-		query = query.Where("(queued_at, id) > (?, ?)", cursor.QueuedAt, cursor.ID)
+		query = query.Where("(created_at, id) > (?, ?)", cursor.CreatedAt, cursor.ID)
 	}
 
-	query = query.Order("queued_at ASC, id ASC")
+	query = query.Order("created_at ASC, id ASC")
 	if page.Limit > 0 {
 		query = query.Limit(page.Limit + 1)
 	}
@@ -481,7 +482,7 @@ func (f *RunnerFleet) runnerListCursor(tx *gorm.DB, id uuid.UUID) (*Runner, bool
 
 func (f *RunnerFleet) taskListCursor(tx *gorm.DB, id uuid.UUID) (*RunnerTask, bool, error) {
 	var cursor RunnerTask
-	err := tx.Select("id", "queued_at").Where("fleet_id = ? AND id = ?", f.ID, id).Take(&cursor).Error
+	err := tx.Select("id", "created_at").Where("fleet_id = ? AND id = ?", f.ID, id).Take(&cursor).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, false, nil
 	}
@@ -575,4 +576,47 @@ func listCountsByFleetState(tx *gorm.DB, model any, states []string) ([]FleetSta
 		}
 	}
 	return result, nil
+}
+
+// SetRunnerFleetProvisioningCooldown persists backoff across manager restarts.
+func SetRunnerFleetProvisioningCooldown(tx *gorm.DB, fleetID uuid.UUID, until time.Time) error {
+	return tx.Model(&RunnerFleet{}).Where("id = ?", fleetID).
+		Update("provisioning_cooldown_until", gorm.Expr("GREATEST(provisioning_cooldown_until, ?)", until)).Error
+}
+
+func (f *RunnerFleet) CountUnassignedRunners(tx *gorm.DB) (int64, error) {
+	var count int64
+	err := tx.Model(&Runner{}).Where("fleet_id = ? AND state IN ?", f.ID, []string{RunnerStatePending, RunnerStateIdle}).
+		Where(`NOT EXISTS (SELECT 1 FROM runner_tasks t WHERE t.runner_id = runners.id AND t.state IN ('reserved', 'running'))`).
+		Count(&count).Error
+	return count, err
+}
+
+var ErrRunnerFleetCreationCapacity = errors.New("fleet runner capacity reached")
+
+// LockRunnerFleetCreation serializes manager creates without taking a fleet row
+// lock. Runner termination can persist cooldowns while holding a runner lock.
+func LockRunnerFleetCreation(tx *gorm.DB, slug string) error {
+	return tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "runner-fleet-creation:"+slug).Error
+}
+
+func (f *RunnerFleet) CheckCreationCapacity(tx *gorm.DB, warm bool, warmCapacity, maxCapacity int) error {
+	counts, err := f.CountRunnersByState(tx)
+	if err != nil {
+		return err
+	}
+	if maxCapacity > 0 && counts[RunnerStatePending]+counts[RunnerStateIdle]+counts[RunnerStateBusy] >= int64(maxCapacity) {
+		return ErrRunnerFleetCreationCapacity
+	}
+	if !warm {
+		return nil
+	}
+	unassigned, err := f.CountUnassignedRunners(tx)
+	if err != nil {
+		return err
+	}
+	if unassigned >= int64(warmCapacity) {
+		return ErrRunnerFleetCreationCapacity
+	}
+	return nil
 }

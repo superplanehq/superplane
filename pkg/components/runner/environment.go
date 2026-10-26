@@ -161,6 +161,9 @@ func ResolveEnvironment(
 	environmentFrom []EnvironmentFromEntry,
 	environment []EnvironmentVariable,
 ) (ResolvedEnvironment, error) {
+	if deferred, ok := secrets.(interface{ DeferRunnerSecretValues() }); ok {
+		deferred.DeferRunnerSecretValues()
+	}
 	resolved := make([]TaskEnvironmentVariable, 0)
 	seen := make(map[string]struct{})
 	usages := make([]string, 0)

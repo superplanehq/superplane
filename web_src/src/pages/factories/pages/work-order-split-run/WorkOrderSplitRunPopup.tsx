@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
+import { WorkOrderQueueStatus } from "../../workOrders/WorkOrderQueueStatus";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
@@ -13,7 +14,7 @@ import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { draftStripAnalysis } from "./draftStripAnalysis";
+import { draftAnalysisQueued, draftStripAnalysis } from "./draftStripAnalysis";
 import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { refinePopupShowsAutomations, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
@@ -53,7 +54,8 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   const factoryQuery = useFactory(organizationId ?? "", factoryId ?? "");
   const refinementEnabled = factoryPlanningEnabled(factoryQuery.data);
   const refinementFeature = { isLoading: factoryQuery.isPending };
-  const isAnalyzing = fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
+  const analysisQueued = draftAnalysisQueued(fixture);
+  const isAnalyzing = !analysisQueued && fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline;
   const canLookupSession = Boolean(organizationId && factoryId && orderId);
   const hasLookupIdentity = Boolean(factoryId && orderId);
   const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
@@ -68,6 +70,8 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
     workOrderId: orderId,
     enabled: canLookupSession,
     canUpdate,
+    analysisActive: isAnalyzing,
+    analysisQueued,
     refinementCanStart: planningSessionCanStart({
       factoryLoaded: Boolean(factoryQuery.data),
       planningEnabled: refinementEnabled,
@@ -211,24 +215,40 @@ function AnalysisWorkOrderPopup({
           sessionLookupError={analysis.queryError?.message}
           panelReview={panelReview}
           header={(views) => (
-            <AnalysisPopupHeader
-              edits={edits}
-              fixture={fixture}
-              titlePrefix={titlePrefix}
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              orderNumber={orderNumber}
-              lineId={lineId}
-              onClose={onClose}
-              fullPage={fullPage}
-              toggleFullPage={toggleFullPage}
-              onArchive={mutations.onArchive}
-              footerBusy={footerActions.busy}
-              reviewActions={reviewActions}
-              showOwnerRow={!unified}
-              planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
-              views={views}
-            />
+            <>
+              <AnalysisPopupHeader
+                edits={edits}
+                fixture={fixture}
+                titlePrefix={titlePrefix}
+                organizationId={organizationId}
+                factoryKey={factoryKey}
+                orderNumber={orderNumber}
+                lineId={lineId}
+                onClose={onClose}
+                fullPage={fullPage}
+                toggleFullPage={toggleFullPage}
+                onArchive={mutations.onArchive}
+                footerBusy={footerActions.busy}
+                reviewActions={reviewActions}
+                showOwnerRow={!unified}
+                planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
+                views={views}
+              />
+              {fixture.queuedRunnerJobs?.length ? (
+                <div className="flex flex-wrap gap-2 border-b border-border px-5 py-2">
+                  {fixture.queuedRunnerJobs.map((queue) => (
+                    <WorkOrderQueueStatus
+                      key={queue.id}
+                      queue={queue}
+                      orderId={orderId ?? ""}
+                      title={fixture.title}
+                      canCancel={false}
+                      canDispatch={canDispatch}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </>
           )}
         />
       </LiveHeaderSpendProvider>
@@ -425,9 +445,15 @@ function analysisPopupClassName(fullPage: boolean, unified: boolean, sourceOnly:
  */
 function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], factory: FactoriesFactory | undefined) {
   const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
+  const queuedAnalysis = draftAnalysisQueued(fixture);
+  const analysisNote =
+    queuedAnalysis && fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline
+      ? { headline: "Analysis queued", text: "Analysis starts when a task slot is available." }
+      : fixture.footer.note;
+  const footer = sourceOnly ? classicSplitRunFooter(fixture.footer) : { ...fixture.footer, note: analysisNote };
   return {
     sourceOnly,
-    viewFixture: sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture,
+    viewFixture: { ...fixture, footer },
   };
 }
 

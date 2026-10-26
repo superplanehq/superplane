@@ -76,6 +76,7 @@ type Runner struct {
 	TerminatedAt           *time.Time
 	CreationIdempotencyKey *string
 	CreationRequestHash    *string
+	ReservedTaskID         *uuid.UUID `gorm:"->;-:migration"`
 }
 
 type RunnerHost struct {
@@ -138,7 +139,7 @@ func FindRunnerRegistration(tx *gorm.DB, runnerID uuid.UUID) (*RunnerRegistratio
 
 func FindRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
 	var runner Runner
-	err := tx.Where("id = ?", id).First(&runner).Error
+	err := runnerSummaryQuery(tx).Where("runners.id = ?", id).First(&runner).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrRunnerNotFound
 	}
@@ -146,6 +147,13 @@ func FindRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
 		return nil, err
 	}
 	return &runner, nil
+}
+
+func runnerSummaryQuery(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&Runner{}).Select(`runners.*, (
+		SELECT id FROM runner_tasks WHERE runner_id = runners.id AND state IN ('reserved', 'running')
+		ORDER BY reserved_at, id LIMIT 1
+	) AS reserved_task_id`)
 }
 
 func LockRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
@@ -310,10 +318,22 @@ func (r *Runner) Register(
 		}).
 		First(&task).
 		Error
+	// A cancellation or preparation expiry can end a reservation while
+	// infrastructure starts. Its signed grant can register the unused runner.
+	endedUndeliveredReservation := false
+	if taskID != nil && errors.Is(taskErr, gorm.ErrRecordNotFound) {
+		previous, err := FindRunnerTask(tx, *taskID)
+		if err == nil {
+			endedUndeliveredReservation = previous.FleetID == r.FleetID && (previous.State == RunnerTaskStateCanceled || previous.State == RunnerTaskStateFailed) && previous.DispatchStartedAt == nil && previous.StartedAt == nil && (previous.RunnerID == nil || *previous.RunnerID == r.ID)
+		}
+		if err != nil && !errors.Is(err, ErrRunnerTaskNotFound) {
+			return err
+		}
+	}
 	switch {
 	case taskID == nil && taskErr == nil:
 		return fmt.Errorf("%w: generic runner has a reserved task", ErrRunnerRegistrationInvalid)
-	case taskID != nil && (taskErr != nil || task.ID != *taskID):
+	case taskID != nil && !endedUndeliveredReservation && (taskErr != nil || task.ID != *taskID):
 		return fmt.Errorf("%w: reserved task does not match token", ErrRunnerRegistrationInvalid)
 	case taskErr != nil && !errors.Is(taskErr, gorm.ErrRecordNotFound):
 		return taskErr
@@ -490,6 +510,22 @@ func IsRunnerCreationIdempotencyKeyConflict(err error) bool {
 }
 
 func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
+	return tx.Transaction(func(tx *gorm.DB) error { return r.terminate(tx, reason) })
+}
+
+func (r *Runner) terminate(tx *gorm.DB, reason string) error {
+	current, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), r.ID)
+	if err != nil {
+		return err
+	}
+	*r = *current
+	active, activeErr := r.FindActiveTask(tx)
+	if activeErr != nil && !errors.Is(activeErr, ErrRunnerTaskNotFound) {
+		return activeErr
+	}
+	if activeErr == nil && (active.State == RunnerTaskStateRunning || active.DispatchStartedAt != nil) {
+		return ErrRunnerBusy
+	}
 	if r.State == RunnerStateBusy {
 		return ErrRunnerBusy
 	}
@@ -531,9 +567,15 @@ func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
 	r.CurrentConnectionID = nil
 	r.CreationIdempotencyKey = nil
 	r.CreationRequestHash = nil
+	if reason == RunnerTerminationProvisioningFailed || reason == RunnerTerminationRegistrationExpired {
+		if err := SetRunnerFleetProvisioningCooldown(tx, r.FleetID, now.Add(time.Minute)); err != nil {
+			return err
+		}
+	}
 	if err := releaseReservedRunnerTask(tx, r.ID, now); err != nil {
 		return err
 	}
+	r.ReservedTaskID = nil
 	if err := tx.Model(&RunnerCredential{}).
 		Where("runner_id = ? AND revoked_at IS NULL", r.ID).
 		Update("revoked_at", now).
@@ -548,19 +590,48 @@ func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
 
 func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {
 	var task RunnerTask
-	err := tx.Where("runner_id = ? AND state = ?", runnerID, RunnerTaskStateReserved).
-		First(&task).
-		Error
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("runner_id = ? AND state = ?", runnerID, RunnerTaskStateReserved).First(&task).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	return tx.Model(&task).Updates(map[string]any{
-		"runner_id":   nil,
-		"state":       RunnerTaskStateQueued,
-		"reserved_at": nil,
-		"updated_at":  now,
-	}).Error
+	return task.ReleaseUndelivered(tx, runnerID, now)
+}
+
+// ReleaseUndelivered returns certainly-unsent work to the queue. The runner
+// must be locked by the caller so cancellation and dispatch cannot race it.
+func (t *RunnerTask) ReleaseUndelivered(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {
+	if t.RunnerID == nil || *t.RunnerID != runnerID || t.State != RunnerTaskStateReserved ||
+		t.DispatchStartedAt != nil || t.StartedAt != nil {
+		return ErrRunnerTaskNotReservable
+	}
+	updates := map[string]any{
+		"runner_id": nil, "reserved_at": nil, "updated_at": now,
+		"state": RunnerTaskStateQueued,
+	}
+	if t.CancelRequestedAt != nil {
+		updates["state"] = RunnerTaskStateCanceled
+		updates["finished_at"] = now
+	}
+	result := tx.Model(t).Where("runner_id = ? AND state = ? AND dispatch_started_at IS NULL AND started_at IS NULL",
+		runnerID, RunnerTaskStateReserved).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrRunnerTaskNotReservable
+	}
+	t.RunnerID = nil
+	t.ReservedAt = nil
+	t.UpdatedAt = now
+	if t.CancelRequestedAt != nil {
+		t.State = RunnerTaskStateCanceled
+		t.FinishedAt = &now
+		return t.CloseQueueInterval(tx, now)
+	}
+	t.State = RunnerTaskStateQueued
+	return t.OpenQueueInterval(tx, now)
 }

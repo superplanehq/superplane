@@ -8,6 +8,7 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
   FactoryAutomation,
+  OrganizationsDescribeOrganizationWorkspaceUsageResponse,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import type * as integrationsData from "@/hooks/useIntegrations";
@@ -111,8 +112,14 @@ function renderLinesBoard(
 
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
+const cancelQueuedTask = vi.fn().mockResolvedValue(undefined);
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
+const workspaceUsage = { data: {} as OrganizationsDescribeOrganizationWorkspaceUsageResponse };
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => workspaceUsage,
+}));
+
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
 const useFactoryBoardWorkOrders = vi.fn((_organizationId?: string, _factoryId?: string, _options?: unknown) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
@@ -238,6 +245,7 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
     isAssigneesSaving: false,
     onDispatch: vi.fn(),
     onAssigneesSave: vi.fn(),
+    onCancelQueuedRunnerJob: cancelQueuedTask,
   }),
 }));
 
@@ -337,6 +345,7 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 async function resetLinesBoardMocks() {
+  workspaceUsage.data = {};
   window.localStorage.clear();
   resetFactoryBoardLaneScrollPositions();
   updateFactoryLineMutateAsync.mockReset();
@@ -380,6 +389,18 @@ async function resetLinesBoardMocks() {
 describe("LinesPage board", () => {
   beforeEach(async () => {
     await resetLinesBoardMocks();
+  });
+
+  it("shows organization runner usage even when the board has no tasks", () => {
+    workspaceUsage.data = { activeRunnerCount: 2, parallelRunnerLimit: 5 };
+    renderLinesBoard();
+    expect(within(screen.getByTestId("lines-detail-header")).getByText("2 of 5 active runners")).toBeInTheDocument();
+  });
+
+  it("hides runner usage for unlimited plans", () => {
+    workspaceUsage.data = { activeRunnerCount: 2 };
+    renderLinesBoard();
+    expect(screen.queryByText(/of .* active runners/)).not.toBeInTheDocument();
   });
 
   it("does not show a back link to the lines list", () => {
@@ -2160,6 +2181,61 @@ describe("LinesPage Implement phase window", () => {
   afterEach(() => {
     restoreHeights?.();
     restoreHeights = undefined;
+  });
+
+  it("keeps an automation wait in Backlog until execution starts", async () => {
+    const at = new Date().toISOString();
+    const queued = dispatchDraftToImplement(kickoffDraft(0), at);
+    queued.lineDispatches![0].stepExecutions = [];
+    queued.lineDispatches![0].queueItem = {
+      id: "queue-step-1",
+      stepName: "Implement",
+      stepIndex: 0,
+      appId: "app-refund-implementer",
+      position: 1,
+      createdAt: at,
+    };
+    useFactoryWorkOrders.mockReturnValue({ data: [queued, dispatchDraftToImplement(kickoffDraft(1), at)] });
+    const view = renderLinesBoard();
+
+    const queuedCard = within(screen.getByTestId("lines-backlog-column")).getByTestId("work-order-card-wo-kickoff-0");
+    expect(within(queuedCard).getByRole("img", { name: "Waiting for automation slot" })).toBeVisible();
+    expect(within(queuedCard).getByRole("status")).toHaveTextContent("Waiting for automation slot");
+    expect(within(queuedCard).queryByText(/Runner queued/)).not.toBeInTheDocument();
+    expect(queuedCard.querySelector(".animate-spin")).toBeNull();
+    expect(within(queuedCard).queryByText(/waiting for a free slot/)).not.toBeInTheDocument();
+    expect(implementPhaseCards()).toHaveLength(1);
+    expect(screen.getByTestId("lines-phase-run-exec-wo-kickoff-1").querySelector(".animate-spin")).not.toBeNull();
+    const refresh = (order: FactoriesWorkOrder) => {
+      useFactoryWorkOrders.mockReturnValue({ data: [order, dispatchDraftToImplement(kickoffDraft(1), at)] });
+      view.rerender(
+        <LinesBoardSpecHarness
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+        />,
+      );
+    };
+    refresh(dispatchDraftToImplement(kickoffDraft(0), at));
+    expect(
+      within(screen.getByTestId("lines-backlog-column")).queryByTestId("work-order-card-wo-kickoff-0"),
+    ).not.toBeInTheDocument();
+    expect(implementPhaseCards()).toHaveLength(2);
+  });
+
+  it("keeps active and pending review work in Verify without an unschedule control", () => {
+    const order = dispatchDraftToImplement(kickoffDraft(0), new Date().toISOString());
+    const dispatch = order.lineDispatches![0];
+    dispatch.state = "STATE_FINISHED";
+    dispatch.stepExecutions![0].state = "STATE_FINISHED";
+    dispatch.stepExecutions![0].result = "RESULT_PASSED";
+    dispatch.stepExecutions![0].step = "Verify";
+    dispatch.stepExecutions![0].stepIndex = 1;
+    dispatch.stepExecutions![0].run!.appId = "app-refund-verifier";
+    order.queuedRunnerJobs = [{ id: "verify-queue", automationName: "Review", position: 1 }];
+    useFactoryWorkOrders.mockReturnValue({ data: [order] });
+    renderLinesBoard();
+    const card = within(screen.getByTestId("lines-verify-column")).getByTestId("work-order-card-wo-kickoff-0");
+    expect(within(card).getByRole("status")).toHaveTextContent("Runner queued #1");
+    expect(within(card).queryByRole("button", { name: /from queue/ })).not.toBeInTheDocument();
   });
 
   it("keeps every Implement card after five consecutive dispatches", async () => {

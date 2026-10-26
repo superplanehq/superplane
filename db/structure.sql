@@ -33,6 +33,36 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
 
 
+--
+-- Name: record_runner_task_queue_interval(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_runner_task_queue_interval() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    was_queued boolean := false;
+    is_queued boolean;
+    transition_at timestamptz;
+BEGIN
+    IF TG_OP = 'UPDATE' THEN
+        was_queued := OLD.backend = 'integrated' AND OLD.state = 'queued' AND OLD.runner_id IS NULL;
+    END IF;
+    is_queued := NEW.backend = 'integrated' AND NEW.state = 'queued' AND NEW.runner_id IS NULL;
+    transition_at := COALESCE(NEW.updated_at, statement_timestamp());
+    IF is_queued AND NOT was_queued THEN
+        INSERT INTO runner_task_queue_intervals(task_id, started_at)
+        VALUES (NEW.id, transition_at) ON CONFLICT DO NOTHING;
+    ELSIF was_queued AND NOT is_queued THEN
+        UPDATE runner_task_queue_intervals
+        SET ended_at = GREATEST(started_at, transition_at)
+        WHERE task_id = NEW.id AND ended_at IS NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -514,6 +544,18 @@ CREATE TABLE public.factories (
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text)),
     CONSTRAINT factories_url_id_format_check CHECK ((url_id ~ '^[a-z0-9]{8}$'::text))
+);
+
+
+--
+-- Name: factory_agent_resource_refreshes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_agent_resource_refreshes (
+    resource_id uuid NOT NULL,
+    attempt_id uuid NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
 );
 
 
@@ -1538,6 +1580,29 @@ CREATE TABLE public.role_metadata (
 
 
 --
+-- Name: runner_credential_cleanups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_credential_cleanups (
+    id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    attempt_id uuid NOT NULL,
+    provider text NOT NULL,
+    provider_resource_id uuid NOT NULL,
+    name text NOT NULL,
+    key_hash text DEFAULT ''::text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    accepted_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    next_retry_at timestamp with time zone NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    issuer_credential_identity text DEFAULT ''::text NOT NULL
+);
+
+
+--
 -- Name: runner_credentials; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1564,6 +1629,7 @@ CREATE TABLE public.runner_fleets (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     deleted_at timestamp with time zone,
+    provisioning_cooldown_until timestamp with time zone,
     CONSTRAINT runner_fleets_runner_version_check CHECK ((runner_version <> ''::text)),
     CONSTRAINT runner_fleets_scope_check CHECK (((((scope_type)::text = 'installation'::text) AND (scope_id IS NULL)) OR (((scope_type)::text = 'organization'::text) AND (scope_id IS NOT NULL)))),
     CONSTRAINT runner_fleets_scope_type_check CHECK (((scope_type)::text = ANY ((ARRAY['installation'::character varying, 'organization'::character varying])::text[]))),
@@ -1607,6 +1673,37 @@ CREATE TABLE public.runner_task_log_lifecycles (
 
 
 --
+-- Name: runner_task_preparations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_task_preparations (
+    task_id uuid NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    deadline timestamp with time zone NOT NULL,
+    attempt_id uuid,
+    attempt_expires_at timestamp with time zone,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    next_retry_at timestamp with time zone NOT NULL,
+    prepared_at timestamp with time zone,
+    updated_at timestamp with time zone NOT NULL,
+    prepared_valid_until timestamp with time zone
+);
+
+
+--
+-- Name: runner_task_queue_intervals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_task_queue_intervals (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    task_id uuid NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    ended_at timestamp with time zone,
+    CONSTRAINT runner_task_queue_intervals_check CHECK (((ended_at IS NULL) OR (ended_at >= started_at)))
+);
+
+
+--
 -- Name: runner_tasks; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1629,6 +1726,7 @@ CREATE TABLE public.runner_tasks (
     finished_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    dispatch_started_at timestamp with time zone,
     CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
     CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
 );
@@ -2561,6 +2659,14 @@ ALTER TABLE ONLY public.factories
 
 
 --
+-- Name: factory_agent_resource_refreshes factory_agent_resource_refreshes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resource_refreshes
+    ADD CONSTRAINT factory_agent_resource_refreshes_pkey PRIMARY KEY (resource_id);
+
+
+--
 -- Name: factory_agent_resource_secrets factory_agent_resource_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3073,6 +3179,22 @@ ALTER TABLE ONLY public.role_metadata
 
 
 --
+-- Name: runner_credential_cleanups runner_credential_cleanups_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_credential_cleanups
+    ADD CONSTRAINT runner_credential_cleanups_name_key UNIQUE (name);
+
+
+--
+-- Name: runner_credential_cleanups runner_credential_cleanups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_credential_cleanups
+    ADD CONSTRAINT runner_credential_cleanups_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: runner_credentials runner_credentials_access_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3110,6 +3232,22 @@ ALTER TABLE ONLY public.runner_registrations
 
 ALTER TABLE ONLY public.runner_task_log_lifecycles
     ADD CONSTRAINT runner_task_log_lifecycles_pkey PRIMARY KEY (task_id);
+
+
+--
+-- Name: runner_task_preparations runner_task_preparations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_preparations
+    ADD CONSTRAINT runner_task_preparations_pkey PRIMARY KEY (task_id);
+
+
+--
+-- Name: runner_task_queue_intervals runner_task_queue_intervals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_queue_intervals
+    ADD CONSTRAINT runner_task_queue_intervals_pkey PRIMARY KEY (id);
 
 
 --
@@ -4066,6 +4204,13 @@ CREATE INDEX idx_factory_work_order_executions_line_dispatch ON public.factory_w
 
 
 --
+-- Name: idx_factory_work_order_executions_organization_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_executions_organization_active ON public.factory_work_order_executions USING btree (organization_id) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying])::text[]));
+
+
+--
 -- Name: idx_factory_work_order_executions_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4112,6 +4257,13 @@ CREATE INDEX idx_factory_work_order_queue_items_factory ON public.factory_work_o
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_order_queue_items USING btree (work_order_id);
+
+
+--
+-- Name: idx_factory_work_order_queue_items_organization_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_queue_items_organization_created ON public.factory_work_order_queue_items USING btree (organization_id, created_at, id);
 
 
 --
@@ -4717,6 +4869,13 @@ CREATE UNIQUE INDEX organizations_slug_active_key ON public.organizations USING 
 
 
 --
+-- Name: runner_credential_cleanup_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_credential_cleanup_pending ON public.runner_credential_cleanups USING btree (next_retry_at) WHERE (completed_at IS NULL);
+
+
+--
 -- Name: runner_fleets_scope_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4752,10 +4911,45 @@ CREATE INDEX runner_task_log_lifecycles_archiving_idx ON public.runner_task_log_
 
 
 --
+-- Name: runner_task_preparation_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_task_preparation_expiry ON public.runner_task_preparations USING btree (deadline) WHERE (prepared_at IS NULL);
+
+
+--
+-- Name: runner_task_queue_intervals_open; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX runner_task_queue_intervals_open ON public.runner_task_queue_intervals USING btree (task_id) WHERE (ended_at IS NULL);
+
+
+--
+-- Name: runner_task_queue_intervals_task; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_task_queue_intervals_task ON public.runner_task_queue_intervals USING btree (task_id, started_at);
+
+
+--
+-- Name: runner_tasks_fleet_queued_creation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_fleet_queued_creation_idx ON public.runner_tasks USING btree (fleet_id, created_at, id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = 'queued'::text) AND (runner_id IS NULL));
+
+
+--
 -- Name: runner_tasks_fleet_state_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX runner_tasks_fleet_state_idx ON public.runner_tasks USING btree (fleet_id, state, queued_at);
+
+
+--
+-- Name: runner_tasks_organization_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING btree (organization_id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = ANY ((ARRAY['reserved'::character varying, 'running'::character varying])::text[])));
 
 
 --
@@ -4934,6 +5128,13 @@ CREATE UNIQUE INDEX workflows_organization_id_name_active_key ON public.workflow
 
 
 --
+-- Name: runner_tasks runner_task_queue_history; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER runner_task_queue_history AFTER INSERT OR UPDATE OF state, runner_id ON public.runner_tasks FOR EACH ROW EXECUTE FUNCTION public.record_runner_task_queue_interval();
+
+
+--
 -- Name: account_linked_accounts account_linked_accounts_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5091,6 +5292,14 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 ALTER TABLE ONLY public.factories
     ADD CONSTRAINT factories_planning_auto_start_line_id_fkey FOREIGN KEY (planning_auto_start_line_id) REFERENCES public.factory_lines(id) ON DELETE SET NULL;
+
+
+--
+-- Name: factory_agent_resource_refreshes factory_agent_resource_refreshes_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_resource_refreshes
+    ADD CONSTRAINT factory_agent_resource_refreshes_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES public.factory_agent_resources(id) ON DELETE CASCADE;
 
 
 --
@@ -5790,6 +5999,14 @@ ALTER TABLE ONLY public.organizations
 
 
 --
+-- Name: runner_credential_cleanups runner_credential_cleanups_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_credential_cleanups
+    ADD CONSTRAINT runner_credential_cleanups_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id);
+
+
+--
 -- Name: runner_credentials runner_credentials_runner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5819,6 +6036,22 @@ ALTER TABLE ONLY public.runner_registrations
 
 ALTER TABLE ONLY public.runner_task_log_lifecycles
     ADD CONSTRAINT runner_task_log_lifecycles_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id) ON DELETE CASCADE;
+
+
+--
+-- Name: runner_task_preparations runner_task_preparations_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_preparations
+    ADD CONSTRAINT runner_task_preparations_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id);
+
+
+--
+-- Name: runner_task_queue_intervals runner_task_queue_intervals_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_queue_intervals
+    ADD CONSTRAINT runner_task_queue_intervals_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id) ON DELETE CASCADE;
 
 
 --
@@ -6309,7 +6542,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261025145014	f
+20261026131736	f
 \.
 
 

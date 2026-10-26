@@ -29,16 +29,31 @@ function liveThinkingCopy(testId: string): string | undefined {
 }
 
 function renderCard(props: {
+  queuedLabel?: string;
   isAnalyzing?: boolean;
   clarityScore?: number;
   confidenceScore?: number;
   hasAgentQuestion?: boolean;
+  queuedRunnerJobs?: FactoriesWorkOrder["queuedRunnerJobs"];
+  state?: FactoriesWorkOrder["state"];
+  lineDispatches?: FactoriesWorkOrder["lineDispatches"];
+  onCancelQueuedRunnerJob?: (orderId: string, queueId: string) => Promise<void>;
+  cancellingQueueJobIds?: ReadonlySet<string>;
+  interactive?: boolean;
 }) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
         <WorkOrderCard
-          entry={buildWorkOrderListEntry(order, factory)}
+          entry={buildWorkOrderListEntry(
+            {
+              ...order,
+              state: props.state ?? order.state,
+              queuedRunnerJobs: props.queuedRunnerJobs,
+              lineDispatches: props.lineDispatches ?? [],
+            },
+            factory,
+          )}
           organizationId="org-1"
           factoryKey="RF"
           factoryLines={[{ id: "line-a", name: "hotfix" }]}
@@ -58,6 +73,65 @@ function renderCard(props: {
 describe("Confidence score on a backlog card", () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("shows a queue icon for a queued line step without a task queue entry", () => {
+    renderCard({ queuedLabel: "Queued #1" });
+
+    expect(screen.getByRole("img", { name: "Waiting for automation slot" })).toBeVisible();
+    expect(screen.queryByLabelText("Draft")).not.toBeInTheDocument();
+  });
+
+  it("shows the queue position instead of the thinking state and removes only that pending work", async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    renderCard({
+      isAnalyzing: true,
+      queuedRunnerJobs: [{ id: "queue-1", position: 2 }],
+      onCancelQueuedRunnerJob: cancel,
+    });
+
+    expect(screen.getByText(/Runner queued #2/)).toBeVisible();
+    expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: `Cancel runner job for ${order.title}` }));
+    expect(cancel).toHaveBeenCalledWith("wo-1", "queue-1");
+  });
+
+  it("keeps the queue label visible while cancellation is pending", () => {
+    renderCard({
+      queuedRunnerJobs: [{ id: "queue-1", position: 1 }],
+      onCancelQueuedRunnerJob: vi.fn(),
+      cancellingQueueJobIds: new Set(["queue-1"]),
+    });
+    expect(screen.getByText(/Runner queued #1/)).toBeVisible();
+    expect(screen.getByRole("button", { name: `Cancel runner job for ${order.title}` })).toBeDisabled();
+  });
+
+  it("keeps pending actions distinct and preserves running status when another automation is active", async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    renderCard({
+      state: "STATE_OPEN",
+      lineDispatches: [{ id: "active", state: "STATE_ACTIVE", stepExecutions: [] }],
+      queuedRunnerJobs: [
+        { id: "queue-1", position: 2, automationName: "Implement" },
+        { id: "queue-2", position: 3, automationName: "Review" },
+      ],
+      onCancelQueuedRunnerJob: cancel,
+    });
+    expect(screen.getByText(/Implement: Runner queued #2/)).toBeVisible();
+    expect(screen.getByText(/Review: Runner queued #3/)).toBeVisible();
+    expect(screen.getByLabelText("Running")).toBeVisible();
+    await userEvent.setup().click(screen.getByRole("button", { name: `Cancel Review runner job for ${order.title}` }));
+    expect(cancel).toHaveBeenCalledWith("wo-1", "queue-2");
+  });
+
+  it("shows queued work without a cancellation control on the public board", () => {
+    renderCard({
+      queuedRunnerJobs: [{ id: "queue-1", position: 3 }],
+      interactive: false,
+      onCancelQueuedRunnerJob: vi.fn(),
+    });
+    expect(screen.getByText(/Runner queued #3/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: `Cancel runner job for ${order.title}` })).not.toBeInTheDocument();
   });
 
   it("shows that analysis runs while the score is not ready", () => {
