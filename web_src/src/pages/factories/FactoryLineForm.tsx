@@ -1,4 +1,4 @@
-import type { FactoryAutomation, FactoryLineStep } from "@/api-client";
+import type { FactoriesFactoryLineStep as FactoryLineStep, FactoryAutomation } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

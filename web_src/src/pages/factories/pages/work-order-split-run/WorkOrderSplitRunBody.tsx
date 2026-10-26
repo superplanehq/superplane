@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { FilesFile } from "@/api-client";
 import { formatWorkOrderDateTime } from "../../lib/workOrderDateTime";
 import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
+import type { ManualCustomVerification } from "../../lib/customVerification";
 
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
@@ -28,6 +29,7 @@ type WorkOrderSplitRunBodyProps = {
   lineId?: string;
   fixture: SplitRunFixture;
   canUpdate?: boolean;
+  manualCustomVerifications?: readonly ManualCustomVerification[];
   footerActions: SplitRunFooterActions;
   files?: FilesFile[];
 };

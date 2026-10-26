@@ -65,6 +65,7 @@ import {
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
   RiskScoreSetupPage,
+  CustomVerificationSetupPage,
   SentryIntakeSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
@@ -191,6 +192,8 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/risk-score" element={<RiskScoreSetupPage />} />
+              <Route path=":lineId/setup/custom-verification" element={<CustomVerificationSetupPage />} />
+              <Route path=":lineId/setup/custom-verification/:automationId" element={<CustomVerificationSetupPage />} />
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
               <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />

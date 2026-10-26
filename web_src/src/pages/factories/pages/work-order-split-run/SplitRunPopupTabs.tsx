@@ -3,6 +3,7 @@ import { useMemo, type ReactNode } from "react";
 import type { FilesFile } from "@/api-client";
 import { useWorkOrder } from "@/hooks/useFactoryData";
 
+import type { ManualCustomVerification } from "../../lib/customVerification";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
 import { phasesWithRunArtifacts } from "./attachStreamArtifacts";
 import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant";
@@ -27,6 +28,7 @@ type SplitRunPopupTabsProps = {
   orderNumber?: string;
   lineId?: string;
   canUpdate: boolean;
+  manualCustomVerifications?: readonly ManualCustomVerification[];
   footerActions: SplitRunFooterActions;
   resultFooter?: ReactNode;
   sidebarNote?: ReactNode;
@@ -115,6 +117,7 @@ export function SplitRunPopupTabs({
   orderNumber,
   lineId,
   canUpdate,
+  manualCustomVerifications,
   footerActions,
   resultFooter,
   sidebarNote,
@@ -187,6 +190,7 @@ export function SplitRunPopupTabs({
           artifacts={popupData.artifacts}
           panelReview={panelReview}
           canStopRun={Boolean(canUpdate && organizationId && factoryId && orderId)}
+          manualCustomVerifications={manualCustomVerifications}
           actionBusy={footerActions.busy}
           onStopRun={(run) => void footerActions.handleStopAutomation(run)}
           onRerunStep={(phase) =>

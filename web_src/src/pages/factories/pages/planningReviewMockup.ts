@@ -11,6 +11,7 @@ export interface PlanningReviewStep {
   command?: string;
   prompt?: string;
   workingDirectory?: string;
+  secrets?: string[];
 }
 
 export interface PlanningReviewComponent {
