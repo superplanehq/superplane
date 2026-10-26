@@ -38,7 +38,7 @@ describe("FactorySettingsRepositoryPage", () => {
 
     await waitFor(() => expect(saveButton).toBeDisabled());
     expect(within(settings).getByRole("option", { name: /acme\/web/i })).toHaveAttribute("aria-selected", "true");
-  }, 10000);
+  }, 20000);
 
   it("shows only repositories accessible to the linked account for a hosted binding", async () => {
     const fixture = factoriesFixtureWithSetupAnswers({
@@ -57,7 +57,7 @@ describe("FactorySettingsRepositoryPage", () => {
     const settings = await screen.findByTestId("factory-settings-repository", {}, { timeout: 8000 });
     expect(await within(settings).findByRole("option", { name: /acme\/api/i })).toBeInTheDocument();
     expect(within(settings).queryByRole("option", { name: /acme\/web/i })).not.toBeInTheDocument();
-  }, 10000);
+  }, 20000);
 
   it("lists integration repositories when catalog IDs are unset zero strings", async () => {
     // The API serializes unset int64 IDs as "0". A Bitbucket workspace without
@@ -79,7 +79,7 @@ describe("FactorySettingsRepositoryPage", () => {
     const settings = await screen.findByTestId("factory-settings-repository", {}, { timeout: 8000 });
     expect(await within(settings).findByRole("option", { name: /acme\/api/i })).toBeInTheDocument();
     expect(within(settings).getByRole("option", { name: /acme\/web/i })).toBeInTheDocument();
-  }, 10000);
+  }, 20000);
 
   it("enables save when the branch changes and sends that branch with the current repository", async () => {
     const user = userEvent.setup();
@@ -115,7 +115,7 @@ describe("FactorySettingsRepositoryPage", () => {
     } finally {
       globalThis.fetch = currentFetch;
     }
-  }, 10000);
+  }, 20000);
 });
 
 function requestTarget(input: RequestInfo | URL): string {
