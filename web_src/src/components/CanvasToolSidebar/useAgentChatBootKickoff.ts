@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createSystemMessage } from "@/components/AgentSidebar/systemMessages";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 import type { useAgentChatMessages, useSendAgentChatMessage } from "@/hooks/useAgentChats";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
@@ -21,6 +22,7 @@ export function useAgentChatBootKickoff({
   canvasId: string;
   isAutoLayoutOnUpdateEnabled: boolean;
 }) {
+  const inSupportSession = useIsSupportSession();
   const [bootReadinessSignal, setBootReadinessSignal] = useState(0);
   const bootState = useRef<"idle" | "sending" | "sent">("idle");
 
@@ -37,6 +39,7 @@ export function useAgentChatBootKickoff({
   }, [canvasId]);
 
   useEffect(() => {
+    if (inSupportSession) return;
     if (bootState.current !== "idle") return;
     if (!messagesQuery.data || messagesQuery.isLoading) return;
     if (!isAgentBootReady(canvasId)) return;
@@ -65,6 +68,7 @@ export function useAgentChatBootKickoff({
         bootState.current = "idle";
       });
   }, [
+    inSupportSession,
     messagesQuery.data,
     messagesQuery.isLoading,
     bootReadinessSignal,

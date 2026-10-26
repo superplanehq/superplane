@@ -25,15 +25,10 @@ const BUSINESS_PERIOD_END = ACTIVE_BILLING_PERIOD_ENDS_AT;
 let canUpdateOrg = true;
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({
-    canAct: (resource: string, action: string) => {
-      if (resource === "org" && action === "update") {
-        return canUpdateOrg;
-      }
-      return true;
-    },
-    isLoading: false,
-  }),
+  usePermissions: () => {
+    const canAct = (resource: string, action: string) => resource !== "org" || action !== "update" || canUpdateOrg;
+    return { canAct, hasPermission: canAct, isLoading: false };
+  },
 }));
 
 describe("OrganizationSettingsBillingPage plans", () => {

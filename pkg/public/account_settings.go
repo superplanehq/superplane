@@ -60,8 +60,8 @@ func (s *Server) updateAccount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if hasActiveImpersonation(r) {
-		http.Error(w, "Account updates are not allowed while impersonating", http.StatusForbidden)
+	if hasActiveSupportSession(r) {
+		http.Error(w, "Account updates are not allowed in a read-only support session", http.StatusForbidden)
 		return
 	}
 
@@ -130,8 +130,8 @@ func (s *Server) disconnectAccountProvider(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if hasActiveImpersonation(r) {
-		http.Error(w, "Sign-in methods cannot change while impersonating", http.StatusForbidden)
+	if hasActiveSupportSession(r) {
+		http.Error(w, "Sign-in methods cannot change in a read-only support session", http.StatusForbidden)
 		return
 	}
 
@@ -167,8 +167,8 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if hasActiveImpersonation(r) {
-		http.Error(w, "Account deletion is not allowed while impersonating", http.StatusForbidden)
+	if hasActiveSupportSession(r) {
+		http.Error(w, "Account deletion is not allowed in a read-only support session", http.StatusForbidden)
 		return
 	}
 

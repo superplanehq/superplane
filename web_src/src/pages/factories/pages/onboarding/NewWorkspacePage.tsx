@@ -2,7 +2,9 @@ import { Link } from "@/components/Link/link";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateFactory, useFactories } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 import { getApiErrorMessage } from "@/lib/errors";
+import { SUPPORT_SESSION_READ_ONLY_MESSAGE } from "@/lib/supportSession";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Loader2 } from "lucide-react";
@@ -19,9 +21,23 @@ import { PLACEHOLDER_WORKSPACE_NAME } from "./workspaceNames";
  */
 export function NewWorkspacePage() {
   const { organizationId } = useParams<{ organizationId: string }>();
+  const inSupportSession = useIsSupportSession();
 
   if (!organizationId) {
     return null;
+  }
+
+  if (inSupportSession) {
+    return (
+      <NewWorkspaceFrame>
+        <div className="mt-6 rounded-lg border border-border p-4">
+          <p className="text-[13px] text-muted-foreground">{SUPPORT_SESSION_READ_ONLY_MESSAGE}</p>
+          <Link href={factoryListPath(organizationId)} className="mt-3 inline-block text-[13px] hover:underline">
+            Back to workspaces
+          </Link>
+        </div>
+      </NewWorkspaceFrame>
+    );
   }
 
   return <NewWorkspacePageContent organizationId={organizationId} />;

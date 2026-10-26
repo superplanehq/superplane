@@ -1,17 +1,18 @@
+import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/useAccount";
-import React from "react";
+import { SUPPORT_SESSION_END_PATH } from "@/lib/supportSession";
 
-const ImpersonationBanner: React.FC = () => {
+export function SupportSessionBanner() {
   const { account } = useAccount();
 
-  const impersonation = account?.impersonation;
-  if (!impersonation?.active) {
+  const supportSession = account?.support_session;
+  if (!supportSession?.active) {
     return null;
   }
 
-  const handleEndImpersonation = async () => {
+  const handleEndSupportSession = async () => {
     try {
-      const response = await fetch("/admin/api/impersonate/end", {
+      const response = await fetch(SUPPORT_SESSION_END_PATH, {
         method: "POST",
         credentials: "include",
       });
@@ -29,21 +30,20 @@ const ImpersonationBanner: React.FC = () => {
   };
 
   return (
-    <div className="shrink-0">
+    <div className="shrink-0" role="status">
       <div className="flex items-center justify-center gap-3 bg-amber-400 px-4 py-2 text-center text-sm font-medium text-amber-900 shadow-sm">
         <span>
-          You are viewing as <strong>{impersonation.user_name}</strong>
+          Support session for <strong>{supportSession.user_name}</strong>. This session is read-only.
         </span>
-        <button
+        <Button
           type="button"
-          onClick={handleEndImpersonation}
-          className="rounded bg-amber-600 px-3 py-0.5 text-xs font-medium text-white transition-colors hover:bg-amber-700"
+          size="xs"
+          onClick={handleEndSupportSession}
+          className="bg-amber-600 text-white hover:bg-amber-700"
         >
-          Exit Impersonation
-        </button>
+          End support session
+        </Button>
       </div>
     </div>
   );
-};
-
-export default ImpersonationBanner;
+}

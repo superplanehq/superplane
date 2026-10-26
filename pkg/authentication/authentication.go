@@ -29,6 +29,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
 )
@@ -479,6 +480,7 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	gothic.Logout(w, r)
 
 	ClearAccountCookie(w, r)
+	supportsession.ClearCookie(w, r)
 
 	http.Redirect(w, r, getPostLogoutRedirectURL(r), http.StatusTemporaryRedirect)
 }

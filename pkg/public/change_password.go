@@ -12,25 +12,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/supportsession"
 	"gorm.io/gorm"
 )
-
-// hasActiveImpersonation reports whether the request is being served
-// inside a fully validated impersonation session. We deliberately rely
-// on middleware.GetImpersonationFromContext rather than re-parsing the
-// cookie locally: the middleware has already verified that the cookie
-// is a real impersonation token issued to *this* admin, that the admin
-// is still an installation admin, and that the session is fresh
-// relative to password rotation. A stale or unrelated cookie that
-// happens to be structurally valid will not produce an Active info
-// here, so we won't incorrectly block password changes for it.
-func hasActiveImpersonation(r *http.Request) bool {
-	info, ok := middleware.GetImpersonationFromContext(r.Context())
-	return ok && info != nil && info.Active
-}
 
 const minPasswordLength = 8
 
@@ -55,17 +41,17 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Always operate on the real account, never the impersonated one.
+	// Always operate on the real account, never the support session target.
 	// An installation admin must not be able to silently rewrite the
-	// password of a user they are impersonating.
+	// password of a user in their support session.
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if hasActiveImpersonation(r) {
-		http.Error(w, "Password change is not allowed while impersonating", http.StatusForbidden)
+	if hasActiveSupportSession(r) {
+		http.Error(w, "Password change is not allowed in a read-only support session", http.StatusForbidden)
 		return
 	}
 
@@ -143,9 +129,9 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Drop any impersonation cookie defensively (we already refused above
+	// Drop any support session cookie defensively (we already refused above
 	// when one was present, but a stale cookie might still be on the wire).
-	impersonation.ClearCookie(w, r)
+	supportsession.ClearCookie(w, r)
 
 	// Reissue the current device's cookie so the user stays signed in
 	// here. Its iat is after PasswordChangedAt, so the freshness check
