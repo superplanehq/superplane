@@ -292,6 +292,29 @@ alerts the team. A higher count is paid capacity. What happens when a lower
 count leaves fewer seats than current members is an
 [open question](#d11-outside-seat-reduction-below-the-member-count).
 
+### Admin-assigned plans without a Polar subscription
+
+**Locked decision:** Business Manual (`business_manual`) and custom plans
+assigned by an installation admin, such as SuperPlane only, can be active
+without a Polar subscription. This is intentional product behavior. Do not
+require a subscription to preserve these assignments.
+
+- The Billing page must show the assigned catalog plan as the current plan.
+- Opening Billing, running subscription sync, or processing a webhook must
+  not replace an admin-assigned plan with None because Polar has no live
+  subscription. Old canceled subscriptions and retained subscription IDs
+  are history, not authority to remove the manual assignment.
+- Preserve the assigned plan, its access, and its credit-purchase permission
+  when an inactive subscription snapshot arrives. Apply this rule whether
+  the organization retains an old subscription ID or has no subscription ID.
+- A live Polar subscription can still replace the admin assignment. Keep
+  the existing subscription identity and event-ordering checks. A scheduled
+  cancellation with an open paid period still counts as live.
+
+Regression coverage must verify that an old canceled subscription cannot
+clear Business Manual or a custom admin-assigned plan. Keep coverage that
+verifies activation of a live Polar subscription.
+
 ## Information customers need
 
 Billing and member management must make the following information clear:
