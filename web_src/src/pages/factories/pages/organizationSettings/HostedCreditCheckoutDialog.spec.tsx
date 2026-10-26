@@ -108,22 +108,22 @@ describe("HostedCreditCheckoutDialog", () => {
     client.setConfig({ baseUrl: "http://localhost", fetch: fetchQuote });
     const { user, onAddCredit } = renderDialog();
     await user.click(screen.getByRole("button", { name: "Custom" }));
-    const amount = screen.getByRole("textbox", { name: "Credit amount in USD" });
-    const confirm = screen.getByRole("button", { name: "Continue to checkout" });
+    const amount = () => screen.getByRole("textbox", { name: "Credit amount in USD" });
+    const confirm = () => screen.getByRole("button", { name: "Continue to checkout" });
 
     for (const invalid of ["0", "-1", "1.234", "1e2", "9007199254740992"]) {
-      fireEvent.change(amount, { target: { value: invalid } });
-      expect(confirm).toBeDisabled();
+      fireEvent.change(amount(), { target: { value: invalid } });
+      expect(confirm()).toBeDisabled();
     }
     expect(fetchQuote).not.toHaveBeenCalled();
-    await user.clear(amount);
-    await user.type(amount, "12.34");
-    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.clear(amount());
+    await user.paste("12.34");
+    await waitFor(() => expect(confirm()).toBeEnabled());
     expect(screen.getByText("$13.52")).toBeInTheDocument();
 
-    await user.clear(amount);
-    await user.type(amount, "25");
-    expect(confirm).toBeDisabled();
+    await user.clear(amount());
+    await user.paste("25");
+    expect(confirm()).toBeDisabled();
     expect(screen.queryByText("$13.52")).not.toBeInTheDocument();
     await waitFor(() => expect(resolveQuote).toBeDefined());
     await act(async () => {
@@ -139,8 +139,8 @@ describe("HostedCreditCheckoutDialog", () => {
         }),
       );
     });
-    await waitFor(() => expect(confirm).toBeEnabled());
-    await user.click(confirm);
+    await waitFor(() => expect(confirm()).toBeEnabled());
+    await user.click(confirm());
     expect(onAddCredit).toHaveBeenCalledWith({
       productId: "prod-custom",
       creditAmountCents: "2500",
