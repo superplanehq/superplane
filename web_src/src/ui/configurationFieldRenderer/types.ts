@@ -27,4 +27,5 @@ export interface FieldRendererProps {
   expressionErrorMessage?: string;
   expressionTemplateValue?: unknown;
   triggerClassName?: string;
+  modelOnly?: boolean;
 }

@@ -18,8 +18,7 @@ export function useWorkOrdersHeaderShortcuts(state: WorkOrderListState): RefObje
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
-      const target = event.target as HTMLElement | null;
-      if (target && isEditableTarget(target)) {
+      if (isEditableEvent(event)) {
         return;
       }
       if (event.key === "/") {
@@ -46,7 +45,17 @@ export function useWorkOrdersHeaderShortcuts(state: WorkOrderListState): RefObje
   return searchRef;
 }
 
+function isEditableEvent(event: KeyboardEvent): boolean {
+  return event.composedPath().some((target) => target instanceof HTMLElement && isEditableTarget(target));
+}
+
 function isEditableTarget(target: HTMLElement): boolean {
   const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    target.isContentEditable ||
+    target.matches(".monaco-editor, [data-global-shortcuts='ignore']")
+  );
 }

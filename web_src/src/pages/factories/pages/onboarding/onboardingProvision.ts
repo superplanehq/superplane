@@ -6,7 +6,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryAutomation,
-  FactoryLineStep,
+  FactoriesFactoryLineStep as FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import {

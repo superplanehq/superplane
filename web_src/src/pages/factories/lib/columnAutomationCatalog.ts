@@ -13,6 +13,7 @@ import type {
 export const ANALYSIS_CATALOG_ID = "analysis";
 export const AGENT_STEP_CATALOG_ID = "agent-step";
 export const CUSTOM_CATALOG_ID = "custom";
+export const CUSTOM_AUTOMATION_CATALOG_ID = "custom-verification";
 export const PR_CLOSURE_CATALOG_ID = "pr-closure";
 export const RISK_SCORE_CATALOG_ID = "risk-score";
 export const VISUAL_EVIDENCE_CATALOG_ID = "visual-evidence";
@@ -59,6 +60,18 @@ export const EVENT_CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
   name: "Custom automation",
   description: "Add a blank automation. Choose a trigger and the steps to run.",
   trigger: "On a trigger you choose",
+  action: "Run the automation",
+  iconSrc: "",
+  iconAlt: "",
+  unique: false,
+};
+
+export const CUSTOM_AUTOMATION_ENTRY: ColumnAutomationCatalogEntry = {
+  id: CUSTOM_AUTOMATION_CATALOG_ID,
+  kind: "custom-verification",
+  name: "Custom automation",
+  description: "Run ordered prompt and Bash steps on a pull request.",
+  trigger: "Manual or automatic",
   action: "Run the automation",
   iconSrc: "",
   iconAlt: "",
@@ -140,7 +153,7 @@ export function catalogForColumn(
       }),
       RISK_SCORE_ENTRY,
       ...(options?.vcsProvider === "bitbucket" ? [] : [VISUAL_EVIDENCE_ENTRY]),
-      ...(allowCustom ? [EVENT_CUSTOM_ENTRY] : []),
+      ...(allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : []),
     ];
   }
   if (key === "done") {
@@ -164,7 +177,7 @@ export function onlyCustomCatalogRemains(
   takenIds: readonly string[],
 ): boolean {
   const remaining = catalog.filter((entry) => !takenIds.includes(entry.id));
-  return remaining.length === 1 && remaining[0]?.kind === "custom";
+  return remaining.length === 1 && ["custom", "custom-verification"].includes(remaining[0]?.kind ?? "");
 }
 
 export function prFeedbackSentence(sourceId: string): { kind: ColumnAutomationKind; trigger: string; action: string } {
