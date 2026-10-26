@@ -1,5 +1,6 @@
-// Package polarfake is a fake Polar subscription API for tests that schedule
-// seat counts.
+// Package polarfake is a fake Polar subscription API for seat tests. Its
+// pending seat count stands for a next-period reduction that the retired
+// automatic scheduler left in Polar.
 package polarfake
 
 import (

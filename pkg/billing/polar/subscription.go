@@ -42,7 +42,9 @@ func BusinessCheckoutProductID(tx *gorm.DB) (string, error) {
 	return BusinessProductID(), nil
 }
 
-func ApplySubscriptionEvent(ctx context.Context, tx *gorm.DB, event *SubscriptionWebhookEvent) error {
+// ApplySubscriptionEvent applies a subscription webhook in its own
+// transaction and writes the capacity alerts after the commit.
+func ApplySubscriptionEvent(ctx context.Context, db *gorm.DB, event *SubscriptionWebhookEvent) error {
 	if event == nil {
 		return permanentApplyError("subscription event is required")
 	}
@@ -53,20 +55,71 @@ func ApplySubscriptionEvent(ctx context.Context, tx *gorm.DB, event *Subscriptio
 	if data.ModifiedAt.Time.IsZero() && !event.Timestamp.Time.IsZero() {
 		data.ModifiedAt = event.Timestamp
 	}
-	return ApplySubscription(ctx, tx, data)
+	return ApplySubscription(ctx, db, data)
 }
 
-func ApplySubscription(ctx context.Context, tx *gorm.DB, data SubscriptionData) error {
-	return applySubscription(ctx, tx, data, false)
+// ApplySubscription applies an unverified snapshot in its own transaction and
+// writes the capacity alerts after the commit.
+func ApplySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData) error {
+	return applyAndEmit(ctx, db, data, false)
+}
+
+// ApplyOrganizationSubscription applies a snapshot that a direct Polar API
+// call returned, in its own transaction, and writes the capacity alerts after
+// the commit. Those snapshots can omit the customer, so the organization fills
+// it in. Inside a caller transaction, use StageOrganizationSubscription.
+func ApplyOrganizationSubscription(ctx context.Context, db *gorm.DB, orgID uuid.UUID, data SubscriptionData) error {
+	return applyAndEmit(ctx, db, withOrganizationCustomer(orgID, data), true)
+}
+
+// StageOrganizationSubscription applies a verified snapshot inside the
+// transaction of the caller. It writes no alert. It returns the staged
+// capacity transitions, and the caller emits them only after its outermost
+// transaction committed.
+func StageOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, data SubscriptionData) (SeatCapacityAlerts, error) {
+	if !inTransaction(tx) {
+		return nil, errors.New("stage the Polar subscription inside a transaction")
+	}
+	return applySubscription(ctx, tx, withOrganizationCustomer(orgID, data), true)
+}
+
+// applyAndEmit applies the snapshot in transactions that it owns, so the
+// capacity alerts that it writes describe committed state only.
+func applyAndEmit(ctx context.Context, db *gorm.DB, data SubscriptionData, verified bool) error {
+	if inTransaction(db) {
+		return errors.New("apply the Polar subscription outside a caller transaction, or stage it")
+	}
+	alerts, err := applySubscription(ctx, db, data, verified)
+	if err != nil {
+		return err
+	}
+	alerts.Emit()
+	return nil
+}
+
+func withOrganizationCustomer(orgID uuid.UUID, data SubscriptionData) SubscriptionData {
+	if strings.TrimSpace(data.organizationExternalID()) == "" {
+		data.ExternalCustomerID = orgID.String()
+	}
+	return data
+}
+
+func inTransaction(db *gorm.DB) bool {
+	_, ok := db.Statement.ConnPool.(gorm.TxCommitter)
+	return ok
 }
 
 // applySubscription applies a subscription snapshot. Snapshots that a direct
 // Polar API call returned are verified; webhook payloads are not, because a
 // delayed event can claim access that Polar already ended.
-func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, verified bool) error {
+//
+// It returns the capacity transitions of the applied state and never writes
+// them. When db is a caller transaction, the transaction below is a savepoint
+// and the caller still owns the commit.
+func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, verified bool) (SeatCapacityAlerts, error) {
 	orgID, err := data.OrganizationID()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	incoming := subscriptionSnapshot(data)
 	incoming.Verified = verified
@@ -74,9 +127,9 @@ func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, 
 	needsSnapshot := errors.New("Polar subscription snapshot required")
 	for {
 		if err := ctx.Err(); err != nil {
-			return err
+			return nil, err
 		}
-		var capacity SeatCapacityCheck
+		var alerts SeatCapacityAlerts
 		var readID, readReason string
 		err = db.WithContext(ctx).Transaction(func(inner *gorm.DB) error {
 			if _, err := models.LockOrganization(inner, orgID); err != nil {
@@ -141,38 +194,40 @@ func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, 
 				return nil
 			}
 			// Check the final plan once, after an atomic subscription replacement.
-			capacity, err = RecheckSeatCapacity(inner, orgID, snapshotSeatCapacityCause(previous, result.Plan))
-			return err
+			capacity, err := RecheckSeatCapacity(inner, orgID, snapshotSeatCapacityCause(previous, result.Plan))
+			if err != nil {
+				return err
+			}
+			alerts = SeatCapacityAlerts{capacity}
+			return nil
 		})
 		if !errors.Is(err, needsSnapshot) {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				_, lookupErr := models.FindOrganizationByIDInTransaction(db.WithContext(ctx), orgID.String())
 				if errors.Is(lookupErr, gorm.ErrRecordNotFound) {
-					return subscriptionOrganizationNotFound(db.WithContext(ctx), orgID, data)
+					return nil, subscriptionOrganizationNotFound(db.WithContext(ctx), orgID, data)
 				}
 				if lookupErr != nil {
-					return lookupErr
+					return nil, lookupErr
 				}
 			}
 			if errors.Is(err, models.ErrInvalidPurchasedSeats) && !errors.Is(err, models.ErrPolarSubscriptionRefreshFailed) {
-				return permanentApplyError(err.Error())
+				return nil, permanentApplyError(err.Error())
 			}
 			if err != nil {
-				return err
+				return nil, err
 			}
-			// When db is itself a transaction, this runs before the outer commit.
-			capacity.Log()
-			return nil
+			return alerts, nil
 		}
 		// Roll back every tentative write before HTTP. A new transaction
 		// rechecks identity and ordering under the lock after the response.
 		// An outer transaction belongs to the caller and cannot be released here.
-		if _, inTransaction := db.Statement.ConnPool.(gorm.TxCommitter); inTransaction {
-			return fmt.Errorf("%w: %s Polar subscription %q outside the caller transaction", models.ErrPolarSubscriptionRefreshFailed, readReason, readID)
+		if inTransaction(db) {
+			return nil, fmt.Errorf("%w: %s Polar subscription %q outside the caller transaction", models.ErrPolarSubscriptionRefreshFailed, readReason, readID)
 		}
 		refreshed, err := readOrganizationSubscription(ctx, orgID, readID, readReason)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if readReason == "verify" {
 			verifiedIncoming = refreshed
@@ -221,9 +276,12 @@ func syncSubscriptionSideEffects(tx *gorm.DB, orgID uuid.UUID, data Subscription
 			return err
 		}
 	}
-	// A live subscription ends the pending checkout for its product.
+	// A live subscription ends the checkout that created it. Polar names
+	// that checkout, so the product or the seat count alone never resolves
+	// an intent. An intent without a matching Polar checkout ID stays
+	// unresolved until checkout reconciliation reads Polar.
 	if models.PolarSubscriptionIsLive(data.Status, data.CancelAtPeriodEnd, data.CurrentPeriodEnd.TimePtr(), time.Now()) {
-		if err := models.ResolveOrganizationBillingCheckoutForSubscription(tx, orgID, data.ProductID); err != nil {
+		if err := models.ResolveOrganizationBillingCheckoutForSubscription(tx, orgID, data.CheckoutID); err != nil {
 			return err
 		}
 	}
@@ -273,15 +331,6 @@ func logSubscriptionForDeletedOrganization(tx *gorm.DB, orgID uuid.UUID, data Su
 		"polar_subscription_status": strings.ToLower(strings.TrimSpace(data.Status)),
 	}).Error(subscriptionForDeletedOrganizationEvent)
 	return true, nil
-}
-
-// ApplyOrganizationSubscription applies a snapshot that a direct Polar API call
-// returned. Those snapshots can omit the customer, so the organization fills it in.
-func ApplyOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, data SubscriptionData) error {
-	if strings.TrimSpace(data.organizationExternalID()) == "" {
-		data.ExternalCustomerID = orgID.String()
-	}
-	return applySubscription(ctx, tx, data, true)
 }
 
 func SyncOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) error {

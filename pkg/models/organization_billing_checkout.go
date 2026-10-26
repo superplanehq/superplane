@@ -42,6 +42,11 @@ var ErrBillingCheckoutStateConflict = errors.New("billing checkout intent change
 
 var ErrBillingCheckoutLiveSubscription = errors.New("organization has a live subscription")
 
+// ErrBillingCheckoutSeatsBelowMembers rejects a checkout whose seat count does
+// not cover the current members. Payment of such a checkout would leave more
+// members than paid seats.
+var ErrBillingCheckoutSeatsBelowMembers = errors.New("the selected seats do not cover the current members")
+
 var unresolvedBillingCheckoutStates = []string{
 	BillingCheckoutStateCreating,
 	BillingCheckoutStateAmbiguous,
@@ -107,6 +112,13 @@ func (c *OrganizationBillingCheckout) MatchesSelection(planKey, productID string
 	return *c.Seats == *seats
 }
 
+// AdmitsMembers reports that the intent leaves room for the given number of
+// members. A checkout without a seat count is not per seat and limits no
+// membership.
+func (c *OrganizationBillingCheckout) AdmitsMembers(members int) bool {
+	return c.Seats == nil || members <= *c.Seats
+}
+
 // PolarCheckoutIDValue returns the Polar checkout ID, or an empty string.
 func (c *OrganizationBillingCheckout) PolarCheckoutIDValue() string {
 	if c.PolarCheckoutID == nil {
@@ -164,8 +176,11 @@ func (c *OrganizationBillingCheckout) Release(tx *gorm.DB, reason string) error 
 
 // ClaimOrganizationBillingCheckout creates the creating intent of an
 // organization, unless an unresolved intent exists. The organization lock
-// serializes concurrent claims. It returns the intent and whether this call
-// created it. The caller makes the Polar call after this function returns.
+// serializes concurrent claims and invitation acceptance, so the selected
+// seats cover the members at the claim, and acceptance keeps the members
+// within them while the checkout can activate. It returns the intent and
+// whether this call created it. The caller makes the Polar call after this
+// function returns.
 func ClaimOrganizationBillingCheckout(tx *gorm.DB, orgID uuid.UUID, planKey, productID string, seats *int) (*OrganizationBillingCheckout, bool, error) {
 	var checkout *OrganizationBillingCheckout
 	claimed := false
@@ -188,15 +203,25 @@ func ClaimOrganizationBillingCheckout(tx *gorm.DB, orgID uuid.UUID, planKey, pro
 			checkout = existing
 			return nil
 		}
-		checkout = &OrganizationBillingCheckout{
+		candidate := &OrganizationBillingCheckout{
 			OrganizationID: orgID,
 			PlanKey:        planKey,
 			PolarProductID: productID,
 			Seats:          seats,
 			State:          BillingCheckoutStateCreating,
 		}
-		claimed = true
-		return inner.Create(checkout).Error
+		members, err := CountActiveHumanUsersByOrganization(inner, orgID.String())
+		if err != nil {
+			return err
+		}
+		if !candidate.AdmitsMembers(max(int(members), 1)) {
+			return ErrBillingCheckoutSeatsBelowMembers
+		}
+		if err := inner.Create(candidate).Error; err != nil {
+			return err
+		}
+		checkout, claimed = candidate, true
+		return nil
 	})
 	if err != nil {
 		return nil, false, err
@@ -253,6 +278,16 @@ func FindUnresolvedOrganizationBillingCheckout(tx *gorm.DB, orgID uuid.UUID) (*O
 	return &checkout, nil
 }
 
+// OrganizationHasPolarCustomer reports that the organization has a Polar
+// customer. Only such an organization can hold a Polar checkout.
+func OrganizationHasPolarCustomer(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
+	var count int64
+	err := tx.Model(&OrganizationLLMSettings{}).
+		Where("organization_id = ? AND polar_customer_id IS NOT NULL AND polar_customer_id <> ''", orgID).
+		Limit(1).Count(&count).Error
+	return count > 0, err
+}
+
 // OrganizationHasBillingCheckouts reports whether the organization has any
 // intent row, resolved or not.
 func OrganizationHasBillingCheckouts(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
@@ -262,12 +297,19 @@ func OrganizationHasBillingCheckouts(tx *gorm.DB, orgID uuid.UUID) (bool, error)
 }
 
 // ResolveOrganizationBillingCheckoutForSubscription marks the unresolved intent
-// of a product as succeeded. The subscription apply path calls it, under the
-// organization lock, when a live subscription of that product is applied.
-func ResolveOrganizationBillingCheckoutForSubscription(tx *gorm.DB, orgID uuid.UUID, productID string) error {
+// of the Polar checkout that created a subscription as succeeded. The
+// subscription apply path calls it, under the organization lock, when a live
+// subscription is applied. Only the Polar checkout identity matches: the
+// product or the seat count can describe another checkout. An empty checkout
+// ID resolves nothing.
+func ResolveOrganizationBillingCheckoutForSubscription(tx *gorm.DB, orgID uuid.UUID, checkoutID string) error {
+	checkoutID = strings.TrimSpace(checkoutID)
+	if checkoutID == "" {
+		return nil
+	}
 	now := time.Now()
 	return tx.Model(&OrganizationBillingCheckout{}).
-		Where("organization_id = ? AND polar_product_id = ? AND state IN ?", orgID, productID, unresolvedBillingCheckoutStates).
+		Where("organization_id = ? AND polar_checkout_id = ? AND state IN ?", orgID, checkoutID, unresolvedBillingCheckoutStates).
 		Updates(map[string]any{
 			"state":       BillingCheckoutStateSucceeded,
 			"resolved_at": now,

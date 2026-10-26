@@ -832,9 +832,10 @@ func TestLiveSubscriptionResolvesThePendingTeamCheckout(t *testing.T) {
 	_, err := f.selectSeats(3)
 	require.NoError(t, err)
 	subscriptionID := "sub_" + uuid.NewString()
+	checkoutID := f.provider.checkouts()[0].ID
 	apply := func(status string, modifiedAt time.Time) {
 		start := modifiedAt.UTC().Truncate(time.Second)
-		payload, err := json.Marshal(map[string]any{"id": subscriptionID, "product_id": f.product, "status": status, "seats": 3, "external_customer_id": f.r.Organization.ID.String(), "current_period_start": start, "current_period_end": start.AddDate(0, 1, 0), "modified_at": start})
+		payload, err := json.Marshal(map[string]any{"id": subscriptionID, "product_id": f.product, "checkout_id": checkoutID, "status": status, "seats": 3, "external_customer_id": f.r.Organization.ID.String(), "current_period_start": start, "current_period_end": start.AddDate(0, 1, 0), "modified_at": start})
 		require.NoError(t, err)
 		var snapshot polar.SubscriptionData
 		require.NoError(t, json.Unmarshal(payload, &snapshot))

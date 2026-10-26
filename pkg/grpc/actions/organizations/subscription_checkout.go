@@ -3,7 +3,6 @@ package organizations
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -14,17 +13,9 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	// checkoutIntentGraceWindow is how long an intent without a Polar checkout
-	// can still become one. Polar documents no default checkout lifetime, so
-	// this is a chosen value. A create call that a client abandoned cannot
-	// take effect at Polar after this window.
-	checkoutIntentGraceWindow = 10 * time.Minute
-
-	// maxCheckoutClaimAttempts bounds the claim and reconcile loop. Each
-	// repeat means that another request changed the intent in between.
-	maxCheckoutClaimAttempts = 3
-)
+// maxCheckoutClaimAttempts bounds the claim and reconcile loop. Each repeat
+// means that another request changed the intent in between.
+const maxCheckoutClaimAttempts = 3
 
 type subscriptionCheckoutRequest struct {
 	OrganizationID uuid.UUID
@@ -43,8 +34,9 @@ type subscriptionCheckoutRequest struct {
 // after that transaction ended.
 func startSubscriptionCheckout(ctx context.Context, request subscriptionCheckoutRequest) (*polar.CheckoutSession, error) {
 	client := polar.NewClientFromEnv()
-	if err := adoptPreexistingCheckout(ctx, client, request); err != nil {
-		return nil, err
+	lifecycle := polar.NewCheckoutLifecycle(client)
+	if err := lifecycle.AdoptPreexisting(ctx, request.OrganizationID); err != nil {
+		return nil, polarBillingError(err, "Could not verify existing checkouts.")
 	}
 
 	for range maxCheckoutClaimAttempts {
@@ -57,13 +49,16 @@ func startSubscriptionCheckout(ctx context.Context, request subscriptionCheckout
 		if errors.Is(err, models.ErrBillingCheckoutLiveSubscription) {
 			return nil, liveSubscriptionSelectionError()
 		}
+		if errors.Is(err, models.ErrBillingCheckoutSeatsBelowMembers) {
+			return nil, grpcerrors.InvalidArgument(err, "Members changed. Refresh and select a seat for each member.")
+		}
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "Could not start subscription checkout.")
 		}
 		if claimed {
 			return createClaimedCheckout(ctx, client, intent, request)
 		}
-		session, err := reconcileUnresolvedCheckout(ctx, client, intent, request)
+		session, err := reconcileUnresolvedCheckout(ctx, lifecycle, intent, request)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +86,7 @@ func createClaimedCheckout(ctx context.Context, client *polar.Client, intent *mo
 		recordFailedCheckoutCreate(db, intent, err)
 		return nil, polarBillingError(err, "Could not start subscription checkout.")
 	}
-	if err := intent.MarkOpen(db, checkoutSnapshot(session)); err != nil {
+	if err := intent.MarkOpen(db, polar.CheckoutSnapshot(session)); err != nil {
 		// Polar holds the checkout. The intent stays creating, and a later
 		// request finds the checkout through the intent ID in its metadata.
 		return nil, grpcerrors.Internal(err, "Could not start subscription checkout.")
@@ -120,157 +115,44 @@ func recordFailedCheckoutCreate(db *gorm.DB, intent *models.OrganizationBillingC
 // reconcileUnresolvedCheckout checks an existing unresolved intent against
 // Polar. It returns a checkout to reuse, or nil when the intent is resolved and
 // the caller can claim again.
-func reconcileUnresolvedCheckout(ctx context.Context, client *polar.Client, intent *models.OrganizationBillingCheckout, request subscriptionCheckoutRequest) (*polar.CheckoutSession, error) {
-	switch {
-	case intent.State == models.BillingCheckoutStateOpen:
-		return reconcileOpenCheckout(ctx, client, intent, request)
-	case intent.State == models.BillingCheckoutStateAmbiguous, checkoutCreateIsStale(intent):
-		return reconcileUndeliveredCheckout(ctx, client, intent, request)
+func reconcileUnresolvedCheckout(ctx context.Context, lifecycle *polar.CheckoutLifecycle, intent *models.OrganizationBillingCheckout, request subscriptionCheckoutRequest) (*polar.CheckoutSession, error) {
+	verification, err := lifecycle.Verify(ctx, intent)
+	if err != nil {
+		return nil, polarBillingError(err, "Could not verify the pending checkout.")
+	}
+	switch verification.Outcome {
+	case polar.CheckoutPayable:
+		return reusablePendingCheckout(intent, request, verification.Checkout)
+	case polar.CheckoutSubscriptionLive:
+		return nil, liveSubscriptionSelectionError()
+	case polar.CheckoutUnconfirmed:
+		return nil, grpcerrors.FailedPrecondition(nil, "The previous checkout could not be confirmed. Try again in a few minutes.")
+	case polar.CheckoutResolved, polar.CheckoutChanged:
+		return nil, nil
 	default:
 		// Another request is creating the checkout now.
 		return nil, checkoutInProgressError()
 	}
 }
 
-// reconcileOpenCheckout reads the checkout from Polar. A past local expiry
-// proves nothing. Only the Polar status resolves the intent.
-func reconcileOpenCheckout(ctx context.Context, client *polar.Client, intent *models.OrganizationBillingCheckout, request subscriptionCheckoutRequest) (*polar.CheckoutSession, error) {
-	checkout, err := client.GetCheckout(ctx, intent.PolarCheckoutIDValue())
-	if err != nil {
-		return nil, polarBillingError(err, "Could not verify the pending checkout.")
+// reusablePendingCheckout returns the payable checkout of the intent when the
+// request asks for the same selection.
+func reusablePendingCheckout(intent *models.OrganizationBillingCheckout, request subscriptionCheckoutRequest, checkout *polar.CheckoutSession) (*polar.CheckoutSession, error) {
+	if !intent.MatchesSelection(request.PlanKey, request.ProductID, request.Seats) {
+		return nil, checkoutInProgressError()
 	}
-	return applyPolarCheckout(ctx, intent, request, checkout)
-}
-
-// reconcileUndeliveredCheckout handles an intent whose create response never
-// arrived. The intent ID in the checkout metadata finds a checkout that Polar
-// created. Without a match, the intent can only be released after the grace
-// window.
-func reconcileUndeliveredCheckout(ctx context.Context, client *polar.Client, intent *models.OrganizationBillingCheckout, request subscriptionCheckoutRequest) (*polar.CheckoutSession, error) {
-	checkouts, err := client.ListCheckouts(ctx, request.OrganizationID.String(), intent.PolarProductID)
-	if err != nil {
-		return nil, polarBillingError(err, "Could not verify the pending checkout.")
+	if intent.CheckoutURLValue() == "" {
+		return nil, grpcerrors.Internal(errors.New("pending checkout has no url"), "Could not start subscription checkout.")
 	}
-	for i := range checkouts {
-		if checkouts[i].IntentID() == intent.ID.String() {
-			return applyPolarCheckout(ctx, intent, request, &checkouts[i])
-		}
-	}
-	if time.Since(intent.CreatedAt) < checkoutIntentGraceWindow {
-		return nil, grpcerrors.FailedPrecondition(nil, "The previous checkout could not be confirmed. Try again in a few minutes.")
-	}
-	db := database.DB(context.WithoutCancel(ctx))
-	err = intent.Release(db, "no matching Polar checkout after the grace window")
-	return nil, ignoreCheckoutConflict(err)
-}
-
-// applyPolarCheckout records what Polar reports and decides the request.
-func applyPolarCheckout(ctx context.Context, intent *models.OrganizationBillingCheckout, request subscriptionCheckoutRequest, checkout *polar.CheckoutSession) (*polar.CheckoutSession, error) {
-	db := database.DB(context.WithoutCancel(ctx))
-	snapshot := checkoutSnapshot(checkout)
-
-	if checkout.Status.Payable() {
-		if err := intent.MarkOpen(db, snapshot); err != nil {
-			return nil, ignoreCheckoutConflict(err)
-		}
-		if !intent.MatchesSelection(request.PlanKey, request.ProductID, request.Seats) {
-			return nil, checkoutInProgressError()
-		}
-		if intent.CheckoutURLValue() == "" {
-			return nil, grpcerrors.Internal(errors.New("pending checkout has no url"), "Could not start subscription checkout.")
-		}
-		return &polar.CheckoutSession{ID: checkout.ID, URL: intent.CheckoutURLValue(), Status: checkout.Status}, nil
-	}
-
-	if checkout.Status == polar.CheckoutStatusSucceeded {
-		if err := requireNoLiveSubscription(ctx, request.OrganizationID); err != nil {
-			return nil, err
-		}
-	}
-	state, _ := checkout.Status.IntentState()
-	if err := intent.Resolve(db, state, &snapshot); err != nil {
-		return nil, ignoreCheckoutConflict(err)
-	}
-	return nil, nil
-}
-
-// requireNoLiveSubscription guards the time between a paid checkout and the
-// webhook that applies its subscription. It reads the subscription from Polar
-// before the caller opens another checkout.
-func requireNoLiveSubscription(ctx context.Context, orgID uuid.UUID) error {
-	db := database.DB(ctx)
-	status, err := polar.VerifyOrganizationSubscription(ctx, orgID)
-	if err != nil {
-		return polarBillingError(err, "Could not verify the current subscription.")
-	}
-	if status != "none" {
-		if status == "active" {
-			if err := polar.SyncOrganizationSubscription(ctx, db, orgID); err != nil {
-				return polarBillingError(err, "Could not verify the current subscription.")
-			}
-		}
-		return liveSubscriptionSelectionError()
-	}
-	current, err := models.FindOrganizationBillingPlan(db, orgID)
-	if err != nil {
-		return grpcerrors.Internal(err, "Could not load the current plan.")
-	}
-	if current.HasLivePolarSubscription(time.Now()) {
-		return liveSubscriptionSelectionError()
-	}
-	return nil
-}
-
-// adoptPreexistingCheckout covers Polar checkouts that were opened before
-// intents existed. An organization without intent rows can still hold a
-// payable checkout, so the first request records it. A request never fabricates
-// an intent: a checkout is adopted with its real Polar ID and URL, or not at all.
-func adoptPreexistingCheckout(ctx context.Context, client *polar.Client, request subscriptionCheckoutRequest) error {
-	db := database.DB(ctx)
-	known, err := models.OrganizationHasBillingCheckouts(db, request.OrganizationID)
-	if err != nil {
-		return grpcerrors.Internal(err, "Could not start subscription checkout.")
-	}
-	if known {
-		return nil
-	}
-	if err := models.BindLegacyBillingProduct(db, polar.BusinessProductID()); err != nil {
-		return grpcerrors.Internal(err, "Could not load billing plans.")
-	}
-	checkouts, err := client.ListCheckouts(ctx, request.OrganizationID.String(), "")
-	if err != nil {
-		return polarBillingError(err, "Could not verify existing checkouts.")
-	}
-	for i := range checkouts {
-		checkout := &checkouts[i]
-		if !checkout.Status.Payable() || checkout.IntentID() != "" {
-			continue
-		}
-		plan, err := models.FindBillingPlanByProduct(db, checkout.ProductID)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			continue // Credit purchase products are not subscription plans.
-		}
-		if err != nil {
-			return grpcerrors.Internal(err, "Could not load billing plans.")
-		}
-		_, err = models.AdoptPreexistingOrganizationBillingCheckout(
-			database.DB(context.WithoutCancel(ctx)), request.OrganizationID, plan.Key, checkout.ProductID, checkout.Seats, checkoutSnapshot(checkout),
-		)
-		if err != nil {
-			return grpcerrors.Internal(err, "Could not start subscription checkout.")
-		}
-		return nil
-	}
-	return nil
+	return &polar.CheckoutSession{ID: checkout.ID, URL: intent.CheckoutURLValue(), Status: checkout.Status}, nil
 }
 
 // reconcileCheckoutBeforeLocalSelection verifies pending checkouts before a
 // local plan change. Activation rechecks the guard under the organization lock.
 func reconcileCheckoutBeforeLocalSelection(ctx context.Context, orgID uuid.UUID) error {
-	client := polar.NewClientFromEnv()
-	request := subscriptionCheckoutRequest{OrganizationID: orgID}
-	if err := adoptPreexistingCheckout(ctx, client, request); err != nil {
-		return err
+	lifecycle := polar.NewCheckoutLifecycle(polar.NewClientFromEnv())
+	if err := lifecycle.AdoptPreexisting(ctx, orgID); err != nil {
+		return polarBillingError(err, "Could not verify existing checkouts.")
 	}
 	intent, err := models.FindUnresolvedOrganizationBillingCheckout(database.DB(ctx), orgID)
 	if err != nil {
@@ -279,36 +161,12 @@ func reconcileCheckoutBeforeLocalSelection(ctx context.Context, orgID uuid.UUID)
 	if intent == nil {
 		return nil
 	}
-	_, err = reconcileUnresolvedCheckout(ctx, client, intent, request)
+	_, err = reconcileUnresolvedCheckout(ctx, lifecycle, intent, subscriptionCheckoutRequest{OrganizationID: orgID})
 	return err
 }
 
 func liveSubscriptionSelectionError() error {
 	return grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
-}
-
-// checkoutCreateIsStale reports a creating intent whose request is gone. The
-// server can stop between the claim and the end of the Polar call.
-func checkoutCreateIsStale(intent *models.OrganizationBillingCheckout) bool {
-	return intent.State == models.BillingCheckoutStateCreating && time.Since(intent.CreatedAt) >= checkoutIntentGraceWindow
-}
-
-func checkoutSnapshot(checkout *polar.CheckoutSession) models.PolarCheckoutSnapshot {
-	return models.PolarCheckoutSnapshot{
-		CheckoutID: checkout.ID,
-		URL:        checkout.URL,
-		Status:     string(checkout.Status),
-		ExpiresAt:  checkout.ExpiresAt,
-	}
-}
-
-// ignoreCheckoutConflict treats a lost race as success. The winner changed the
-// intent, and the next claim reads the new state.
-func ignoreCheckoutConflict(err error) error {
-	if err == nil || errors.Is(err, models.ErrBillingCheckoutStateConflict) {
-		return nil
-	}
-	return grpcerrors.Internal(err, "Could not start subscription checkout.")
 }
 
 func checkoutInProgressError() error {
