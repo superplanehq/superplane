@@ -111,35 +111,22 @@ type OrganizationLLMCreditSummary struct {
 	WelcomeCreditExpiresAt   *time.Time
 }
 
-// GrantWelcomeCredit grants the Trial plan credit to a new organization. When
-// a default onboarding plan exists and the organization uses new billing, the
-// welcome credit is that plan's trial credit instead. GrantPlanWelcomeCredit
-// grants it after the card step, so nothing is granted here.
+// GrantWelcomeCredit grants signup credit once per account. New billing uses
+// the same $10 credit for either starter plan, independent of plan selection.
 func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
-	waits, err := welcomeCreditWaitsForOnboardingPlan(tx, orgID)
-	if err != nil || waits {
-		return err
-	}
 	settings, err := FindBillingPlan(tx, BillingPlanTrial)
 	if err != nil {
 		return err
 	}
-	return grantWelcomeCredit(tx, orgID, accountID, settings)
-}
-
-// GrantPlanWelcomeCredit grants the trial credit of the plan that an
-// organization selected during onboarding. One welcome credit per account, as
-// for the Trial plan.
-func GrantPlanWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID, plan *BillingPlan) error {
-	return grantWelcomeCredit(tx, orgID, accountID, plan)
-}
-
-func welcomeCreditWaitsForOnboardingPlan(tx *gorm.DB, orgID uuid.UUID) (bool, error) {
-	plan, err := FindOnboardingDefaultBillingPlan(tx)
-	if err != nil || plan == nil {
-		return false, err
+	newBilling, err := OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureNewBilling)
+	if err != nil {
+		return err
 	}
-	return OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureNewBilling)
+	if newBilling {
+		settings.TrialCreditCents = 1000
+		settings.TrialLengthDays = 365
+	}
+	return grantWelcomeCredit(tx, orgID, accountID, settings)
 }
 
 func grantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID, settings *BillingPlan) error {
@@ -1059,6 +1046,10 @@ func includedCreditDeltaForTarget(tx *gorm.DB, orgID uuid.UUID, target int64, no
 }
 
 func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingPlan) error {
+	// Starter plans share signup credit; switching plans does not add another grant.
+	if next.Catalog.Key == "pay_as_you_go" || next.Catalog.Key == "starter" {
+		return nil
+	}
 	if previous == nil || previous.PlanSource == BillingPlanSourceAdmin || previous.Catalog.Category != "trial" ||
 		next.Catalog.Category != "paid" || next.Catalog.Visibility != "public" || next.Catalog.TrialCreditCents == 0 {
 		return nil

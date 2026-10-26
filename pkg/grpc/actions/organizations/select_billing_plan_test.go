@@ -67,13 +67,12 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
 }
 
-// A new organization gets the onboarding default plan's trial credit when the
-// card step activates the plan, and not before.
-func TestSelectOnboardingDefaultPlanGrantsItsTrialCredit(t *testing.T) {
+// Selecting a starter plan recovers signup credit deferred by earlier onboarding.
+func TestSelectBillingPlanRecoversSignupCredit(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	plan := models.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: "Pay as you go", Category: "paid", Visibility: "public", RequirePaymentMethod: true, TrialCreditCents: 1000, TrialLengthDays: 365, CreditFrequency: "none", CreditExpiration: "never", OnboardingDefault: true}
+	plan := models.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: "Pay as you go", Category: "paid", Visibility: "public", RequirePaymentMethod: true, TrialCreditCents: 1000, TrialLengthDays: 365, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, models.SaveBillingPlan(db, &plan))
 	cleanupDB := database.DB(context.WithoutCancel(t.Context()))
 	t.Cleanup(func() {
@@ -85,10 +84,9 @@ func TestSelectOnboardingDefaultPlanGrantsItsTrialCredit(t *testing.T) {
 	organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
 	require.NoError(t, err)
 	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, organization.ID, features.FeatureNewBilling))
-	require.NoError(t, models.GrantWelcomeCredit(db, organization.ID, account.ID))
 	before, err := models.DescribeOrganizationLLMCredit(db, organization.ID)
 	require.NoError(t, err)
-	require.Zero(t, before.GrantMicros, "the welcome credit waits for the plan")
+	require.Zero(t, before.GrantMicros, "the earlier onboarding deferred signup credit")
 
 	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 		require.Equal(t, http.MethodGet, req.Method)

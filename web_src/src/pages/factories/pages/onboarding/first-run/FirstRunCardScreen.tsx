@@ -1,8 +1,8 @@
+import type { OrganizationsBillingPlanOption } from "@/api-client";
+import { Input } from "@/components/ui/input";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
-
-import wordmark from "@/assets/superplane-wordmark.svg";
+import { ArrowRight, Check, Gift } from "lucide-react";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
@@ -13,151 +13,152 @@ const copy = FIRST_RUN_COPY.card;
 
 export type FirstRunCardPhase = "add-card" | "opening" | "waiting-for-card" | "card-saved" | "starting" | "plan-active";
 
-type CardStory = { planName: string; credit: string | null; checkout: boolean; phase: FirstRunCardPhase };
-
-type TimelineRow = { id: string; title: string; body: string; done: boolean };
-
-function formatCredit(cents: number): string {
-  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
-
-function todayBody({ planName, credit, checkout, phase }: CardStory): string {
-  if (phase === "plan-active") return copy.planActive(planName);
-  if (phase === "card-saved" || phase === "starting") return copy.cardSaved;
-  if (checkout) return copy.todayCheckout(planName);
-  if (credit) return copy.todayCredit(credit);
-  return copy.todayNoCharge;
-}
-
-function timelineRows(story: CardStory): TimelineRow[] {
-  const { planName, credit, phase } = story;
-  const cardSaved = phase === "card-saved" || phase === "starting" || phase === "plan-active";
-  return [
-    { id: "today", title: copy.today, body: todayBody(story), done: cardSaved },
-    credit
-      ? { id: "after", title: copy.afterCredit, body: copy.afterCreditBody(planName), done: false }
-      : { id: "after", title: copy.afterToday, body: copy.afterTodayBody(planName), done: false },
-    { id: "any-time", title: copy.anyTime, body: copy.anyTimeBody, done: false },
-  ];
-}
-
-function actionLabel(phase: FirstRunCardPhase): string {
+function actionLabel(phase: FirstRunCardPhase, planName?: string): string {
   if (phase === "opening") return copy.opening;
   if (phase === "waiting-for-card") return copy.waitingForCard;
   if (phase === "starting") return copy.starting;
-  if (phase === "card-saved" || phase === "plan-active") return copy.continue;
-  return copy.addCard;
+  if (phase === "plan-active" || !planName) return copy.continue;
+  return copy.continueWith(planName);
 }
 
-/** The credit as an object: a gift-card tile with the amount and the plan. */
-function CreditTile({ planName, credit, phase }: Pick<CardStory, "planName" | "credit" | "phase">) {
-  const applied = phase === "plan-active";
+function nextStep(phase: FirstRunCardPhase, checkout: boolean): string {
+  if (phase === "plan-active") return copy.planActive;
+  if (phase === "waiting-for-card") return copy.waitingDetail;
+  if (phase === "card-saved") return checkout ? copy.checkoutSaved : copy.cardSaved;
+  return checkout ? copy.checkoutNext : copy.cardNext;
+}
+
+function PlanChoice({
+  plan,
+  selected,
+  disabled,
+  onSelect,
+}: {
+  plan: OrganizationsBillingPlanOption;
+  selected: boolean;
+  disabled: boolean;
+  onSelect: (key: string) => void;
+}) {
+  const starter = plan.key === "starter";
+  const price = (Number(plan.priceCents ?? 0) / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  });
   return (
-    <div
-      className="relative overflow-hidden rounded-xl border border-[#34322b] bg-[linear-gradient(135deg,#2a2923_0%,#181713_60%,#11110e_100%)] p-5"
-      data-testid="first-run-credit-tile"
+    <label
+      className={cn(
+        "relative flex min-w-0 cursor-pointer flex-col rounded-lg border p-4 transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
+        selected ? "border-foreground bg-muted" : "border-border hover:border-muted-foreground",
+        disabled && "pointer-events-none cursor-default opacity-60",
+      )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <img src={wordmark} alt="SuperPlane" className="h-[14px] w-auto opacity-80" />
-        <span className="rounded-[4px] border border-[#34322b] px-2 py-[3px] font-mono text-[11px] uppercase tracking-[0.04em] text-[#9b9993]">
-          {planName}
-        </span>
-      </div>
-      <div className="mt-8">
-        <p className="font-mono text-[40px] leading-none tracking-[-0.02em] text-[#eeede9]">{credit ?? planName}</p>
-        <p className="mt-2 text-[13px] text-[#9b9993]">
-          {credit ? (applied ? copy.tileCreditApplied : copy.tileCredit) : copy.tilePlan}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function Timeline({ rows }: { rows: TimelineRow[] }) {
-  return (
-    <ol className="relative space-y-5 pl-7" data-testid="first-run-card-timeline">
-      <span aria-hidden className="absolute top-2 bottom-2 left-[6px] w-px bg-[#34322b]" />
-      {rows.map((row) => (
-        <li
-          key={row.id}
-          className="relative"
-          data-testid={`first-run-card-${row.id}`}
-          data-done={row.done || undefined}
+      <Input
+        type="radio"
+        name="onboarding-plan"
+        value={plan.key}
+        checked={selected}
+        disabled={disabled}
+        onChange={() => plan.key && onSelect(plan.key)}
+        aria-label={plan.name}
+        className="sr-only"
+      />
+      <span className="flex items-center justify-between gap-2 text-[14px] font-medium">
+        {plan.name}
+        <span
+          aria-hidden
+          className={cn(
+            "flex size-4 shrink-0 items-center justify-center rounded-full border",
+            selected ? "border-foreground bg-foreground text-background" : "border-muted-foreground",
+          )}
         >
-          <span
-            aria-hidden
-            className={cn(
-              "absolute top-[3px] -left-7 inline-flex size-[13px] items-center justify-center rounded-full border",
-              row.done ? "border-[#45b88b] bg-[#45b88b] text-[#11110e]" : "border-[#9b9993] bg-[#11110e]",
-            )}
-          >
-            {row.done ? <Check className="size-[9px]" strokeWidth={3.5} /> : null}
-          </span>
-          <p className="text-[14px] leading-5 text-[#eeede9]">{row.title}</p>
-          <p className="mt-0.5 text-[13px] leading-5 text-[#9b9993]">{row.body}</p>
-        </li>
-      ))}
-    </ol>
+          {selected && <Check className="size-3" strokeWidth={3} />}
+        </span>
+      </span>
+      <span className="mt-3 flex items-baseline gap-1.5">
+        <span className="text-[34px] font-medium leading-none tracking-[-0.04em]">{price}</span>
+        <span className="text-[13px] text-muted-foreground">{copy.monthly}</span>
+      </span>
+      <span className="mt-3 border-t border-border pt-3 text-[13px] font-medium">
+        {starter ? copy.starterCapacity : copy.paygCapacity}
+      </span>
+    </label>
   );
 }
 
-/**
- * The card step. The credit is the object on the screen, and a short
- * timeline says what happens today, after the credit, and later. The card
- * itself is saved in the Polar portal. There is no skip.
- */
 export function FirstRunCardScreen({
-  planName,
-  trialCreditCents,
-  checkout = false,
+  plans,
+  selectedPlanKey,
   phase,
   error,
-  busy,
+  busy = false,
   chrome,
   sphere,
-  onAddCard,
+  onSelectPlan,
   onContinue,
 }: {
-  planName: string;
-  trialCreditCents: number;
-  /** The plan needs a Polar checkout after the card. */
-  checkout?: boolean;
+  plans: OrganizationsBillingPlanOption[];
+  selectedPlanKey?: string;
   phase: FirstRunCardPhase;
   error?: string;
   busy?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  onAddCard: () => void;
+  onSelectPlan: (key: string) => void;
   onContinue: () => void;
 }) {
-  const credit = trialCreditCents > 0 ? formatCredit(trialCreditCents) : null;
-  const story: CardStory = { planName, credit, checkout, phase };
+  const plan = plans.find((candidate) => candidate.key === selectedPlanKey);
+  const inProgress = ["opening", "waiting-for-card", "starting"].includes(phase);
   const cardSaved = phase === "card-saved" || phase === "plan-active";
-  const inProgress = phase === "opening" || phase === "waiting-for-card" || phase === "starting";
+  const disabled = busy || inProgress;
+  const plansDisabled = disabled || phase === "plan-active";
   return (
-    <FirstRunShell testId="first-run-card" chrome={chrome} busy={busy} sphere={sphere} visual="preview">
-      <FirstRunHeading headline={credit ? copy.headlineWithCredit(credit) : copy.headline(planName)}>
-        <p>{credit ? copy.creditIntro(credit) : copy.planIntro}</p>
-      </FirstRunHeading>
+    <FirstRunShell testId="first-run-card" chrome={chrome} busy={disabled} sphere={sphere} visual="preview">
+      <FirstRunHeading greeting={copy.greeting} headline={copy.headline} />
 
-      <div className="mt-8 space-y-7">
-        <CreditTile planName={planName} credit={credit} phase={phase} />
-        <Timeline rows={timelineRows(story)} />
-        <div className="space-y-3">
+      <div className="mt-5 space-y-3">
+        <div className="flex items-start gap-3 rounded-lg border border-[#c5ebc3]/20 bg-[#c5ebc3]/[0.04] px-4 py-3.5">
+          <Gift className="mt-0.5 size-4 shrink-0 text-[#c5ebc3]" aria-hidden />
+          <div>
+            <p className="text-[13px] font-medium text-[#c5ebc3]">{copy.credit}</p>
+            <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{copy.creditBody}</p>
+          </div>
+        </div>
+        <fieldset disabled={plansDisabled}>
+          <legend className="sr-only">{copy.headline}</legend>
+          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
+            {plans.map((option) => (
+              <PlanChoice
+                key={option.key}
+                plan={option}
+                selected={option.key === selectedPlanKey}
+                disabled={plansDisabled}
+                onSelect={onSelectPlan}
+              />
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="space-y-2 pt-1">
           <LoadingButton
             type="button"
             className="w-full"
-            disabled={busy}
+            disabled={busy || (!plan && phase !== "plan-active")}
             loading={inProgress}
-            loadingText={actionLabel(phase)}
-            onClick={cardSaved ? onContinue : onAddCard}
+            loadingText={actionLabel(phase, plan?.name)}
+            onClick={onContinue}
             data-testid={cardSaved ? "first-run-card-continue" : "first-run-add-card"}
           >
-            {actionLabel(phase)}
+            {actionLabel(phase, plan?.name)}
+            <ArrowRight className="size-4" aria-hidden />
           </LoadingButton>
-          {error ? (
+          <p role="status" className="text-center text-[12px] leading-5 text-muted-foreground">
+            {nextStep(phase, Boolean(plan?.subscriptionRequired))}
+          </p>
+          {error || plans.length === 0 ? (
             <p role="alert" className="text-[13px] text-destructive">
-              {error}
+              {error || copy.unavailable}
             </p>
           ) : null}
         </div>

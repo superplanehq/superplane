@@ -146,6 +146,11 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		if err != nil {
 			return nil, err
 		}
+		if account, err := uuid.Parse(accountID); err == nil {
+			if err := models.GrantWelcomeCredit(db, organizationID, account); err != nil {
+				return nil, grpcerrors.Internal(err, "Could not apply signup credit.")
+			}
+		}
 		return &pb.CreateBusinessCheckoutResponse{CheckoutUrl: session.URL}, nil
 	}
 	if catalog.PriceCents != 0 {
@@ -170,8 +175,7 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 }
 
 // activatePlanWithWelcomeCredit selects a plan that needs no checkout. The
-// plan's trial credit is the organization's welcome credit when it has none
-// yet, for example after the onboarding card step.
+// one-time signup credit is also granted if an earlier onboarding deferred it.
 func activatePlanWithWelcomeCredit(db *gorm.DB, organizationID uuid.UUID, accountID string, catalog *models.BillingPlan) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		if _, err := models.ActivateOrganizationBillingPlan(tx, organizationID, catalog.Key); err != nil {
@@ -181,7 +185,7 @@ func activatePlanWithWelcomeCredit(db *gorm.DB, organizationID uuid.UUID, accoun
 		if err != nil {
 			return nil
 		}
-		return models.GrantPlanWelcomeCredit(tx, organizationID, account, catalog)
+		return models.GrantWelcomeCredit(tx, organizationID, account)
 	})
 }
 

@@ -11,7 +11,7 @@ const cardStep: OnboardingCardStep = {
   ready: true,
   available: false,
   required: false,
-  plan: undefined,
+  plans: [],
   planActive: false,
   hasPaymentMethod: false,
   refetch: async () => undefined,
@@ -20,7 +20,7 @@ vi.mock("./useOnboardingCardStep", () => ({ useOnboardingCardStep: () => ({ ...c
 beforeEach(() => {
   verify.mockReset().mockResolvedValue(true);
   toast.mockClear();
-  Object.assign(cardStep, { ready: true, available: false, required: false, plan: undefined, planActive: false });
+  Object.assign(cardStep, { ready: true, available: false, required: false, plans: [], planActive: false });
 });
 function mount(saving = false, screen: "tickets" | "card" = "tickets") {
   const finish = vi.fn(async () => {});
@@ -64,8 +64,12 @@ it("keeps setup open when model access cannot be verified", async () => {
   expect(goToScreen).not.toHaveBeenCalled();
 });
 
-it("opens the card step after the backlog step when the default plan is not active", async () => {
-  Object.assign(cardStep, { available: true, required: true, plan: { key: "pay_as_you_go", name: "Pay as you go" } });
+it("opens the card step after the backlog step when a starter plan is not active", async () => {
+  Object.assign(cardStep, {
+    available: true,
+    required: true,
+    plans: [{ key: "pay_as_you_go", name: "Pay-as-you-go" }],
+  });
   const { result, finish, goToScreen } = mount();
   expect(result.current.hasCardStep).toBe(true);
   await act(async () => result.current.afterTickets());

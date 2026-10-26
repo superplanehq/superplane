@@ -184,53 +184,6 @@ func TestPerSeatPlanMaximum(t *testing.T) {
 	}
 }
 
-func TestOnboardingDefaultBillingPlan(t *testing.T) {
-	support.Setup(t)
-	db := database.Conn()
-	newPlan := func(name string) models.BillingPlan {
-		plan := models.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: name, Category: "paid", Visibility: "public", RequirePaymentMethod: true, TrialCreditCents: 1000, TrialLengthDays: 365, CreditFrequency: "none", CreditExpiration: "never", OnboardingDefault: true}
-		t.Cleanup(func() { require.NoError(t, db.Where("key = ?", plan.Key).Delete(&models.BillingPlan{}).Error) })
-		return plan
-	}
-
-	t.Run("only a public paid plan can be the default", func(t *testing.T) {
-		private := newPlan("Private")
-		private.Visibility = "private"
-		require.ErrorIs(t, models.SaveBillingPlan(db, &private), models.ErrCatalogPlan)
-
-		trial := newPlan("Trial")
-		trial.Category = "trial"
-		require.ErrorIs(t, models.SaveBillingPlan(db, &trial), models.ErrCatalogPlan)
-
-		priced := newPlan("Priced")
-		priced.PriceCents = 2000
-		priced.PerSeat = true
-		priced.SeatLimit = new(50)
-		priced.PolarProductID = new("product_" + uuid.NewString())
-		require.NoError(t, models.SaveBillingPlan(db, &priced))
-	})
-
-	t.Run("the last saved default replaces the earlier one", func(t *testing.T) {
-		first := newPlan("First")
-		require.NoError(t, models.SaveBillingPlan(db, &first))
-		second := newPlan("Second")
-		require.NoError(t, models.SaveBillingPlan(db, &second))
-
-		current, err := models.FindOnboardingDefaultBillingPlan(db)
-		require.NoError(t, err)
-		require.Equal(t, second.ID, current.ID)
-		stored, err := models.FindBillingPlan(db, first.Key)
-		require.NoError(t, err)
-		require.False(t, stored.OnboardingDefault)
-
-		second.OnboardingDefault = false
-		require.NoError(t, models.SaveBillingPlan(db, &second))
-		cleared, err := models.FindOnboardingDefaultBillingPlan(db)
-		require.NoError(t, err)
-		require.Nil(t, cleared)
-	})
-}
-
 func TestFeatureDeletionSerializesReferenceWrites(t *testing.T) {
 	for _, writer := range []string{"create plan", "update plan", "enabled grant", "disabled grant"} {
 		for _, deleteFirst := range []bool{true, false} {

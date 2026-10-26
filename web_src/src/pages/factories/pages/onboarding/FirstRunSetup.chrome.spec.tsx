@@ -516,11 +516,9 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
-  it("asks for a card after the backlog step, then starts the default plan", async () => {
+  it("asks for a card after the backlog step, then starts Pay-as-you-go", async () => {
     Object.assign(billingState, { enabled: true, newBilling: true });
-    billingState.availablePlans = [
-      { key: "payg", name: "Pay as you go", onboardingDefault: true, trialCreditCents: "1000" },
-    ];
+    billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
     const user = userEvent.setup();
     const model = hostedVcsModel();
     renderSetup(model);
@@ -534,7 +532,9 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await user.click(await screen.findByTestId("first-run-add-card"));
     openCardSetup.mock.calls[0][0]?.();
-    await waitFor(() => expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "payg", expect.any(Object)));
+    await waitFor(() =>
+      expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "pay_as_you_go", expect.any(Object)),
+    );
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
   });
 

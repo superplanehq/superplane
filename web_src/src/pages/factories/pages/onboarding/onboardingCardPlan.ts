@@ -2,7 +2,7 @@ import { organizationsSelectBillingPlan } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 /**
- * Starts the organization on the onboarding default plan. A plan with no
+ * Starts the organization on the selected onboarding plan. A plan with no
  * checkout activates at once. A plan with a Polar product leaves for checkout.
  * Returns true when the browser leaves for checkout.
  */

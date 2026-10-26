@@ -58,7 +58,7 @@ const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
 };
 
 // Steps that this flow does not show. The card step is absent when billing
-// has no default plan or the organization already has a paid plan.
+// has no starter plans or the organization already has a paid plan.
 function stepsSkipped(flow: FirstRunSetupFlow, target: FirstRunScreen): { before: number; total: number } {
   const agent = Number(flow.skipAgentScreen);
   const card = Number(!flow.hasCardStep);

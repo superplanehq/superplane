@@ -35,7 +35,6 @@ function listedPlan(overrides: Partial<BillingPlanListItem>): BillingPlanListIte
     trial_length_days: 14,
     markup_bps: null,
     features: [],
-    onboarding_default: false,
     delete_disabled_reason: null,
     assigned: false,
     ...overrides,
@@ -368,62 +367,6 @@ it("protects Business Manual from deletion and unsupported catalog edits", async
   expect(screen.getByRole("combobox", { name: "Category" }).hasAttribute("disabled")).toBe(true);
   expect(screen.getByRole("combobox", { name: "Polar product" })).toBeDisabled();
 });
-
-it("marks a public paid plan as the default plan after onboarding", async () => {
-  const { requests } = stubBillingCatalog([
-    listedPlan({
-      id: "starter",
-      key: "starter",
-      name: "Starter",
-      visibility: "public",
-      price_cents: 0,
-      onboarding_default: true,
-    }),
-    listedPlan({ id: "payg", key: "pay_as_you_go", name: "Pay as you go", visibility: "public", price_cents: 0 }),
-    listedPlan({
-      id: "team",
-      key: "team",
-      name: "Team",
-      visibility: "public",
-      price_cents: 2900,
-      per_seat: true,
-      seat_limit: 50,
-      polar_product_id: "prod_team",
-    }),
-    listedPlan({ id: "internal", key: "internal", name: "Internal", visibility: "private" }),
-  ]);
-  const user = userEvent.setup();
-  render(
-    <MemoryRouter>
-      <BillingPlans />
-    </MemoryRouter>,
-  );
-  const starterRow = (await screen.findByRole("button", { name: "Edit Starter" })).closest("tr")!;
-  expect(within(starterRow).getByText("Onboarding default")).toBeInTheDocument();
-  const paygRow = screen.getByRole("button", { name: "Edit Pay as you go" }).closest("tr")!;
-  expect(within(paygRow).queryByText("Onboarding default")).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Edit Team" }));
-  expect(screen.getByRole("checkbox", { name: "Default plan after onboarding" })).toBeEnabled();
-  await user.keyboard("{Escape}");
-  await user.click(screen.getByRole("button", { name: "Edit Internal" }));
-  expect(screen.getByRole("checkbox", { name: "Default plan after onboarding" })).toBeDisabled();
-  expect(screen.getByText("Only a public paid plan can be the default.")).toBeInTheDocument();
-  await user.keyboard("{Escape}");
-
-  await user.click(screen.getByRole("button", { name: "Edit Pay as you go" }));
-  const checkbox = screen.getByRole("checkbox", { name: "Default plan after onboarding" });
-  expect(checkbox).toBeEnabled();
-  await user.click(checkbox);
-  await user.click(screen.getByRole("button", { name: "Save plan" }));
-  await waitFor(() =>
-    expect(requests.filter((request) => request.method === "PUT")).toEqual([
-      expect.objectContaining({
-        path: "/admin/api/billing-plans/payg",
-        body: expect.objectContaining({ key: "pay_as_you_go", onboarding_default: true }),
-      }),
-    ]),
-  );
-}, 15000);
 
 it("links the empty plan feature selector to Features", async () => {
   vi.stubGlobal(

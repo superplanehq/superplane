@@ -60,66 +60,31 @@ func Test__WelcomeGrantSetsExpiresAt(t *testing.T) {
 	assert.WithinDuration(t, *grant.ExpiresAt, *summary.WelcomeCreditExpiresAt, time.Second)
 }
 
-func Test__WelcomeCreditComesWithTheOnboardingDefaultPlan(t *testing.T) {
+func Test__NewBillingSignupCreditDoesNotDependOnPlan(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	support.Setup(t)
 	db := database.Conn()
-	plan := models.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: "Pay as you go", Category: "paid", Visibility: "public", RequirePaymentMethod: true, TrialCreditCents: 1000, TrialLengthDays: 365, CreditFrequency: "none", CreditExpiration: "never", OnboardingDefault: true}
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	t.Cleanup(func() { require.NoError(t, db.Where("key = ?", plan.Key).Delete(&models.BillingPlan{}).Error) })
-
-	newOrganization := func(t *testing.T, newBilling bool) (*models.Organization, *models.Account) {
-		account, err := models.CreateAccountInTransaction(db, support.RandomName("account"), support.RandomName("owner")+"@example.com")
-		require.NoError(t, err)
-		organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
-		require.NoError(t, err)
-		if newBilling {
-			require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, organization.ID, features.FeatureNewBilling))
-		}
-		return organization, account
-	}
-	welcomeGrant := func(t *testing.T, orgID uuid.UUID) *models.OrganizationLLMCreditGrant {
-		var grants []models.OrganizationLLMCreditGrant
-		require.NoError(t, db.Where("organization_id = ? AND kind = ?", orgID, models.LLMCreditGrantKindWelcome).Find(&grants).Error)
-		if len(grants) == 0 {
-			return nil
-		}
-		require.Len(t, grants, 1)
-		return &grants[0]
-	}
-
-	t.Run("new billing organizations wait for the plan", func(t *testing.T) {
-		organization, account := newOrganization(t, true)
-		require.NoError(t, models.GrantWelcomeCredit(db, organization.ID, account.ID))
-		require.Nil(t, welcomeGrant(t, organization.ID))
-
-		require.NoError(t, models.GrantPlanWelcomeCredit(db, organization.ID, account.ID, &plan))
-		grant := welcomeGrant(t, organization.ID)
-		require.NotNil(t, grant)
-		assert.Equal(t, models.CentsToMicros(1000), grant.AmountMicros)
-		require.NotNil(t, grant.ExpiresAt)
-		assert.WithinDuration(t, time.Now().AddDate(0, 0, 365), *grant.ExpiresAt, time.Minute)
-
-		stored, err := models.FindAccountByID(account.ID.String())
-		require.NoError(t, err)
-		assert.True(t, stored.HasReceivedWelcomeCredit())
-	})
-
-	t.Run("one welcome credit per account", func(t *testing.T) {
-		first, account := newOrganization(t, true)
-		require.NoError(t, models.GrantPlanWelcomeCredit(db, first.ID, account.ID, &plan))
-		second, _ := newOrganization(t, true)
-		require.NoError(t, models.GrantPlanWelcomeCredit(db, second.ID, account.ID, &plan))
-		require.Nil(t, welcomeGrant(t, second.ID))
-	})
-
-	t.Run("organizations without new billing keep the trial credit", func(t *testing.T) {
-		organization, account := newOrganization(t, false)
-		require.NoError(t, models.GrantWelcomeCredit(db, organization.ID, account.ID))
-		grant := welcomeGrant(t, organization.ID)
-		require.NotNil(t, grant)
-		assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), grant.AmountMicros)
-	})
+	account, err := models.CreateAccountInTransaction(db, support.RandomName("account"), support.RandomName("owner")+"@example.com")
+	require.NoError(t, err)
+	organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, organization.ID, features.FeatureNewBilling))
+	require.NoError(t, models.GrantWelcomeCredit(db, organization.ID, account.ID))
+	summary, err := models.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CentsToMicros(1000), summary.GrantMicros)
+	require.NotNil(t, summary.WelcomeCreditExpiresAt)
+	require.WithinDuration(t, time.Now().AddDate(0, 0, 365), *summary.WelcomeCreditExpiresAt, time.Minute)
+	require.NoError(t, models.GrantWelcomeCredit(db, organization.ID, account.ID))
+	again, err := models.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, summary.GrantMicros, again.GrantMicros)
+	second, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
+	require.NoError(t, err)
+	require.NoError(t, models.GrantWelcomeCredit(db, second.ID, account.ID))
+	secondCredit, err := models.DescribeOrganizationLLMCredit(db, second.ID)
+	require.NoError(t, err)
+	require.Zero(t, secondCredit.GrantMicros)
 }
 
 func Test__ExpiredWelcomeCreditIsNotUsable(t *testing.T) {

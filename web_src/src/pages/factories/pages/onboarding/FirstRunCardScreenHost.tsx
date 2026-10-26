@@ -31,7 +31,7 @@ function cardPhase(args: {
 
 /**
  * Saves a card through the Polar portal, then starts the organization on the
- * default plan and continues setup. A saved card from an earlier visit skips
+ * selected plan and continues setup. A saved card from an earlier visit skips
  * straight to the plan.
  */
 export function FirstRunCardScreenHost({
@@ -49,17 +49,20 @@ export function FirstRunCardScreenHost({
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const { cardStep } = flow;
-  const plan = cardStep.plan;
+  const [selectedPlanKey, setSelectedPlanKey] = useState(
+    () => new URLSearchParams(window.location.search).get("plan") ?? "pay_as_you_go",
+  );
+  const plan = cardStep.plans.find((candidate) => candidate.key === selectedPlanKey) ?? cardStep.plans[0];
 
   const startPlan = async () => {
     if (!plan?.key) return;
     setError("");
     setStarting(true);
     try {
-      const seats = plan.perSeat ? Math.max(cardStep.occupiedSeats ?? 1, 1) : undefined;
+      const returnUrl = new URL(window.location.href);
+      returnUrl.searchParams.set("plan", plan.key);
       const checkout = await activateOnboardingPlan(organizationId, plan.key, {
-        seats,
-        returnPath: `${window.location.pathname}${window.location.search}`,
+        returnPath: `${returnUrl.pathname}${returnUrl.search}`,
       });
       if (checkout) return;
       await cardStep.refetch();
@@ -73,16 +76,28 @@ export function FirstRunCardScreenHost({
 
   return (
     <FirstRunCardScreen
-      planName={plan?.name ?? ""}
-      trialCreditCents={Number(plan?.trialCreditCents ?? 0)}
-      checkout={Boolean(plan?.subscriptionRequired)}
+      plans={cardStep.plans}
+      selectedPlanKey={plan?.key}
+      onSelectPlan={(key) => {
+        setSelectedPlanKey(key);
+        setError("");
+      }}
       phase={cardPhase({ cardStep, starting, opening: cardSetup.opening, waitingForCard: cardSetup.waitingForCard })}
       error={error || cardSetup.error || undefined}
       busy={flow.busy}
       chrome={chrome}
       sphere={sphere}
-      onAddCard={() => cardSetup.open(() => void startPlan())}
-      onContinue={() => void (cardStep.planActive ? flow.finishSetup() : startPlan())}
+      onContinue={() => {
+        if (cardStep.planActive) {
+          void flow.finishSetup();
+          return;
+        }
+        if (cardStep.hasPaymentMethod) {
+          void startPlan();
+          return;
+        }
+        cardSetup.open(() => void startPlan());
+      }}
     />
   );
 }

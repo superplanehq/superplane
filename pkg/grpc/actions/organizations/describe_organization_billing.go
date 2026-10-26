@@ -93,8 +93,6 @@ func DescribeOrganizationBilling(
 				PerSeat: item.PerSeat, SeatMaximum: seatMaximum,
 				RequirePaymentMethod: item.RequirePaymentMethod,
 				SubscriptionRequired: item.PerSeat || item.PolarProductID != nil || item.PriceCents != 0,
-				OnboardingDefault:    item.OnboardingDefault,
-				TrialCreditCents:     item.TrialCreditCents,
 			})
 		}
 	}
