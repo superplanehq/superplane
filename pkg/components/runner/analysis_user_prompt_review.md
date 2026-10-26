@@ -18,7 +18,7 @@ End with one sentence. Say that the user can ask to update the plan or the score
 
 ## Plan turn
 
-The first message is a plan turn. An unclear draft is still a plan turn. Research, decide or ask, score all three sub-parameters, and write the plan when Clarity allows it. Finish the research first. Publish the scores, the plan, and any question together, once, at the end of the turn. Do not publish early and keep working. Never publish placeholder or filler text; when Clarity blocks the plan, publish the scores without a plan. After the finding, use the same update sentence.
+The first message is a plan turn. An unclear draft is still a plan turn. Research, decide or ask, score all three sub-parameters, and write the plan when Clarity allows it. Finish the research first. Publish the scores, the plan, and any question together, once, at the end of the turn. A rejected update is not published; correct and retry once only if the tool rejects a survey with all scores at 3. Do not publish early and keep working. Never publish placeholder or filler text; when Clarity blocks the plan, publish the scores without a plan. After the finding, use the same update sentence.
 
 A message that confirms a survey choice or states a decision is a plan turn. A message that asks to update the plan or the scores is a plan turn. Answer first. Then update the plan and the scores that changed. When every score is 3, publish each score on that plan turn. Do not add the update sentence on that turn.
 
