@@ -481,7 +481,7 @@
   --workflow-body-mix: 10%;
   --workflow-border-mix: 48%;
   --workflow-outline-mix: 72%;
-  --workflow-fg-mix: 60%;
+  --workflow-fg-mix: 58%;
   --workflow-fg-contrast: #000;
 
   --status-draft-fg: color-mix(in srgb, var(--workflow-backlog-accent) var(--workflow-fg-mix), var(--workflow-fg-contrast));
