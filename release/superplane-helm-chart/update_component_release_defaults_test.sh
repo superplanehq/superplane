@@ -463,4 +463,46 @@ fi
 cmp -s "${VALUES_BACKUP}" "${VALUES_PATH}"
 test -f "${TMP_DIR}/chart-output-reused/superplane-1.2.3.tgz"
 
+cat >"${TMP_DIR}/candidate-values.yaml" <<'EOF'
+candidateOnly: keep
+
+componentReleases:
+  runnerVersion: v0.2.1
+  runnerVersions:
+    - v0.2.1
+  fleetManagerVersion: v0.1.5
+
+candidateTail: keep
+EOF
+cat >"${TMP_DIR}/stable-values.yaml" <<'EOF'
+stableOnly: keep
+
+componentReleases:
+  runnerVersion: v9.0.0
+  runnerVersions:
+    - v9.0.0
+  fleetManagerVersion: v9.0.0
+
+stableTail: keep
+EOF
+node "${UPDATER}" reuse \
+  "${TMP_DIR}/candidate-values.yaml" \
+  "${TMP_DIR}/stable-values.yaml"
+cat >"${TMP_DIR}/expected-reused-values.yaml" <<'EOF'
+stableOnly: keep
+
+componentReleases:
+  runnerVersion: v0.2.1
+  runnerVersions:
+    - v0.2.1
+  fleetManagerVersion: v0.1.5
+
+stableTail: keep
+EOF
+if ! cmp -s "${TMP_DIR}/expected-reused-values.yaml" "${TMP_DIR}/stable-values.yaml"; then
+  diff -u "${TMP_DIR}/expected-reused-values.yaml" "${TMP_DIR}/stable-values.yaml" >&2 || true
+  echo "candidate component release defaults were not reused" >&2
+  exit 1
+fi
+
 echo "Chart component release default tests passed."
