@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sync"
 	"testing"
@@ -21,6 +22,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
 )
 
 func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
@@ -67,6 +69,58 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	plan.RequirePaymentMethod = false
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
+}
+
+// Selecting a starter plan recovers signup credit deferred by earlier onboarding.
+func TestSelectBillingPlanRecoversSignupCredit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	plan := billingmodels.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: "Pay as you go", Category: "paid", Visibility: "public", RequirePaymentMethod: true, TrialCreditCents: 1000, TrialLengthDays: 365, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	cleanupDB := database.DB(context.WithoutCancel(t.Context()))
+	t.Cleanup(func() {
+		require.NoError(t, cleanupDB.Where("plan_id = ?", plan.ID).Delete(&billingmodels.OrganizationBillingPlan{}).Error)
+		require.NoError(t, cleanupDB.Where("id = ?", plan.ID).Delete(&billingmodels.BillingPlan{}).Error)
+	})
+	account, err := models.CreateAccountInTransaction(db, support.RandomName("account"), support.RandomName("owner")+"@example.com")
+	require.NoError(t, err)
+	organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, organization.ID, features.FeatureNewBilling))
+	before, err := billingmodels.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Zero(t, before.GrantMicros, "the earlier onboarding deferred signup credit")
+
+	server := polartest.APIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, http.MethodGet, req.Method)
+		if req.URL.Path == "/checkouts/" {
+			writeFakeJSON(t, w, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
+			return
+		}
+		items := []map[string]any{{"id": "pm_saved", "type": "card", "method_metadata": map[string]int{"exp_month": 12, "exp_year": time.Now().Year() + 1}}}
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": items, "pagination": map[string]int{"max_page": 1}}))
+	})
+	polartest.UseServer(t, server)
+	_, err = SelectBillingPlan(t.Context(), organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, account.ID.String(), "http://localhost")
+	require.NoError(t, err)
+
+	current, err := billingmodels.FindOrganizationBillingPlan(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, plan.ID, current.PlanID)
+	after, err := billingmodels.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, billingmodels.CentsToMicros(1000), after.GrantMicros)
+	require.Equal(t, after.GrantMicros, after.RemainingMicros)
+	require.NotNil(t, after.WelcomeCreditExpiresAt)
+	require.WithinDuration(t, time.Now().AddDate(0, 0, 365), *after.WelcomeCreditExpiresAt, time.Minute)
+
+	// Selecting the plan again does not grant the credit twice.
+	_, err = SelectBillingPlan(t.Context(), organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, account.ID.String(), "http://localhost")
+	require.NoError(t, err)
+	again, err := billingmodels.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, after.GrantMicros, again.GrantMicros)
 }
 
 func TestSelectNoneBillingPlanWhenNoPublicPlansExist(t *testing.T) {
@@ -161,11 +215,16 @@ func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 	product := "prod_selected_" + uuid.NewString()
 	plan := billingmodels.BillingPlan{Key: "paid_" + uuid.NewString()[:8], Name: "Paid", Category: "paid", Visibility: "public", PriceCents: 25000, PolarProductID: &product, RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	// Reproduce an account whose signup credit was deferred.
+	require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
+	require.NoError(t, db.Model(&models.Account{}).Where("id = ?", r.Account.ID).Update("welcome_credit_granted_at", nil).Error)
 	checkoutCalls := 0
 	server := polartest.APIServer(t, func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
 		case "/customers/external/" + r.Organization.ID.String():
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_existing", "external_id": r.Organization.ID.String()}))
+		case "/checkouts/chk_selected":
+			writeFakeJSON(t, w, map[string]any{"id": "chk_selected", "status": "open", "url": "https://polar.sh/checkout/selected", "product_id": product})
 		case "/checkouts/":
 			if req.Method == http.MethodGet {
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
@@ -188,6 +247,21 @@ func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 		}
 	})
 	polartest.UseServer(t, server)
+	// A failed account stamp must roll back the grant. Otherwise another
+	// organization can grant the same account signup credit again.
+	callback := "test:fail_welcome_credit_stamp"
+	require.NoError(t, db.Callback().Update().Before("gorm:update").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "accounts" {
+			tx.AddError(errors.New("account stamp unavailable"))
+		}
+	}))
+	t.Cleanup(func() { db.Callback().Update().Remove(callback) })
+	_, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key, ReturnPath: "/org/setup?step=billing"}, r.Account.ID.String(), "http://localhost")
+	require.ErrorContains(t, err, "Could not apply signup credit")
+	var grants int64
+	require.NoError(t, db.Model(&billingmodels.OrganizationLLMCreditGrant{}).Where("organization_id = ? AND kind = ?", r.Organization.ID, billingmodels.LLMCreditGrantKindWelcome).Count(&grants).Error)
+	require.Zero(t, grants, "the credit and account stamp must commit together")
+	require.NoError(t, db.Callback().Update().Remove(callback))
 	response, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key, ReturnPath: "/org/setup?step=billing"}, r.Account.ID.String(), "http://localhost")
 	require.NoError(t, err)
 	require.Equal(t, "https://polar.sh/checkout/selected", response.CheckoutUrl)

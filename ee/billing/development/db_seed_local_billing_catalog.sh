@@ -39,9 +39,26 @@ VALUES
   ),
   (
     'starter', 'Starter', 'paid', 'public', 2000, false,
-    'abc9ef98-20c0-48b5-8204-1448df733737', NULL
+    'abc9ef98-20c0-48b5-8204-1448df733737', 10
   )
 ON CONFLICT (key) DO NOTHING;
+
+-- Pay-as-you-go has no price and no Polar product. New organizations start on
+-- it after the onboarding card step. Signup credit is independent of the plan.
+INSERT INTO billing_plans (
+  key, name, category, visibility, price_cents, per_seat,
+  trial_credit_cents, trial_length_days
+)
+VALUES ('pay_as_you_go', 'Pay-as-you-go', 'paid', 'public', 0, false, 0, 365)
+ON CONFLICT (key) DO NOTHING;
+
+-- Starter plans share signup credit and differ only in task concurrency.
+UPDATE billing_plans
+SET seat_limit = 10,
+    parallel_task_limit = CASE WHEN key = 'pay_as_you_go' THEN 5 ELSE NULL END,
+    trial_credit_cents = 0,
+    updated_at = NOW()
+WHERE key IN ('pay_as_you_go', 'starter');
 
 -- Enforce plan access locally. BYOS remains available through its plan feature.
 UPDATE plan_feature_definitions

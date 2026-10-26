@@ -9,7 +9,6 @@ import type { FactoriesFactory, OrganizationsBillingPlanOption } from "@/api-cli
 import { unmockedPackage } from "@/test/unmockedModule";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
-import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -77,12 +76,15 @@ vi.mock("./useGitHubOnboarding", () => ({
   useGitHubInstallationChecks: vi.fn(),
 }));
 
-type BillingState = { enabled: boolean; newBilling: boolean; byok: boolean; planActive: boolean };
-const billingState: BillingState & { availablePlans?: OrganizationsBillingPlanOption[] } = {
+const defaultBillingState = {
   enabled: false,
   newBilling: false,
   byok: false,
   planActive: false,
+  hasPaymentMethod: false,
+};
+const billingState: typeof defaultBillingState & { availablePlans?: OrganizationsBillingPlanOption[] } = {
+  ...defaultBillingState,
 };
 const billingData = () => ({
   billingEnabled: billingState.enabled,
@@ -90,6 +92,7 @@ const billingData = () => ({
   productFeatures: { byo_key: true },
   planCategory: billingState.planActive ? "paid" : "none",
   creditPurchaseAllowed: billingState.planActive,
+  hasPaymentMethod: billingState.hasPaymentMethod,
 });
 const refetchBilling = vi.fn(async () => ({ data: billingData() }));
 vi.mock("@/hooks/useOrganizationBilling", () => ({
@@ -107,20 +110,24 @@ vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
     refetch: async () => ({ data: workspaceUsage }),
   }),
 }));
-vi.mock("./first-run/FirstRunBillingScreen", () => ({
-  FirstRunBillingScreen: ({ onContinue, chrome }: { onContinue: () => void; chrome?: FirstRunChrome }) => (
-    <section data-testid="first-run-billing">
-      <button data-testid="first-run-back" onClick={chrome?.onBack}>
-        Back
-      </button>
-      <button onClick={onContinue}>Finish with selected plan</button>
-    </section>
-  ),
+const openCardSetup = vi.fn(async () => {});
+const activateOnboardingPlan = vi.fn(async () => {
+  billingState.planActive = true;
+  return false;
+});
+vi.mock("./onboardingCardPlan", () => ({
+  activateOnboardingPlan,
+  createOnboardingCardSession: openCardSetup,
+  resumeOnboardingPlan: vi.fn(async () => false),
 }));
 
 const navigateSpy = vi.fn();
 
 let accountOrganizations: Array<{ id: string; name: string; slug?: string }>;
+const twoOrganizations = [
+  { id: "org-1", name: "Acme" },
+  { id: "org-2", name: "Other Co" },
+];
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: accountOrganizations, refetch: vi.fn() }),
@@ -199,6 +206,15 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   };
 }
 
+function hostedVcsModel(overrides: Partial<OnboardingPageModel> = {}) {
+  return pageModel({
+    hostedAgentReady: true,
+    hostedModelsAvailable: true,
+    setup: { ...setupState(), issuesChoice: "vcs" },
+    ...overrides,
+  });
+}
+
 function StatefulSetup({ model }: { model: OnboardingPageModel }) {
   const [choice, setChoice] = useState<OnboardingAgentCredentialChoice | null>(null);
   return <FirstRunSetup model={{ ...model, agentCredentialChoice: choice, setAgentCredentialChoice: setChoice }} />;
@@ -236,9 +252,11 @@ describe("FirstRunSetup chrome", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
     navigateSpy.mockClear();
-    Object.assign(billingState, { byok: false, enabled: false, newBilling: false, planActive: false });
+    Object.assign(billingState, defaultBillingState);
     billingState.availablePlans = [{ key: "free", name: "Free" }];
     refetchBilling.mockClear();
+    openCardSetup.mockReset();
+    activateOnboardingPlan.mockClear();
     localStorage.clear();
     githubPending = false;
     githubLinked = true;
@@ -270,10 +288,7 @@ describe("FirstRunSetup chrome", () => {
 
   it("shows Log out and the organization switch when another organization exists", () => {
     factories = [factory];
-    accountOrganizations = [
-      { id: "org-1", name: "Acme" },
-      { id: "org-2", name: "Other Co" },
-    ];
+    accountOrganizations = twoOrganizations;
 
     renderSetup(pageModel());
 
@@ -284,10 +299,7 @@ describe("FirstRunSetup chrome", () => {
 
   it("shows both switches when another workspace and another organization exist", () => {
     factories = [factory, { id: "factory-2", key: "CORE", name: "Core" }];
-    accountOrganizations = [
-      { id: "org-1", name: "Acme" },
-      { id: "org-2", name: "Other Co" },
-    ];
+    accountOrganizations = twoOrganizations;
 
     renderSetup(pageModel());
 
@@ -296,10 +308,7 @@ describe("FirstRunSetup chrome", () => {
   });
 
   it("opens the current organization from the switch menu so the user can leave setup", async () => {
-    accountOrganizations = [
-      { id: "org-1", name: "Acme" },
-      { id: "org-2", name: "Other Co" },
-    ];
+    accountOrganizations = twoOrganizations;
     const user = userEvent.setup();
 
     renderSetup(pageModel());
@@ -507,23 +516,26 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
-  it.each([false, true])(
-    "completes Trial setup without plan selection (skip initial import: %s)",
-    async (skipInitialImport) => {
-      billingState.enabled = true;
-      billingState.newBilling = true;
-      const user = userEvent.setup();
-      const model = pageModel({
-        hostedAgentReady: true,
-        hostedModelsAvailable: true,
-        setup: { ...setupState(), issuesChoice: "vcs", skipInitialImport },
-      });
-      renderSetup(model);
-      await user.click(screen.getByTestId("first-run-analyze-tickets"));
-      expect(screen.queryByTestId("first-run-billing")).not.toBeInTheDocument();
-      await waitFor(() => expect(model.finish).toHaveBeenCalled());
-    },
-  );
+  it("starts Pay-as-you-go after the backlog step when a card is saved", async () => {
+    Object.assign(billingState, { enabled: true, newBilling: true, hasPaymentMethod: true });
+    billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
+    const user = userEvent.setup();
+    const model = hostedVcsModel();
+    renderSetup(model);
+    // The card step follows, so the tickets button does not promise a scan.
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByTestId("first-run-card")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", "Step 5 of 5");
+    expect(model.finish).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
+    await user.click(await screen.findByTestId("first-run-card-continue"));
+    await waitFor(() =>
+      expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "pay_as_you_go", expect.any(Object)),
+    );
+    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+  });
 
   it.each(
     ["issues", "billing"].flatMap((step) => [
@@ -534,33 +546,22 @@ describe("FirstRunSetup chrome", () => {
   )("finishes without plan selection (%j)", async ({ step, newBilling, availablePlans }) => {
     Object.assign(billingState, { enabled: true, newBilling, availablePlans });
     const user = userEvent.setup();
-    const model = pageModel({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      setup: { ...setupState(), issuesChoice: "vcs" },
-    });
+    const model = hostedVcsModel();
     renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
-    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
     await user.click(
       step === "issues"
         ? screen.getByTestId("first-run-analyze-tickets")
         : screen.getByRole("button", { name: "Continue" }),
     );
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
-    expect(screen.queryByRole("button", { name: "Finish with selected plan" })).not.toBeInTheDocument();
   });
 
   it.each([false, true])("routes a restored billing URL through model access (own key: %s)", async (byok) => {
     billingState.enabled = true;
     billingState.newBilling = true;
-    const model = pageModel({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      bringYourOwnKey: byok,
-      setup: { ...setupState(), issuesChoice: "vcs" },
-    });
+    const model = hostedVcsModel({ bringYourOwnKey: byok });
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=billing&plan=team&subscribed=1&checkout_id=old");
-    expect(screen.queryByTestId("first-run-billing")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-card")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-complete")).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Continue" }));
     if (byok) {
