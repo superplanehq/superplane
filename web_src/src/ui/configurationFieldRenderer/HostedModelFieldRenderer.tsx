@@ -17,7 +17,12 @@ import {
   type SelectableLLMSourceID,
 } from "@/lib/selectableLLMModels";
 import { toTestId } from "@/lib/testID";
-import { THINKING_LEVEL_KEY, THINKING_LEVELS, normalizeThinkingLevel } from "@/lib/thinkingLevel";
+import {
+  CODEX_THINKING_LEVELS,
+  THINKING_LEVEL_KEY,
+  THINKING_LEVELS,
+  normalizeThinkingLevel,
+} from "@/lib/thinkingLevel";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
@@ -147,6 +152,7 @@ function ProviderBYOKModelField({
       readOnly={readOnly}
       options={options}
       modelOnly={modelOnly}
+      thinkingOptions={provider === "openai" ? CODEX_THINKING_LEVELS : THINKING_LEVELS}
       triggerClassName={triggerClassName}
       onCommit={(nextModel, nextThinking) =>
         commitModelAndThinking(field.name, nextModel, nextThinking, onChange, onValuesChange)
@@ -180,6 +186,7 @@ function ModelThinkingSelect({
   readOnly,
   options,
   modelOnly,
+  thinkingOptions = THINKING_LEVELS,
   triggerClassName,
   onCommit,
 }: {
@@ -191,11 +198,12 @@ function ModelThinkingSelect({
   readOnly?: boolean;
   options: Array<{ value: string; label: string }>;
   modelOnly: boolean;
+  thinkingOptions?: ReadonlyArray<{ value: string; label: string }>;
   triggerClassName?: string;
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
   const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
-  const thinkingLabel = THINKING_LEVELS.find((level) => level.value === thinkingLevel)?.label ?? "Default";
+  const thinkingLabel = thinkingOptions.find((level) => level.value === thinkingLevel)?.label ?? "Default";
   const modelListTestId = fieldName ? toTestId(`field-${fieldName}-hosted-model-list`) : undefined;
   const thinkingTestId = fieldName ? toTestId(`field-${fieldName}-hosted-thinking`) : undefined;
 
@@ -241,7 +249,7 @@ function ModelThinkingSelect({
                 label="Thinking"
                 testId={thinkingTestId}
                 value={thinkingLevel}
-                options={[...THINKING_LEVELS]}
+                options={[...thinkingOptions]}
                 onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
               />,
             ]}

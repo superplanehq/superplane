@@ -3254,6 +3254,8 @@ message FactoryCodexConnection {
   bool eligible = 7;
   // True while a login runner or a factory task still holds the connection.
   bool reservation_held = 8;
+  // Models available to this ChatGPT subscription.
+  repeated string available_models = 9;
 }
 
 message DescribeFactoryCodexConnectionRequest {
@@ -3266,6 +3268,8 @@ message DescribeFactoryCodexConnectionResponse {
 
 message StartFactoryCodexConnectionRequest {
   string factory_id = 1;
+  // Refresh the model catalog without starting a new device sign-in.
+  bool refresh_catalog = 2;
 }
 
 message StartFactoryCodexConnectionResponse {
