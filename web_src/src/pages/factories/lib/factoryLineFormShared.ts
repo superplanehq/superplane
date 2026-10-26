@@ -1,4 +1,4 @@
-import type { FactoryLineStep } from "@/api-client";
+import type { FactoriesFactoryLineStep as FactoryLineStep } from "@/api-client";
 
 export const RUN_APP_TYPE = "runApp";
 

@@ -2,6 +2,7 @@ package claude
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -75,7 +76,7 @@ Example:
 
 ## Configuration
 - **Machine type**: Runner fleet available to the organization (required).
-- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Steps**: One or more ordered bash commands or agent prompts.
 - **Anthropic API Key**: SuperPlane secret or Claude integration used as ` + "`ANTHROPIC_API_KEY`" + `.
 - **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
@@ -129,12 +130,7 @@ func (c *RunClaudeCode) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if err := validateRunClaudeCodeSpec(spec); err != nil {
-		return err
-	}
-
-	_, err = ctx.Webhook.Setup()
-	return err
+	return validateRunClaudeCodeSpec(spec)
 }
 
 func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
@@ -152,19 +148,12 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := c.injectCredentials(ctx, resolved.Variables, spec.Credentials)
-	if err != nil {
-		return err
-	}
-
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("webhook setup: %w", err)
-	}
-
-	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
-	if err != nil {
-		return fmt.Errorf("new runner task client: %w", err)
+	environment := resolved.Variables
+	if claudeStepsNeedAPIKey(spec.Steps) {
+		environment, err = c.injectCredentials(ctx, environment, spec.Credentials)
+		if err != nil {
+			return err
+		}
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
@@ -180,7 +169,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	}
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
-	task := buildClaudeCodeBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
+	task := buildClaudeCodeTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = runner.AppendPlanningSessionMCPFiles(task.Files)
@@ -195,22 +184,20 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		Files:          task.Files,
-		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
-		Labels:         runner.OriginLabelsForTask(ctx),
 	}
 
-	taskID, err := client.CreateTask(params)
+	taskID, err := runner.CreateTask(ctx.RunnerTasks, params)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
+	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
-func (c *RunClaudeCode) injectCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {
+func (c *RunClaudeCode) injectCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.TaskEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envAnthropicAPIKey, credentials.Secret)
@@ -230,18 +217,18 @@ func (c *RunClaudeCode) Hooks() []core.Hook {
 func (c *RunClaudeCode) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case runner.HookPoll:
-		return runner.PollBrokerTask(ctx, FinishedEventType)
+		return runner.PollTask(ctx, FinishedEventType)
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
 func (c *RunClaudeCode) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return runner.HandleBrokerWebhook(ctx, FinishedEventType)
+	return http.StatusNotFound, nil, nil
 }
 
 func (c *RunClaudeCode) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerTask(ctx, FinishedEventType)
+	return runner.CancelTask(ctx, FinishedEventType)
 }
 
 func (c *RunClaudeCode) Cleanup(ctx core.SetupContext) error { return nil }

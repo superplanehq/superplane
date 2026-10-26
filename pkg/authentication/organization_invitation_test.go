@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
 
@@ -46,8 +47,7 @@ func TestInvitationSignupWithRegistrationDisabled(t *testing.T) {
 				token := uuid.NewString()
 				redirect := "/invitations/" + token
 				if scenario.sharedLink {
-					link, err := models.FindOrCreateInviteLink(database.Conn(), registry.Organization.ID)
-					require.NoError(t, err)
+					link := support.SeedHistoricalInviteLink(t, registry.Organization.ID, true)
 					token = link.Token.String()
 					redirect = "/invite/" + token
 				} else {

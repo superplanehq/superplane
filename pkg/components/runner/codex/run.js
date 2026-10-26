@@ -242,6 +242,16 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
     `mcp_servers.superplane.command=${tomlString("node")}`,
     "-c",
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+    // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
+    // answer that prompt, so approve only these planning tools, not shell writes.
+    ...(planningEnabled(env)
+      ? [
+          "-c",
+          'mcp_servers.superplane.tools.propose_update.approval_mode="approve"',
+          "-c",
+          'mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"',
+        ]
+      : []),
     ...workspaceMCPConfigOverrides(env),
   ];
 }
@@ -649,7 +659,7 @@ function createCodexFormatter(telemetry, activityOverride) {
     activity.startTool({
       id,
       kind: normalizeCodexToolKind(item),
-      name: String(item.name || item.type || "tool"),
+      name: String(item.tool || item.name || item.type || "tool"),
       input: toolTextForItem(item),
     });
     return id;
@@ -678,7 +688,11 @@ function createCodexFormatter(telemetry, activityOverride) {
       id = rememberTool(item);
     }
     emitStart(id);
-    const output = item.aggregated_output || item.output || "";
+    const output =
+      item.aggregated_output ||
+      item.output ||
+      (item.error && item.error.message) ||
+      "";
     if (typeof output === "string" && output.trim()) {
       if (activity.enabled) {
         activity.appendToolOutput(
@@ -876,6 +890,11 @@ function toolTextForItem(item) {
       ? paths.map(String).join("\n")
       : String(item.path || "file");
   }
+  if (type === "mcp_tool_call") {
+    return [item.server, item.tool || item.name || "mcp"]
+      .filter(Boolean)
+      .join(".");
+  }
   return String(
     item.command || item.path || item.query || item.name || type || "tool",
   );
@@ -886,7 +905,18 @@ function stripBashLc(command) {
 }
 
 function toolFailed(item) {
-  if (item.status === "failed") {
+  const status = String(item.status || "").toLowerCase();
+  if (
+    [
+      "failed",
+      "declined",
+      "cancelled",
+      "canceled",
+      "timed_out",
+      "timeout",
+      "interrupted",
+    ].includes(status)
+  ) {
     return true;
   }
   const exit = Number(item.exit_code);

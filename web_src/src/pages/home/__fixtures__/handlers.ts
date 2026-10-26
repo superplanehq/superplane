@@ -108,7 +108,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       pattern: re("/api/v1/organizations/[^/]+/selectable-llm-models"),
       resolve: () => ({ json: { models: storybookSelectableLlmModels() } }),
     },
-    { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
       resolve: () => ({

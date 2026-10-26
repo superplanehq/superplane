@@ -4,8 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	billing "github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -50,11 +53,31 @@ func TestAccountSoftDelete_MarksOnlyLastOwnerOrganizations(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, models.SetUserIsOwner(db, otherUser.ID, true))
 
-	require.NoError(t, r.Account.SoftDelete(db, time.Now()))
+	plan, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	clearance, err := billingmodels.NewLocalDeletionClearance(r.Organization.ID, plan)
+	require.NoError(t, err)
+
+	require.NoError(t, r.Account.SoftDelete(db, time.Now(), map[uuid.UUID]billing.DeletionGuard{
+		r.Organization.ID: clearance,
+	}))
 
 	_, err = models.FindOrganizationByID(r.Organization.ID.String())
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	_, err = models.FindOrganizationByID(kept.ID.String())
+	require.NoError(t, err)
+}
+
+func TestAccountSoftDelete_RequiresClearanceForEachDeletedOrganization(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	err := r.Account.SoftDelete(db, time.Now(), nil)
+
+	require.ErrorIs(t, err, billing.ErrOrganizationSubscriptionUnverified)
+	_, err = models.FindOrganizationByID(r.Organization.ID.String())
+	require.NoError(t, err)
+	_, err = models.FindAccountByID(r.Account.ID.String())
 	require.NoError(t, err)
 }

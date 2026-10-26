@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { PersonalApiTokenDialogs } from "@/components/PersonalApiTokens";
+import { SupportSessionReadOnly } from "@/components/SupportSessionReadOnly";
 import type { AccountLinkedAccount } from "@/contexts/accountContextState";
 import { useAccount } from "@/contexts/useAccount";
 import { meKeys } from "@/hooks/useMe";
@@ -75,7 +76,7 @@ export function FactorySettingsAccountProfilePage() {
   const redirectPath = `${location.pathname}${location.search}`;
 
   return (
-    <>
+    <SupportSessionReadOnly>
       <AccountProfileRedesignPage
         name={name}
         email={account.email}
@@ -147,6 +148,6 @@ export function FactorySettingsAccountProfilePage() {
       />
       {account.has_password ? <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} /> : null}
       <PersonalApiTokenDialogs panel={tokensPanel} />
-    </>
+    </SupportSessionReadOnly>
   );
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -78,4 +79,47 @@ func TestGetCanvasAgentChat_PermissionDenied(t *testing.T) {
 	_, err := actionsagents.GetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: canvas.ID.String()})
 	require.Error(t, err)
 	assert.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+}
+
+func TestGetCanvasAgentChat_SupportSessionDoesNotProvision(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas := setupCanvas(t, r)
+	ctx := authentication.SetSupportSessionInMetadata(context.Background())
+	ensureCalls := 0
+
+	t.Run("returns the existing chat", func(t *testing.T) {
+		sessionID := uuid.New()
+		svc := &stubService{
+			ensureSession: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error) {
+				ensureCalls++
+				return nil, nil
+			},
+			findCanvasSession: func(uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error) {
+				return &models.AgentSession{ID: sessionID, CanvasID: canvas.ID, Status: models.AgentSessionStatusIdle}, nil
+			},
+		}
+
+		resp, err := actionsagents.GetCanvasAgentChat(ctx, svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: canvas.ID.String()})
+		require.NoError(t, err)
+		assert.Equal(t, sessionID.String(), resp.Chat.Id)
+		assert.Zero(t, ensureCalls)
+	})
+
+	t.Run("fails without creating a chat when none exists", func(t *testing.T) {
+		svc := &stubService{
+			ensureSession: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error) {
+				ensureCalls++
+				return nil, nil
+			},
+			findCanvasSession: func(uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error) {
+				return nil, nil
+			},
+		}
+
+		_, err := actionsagents.GetCanvasAgentChat(ctx, svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: canvas.ID.String()})
+		require.Error(t, err)
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+		assert.Zero(t, ensureCalls)
+	})
 }

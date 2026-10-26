@@ -3,16 +3,32 @@ import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
 
+import {
+  clearBitbucketInstallationAttempt,
+  readBitbucketInstallationAttempt,
+  writeBitbucketInstallationAttempt,
+  type BitbucketInstallationAttempt,
+} from "./bitbucketInstallationAttempt";
 import { bitbucketInstallationAttemptMs } from "./bitbucketOnboardingPoll";
 import { navigateGitHubWindow, openGitHubWindow } from "./useFirstRunGitHub";
 import type { FirstRunBlocking } from "./useFirstRunBlockingAction";
 import { useBitbucketOnboarding } from "./useBitbucketOnboarding";
 import { onboardingStepPath } from "./onboardingStepPath";
 
-type InstallationAttempt = {
-  startedAt: number;
-  knownSlugs: string[];
+type OrganizationAttempt = {
+  organizationId: string;
+  attempt: BitbucketInstallationAttempt | null;
 };
+
+// Restore the attempt that a reload interrupted. Drop one that already expired.
+function restoreAttempt(organizationId: string): OrganizationAttempt {
+  const stored = readBitbucketInstallationAttempt(organizationId);
+  if (stored && Date.now() - stored.startedAt >= bitbucketInstallationAttemptMs) {
+    clearBitbucketInstallationAttempt(organizationId);
+    return { organizationId, attempt: null };
+  }
+  return { organizationId, attempt: stored };
+}
 
 function installedSlugs(data: { installedWorkspaces?: Array<{ slug?: string; externalId?: string }> } | undefined) {
   return (data?.installedWorkspaces ?? [])
@@ -37,23 +53,48 @@ export function useFirstRunBitbucket(args: {
   blocking: FirstRunBlocking;
 }) {
   const location = useLocation();
-  const [attempt, setAttempt] = useState<InstallationAttempt | null>(null);
+  const { organizationId } = args;
+  const [stored, setStored] = useState(() => restoreAttempt(organizationId));
+  // An organization change must never show the spinner of another organization.
+  let current = stored;
+  if (stored.organizationId !== organizationId) {
+    current = restoreAttempt(organizationId);
+    setStored(current);
+  }
+  const attempt = current.attempt;
   const [now, setNow] = useState(() => Date.now());
   const timedOut = attempt != null && now - attempt.startedAt >= bitbucketInstallationAttemptMs;
   const attemptActive = attempt != null && !timedOut;
-  const onboarding = useBitbucketOnboarding(args.organizationId, {
+  const onboarding = useBitbucketOnboarding(organizationId, {
     poll: !args.setupFinished,
     attemptActive,
   });
   const slugs = installedSlugs(onboarding.data);
   const refetchOnboarding = onboarding.refetch;
 
+  const startAttempt = (known: string[]) => {
+    const next = { startedAt: Date.now(), knownSlugs: known };
+    writeBitbucketInstallationAttempt(organizationId, next);
+    setStored({ organizationId, attempt: next });
+  };
+
+  const endAttempt = () => {
+    clearBitbucketInstallationAttempt(organizationId);
+    setStored({ organizationId, attempt: null });
+  };
+
   // Stop the attempt when a new installation appears. Existing selections
   // stay untouched, and the picker shows the new workspace automatically.
   useEffect(() => {
     if (attempt == null) return;
-    if (slugs.some((slug) => !attempt.knownSlugs.includes(slug))) setAttempt(null);
+    if (slugs.some((slug) => !attempt.knownSlugs.includes(slug))) endAttempt();
   }, [attempt, slugs.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Forget the stored attempt when the five-minute window ends. The state
+  // keeps it, so the timed-out notice and the retry path still work.
+  useEffect(() => {
+    if (timedOut) clearBitbucketInstallationAttempt(organizationId);
+  }, [timedOut, organizationId]);
 
   // Re-render once when the five-minute window ends.
   useEffect(() => {
@@ -77,8 +118,6 @@ export function useFirstRunBitbucket(args: {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [attemptActive, refetchOnboarding]);
-
-  const startAttempt = (known: string[]) => setAttempt({ startedAt: Date.now(), knownSlugs: known });
 
   const installUrl = onboarding.data?.installUrl ?? "";
 

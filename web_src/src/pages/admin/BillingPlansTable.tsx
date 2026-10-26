@@ -1,6 +1,16 @@
 import { Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/Table/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { BillingHelp } from "./BillingHelp";
@@ -30,7 +40,7 @@ export function BillingPlansTable({
               Limits{" "}
               <BillingHelp
                 label="Plan limits"
-                text="Seats are organization members. Parallel task limits are saved but not enforced."
+                text="Seats are organization members. The parallel runner limit counts reserved or running runner jobs across all workspaces and fleets."
               />
             </TableHeader>
             <TableHeader>Features</TableHeader>
@@ -67,7 +77,7 @@ export function BillingPlansTable({
               <TableCell>
                 <div>{plan.seat_limit ?? "Unlimited"} seats</div>
                 <div className="text-xs text-muted-foreground">
-                  {plan.parallel_task_limit ?? "Unlimited"} parallel tasks
+                  Parallel runner limit: {plan.parallel_task_limit ?? "Unlimited"}
                 </div>
               </TableCell>
               <TableCell>{plan.features.length}</TableCell>
@@ -95,33 +105,65 @@ function DeletePlanButton({
   onDelete: (plan: BillingPlanListItem) => void;
 }) {
   const reason = plan.delete_disabled_reason;
-  const button = (
-    <Button
-      size="icon-sm"
-      variant="ghost"
-      aria-label={`Delete ${plan.name}`}
-      disabled={!!reason}
-      onClick={() => onDelete(plan)}
-    >
-      <Trash2 aria-hidden="true" />
-    </Button>
-  );
-  if (!reason) return button;
-  // Disabled buttons do not receive focus. The wrapper receives hover and
-  // keyboard focus so that the reason is available to every user.
+  if (reason) {
+    // Disabled buttons do not receive focus. The wrapper receives hover and
+    // keyboard focus so that the reason is available to every user.
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            role="group"
+            tabIndex={0}
+            aria-label={`Delete ${plan.name} is unavailable`}
+            className="inline-flex rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <Button size="icon-sm" variant="ghost" aria-label={`Delete ${plan.name}`} disabled>
+              <Trash2 aria-hidden="true" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{reason}</TooltipContent>
+      </Tooltip>
+    );
+  }
+  return <ConfirmDeletePlanButton plan={plan} onDelete={onDelete} />;
+}
+
+function ConfirmDeletePlanButton({
+  plan,
+  onDelete,
+}: {
+  plan: BillingPlanListItem;
+  onDelete: (plan: BillingPlanListItem) => void;
+}) {
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const confirmDelete = () => {
+    setConfirmationOpen(false);
+    onDelete(plan);
+  };
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          role="group"
-          tabIndex={0}
-          aria-label={`Delete ${plan.name} is unavailable`}
-          className="inline-flex rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-          {button}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{reason}</TooltipContent>
-    </Tooltip>
+    <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
+      <DialogTrigger asChild>
+        <Button size="icon-sm" variant="ghost" aria-label={`Delete ${plan.name}`}>
+          <Trash2 aria-hidden="true" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete plan?</DialogTitle>
+          <DialogDescription>
+            Delete “{plan.name}” ({plan.key})? This removes the plan from the billing catalog.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setConfirmationOpen(false)}>
+            Keep plan
+          </Button>
+          <Button variant="destructive" onClick={confirmDelete}>
+            Delete plan
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -40,19 +40,6 @@ export type RecordPage<T> = {
   hasNextPage: boolean;
 };
 
-export type BrokerTask = {
-  id: string;
-  status: string;
-  fleet_id: string;
-  created_at: string;
-  claimed_at?: string;
-  lease_until?: string;
-  runner_id?: string;
-  execution_mode?: string;
-  docker_image?: string;
-  cancel_requested?: boolean;
-};
-
 export const REFRESH_INTERVAL_MS = 5000;
 export const FLEET_REQUEST_TIMEOUT_MS = 30_000;
 export const PAGE_SIZE = 50;
@@ -73,21 +60,6 @@ export const statusBadgeClass = (status: string, cancelRequested: boolean) => {
     return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
   }
   return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
-};
-
-export const formatBrokerStatus = (status: string, cancelRequested: boolean) => {
-  if (cancelRequested) {
-    return "cancel requested";
-  }
-  return status;
-};
-
-export const formatExecutionMode = (task: BrokerTask) => {
-  const mode = task.execution_mode?.trim() || "host";
-  if (mode === "docker" && task.docker_image) {
-    return `docker (${task.docker_image})`;
-  }
-  return mode;
 };
 
 export const parseCount = (value: unknown) => {
@@ -165,15 +137,6 @@ export const fetchRunner = async (fleetId: string, runnerId: string, signal?: Ab
   }
   const body: { runner: FleetRunner } = await response.json();
   return body.runner;
-};
-
-export const fetchBrokerTasks = async () => {
-  const response = await adminFetch("/admin/api/runner/tasks");
-  if (!response.ok) {
-    throw new Error(await readError(response, "Failed to load runner tasks"));
-  }
-  const data: { configured: boolean; tasks?: BrokerTask[] } = await response.json();
-  return { configured: data.configured, tasks: data.tasks ?? [] };
 };
 
 type ListBody<T> = {

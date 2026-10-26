@@ -91,10 +91,10 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 
-	t.Run("requires at least one prompt", func(t *testing.T) {
+	t.Run("allows bash only", func(t *testing.T) {
 		spec := valid
 		spec.Steps = []ClaudeCodeStep{{Name: "Echo", Type: runner.AgentStepBash, Command: strPtr("echo hi")}}
-		require.Error(t, validateRunClaudeCodeSpec(spec))
+		require.NoError(t, validateRunClaudeCodeSpec(spec))
 	})
 
 	t.Run("rejects hosted credentials", func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 	})
 }
 
-func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
+func TestBuildClaudeCodeTaskRunsOrderedSteps(t *testing.T) {
 	t.Parallel()
 
 	spec := RunClaudeCodeSpec{
@@ -121,7 +121,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	task := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil, false)
+	task := buildClaudeCodeTask(spec, "", nil, nil, nil, false)
 	require.Len(t, task.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[0].Kind)
@@ -196,7 +196,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.NotContains(t, runScript, "workdir")
 }
 
-func TestBuildClaudeCodeBrokerTaskRewritesPlanningImagePromptPaths(t *testing.T) {
+func TestBuildClaudeCodeTaskRewritesPlanningImagePromptPaths(t *testing.T) {
 	t.Parallel()
 
 	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -220,7 +220,7 @@ func TestBuildClaudeCodeBrokerTaskRewritesPlanningImagePromptPaths(t *testing.T)
 		Filename:    "bug.png",
 		ContentType: "image/png",
 	}}
-	task := buildClaudeCodeBrokerTask(spec, "", nil, dispatched, attachments, true)
+	task := buildClaudeCodeTask(spec, "", nil, dispatched, attachments, true)
 
 	prompt := requireTaskFile(t, task.Files, "prompts/01-fix-panic.txt").Content
 	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
@@ -232,7 +232,7 @@ func TestBuildClaudeCodeBrokerTaskRewritesPlanningImagePromptPaths(t *testing.T)
 	assert.Equal(t, "Process task attachments", task.Commands[2].Name)
 }
 
-func TestBuildClaudeCodeBrokerTaskKeepsLineImageURLs(t *testing.T) {
+func TestBuildClaudeCodeTaskKeepsLineImageURLs(t *testing.T) {
 	t.Parallel()
 
 	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -250,7 +250,7 @@ func TestBuildClaudeCodeBrokerTaskKeepsLineImageURLs(t *testing.T) {
 		Model: "sonnet",
 		Steps: []ClaudeCodeStep{{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr(original)}},
 	}
-	task := buildClaudeCodeBrokerTask(spec, "", nil, dispatched, []runner.TaskAttachment{{
+	task := buildClaudeCodeTask(spec, "", nil, dispatched, []runner.TaskAttachment{{
 		ID:          fileID,
 		URL:         signed,
 		Filename:    "bug.png",
@@ -264,7 +264,7 @@ func TestBuildClaudeCodeBrokerTaskKeepsLineImageURLs(t *testing.T) {
 	assert.Contains(t, requireTaskFile(t, task.Files, "attachments/manifest.json").Content, "sp_file=1")
 }
 
-func TestBuildClaudeCodeBrokerTaskPassesThinking(t *testing.T) {
+func TestBuildClaudeCodeTaskPassesThinking(t *testing.T) {
 	t.Parallel()
 
 	spec := RunClaudeCodeSpec{
@@ -274,7 +274,7 @@ func TestBuildClaudeCodeBrokerTaskPassesThinking(t *testing.T) {
 			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
 		},
 	}
-	task := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil, false)
+	task := buildClaudeCodeTask(spec, "", nil, nil, nil, false)
 	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" 'sonnet' 'high'`)
 }
 
@@ -295,7 +295,7 @@ func TestValidateRunClaudeCodeSpecRejectsUnknownThinking(t *testing.T) {
 	require.Error(t, validateRunClaudeCodeSpec(spec))
 }
 
-func TestBuildClaudeCodeBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
+func TestBuildClaudeCodeTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
 	t.Parallel()
 
 	spec := RunClaudeCodeSpec{
@@ -305,7 +305,7 @@ func TestBuildClaudeCodeBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) 
 		},
 	}
 
-	task := buildClaudeCodeBrokerTask(spec, "The gh CLI is already installed. Use GITHUB_TOKEN.", []runner.IntegrationSetup{
+	task := buildClaudeCodeTask(spec, "The gh CLI is already installed. Use GITHUB_TOKEN.", []runner.IntegrationSetup{
 		{Name: "Set up Semaphore", Script: "echo install-sem-ai"},
 	}, nil, nil, false)
 	require.Len(t, task.Commands, 3)
@@ -346,7 +346,7 @@ func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
 			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("fix"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil, false)
+	base := buildClaudeCodeTask(spec, "", nil, nil, nil, false)
 	got := applyPlanningFollowUp(base, nil, spec)
 	assert.Len(t, got.Commands, len(base.Commands))
 	assert.Len(t, got.Files, len(base.Files))
@@ -362,8 +362,8 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet"), WorkingDirectory: "repo"},
 		},
 	}
-	base := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil, false)
-	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
+	base := buildClaudeCodeTask(spec, "", nil, nil, nil, false)
+	got := applyPlanningFollowUp(base, []runner.TaskEnvironmentVariable{{
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
 	}}, spec)
@@ -379,7 +379,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentProcessScriptPath).Content)
 }
 
-func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {
+func requireEnvironmentValue(t *testing.T, environment []runner.TaskEnvironmentVariable, name string) string {
 	t.Helper()
 	for _, variable := range environment {
 		if variable.Name == name {
@@ -390,7 +390,7 @@ func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmen
 	return ""
 }
 
-func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {
+func requireTaskFile(t *testing.T, files []runner.TaskFile, path string) runner.TaskFile {
 	t.Helper()
 	for _, file := range files {
 		if file.Path == path {
@@ -398,5 +398,5 @@ func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) r
 		}
 	}
 	t.Fatalf("missing task file %q", path)
-	return runner.BrokerTaskFile{}
+	return runner.TaskFile{}
 }

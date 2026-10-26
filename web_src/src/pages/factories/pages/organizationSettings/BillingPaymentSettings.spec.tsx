@@ -7,6 +7,7 @@ import { BillingPaymentSettings } from "./BillingPaymentSettings";
 
 const selectPlan = vi.fn();
 const createSession = vi.fn();
+const createPortalSession = vi.fn();
 const refetch = vi.fn();
 const billing: OrganizationsDescribeOrganizationBillingResponse = {
   billingEnabled: true,
@@ -22,7 +23,7 @@ const billing: OrganizationsDescribeOrganizationBillingResponse = {
 vi.mock("@/api-client", () => ({
   organizationsSelectBillingPlan: selectPlan,
   organizationsCreatePaymentMethodSession: createSession,
-  organizationsCreateBillingPortalSession: vi.fn(),
+  organizationsCreateBillingPortalSession: createPortalSession,
 }));
 vi.mock("@/hooks/useOrganizationBilling", () => ({
   organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
@@ -30,11 +31,16 @@ vi.mock("@/hooks/useOrganizationBilling", () => ({
 }));
 
 beforeEach(() => {
+  delete billing.polarSubscriptionStatus;
+  delete billing.paymentFailedAt;
+  delete billing.paidAccessEndsAt;
   billing.hasPaymentMethod = false;
   billing.occupiedSeats = 2;
+  billing.pendingInvitationSeats = 0;
   billing.availablePlans![1].seatMaximum = 5;
   selectPlan.mockReset().mockResolvedValue({ data: {} });
   createSession.mockReset().mockResolvedValue({ data: { portalUrl: "https://polar.example/portal?token=test" } });
+  createPortalSession.mockReset().mockResolvedValue({ data: { portalUrl: "https://polar.example/portal" } });
   refetch.mockReset().mockResolvedValue({ data: billing });
 });
 afterEach(() => vi.restoreAllMocks());
@@ -185,6 +191,46 @@ it("supports an unlimited maximum and a zero-member minimum of one", async () =>
   expect(screen.getByRole("button", { name: "Subscribe to Team" })).toBeEnabled();
 });
 
+it("defaults Team seats to members plus pending invitations", async () => {
+  billing.occupiedSeats = 1;
+  billing.pendingInvitationSeats = 2;
+  const user = renderSettings();
+  const seats = screen.getByRole("spinbutton", { name: "Team seats" });
+  expect(seats).toHaveValue(3);
+  expect(seats).toHaveAttribute("min", "1");
+  expect(screen.getByText(/adds 2 seats for pending invitations/)).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Subscribe to Team" }));
+  await waitFor(() =>
+    expect(selectPlan).toHaveBeenCalledWith(expect.objectContaining({ body: { planKey: "team", seats: 3 } })),
+  );
+});
+
+it.each([0, undefined])("defaults Team seats to members with no pending invitations: %s", (pending) => {
+  billing.pendingInvitationSeats = pending;
+  renderSettings();
+  expect(screen.getByRole("spinbutton", { name: "Team seats" })).toHaveValue(2);
+  expect(screen.queryByText(/pending invitation/)).not.toBeInTheDocument();
+});
+
+it("caps the pending default at the plan maximum and lets the admin pay for members only", async () => {
+  billing.pendingInvitationSeats = 5;
+  const user = renderSettings();
+  const seats = screen.getByRole("spinbutton", { name: "Team seats" });
+  expect(seats).toHaveValue(5);
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "The plan maximum is 5 seats. 2 pending invitations cannot get a seat.",
+  );
+  const subscribe = screen.getByRole("button", { name: "Subscribe to Team" });
+  expect(subscribe).toBeEnabled();
+  await user.clear(seats);
+  await user.type(seats, "2");
+  expect(subscribe).toBeEnabled();
+  await user.click(subscribe);
+  await waitFor(() =>
+    expect(selectPlan).toHaveBeenCalledWith(expect.objectContaining({ body: { planKey: "team", seats: 2 } })),
+  );
+});
+
 it("hides checkout controls from members without billing permission", () => {
   renderSettings(false);
   expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
@@ -195,6 +241,7 @@ it("hides checkout controls from members without billing permission", () => {
 it.each(["missing usage", "maximum below occupancy"])(
   "blocks checkout when bounds cannot cover members: %s",
   (condition) => {
+    billing.pendingInvitationSeats = 3;
     if (condition === "missing usage") delete billing.occupiedSeats;
     else billing.availablePlans![1].seatMaximum = 1;
     renderSettings();
@@ -203,3 +250,86 @@ it.each(["missing usage", "maximum below occupancy"])(
     expect(selectPlan).not.toHaveBeenCalled();
   },
 );
+
+const FAILED_AT = "2026-10-20T10:00:00Z";
+const ACCESS_ENDS_AT = "2026-10-27T10:00:00Z";
+const failedOn = new Date(FAILED_AT).toLocaleDateString();
+const accessEndsOn = new Date(ACCESS_ENDS_AT).toLocaleDateString();
+
+it("shows the failure and the date Team features end while a grace period is open", () => {
+  Object.assign(billing, {
+    polarSubscriptionStatus: "past_due",
+    paymentFailedAt: FAILED_AT,
+    paidAccessEndsAt: ACCESS_ENDS_AT,
+  });
+  renderSettings();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    `The renewal payment failed on ${failedOn}. Update the payment method by ${accessEndsOn} to keep Team features.`,
+  );
+});
+
+it("says Team features are off when no grace period applies", () => {
+  Object.assign(billing, { polarSubscriptionStatus: "past_due", paymentFailedAt: FAILED_AT });
+  renderSettings();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    `The renewal payment failed on ${failedOn}. Team features are off until you update the payment method.`,
+  );
+});
+
+it("opens the Polar payment method page from the banner", async () => {
+  Object.assign(billing, { polarSubscriptionStatus: "past_due", paymentFailedAt: FAILED_AT });
+  const assign = vi.fn();
+  const previousAssign = window.location.assign.bind(window.location);
+  window.location.assign = assign;
+  try {
+    const user = renderSettings();
+    await user.click(screen.getByRole("button", { name: "Update payment method" }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://polar.example/portal/settings?token=test"));
+    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(selectPlan).not.toHaveBeenCalled();
+  } finally {
+    window.location.assign = previousAssign;
+  }
+});
+
+it("shows a failed portal call on the banner and lets the owner retry", async () => {
+  Object.assign(billing, { polarSubscriptionStatus: "past_due", paymentFailedAt: FAILED_AT });
+  createSession.mockRejectedValueOnce(new Error("Polar is unavailable"));
+  const user = renderSettings();
+  await user.click(screen.getByRole("button", { name: "Update payment method" }));
+  await waitFor(() => expect(screen.getAllByRole("alert").at(-1)).toHaveTextContent("Polar is unavailable"));
+  expect(screen.getByRole("button", { name: "Update payment method" })).toBeEnabled();
+});
+
+it.each(["past_due", "paused"])("hides plan checkout while the subscription is %s", (status) => {
+  Object.assign(billing, { polarSubscriptionStatus: status, paymentFailedAt: FAILED_AT });
+  renderSettings();
+  expect(screen.queryByRole("spinbutton", { name: "Team seats" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Subscribe to / })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Select / })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
+});
+
+it("keeps the banner text but removes the action for members without billing permission", () => {
+  Object.assign(billing, { polarSubscriptionStatus: "past_due", paymentFailedAt: FAILED_AT });
+  renderSettings(false);
+  expect(screen.getByRole("alert")).toHaveTextContent("The renewal payment failed on");
+  expect(screen.queryByRole("button", { name: "Update payment method" })).not.toBeInTheDocument();
+});
+
+it.each([false, true])("opens the portal for a paused subscription with a saved card: %s", async (saved) => {
+  Object.assign(billing, { polarSubscriptionStatus: "paused", hasPaymentMethod: saved });
+  const assign = vi.fn();
+  const previousAssign = window.location.assign.bind(window.location);
+  window.location.assign = assign;
+  try {
+    const user = renderSettings();
+    await user.click(screen.getByRole("button", { name: "Manage payment method" }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://polar.example/portal"));
+    expect(createPortalSession).toHaveBeenCalledWith(expect.objectContaining({ path: { id: "org-1" }, body: {} }));
+    expect(createSession).not.toHaveBeenCalled();
+    expect(selectPlan).not.toHaveBeenCalled();
+  } finally {
+    window.location.assign = previousAssign;
+  }
+});

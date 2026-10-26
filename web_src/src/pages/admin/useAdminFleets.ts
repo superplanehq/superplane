@@ -4,13 +4,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import {
   FLEET_REQUEST_TIMEOUT_MS,
   REFRESH_INTERVAL_MS,
-  type BrokerTask,
   type FleetCapacity,
   type FleetRunner,
   type FleetTask,
   type InstallationFleet,
   type RecordPage,
-  fetchBrokerTasks,
   fetchFleetDetails,
   fetchInstallationFleets,
   selectedFleetIdAfterRefresh,
@@ -82,8 +80,7 @@ const sameDetailQuery = (left: DetailQuery, right: DetailQuery) =>
 export const useAdminFleets = () => {
   const catalog = useFleetCatalog();
   const records = useFleetRecords(catalog.selectedFleetId);
-  const broker = useBrokerTasks();
-  return { ...catalog, ...records, ...broker };
+  return { ...catalog, ...records };
 };
 
 const useFleetCatalog = () => {
@@ -221,30 +218,4 @@ const useFleetRecords = (selectedFleetId: string | null) => {
   }, [cursorsReady, detailsPoll, loadDetails, runnerCursor, selectedFleetId, taskCursor]);
 
   return { capacity, runners, tasks, runnerCursors, taskCursors, setRunnerCursors, setTaskCursors };
-};
-
-const useBrokerTasks = () => {
-  const [configured, setConfigured] = useState<boolean | null>(null);
-  const [brokerTasks, setBrokerTasks] = useState<BrokerTask[]>([]);
-  const [brokerLoaded, setBrokerLoaded] = useState(false);
-
-  const loadBroker = useCallback(async () => {
-    try {
-      const data = await fetchBrokerTasks();
-      setConfigured(data.configured);
-      setBrokerTasks(data.tasks);
-    } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : "Failed to load runner tasks");
-    } finally {
-      setBrokerLoaded(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadBroker();
-    const interval = window.setInterval(() => void loadBroker(), REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(interval);
-  }, [loadBroker]);
-
-  return { configured, brokerTasks, brokerLoaded };
 };

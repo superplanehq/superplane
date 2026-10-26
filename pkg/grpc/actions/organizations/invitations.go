@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/entitlements"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -77,6 +77,9 @@ func (s *InvitationService) Create(ctx context.Context, orgID, inviterID string,
 		if err := requireInvitationCapacity(tx, organization, false); err != nil {
 			return err
 		}
+		if err := reserveInvitationSend(tx, organization, email); err != nil {
+			return err
+		}
 		token, err = prepareInvitation(tx, invitation, now)
 		if err != nil {
 			return err
@@ -115,7 +118,7 @@ func (s *InvitationService) List(ctx context.Context, orgID string) (*pb.ListInv
 		if err != nil {
 			return err
 		}
-		seats, err := entitlements.ResolveSeats(tx, organization)
+		seats, err := billing.ResolveSeats(tx, organization)
 		if err != nil {
 			return err
 		}
@@ -128,7 +131,16 @@ func (s *InvitationService) List(ctx context.Context, orgID string) (*pb.ListInv
 		for i := range invitations {
 			response.Invitations = append(response.Invitations, invitationToProto(&invitations[i]))
 		}
-		response.Seats = &pb.InvitationSeatSummary{PerSeat: seats.PerSeat, Purchased: seatCountToProto(seats.Purchased), Occupied: int64(seats.Occupied), PendingInvitations: int64(seats.PendingInvitations), Invitable: seatCountToProto(seats.Invitable), Purchasable: seatCountToProto(seats.Purchasable), MemberLimit: seatCountToProto(seats.MemberLimit)}
+		response.Seats = &pb.InvitationSeatSummary{
+			PerSeat:            seats.PerSeat,
+			Purchased:          seatCountToProto(seats.Purchased),
+			Occupied:           int64(seats.Occupied),
+			PendingInvitations: int64(seats.PendingInvitations),
+			Invitable:          seatCountToProto(seats.Invitable),
+			Purchasable:        seatCountToProto(seats.Purchasable),
+			MemberLimit:        seatCountToProto(seats.MemberLimit),
+			PaymentBlocked:     seats.PaymentBlocked,
+		}
 		return nil
 	})
 	if err != nil {
@@ -181,6 +193,9 @@ func (s *InvitationService) Resend(ctx context.Context, orgID, actorID, invitati
 			}
 		}
 		if err := requireInvitationCapacity(tx, organization, invitation.State == models.InvitationStatePending); err != nil {
+			return err
+		}
+		if err := reserveInvitationSend(tx, organization, invitation.Email); err != nil {
 			return err
 		}
 		if err := invitation.ArchiveToken(tx); err != nil {
@@ -300,26 +315,37 @@ func requireNoPendingInvitation(tx *gorm.DB, invitation *models.OrganizationInvi
 }
 
 func requireInvitationCapacity(tx *gorm.DB, orgID uuid.UUID, alreadyPending bool) error {
-	seats, err := entitlements.ResolveSeats(tx, orgID)
+	return billing.ValidateInvitationCapacity(tx, orgID, alreadyPending, int(loadInvitationLimits().pending))
+}
+
+// reserveInvitationSend checks all limits and records the send in the caller's
+// transaction. The caller holds the organization lock. The recipient lock also
+// serializes reservations from different organizations across server replicas.
+func reserveInvitationSend(tx *gorm.DB, orgID uuid.UUID, email string) error {
+	email = utils.NormalizeEmail(email)
+	if err := models.LockInvitationRecipient(tx, email); err != nil {
+		return err
+	}
+	// Start the windows after any lock wait, so cleanup cannot remove a row
+	// that this check still counts.
+	now := time.Now()
+	limits := loadInvitationLimits()
+	orgSends, err := models.CountOrganizationInvitationSendsSince(tx, orgID, now.Add(-invitationOrgWindow))
 	if err != nil {
 		return err
 	}
-	if seats.PaymentBlocked {
-		return grpcerrors.FailedPreconditionWithReason("The last renewal payment failed. Update the payment method before you invite members.", "PAYMENT_PAST_DUE")
+	recipientSends, err := models.CountRecipientInvitationSendsSince(tx, orgID, email, now.Add(-invitationRecipientWindow))
+	if err != nil {
+		return err
 	}
-	if seats.PerSeat {
-		if alreadyPending || *seats.Invitable > 0 {
-			return nil
-		}
-		if seats.Purchasable != nil && *seats.Purchasable == 0 {
-			return grpcerrors.FailedPreconditionWithReason("This organization has reached its plan seat maximum.", "PLAN_MAXIMUM_REACHED")
-		}
-		return grpcerrors.FailedPreconditionWithReason("Purchase a seat before sending another invitation.", "SEAT_PURCHASE_REQUIRED")
+	sharedRecipientSends, err := models.CountSharedRecipientInvitationSendsSince(tx, email, now.Add(-invitationRecipientWindow))
+	if err != nil {
+		return err
 	}
-	if seats.MemberLimit != nil && seats.Occupied >= *seats.MemberLimit {
-		return grpcerrors.FailedPreconditionWithReason("This organization has reached its member limit.", "MEMBER_LIMIT_REACHED")
+	if orgSends >= limits.orgHourly || recipientSends >= limits.recipientDaily || sharedRecipientSends >= limits.sharedRecipientDaily {
+		return grpcerrors.ResourceExhaustedWithReason("Too many invitations were sent. Try again later.", "INVITATION_RATE_LIMITED")
 	}
-	return nil
+	return models.RecordOrganizationInvitationSend(tx, orgID, email, now)
 }
 
 func prepareInvitation(tx *gorm.DB, invitation *models.OrganizationInvitation, now time.Time) (string, error) {

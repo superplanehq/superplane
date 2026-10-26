@@ -42,7 +42,7 @@ interface OrganizationMenuButtonProps {
 export function OrganizationMenuButton({ organizationId, className }: OrganizationMenuButtonProps) {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || "");
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -206,7 +206,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                       const allowed =
                         !link.permission ||
                         permissionsLoading ||
-                        canAct(link.permission.resource, link.permission.action);
+                        hasPermission(link.permission.resource, link.permission.action);
 
                       if (!allowed) {
                         return (

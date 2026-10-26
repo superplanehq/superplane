@@ -101,40 +101,6 @@ service Organizations {
     };
   }
 
-  rpc GetInviteLink(GetInviteLinkRequest) returns (GetInviteLinkResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/invite-link"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get an organization invite link";
-      description: "Returns the invite link for an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc UpdateInviteLink(UpdateInviteLinkRequest) returns (UpdateInviteLinkResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/organizations/{id}/invite-link"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update an organization invite link";
-      description: "Enables or disables the invite link for an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc ResetInviteLink(ResetInviteLinkRequest) returns (ResetInviteLinkResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/invite-link/reset"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Reset an organization invite link";
-      description: "Generates a new invite link token for an organization";
-      tags: "Organization";
-    };
-  }
-
   rpc DescribeOrganizationWorkspaceUsage(DescribeOrganizationWorkspaceUsageRequest) returns (DescribeOrganizationWorkspaceUsageResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/workspace-usage"
@@ -593,31 +559,6 @@ message InviteLink {
   google.protobuf.Timestamp updated_at = 6;
 }
 
-message GetInviteLinkRequest {
-  string id = 1;
-}
-
-message GetInviteLinkResponse {
-  InviteLink invite_link = 1;
-}
-
-message UpdateInviteLinkRequest {
-  string id = 1;
-  bool enabled = 2;
-}
-
-message UpdateInviteLinkResponse {
-  InviteLink invite_link = 1;
-}
-
-message ResetInviteLinkRequest {
-  string id = 1;
-}
-
-message ResetInviteLinkResponse {
-  InviteLink invite_link = 1;
-}
-
 message DescribeOrganizationWorkspaceUsageRequest {
   string id = 1;
   // Period window in days. Defaults to 30. Maximum is 90.
@@ -964,6 +905,14 @@ message DescribeOrganizationBillingResponse {
   // so clients must use this flag instead of remaining_credit_cents.
   bool hosted_credit_available = 35;
   SeatPurchase last_seat_purchase = 36;
+  optional int32 pending_invitation_seats = 37;
+  optional int32 invitable_seats = 38;
+  // When the current renewal payment failure started. Set only while the
+  // subscription is past due.
+  google.protobuf.Timestamp payment_failed_at = 39;
+  // When Team features end after a failed renewal payment. Set only while a
+  // grace period keeps them on.
+  google.protobuf.Timestamp paid_access_ends_at = 40;
 }
 
 message SeatPurchase {
@@ -985,18 +934,39 @@ message PreviewSeatPurchaseResponse {
   int32 target_seats = 2;
   int64 seat_price_cents = 3;
   int64 prorated_charge_cents = 4;
+  // period_start is the start of the prorated coverage: the preview time.
+  // It is not the billing-period start. See billing_period_start.
   google.protobuf.Timestamp period_start = 5;
+  // period_end is the end of the billing period.
   google.protobuf.Timestamp period_end = 6;
   int64 new_monthly_total_cents = 7;
   optional int32 purchasable_seats = 8;
   bool estimate = 9;
   bool excludes_tax = 10;
+  // subscription_id is the Polar subscription that the preview priced.
+  string subscription_id = 11;
+  // billing_period_start is the start of the billing period that the
+  // preview priced. A purchase sends it back as confirmed_period_start.
+  google.protobuf.Timestamp billing_period_start = 12;
 }
 
 message PurchaseSeatsRequest {
   string id = 1;
   int32 additional_seats = 2;
   int32 expected_purchased_seats = 3;
+  // operation_key identifies one purchase within the organization. A repeat
+  // with the same key and request returns the stored purchase and does not
+  // charge again. A repeat with the same key and another request is rejected.
+  string operation_key = 4;
+  // The confirmed fields bind a new purchase to the subscription and the
+  // billing period of the preview that the user confirmed:
+  // subscription_id, billing_period_start, and period_end. A new operation
+  // needs all three. When they do not match the current subscription, the
+  // purchase is rejected before any charge. A recorded operation key replays
+  // without them.
+  string confirmed_subscription_id = 5;
+  google.protobuf.Timestamp confirmed_period_start = 6;
+  google.protobuf.Timestamp confirmed_period_end = 7;
 }
 
 message PurchaseSeatsResponse {
@@ -1012,6 +982,7 @@ message BillingPlanOption {
   bool require_payment_method = 5;
   bool subscription_required = 6;
   optional int32 seat_maximum = 7;
+  optional int32 parallel_task_limit = 8;
 }
 
 message SelectBillingPlanRequest {
@@ -1351,6 +1322,7 @@ message InvitationSeatSummary {
   optional int64 invitable = 5;
   optional int64 purchasable = 6;
   optional int64 member_limit = 7;
+  bool payment_blocked = 8;
 }
 message CreateInvitationRequest {
   string id = 1;

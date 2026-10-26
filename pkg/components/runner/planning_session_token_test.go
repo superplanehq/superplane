@@ -47,8 +47,8 @@ func TestParsePlanningSessionTokenRejectsWrongPurpose(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestRunnerSuperplaneBaseURLUsesDockerHostForLocalBroker(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "http://host.docker.internal:8091")
+func TestRunnerSuperplaneBaseURLUsesDockerHostForLocalRunners(t *testing.T) {
+	t.Setenv("RUNNER_API_BASE_URL", "http://host.docker.internal:8000")
 	t.Setenv("BASE_URL", "https://dead.trycloudflare.com")
 	t.Setenv("WEBHOOKS_BASE_URL", "https://dead.trycloudflare.com")
 	t.Setenv("PUBLIC_API_PORT", "8000")
@@ -56,20 +56,20 @@ func TestRunnerSuperplaneBaseURLUsesDockerHostForLocalBroker(t *testing.T) {
 	assert.Equal(t, "http://host.docker.internal:8000", RunnerSuperplaneBaseURL(""))
 }
 
-func TestRunnerSuperplaneBaseURLRewritesLoopbackForLocalBroker(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "http://host.docker.internal:8091")
+func TestRunnerSuperplaneBaseURLRewritesLoopbackForLocalRunners(t *testing.T) {
+	t.Setenv("RUNNER_API_BASE_URL", "http://host.docker.internal:8000")
 	t.Setenv("BASE_URL", "http://localhost:8000")
 	t.Setenv("WEBHOOKS_BASE_URL", "http://host.docker.internal:8000")
 
 	assert.Equal(t, "http://host.docker.internal:8000", RunnerSuperplaneBaseURL(""))
 }
 
-func TestRunnerSuperplaneBaseURLUsesPublicURLForRemoteBroker(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+func TestRunnerSuperplaneBaseURLUsesPublicURLForRemoteRunners(t *testing.T) {
+	t.Setenv("RUNNER_API_BASE_URL", "https://app.example")
 	t.Setenv("BASE_URL", "https://app.example")
 	t.Setenv("WEBHOOKS_BASE_URL", "https://hooks.example")
 
-	assert.Equal(t, "https://hooks.example", RunnerSuperplaneBaseURL("https://app.example"))
+	assert.Equal(t, "https://app.example", RunnerSuperplaneBaseURL("https://app.example"))
 }
 
 func TestPlanningSessionKindDeterminesAnalysisMode(t *testing.T) {

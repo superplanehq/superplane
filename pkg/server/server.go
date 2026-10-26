@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-
 	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
 	_ "net/http/pprof"
 	"os"
@@ -18,11 +17,17 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	eebilling "github.com/superplanehq/superplane/ee/billing"
+	billinghttp "github.com/superplanehq/superplane/ee/billing/http"
+	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
+	"github.com/superplanehq/superplane/ee/billing/polar"
+	billingworkers "github.com/superplanehq/superplane/ee/billing/workers"
 	"github.com/superplanehq/superplane/ee/rbac"
 	"github.com/superplanehq/superplane/pkg/agents"
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/blob"
 	blobazure "github.com/superplanehq/superplane/pkg/blob/azure"
@@ -197,6 +202,7 @@ func startWorkers(
 	baseURL string,
 	authService authorization.Authorization,
 	agentProvider agents.Provider,
+	nodeRequestExecutor *workers.NodeRequestExecutor,
 ) {
 	log.Println("Starting Workers")
 
@@ -275,8 +281,7 @@ func startWorkers(
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Node Request Worker")
 
-		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
+		w := workers.NewNodeRequestWorker(nodeRequestExecutor)
 		go w.Start(context.Background())
 	}
 
@@ -378,7 +383,14 @@ func startWorkers(
 	if os.Getenv("START_PRICE_BOOK_SYNC_WORKER") == "yes" {
 		log.Println("Starting Price Book Sync Worker")
 
-		w := workers.NewPriceBookSyncWorker(encryptor, registry)
+		w := billingworkers.NewPriceBookSyncWorker(encryptor, registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_SEAT_RENEWAL_SYNC_WORKER") == "yes" {
+		log.Println("Starting Seat Renewal Sync Worker")
+
+		w := billingworkers.NewSeatRenewalSyncWorker()
 		go w.Start(context.Background())
 	}
 
@@ -480,6 +492,7 @@ func buildGRPCServices(
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
+	features.Register(enterprise.Billing, billingorganizations.New())
 
 	return grpc.NewServices(grpc.ServicesConfig{
 		EmailService:     buildEmailService(encryptor),
@@ -534,8 +547,8 @@ func (s *processShutdown) stop() {
 	closeProductAnalytics()
 }
 
-func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string, shutdown *processShutdown) {
-	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
+func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string, shutdown *processShutdown, nodeRequestExecutor *workers.NodeRequestExecutor) {
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName, nodeRequestExecutor)
 	if err != nil {
 		log.Fatalf("failed to create runner API server: %v", err)
 	}
@@ -557,8 +570,9 @@ func registerRunnerAPI(
 	encryptor crypto.Encryptor,
 	activeLogStoreName string,
 	shutdown *processShutdown,
+	nodeRequestExecutor *workers.NodeRequestExecutor,
 ) {
-	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName, nodeRequestExecutor)
 	if err != nil {
 		log.Fatalf("failed to create integrated runner API server: %v", err)
 	}
@@ -593,6 +607,7 @@ func startPublicAPI(
 	grpcServices *grpc.Services,
 	activeLogStoreName string,
 	shutdown *processShutdown,
+	nodeRequestExecutor *workers.NodeRequestExecutor,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
 
@@ -619,6 +634,9 @@ func startPublicAPI(
 	}
 
 	server.SetLicenseService(licenseService)
+	server.SetBillingHTTPRegistrar(billinghttp.New(encryptor, registry, func() (string, string) {
+		return baseURL, webhooksBaseURL
+	}))
 
 	// Start the EventDistributer worker if enabled
 	if os.Getenv("START_EVENT_DISTRIBUTER") == "yes" {
@@ -649,7 +667,8 @@ func startPublicAPI(
 
 	if os.Getenv("START_RUNNER_API") == "yes" {
 		log.Println("Registering Runner API routes on Public API")
-		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName, shutdown)
+		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName, shutdown,
+			nodeRequestExecutor)
 	}
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
@@ -749,6 +768,7 @@ func startPprofServer() {
 }
 
 func Start() {
+	billing.Bind(eebilling.New(polar.NewRuntime()))
 	configureLogging()
 	setupOtel()
 	startPprofServer()
@@ -757,11 +777,8 @@ func Start() {
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
 
-	if err := models.BindLegacyBillingProduct(database.Conn(), os.Getenv("POLAR_BUSINESS_PRODUCT_ID")); err != nil {
-		log.Fatalf("bind legacy billing product: %v", err)
-	}
-	if err := models.LoadCurrentPriceBook(database.Conn()); err != nil {
-		log.WithError(err).Warn("failed to load usage price book; using in-memory rates")
+	if err := billing.Initialize(database.Conn()); err != nil {
+		log.Fatalf("initialize billing: %v", err)
 	}
 
 	log.SetLevel(log.DebugLevel)
@@ -889,6 +906,7 @@ func Start() {
 
 	var grpcServices *grpc.Services
 	shutdown := &processShutdown{}
+	nodeRequestExecutor := workers.NewNodeRequestExecutor(encryptorInstance, registry, webhooksBaseURL, authService)
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		services, err := buildGRPCServices(
 			baseURL,
@@ -920,9 +938,11 @@ func Start() {
 			grpcServices,
 			activeLogStoreName,
 			shutdown,
+			nodeRequestExecutor,
 		)
 	} else if os.Getenv("START_RUNNER_API") == "yes" {
-		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName, shutdown)
+		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName, shutdown,
+			nodeRequestExecutor)
 	}
 
 	startWorkers(
@@ -932,6 +952,7 @@ func Start() {
 		baseURL,
 		authService,
 		agentProvider,
+		nodeRequestExecutor,
 	)
 
 	log.Println("SuperPlane is UP.")

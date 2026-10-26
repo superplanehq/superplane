@@ -8,13 +8,14 @@ import { type CSSProperties, type ReactNode } from "react";
 import wordmark from "@/assets/superplane-wordmark.svg";
 
 import { useFactoriesThemeClass } from "../../../lib/useFactoriesThemeClass";
+import { artInk, type FirstRunArtInk } from "./firstRunArtScene";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunSpherePane, type FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 import { FirstRunVisualContext, useFirstRunVisual, type FirstRunVisual } from "./firstRunVisual";
 import { FirstRunWorkspaceSwitch } from "./FirstRunWorkspaceSwitch";
 
-export const FIRST_RUN_STEP_COUNT = 5;
+export const FIRST_RUN_STEP_COUNT = 6;
 export type { FirstRunVisual };
 
 const PREVIEW_TOKENS = {
@@ -121,6 +122,7 @@ export function FirstRunShell({
           contentSpacing={contentSpacing}
           side={side}
           background={sphere?.art?.background}
+          ink={artInk(sphere?.art)}
         >
           {children}
         </PreviewShell>
@@ -215,6 +217,7 @@ function PreviewShell({
   contentSpacing,
   side,
   background,
+  ink,
 }: {
   children: ReactNode;
   testId: string;
@@ -223,6 +226,7 @@ function PreviewShell({
   contentSpacing: "default" | "compact";
   side: ReactNode;
   background?: string;
+  ink: FirstRunArtInk;
 }) {
   return (
     <div
@@ -271,7 +275,7 @@ function PreviewShell({
             data-testid="first-run-art-stage"
           >
             {side}
-            <FirstRunSignedIn chrome={chrome} preview />
+            <FirstRunSignedIn chrome={chrome} preview ink={ink} />
           </div>
         </>
       ) : null}
@@ -291,21 +295,36 @@ function FirstRunTopBar({ chrome, disabled }: { chrome?: FirstRunChrome; disable
   );
 }
 
-function FirstRunSignedIn({ chrome, preview = false }: { chrome?: FirstRunChrome; preview?: boolean }) {
+function signedInTone(preview: boolean, ink: FirstRunArtInk) {
+  if (!preview) return { label: "text-muted-foreground", identity: "text-foreground" };
+  if (ink === "dark") return { label: "text-[rgba(17,17,14,0.6)]", identity: "text-[#11110e]" };
+  return { label: "text-[rgba(238,237,233,0.5)]", identity: "text-[#eeede9]" };
+}
+
+function FirstRunSignedIn({
+  chrome,
+  preview = false,
+  ink = "light",
+}: {
+  chrome?: FirstRunChrome;
+  preview?: boolean;
+  /** Text color over the art, set by the scene behind it. */
+  ink?: FirstRunArtInk;
+}) {
   const identity = chrome?.email ?? chrome?.displayName;
   if (!identity) return null;
+  const tone = signedInTone(preview, ink);
   return (
     <p
       className={cn(
         "text-right text-[14px] leading-[1.3]",
-        preview
-          ? "absolute top-[22px] right-7 z-10 flex flex-col items-end gap-[5px]"
-          : "text-[13px] leading-5 text-muted-foreground",
+        preview ? "absolute top-[22px] right-7 z-10 flex flex-col items-end gap-[5px]" : "text-[13px] leading-5",
       )}
       data-testid="first-run-signed-in"
+      data-ink={preview ? ink : undefined}
     >
-      <span className={cn("block", preview && "text-[rgba(238,237,233,0.5)]")}>{FIRST_RUN_COPY.chrome.loggedInAs}</span>
-      <span className={cn("block", preview ? "text-[#eeede9]" : "text-foreground")}>{identity}</span>
+      <span className={cn("block", tone.label)}>{FIRST_RUN_COPY.chrome.loggedInAs}</span>
+      <span className={cn("block", tone.identity)}>{identity}</span>
     </p>
   );
 }

@@ -1,6 +1,8 @@
 import type {
   FactoriesDescribeFactoryVelocityResponse,
   OrganizationsDescribeOrganizationBillingResponse,
+  OrganizationsPreviewSeatPurchaseResponse,
+  OrganizationsPurchaseSeatsResponse,
   FactoriesFactory,
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
@@ -16,7 +18,7 @@ import type {
   FactoriesFactoryAgentResource,
   FactoriesFactoryMcpClient,
   FactoryAutomation,
-  FactoryLineStep,
+  FactoriesFactoryLineStep as FactoryLineStep,
   SuperplaneUsersUser,
 } from "@/api-client";
 
@@ -351,6 +353,12 @@ export interface FactoriesFixture {
   billingSyncCalls?: number;
   /** Plan returned from Polar sync; applied to organizationBilling after the first sync. */
   billingAfterSync?: FactoriesFixture["organizationBilling"];
+  seatPurchasePreview?: OrganizationsPreviewSeatPurchaseResponse;
+  seatPurchaseResponse?: OrganizationsPurchaseSeatsResponse;
+  seatPurchasePreviewCalls?: number;
+  seatPurchaseCalls?: number;
+  seatPurchasePreviewError?: { status: number; message: string };
+  seatPurchaseError?: { status: number; message: string };
   /**
    * Ready BYOK providers (`anthropic`, `openai`, `openrouter`).
    * Omit to treat every provider with a catalog as connected.

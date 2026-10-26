@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -75,9 +75,9 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 
 	organization, err := models.FindOrganizationByName("Demo")
 	require.NoError(t, err)
-	credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
+	credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), credit.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), credit.GrantMicros)
 
 	owner, err := models.FindAccountByEmail("owner@example.com")
 	require.NoError(t, err)
@@ -88,7 +88,6 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 		Where("scope_type = ?", models.RunnerFleetScopeInstallation).
 		Find(&fleets).Error)
 	require.Empty(t, fleets)
-	assert.True(t, organization.HasExperimentalFeature(features.FeatureNewRunners))
 }
 
 func setupOwnerTestServer(t *testing.T) *Server {
@@ -309,17 +308,17 @@ func TestSetupOwnerProgressRejectsNonAdmin(t *testing.T) {
 }
 
 func TestSetupOwnerSkipsWelcomeCreditWhenBillingDisabled(t *testing.T) {
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	server := setupOwnerTestServer(t)
 	authCookie := submitOwnerForm(t, server)
 
 	organization, err := models.FindOrganizationByName("Demo")
 	require.NoError(t, err)
-	credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
+	credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
 	require.NoError(t, err)
 	assert.Zero(t, credit.GrantMicros)
 
-	plan, err := models.FindOrganizationBillingPlan(database.Conn(), organization.ID)
+	plan, err := billingmodels.FindOrganizationBillingPlan(database.Conn(), organization.ID)
 	require.NoError(t, err)
 	assert.Nil(t, plan)
 

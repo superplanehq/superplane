@@ -23,6 +23,7 @@ const (
 	OwnerSetupStepFleetDocker   = "fleet-docker"
 )
 
+// InstallationMetadata holds general installation settings.
 type InstallationMetadata struct {
 	ID                        int    `gorm:"primary_key"`
 	InstallationID            string `gorm:"type:varchar(64)"`

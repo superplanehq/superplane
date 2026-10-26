@@ -47,16 +47,12 @@ const FeatureOrganizationBYOK = "organization_byok"
 // organization LLM Models page. It requires FeatureOrganizationBYOK as well.
 const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
 
-// FeatureFactoryCustomAutomations gates blank custom automations on Verify,
-// Done, and phase columns until the flow is generally available.
+// FeatureFactoryCustomAutomations gates custom automations on Verify, Done,
+// and phase columns until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
-
-// FeatureNewRunners routes newly created runner tasks through SuperPlane's
-// integrated runner API. Existing executions keep their persisted backend.
-const FeatureNewRunners = "new_runners"
 
 // FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
 // the Merge button on pull request review until the feature is generally
@@ -87,9 +83,8 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
-	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
+	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add custom automations to board columns"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
-	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture", Released: released()},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 }

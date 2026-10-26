@@ -35,7 +35,7 @@ describe("purchase confirmation observer", () => {
     rerender({ invoices: [paidInvoice] });
     expect(window.dataLayer?.filter((event) => event.event === "purchase")).toHaveLength(1);
   });
-  it("does not poll or track when disabled, including impersonation", () => {
+  it("does not poll or track when disabled, including in a support session", () => {
     renderHook(() =>
       useGooglePurchaseTracking({ checkoutID: "hook-checkout", invoices: [paidInvoice], enabled: false }),
     );

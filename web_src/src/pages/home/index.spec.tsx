@@ -58,6 +58,7 @@ vi.mock("@/contexts/useAccount", () => ({
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: permissionMocks.canAct,
+    hasPermission: permissionMocks.canAct,
     isLoading: false,
   }),
 }));

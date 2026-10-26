@@ -287,12 +287,14 @@ func TestListCatalogPrices_OpenRouter(t *testing.T) {
 
 	prices, err := ListCatalogPrices(context.Background(), httpCtx, ProviderOpenRouter, Credentials{APIKey: "sk-or"})
 	require.NoError(t, err)
-	require.Len(t, prices, 1)
+	require.Len(t, prices, 2)
 	assert.Equal(t, "anthropic/claude-sonnet-4-6", prices[0].ID)
-	assert.Equal(t, int64(300), prices[0].Rate.Input)
-	assert.Equal(t, int64(1500), prices[0].Rate.Output)
-	assert.Equal(t, int64(30), prices[0].Rate.CacheRead)
-	assert.Equal(t, int64(375), prices[0].Rate.CacheWrite)
+	assert.Equal(t, "0.000003", prices[0].Pricing.Prompt)
+	assert.Equal(t, "0.000015", prices[0].Pricing.Completion)
+	assert.Equal(t, "0.0000003", prices[0].Pricing.InputCacheRead)
+	assert.Equal(t, "0.00000375", prices[0].Pricing.InputCacheWrite)
+	assert.Equal(t, "bad/model", prices[1].ID)
+	assert.Equal(t, "nope", prices[1].Pricing.Prompt)
 }
 
 func TestListCatalogPrices_UnsupportedProvider(t *testing.T) {

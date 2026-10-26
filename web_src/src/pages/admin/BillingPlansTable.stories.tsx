@@ -29,6 +29,7 @@ const basePlan: BillingPlanListItem = {
   markup_bps: null,
   features: [],
   delete_disabled_reason: null,
+  assigned: false,
 };
 
 const plans: BillingPlanListItem[] = [
@@ -61,6 +62,7 @@ const plans: BillingPlanListItem[] = [
     key: "pilot",
     name: "Pilot",
     delete_disabled_reason: assignedReason,
+    assigned: true,
   },
 ];
 
@@ -114,7 +116,24 @@ export const DeleteEnabledPlan: Story = {
   play: async () => {
     const canvas = within(document.body);
     await userEvent.click(await canvas.findByRole("button", { name: "Delete Spring promo" }));
+    const dialog = await canvas.findByRole("dialog", { name: "Delete plan?" });
+    await expect(dialog).toHaveTextContent("Delete “Spring promo” (spring_promo)?");
+    await expect(canvas.getByText("Spring promo")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete plan" }));
     await waitFor(() => expect(canvas.queryByText("Spring promo")).not.toBeInTheDocument());
     await expect(canvas.getByRole("button", { name: "Delete Pilot" })).toBeDisabled();
+  },
+};
+
+export const CancelDeleteEnabledPlan: Story = {
+  play: async () => {
+    const canvas = within(document.body);
+    const deleteButton = await canvas.findByRole("button", { name: "Delete Spring promo" });
+    await userEvent.click(deleteButton);
+    const dialog = await canvas.findByRole("dialog", { name: "Delete plan?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Keep plan" }));
+    await waitFor(() => expect(canvas.queryByRole("dialog")).not.toBeInTheDocument());
+    await expect(canvas.getByText("Spring promo")).toBeInTheDocument();
+    await expect(deleteButton).toHaveFocus();
   },
 };
