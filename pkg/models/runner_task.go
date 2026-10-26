@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -599,14 +600,14 @@ func lockRunnerTaskOrganization(tx *gorm.DB, organizationID uuid.UUID, options s
 }
 
 func checkOrganizationRunnerCapacity(tx *gorm.DB, organizationID uuid.UUID) error {
-	if !BillingEnabled() {
+	if !billing.Enabled() {
 		return nil
 	}
-	plan, err := ResolveOrganizationBillingPlan(tx, organizationID)
+	limit, err := billing.ResolveParallelTaskLimit(tx, organizationID)
 	if err != nil {
 		return err
 	}
-	if plan.Catalog.ParallelTaskLimit == nil {
+	if limit == nil {
 		return nil
 	}
 	var count int64
@@ -617,7 +618,7 @@ func checkOrganizationRunnerCapacity(tx *gorm.DB, organizationID uuid.UUID) erro
 	if err != nil {
 		return err
 	}
-	if count >= int64(*plan.Catalog.ParallelTaskLimit) {
+	if count >= int64(*limit) {
 		return ErrOrganizationRunnerCapacity
 	}
 	return nil
