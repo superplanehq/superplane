@@ -371,7 +371,7 @@ describe("catalogForColumn", () => {
       "checks",
       "risk-score",
       "visual-evidence",
-      "custom",
+      "custom-verification",
     ]);
   });
 

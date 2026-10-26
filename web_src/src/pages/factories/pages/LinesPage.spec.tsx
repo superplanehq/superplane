@@ -44,6 +44,7 @@ import {
   factorySentryIntakeSetupPath,
   firstFactoryLineId,
 } from "../lib/factoryPagePaths";
+import { factoryCustomVerificationSetupPath } from "../lib/customVerificationPaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT,
@@ -1116,7 +1117,7 @@ describe("LinesPage board extras", () => {
     );
   });
 
-  it("opens the name dialog when Verify only has custom automation left", async () => {
+  it("opens custom Verify setup when only custom automation remains", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
@@ -1138,32 +1139,23 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
 
     expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
-    expect(screen.getByTestId("factory-app-name-input")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryCustomVerificationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
   });
 
-  it("creates a custom Verify automation and opens the editor", async () => {
+  it("opens custom Verify setup from the catalog", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-    createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "canvas-custom", name: "Destroy ephemeral env" });
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-verify-menu"));
     await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
-    await user.click(screen.getByTestId("add-column-automation-template-custom"));
-    await user.type(screen.getByTestId("factory-app-name-input"), "Destroy ephemeral env");
-    await user.click(screen.getByTestId("factory-app-create-button"));
+    await user.click(screen.getByTestId("add-column-automation-template-custom-verification"));
 
-    await waitFor(() => {
-      expect(createFactoryAutomationMutateAsync).toHaveBeenCalledWith({
-        name: "Destroy ephemeral env",
-        columnKey: "verify",
-      });
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/automations/canvas-custom`,
-      );
-    });
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryCustomVerificationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
   });
 
   it("opens the created scheduled intake in the board automation view", async () => {

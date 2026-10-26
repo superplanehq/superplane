@@ -305,6 +305,9 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 	if err := models.MaybeLinkVisualEvidenceRun(tx, canvas, event, run); err != nil {
 		return nil, uuid.Nil, fmt.Errorf("link visual evidence run %s: %w", run.ID, err)
 	}
+	if err := models.MaybeLinkCustomVerificationRun(tx, canvas, event, run); err != nil {
+		return nil, uuid.Nil, fmt.Errorf("link custom verification run %s: %w", run.ID, err)
+	}
 
 	var queueItems []models.CanvasNodeQueueItem
 	for _, edge := range outgoingEdges {
