@@ -36,6 +36,7 @@ ruby -ryaml -e '
   raise "candidate verification must check the published prerelease" unless candidate_verification.include?("verify-published-prerelease")
   raise "candidate verification must verify the prepared manifest" unless candidate_verification.include?("verify-manifest")
   raise "candidate verification must export resolved component defaults" unless candidate_verification.include?("component-releases-${RELEASE_CANDIDATE_VERSION}.yaml")
+  raise "candidate verification must not exit the Semaphore job" if candidate_verification.match?(/^\s*exit\b/)
   asset_build = blocks.fetch("Build Release Assets").dig("task", "jobs", 0, "commands").join("\n")
   raise "stable assets must use the finalization build" unless asset_build.include?("build-finalized-assets.sh")
   %w[$component_releases $RELEASE_VERSION $SEMAPHORE_GIT_SHA].each do |argument|
