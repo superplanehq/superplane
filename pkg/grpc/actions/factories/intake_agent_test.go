@@ -19,11 +19,7 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
-		_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
-			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
-			MarkupBPS:           models.DefaultMarkupBPS,
-			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
-		})
+		_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{})
 		require.NoError(t, err)
 	})
 
@@ -203,11 +199,7 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
-			MarkupBPS:           models.DefaultMarkupBPS,
-			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
-		})
+		_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{})
 		require.NoError(t, err)
 
 		agent := resolveIntakeAgent(db, factory)
@@ -347,9 +339,6 @@ func enableHostedSuperPlaneAgent(t *testing.T, db *gorm.DB) {
 	provider := models.UsageProviderAnthropic
 	model := "claude-sonnet-4-6"
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
 		DefaultHostedProvider: &provider,
 		DefaultHostedModel:    &model,
 	})

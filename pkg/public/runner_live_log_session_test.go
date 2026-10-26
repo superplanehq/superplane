@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -141,9 +142,7 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 
 	t.Run("hosted pricing follows execution credentials without charging for reads", func(t *testing.T) {
 		markup := 2000
-		require.NoError(t, database.Conn().Save(&models.OrganizationLLMSettings{
-			OrganizationID: r.Organization.ID, MarkupBPS: &markup,
-		}).Error)
+		require.NoError(t, billingmodels.UpsertOrganizationLLMMarkup(database.DB(t.Context()), r.Organization.ID, &markup))
 		for _, item := range []struct {
 			name, component, source string
 			priced                  bool
