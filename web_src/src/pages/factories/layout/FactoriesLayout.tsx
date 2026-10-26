@@ -140,7 +140,7 @@ function FactoriesLayoutContent({
 }) {
   useFactoriesThemeClass();
   const { account } = useAccount();
-  const { canAct } = usePermissions();
+  const { canAct, hasPermission } = usePermissions();
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
   const { slug, routeSegment } = workspaceLayoutKeys(factory, factoryKey);
@@ -210,7 +210,7 @@ function FactoriesLayoutContent({
     storybookPendingWorkspaceId: storybookOnboarding?.pending?.workspaceId,
     hasStorybookOnboarding: Boolean(storybookOnboarding),
     factoryId,
-    canConfigure: canAct("factories", "update"),
+    canConfigure: hasPermission("factories", "update"),
     factory,
   });
 

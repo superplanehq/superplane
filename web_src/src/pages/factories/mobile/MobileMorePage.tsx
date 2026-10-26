@@ -69,10 +69,10 @@ const GROUP_CLASS = "overflow-hidden rounded-lg border border-border bg-card div
 export function MobileMorePage() {
   const { organizationId, routeSegment, factory } = useFactoriesLayout();
   const { account } = useAccount();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const showAgent = isWorkspaceAgentNavVisible({
     permissionsLoading,
-    canUpdateFactories: canAct("factories", "update"),
+    canUpdateFactories: hasPermission("factories", "update"),
   });
   const { data: organization } = useOrganization(organizationId);
   const { preference, setPreference } = useTheme();

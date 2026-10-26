@@ -30,7 +30,7 @@ interface FactoriesSidebarProps {
 export function FactoriesSidebar({ organizationId, factoryKey, factory, factories }: FactoriesSidebarProps) {
   const navigate = useNavigate();
   const { account } = useAccount();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { canAct, hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { data: organization } = useOrganization(organizationId);
   const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -54,7 +54,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         factory={factory}
         factories={factories}
         canCreateFactory={canAct("factories", "create")}
-        canOpenSettings={canAct("factories", "update")}
+        canOpenSettings={hasPermission("factories", "update")}
         permissionsLoading={permissionsLoading}
         onCreateFactory={() => navigate(newFactoryPath(organizationId))}
       />
@@ -64,7 +64,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         lineId={routeLineId ?? firstFactoryLineId(factory)}
         showAgent={isWorkspaceAgentNavVisible({
           permissionsLoading,
-          canUpdateFactories: canAct("factories", "update"),
+          canUpdateFactories: hasPermission("factories", "update"),
         })}
       />
       <div className="flex-1" />

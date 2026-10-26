@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/metadata"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -376,6 +377,35 @@ func Test__SendPlanningSessionMessage__StoresSenderUserID(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, described.Session.Messages, 1)
 	assert.Equal(t, r.User.String(), described.Session.Messages[0].UserId)
+}
+
+func Test__DescribePlanningSession__SupportSessionDoesNotHeartbeat(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	staleHeartbeat := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	require.NoError(t, db.Model(session).Update("heartbeat_at", staleHeartbeat).Error)
+	request := &pb.DescribePlanningSessionRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+	}
+
+	supportCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"x-user-id", r.User.String(),
+		authentication.SupportSessionMetadataKey, "true",
+	))
+	_, err := DescribePlanningSession(supportCtx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.True(t, reloaded.HeartbeatAt.Equal(staleHeartbeat))
+
+	userCtx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	_, err = DescribePlanningSession(userCtx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	reloaded, err = models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.True(t, reloaded.HeartbeatAt.After(staleHeartbeat))
 }
 
 func Test__AnswerPlanningSessionSurvey__StoresSenderUserID(t *testing.T) {

@@ -45,7 +45,7 @@ func FindPlanningSessionByWorkOrder(ctx context.Context, organizationID string, 
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to find planning session")
 	}
-	if session.State != models.PlanningSessionStateEnded {
+	if shouldHeartbeatPlanningSession(ctx, session) {
 		if err := session.Heartbeat(db); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to find planning session")
 		}
@@ -63,7 +63,7 @@ func DescribePlanningSession(ctx context.Context, organizationID string, req *pb
 		return nil, err
 	}
 	db := database.DB(ctx)
-	if session.State != models.PlanningSessionStateEnded {
+	if shouldHeartbeatPlanningSession(ctx, session) {
 		if err := session.Heartbeat(db); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to describe planning session")
 		}
@@ -73,6 +73,11 @@ func DescribePlanningSession(ctx context.Context, organizationID string, req *pb
 		return nil, factoryErrorToStatus(err, "failed to describe planning session")
 	}
 	return &pb.DescribePlanningSessionResponse{Session: serialized}, nil
+}
+
+// A read-only support session must not keep the planning session alive.
+func shouldHeartbeatPlanningSession(ctx context.Context, session *models.FactoryPlanningSession) bool {
+	return session.State != models.PlanningSessionStateEnded && !authentication.IsSupportSessionFromMetadata(ctx)
 }
 
 func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {
