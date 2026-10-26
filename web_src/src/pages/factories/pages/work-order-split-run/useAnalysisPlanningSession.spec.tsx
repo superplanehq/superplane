@@ -20,6 +20,7 @@ import {
 vi.mock("../planningSessionClient", () => ({
   findPlanningSessionByWorkOrder: vi.fn(),
   sendPlanningSessionMessage: vi.fn(),
+  sendWorkOrderPlanningMessage: vi.fn(),
   answerPlanningSessionSurvey: vi.fn(),
 }));
 
@@ -28,11 +29,8 @@ function planningTalk(message: CreateWithAgentMessage) {
 }
 
 function wrapper({ children }: { children: ReactNode }) {
-  return (
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      {children}
-    </QueryClientProvider>
-  );
+  const Wrapper = wrapperWithClient(new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  return <Wrapper>{children}</Wrapper>;
 }
 
 function wrapperWithClient(queryClient: QueryClient) {
@@ -318,7 +316,9 @@ describe("useAnalysisPlanningSession", () => {
       await result.current.onSend();
     });
 
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(6));
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["backlog-analysis-runs", "org-1"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["organizations", "org-1", "workspace-usage"] });
   });
 
   it("lets the user send after analysis stops so a new run can continue the chat", async () => {

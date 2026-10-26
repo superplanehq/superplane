@@ -58,7 +58,12 @@ export function patchedWorkOrder(
   order: FactoriesWorkOrderSummary,
   described: FactoriesWorkOrder,
 ): FactoriesWorkOrderSummary {
-  return { ...order, ...summaryFromDescribedOrder(described), planningSession: described.planningSession };
+  return {
+    ...order,
+    ...summaryFromDescribedOrder(described),
+    planningSession: described.planningSession,
+    queuedRunnerJobs: described.queuedRunnerJobs,
+  };
 }
 
 export function patchCachedWorkOrderList(

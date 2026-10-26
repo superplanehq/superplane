@@ -31,3 +31,9 @@ type IntegrationSecrets struct {
 type IntegrationSecretProvider interface {
 	ResolveSecrets(ctx IntegrationSecretContext) (IntegrationSecrets, error)
 }
+
+// IntegrationRunnerSecretDescriptor describes exported fields without remote
+// credential minting. Integrated runner jobs resolve these fields at delivery.
+type IntegrationRunnerSecretDescriptor interface {
+	DescribeRunnerSecrets(ctx IntegrationSecretContext) (IntegrationSecrets, error)
+}

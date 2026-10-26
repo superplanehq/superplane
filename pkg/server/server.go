@@ -541,8 +541,8 @@ func (s *processShutdown) stop() {
 	closeProductAnalytics()
 }
 
-func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string, shutdown *processShutdown, nodeRequestExecutor *workers.NodeRequestExecutor) {
-	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName, nodeRequestExecutor)
+func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string, shutdown *processShutdown, nodeRequestExecutor *workers.NodeRequestExecutor, integrationRegistry *registry.Registry) {
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName, nodeRequestExecutor, integrationRegistry)
 	if err != nil {
 		log.Fatalf("failed to create runner API server: %v", err)
 	}
@@ -565,8 +565,9 @@ func registerRunnerAPI(
 	activeLogStoreName string,
 	shutdown *processShutdown,
 	nodeRequestExecutor *workers.NodeRequestExecutor,
+	integrationRegistry *registry.Registry,
 ) {
-	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName, nodeRequestExecutor)
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName, nodeRequestExecutor, integrationRegistry)
 	if err != nil {
 		log.Fatalf("failed to create integrated runner API server: %v", err)
 	}
@@ -659,7 +660,7 @@ func startPublicAPI(
 	if os.Getenv("START_RUNNER_API") == "yes" {
 		log.Println("Registering Runner API routes on Public API")
 		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName, shutdown,
-			nodeRequestExecutor)
+			nodeRequestExecutor, registry)
 	}
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
@@ -935,7 +936,7 @@ func Start() {
 		)
 	} else if os.Getenv("START_RUNNER_API") == "yes" {
 		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName, shutdown,
-			nodeRequestExecutor)
+			nodeRequestExecutor, registry)
 	}
 
 	startWorkers(

@@ -16,6 +16,9 @@ export type IntentAnalysisChat = {
   composer: string;
   composerError?: string;
   canSend: boolean;
+  canAnalyze?: boolean;
+  analyzeLabel?: string;
+  onAnalyze?: () => Promise<boolean>;
   isUploading?: boolean;
   onComposerChange: (value: string) => void;
   onSend: (text?: string) => void | Promise<boolean>;

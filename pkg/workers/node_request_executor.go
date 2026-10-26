@@ -127,11 +127,12 @@ func (e *NodeRequestExecutor) execute(
 	}
 
 	runCancellations := &RunCancellationNotifier{}
+	runnerChanges := &RunnerTaskChangeNotifier{}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := lockRequest(tx, request.ID)
 		if err == nil {
-			return e.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
+			return e.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runnerChanges)
 		}
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -183,6 +184,7 @@ func (e *NodeRequestExecutor) execute(
 	}
 
 	runCancellations.Publish()
+	runnerChanges.Publish()
 
 	return nil
 }
@@ -214,10 +216,11 @@ func (e *NodeRequestExecutor) processRequest(
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
 	onProductAnalytics func(productanalytics.Event),
+	runnerChanges *RunnerTaskChangeNotifier,
 ) error {
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
-		return e.invokeHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
+		return e.invokeHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runnerChanges)
 	}
 
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
@@ -233,12 +236,13 @@ func (e *NodeRequestExecutor) invokeHook(
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
 	onProductAnalytics func(productanalytics.Event),
+	runnerChanges *RunnerTaskChangeNotifier,
 ) error {
 	if request.ExecutionID == nil {
 		return e.invokeNodeHook(logger, tx, request, onNewEvents)
 	}
 
-	return e.invokeComponentHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
+	return e.invokeComponentHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runnerChanges)
 }
 
 func (e *NodeRequestExecutor) invokeNodeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
@@ -419,6 +423,7 @@ func (e *NodeRequestExecutor) invokeComponentHook(
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
 	onProductAnalytics func(productanalytics.Event),
+	runnerChanges *RunnerTaskChangeNotifier,
 ) error {
 	if request.ExecutionID == nil {
 		return fmt.Errorf("execution id is required for component hook")
@@ -434,7 +439,7 @@ func (e *NodeRequestExecutor) invokeComponentHook(
 		return request.Complete(tx)
 	}
 
-	return e.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
+	return e.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runnerChanges)
 }
 
 func (e *NodeRequestExecutor) invokeExecutionComponentHook(
@@ -448,6 +453,7 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
 	onFileBindCleanup func(contexts.FileBindCleanup),
 	onProductAnalytics func(productanalytics.Event),
+	runnerChanges *RunnerTaskChangeNotifier,
 ) error {
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
@@ -509,13 +515,16 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 			WithRemoteImageIngest(e.encryptor, e.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, e.encryptor, workflow.OrganizationID, workflow.FactoryID),
-		RunnerTasks: contexts.NewRunnerTaskContext(
+		RunnerTasks: runnerChanges.Bind(contexts.NewRunnerTaskContext(
 			tx,
 			e.encryptor,
 			workflow.OrganizationID,
-		),
+		)),
 	}
 
+	hookCtx.RunnerTasks.(*contexts.RunnerTaskContext).
+		WithRunScope(execution.RunID).
+		WithSecrets(hookCtx.Secrets.(*contexts.SecretsContext))
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {

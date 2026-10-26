@@ -1,18 +1,25 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import type { FactoriesWorkOrder } from "@/api-client";
 import { clearBacklogAnalysisPending, pendingBacklogAnalysisIds } from "@/pages/factories/lib/backlogAnalysis";
 
-const { factoriesCreateWorkOrder, factoriesSelectFactoryVcsProviderRepository, organizationsListIntegrations } =
-  vi.hoisted(() => ({
-    factoriesCreateWorkOrder: vi.fn(),
-    factoriesSelectFactoryVcsProviderRepository: vi.fn(),
-    organizationsListIntegrations: vi.fn(),
-  }));
+const {
+  factoriesCancelWorkOrderQueue,
+  factoriesCreateWorkOrder,
+  factoriesSelectFactoryVcsProviderRepository,
+  organizationsListIntegrations,
+} = vi.hoisted(() => ({
+  factoriesCancelWorkOrderQueue: vi.fn(),
+  factoriesCreateWorkOrder: vi.fn(),
+  factoriesSelectFactoryVcsProviderRepository: vi.fn(),
+  organizationsListIntegrations: vi.fn(),
+}));
 
 vi.mock("@/api-client", () => ({
+  factoriesCancelWorkOrderQueue,
   factoriesCreateWorkOrder,
   factoriesSelectFactoryVcsProviderRepository,
   organizationsListIntegrations,
@@ -21,6 +28,7 @@ vi.mock("@/api-client", () => ({
 import {
   factoryQueryKeys,
   mergeFactoryBoardWorkOrders,
+  useCancelWorkOrderQueue,
   useCreateWorkOrder,
   useSelectFactoryVcsProviderRepository,
 } from "./useFactoryData";
@@ -59,6 +67,97 @@ describe("useSelectFactoryVcsProviderRepository", () => {
     await act(async () => {
       await result.current.selectRepository.mutateAsync({ repository: "acme/api" });
       expect(queryClient.getQueryData(["integrations", "connected", "org-1"])).toEqual([integration]);
+    });
+  });
+});
+
+describe("useCancelWorkOrderQueue", () => {
+  beforeEach(() => {
+    factoriesCancelWorkOrderQueue.mockReset();
+  });
+
+  it("keeps cancellation updates in the original workspace after navigation", async () => {
+    const queued: FactoriesWorkOrder = {
+      id: "wo-queued",
+      state: "STATE_DRAFT",
+      queuedRunnerJobs: [{ id: "queue-1", position: 2 }],
+    };
+    const cancelled = { ...queued, queuedRunnerJobs: [] };
+    const other = { id: "wo-other", state: "STATE_DRAFT" };
+    let finishCancellation!: (response: { data: { order: FactoriesWorkOrder } }) => void;
+    factoriesCancelWorkOrderQueue.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishCancellation = resolve;
+        }),
+    );
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [queued]);
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-2"), [other]);
+    const { result, rerender } = renderHook(({ factoryId }) => useCancelWorkOrderQueue("org-1", factoryId), {
+      initialProps: { factoryId: "factory-1" },
+      wrapper: createWrapper(queryClient),
+    });
+    let cancelling!: Promise<FactoriesWorkOrder>;
+    act(() => {
+      cancelling = result.current.mutateAsync({ orderId: queued.id!, queueId: "queue-1" });
+    });
+    await waitFor(() => expect(factoriesCancelWorkOrderQueue).toHaveBeenCalledTimes(1));
+    rerender({ factoryId: "factory-2" });
+
+    await act(async () => {
+      finishCancellation({ data: { order: cancelled } });
+      await cancelling;
+    });
+
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"))).toMatchObject([
+      { id: "wo-queued", queuedRunnerJobs: [] },
+    ]);
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrders("org-1", "factory-2"))).toEqual([other]);
+    expect(
+      queryClient.getQueryData(factoryQueryKeys.workOrderDetail("org-1", "factory-2", queued.id!)),
+    ).toBeUndefined();
+  });
+
+  it("refreshes analysis and capacity after a task leaves the queue", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    let cancelled = false;
+    factoriesCancelWorkOrderQueue.mockImplementation(async () => {
+      cancelled = true;
+      return { data: { order: { id: "wo-dequeued", queuedRunnerJobs: [] } } };
+    });
+    const { result } = renderHook(
+      () => ({
+        cancel: useCancelWorkOrderQueue("org-1", "factory-1"),
+        analysis: useQuery({
+          queryKey: ["backlog-analysis-runs", "org-1", "canvas-1"],
+          queryFn: async () => ({ state: cancelled ? "STATE_CANCELLING" : "STATE_PENDING" }),
+        }),
+        session: useQuery({
+          queryKey: factoryQueryKeys.planningSession("org-1", "factory-1", "wo-dequeued"),
+          queryFn: async () => ({ state: cancelled ? "ended" : "running" }),
+        }),
+        capacity: useQuery({
+          queryKey: ["organizations", "org-1", "workspace-usage", 30],
+          queryFn: async () => ({ activeRunnerCount: cancelled ? 1 : 2 }),
+        }),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => {
+      expect(result.current.analysis.data?.state).toBe("STATE_PENDING");
+      expect(result.current.session.data?.state).toBe("running");
+      expect(result.current.capacity.data?.activeRunnerCount).toBe(2);
+    });
+    await act(async () => {
+      await result.current.cancel.mutateAsync({ orderId: "wo-dequeued", queueId: "queue-1" });
+    });
+
+    await waitFor(() => {
+      expect(result.current.analysis.data?.state).toBe("STATE_CANCELLING");
+      expect(result.current.session.data?.state).toBe("ended");
+      expect(result.current.capacity.data?.activeRunnerCount).toBe(1);
     });
   });
 });

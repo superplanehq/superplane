@@ -446,6 +446,11 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       if (!organizationId || !factoryId) {
         return;
       }
+      if (data.payload?.reason === "runner_capacity_updated") {
+        void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "workspace-usage"] });
+        void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.list(organizationId) });
+        return;
+      }
       const orderId = data.payload?.orderId;
       if (!orderId || (data.payload?.factoryId && data.payload.factoryId !== factoryId)) {
         return;

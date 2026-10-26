@@ -34,7 +34,8 @@ type AdminClient interface {
 	) (adminclient.CreateRunnerResponse, error)
 	DescribeRunner(context.Context, string, string) (adminclient.Runner, error)
 	ListRunners(context.Context, string, []string, int) ([]adminclient.Runner, error)
-	DeleteRunner(context.Context, string, string, []string) (adminclient.Runner, error)
+	DeleteRunner(context.Context, string, string, []string, ...adminclient.DeleteRunnerOptions) (adminclient.Runner, error)
+	ListQueuedTasks(context.Context, string) ([]adminclient.Task, error)
 }
 
 type ArtifactResolver interface {
@@ -306,75 +307,84 @@ func (r *Reconciler) reconcileCapacity(
 	activeRunners []adminclient.Runner,
 	resourcesByRunner map[string][]provider.Resource,
 ) error {
-	target := targetActiveRunners(capacity, r.config.WarmCapacity, r.config.MaxCapacity)
-	active := int(capacity.PendingRunners + capacity.IdleRunners)
-	if active < target {
-		r.logAction(
-			"increasing fleet capacity",
-			slog.Int("active_runners", active),
-			slog.Int("target_runners", target),
-			slog.Int("runner_count", target-active),
-		)
-		var provisionErrors []error
-		for range target - active {
-			if err := r.provision(
-				ctx,
-				fleet,
-				genericIdempotencyKey(r.config.FleetID),
-				resourcesByRunner,
-			); err != nil {
-				provisionErrors = append(provisionErrors, err)
-			}
-		}
-		return errors.Join(provisionErrors...)
+	unassigned := int(capacity.UnassignedRunners)
+	active := int(capacity.PendingRunners + capacity.IdleRunners + capacity.BusyRunners)
+	target := r.config.WarmCapacity + int(capacity.RunnableTasks)
+	if r.config.MaxCapacity > 0 {
+		target = min(target, max(0, r.config.MaxCapacity-int(capacity.BusyRunners)))
 	}
-	if active == target {
-		r.logAction(
-			"fleet capacity matches target",
-			slog.Int("active_runners", active),
-			slog.Int("target_runners", target),
-		)
+	if unassigned > target {
+		return r.terminateRunners(ctx, oldestRunners(activeRunners, unassigned-target), resourcesByRunner, deletionReasonCapacityReduction)
+	}
+	if capacity.ProvisioningCooldownUntil != nil && capacity.ProvisioningCooldownUntil.After(time.Now()) {
+		r.logAction("waiting for provisioning cooldown", slog.Time("provisioning_cooldown_until", *capacity.ProvisioningCooldownUntil))
 		return nil
 	}
-	r.logAction(
-		"decreasing fleet capacity",
-		slog.Int("active_runners", active),
-		slog.Int("target_runners", target),
-		slog.Int("runner_count", active-target),
-	)
-	return r.terminateRunners(
-		ctx,
-		oldestRunners(activeRunners, active-target),
-		resourcesByRunner,
-		deletionReasonCapacityReduction,
-	)
+	available := func() bool { return r.config.MaxCapacity == 0 || active < r.config.MaxCapacity }
+	warmMissing := max(0, r.config.WarmCapacity-unassigned)
+	if warmMissing > 0 {
+		r.logAction("increasing fleet capacity", slog.Int("runner_count", warmMissing))
+	}
+	for range warmMissing {
+		if !available() {
+			break
+		}
+		if err := r.provision(ctx, fleet, "", resourcesByRunner); err != nil {
+			if creationDeclined(err) {
+				break
+			}
+			return err
+		}
+		active++
+		unassigned++
+	}
+	demand := max(0, int(capacity.RunnableTasks)-unassigned)
+	if demand == 0 || !available() {
+		return nil
+	}
+	tasks, err := r.admin.ListQueuedTasks(ctx, r.config.FleetID)
+	if err != nil {
+		return fmt.Errorf("list queued jobs for fleet %s: %w", r.config.FleetID, err)
+	}
+	r.logAction("increasing fleet capacity", slog.Int("queued_demand", demand))
+	for _, task := range tasks {
+		if demand == 0 || !available() {
+			break
+		}
+		if err := r.provision(ctx, fleet, task.ID, resourcesByRunner); err != nil {
+			if creationDeclined(err) {
+				continue
+			}
+			return err
+		}
+		active++
+		demand--
+	}
+	return nil
 }
 
-func targetActiveRunners(
-	capacity adminclient.Capacity,
-	warmCapacity, maxCapacity int,
-) int {
-	target := int(capacity.RunnableTasks) + warmCapacity
-	if maxCapacity == 0 {
-		return target
-	}
-	available := maxCapacity - int(capacity.BusyRunners)
-	if available <= 0 {
-		return 0
-	}
-	return min(target, available)
+func creationDeclined(err error) bool {
+	return adminclient.IsStatus(err, http.StatusConflict) || adminclient.IsStatus(err, http.StatusPreconditionFailed) ||
+		adminclient.IsStatus(err, http.StatusBadRequest) || adminclient.IsStatus(err, http.StatusNotFound) ||
+		adminclient.IsStatus(err, http.StatusTooManyRequests)
 }
 
 func (r *Reconciler) provision(
 	ctx context.Context,
 	fleet adminclient.Fleet,
-	idempotencyKey string,
+	taskID string,
 	resourcesByRunner map[string][]provider.Resource,
 ) error {
 	r.logAction("creating logical runner")
+	idempotencyKey := genericIdempotencyKey(r.config.FleetID)
+	if taskID != "" {
+		idempotencyKey = "fleet-manager/" + r.config.FleetID + "/task/" + taskID
+	}
+	warmCapacity, maxCapacity := int32(r.config.WarmCapacity), int32(r.config.MaxCapacity)
 	created, err := r.admin.CreateRunner(ctx, r.config.FleetID, adminclient.CreateRunnerRequest{
 		IdempotencyKey: idempotencyKey,
-		Ephemeral:      true,
+		Ephemeral:      true, TaskID: taskID,
+		WarmCapacity: &warmCapacity, MaxCapacity: &maxCapacity,
 	})
 	if err != nil {
 		return fmt.Errorf("create logical runner for fleet %s: %w", r.config.FleetID, err)
@@ -455,7 +465,7 @@ func (r *Reconciler) rollbackProvision(
 		"terminating logical runner after provisioning failure",
 		slog.String("runner_id", runnerID),
 	)
-	_, rollbackError := r.admin.DeleteRunner(ctx, r.config.FleetID, runnerID, []string{adminclient.RunnerStatePending})
+	_, rollbackError := r.admin.DeleteRunner(ctx, r.config.FleetID, runnerID, []string{adminclient.RunnerStatePending}, adminclient.DeleteRunnerOptions{Reason: "provisioning_failed"})
 	if rollbackError != nil {
 		return errors.Join(
 			provisionError,
@@ -526,7 +536,7 @@ func (r *Reconciler) terminateRunners(
 			"terminating logical runner",
 			slog.String("runner_id", runner.ID),
 		)
-		terminated, err := r.admin.DeleteRunner(ctx, r.config.FleetID, runner.ID, []string{runner.State})
+		terminated, err := r.admin.DeleteRunner(ctx, r.config.FleetID, runner.ID, []string{runner.State}, adminclient.DeleteRunnerOptions{RequireUnassigned: deletionReason == deletionReasonCapacityReduction})
 		if adminclient.IsStatus(err, http.StatusConflict) {
 			continue
 		}
@@ -648,7 +658,12 @@ func oldestRunners(runners []adminclient.Runner, count int) []adminclient.Runner
 	if count <= 0 {
 		return nil
 	}
-	sorted := append([]adminclient.Runner(nil), runners...)
+	var sorted []adminclient.Runner
+	for _, runner := range runners {
+		if runner.ReservedTaskID == nil {
+			sorted = append(sorted, runner)
+		}
+	}
 	sort.Slice(sorted, func(left, right int) bool {
 		return sorted[left].CreatedAt.Before(sorted[right].CreatedAt)
 	})

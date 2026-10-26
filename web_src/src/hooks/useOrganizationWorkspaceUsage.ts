@@ -4,7 +4,7 @@ import { organizationsDescribeOrganizationWorkspaceUsage } from "@/api-client";
 import type { OrganizationsDescribeOrganizationWorkspaceUsageResponse } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-export function useOrganizationWorkspaceUsage(organizationId: string, periodDays = 30) {
+export function useOrganizationWorkspaceUsage(organizationId: string, periodDays = 30, pollRunnerCapacity = false) {
   return useQuery({
     queryKey: ["organizations", organizationId, "workspace-usage", periodDays] as const,
     queryFn: async (): Promise<OrganizationsDescribeOrganizationWorkspaceUsageResponse> => {
@@ -19,5 +19,6 @@ export function useOrganizationWorkspaceUsage(organizationId: string, periodDays
     },
     enabled: Boolean(organizationId),
     staleTime: 30 * 1000,
+    refetchInterval: pollRunnerCapacity ? 10_000 : false,
   });
 }

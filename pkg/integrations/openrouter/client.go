@@ -364,6 +364,10 @@ type createKeyResponse struct {
 }
 
 func (c *Client) CreateKey(req CreateKeyRequest) (*CreatedKey, error) {
+	return c.CreateKeyWithContext(context.Background(), req)
+}
+
+func (c *Client) CreateKeyWithContext(ctx context.Context, req CreateKeyRequest) (*CreatedKey, error) {
 	if strings.TrimSpace(c.ManagementKey) == "" {
 		return nil, fmt.Errorf("provisioning API key is not configured")
 	}
@@ -373,7 +377,7 @@ func (c *Client) CreateKey(req CreateKeyRequest) (*CreatedKey, error) {
 		return nil, fmt.Errorf("failed to marshal create key request: %v", err)
 	}
 
-	body, err := c.execRequestWithKey(context.Background(), http.MethodPost, baseURL+"/keys", bytes.NewReader(payload), c.ManagementKey)
+	body, err := c.execRequestWithKey(ctx, http.MethodPost, baseURL+"/keys", bytes.NewReader(payload), c.ManagementKey)
 	if err != nil {
 		return nil, err
 	}
@@ -390,6 +394,10 @@ func (c *Client) CreateKey(req CreateKeyRequest) (*CreatedKey, error) {
 }
 
 func (c *Client) DeleteKey(hash string) error {
+	return c.DeleteKeyWithContext(context.Background(), hash)
+}
+
+func (c *Client) DeleteKeyWithContext(ctx context.Context, hash string) error {
 	if strings.TrimSpace(c.ManagementKey) == "" {
 		return fmt.Errorf("provisioning API key is not configured")
 	}
@@ -399,7 +407,7 @@ func (c *Client) DeleteKey(hash string) error {
 		return fmt.Errorf("key hash is required")
 	}
 
-	_, err := c.execRequestWithKey(context.Background(), http.MethodDelete, baseURL+"/keys/"+url.PathEscape(hash), nil, c.ManagementKey)
+	_, err := c.execRequestWithKey(ctx, http.MethodDelete, baseURL+"/keys/"+url.PathEscape(hash), nil, c.ManagementKey)
 	if err == nil {
 		return nil
 	}
@@ -471,7 +479,8 @@ func (c *Client) execRequestWithKey(ctx context.Context, method, URL string, bod
 
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %v", err)
+		message := fmt.Sprintf("failed to read response body: %v", err)
+		return nil, core.NewProviderTransportError(message, err)
 	}
 
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {

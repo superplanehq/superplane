@@ -1,3 +1,4 @@
+import { getExecutionStatus } from "@/ui/Runs/runPresentation";
 import { useEventExecutions } from "@/hooks/useCanvasData";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
@@ -253,6 +254,7 @@ function RunDetails({
   const checks = useWatchedPullRequestChecks(phase, organizationId);
   return (
     <>
+      <RunnerJobStates phase={phase} organizationId={organizationId} />
       <WatchedPullRequestCheckList checks={checks} />
       {checksDescriptionIsRedundant(run.description, checks) ? null : <RunDescription description={run.description} />}
       <LiveAgentSteps
@@ -264,6 +266,31 @@ function RunDetails({
         runHref={runHrefFor(organizationId, factoryKey, phase, orderNumber)}
       />
     </>
+  );
+}
+
+/** Shared by desktop and phone automation activity. A node can start before its runner does. */
+function RunnerJobStates({ phase, organizationId }: { phase?: SplitRunPhase; organizationId?: string }) {
+  const live = useSplitRunLiveCanvas(organizationId, phase);
+  const executions = useEventExecutions(phase?.appId ?? "", live.rootEventId ?? null, phase?.status === "running");
+  const jobs =
+    executions.data?.executions?.filter(
+      (execution) => execution.runnerJob && ["queued", "reserved", "running"].includes(execution.runnerJob.state ?? ""),
+    ) ?? [];
+  if (jobs.length === 0) return null;
+  return (
+    <ul aria-label="Runner jobs" className="flex flex-col gap-1 text-[12.5px] text-muted-foreground">
+      {jobs.map((execution) => {
+        const node = live.canvas?.nodes.find((entry) => entry.id === execution.nodeId);
+        return (
+          <li key={execution.runnerJob?.id ?? execution.id}>
+            <span role="status">
+              {node?.name || execution.nodeId}: {getExecutionStatus(execution).label}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type stubIntakeItemAvailabilitySource struct {
@@ -265,6 +267,70 @@ func TestRefreshBacklog(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
 		assert.Contains(t, message, "Add a readable intake")
+	})
+
+	t.Run("does not block dispatch while waiting for organization capacity", func(t *testing.T) {
+		factory := newFactory(t)
+		createIntake(t, factory, models.FactoryIntakeSourceGitHubIssues)
+		order := createDraft(t, factory, "Dispatched issue", "https://github.com/acme/payments/issues/12")
+		source := &stubIntakeItemAvailabilitySource{
+			scope:     "github:acme/payments",
+			urlPrefix: "https://github.com/acme/payments/issues/",
+			available: map[string]bool{"12": false},
+		}
+		db := database.DB(t.Context())
+		dispatch := db.Begin()
+		require.NoError(t, dispatch.Error)
+		defer dispatch.Rollback()
+		require.NoError(t, models.LockOrganizationTaskAdmission(dispatch, r.Organization.ID))
+		var dispatchPID int
+		require.NoError(t, dispatch.Raw("SELECT pg_backend_pid()").Scan(&dispatchPID).Error)
+
+		refreshCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		type refreshResult struct {
+			response *pb.RefreshBacklogResponse
+			err      error
+		}
+		refreshed := make(chan refreshResult, 1)
+		go func() {
+			defer close(refreshed)
+			response, err := RefreshBacklog(refreshCtx, IntakeDependencies{
+				NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+					return source, nil
+				},
+			}, orgID, request(factory))
+			refreshed <- refreshResult{response: response, err: err}
+		}()
+		defer func() {
+			_ = dispatch.Rollback().Error
+			cancel()
+			// Wait for refresh before the fixture is released, including on failure.
+			for range refreshed {
+			}
+		}()
+
+		require.Eventually(t, func() bool {
+			var waiting bool
+			err := db.Raw(`SELECT EXISTS (
+				SELECT 1 FROM pg_stat_activity
+				WHERE datname = current_database() AND ? = ANY(pg_blocking_pids(pid))
+			)`, dispatchPID).Scan(&waiting).Error
+			return err == nil && waiting
+		}, 5*time.Second, 10*time.Millisecond, "refresh must wait for the organization lock")
+
+		current, err := factory.FindWorkOrder(dispatch.Clauses(clause.Locking{Strength: "UPDATE", Options: "NOWAIT"}), order.ID)
+		require.NoError(t, err, "refresh must not hold the draft row while waiting for dispatch")
+		require.NoError(t, current.TransitionOnDispatch(dispatch, &r.User))
+		require.NoError(t, dispatch.Commit().Error)
+
+		result := <-refreshed
+		require.NoError(t, result.err)
+		assert.Zero(t, result.response.GetArchivedCount())
+		assert.Zero(t, result.response.GetFailedItemCount())
+		reloaded, err := factory.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
 	})
 
 	t.Run("does not archive a draft dispatched during its source check", func(t *testing.T) {
