@@ -60,7 +60,7 @@ echo "env://coolify-v1:$(openssl rand -base64 32)"
 Complete owner setup in the SuperPlane UI. Do not create a personal API token
 for the default path.
 
-### Published images (`docker-compose.image.yml`)
+### Published images (`template/superplane.yaml`)
 
 1. Deploy the stack and wait until `app` is healthy.
 2. Open the SuperPlane URL and complete owner setup.
@@ -83,7 +83,7 @@ this repository.
 1. Create a Docker Compose application from the Git repo.
 2. Set the base directory to `/`.
 3. Set the Compose path to `deploy/coolify/docker-compose.source.yml`.
-4. Leave `SUPERPLANE_VERSION` at `v1.0.0-rc5`, or set a published GHCR tag.
+4. Leave `SUPERPLANE_VERSION` at `v1.0.0-rc7`, or set a published GHCR tag.
 5. Attach the domain to `app` on port `8000`.
 6. Deploy. Complete owner setup.
 
@@ -92,18 +92,18 @@ timeout.
 
 ## Paste / published images
 
-Use [docker-compose.image.yml](docker-compose.image.yml) when you do not want a
-Git checkout.
+Use [template/superplane.yaml](template/superplane.yaml) when you do not want a
+Git checkout. This is also the Coolify one-click catalog file.
 
 1. Create a Docker Compose Empty resource in Coolify.
-2. Paste the image Compose file.
-3. Leave `SUPERPLANE_VERSION` at `v1.0.0-rc5`, or set a published GHCR tag.
+2. Paste `template/superplane.yaml`.
+3. Leave `SUPERPLANE_VERSION` at `v1.0.0-rc7`, or set a published GHCR tag.
 4. Leave the encryption variables as Coolify generated them.
 5. Attach the domain to `app` on port `8000`.
 6. Deploy. Complete owner setup. Wait for Fleet Manager.
 
-`SUPERPLANE_VERSION` defaults to `v1.0.0-rc5`.
-`FLEET_MANAGER_VERSION` defaults to `v0.1.5` (the first tag with `-docker`).
+`SUPERPLANE_VERSION` defaults to `v1.0.0-rc7`.
+`FLEET_MANAGER_VERSION` defaults to `v0.1.6`.
 `RUNNER_VERSION` defaults to `v0.2.1`.
 
 ## Runner network and architecture

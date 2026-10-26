@@ -1,6 +1,6 @@
 # Coolify Git build pack: base directory /, this file as the Compose path.
 # Builds the runner and Fleet Manager from this repository.
-# SUPERPLANE_VERSION defaults to v1.0.0-rc5.
+# SUPERPLANE_VERSION defaults to v1.0.0-rc7.
 # Coolify generates SERVICE_REALBASE64_32_ENCRYPTION and builds
 # ENCRYPTION_MASTER_KEYS. Keep that value. Do not paste a password.
 # Attach the public domain to service app on port 8000 (SERVICE_URL_APP_8000).
@@ -9,7 +9,7 @@
 # Complete owner setup. Fleet Manager waits, then mints an admin token.
 # On ARM, set RUNNER_FLEET_ID=e1-large-arm64 and RUNNER_ARCH=arm64.
 # For a pasteable stack that only pulls published images, use
-# docker-compose.image.yml. See README.md.
+# template/superplane.yaml. See README.md.
 
 services:
   init:
@@ -65,7 +65,7 @@ services:
       retries: 10
 
   app:
-    image: ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION:-v1.0.0-rc5}
+    image: ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION:-v1.0.0-rc7}
     pull_policy: always
     restart: unless-stopped
     stop_grace_period: 45s
@@ -171,7 +171,7 @@ services:
       ENABLE_PASSWORD_LOGIN: "yes"
       BLOCK_SIGNUP: "yes"
       REDIRECT_HTTP_REQUESTS: "yes"
-      SUPERPLANE_VERSION: ${SUPERPLANE_VERSION:-v1.0.0-rc5}
+      SUPERPLANE_VERSION: ${SUPERPLANE_VERSION:-v1.0.0-rc7}
       RUNNER_STABLE_VERSION: ${RUNNER_VERSION:-v0.2.1}
       SUPERPLANE_INSTALLATION_TYPE: single-host
       SUPERPLANE_BILLING_ENABLED: "no"
