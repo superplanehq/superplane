@@ -28,6 +28,7 @@ type fakeAdmin struct {
 	createResponse    adminclient.CreateRunnerResponse
 	createRequests    []adminclient.CreateRunnerRequest
 	deletedRunnerIDs  []string
+	providerDeleted   []string
 	deleteStates      [][]string
 	deleteResponse    *adminclient.Runner
 	deleteError       error
@@ -99,6 +100,14 @@ func limitedRunners(runners []adminclient.Runner, limit int) []adminclient.Runne
 	return runners[:limit]
 }
 
+func (f *fakeAdmin) MarkRunnerProviderDeleted(
+	_ context.Context,
+	_, runnerID string,
+) (adminclient.Runner, error) {
+	f.providerDeleted = append(f.providerDeleted, runnerID)
+	return adminclient.Runner{ID: runnerID, State: adminclient.RunnerStateTerminated}, nil
+}
+
 func (f *fakeAdmin) DeleteRunner(
 	_ context.Context,
 	_, runnerID string, states []string,
@@ -141,6 +150,7 @@ type fakeProvider struct {
 	createRequest provider.CreateRequest
 	bootstrap     provider.RunnerBootstrap
 	createError   error
+	deleteError   error
 	deleted       []provider.Resource
 	events        *[]string
 }
@@ -178,7 +188,7 @@ func (f *fakeProvider) Create(
 
 func (f *fakeProvider) Delete(_ context.Context, resource provider.Resource) error {
 	f.deleted = append(f.deleted, resource)
-	return nil
+	return f.deleteError
 }
 
 func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
@@ -355,6 +365,45 @@ func TestTerminatedRunnerDeletesTaggedProviderResource(t *testing.T) {
 	if len(resourceProvider.deleted) != 1 ||
 		resourceProvider.deleted[0].ID != "resource-terminated" {
 		t.Fatalf("deleted resources = %#v", resourceProvider.deleted)
+	}
+}
+
+func TestProviderDeletionConfirmation(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		resourceExists bool
+		terminatedAgo  time.Duration
+		deleteError    error
+		wantConfirmed  bool
+	}{
+		{name: "deletion accepted but resource still listed", resourceExists: true, terminatedAgo: 2 * time.Minute},
+		{name: "failed deletion", resourceExists: true, deleteError: errors.New("provider unavailable")},
+		{name: "absent resource after grace", terminatedAgo: 2 * time.Minute, wantConfirmed: true},
+		{name: "absent resource during grace", terminatedAgo: time.Second},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			admin := newFakeAdmin()
+			terminatedAt := time.Now().Add(-test.terminatedAgo)
+			admin.terminatedRunners = []adminclient.Runner{{
+				ID: "runner-terminated", FleetID: "fleet-a",
+				State: adminclient.RunnerStateTerminated, TerminatedAt: &terminatedAt,
+			}}
+			resourceProvider := &fakeProvider{deleteError: test.deleteError}
+			if test.resourceExists {
+				resourceProvider.resources = []provider.Resource{{
+					ID: "resource-terminated", RunnerID: "runner-terminated", FleetID: "fleet-a",
+				}}
+			}
+			reconciler := newTestReconciler(t, admin, &fakeArtifactResolver{}, resourceProvider, 0, 0)
+			err := reconciler.Reconcile(context.Background())
+			if !errors.Is(err, test.deleteError) {
+				t.Fatalf("reconcile error = %v, want %v", err, test.deleteError)
+			}
+			confirmed := slices.Contains(admin.providerDeleted, "runner-terminated")
+			if confirmed != test.wantConfirmed {
+				t.Fatalf("provider deletion confirmed = %v, want %v", confirmed, test.wantConfirmed)
+			}
+		})
 	}
 }
 

@@ -398,6 +398,33 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 	return &pb.DeleteRunnerResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
 }
 
+func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRunnerProviderDeletedRequest) (*pb.MarkRunnerProviderDeletedResponse, error) {
+	fleet, err := findFleet(ctx, req.GetFleetId())
+	if err != nil {
+		return nil, err
+	}
+	runnerID, err := parseID(req.GetRunnerId(), "runner ID")
+	if err != nil {
+		return nil, err
+	}
+
+	var runner *models.Runner
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		runner, err = fleet.FindRunner(tx, runnerID)
+		if err != nil {
+			return err
+		}
+		return runner.MarkProviderDeleted(tx, time.Now())
+	})
+	if errors.Is(err, models.ErrRunnerNotFound) {
+		return nil, grpcerrors.NotFound(err, "runner not found")
+	}
+	if err != nil {
+		return nil, grpcerrors.FailedPrecondition(err, "runner VM is not confirmed deleted")
+	}
+	return &pb.MarkRunnerProviderDeletedResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
+}
+
 func (s *Service) createRunner(
 	ctx context.Context,
 	fleetID string,
