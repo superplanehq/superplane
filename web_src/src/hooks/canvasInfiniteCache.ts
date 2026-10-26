@@ -8,6 +8,8 @@ import type {
 } from "@/api-client";
 import type { CanvasRunsFilters } from "./useCanvasData";
 
+const RUN_FILTER_QUERY_TOKENS: readonly unknown[] = ["states", "results", "includeTask", "searchFilters"];
+
 export type InfiniteRunsPage = {
   runs?: CanvasesCanvasRun[];
   totalCount?: number;
@@ -64,12 +66,16 @@ export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): Canv
   }
 
   const filters: CanvasRunsFilters = {};
+  const searchFiltersIndex = queryKey.indexOf("searchFilters");
+  if (searchFiltersIndex !== -1) {
+    Object.assign(filters, queryKey[searchFiltersIndex + 1]);
+  }
   let index = infiniteIndex + 1;
 
   if (queryKey[index] === "states") {
     index += 1;
     const states: CanvasesCanvasRunState[] = [];
-    while (index < queryKey.length && queryKey[index] !== "results" && queryKey[index] !== "includeTask") {
+    while (index < queryKey.length && !RUN_FILTER_QUERY_TOKENS.includes(queryKey[index])) {
       states.push(queryKey[index] as CanvasesCanvasRunState);
       index += 1;
     }
@@ -81,7 +87,7 @@ export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): Canv
   if (queryKey[index] === "results") {
     index += 1;
     const results: CanvasesCanvasRunResult[] = [];
-    while (index < queryKey.length && queryKey[index] !== "includeTask") {
+    while (index < queryKey.length && !RUN_FILTER_QUERY_TOKENS.includes(queryKey[index])) {
       results.push(queryKey[index] as CanvasesCanvasRunResult);
       index += 1;
     }
@@ -94,15 +100,21 @@ export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): Canv
 }
 
 export function runMatchesFilters(run: CanvasesCanvasRun, filters: CanvasRunsFilters): boolean {
-  if (filters.states?.length && (!run.state || !filters.states.includes(run.state))) {
+  if (filters.triggerIds?.length && (!run.rootEvent?.nodeId || !filters.triggerIds.includes(run.rootEvent.nodeId))) {
     return false;
   }
-
-  if (filters.results?.length && (!run.result || !filters.results.includes(run.result))) {
+  if (filters.search && !run.rootEvent?.customName?.toLowerCase().includes(filters.search.trim().toLowerCase())) {
     return false;
   }
+  return runMatchesStatusFilters(run, filters);
+}
 
-  return true;
+function runMatchesStatusFilters(run: CanvasesCanvasRun, filters: CanvasRunsFilters): boolean {
+  const hasStatuses = !!(filters.states?.length || filters.results?.length);
+  return (
+    !hasStatuses ||
+    !!((run.state && filters.states?.includes(run.state)) || (run.result && filters.results?.includes(run.result)))
+  );
 }
 
 function parseTimestamp(value: string | undefined): number {

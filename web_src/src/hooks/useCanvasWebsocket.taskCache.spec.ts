@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { createElement } from "react";
@@ -25,6 +25,7 @@ vi.mock("@/stores/nodeExecutionStore", () => ({
     selector ? selector(nodeExecutionStoreMock) : nodeExecutionStoreMock,
 }));
 
+import type { InfiniteRunsPage } from "./canvasInfiniteCache";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 
 const testCanvasId = "canvas-1";
@@ -42,6 +43,46 @@ afterEach(() => {
 });
 
 describe("useCanvasWebsocket task cache", () => {
+  it("keeps live runs inside the selected title, trigger, and status filters", () => {
+    const queryClient = new QueryClient();
+    const filters = {
+      search: "deploy",
+      triggerIds: ["trigger-a"],
+      states: ["STATE_STARTED" as const],
+      results: ["RESULT_PASSED" as const],
+      includeTask: true,
+    };
+    queryClient.setQueryData(canvasKeys.infiniteRuns(testCanvasId, filters), {
+      pages: [{ runs: [], totalCount: 0 }],
+      pageParams: [undefined],
+    });
+    const { unmount } = renderHook(() => useCanvasWebsocket({ canvasId: testCanvasId, organizationId: "org-1" }), {
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(QueryClientProvider, { client: queryClient }, children),
+    });
+    for (const [id, nodeId, customName, result] of [
+      ["matching", "trigger-a", "Deploy API", "RESULT_PASSED"],
+      ["wrong-title", "trigger-a", "Build API", "RESULT_PASSED"],
+      ["wrong-trigger", "trigger-b", "Deploy API", "RESULT_PASSED"],
+      ["wrong-status", "trigger-a", "Deploy API", "RESULT_FAILED"],
+    ] as const) {
+      emitWebsocketMessage("run_finished", {
+        id,
+        canvasId: testCanvasId,
+        state: "STATE_FINISHED",
+        result,
+        rootEvent: { nodeId, customName },
+      });
+    }
+    const cached = queryClient.getQueryData<InfiniteData<InfiniteRunsPage>>(
+      canvasKeys.infiniteRuns(testCanvasId, filters),
+    );
+    expect(cached?.pages[0]?.runs?.map((run) => run.id)).toEqual(["matching"]);
+    expect(cached?.pages[0]?.totalCount).toBe(1);
+    unmount();
+    queryClient.clear();
+  });
+
   it("patches the include-task describe cache and keeps the task label", async () => {
     const queryClient = new QueryClient();
     const task = { id: "task-1", key: "SP-1", title: "Linked task" };
