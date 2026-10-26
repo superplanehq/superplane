@@ -22,7 +22,7 @@ global_job_config:
   prologue:
     commands:
       - checkout
-      - test "$SEMAPHORE_GIT_BRANCH" = main
+      - bash release/verify-superplane-release-branch.sh "$SEMAPHORE_GIT_BRANCH"
       - test "$SEMAPHORE_PIPELINE_PROMOTION" = true
       - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
 

@@ -43,6 +43,10 @@ ruby -ryaml -e '
   end
 
   publish = YAML.safe_load(File.read(ARGV[1]))
+  publish_prologue = publish.dig("global_job_config", "prologue", "commands").join("\n")
+  unless publish_prologue.include?("verify-superplane-release-branch.sh")
+    raise "publication must accept SuperPlane release branches"
+  end
   publish_blocks = publish.fetch("blocks").to_h { |block| [block.fetch("name"), block] }
   expected_publishers = ["Publish amd64 Image", "Publish arm64 Image"]
   expected_publishers.each do |name|
