@@ -79,6 +79,13 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBil
 	// period, and these are not per-seat. The lock must not depend on the catalog.
 	if paymentBlocked(plan) {
 		lockSeatsAtOccupied(usage, plan, maximum)
+		// The renewal count ignores the payment state, so the admin sees the
+		// same count that the renewal scheduler sends to Polar.
+		renewal, err := paidRenewalSeats(plan, usage.Occupied)
+		if err != nil {
+			return nil, err
+		}
+		usage.RenewalQuantity = renewal
 		return usage, nil
 	}
 	if !plan.Catalog.PerSeat {
@@ -97,9 +104,8 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBil
 	usage.Purchased = &purchased
 	usage.Available = &available
 	usage.PlanMaximum = maximum
-	// A plan without paid seats needs repair and has no renewal count.
-	renewal, err := RenewalSeats(plan, usage.Occupied)
-	if err != nil && !errors.Is(err, ErrInvalidPaidSeats) {
+	renewal, err := paidRenewalSeats(plan, usage.Occupied)
+	if err != nil {
 		return nil, err
 	}
 	usage.RenewalQuantity = renewal
@@ -115,6 +121,17 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *models.OrganizationBil
 // subscription from one without seats.
 func paymentBlocked(plan *models.OrganizationBillingPlan) bool {
 	return models.PolarSubscriptionIsPaymentBlocked(plan.PolarSubscriptionStatus) && plan.PurchasedSeats != nil
+}
+
+// paidRenewalSeats returns RenewalSeats for a seat summary. A plan without
+// paid seats needs repair and has no renewal count, so that state is nil and
+// not an error.
+func paidRenewalSeats(plan *models.OrganizationBillingPlan, occupied int) (*int, error) {
+	renewal, err := RenewalSeats(plan, occupied)
+	if errors.Is(err, ErrInvalidPaidSeats) {
+		return nil, nil
+	}
+	return renewal, err
 }
 
 func lockSeatsAtOccupied(usage *SeatUsage, plan *models.OrganizationBillingPlan, maximum *int) {
