@@ -23,6 +23,9 @@ export function planningSessionPhase(
 }
 
 function planningSessionPhaseStatus(machineStatus: CreateWithAgentView["machineStatus"]): SplitRunPhase["status"] {
+  if (machineStatus === "queued") {
+    return "pending";
+  }
   if (machineStatus === "failed") {
     return "failed";
   }
@@ -36,6 +39,9 @@ function planningSessionPhaseStatus(machineStatus: CreateWithAgentView["machineS
 }
 
 function planningAgentLineStatus(machineStatus: CreateWithAgentView["machineStatus"]): SplitRunStreamLine["status"] {
+  if (machineStatus === "queued") {
+    return "pending";
+  }
   if (machineStatus === "failed") {
     return "failed";
   }

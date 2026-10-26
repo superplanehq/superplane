@@ -22,7 +22,7 @@ func TestSerializePlanningSessionSummary_KeepsBoardFields(t *testing.T) {
 		}),
 	}
 
-	summary := serializePlanningSessionSummary(session, "exec-1")
+	summary := serializePlanningSessionSummary(session, planningSessionRuntime{executionID: "exec-1"})
 	require.NotNil(t, summary)
 	assert.Equal(t, session.ID.String(), summary.Id)
 	assert.Equal(t, models.PlanningSessionStateRunning, summary.State)
@@ -41,7 +41,7 @@ func TestSerializePlanningSessionSummary_OmitsEmptySurvey(t *testing.T) {
 		State: models.PlanningSessionStateRunning,
 	}
 
-	summary := serializePlanningSessionSummary(session, "")
+	summary := serializePlanningSessionSummary(session, planningSessionRuntime{})
 	require.NotNil(t, summary)
 	assert.Nil(t, summary.Survey)
 	assert.Empty(t, summary.ExecutionId)

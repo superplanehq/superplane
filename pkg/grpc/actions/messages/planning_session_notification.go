@@ -45,6 +45,42 @@ func PublishPlanningBoardStatus(session *models.FactoryPlanningSession) {
 	}
 }
 
+// PublishPlanningBoardStatusForRun refreshes planning state after committed
+// runner task changes, including the first queued task and its admission.
+func PublishPlanningBoardStatusForRun(tx *gorm.DB, runID uuid.UUID) {
+	if runID == uuid.Nil {
+		return
+	}
+	session, err := models.FindPlanningSessionByRun(tx, runID)
+	if errors.Is(err, models.ErrFactoryPlanningSessionNotFound) {
+		return
+	}
+	if err != nil {
+		log.WithError(err).Warnf("Failed to find planning session for run %s", runID)
+		return
+	}
+	PublishPlanningBoardStatus(session)
+}
+
+// PublishPlanningRunnerStatus refreshes the task that changed and sessions
+// queued behind the organization's shared runner capacity.
+func PublishPlanningRunnerStatus(tx *gorm.DB, task *models.RunnerTask) {
+	execution, err := task.FindExecution(tx)
+	if err == nil {
+		PublishPlanningBoardStatusForRun(tx, execution.RunID)
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.WithError(err).Warnf("Failed to find execution for runner task %s", task.ID)
+	}
+	sessions, err := models.ListQueuedRunnerPlanningSessions(tx, task.OrganizationID)
+	if err != nil {
+		log.WithError(err).Warnf("Failed to find queued planning sessions for organization %s", task.OrganizationID)
+		return
+	}
+	for i := range sessions {
+		PublishPlanningBoardStatus(&sessions[i])
+	}
+}
+
 func PublishPlanningAgentQuestion(session *models.FactoryPlanningSession) {
 	message, ok := planningAgentQuestionMessage(session)
 	if !ok {

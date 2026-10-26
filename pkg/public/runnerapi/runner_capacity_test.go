@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
@@ -56,6 +57,60 @@ func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
 	occupyingTask := newTask(otherFleet.ID)
 	require.NoError(t, occupyingTask.Reserve(db, occupyingRunner.ID))
 	queued := newTask(fleet.ID)
+	attachSession := func(task *models.RunnerTask) *models.FactoryPlanningSession {
+		factoryModel, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		order, err := factoryModel.CreateWorkOrder(db, "Queued planning", "", &resource.User, nil, nil)
+		require.NoError(t, err)
+		canvas, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, resource, factoryModel.ID, "Backlog", "start")
+		run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, entrypoint, models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+		session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+			Repository: "acme/payments", CanvasID: canvas.ID, CanvasRunID: run.ID, WorkOrderID: order.ID,
+		})
+		require.NoError(t, err)
+		event := support.EmitCanvasEventForNode(t, canvas.ID, entrypoint, "default", nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, entrypoint, event.ID, event.ID)
+		require.NoError(t, db.Model(execution).Update("run_id", run.ID).Error)
+		require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, entrypoint, execution.ID, "task_id", task.ID.String()))
+		return session
+	}
+	session := attachSession(queued)
+	otherSession := attachSession(newTask(otherFleet.ID))
+	type boardUpdate struct {
+		orderID string
+		state   string
+	}
+	updates := make(chan boardUpdate, 4)
+	restorePublisher := messages.SetFactoryWorkOrderUpdatedPublisherForTest(func(factoryID, orderID, _ string) error {
+		ownSession := factoryID == session.FactoryID.String() && orderID == session.DraftWorkOrderID.String()
+		queuedSession := factoryID == otherSession.FactoryID.String() && orderID == otherSession.DraftWorkOrderID.String()
+		if !ownSession && !queuedSession {
+			return nil
+		}
+		// Read through another connection: the notification must follow commit.
+		stored, findErr := models.FindRunnerTask(database.DB(t.Context()), queued.ID)
+		if findErr != nil {
+			return findErr
+		}
+		updates <- boardUpdate{orderID: orderID, state: stored.State}
+		return nil
+	})
+	defer restorePublisher()
+	assertUpdates := func(state string) {
+		t.Helper()
+		var orderIDs []string
+		for range 2 {
+			select {
+			case update := <-updates:
+				orderIDs = append(orderIDs, update.orderID)
+				assert.Equal(t, state, update.state)
+			case <-time.After(time.Second):
+				t.Fatal("the planning boards did not receive the runner capacity update")
+			}
+		}
+		assert.ElementsMatch(t, []string{session.DraftWorkOrderID.String(), otherSession.DraftWorkOrderID.String()}, orderIDs)
+	}
 
 	activeStore, err := runnerlogsfs.New(t.TempDir())
 	require.NoError(t, err)
@@ -113,8 +168,17 @@ func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
 		return err == nil && started.State == models.RunnerTaskStateRunning &&
 			started.RunnerID != nil && *started.RunnerID == runner.ID
 	}, time.Second, 10*time.Millisecond)
+	assertUpdates(models.RunnerTaskStateRunning)
 
 	require.NoError(t, socket.WriteJSON(typedMessage{Type: "invalid"}))
 	require.NoError(t, socket.ReadJSON(&invalid))
 	assert.Equal(t, "invalid_message", invalid.Code)
+	requestID := uuid.NewString()
+	require.NoError(t, socket.WriteJSON(completeMessage{
+		Type: messageTypeComplete, RequestID: requestID, TaskID: queued.ID.String(), ExitCode: 0,
+	}))
+	var ack ackMessage
+	require.NoError(t, socket.ReadJSON(&ack))
+	assert.Equal(t, requestID, ack.RequestID)
+	assertUpdates(models.RunnerTaskStateSucceeded)
 }
