@@ -436,7 +436,7 @@ func Test__ListCanvasRuns__StatesAndResultsAreOredWithinWorkflow(t *testing.T) {
 	createRunWithState(t, canvasB.ID, models.CanvasRunStateFinished, models.CanvasRunResultPassed)
 	createRunWithState(t, canvasB.ID, models.CanvasRunStateStarted, "")
 
-	runs, err := models.ListCanvasRuns(canvasA.ID, 50, nil, models.CanvasRunFilters{
+	runs, err := models.ListCanvasRuns(database.DB(t.Context()), canvasA.ID, 50, nil, models.CanvasRunFilters{
 		States:  []string{models.CanvasRunStateStarted},
 		Results: []string{models.CanvasRunResultPassed},
 	})

@@ -731,6 +731,9 @@ message ListRunsRequest {
   repeated CanvasRun.State states = 4;
   repeated CanvasRun.Result results = 5;
   optional bool include_task = 6;
+  // Case-insensitive substring match on the root event's custom run title.
+  string search = 7;
+  repeated string trigger_ids = 8;
 }
 
 message ListRunsResponse {
