@@ -147,43 +147,6 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 	})
 }
 
-func (t *RunnerTask) requestCancelLocked(tx *gorm.DB, now time.Time) error {
-	if t.IsTerminal() {
-		return nil
-	}
-	if (t.State == RunnerTaskStateQueued && t.RunnerID == nil) ||
-		(t.State == RunnerTaskStateReserved && t.DispatchStartedAt == nil && t.StartedAt == nil) {
-		result := tx.Model(t).Where("state IN ? AND dispatch_started_at IS NULL AND started_at IS NULL",
-			[]string{RunnerTaskStateQueued, RunnerTaskStateReserved}).Updates(map[string]any{
-			"state": RunnerTaskStateCanceled, "runner_id": nil, "finished_at": now, "updated_at": now,
-		})
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected != 1 {
-			return ErrRunnerTaskNotReservable
-		}
-		if err := t.CloseQueueInterval(tx, now); err != nil {
-			return err
-		}
-		t.State, t.RunnerID, t.FinishedAt, t.UpdatedAt = RunnerTaskStateCanceled, nil, &now, now
-		return nil
-	}
-	if t.CancelRequestedAt != nil {
-		return nil
-	}
-	result := tx.Model(t).Where("state IN ? AND cancel_requested_at IS NULL", []string{RunnerTaskStateReserved, RunnerTaskStateRunning}).
-		Updates(map[string]any{"cancel_requested_at": now, "updated_at": now})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected != 1 {
-		return ErrRunnerTaskNotCompletable
-	}
-	t.CancelRequestedAt, t.UpdatedAt = &now, now
-	return nil
-}
-
 // Reserve is the shared boundary for automatic assignment and explicit admin
 // reservations. It also works without an outer transaction.
 func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
@@ -214,51 +177,6 @@ func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
 		*t = *current
 		return nil
 	})
-}
-
-func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
-	if t.State != RunnerTaskStateQueued || t.RunnerID != nil || t.CancelRequestedAt != nil {
-		return ErrRunnerTaskNotReservable
-	}
-	if t.Backend != RunnerTaskBackendIntegrated {
-		return ErrRunnerTaskBackendMismatch
-	}
-	if t.FleetID != runner.FleetID {
-		return ErrRunnerTaskFleetMismatch
-	}
-	if runner.State != RunnerStatePending && runner.State != RunnerStateIdle {
-		return ErrRunnerTaskNotReservable
-	}
-	if _, err := runner.FindActiveTask(tx); !errors.Is(err, ErrRunnerTaskNotFound) {
-		if err != nil {
-			return err
-		}
-		return ErrRunnerTaskAlreadyAssigned
-	}
-	if err := checkOrganizationRunnerCapacity(tx, t.OrganizationID); err != nil {
-		return err
-	}
-	now := time.Now()
-	result := tx.Model(t).
-		Where("state = ? AND runner_id IS NULL AND cancel_requested_at IS NULL", RunnerTaskStateQueued).
-		Updates(map[string]any{
-			"runner_id": runner.ID, "state": RunnerTaskStateReserved,
-			"reserved_at": now, "updated_at": now,
-		})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected != 1 {
-		return ErrRunnerTaskNotReservable
-	}
-	if err := t.CloseQueueInterval(tx, now); err != nil {
-		return err
-	}
-	t.RunnerID = &runner.ID
-	t.State = RunnerTaskStateReserved
-	t.ReservedAt = &now
-	t.UpdatedAt = now
-	return nil
 }
 
 func (r *Runner) FindActiveTask(tx *gorm.DB) (*RunnerTask, error) {
@@ -572,6 +490,88 @@ func (t *RunnerTask) FindLifecycle(tx *gorm.DB) (*RunnerTaskLogLifecycle, error)
 		return nil, err
 	}
 	return &lifecycle, nil
+}
+
+func (t *RunnerTask) requestCancelLocked(tx *gorm.DB, now time.Time) error {
+	if t.IsTerminal() {
+		return nil
+	}
+	if (t.State == RunnerTaskStateQueued && t.RunnerID == nil) ||
+		(t.State == RunnerTaskStateReserved && t.DispatchStartedAt == nil && t.StartedAt == nil) {
+		result := tx.Model(t).Where("state IN ? AND dispatch_started_at IS NULL AND started_at IS NULL",
+			[]string{RunnerTaskStateQueued, RunnerTaskStateReserved}).Updates(map[string]any{
+			"state": RunnerTaskStateCanceled, "runner_id": nil, "finished_at": now, "updated_at": now,
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrRunnerTaskNotReservable
+		}
+		if err := t.CloseQueueInterval(tx, now); err != nil {
+			return err
+		}
+		t.State, t.RunnerID, t.FinishedAt, t.UpdatedAt = RunnerTaskStateCanceled, nil, &now, now
+		return nil
+	}
+	if t.CancelRequestedAt != nil {
+		return nil
+	}
+	result := tx.Model(t).Where("state IN ? AND cancel_requested_at IS NULL", []string{RunnerTaskStateReserved, RunnerTaskStateRunning}).
+		Updates(map[string]any{"cancel_requested_at": now, "updated_at": now})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrRunnerTaskNotCompletable
+	}
+	t.CancelRequestedAt, t.UpdatedAt = &now, now
+	return nil
+}
+
+func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
+	if t.State != RunnerTaskStateQueued || t.RunnerID != nil || t.CancelRequestedAt != nil {
+		return ErrRunnerTaskNotReservable
+	}
+	if t.Backend != RunnerTaskBackendIntegrated {
+		return ErrRunnerTaskBackendMismatch
+	}
+	if t.FleetID != runner.FleetID {
+		return ErrRunnerTaskFleetMismatch
+	}
+	if runner.State != RunnerStatePending && runner.State != RunnerStateIdle {
+		return ErrRunnerTaskNotReservable
+	}
+	if _, err := runner.FindActiveTask(tx); !errors.Is(err, ErrRunnerTaskNotFound) {
+		if err != nil {
+			return err
+		}
+		return ErrRunnerTaskAlreadyAssigned
+	}
+	if err := checkOrganizationRunnerCapacity(tx, t.OrganizationID); err != nil {
+		return err
+	}
+	now := time.Now()
+	result := tx.Model(t).
+		Where("state = ? AND runner_id IS NULL AND cancel_requested_at IS NULL", RunnerTaskStateQueued).
+		Updates(map[string]any{
+			"runner_id": runner.ID, "state": RunnerTaskStateReserved,
+			"reserved_at": now, "updated_at": now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrRunnerTaskNotReservable
+	}
+	if err := t.CloseQueueInterval(tx, now); err != nil {
+		return err
+	}
+	t.RunnerID = &runner.ID
+	t.State = RunnerTaskStateReserved
+	t.ReservedAt = &now
+	t.UpdatedAt = now
+	return nil
 }
 
 func (t *RunnerTask) markLogsArchivable(tx *gorm.DB, now time.Time) error {

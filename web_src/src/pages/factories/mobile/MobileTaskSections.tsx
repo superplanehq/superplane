@@ -17,9 +17,15 @@ import { MobileTaskActivity } from "./MobileTaskActivity";
 export function MobileTaskStatus({
   order,
   fixture,
+  canUpdate,
+  onCancelQueuedRunnerJob,
+  cancellingQueueJobIds,
 }: {
   order: FactoriesWorkOrder;
   fixture: Pick<SplitRunFixture, "queuedRunnerJobs" | "title">;
+  canUpdate: boolean;
+  onCancelQueuedRunnerJob?: (orderId: string, queueId: string) => Promise<void>;
+  cancellingQueueJobIds?: ReadonlySet<string>;
 }) {
   const queuedRunnerJobs = fixture.queuedRunnerJobs ?? [];
   const statusMeta = getWorkOrderDisplayStatusMeta(getWorkOrderDisplayStatus(order));
@@ -43,8 +49,10 @@ export function MobileTaskStatus({
           queue={queue}
           orderId={order.id ?? ""}
           title={fixture.title}
-          canCancel={false}
-          canDispatch={false}
+          canCancel={canUpdate}
+          canDispatch={canUpdate}
+          onCancel={onCancelQueuedRunnerJob}
+          cancellingJobIds={cancellingQueueJobIds}
         />
       ))}
     </>

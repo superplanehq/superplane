@@ -32,6 +32,8 @@ const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading
 
 const {
   onDispatch,
+  onCancelQueuedRunnerJob,
+  cancellingQueueJobIds,
   dispatchingIds,
   canUpdateWorkOrder,
   runnerModelCalls,
@@ -42,6 +44,8 @@ const {
   liveCanvas,
 } = vi.hoisted(() => ({
   onDispatch: vi.fn(),
+  onCancelQueuedRunnerJob: vi.fn(),
+  cancellingQueueJobIds: { current: new Set<string>() },
   dispatchingIds: { current: new Set<string>() },
   canUpdateWorkOrder: { current: true },
   runnerModelCalls: [] as unknown[][],
@@ -100,6 +104,8 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
     dispatchingOrderIds: dispatchingIds.current,
     isAssigneesSaving: false,
     onDispatch,
+    onCancelQueuedRunnerJob,
+    cancellingQueueJobIds: cancellingQueueJobIds.current,
     onAssigneesSave: vi.fn(),
   }),
 }));
@@ -338,6 +344,58 @@ describe("MobileTaskDetailPage back link", () => {
 });
 
 const PLAN_LINE_NAME = "plan-and-implement";
+
+describe("MobileTaskDetailPage queued runner jobs", () => {
+  const queuedRunnerJobs = [
+    { id: "job-1", nodeName: "Analyze", position: 1 },
+    { id: "job-2", nodeName: "Verify", position: 2 },
+  ];
+  beforeEach(() => {
+    resetPlanningSession();
+    onCancelQueuedRunnerJob.mockReset();
+    cancellingQueueJobIds.current = new Set();
+    canUpdateWorkOrder.current = true;
+  });
+
+  for (const planning of [false, true]) {
+    it(`cancels the selected runner job with planning ${planning ? "on" : "off"}`, async () => {
+      const order = { ...DRAFT_WORK_ORDER, queuedRunnerJobs };
+      useWorkOrder.mockReturnValue({ data: order, isLoading: false, isError: false });
+      renderTask(
+        `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${order.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+        factoryWithPlanning(REFUND_FACTORY, { enabled: planning, clarity: planning, confidence: planning }),
+      );
+      if (planning) await screen.findByTestId("split-run-intent-composer");
+
+      await userEvent
+        .setup()
+        .click(await screen.findByRole("button", { name: `Cancel Verify runner job for ${order.title}` }));
+
+      expect(onCancelQueuedRunnerJob).toHaveBeenCalledTimes(1);
+      expect(onCancelQueuedRunnerJob).toHaveBeenCalledWith(order.id, "job-2");
+    });
+  }
+
+  it("disables only the job whose cancellation is pending", () => {
+    cancellingQueueJobIds.current = new Set(["job-1"]);
+    const order = { ...RUNNING_WORK_ORDER, queuedRunnerJobs };
+    useWorkOrder.mockReturnValue({ data: order, isLoading: false, isError: false });
+    renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${order.number}`);
+
+    expect(screen.getByRole("button", { name: `Cancel Analyze runner job for ${order.title}` })).toBeDisabled();
+    expect(screen.getByRole("button", { name: `Cancel Verify runner job for ${order.title}` })).toBeEnabled();
+  });
+
+  it("shows the queue without cancellation for a read-only user", () => {
+    canUpdateWorkOrder.current = false;
+    const order = { ...RUNNING_WORK_ORDER, queuedRunnerJobs };
+    useWorkOrder.mockReturnValue({ data: order, isLoading: false, isError: false });
+    renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${order.number}`);
+
+    expect(screen.getByText("Analyze: Runner queued #1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Cancel .*runner job/ })).not.toBeInTheDocument();
+  });
+});
 
 async function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?lineId=${REFUND_LINE_PLAN_ID}`) {
   useWorkOrder.mockReturnValue({ data: DRAFT_WORK_ORDER, isLoading: false, isError: false });

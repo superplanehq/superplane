@@ -249,8 +249,8 @@ func (c *RunnerTaskContext) withCredentialRefreshes(payload []byte) ([]byte, err
 }
 
 // RunnerAttachmentScope derives authorization from the producing run, including
-// a factory step ancestor for nested Run App invocations. File rows never grant
-// their own workspace or task scope.
+// indexed task links and ancestors for nested Run App invocations.
+// File rows never grant their own workspace or task scope.
 func RunnerAttachmentScope(tx *gorm.DB, organizationID, runID uuid.UUID) (uuid.UUID, uuid.UUID, error) {
 	if runID == uuid.Nil {
 		return uuid.Nil, uuid.Nil, models.ErrFileForeignReference
@@ -271,7 +271,15 @@ func RunnerAttachmentScope(tx *gorm.DB, organizationID, runID uuid.UUID) (uuid.U
 	}
 	execution, err := models.FindWorkOrderExecutionForRun(tx, runID)
 	if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-		return *canvas.FactoryID, uuid.Nil, nil
+		tasks, err := models.ResolveCanvasRunTasks(tx, canvas, []models.CanvasRun{*run})
+		if err != nil {
+			return uuid.Nil, uuid.Nil, err
+		}
+		task, ok := tasks[runID]
+		if !ok {
+			return *canvas.FactoryID, uuid.Nil, nil
+		}
+		return runnerAttachmentScopeForOrder(tx, organizationID, *canvas.FactoryID, task.ID)
 	}
 	if err != nil {
 		return uuid.Nil, uuid.Nil, err
@@ -282,14 +290,18 @@ func RunnerAttachmentScope(tx *gorm.DB, organizationID, runID uuid.UUID) (uuid.U
 	if execution.FactoryID != *canvas.FactoryID {
 		return *canvas.FactoryID, uuid.Nil, nil
 	}
-	order, err := models.FindUnscopedWorkOrder(tx, execution.WorkOrderID)
+	return runnerAttachmentScopeForOrder(tx, organizationID, *canvas.FactoryID, execution.WorkOrderID)
+}
+
+func runnerAttachmentScopeForOrder(tx *gorm.DB, organizationID, factoryID, orderID uuid.UUID) (uuid.UUID, uuid.UUID, error) {
+	order, err := models.FindUnscopedWorkOrder(tx, orderID)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, err
 	}
-	if order.OrganizationID != organizationID || order.FactoryID != *canvas.FactoryID {
+	if order.OrganizationID != organizationID || order.FactoryID != factoryID {
 		return uuid.Nil, uuid.Nil, models.ErrFileForeignReference
 	}
-	return *canvas.FactoryID, order.ID, nil
+	return factoryID, order.ID, nil
 }
 
 func walkCredentialStrings(value any, path []string, visit func([]string, string)) {

@@ -137,6 +137,7 @@ type MobileTaskModel = {
     ReturnType<typeof useSplitRunWorkOrderEdits>,
     "owner" | "assigneeIds" | "canEdit" | "ownerBusy" | "saveOwner"
   >;
+  queueActions: Pick<ReturnType<typeof useWorkOrderCardActions>, "onCancelQueuedRunnerJob" | "cancellingQueueJobIds">;
 };
 
 /** Loads everything the task screen shows and wires the footer actions. */
@@ -217,6 +218,7 @@ function useMobileTaskModel(
     columnAppRunQueries: columnAppCheckRuns.queries,
     footerActions,
     ownerEdits,
+    queueActions: cardActions,
   };
 }
 
@@ -284,6 +286,8 @@ function LoadedMobileTask({
                 fixture={fixture}
                 organizationId={organizationId}
                 ownerEdits={model.ownerEdits}
+                canUpdate={model.canUpdate}
+                queueActions={model.queueActions}
               />
             </div>
           }
@@ -301,6 +305,8 @@ function LoadedMobileTask({
           fixture={fixture}
           organizationId={organizationId}
           ownerEdits={model.ownerEdits}
+          canUpdate={model.canUpdate}
+          queueActions={model.queueActions}
         />
         {review(true)}
         <Section title={MOBILE_TASK_COPY.description}>
@@ -433,11 +439,15 @@ function MobileTaskHeader({
   fixture,
   organizationId,
   ownerEdits,
+  canUpdate,
+  queueActions,
 }: {
   order: FactoriesWorkOrder;
   fixture: SplitRunFixture;
   organizationId: string;
   ownerEdits: MobileTaskModel["ownerEdits"];
+  canUpdate: boolean;
+  queueActions: MobileTaskModel["queueActions"];
 }) {
   const { factoryKey } = useFactoriesLayout();
   const identifier = fixture.identifier?.trim() || formatWorkOrderIdentifier(factoryKey, order.number);
@@ -450,7 +460,7 @@ function MobileTaskHeader({
             {identifier}
           </span>
         ) : null}
-        <MobileTaskStatus order={order} fixture={fixture} />
+        <MobileTaskStatus order={order} fixture={fixture} canUpdate={canUpdate} {...queueActions} />
       </div>
       <h1 className="text-[20px] leading-snug font-semibold tracking-[-0.02em] text-foreground break-words">
         {fixture.title}

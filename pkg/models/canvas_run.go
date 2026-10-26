@@ -914,6 +914,16 @@ func ListChildRunsByParentExecutions(tx *gorm.DB, parentWorkflowID uuid.UUID, pa
 	return runs, nil
 }
 
+func FindChildRunByParentExecution(tx *gorm.DB, parentWorkflowID, parentExecutionID, runID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+	err := tx.Where("id = ? AND parent_execution_id = ? AND parent_workflow_id = ?", runID, parentExecutionID, parentWorkflowID).
+		First(&run).Error
+	if err != nil {
+		return nil, err
+	}
+	return &run, nil
+}
+
 type RunCancellationDrainResult struct {
 	RequestedExecutionIDs []uuid.UUID
 	DeletedQueueItems     []CanvasNodeQueueItem

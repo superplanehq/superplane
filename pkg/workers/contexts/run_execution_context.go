@@ -74,8 +74,8 @@ func (c *RunExecutionContext) QueueWait(rawID string, from, until time.Time) (*c
 	if err != nil {
 		return nil, fmt.Errorf("invalid child run ID: %w", err)
 	}
-	var run models.CanvasRun
-	if err := c.tx.Where("id = ? AND parent_execution_id = ? AND parent_workflow_id = ?", id, c.execution.ID, c.canvas.ID).First(&run).Error; err != nil {
+	run, err := models.FindChildRunByParentExecution(c.tx, c.canvas.ID, c.execution.ID, id)
+	if err != nil {
 		return nil, err
 	}
 	if run.State == models.CanvasRunStateFinished {

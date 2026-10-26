@@ -149,13 +149,6 @@ func FindRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
 	return &runner, nil
 }
 
-func runnerSummaryQuery(tx *gorm.DB) *gorm.DB {
-	return tx.Model(&Runner{}).Select(`runners.*, (
-		SELECT id FROM runner_tasks WHERE runner_id = runners.id AND state IN ('reserved', 'running')
-		ORDER BY reserved_at, id LIMIT 1
-	) AS reserved_task_id`)
-}
-
 func LockRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
 	return FindRunner(
 		tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}),
@@ -513,6 +506,48 @@ func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
 	return tx.Transaction(func(tx *gorm.DB) error { return r.terminate(tx, reason) })
 }
 
+// ReleaseUndelivered returns certainly-unsent work to the queue. The runner
+// must be locked by the caller so cancellation and dispatch cannot race it.
+func (t *RunnerTask) ReleaseUndelivered(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {
+	if t.RunnerID == nil || *t.RunnerID != runnerID || t.State != RunnerTaskStateReserved ||
+		t.DispatchStartedAt != nil || t.StartedAt != nil {
+		return ErrRunnerTaskNotReservable
+	}
+	updates := map[string]any{
+		"runner_id": nil, "reserved_at": nil, "updated_at": now,
+		"state": RunnerTaskStateQueued,
+	}
+	if t.CancelRequestedAt != nil {
+		updates["state"] = RunnerTaskStateCanceled
+		updates["finished_at"] = now
+	}
+	result := tx.Model(t).Where("runner_id = ? AND state = ? AND dispatch_started_at IS NULL AND started_at IS NULL",
+		runnerID, RunnerTaskStateReserved).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrRunnerTaskNotReservable
+	}
+	t.RunnerID = nil
+	t.ReservedAt = nil
+	t.UpdatedAt = now
+	if t.CancelRequestedAt != nil {
+		t.State = RunnerTaskStateCanceled
+		t.FinishedAt = &now
+		return t.CloseQueueInterval(tx, now)
+	}
+	t.State = RunnerTaskStateQueued
+	return t.OpenQueueInterval(tx, now)
+}
+
+func runnerSummaryQuery(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&Runner{}).Select(`runners.*, (
+		SELECT id FROM runner_tasks WHERE runner_id = runners.id AND state IN ('reserved', 'running')
+		ORDER BY reserved_at, id LIMIT 1
+	) AS reserved_task_id`)
+}
+
 func (r *Runner) terminate(tx *gorm.DB, reason string) error {
 	current, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), r.ID)
 	if err != nil {
@@ -599,39 +634,4 @@ func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) e
 		return err
 	}
 	return task.ReleaseUndelivered(tx, runnerID, now)
-}
-
-// ReleaseUndelivered returns certainly-unsent work to the queue. The runner
-// must be locked by the caller so cancellation and dispatch cannot race it.
-func (t *RunnerTask) ReleaseUndelivered(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {
-	if t.RunnerID == nil || *t.RunnerID != runnerID || t.State != RunnerTaskStateReserved ||
-		t.DispatchStartedAt != nil || t.StartedAt != nil {
-		return ErrRunnerTaskNotReservable
-	}
-	updates := map[string]any{
-		"runner_id": nil, "reserved_at": nil, "updated_at": now,
-		"state": RunnerTaskStateQueued,
-	}
-	if t.CancelRequestedAt != nil {
-		updates["state"] = RunnerTaskStateCanceled
-		updates["finished_at"] = now
-	}
-	result := tx.Model(t).Where("runner_id = ? AND state = ? AND dispatch_started_at IS NULL AND started_at IS NULL",
-		runnerID, RunnerTaskStateReserved).Updates(updates)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected != 1 {
-		return ErrRunnerTaskNotReservable
-	}
-	t.RunnerID = nil
-	t.ReservedAt = nil
-	t.UpdatedAt = now
-	if t.CancelRequestedAt != nil {
-		t.State = RunnerTaskStateCanceled
-		t.FinishedAt = &now
-		return t.CloseQueueInterval(tx, now)
-	}
-	t.State = RunnerTaskStateQueued
-	return t.OpenQueueInterval(tx, now)
 }
