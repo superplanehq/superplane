@@ -24,7 +24,7 @@ type requestLogFields struct {
 	organizationID        string
 	userID                string
 	accountID             string
-	impersonatorAccountID string
+	supportAdminAccountID string
 }
 
 func withRequestLogFields(r *http.Request, requestID string) *http.Request {
@@ -56,8 +56,8 @@ func SetRequestLogUser(ctx context.Context, user *models.User) {
 	}
 }
 
-// requestLogAccountIdentity keeps the impersonated account as account_id
-// and the admin account as impersonator_account_id.
+// requestLogAccountIdentity keeps the support session target account as account_id
+// and the admin account as support_admin_account_id.
 func requestLogAccountIdentity(account, effective *models.Account, adminAccountID string) (*models.Account, string) {
 	if effective == nil {
 		return account, ""
@@ -79,14 +79,14 @@ func SetRequestLogAccount(ctx context.Context, account *models.Account) {
 	fields.accountID = uuidString(account.ID)
 }
 
-// SetRequestLogImpersonator records the admin account that started impersonation.
-func SetRequestLogImpersonator(ctx context.Context, adminAccountID string) {
+// SetRequestLogSupportAdmin records the admin account that started the support session.
+func SetRequestLogSupportAdmin(ctx context.Context, adminAccountID string) {
 	fields := requestLogFieldsFrom(ctx)
 	if fields == nil {
 		return
 	}
 
-	fields.impersonatorAccountID = strings.TrimSpace(adminAccountID)
+	fields.supportAdminAccountID = strings.TrimSpace(adminAccountID)
 }
 
 // RequestIDFromContext returns the id assigned to this HTTP request.

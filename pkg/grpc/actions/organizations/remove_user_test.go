@@ -13,12 +13,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/ee/billing/entitlements"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	polartest "github.com/superplanehq/superplane/ee/billing/testsupport/polar"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -117,7 +118,7 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			r := support.Setup(t)
 			t.Cleanup(r.Close)
-			t.Setenv(models.BillingEnabledEnv, "yes")
+			t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			t.Cleanup(cancel)
 			ctx = authentication.SetUserIdInMetadata(ctx, r.User.String())
@@ -125,7 +126,7 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 			require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 			setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(4))
 			periodEnd := time.Now().Add(30 * 24 * time.Hour)
-			require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
+			require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
 				"polar_subscription_id": "sub_" + uuid.NewString(),
 				"current_period_end":    periodEnd,
 			}).Error)
@@ -136,19 +137,18 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 			replacement, err := models.CreateAccount("Replacement member", uuid.NewString()+"@example.com")
 			require.NoError(t, err)
 			orderID := uuid.NewString()
-			_, err = models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(2500), orderID)
+			_, err = billingmodels.AddPolarLLMCreditGrant(db, r.Organization.ID, billingmodels.CentsToMicros(2500), orderID)
 			require.NoError(t, err)
-			_, err = models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(500), orderID, uuid.NewString())
+			_, err = billingmodels.AddPolarLLMCreditRefund(db, r.Organization.ID, billingmodels.CentsToMicros(500), orderID, uuid.NewString())
 			require.NoError(t, err)
-			billing, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			billing, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 			require.NoError(t, err)
 			require.NotNil(t, billing)
-			credits, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
+			credits, err := billingmodels.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 			require.NoError(t, err)
 
-			// Removal and acceptance schedule the renewal seat count in the
-			// background. Polar is down, so that schedule fails and changes
-			// nothing. Seat reuse must not wait for it.
+			// Polar is down. Removal and acceptance never call it, so seat
+			// reuse neither waits for Polar nor changes the subscription.
 			var seatUpdates atomic.Int32
 			release := make(chan struct{})
 			polar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -166,11 +166,10 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 			}))
 			t.Cleanup(func() {
 				close(release)
-				seatrenewal.Wait()
 				polar.Close()
 				assert.Zero(t, seatUpdates.Load(), "seat reuse must not change the Polar subscription")
 			})
-			usePolarTestServer(t, polar)
+			polartest.UseServer(t, polar)
 
 			assertState := func(stage string, occupied, available, pending, invitable int) {
 				t.Helper()
@@ -181,12 +180,12 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 				assert.Equal(t, seatQuantity(available), seats.Available, stage)
 				assert.Equal(t, pending, seats.PendingInvitations, stage)
 				assert.Equal(t, seatQuantity(invitable), seats.Invitable, stage)
-				saved, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+				saved, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 				require.NoError(t, err, stage)
 				require.NotNil(t, saved, stage)
 				assert.Equal(t, billing.PurchasedSeats, saved.PurchasedSeats, stage)
 				assert.Equal(t, billing.CurrentPeriodEnd, saved.CurrentPeriodEnd, stage)
-				savedCredits, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
+				savedCredits, err := billingmodels.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
 				require.NoError(t, err, stage)
 				assert.Equal(t, credits, savedCredits, "credit and refund records must not change: %s", stage)
 				assert.Zero(t, seatUpdates.Load(), stage)
@@ -227,7 +226,7 @@ func TestRemoveUserHandlesPendingInvitationsOfInviter(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
-			t.Setenv(models.BillingEnabledEnv, "no")
+			t.Setenv(billingmodels.BillingEnabledEnv, "no")
 			orgID := r.Organization.ID.String()
 			s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 			inviter := createInvitationAdmin(t, r, "inviter@example.com")
@@ -264,7 +263,7 @@ func TestRemoveUserHandlesPendingInvitationsOfInviter(t *testing.T) {
 func TestRemoveGroupAdminThenReinviteAsOperatorGrantsOnlyOperator(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 	account, err := models.CreateAccount("Group admin", "group-admin@example.com")
@@ -337,7 +336,7 @@ func (a failingGrantRemovalAuthorization) RemoveUserFromOrganizationInTransactio
 func TestRemoveUserRollsBackRolesMembershipAndInvitations(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	orgID := r.Organization.ID.String()
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 	member := createInvitationAdmin(t, r, "member@example.com")

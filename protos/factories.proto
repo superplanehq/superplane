@@ -196,6 +196,53 @@ service Factories {
     };
   }
 
+  rpc CreateFactoryCustomAutomation(CreateFactoryCustomAutomationRequest) returns (CreateFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/custom-automations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create custom automation";
+      description: "Creates a managed Verify-column automation with prompt and bash steps";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactoryCustomAutomation(DescribeFactoryCustomAutomationRequest) returns (DescribeFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe custom automation";
+      description: "Returns the focused settings for a managed Verify-column automation";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryCustomAutomation(UpdateFactoryCustomAutomationRequest) returns (UpdateFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update custom automation";
+      description: "Updates the focused settings and managed graph for a Verify-column automation";
+      tags: "Factory";
+    };
+  }
+
+  rpc RunFactoryCustomAutomation(RunFactoryCustomAutomationRequest) returns (RunFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}:run"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Run custom automation";
+      description: "Starts one managed Verify-column automation for one task";
+      tags: "Factory";
+    };
+  }
+
   rpc PreviewFactorySchedule(PreviewFactoryScheduleRequest) returns (PreviewFactoryScheduleResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/scheduled-intake/preview"
@@ -1216,6 +1263,82 @@ message CreateFactoryAutomationRequest {
 
 message CreateFactoryAutomationResponse {
   Factory.Automation automation = 1;
+}
+
+message FactoryCustomAutomation {
+  enum StartMode {
+    START_MODE_UNSPECIFIED = 0;
+    START_MODE_MANUAL = 1;
+    START_MODE_AUTOMATIC = 2;
+  }
+
+  message Step {
+    enum Type {
+      TYPE_UNSPECIFIED = 0;
+      TYPE_PROMPT = 1;
+      TYPE_BASH = 2;
+    }
+
+    string name = 1;
+    Type type = 2;
+    string prompt = 3;
+    string command = 4;
+    string working_directory = 5;
+    repeated string secrets = 6;
+  }
+
+  message Settings {
+    StartMode start_mode = 1;
+    FactoryAppTemplateAgent agent = 2;
+    repeated Step steps = 3;
+    string icon = 4;
+    int32 execution_timeout_seconds = 5;
+  }
+
+  Factory.Automation automation = 1;
+  Settings settings = 2;
+  string provider = 3;
+}
+
+message CreateFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string name = 2;
+  FactoryCustomAutomation.Settings settings = 3;
+}
+
+message CreateFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
+}
+
+message DescribeFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+}
+
+message DescribeFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
+}
+
+message UpdateFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+  string name = 3;
+  FactoryCustomAutomation.Settings settings = 4;
+}
+
+message UpdateFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
+}
+
+message RunFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+  string work_order_id = 3;
+}
+
+message RunFactoryCustomAutomationResponse {
+  string run_id = 1;
+  string event_id = 2;
 }
 
 message PreviewFactoryScheduleRequest {
@@ -3003,6 +3126,10 @@ message PlanningSessionSummary {
   string wait_state = 3;
   string execution_id = 4;
   PlanningSessionSurvey survey = 5;
+  // Integrated runner task state, independent of the agent node state.
+  string runner_state = 6;
+  // "parallelism_limit" while a queued task waits for organization capacity.
+  string queue_reason = 7;
 }
 
 message PlanningSession {
@@ -3021,6 +3148,10 @@ message PlanningSession {
   string selectable_model_key = 13;
   PlanningSessionKind kind = 14;
   repeated PlanningSessionActivity activities = 15;
+  // Integrated runner task state, independent of the agent node state.
+  string runner_state = 16;
+  // "parallelism_limit" while a queued task waits for organization capacity.
+  string queue_reason = 17;
 }
 
 enum PlanningSessionKind {

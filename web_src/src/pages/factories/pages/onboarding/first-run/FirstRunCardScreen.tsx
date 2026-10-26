@@ -1,4 +1,5 @@
 import type { OrganizationsBillingPlanOption } from "@/api-client";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
@@ -47,7 +48,8 @@ function PlanChoice({
     minimumFractionDigits: 0,
   });
   return (
-    <label
+    <Label
+      htmlFor={`onboarding-plan-${plan.key}`}
       className={cn(
         "relative flex min-w-0 cursor-pointer flex-col rounded-lg border p-4 transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
         selected ? "border-foreground bg-muted" : "border-border hover:border-muted-foreground",
@@ -55,6 +57,7 @@ function PlanChoice({
       )}
     >
       <Input
+        id={`onboarding-plan-${plan.key}`}
         type="radio"
         name="onboarding-plan"
         value={plan.key}
@@ -83,7 +86,7 @@ function PlanChoice({
       <span className="mt-3 border-t border-border pt-3 text-[13px] font-medium">
         {starter ? copy.starterCapacity : copy.paygCapacity}
       </span>
-    </label>
+    </Label>
   );
 }
 

@@ -14,9 +14,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -408,7 +408,7 @@ func TestOrganizationAuthMiddleware_APIKeyWithDeletedCreator(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, res.Code)
 }
 
-func TestOrganizationAuthMiddleware_BlockedImpersonationTargetFallsBackToAdmin(t *testing.T) {
+func TestOrganizationAuthMiddleware_BlockedSupportSessionTargetFallsBackToAdmin(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
 	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
@@ -420,7 +420,7 @@ func TestOrganizationAuthMiddleware_BlockedImpersonationTargetFallsBackToAdmin(t
 
 	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
-	impersonationToken, err := impersonation.GenerateToken(signer, r.Account.ID.String(), targetAccount.ID.String())
+	supportSessionToken, err := supportsession.GenerateToken(signer, r.Account.ID.String(), targetAccount.ID.String())
 	require.NoError(t, err)
 	require.NoError(t, targetAccount.Block(database.Conn(), time.Now()))
 
@@ -433,17 +433,17 @@ func TestOrganizationAuthMiddleware_BlockedImpersonationTargetFallsBackToAdmin(t
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: accountToken})
-	req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impersonationToken})
+	req.AddCookie(&http.Cookie{Name: "support_session_token", Value: supportSessionToken})
 	req.Header.Set("x-organization-id", r.Organization.ID.String())
 
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusNoContent, res.Code)
-	assertImpersonationCookieCleared(t, res)
+	assertSupportSessionCookieCleared(t, res)
 }
 
-func TestAccountAuthMiddleware_BlockedImpersonationTargetClearsCookie(t *testing.T) {
+func TestAccountAuthMiddleware_BlockedSupportSessionTargetClearsCookie(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
 	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
@@ -453,7 +453,7 @@ func TestAccountAuthMiddleware_BlockedImpersonationTargetClearsCookie(t *testing
 
 	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
-	impersonationToken, err := impersonation.GenerateToken(signer, r.Account.ID.String(), targetAccount.ID.String())
+	supportSessionToken, err := supportsession.GenerateToken(signer, r.Account.ID.String(), targetAccount.ID.String())
 	require.NoError(t, err)
 	require.NoError(t, targetAccount.Block(database.Conn(), time.Now()))
 
@@ -466,13 +466,13 @@ func TestAccountAuthMiddleware_BlockedImpersonationTargetClearsCookie(t *testing
 
 	req := httptest.NewRequest(http.MethodGet, "/account", nil)
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: accountToken})
-	req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impersonationToken})
+	req.AddCookie(&http.Cookie{Name: "support_session_token", Value: supportSessionToken})
 
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusNoContent, res.Code)
-	assertImpersonationCookieCleared(t, res)
+	assertSupportSessionCookieCleared(t, res)
 }
 
 func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
@@ -591,15 +591,15 @@ func mintTestAccountToken(t *testing.T, signer *jwt.Signer, accountID string, is
 	return tokenString
 }
 
-func assertImpersonationCookieCleared(t *testing.T, recorder *httptest.ResponseRecorder) {
+func assertSupportSessionCookieCleared(t *testing.T, recorder *httptest.ResponseRecorder) {
 	t.Helper()
 
 	for _, cookie := range recorder.Result().Cookies() {
-		if cookie.Name == "impersonation_token" {
+		if cookie.Name == "support_session_token" {
 			assert.Less(t, cookie.MaxAge, 0)
 			return
 		}
 	}
 
-	assert.Fail(t, "impersonation cookie was not cleared")
+	assert.Fail(t, "support session cookie was not cleared")
 }

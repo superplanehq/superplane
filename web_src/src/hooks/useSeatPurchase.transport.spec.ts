@@ -3,111 +3,10 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { OrganizationsSeatPurchase } from "@/api-client";
 import { client } from "@/api-client/client.gen";
 import { useOrganizationBilling } from "./useOrganizationBilling";
 import { useSeatPurchase } from "./useSeatPurchase";
-
-type PurchaseBody = { additionalSeats?: number; expectedPurchasedSeats?: number; operationKey?: string };
-// A number is an HTTP status that the server returns before it processes the request.
-type Fault = "lost request" | "lost response" | number;
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// FakeBillingServer follows the purchase contract of the server: the
-// operation key with the same request replays the stored purchase, also after
-// a renewal. The same key with another request gets HTTP 412, a missing key
-// HTTP 400, and a stale baseline HTTP 409.
-class FakeBillingServer {
-  purchasedSeats = 4;
-  periodStart = new Date(Date.now() - 10 * DAY_MS).toISOString();
-  periodEnd = new Date(Date.now() + 20 * DAY_MS).toISOString();
-  lastSeatPurchase: OrganizationsSeatPurchase | undefined;
-  charges = 0;
-  billingUnavailable = false;
-  purchaseRequests: PurchaseBody[] = [];
-  private nextFault: Fault | undefined;
-  private operations = new Map<string, { fingerprint: string; purchase: OrganizationsSeatPurchase }>();
-
-  failNextPurchase(fault: Fault) {
-    this.nextFault = fault;
-  }
-
-  renew() {
-    this.periodStart = this.periodEnd;
-    this.periodEnd = new Date(Date.parse(this.periodEnd) + 30 * DAY_MS).toISOString();
-    this.purchasedSeats = 4;
-  }
-
-  billing() {
-    return {
-      purchasedSeats: this.purchasedSeats,
-      purchasableSeats: 10,
-      currentPeriodStart: this.periodStart,
-      currentPeriodEnd: this.periodEnd,
-      lastSeatPurchase: this.lastSeatPurchase,
-    };
-  }
-
-  fetch: typeof fetch = async (input) => {
-    const request = input instanceof Request ? input : new Request(input);
-    const path = new URL(request.url).pathname;
-    if (path.endsWith("/seats/preview")) {
-      const { additionalSeats = 0 } = (await request.json()) as PurchaseBody;
-      return this.respond(200, {
-        purchasedSeats: this.purchasedSeats,
-        targetSeats: this.purchasedSeats + additionalSeats,
-        proratedChargeCents: "500",
-        periodStart: new Date().toISOString(),
-        periodEnd: this.periodEnd,
-      });
-    }
-    if (path.endsWith("/seats/purchase")) return this.purchase((await request.json()) as PurchaseBody);
-    if (path.endsWith("/billing/sync") || path.endsWith("/billing")) {
-      if (this.billingUnavailable) throw new TypeError("Failed to fetch");
-      return this.respond(200, this.billing());
-    }
-    throw new Error(`Unexpected billing request: ${path}`);
-  };
-
-  private purchase(body: PurchaseBody) {
-    this.purchaseRequests.push(body);
-    const fault = this.nextFault;
-    this.nextFault = undefined;
-    if (fault === "lost request") throw new TypeError("Failed to fetch");
-    if (typeof fault === "number") return this.respond(fault, { message: "The purchase was not processed." });
-    const response = this.process(body);
-    if (fault === "lost response") throw new TypeError("Failed to fetch");
-    return response;
-  }
-
-  private process({ additionalSeats, expectedPurchasedSeats, operationKey }: PurchaseBody) {
-    if (!operationKey || !additionalSeats) return this.respond(400, { message: "The request is not valid." });
-    const fingerprint = `${additionalSeats}:${expectedPurchasedSeats}`;
-    const stored = this.operations.get(operationKey);
-    if (stored && stored.fingerprint !== fingerprint)
-      return this.respond(412, { message: "The operation key belongs to another purchase." });
-    if (stored) return this.respond(200, { purchase: stored.purchase, billing: this.billing() });
-    if (expectedPurchasedSeats !== this.purchasedSeats)
-      return this.respond(409, { message: "The seat count changed. Preview this purchase again." });
-    this.charges += 1;
-    const purchase = {
-      id: `purchase-${this.charges}`,
-      status: "succeeded",
-      fromSeats: this.purchasedSeats,
-      toSeats: this.purchasedSeats + additionalSeats,
-      createdAt: new Date().toISOString(),
-    };
-    this.purchasedSeats = purchase.toSeats;
-    this.lastSeatPurchase = purchase;
-    this.operations.set(operationKey, { fingerprint, purchase });
-    return this.respond(200, { purchase, billing: this.billing() });
-  }
-
-  private respond(status: number, body: unknown) {
-    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-  }
-}
+import { DAY_MS, FakeBillingServer } from "./useSeatPurchase.transport.spec.fixtures";
 
 // Each mount has its own query cache, like a page load.
 function mountPage(organizationId = "org-1") {
@@ -144,6 +43,34 @@ async function previewAndConfirm(page: ReturnType<typeof mountPage>) {
   await act(async () => page.result.current.confirm());
 }
 
+// This tab cannot write storage until unblockWrites. The returned storage is
+// the shared same-origin storage that other tabs still write.
+function blockStorageWrites() {
+  const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+  const localStorage = window.localStorage;
+  let writesBlocked = true;
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: localStorage.getItem.bind(localStorage),
+      removeItem: localStorage.removeItem.bind(localStorage),
+      setItem: (key: string, value: string) => {
+        if (writesBlocked) throw new DOMException("Storage is full.", "QuotaExceededError");
+        localStorage.setItem(key, value);
+      },
+    },
+  });
+  return {
+    localStorage,
+    unblockWrites: () => {
+      writesBlocked = false;
+    },
+    restore: () => {
+      if (descriptor) Object.defineProperty(window, "localStorage", descriptor);
+    },
+  };
+}
+
 describe("seat purchase HTTP recovery", () => {
   const previousConfig = client.getConfig();
   let server: FakeBillingServer;
@@ -170,12 +97,75 @@ describe("seat purchase HTTP recovery", () => {
     await act(async () => page.result.current.confirm());
     expect(page.result.current.preview).toBeUndefined();
     expect(server.purchaseRequests).toEqual([
-      { additionalSeats: 1, expectedPurchasedSeats: 4, operationKey: expect.stringMatching(/^[0-9a-f-]{36}$/) },
+      {
+        additionalSeats: 1,
+        expectedPurchasedSeats: 4,
+        operationKey: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        ...server.confirmedContext(),
+      },
     ]);
     await advance(300);
     expect(page.result.current.preview?.purchasedSeats).toBe(7);
     expect(page.result.current.canConfirm).toBe(true);
     expect(server.purchaseRequests).toHaveLength(1);
+  });
+
+  it("sends the exact subscription and billing period of the confirmed preview", async () => {
+    // Microseconds show that the browser sends the server value unchanged.
+    server.periodStart = new Date(Date.now() - 10 * DAY_MS).toISOString().replace("Z", "456Z");
+    const page = await loadPage();
+    await previewAndConfirm(page);
+    expect(server.purchaseRequests).toEqual([
+      {
+        additionalSeats: 1,
+        expectedPurchasedSeats: 4,
+        operationKey: expect.any(String),
+        confirmedSubscriptionId: "sub_team",
+        confirmedPeriodStart: server.periodStart,
+        confirmedPeriodEnd: server.periodEnd,
+      },
+    ]);
+    expect(server.charges).toBe(1);
+  });
+
+  it("does not confirm a preview without its subscription and billing period", async () => {
+    server.previewOmitsBinding = true;
+    const page = await loadPage();
+    act(() => page.result.current.setOpen(true));
+    await advance(300);
+    expect(page.result.current.canConfirm).toBe(false);
+    expect(page.result.current.previewError).toBe("SuperPlane could not estimate this purchase. Try again.");
+    await act(async () => page.result.current.confirm());
+    expect(server.purchaseRequests).toHaveLength(0);
+  });
+
+  it.each([
+    { change: "renewal with the same seat count", apply: (fake: FakeBillingServer) => fake.renew() },
+    {
+      change: "replacement subscription",
+      apply: (fake: FakeBillingServer) => {
+        fake.subscriptionId = "sub_replacement";
+      },
+    },
+  ])("uses HTTP 409 after a $change to require a new preview and confirmation", async ({ apply }) => {
+    const page = await loadPage();
+    act(() => page.result.current.setOpen(true));
+    await advance(300);
+    const stale = server.confirmedContext();
+    apply(server);
+    await act(async () => page.result.current.confirm());
+    expect(server.purchaseRequests).toEqual([expect.objectContaining(stale)]);
+    expect(server.charges).toBe(0);
+    expect(page.result.current.preview).toBeUndefined();
+    await advance(10_000);
+    expect(page.result.current.canConfirm).toBe(true);
+    expect(server.purchaseRequests).toHaveLength(1);
+
+    await act(async () => page.result.current.confirm());
+    const [first, second] = server.purchaseRequests;
+    expect(second.operationKey).not.toBe(first.operationKey);
+    expect(second).toEqual(expect.objectContaining(server.confirmedContext()));
+    expect(server.charges).toBe(1);
   });
 
   it.each([
@@ -214,6 +204,7 @@ describe("seat purchase HTTP recovery", () => {
 
   it("replays the stored purchase after a renewal restores the original seat count", async () => {
     const first = await loadPage();
+    const original = server.confirmedContext();
     server.failNextPurchase("lost response");
     await previewAndConfirm(first);
     expect(server.charges).toBe(1);
@@ -222,7 +213,10 @@ describe("seat purchase HTTP recovery", () => {
 
     const restored = await loadPage();
     await previewAndConfirm(restored);
+    expect(restored.result.current.preview).toBeUndefined();
     expect(server.purchaseRequests[1]).toEqual(server.purchaseRequests[0]);
+    expect(server.purchaseRequests[1]).toEqual(expect.objectContaining(original));
+    expect(server.purchaseRequests[1].confirmedPeriodStart).not.toBe(server.periodStart);
     expect(server.charges).toBe(1);
     expect(restored.result.current.purchase?.id).toBe("purchase-1");
     expect(restored.result.current.attemptSucceeded).toBe(true);
@@ -306,7 +300,7 @@ describe("seat purchase HTTP recovery", () => {
     expect(retry).toBe(original);
   });
 
-  it("preserves an unresolved key from the earlier single-operation storage format when another request is confirmed", async () => {
+  it("replays a legacy version 1 operation without a binding when another request is confirmed", async () => {
     const operationKey = crypto.randomUUID();
     window.localStorage.setItem(
       "superplane:seat-purchase-operation:org-1",
@@ -316,9 +310,15 @@ describe("seat purchase HTTP recovery", () => {
         operationKey,
         additionalSeats: 1,
         expectedPurchasedSeats: 4,
+        // A version 1 period start is the coverage start.
+        periodStart: new Date().toISOString(),
+        periodEnd: server.periodEnd,
         confirmedAt: new Date().toISOString(),
       }),
     );
+    // The legacy request reached Polar. A renewal restored the seat count.
+    server.recordLegacyPurchase(operationKey, 1, 4);
+    server.renew();
     const page = await loadPage();
     act(() => page.result.current.setOpen(true));
     act(() => page.result.current.setAdditionalSeats("2"));
@@ -330,25 +330,39 @@ describe("seat purchase HTTP recovery", () => {
     await previewAndConfirm(restored);
     expect(server.purchaseRequests[1]).toEqual({ additionalSeats: 1, expectedPurchasedSeats: 4, operationKey });
     expect(server.charges).toBe(1);
+    expect(restored.result.current.purchase?.id).toBe("purchase-1");
+  });
+
+  it("does not charge for a legacy version 1 operation that the server never recorded", async () => {
+    const operationKey = crypto.randomUUID();
+    window.localStorage.setItem(
+      "superplane:seat-purchase-operation:org-1",
+      JSON.stringify([
+        {
+          version: 1,
+          organizationId: "org-1",
+          operationKey,
+          additionalSeats: 1,
+          expectedPurchasedSeats: 4,
+          confirmedAt: new Date().toISOString(),
+        },
+      ]),
+    );
+    const page = await loadPage();
+    await previewAndConfirm(page);
+    expect(server.purchaseRequests).toEqual([{ additionalSeats: 1, expectedPurchasedSeats: 4, operationKey }]);
+    expect(server.charges).toBe(0);
+
+    await previewAndConfirm(page);
+    expect(server.purchaseRequests[1].operationKey).not.toBe(operationKey);
+    expect(server.purchaseRequests[1]).toEqual(expect.objectContaining(server.confirmedContext()));
+    expect(server.charges).toBe(1);
   });
 
   it("merges another tab's unresolved key with failed writes and keeps retired keys out of later saves", async () => {
     const organizationId = "org-cross-tab-storage";
     const storageKey = `superplane:seat-purchase-operation:${organizationId}`;
-    const storage = Object.getOwnPropertyDescriptor(window, "localStorage");
-    const localStorage = window.localStorage;
-    let writesBlocked = true;
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      value: {
-        getItem: localStorage.getItem.bind(localStorage),
-        removeItem: localStorage.removeItem.bind(localStorage),
-        setItem: (key: string, value: string) => {
-          if (writesBlocked) throw new DOMException("Storage is full.", "QuotaExceededError");
-          localStorage.setItem(key, value);
-        },
-      },
-    });
+    const { localStorage, unblockWrites, restore } = blockStorageWrites();
     try {
       const page = await loadPage(organizationId);
       server.failNextPurchase("lost request");
@@ -357,10 +371,24 @@ describe("seat purchase HTTP recovery", () => {
 
       // Another tab has independent memory and writes this shared storage record
       // before sending its purchase through the same HTTP contract.
-      const other = { additionalSeats: 2, expectedPurchasedSeats: 4, operationKey: crypto.randomUUID() };
+      const otherRequest = { additionalSeats: 2, expectedPurchasedSeats: 4, operationKey: crypto.randomUUID() };
+      const otherBinding = {
+        subscriptionId: server.subscriptionId,
+        periodStart: server.periodStart,
+        periodEnd: server.periodEnd,
+      };
+      const other = { ...otherRequest, ...server.confirmedContext() };
       localStorage.setItem(
         storageKey,
-        JSON.stringify([{ version: 1, organizationId, confirmedAt: new Date().toISOString(), ...other }]),
+        JSON.stringify([
+          {
+            version: 2,
+            organizationId,
+            confirmedAt: new Date().toISOString(),
+            ...otherRequest,
+            binding: otherBinding,
+          },
+        ]),
       );
       server.failNextPurchase("lost response");
       await expect(
@@ -382,23 +410,86 @@ describe("seat purchase HTTP recovery", () => {
 
       // Retirement also fails to persist. A later successful save must preserve
       // the first tab's key without restoring the retired key from storage.
-      writesBlocked = false;
+      unblockWrites();
       act(() => page.result.current.setAdditionalSeats("3"));
       server.failNextPurchase("lost request");
       await previewAndConfirm(page);
       act(() => page.result.current.setAdditionalSeats("1"));
       await previewAndConfirm(page);
       expect(server.purchaseRequests[4]).toEqual(first);
+      // The first request never reached the server, and its period ended.
+      expect(server.charges).toBe(1);
+      await previewAndConfirm(page);
+      expect(server.purchaseRequests[5].operationKey).not.toBe(first.operationKey);
       expect(server.charges).toBe(2);
 
       server.renew();
       await act(async () => page.result.current.refreshBilling());
       act(() => page.result.current.setAdditionalSeats("2"));
       await previewAndConfirm(page);
-      expect(server.purchaseRequests[5].operationKey).not.toBe(other.operationKey);
+      expect(server.purchaseRequests[6].operationKey).not.toBe(other.operationKey);
       expect(server.charges).toBe(3);
     } finally {
-      if (storage) Object.defineProperty(window, "localStorage", storage);
+      restore();
+    }
+  });
+
+  it("charges a new confirmation after another tab settles the key that a failed write in this tab saw", async () => {
+    const organizationId = "org-cross-tab-settled";
+    const storageKey = `superplane:seat-purchase-operation:${organizationId}`;
+    const { localStorage, unblockWrites, restore } = blockStorageWrites();
+    try {
+      // Another tab stores its confirmed purchase before it sends the request.
+      const other = { additionalSeats: 2, expectedPurchasedSeats: 4, operationKey: crypto.randomUUID() };
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify([
+          {
+            version: 2,
+            organizationId,
+            confirmedAt: new Date().toISOString(),
+            ...other,
+            binding: {
+              subscriptionId: server.subscriptionId,
+              periodStart: server.periodStart,
+              periodEnd: server.periodEnd,
+            },
+          },
+        ]),
+      );
+      const otherBody = JSON.stringify({ ...other, ...server.confirmedContext() });
+
+      // This tab cannot save its own confirmation, and its request is lost.
+      const page = await loadPage(organizationId);
+      server.failNextPurchase("lost request");
+      await previewAndConfirm(page);
+      expect(server.charges).toBe(0);
+
+      // The other tab gets its answer and forgets its settled key.
+      const otherResponse = await server.fetch(
+        new Request(`http://localhost/api/v1/organizations/${organizationId}/billing/seats/purchase`, {
+          method: "POST",
+          body: otherBody,
+        }),
+      );
+      expect(otherResponse.status).toBe(200);
+      expect(server.charges).toBe(1);
+      localStorage.removeItem(storageKey);
+
+      // A new period starts at the same seat count. The user confirms the
+      // same counts again as a new purchase.
+      unblockWrites();
+      server.renew();
+      await act(async () => page.result.current.refreshBilling());
+      act(() => page.result.current.setAdditionalSeats("2"));
+      await previewAndConfirm(page);
+      const retry = server.purchaseRequests[2];
+      expect(retry.operationKey).not.toBe(other.operationKey);
+      expect(retry).toEqual(expect.objectContaining({ ...server.confirmedContext(), additionalSeats: 2 }));
+      expect(server.charges).toBe(2);
+      expect(page.result.current.purchase?.id).toBe("purchase-2");
+    } finally {
+      restore();
     }
   });
 

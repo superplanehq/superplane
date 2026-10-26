@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
@@ -194,19 +194,20 @@ it("sends one delete request and blocks dismissal while the request is pending",
   renderPage();
   await user.click(await screen.findByRole("button", { name: "Delete Reports" }));
   const dialog = screen.getByRole("dialog", { name: "Delete “Reports”?" });
-  await user.click(within(dialog).getByRole("button", { name: "Delete feature" }));
+  // Dispatch synchronously so the interaction does not wait for the deferred request.
+  fireEvent.click(within(dialog).getByRole("button", { name: "Delete feature" }));
   const pending = within(dialog).getByRole("button", { name: "Deleting..." });
   expect(pending).toBeDisabled();
   expect(within(dialog).getByRole("button", { name: "Keep feature" })).toBeDisabled();
-  await user.keyboard("{Escape}");
+  fireEvent.keyDown(dialog, { key: "Escape", code: "Escape" });
   pending.click();
   expect(screen.getByRole("dialog", { name: "Delete “Reports”?" })).toBeInTheDocument();
   expect(catalog.deletes).toHaveLength(1);
-  resolveDelete(new Response(null, { status: 204 }));
+  await act(async () => resolveDelete(new Response(null, { status: 204 })));
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   expect(catalog.deletes).toHaveLength(1);
   expect(await screen.findByText("No features. Create a feature to add it to plans.")).toBeInTheDocument();
-}, 15000);
+});
 
 it("shows a delete error in the dialog, allows retry, and keeps the feature until deletion succeeds", async () => {
   let attempts = 0;

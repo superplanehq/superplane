@@ -72,6 +72,7 @@ export function PlanningReviewStepBody({
     <div
       className="planning-review-code-editor relative rounded-lg border border-border bg-card px-3 py-2"
       data-testid={`${testId}-editor`}
+      data-global-shortcuts="ignore"
     >
       <Editor
         height={editorHeight(value)}

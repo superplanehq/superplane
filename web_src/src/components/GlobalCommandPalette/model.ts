@@ -288,7 +288,7 @@ function buildModel({
     setPage,
     setSearch,
     settingsActions: buildOrganizationSettingsActions({
-      canAct: data.permissionState.canAct,
+      canAct: data.permissionState.hasPermission,
       goTo: navigation.goTo,
       organizationId,
     }),

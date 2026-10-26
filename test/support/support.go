@@ -8,7 +8,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	eebilling "github.com/superplanehq/superplane/ee/billing"
+	billingtestsupport "github.com/superplanehq/superplane/ee/billing/testsupport"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,7 +21,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	// Import components, triggers, and integrations to register them via init()
+	// Register components, triggers, integrations, and widgets for fixtures.
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
 	_ "github.com/superplanehq/superplane/pkg/components/display"
@@ -75,6 +78,7 @@ func Setup(t require.TestingT) *ResourceRegistry {
 }
 
 func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistry {
+	ensureBilling(t)
 	require.NoError(t, database.TruncateTables())
 	restoreSeedUsagePriceBooks(t)
 
@@ -141,7 +145,7 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		t.FailNow()
 	}
 
-	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+	err = billing.GrantWelcomeCredit(tx, organization.ID, account.ID)
 	if !assert.NoError(t, err) {
 		tx.Rollback()
 		t.FailNow()
@@ -208,6 +212,7 @@ func AuthService(t require.TestingT) *authorization.AuthService {
 }
 
 func CreateOrganization(t require.TestingT, r *ResourceRegistry, userID uuid.UUID) *models.Organization {
+	ensureBilling(t)
 	tx := database.Conn().Begin()
 	organization, err := models.CreateOrganizationInTransaction(tx, RandomName("org"), RandomName("org-display"))
 	if !assert.NoError(t, err) {
@@ -227,7 +232,7 @@ func CreateOrganization(t require.TestingT, r *ResourceRegistry, userID uuid.UUI
 			tx.Rollback()
 			t.FailNow()
 		}
-		err = models.GrantWelcomeCredit(tx, organization.ID, r.Account.ID)
+		err = billing.GrantWelcomeCredit(tx, organization.ID, r.Account.ID)
 		if !assert.NoError(t, err) {
 			tx.Rollback()
 			t.FailNow()
@@ -251,6 +256,18 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgOperator, organizationID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
 	return user
+}
+
+// SeedHistoricalInviteLink stores a shared invite link as older releases did.
+// SuperPlane no longer creates these links, but stored links stay readable.
+func SeedHistoricalInviteLink(t require.TestingT, organizationID uuid.UUID, enabled bool) *models.OrganizationInviteLink {
+	link := &models.OrganizationInviteLink{
+		OrganizationID: organizationID,
+		Token:          uuid.New(),
+		Enabled:        enabled,
+	}
+	require.NoError(t, database.Conn().Create(link).Error)
+	return link
 }
 
 func EmitCanvasEventForNode(t require.TestingT, canvasID uuid.UUID, nodeID string, channel string, executionID *uuid.UUID) *models.CanvasEvent {
@@ -718,12 +735,21 @@ func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID str
 	require.NoError(t, database.Conn().Create(&node).Error)
 }
 
-var seedUsagePriceBookVersions = []string{"2026-09-23.1"}
-
 func restoreSeedUsagePriceBooks(t require.TestingT) {
-	db := database.Conn()
-	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBookRate{}).Error)
-	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBook{}).Error)
-	require.NoError(t, models.ActivateUsagePriceBook(db, "2026-09-23.1"))
-	require.NoError(t, models.LoadCurrentPriceBook(db))
+	require.NoError(t, billingtestsupport.RestoreSeedUsagePriceBooks(database.Conn()))
+}
+
+func ensureBilling(t require.TestingT) {
+	_, err := billing.Current()
+	if err == nil {
+		return
+	}
+	require.ErrorIs(t, err, billing.ErrImplementationMissing)
+	billing.Bind(eebilling.New(nil))
+}
+
+func init() {
+	if _, err := billing.Current(); err != nil {
+		billing.Bind(eebilling.New(nil))
+	}
 }

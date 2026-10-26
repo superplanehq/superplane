@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -107,8 +108,8 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 			return err
 		}
-		if models.BillingEnabled() {
-			if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
+		if billing.Enabled() {
+			if err := billing.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
 				return err
 			}
 		}

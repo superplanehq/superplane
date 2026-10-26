@@ -7,16 +7,15 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 )
 
 // ErrNoCatalogPrices means the provider list-models API has no rate fields.
 var ErrNoCatalogPrices = errors.New("provider does not publish catalog prices")
 
-// CatalogPrice is one model id with cents-per-million rates from a provider catalog.
+// CatalogPrice is one model id and the raw prices returned by its provider.
 type CatalogPrice struct {
-	ID   string
-	Rate pricebook.Rate
+	ID      string
+	Pricing RawCatalogRate
 }
 
 // ListCatalogPrices fetches priced models for providers that publish catalog rates.
@@ -35,4 +34,14 @@ func ListCatalogPrices(ctx context.Context, httpClient core.HTTPContext, provide
 		return nil, fmt.Errorf("%w: %s", ErrNoCatalogPrices, provider)
 	}
 	return compat.listCatalogPrices(ctx)
+}
+
+// RawCatalogRate contains provider prices in US dollars per token.
+// Billing owns conversion into ledger rates.
+type RawCatalogRate struct {
+	Prompt            string `json:"prompt"`
+	Completion        string `json:"completion"`
+	InputCacheRead    string `json:"input_cache_read"`
+	InputCacheWrite   string `json:"input_cache_write"`
+	InternalReasoning string `json:"internal_reasoning"`
 }

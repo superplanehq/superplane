@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
+import { SUPPORT_SESSION_READ_ONLY_MESSAGE } from "@/lib/supportSession";
 import { cn } from "@/lib/utils";
 import {
   FeedbackRequestError,
@@ -64,6 +66,7 @@ export function FeedbackDialog({ open, onOpenChange, organizationId, initialCate
   const [file, setFile] = useState<File | undefined>();
   const [fileError, setFileError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const inSupportSession = useIsSupportSession();
 
   useEffect(() => {
     if (!open) {
@@ -78,7 +81,7 @@ export function FeedbackDialog({ open, onOpenChange, organizationId, initialCate
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!organizationId || !category || !details.trim() || isSubmitting) {
+    if (inSupportSession || !organizationId || !category || !details.trim() || isSubmitting) {
       return;
     }
 
@@ -107,7 +110,9 @@ export function FeedbackDialog({ open, onOpenChange, organizationId, initialCate
       <DialogContent className="sm:max-w-xl" showCloseButton={!isSubmitting}>
         <DialogHeader>
           <DialogTitle>Send feedback</DialogTitle>
-          <DialogDescription>Choose a category and describe the issue or idea.</DialogDescription>
+          <DialogDescription>
+            {inSupportSession ? SUPPORT_SESSION_READ_ONLY_MESSAGE : "Choose a category and describe the issue or idea."}
+          </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
           <FeedbackCategoryPicker category={category} onChange={setCategory} disabled={isSubmitting} />
@@ -136,7 +141,7 @@ export function FeedbackDialog({ open, onOpenChange, organizationId, initialCate
             </Button>
             <LoadingButton
               type="submit"
-              disabled={!organizationId || !category || !details.trim()}
+              disabled={inSupportSession || !organizationId || !category || !details.trim()}
               loading={isSubmitting}
               loadingText="Sending..."
               data-testid="feedback-send"

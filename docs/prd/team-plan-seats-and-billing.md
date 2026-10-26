@@ -1,13 +1,13 @@
 # Team plan seats and billing
 
-> Status: Draft. Billing, invitation, and membership rules are agreed. Five
+> Status: Draft. Billing, invitation, and membership rules are agreed. Four
 > questions remain open. [Open questions](#open-questions) lists them with the
 > shipped behavior, the options, and what each question blocks. Decided
 > entries stay in that section as decision records.
 >
 > Audience: Product, design, and engineering
 >
-> Date: October 23, 2026. Updated: October 25, 2026.
+> Date: October 23, 2026. Updated: October 26, 2026.
 
 ## Goal
 
@@ -15,8 +15,10 @@ Organizations can buy Team seats, invite people by email, and reuse paid
 capacity when members leave. Billing stays predictable as membership changes.
 
 An organization pays for additional seats when it buys them. At renewal, it
-pays only for current members who accepted their invitations. The
-organization can see its current capacity, next renewal date, and expected bill.
+keeps and pays for its paid seats. Seats change only when an Admin changes
+them: an Admin buys seats at once, and an Admin removes seats for the next
+period. The organization can see its current capacity, next renewal date, and
+expected bill.
 
 This PRD defines product behavior. It does not prescribe an implementation.
 
@@ -29,14 +31,15 @@ The first release covers:
 - email invitations, with capacity rules and a default lifetime of 7 days,
 - removal of shared organization invite links on every plan and deployment,
 - member removal and seat reuse,
-- automatic seat reductions at renewal.
+- paid seats that renew unchanged,
+- seat removal by an Admin, effective at renewal.
 
 Deferred: annual billing, cancellation policy, and migration of existing
 organizations above the Team maximum. The current Team plan has no included
-AI credit. Five questions remain open. They cover access after a failed
-renewal payment, acceptance of invitations near renewal, seat counts lowered
-outside SuperPlane, signup without email delivery, and seat purchases while a
-cancellation is scheduled. See [Open questions](#open-questions).
+AI credit. Four questions remain open. They cover access after a failed
+renewal payment, seat counts lowered outside SuperPlane, signup without email
+delivery, and seat purchases while a cancellation is scheduled. See
+[Open questions](#open-questions).
 
 Purchased seats are required only on per-seat plans, such as Team. Email
 invitations and the removal of shared invite links apply to every plan and
@@ -62,8 +65,9 @@ The billing rules apply to per-seat plans, such as Team.
 | Mid-period purchases | Prorate additional seats for the remaining portion of the current billing period. |
 | Payment confirmation | Additional seats become available only after successful payment. |
 | Renewal date | Keep the billing cycle established by the initial subscription. Seat changes do not restart it. |
-| Renewal quantity | Renew only seats occupied by current, accepted members. Pending invitations never count. Renewal never adds seats: the quantity is capped at the current paid seats. See [D14](#d14-renewal-quantity-when-over-capacity). |
-| Unused capacity | Automatically remove unused seats at renewal and exclude them from the new period's charge. |
+| Renewal quantity | Renew the paid seats. Renewal never removes or adds seats automatically. When an Admin confirmed a seat removal, renew the pending quantity. See [D14](#d14-renewal-quantity-and-seat-removal). |
+| Unused capacity | Keep unused paid seats. They stay available for reuse until an Admin removes them. |
+| Seat removal | Only an Admin removes seats. The removal takes effect at renewal. It makes no current charge, refund, or credit. See [Remove unused seats](#remove-unused-seats). |
 | Seat changes | Seat count changes only through SuperPlane. Customers do not change seats in the payment provider's portal. |
 
 ### Membership and invitations
@@ -81,14 +85,14 @@ The billing rules apply to per-seat plans, such as Team.
 | Joining | Sending or accepting an invitation does not create a separate charge or subscription. |
 | Shared invite links | Shared organization invite links are removed for every plan and deployment. Email invitations replace them. |
 | Deployments without email | An Admin can copy the link of an individual invitation and share it directly. Shipped difference: signup through that link still needs an emailed code. See [D15](#d15-signup-without-email-delivery). |
-| Member removal | Remove access immediately. Keep the paid seat available for reuse until renewal. |
+| Member removal | Remove access immediately. Keep the paid seat available for reuse. Member removal never changes the seat count. |
 | Seat reuse | A replacement member can use an existing available seat without another payment. |
-| Pending invitations at renewal | Pending invitations stay pending at renewal. They never count toward the renewal quantity, so renewal keeps no seat for them. After renewal, acceptance needs a free seat. |
+| Pending invitations at renewal | Pending invitations stay pending at renewal. Renewal keeps the paid seats, so a pending invitation keeps its seat unless an Admin removed seats. Pending invitations never disappear automatically. |
 
 ## Definitions
 
-Seat terms (purchased, occupied, available, invitable, unused, and renewal
-quantity) apply to per-seat plans.
+Seat terms (purchased, occupied, available, invitable, unused, pending
+quantity, admission limit, and renewal quantity) apply to per-seat plans.
 
 | Term | Meaning |
 | --- | --- |
@@ -96,14 +100,17 @@ quantity) apply to per-seat plans.
 | Service account | A non-human account used for automation. It is not a member for seat purposes. |
 | Admin | A member with the Admin role. Admins manage billing and invitations. |
 | Purchased seat | Capacity the organization paid for during the current billing period. |
+| Paid capacity (P) | The number of purchased seats in the current period. The payment provider reports it. |
+| Pending quantity (Q) | The seat count for the next period after an Admin confirmed a seat removal. Without a pending removal, Q equals P. |
+| Admission limit (L) | The seat count that limits members and pending invitations now: L = min(P, Q). |
 | Occupied seat | A purchased seat used by a current member. The owner occupies one seat. |
-| Available seat | A purchased seat without a current member. |
+| Available seat | A seat below the admission limit without a current member. |
 | Pending invitation | An invitation that its recipient has not accepted, that is not canceled, and that has not expired. It does not make the recipient a member. |
 | Invitable seat | An available seat that no pending invitation uses. An Admin can send one invitation for each invitable seat. |
-| Unused seat | Purchased capacity without a current member at renewal. Seats used by pending invitations are unused for renewal billing. |
+| Unused seat | Purchased capacity without a current member. It stays paid until an Admin removes it. |
 | Plan maximum | The largest number of seats the organization can purchase on its plan. |
 | Renewal | The end of the current subscription period and the start of the next monthly period. |
-| Renewal quantity | The number of current members at renewal, owner included. The minimum is one. The maximum is the current paid seats. See [D14](#d14-renewal-quantity-when-over-capacity). |
+| Renewal quantity | The seat count of the next period: Q when an Admin confirmed a seat removal, otherwise P. See [D14](#d14-renewal-quantity-and-seat-removal). |
 
 Member counts do not depend on recent activity. A person who remains a member
 still occupies a seat even if they do not sign in during the month.
@@ -112,15 +119,16 @@ Seat values at any moment:
 
 | Value | Formula |
 | --- | --- |
-| Available seats | purchased seats − occupied seats |
-| Invitable seats | purchased seats − occupied seats − pending invitations |
-| Purchasable seats | plan maximum − purchased seats |
-| Renewal quantity | min(max(occupied seats, 1), purchased seats) |
+| Admission limit (L) | min(P, Q). Without a pending removal, L = P. |
+| Available seats | L − occupied seats |
+| Invitable seats | L − occupied seats − pending invitations |
+| Purchasable seats | plan maximum − P |
+| Renewal quantity | Q. Without a pending removal, Q = P. |
 
-> The renewal quantity is defined only when the purchased seats are 1 or
-> more. Zero or missing purchased seats are an invalid state that needs
-> repair. That state has no renewal quantity. See
-> [D14](#d14-renewal-quantity-when-over-capacity).
+> These values are defined only when the paid capacity is 1 or more. Zero or
+> missing paid capacity is an invalid state that needs repair. That state has
+> no renewal quantity. See
+> [D14](#d14-renewal-quantity-and-seat-removal).
 
 ## Product requirements
 
@@ -147,15 +155,21 @@ Seat values at any moment:
 - Make the additional capacity available after successful payment.
 - If payment fails or remains unconfirmed, do not grant additional capacity.
 - A repeated submission must not create an unintended duplicate purchase.
-- Seat reductions do not happen during a period. They happen automatically at renewal.
+- Seat reductions never happen automatically. An Admin removes seats, and the
+  removal takes effect at renewal. See [Remove unused seats](#remove-unused-seats).
+- A purchase starts from the paid capacity P, not from the pending quantity Q.
+  A confirmed purchase supersedes a pending removal. Example: with 10 paid
+  seats and a pending quantity of 7, a purchase of 1 seat gives 11 paid seats,
+  and the removal ends.
+- A purchase needs `now + 10 minutes < renewal`. The boundary is strict.
 
 The charge starts when the seat is purchased, even if nobody joins
 immediately. It does not wait for an invitation or acceptance. Unused seats
-purchased near renewal still follow the automatic reduction rule.
+stay paid and renew until an Admin removes them.
 
 The displayed monthly total for all purchased seats is distinct from the
-expected renewal charge. The latter includes only current, accepted members
-and can change before renewal.
+expected renewal charge. The latter uses the renewal quantity: the paid
+seats, or the pending quantity after an Admin removal.
 
 ### Invite people by email
 
@@ -214,6 +228,16 @@ On per-seat plans:
 - On per-seat plans, acceptance must never admit a member without purchased
   capacity. If no seat is available, the recipient is not admitted and the
   invitation stays pending. Acceptance never purchases a seat.
+- While a plan checkout can still activate, acceptance must not take
+  membership above the seat count that the checkout selected. The recipient
+  is not admitted, the invitation stays pending, and nothing is charged. The
+  recipient sees that the organization is changing its plan and asks an
+  Admin. A checkout from before this rule counts too. A verified expiry or
+  failure of the checkout ends the restriction.
+- Acceptance of a deleted or blocked account admits no one. When an account
+  deletion and an acceptance overlap, the result is one of these: no
+  membership, or a membership that the deletion removes. A deleted account
+  never keeps a membership, a role, or an occupied seat.
 - On plans that are not per-seat, acceptance needs no purchased seat. The
   plan's member limit applies, if the plan has one. With billing off, no
   limit applies.
@@ -223,7 +247,9 @@ On per-seat plans:
 - Shared organization invite links are removed for every plan and deployment.
 - An existing shared link admits no new member. The page explains that the
   organization uses email invitations.
-- An existing member who opens an old link reaches the organization.
+- An existing member who opens an old link that is still enabled reaches the
+  organization. This is the only historical-link exception. A disabled link
+  admits no one, also not an existing member.
 - New organizations do not receive a shared link.
 - Shared links no longer allow signup when open registration is disabled.
 - Self-hosted administrators receive notice of this change before they upgrade.
@@ -231,40 +257,75 @@ On per-seat plans:
 ### Remove a member and reuse a seat
 
 - Removing a member ends that person's organization access immediately.
-- The purchased seat remains available through the end of the paid period.
+- The purchased seat stays paid and available. Member removal never changes
+  the seat count.
 - Member removal does not produce an automatic prorated refund or billing credit.
 - The organization can invite a replacement without another seat purchase.
 - Removing and replacing a member does not change the renewal date.
 - Member removal must remain possible if a billing service is unavailable.
+  Account deletion follows the same rule for the organizations that it does
+  not delete.
 
 Reusing a seat changes who occupies the capacity. It does not extend the paid
 period or create a new allowance of time.
 
+### Remove unused seats
+
+The rules apply to per-seat plans. Seat removal ships after the rules below
+have an implementation. Until then, paid seats renew unchanged.
+
+- Only an Admin removes seats. SuperPlane never removes seats on its own.
+- The Admin selects the pending quantity Q for the next period. Confirmation
+  requires `max(members, 1) ≤ Q < P`. Members are current, accepted human
+  members, owner included.
+- Pending invitations do not raise the minimum. They also do not disappear
+  automatically. An invitation above the new limit stays pending, and its
+  acceptance needs a free seat.
+- On confirmation, the admission limit `L = min(P, Q)` applies at once.
+  Invitations and acceptance use L.
+- The removal takes effect at renewal. It makes no current charge, refund, or
+  credit. The paid seats stay usable up to L until renewal.
+- The Admin can change the pending quantity or cancel the removal.
+- Schedule, change, cancel, and purchase need `now + 10 minutes < renewal`.
+  The boundary is strict: at exactly 10 minutes before renewal, the action is
+  rejected. Nothing is sent to the payment provider for a rejected action.
+- A confirmed purchase uses P and supersedes the removal. See
+  [Buy additional seats](#buy-additional-seats).
+- While a removal or a purchase has an unresolved provider result, SuperPlane
+  uses the most restrictive limit that the result can produce. It blocks a
+  second removal or purchase. It shows a renewal estimate only from verified
+  provider data, and it labels the value as an estimate.
+- SuperPlane can cancel a removal that it scheduled to protect members, for
+  example when it cannot verify the removal before the boundary. This
+  protective cancellation restores Q = P for the next period. It never charges
+  now, and it never sets more seats than P. It is not a repair of a count that
+  was lowered outside SuperPlane. That repair is
+  [D11](#d11-outside-seat-reduction-below-the-member-count), which stays open.
+
 ### Renew the subscription
 
-- Determine the number of current, accepted members at renewal.
-- Include the owner in that count.
-- Exclude removed members, service accounts, and recipients of pending invitations.
-- Set the new period's purchased capacity to that member count, at least one
-  and at most the current paid seats. Renewal never adds seats.
-- When the paid seat count is zero or missing, send no count. That state needs
-  repair. See [D14](#d14-renewal-quantity-when-over-capacity).
-
+- Renew the paid seats P. When an Admin confirmed a seat removal before the
+  boundary, renew the pending quantity Q.
+- Never remove or add seats automatically. Membership changes, pending
+  invitations, and the plan maximum do not change the renewal quantity.
 - Charge the monthly seat price for that quantity.
-- Remove all remaining unused capacity automatically.
-- Do not require an Admin to request a seat reduction.
-- Do not retain unused capacity because an invitation is pending.
-- Keep pending invitations pending. Renewal keeps no seat for them.
+- Keep the renewal date.
+- Keep pending invitations pending.
+- When the paid seat count is zero or missing, send no count. That state needs
+  repair. See [D14](#d14-renewal-quantity-and-seat-removal).
+- The payment provider stays the source of truth for paid capacity, status,
+  and period. SuperPlane reads them again to repair a missed renewal, payment
+  failure, or recovery. That repair only reads the provider.
 
-After renewal, adding another person requires a new seat purchase unless an
-existing paid seat becomes available. This also applies to the recipient of a
-pending invitation. Until a seat is free, acceptance admits no one, and the
-invitation stays pending.
+After renewal, adding another person requires a free seat below the admission
+limit, or a new seat purchase. This also applies to the recipient of a pending
+invitation. Until a seat is free, acceptance admits no one, and the invitation
+stays pending.
 
 Acceptance and renewal must produce a consistent membership and billing
-result. Concurrent actions must not create more members than the paid
-capacity permits. How an acceptance just before renewal is handled is an
-[open decision](#d8-accepting-invitations-near-renewal).
+result. Concurrent actions must not create more members than the renewed
+capacity permits. This invariant is
+[D8](#d8-accepting-invitations-near-renewal).
 
 ## Plan catalog and Polar responsibilities
 
@@ -292,6 +353,29 @@ alerts the team. A higher count is paid capacity. What happens when a lower
 count leaves fewer seats than current members is an
 [open question](#d11-outside-seat-reduction-below-the-member-count).
 
+### Admin-assigned plans without a Polar subscription
+
+**Locked decision:** Business Manual (`business_manual`) and custom plans
+assigned by an installation admin, such as SuperPlane only, can be active
+without a Polar subscription. This is intentional product behavior. Do not
+require a subscription to preserve these assignments.
+
+- The Billing page must show the assigned catalog plan as the current plan.
+- Opening Billing, running subscription sync, or processing a webhook must
+  not replace an admin-assigned plan with None because Polar has no live
+  subscription. Old canceled subscriptions and retained subscription IDs
+  are history, not authority to remove the manual assignment.
+- Preserve the assigned plan, its access, and its credit-purchase permission
+  when an inactive subscription snapshot arrives. Apply this rule whether
+  the organization retains an old subscription ID or has no subscription ID.
+- A live Polar subscription can still replace the admin assignment. Keep
+  the existing subscription identity and event-ordering checks. A scheduled
+  cancellation with an open paid period still counts as live.
+
+Regression coverage must verify that an old canceled subscription cannot
+clear Business Manual or a custom admin-assigned plan. Keep coverage that
+verifies activation of a live Polar subscription.
+
 ## Information customers need
 
 Billing and member management must make the following information clear:
@@ -301,12 +385,16 @@ Billing and member management must make the following information clear:
 - Pending invitations and the seats they use.
 - Seats available for new invitations.
 - The next renewal date.
-- The expected number of seats and charge at renewal, based on current membership.
+- The expected number of seats and charge at renewal: the paid seats, or the
+  pending quantity after an Admin removal.
+- A pending seat removal, its quantity, and the admission limit that it sets
+  at once.
 - The immediate cost of a proposed purchase and its remaining paid period.
 - Whether a payment succeeded, failed, or is awaiting confirmation.
 - Why an invitation cannot be sent and whether a seat purchase can resolve it.
-- That pending invitations do not count at renewal, and that acceptance after
-  renewal needs a free seat.
+- That paid seats renew unchanged until an Admin removes them.
+- For an invitation recipient: why acceptance is not possible now, for
+  example no free seat, a failed payment, or a plan checkout in progress.
 
 ## Examples
 
@@ -324,10 +412,13 @@ The subscription starts on November 1 and renews on December 1.
 | November 10 | The third person accepts the invitation. | Three seats are occupied. No additional charge. |
 | November 15 | Buy another seat and invite a fourth member, who accepts. | Pay about $10.67 immediately. The renewal date remains December 1. |
 | November 22 | Remove one member. | Access ends. One of the four paid seats becomes reusable. |
-| December 1 | Three members remain. | Renew three seats for $60 and remove the unused seat. |
+| December 1 | Three members remain. | Renew four seats for $80. The spare seat stays paid and available. |
 
-If a replacement joins before December 1, the organization renews four seats
-for $80 instead. The replacement does not create an additional November charge.
+If an Admin removes one seat before 23:50 on November 30, the pending
+quantity is three. The admission limit becomes three at once. The
+organization renews three seats for $60 on December 1, with no November
+refund or credit. If a replacement joins before December 1, it uses the spare
+seat and creates no additional November charge.
 
 ### Invitation capacity
 
@@ -345,18 +436,41 @@ An organization has 10 purchased seats and 9 members.
 ### Pending invitations at renewal
 
 An organization has 10 purchased seats, 9 current members, and 1 pending
-invitation. It renews 9 seats for $180. The invitation stays pending, but
-renewal keeps no seat for it. If the recipient tries to accept, SuperPlane
-admits no one and explains that no seat is available. To add that person, an
-Admin buys a seat. The recipient can then accept the same invitation before it
-expires.
+invitation. It renews 10 seats for $200. The invitation keeps its seat, and
+the recipient can accept it after renewal.
+
+If an Admin confirms a pending quantity of 9 before renewal, the minimum is 9
+because the pending invitation does not count. The admission limit becomes 9
+at once. The invitation stays pending. If the recipient tries to accept,
+SuperPlane admits no one and explains that no seat is available. The
+organization renews 9 seats for $180.
+
+### Spare capacity
+
+An organization has 10 paid seats and 7 members. Three seats stay paid and
+available at every renewal. An Admin can confirm a pending quantity from 7 to
+9. A pending quantity of 6 is rejected, because it does not cover the members.
+
+### Purchase while a removal is pending
+
+An organization has 10 paid seats, 7 members, and a pending quantity of 7.
+The Admin buys 1 seat. The purchase starts from the 10 paid seats, so the
+organization has 11 paid seats. The purchase supersedes the removal, and the
+organization renews 11 seats.
+
+### Unresolved operations
+
+A seat purchase from 10 to 11 seats loses its provider response. SuperPlane
+keeps the purchase, does not grant the eleventh seat, and blocks another
+purchase. A later verified provider read can show 11 paid seats. SuperPlane
+then grants the capacity without another charge. The purchase stays
+unconfirmed until evidence about that purchase settles it.
 
 ### Reach the plan maximum
 
 An organization with 50 purchased seats cannot buy a fifty-first seat.
 If one member leaves, the organization can reuse that seat before renewal.
-If only 49 members remain at renewal, capacity falls to 49. It can then buy
-one additional seat, subject to successful payment.
+Capacity stays at 50 at renewal unless an Admin removes a seat.
 
 ## Included credit
 
@@ -393,14 +507,21 @@ billing state.
 | Accept an email invitation with paid capacity available. | Add the intended recipient with the invited role and no charge. |
 | Accept while signed in with a different email. | Admit no one. |
 | Repeat an invitation acceptance. | Do not create another membership, occupied seat, or charge. |
-| Use an old shared invite link on any plan. | Do not admit a new member. |
+| Use an old shared invite link on any plan. | Do not admit a new member. An existing member reaches the organization only through an enabled link. |
 | Send invitations on a deployment without email delivery. | The Admin can copy each invitation link. |
-| Remove a member during a paid period. | End access immediately and make the seat reusable. |
+| Remove a member during a paid period. | End access immediately and make the seat reusable. Send no seat change. |
 | Remove a member while the billing service is unavailable. | Removal succeeds. |
+| Delete an account while the billing service is unavailable. | The deletion succeeds for every organization that it does not delete. |
 | Replace a removed member before renewal. | Reuse the existing seat without another charge. |
-| Renew with unused seats and pending invitations. | Charge only for current, accepted members, reduce capacity to that count, and keep pending invitations pending. |
+| Renew with unused seats and pending invitations. | Charge for the paid seats, keep the unused seats, and keep pending invitations pending. |
+| Remove seats as an Admin. | Accept only `max(members, 1) ≤ Q < P`. Apply `L = min(P, Q)` at once. Renew Q with no current charge, refund, or credit. |
+| Remove, change, cancel, or buy at 10 minutes or less before renewal. | Reject the action. Send nothing to the payment provider. |
+| Buy a seat while a removal is pending. | Start from P and end the removal. 10 paid seats, a pending quantity of 7, and 1 seat give 11. |
 | Accept a pending invitation after renewal with no free seat. | Admit no one. Keep the invitation pending. |
 | Accept a pending invitation after renewal and a seat purchase. | Add the recipient with the invited role. No other charge. |
+| Accept while a plan checkout for fewer seats can still activate. | Admit no one. Keep the invitation pending. No charge. |
+| Accept while the account is being deleted. | Either no membership, or a membership that the deletion removes. Never an active membership for a deleted account. |
+| Delete an organization while its checkout can still activate. | Refuse the deletion. A verified expiry or failure allows it. |
 | Purchase or accept invitations concurrently. | Respect both purchased capacity and the configured maximum. |
 | Raise the seat count outside SuperPlane. | Treat the new count as purchased capacity and alert the team. |
 | Lower the seat count outside SuperPlane below current members. | Alert the team. The access outcome is an [open question](#d11-outside-seat-reduction-below-the-member-count). Shipped behavior: members keep access, and invitations and acceptance are blocked. |
@@ -415,13 +536,12 @@ the question blocks. This section does not choose an option. A decided entry
 stays in place as a decision record so that links to it still resolve. The
 table lists only unresolved decisions.
 
-Task IDs (11, 05, 13b, 17, 19, 26, 27b, 32) come from the outside backlog and
-appear as written there.
+Task IDs (11, 05, 13b, 17, 19, 26, 27b, 32, 9B1) come from the outside
+backlog and appear as written there.
 
 | ID | Title | Blocks |
 | --- | --- | --- |
 | [D7](#d7-grace-after-a-failed-renewal-payment) | Grace after a failed renewal payment | Launch |
-| [D8](#d8-accepting-invitations-near-renewal) | Accepting invitations near renewal | 13b |
 | [D11](#d11-outside-seat-reduction-below-the-member-count) | Outside seat reduction below the member count | Launch. Also decides whether 17 stays dropped. Affects 11 and 05. |
 | [D15](#d15-signup-without-email-delivery) | Signup without email delivery | 26 |
 | [09-a](#09-a-seat-purchase-while-a-cancellation-is-scheduled) | Seat purchase while a cancellation is scheduled | No task is named |
@@ -479,50 +599,50 @@ In every option, no new member can join while the subscription is past due.
 
 ### D8. Accepting invitations near renewal
 
+**Decided.** 2026-10-26. Retained as an invariant.
+
 **Question.** Does SuperPlane block invitation acceptance in a window before
 renewal, or while the stored billing period has expired or cannot be verified?
 If it does, how does acceptance reopen?
 
-**Context.** Polar renews with the seat count set before the period ends. An
-acceptance after the last update can leave more members than renewed seats.
+**Context.** The question came from automatic renewal reductions. Polar
+renewed with a seat count that SuperPlane set from the members before the
+period ended, so an acceptance after the last update could leave more members
+than renewed seats. Renewal now keeps the paid seats. Only an Admin removal
+lowers the next quantity, and its admission limit applies at once.
+
+**Decision.**
+
+- The invariant stays: acceptance and renewal must produce a consistent
+  membership and billing result. Concurrent actions must not create more
+  members than the renewed capacity permits.
+- Acceptance uses the admission limit `L = min(P, Q)`. A confirmed removal
+  lowers L before renewal, so the renewed quantity covers every member.
+- The draft task 13b is superseded. The admission work of 9B1 owns the
+  invariant. It keeps the surviving requirements of 13b: the race between
+  acceptance and a removal near the boundary, and recovery when the provider
+  result of a removal is unknown or the stored period cannot be verified.
+- There is no automatic charge in any case.
 
 **Shipped today.**
 
-- `Accept` has no pre-renewal window. It does not check the stored billing
-  period (`accept_invitation.go`).
-- After a member joins, `seatrenewal.ScheduleAsync` tries to set the
-  next-period seat count in Polar. It makes up to three attempts in about ten
-  seconds (`pkg/billing/seatrenewal/async.go`).
-- `SeatRenewalSyncWorker` checks and repairs the next-period seat count every
-  5 minutes (`pkg/workers/seat_renewal_sync_worker.go`).
+- `Accept` has no pre-renewal window. It checks the paid capacity under the
+  organization lock (`accept_invitation.go`).
+- No flow changes the Polar seat count automatically. Member removal,
+  acceptance, account deletion, seat purchase settlement, purchase preview,
+  billing sync, resume, and subscription webhooks send no seat change.
+- `SeatRenewalSyncWorker` reads the Polar subscription every 5 minutes and
+  applies it. It repairs a missed renewal, payment failure, or recovery. It
+  never writes a seat count (`pkg/workers/seat_renewal_sync_worker.go`).
 - Only a seat purchase rejects an unknown or expired billing period
   (`purchase_seats.go`).
 
-**Options.**
+**Superseded options.** The earlier options were: keep no window, block a
+window before renewal, block while the stored period has expired or cannot be
+verified, or make acceptance depend on a next-period seat update. All of them
+assumed automatic reductions.
 
-1. Keep the shipped behavior: no window and no period check.
-   - Tradeoff: Invitees never wait because of renewal timing.
-   - Tradeoff: If the Polar update and the worker both fail before renewal,
-     Polar renews with fewer seats than members. This leads to the state in
-     [D11](#d11-outside-seat-reduction-below-the-member-count).
-2. Block acceptance in a window before renewal. It reopens when the renewal
-   snapshot stores the new period.
-   - Tradeoff: The window limits the exposure to a late update.
-   - Tradeoff: Invitees wait during the window. The length of the window
-     needs a value.
-3. Block acceptance while the stored period has expired or cannot be verified.
-   It reopens when a webhook or billing sync stores a current period.
-   - Tradeoff: Acceptance cannot run on stale billing data.
-   - Tradeoff: A late webhook or a Polar outage blocks joins that were valid.
-4. Make acceptance depend on the next-period seat count update near renewal.
-   Acceptance is rejected when the update fails, and it reopens when the
-   update succeeds.
-   - Tradeoff: The renewed seat count always covers the new member.
-   - Tradeoff: A Polar outage near renewal blocks every acceptance.
-
-In every option, there is no automatic charge.
-
-**Blocks.** 13b.
+**Unblocks.** 9B1.
 
 ### D11. Outside seat reduction below the member count
 
@@ -562,6 +682,11 @@ and 10 members, then the count drops to 9.
 
 In every option, SuperPlane alerts the team.
 
+Option 1 is a repair of a count that was lowered outside SuperPlane. It is
+different from the protective cancellation of a removal that SuperPlane
+scheduled itself (see [Remove unused seats](#remove-unused-seats)). The
+retained renewal policy does not decide this question.
+
 **Blocks.** Launch. The answer also decides whether 17 stays dropped. It
 affects 11 and 05.
 
@@ -596,78 +721,83 @@ checkout lifetime race; 33a and 33b own that work.
 
 **Unblocks.** 19.
 
-### D14. Renewal quantity when over capacity
+### D14. Renewal quantity and seat removal
 
-**Decided.** 2026-10-25. Option 2 for valid paid seats, and the first choice
-of option 3 for an invalid count.
+**Decided.** 2026-10-25. **Replaced.** 2026-10-26.
 
-**Question.** Which seat count does renewal use when members exceed paid seats,
-or when the seat count in Polar is not valid?
+**Question.** Which seat count does renewal use? Does SuperPlane reduce
+unused seats automatically, and how does an Admin remove seats?
 
-**Context.** The earlier PRD formula for renewal quantity was "occupied seats
-(minimum 1)". The scheduler capped that value at the paid seats, so the
-renewal estimate and the scheduled count could differ. Example: 3 members and
-1 paid seat gave an estimate of 3 seats, but the scheduler sent 1.
+**Decision of 2026-10-26.** Two business decisions replace the decision of
+2026-10-25:
 
-**Decision.**
+1. No automatic renewal reductions. Renewal keeps the paid seat quantity.
+   SuperPlane never reduces seats automatically.
+2. A manual seat removal takes effect at the next renewal, with no mid-period
+   refund or credit. On confirmation, the lower admission limit
+   `L = min(P, Q)` applies at once. P is the paid capacity, and Q is the
+   pending renewal quantity.
 
-- For valid paid seats (1 or more), the renewal quantity is
-  `min(max(members, 1), current paid seats)`. Members are current, accepted
-  human members, owner included. Pending invitations never count.
+These rules follow from the decisions:
+
+- Confirmation requires `max(members, 1) ≤ Q < P`. Pending invitations do not
+  raise the minimum and do not disappear automatically.
+- A purchase starts from P and supersedes a pending removal. Example: 10 paid
+  seats, a pending quantity of 7, and 1 purchased seat give 11 paid seats.
+- Schedule, change, cancel, and purchase need `now + 10 minutes < renewal`.
 - Renewal never increases the seat count automatically. Only a seat purchase
   adds seats. A change to the plan maximum does not create purchased seats.
-- When members exceed the paid seats, the organization stays over capacity at
-  the next period. The billing page shows the billed seat count and a
-  separate over-capacity warning. See
-  [D11](#d11-outside-seat-reduction-below-the-member-count).
-- Zero or missing stored paid seats are an invalid state that needs repair. That
-  state has no renewal estimate, and the scheduler sends no count. The
-  scheduler returns an error, and the sync worker tries again.
-- The billing estimate and the scheduler use the same quantity from the stored
-  plan. Before sending, the scheduler also caps that quantity at the paid seats
-  in the Polar response. The estimate and scheduled count match when the stored
-  plan and the Polar response report the same valid paid seat count.
-- An older Polar response does not replace the newer stored plan, but its paid
-  seat count still caps the scheduled count. For example, 9 members and 10
-  stored paid seats give an estimate of 9. An older Polar response with 4 paid
-  seats caps the scheduled count at 4. The next scheduler run reads Polar again.
+- Zero or missing paid seats are an invalid state that needs repair. That
+  state has no renewal estimate, and SuperPlane sends no count.
+- Legacy cleanup clears only the verified automatic reductions that the
+  retired scheduler sent. It keeps schedules that an Admin made.
 
-**Implementation.** `RenewalSeats` and `ResolveRenewalSeats` in
-`pkg/entitlements/seat_renewal.go` define the quantity from the stored plan.
-They return `ErrInvalidPaidSeats` for zero or missing paid seats.
-`resolvePlanSeats` in `pkg/entitlements/seats.go` uses the rule for the estimate, and
-`describe_organization_billing.go` in `pkg/grpc/actions/organizations/` omits
-`expected_renewal_seats` and `expected_renewal_cents` when the rule returns no
-count. `loadLocalState` in `pkg/billing/seatrenewal/schedule.go` uses the same
-rule for the initial scheduler target. `Scheduler.schedule` then applies
-`min(*result.Target, *snapshot.Seats)` before sending the count to Polar. This
-extra cap prevents renewal from adding seats above the Polar response count.
-`BillingSeatsCard.tsx` in
-`web_src/src/pages/factories/pages/organizationSettings/` shows the estimate,
-the over-capacity explanation, and the unavailable estimate.
+See [Remove unused seats](#remove-unused-seats) for unresolved operations,
+estimates, change and cancel, and protective cancellation.
 
-**Options considered.**
+**Superseded decision of 2026-10-25.** Option 2 for valid paid seats, and the
+first choice of option 3 for an invalid count. The renewal quantity was
+`min(max(members, 1), current paid seats)`. Members were current, accepted
+human members, owner included, and pending invitations never counted. A
+scheduler sent that quantity to Polar as a next-period seat update after each
+membership change and every 5 minutes. Before it sent the quantity, it also
+capped the quantity at the paid seats in the Polar response. The earlier PRD
+formula was "occupied seats (minimum 1)". The options considered were: renew
+all members (option 1), cap the renewal quantity at the paid seats (option 2,
+chosen), and, for an invalid Polar count, send nothing and retry, send the
+occupied count without a cap, or block joins (option 3).
 
-1. Renew all members. Send the occupied count, even above the paid seats.
-   - Tradeoff: Billing matches the people who have access.
-   - Tradeoff: The change adds seats without a purchase flow, so the PRD rule
-     that seat changes need a SuperPlane purchase and payment confirmation
-     does not hold for those seats. It can also exceed the plan maximum.
-2. Cap the renewal quantity at the paid seats (chosen).
-   - Tradeoff: Renewal never adds seats or charges for seats that the
-     organization did not buy.
-   - Tradeoff: Members above the cap stay in the over-capacity state at the
-     next period. See
-     [D11](#d11-outside-seat-reduction-below-the-member-count).
-3. Handle an invalid Polar count.
-   - Send nothing and retry (chosen). Tradeoff: The renewal can use a stale
-     count when the count stays invalid until renewal.
-   - Send the occupied count with no cap. Tradeoff: Renewal can add seats
-     from bad data.
-   - Block joins until the count is valid. Tradeoff: A Polar data problem
-     blocks members who did nothing wrong.
+**Shipped today.**
 
-**Unblocks.** 27b and 32.
+- The automatic scheduler is retired. No flow sends a next-period seat
+  update. Reductions that the retired scheduler sent stay in Polar until
+  legacy cleanup.
+- `organization_billing_plans.renewal_seats_scheduled` and
+  `renewal_seats_scheduled_at` keep the last count that the retired scheduler
+  sent. Nothing writes them now.
+- The billing estimate still uses the superseded formula through
+  `RenewalSeats` in `pkg/entitlements/seat_renewal.go`. The estimate and the
+  copy change with the seat removal presentation. Do not release the retained
+  renewal policy before legacy cleanup and that presentation are complete.
+
+**Evidence for the gates.**
+
+- G5: the replaced D14 is recorded here. The renewal quantity, the estimate,
+  and the copy show retained seats and Admin removal.
+- G9: sandbox evidence shows an ordinary renewal that keeps the paid seats; a
+  removal as a next-period update with no charge or credit; change, cancel,
+  and same-count clearing; a purchase that clears a pending removal;
+  past-due handling; and the 10-minute boundary.
+- G10: actual invoices show a purchase that starts from P while a removal is
+  pending, and a removal with no current charge, refund, or credit.
+- G13: alert policies cover unresolved purchases, independent of the
+  reconciliation results; unresolved removals; over-capacity lines that
+  describe committed state only; and reconciliation failures. The retired
+  signals `billing.seat_renewal_mismatch_fixed`,
+  `billing.seat_renewal_blocked_by_purchase`, and the `renewal_impact` field
+  no longer exist. Remove them from alert policies.
+
+**Unblocks.** 9B1.
 
 ### D15. Signup without email delivery
 

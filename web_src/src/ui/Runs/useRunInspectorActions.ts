@@ -8,6 +8,7 @@ import {
   canvasesReemitTriggerEvent,
   type CanvasesCanvasRun,
 } from "@/api-client";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { RunInspectorNodeSection } from "./types";
@@ -26,6 +27,7 @@ export function useRunInspectorActions({
   onRerunCreated?: (eventId: string) => void | Promise<void>;
 }) {
   const queryClient = useQueryClient();
+  const readOnly = useIsSupportSession();
   const runningExecutionIds = useMemo(() => {
     const ids = new Set<string>();
     for (const executionRef of run.executions ?? []) {
@@ -70,6 +72,7 @@ export function useRunInspectorActions({
   const cancelQueuedItemMutation = useCancelQueuedItemMutation({ canvasId, refreshRunQueries });
 
   return {
+    readOnly,
     rerun: () => rerunMutation.mutate(),
     rerunPending: rerunMutation.isPending,
     stop: () => stopMutation.mutate(),

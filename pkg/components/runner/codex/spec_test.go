@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
-func TestDecodeRunCodexSpecRequiresPromptStep(t *testing.T) {
+func TestDecodeRunCodexSpecAllowsBashOnly(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunCodexSpec(map[string]any{
@@ -26,9 +26,7 @@ func TestDecodeRunCodexSpecRequiresPromptStep(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.True(t, spec.IncludeVisualEvidence)
-	err = validateRunCodexSpec(spec)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "prompt")
+	require.NoError(t, validateRunCodexSpec(spec))
 }
 
 func TestValidateRunCodexSpecRejectsHostedCredentials(t *testing.T) {

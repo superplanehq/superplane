@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,14 +11,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
-	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
@@ -143,11 +142,13 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 	if req.InvitationDurationDays != nil && (*req.InvitationDurationDays < 1 || *req.InvitationDurationDays > 365) {
 		return errors.Join(errInvalidInstallationSettingsRequest, errors.New("invitation duration must be between 1 and 365 days"))
 	}
-	if req.PastDueGraceDays != nil && (*req.PastDueGraceDays < 0 || *req.PastDueGraceDays > models.MaxPastDueGraceDays) {
-		return errors.Join(errInvalidInstallationSettingsRequest, fmt.Errorf("past due grace must be between 0 and %d days", models.MaxPastDueGraceDays))
+	if req.PastDueGraceDays != nil {
+		if err := billing.ValidatePastDueGraceDays(*req.PastDueGraceDays); err != nil {
+			return errors.Join(errInvalidInstallationSettingsRequest, err)
+		}
 	}
 	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil || req.InvitationDurationDays != nil || req.PastDueGraceDays != nil {
+		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil || req.InvitationDurationDays != nil {
 			err := models.ApplyInstallationMetadata(tx, func(metadata *models.InstallationMetadata) {
 				if req.AllowPrivateNetworkAccess != nil {
 					metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
@@ -161,13 +162,15 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 					metadata.InvitationDurationDays = *req.InvitationDurationDays
 				}
 
-				if req.PastDueGraceDays != nil {
-					metadata.PastDueGraceDays = *req.PastDueGraceDays
-				}
-
 				metadata.UpdatedAt = time.Now()
 			})
 			if err != nil {
+				return err
+			}
+		}
+
+		if req.PastDueGraceDays != nil {
+			if err := billing.UpdatePastDueGraceDays(tx, *req.PastDueGraceDays); err != nil {
 				return err
 			}
 		}
@@ -191,11 +194,16 @@ func (s *Server) buildInstallationSettingsResponse() (installationSettingsRespon
 		return installationSettingsResponse{}, err
 	}
 
+	graceDays, err := billing.GetPastDueGraceDays(database.Conn())
+	if err != nil {
+		return installationSettingsResponse{}, err
+	}
+
 	response := installationSettingsResponse{
 		AllowPrivateNetworkAccess:  policy.AllowPrivateNetworkAccess,
 		SignupsEnabled:             metadata.SignupsEnabled,
 		InvitationDurationDays:     metadata.InvitationDurationDays,
-		PastDueGraceDays:           metadata.PastDueGraceDays,
+		PastDueGraceDays:           graceDays,
 		SignupsBlockedByEnv:        s.authHandler.SignupsBlockedByEnvironment(),
 		EffectiveBlockedHTTPHosts:  policy.BlockedHosts,
 		EffectivePrivateIPRanges:   policy.PrivateIPRanges,
@@ -601,15 +609,15 @@ func (s *Server) adminListOrgUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// startImpersonation begins an impersonation session.
-func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
-	// Block nested impersonation only if the existing token is still valid.
-	if tokenStr, err := impersonation.ReadCookie(r); err == nil {
-		if _, validErr := impersonation.ValidateToken(s.jwt, tokenStr); validErr == nil {
-			http.Error(w, "Already impersonating — end current session first", http.StatusBadRequest)
+// startSupportSession begins a support session.
+func (s *Server) startSupportSession(w http.ResponseWriter, r *http.Request) {
+	// Block nested support sessions only if the existing token is still valid.
+	if tokenStr, err := supportsession.ReadCookie(r); err == nil {
+		if _, validErr := supportsession.ValidateToken(s.jwt, tokenStr); validErr == nil {
+			http.Error(w, "End the current support session first", http.StatusBadRequest)
 			return
 		}
-		impersonation.ClearCookie(w, r)
+		supportsession.ClearCookie(w, r)
 	}
 
 	admin, ok := middleware.GetAccountFromContext(r.Context())
@@ -633,7 +641,7 @@ func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.AccountID == admin.ID.String() {
-		http.Error(w, "Cannot impersonate yourself", http.StatusBadRequest)
+		http.Error(w, "You cannot start a support session for your own account", http.StatusBadRequest)
 		return
 	}
 
@@ -643,27 +651,27 @@ func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if target.IsBlocked() {
-		http.Error(w, "Cannot impersonate a blocked account", http.StatusBadRequest)
+		http.Error(w, "You cannot start a support session for a blocked account", http.StatusBadRequest)
 		return
 	}
 
-	token, err := impersonation.GenerateToken(s.jwt, admin.ID.String(), target.ID.String())
+	token, err := supportsession.GenerateToken(s.jwt, admin.ID.String(), target.ID.String())
 	if err != nil {
-		log.Errorf("admin: failed to generate impersonation token: %v", err)
-		http.Error(w, "Failed to start impersonation", http.StatusInternalServerError)
+		log.Errorf("admin: failed to generate support session token: %v", err)
+		http.Error(w, "Failed to start support session", http.StatusInternalServerError)
 		return
 	}
 
-	impersonation.SetCookie(w, r, token)
+	supportsession.SetCookie(w, r, token)
 
 	log.WithFields(log.Fields{
 		"admin_account_id":  admin.ID.String(),
 		"admin_email":       admin.Email,
 		"target_account_id": target.ID.String(),
 		"target_email":      target.Email,
-		"action":            "impersonation_start",
+		"action":            "support_session_start",
 		"client_ip":         r.RemoteAddr,
-	}).Info("admin impersonation started")
+	}).Info("admin support session started")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -671,8 +679,8 @@ func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// endImpersonation ends the current impersonation session.
-func (s *Server) endImpersonation(w http.ResponseWriter, r *http.Request) {
+// endSupportSession ends the current support session.
+func (s *Server) endSupportSession(w http.ResponseWriter, r *http.Request) {
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -683,22 +691,22 @@ func (s *Server) endImpersonation(w http.ResponseWriter, r *http.Request) {
 	fields := log.Fields{
 		"admin_account_id": account.ID.String(),
 		"admin_email":      account.Email,
-		"action":           "impersonation_end",
+		"action":           "support_session_end",
 		"client_ip":        r.RemoteAddr,
 	}
 
-	if tokenStr, err := impersonation.ReadCookie(r); err == nil {
-		if claims, err := impersonation.ValidateToken(s.jwt, tokenStr); err == nil {
-			fields["target_account_id"] = claims.ImpersonatedAccountID
-			if target, err := models.FindAccountByID(claims.ImpersonatedAccountID); err == nil {
+	if tokenStr, err := supportsession.ReadCookie(r); err == nil {
+		if claims, err := supportsession.ValidateToken(s.jwt, tokenStr); err == nil {
+			fields["target_account_id"] = claims.TargetAccountID
+			if target, err := models.FindAccountByID(claims.TargetAccountID); err == nil {
 				fields["target_email"] = target.Email
 			}
 		}
 	}
 
-	log.WithFields(fields).Info("admin impersonation ended")
+	log.WithFields(fields).Info("admin support session ended")
 
-	impersonation.ClearCookie(w, r)
+	supportsession.ClearCookie(w, r)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -706,16 +714,16 @@ func (s *Server) endImpersonation(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// impersonationStatus returns the current impersonation state.
-func (s *Server) impersonationStatus(w http.ResponseWriter, r *http.Request) {
-	tokenStr, err := impersonation.ReadCookie(r)
+// supportSessionStatus returns the current support session state.
+func (s *Server) supportSessionStatus(w http.ResponseWriter, r *http.Request) {
+	tokenStr, err := supportsession.ReadCookie(r)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"active": false})
 		return
 	}
 
-	claims, err := impersonation.ValidateToken(s.jwt, tokenStr)
+	claims, err := supportsession.ValidateToken(s.jwt, tokenStr)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"active": false})
@@ -730,9 +738,9 @@ func (s *Server) impersonationStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	target, err := models.FindAccountByID(claims.ImpersonatedAccountID)
+	target, err := models.FindAccountByID(claims.TargetAccountID)
 	if err != nil || target.IsBlocked() {
-		impersonation.ClearCookie(w, r)
+		supportsession.ClearCookie(w, r)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"active": false})
 		return
@@ -1106,7 +1114,7 @@ func adminOrganizationRemainingCents(ctx context.Context, organizations []models
 			missing = append(missing, org.ID)
 			continue
 		}
-		cents[org.ID] = pricebook.MicrosToCents(*org.RemainingCreditMicros)
+		cents[org.ID] = billing.MicrosToCents(*org.RemainingCreditMicros)
 	}
 	if len(missing) == 0 {
 		return cents, nil
@@ -1123,14 +1131,14 @@ func adminOrganizationRemainingCents(ctx context.Context, organizations []models
 }
 
 func remainingCreditCentsByOrganization(ctx context.Context, organizationIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
-	micros, err := models.RemainingHostedCreditMicros(database.DB(ctx), organizationIDs)
+	micros, err := billing.RemainingCreditMicros(database.DB(ctx), organizationIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	cents := make(map[uuid.UUID]int64, len(organizationIDs))
 	for _, id := range organizationIDs {
-		cents[id] = pricebook.MicrosToCents(micros[id])
+		cents[id] = billing.MicrosToCents(micros[id])
 	}
 	return cents, nil
 }

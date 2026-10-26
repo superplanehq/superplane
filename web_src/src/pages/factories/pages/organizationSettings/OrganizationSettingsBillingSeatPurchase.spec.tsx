@@ -17,6 +17,7 @@ let canManageBilling = true;
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: (resource: string, action: string) => resource !== "org" || action !== "update" || canManageBilling,
+    hasPermission: (resource: string, action: string) => resource !== "org" || action !== "update" || canManageBilling,
     isLoading: false,
   }),
 }));
@@ -66,6 +67,8 @@ describe("Organization billing seat purchases", () => {
             proratedChargeCents: "1234",
             newMonthlyTotalCents: "35123",
             periodEnd: ACTIVE_BILLING_PERIOD_ENDS_AT,
+            subscriptionId: "sub_team",
+            billingPeriodStart: "2026-10-01T00:00:00Z",
           },
         },
       },
@@ -174,10 +177,11 @@ describe("Organization billing seat purchases", () => {
     expect(dialog).toHaveTextContent("Resume the subscription before buying seats.");
     expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Confirm purchase" })).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Close" }));
-    expect(
-      await within(screen.getByTestId("billing-plans")).findByRole("button", { name: "Keep Team" }),
-    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(screen.getByTestId("billing-plans")).getByRole("button", { name: "Keep Team" })).toBeVisible(),
+    );
     expect(purchaseRequests).toHaveLength(0);
   });
 

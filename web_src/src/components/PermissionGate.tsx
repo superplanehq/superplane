@@ -4,6 +4,8 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionDeniedPage } from "@/components/PermissionDeniedPage";
 import { cn } from "@/lib/utils";
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
+import { SUPPORT_SESSION_READ_ONLY_MESSAGE } from "@/lib/supportSession";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 
 interface PermissionTooltipProps {
@@ -14,6 +16,7 @@ interface PermissionTooltipProps {
 }
 
 export function PermissionTooltip({ allowed, message, children, className }: PermissionTooltipProps) {
+  const inSupportSession = useIsSupportSession();
   if (allowed) return <>{children}</>;
 
   return (
@@ -23,7 +26,7 @@ export function PermissionTooltip({ allowed, message, children, className }: Per
           <div className="pointer-events-none opacity-60 w-full">{children}</div>
         </div>
       </TooltipTrigger>
-      <TooltipContent side="top">{message}</TooltipContent>
+      <TooltipContent side="top">{inSupportSession ? SUPPORT_SESSION_READ_ONLY_MESSAGE : message}</TooltipContent>
     </Tooltip>
   );
 }
@@ -46,14 +49,16 @@ function PermissionLoading() {
   );
 }
 
+// Route gates use the real permission so a read-only support session can
+// still open pages whose actions it cannot use.
 export function RequirePermission({ resource, action, children }: RequirePermissionProps) {
-  const { canAct, isLoading } = usePermissions();
+  const { hasPermission, isLoading } = usePermissions();
 
   if (isLoading) {
     return <PermissionLoading />;
   }
 
-  if (!canAct(resource, action)) {
+  if (!hasPermission(resource, action)) {
     return <PermissionDeniedPage resource={resource} action={action} />;
   }
 
@@ -66,13 +71,13 @@ interface RequireAnyPermissionProps {
 }
 
 export function RequireAnyPermission({ checks, children }: RequireAnyPermissionProps) {
-  const { canAct, isLoading } = usePermissions();
+  const { hasPermission, isLoading } = usePermissions();
 
   if (isLoading) {
     return <PermissionLoading />;
   }
 
-  if (!checks.some((check) => canAct(check.resource, check.action))) {
+  if (!checks.some((check) => hasPermission(check.resource, check.action))) {
     return <PermissionDeniedPage />;
   }
 
