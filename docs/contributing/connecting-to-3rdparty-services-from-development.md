@@ -71,6 +71,16 @@ The AWS integration uses OpenID Connect. When running locally, AWS IAM needs an 
 3. **Verify:** Open `https://<tunnel-url>/.well-known/openid-configuration` in a browser; the JSON `issuer` must match the tunnel URL.
 4. **IAM:** In AWS IAM → Identity providers → Add provider (OpenID Connect), set **Provider URL** to the tunnel URL and **Audience** to your SuperPlane AWS integration ID (shown in the app when configuring the integration).
 
+## GitHub Enterprise Cloud (local)
+
+Turn on the `github_enterprise` organization feature. Set
+`SUPERPLANE_GITHUB_ENTERPRISE_ALLOWED_HOSTS` in `.env` if you want to limit
+hostnames. Empty allows any hostname that SuperPlane accepts.
+
+First-run then offers GitHub Enterprise Cloud. Create a GitHub App on the
+enterprise organization. SuperPlane does not use the hosted GitHub App for
+that host. The local tunnel must still reach GitHub webhooks.
+
 ## Factory GitHub App (local workspace setup)
 
 Factory workspace setup installs a GitHub App. Cloud holds the public

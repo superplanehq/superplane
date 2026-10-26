@@ -2253,6 +2253,14 @@ func (l *lazyWebhookFactory) VCSProvider() (string, error) {
 	return inner.VCSProvider()
 }
 
+func (l *lazyWebhookFactory) GitHubHost() (string, error) {
+	inner, err := l.load()
+	if err != nil {
+		return "", err
+	}
+	return inner.GitHubHost()
+}
+
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {
 	tx := database.Conn()
 	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)

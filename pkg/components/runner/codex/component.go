@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -93,7 +94,7 @@ func (c *RunCodex) Configuration() []configuration.Field {
 		runner.AgentStepsField(
 			"Ordered bash commands and Codex prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",
-			"git clone https://github.com/org/repo.git /tmp/repo",
+			"git clone "+githubcommon.DotCom().CloneURL("org/repo")+" /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
 		runner.AgentAdditionalInstructionsField(),

@@ -36,3 +36,6 @@ export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
 
 /** Organization experimental feature: catalog billing and payment setup. */
 export const FEATURE_NEW_BILLING = "new_billing";
+
+/** Organization experimental feature: GitHub Enterprise Cloud (ghe.com) connections. */
+export const FEATURE_GITHUB_ENTERPRISE = "github_enterprise";

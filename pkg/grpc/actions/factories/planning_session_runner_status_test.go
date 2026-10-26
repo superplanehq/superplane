@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -16,16 +17,16 @@ import (
 
 func TestPlanningSessionReportsRunnerCapacityThroughSessionAndBoardAPIs(t *testing.T) {
 	r := support.Setup(t)
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.DB(t.Context())
 	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
 	session := openAnalysisSession(t, r, db)
-	plan := &models.BillingPlan{
+	plan := &billingmodels.BillingPlan{
 		Key: "planning_" + uuid.NewString()[:8], Name: "Planning capacity", Category: "paid", Visibility: "private",
 		CreditFrequency: "none", CreditExpiration: "never", ParallelTaskLimit: new(1),
 	}
-	require.NoError(t, models.SaveBillingPlan(db, plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, billingmodels.SaveBillingPlan(db, plan))
+	_, err := billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
 	fleet := models.DefaultInstallationRunnerFleets("test")[0]
 	fleet.Slug = support.RandomName("planning")

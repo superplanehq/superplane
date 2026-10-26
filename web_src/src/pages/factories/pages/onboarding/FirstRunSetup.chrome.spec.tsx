@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
 import { useState } from "react";
@@ -10,10 +10,11 @@ import { unmockedPackage } from "@/test/unmockedModule";
 
 import { billingState, defaultBillingState, refetchBilling } from "./FirstRunSetup.chrome.spec.billing";
 
+import { hostedVcsModel, pageModel, setupState } from "./FirstRunSetup.chrome.spec.model";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
-import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+import { useOnboardingSetupState } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
@@ -43,7 +44,9 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
-
+vi.mock("./useFirstRunGitHubEnterprise", () => ({
+  useFirstRunGitHubEnterprise: () => ({ connect: vi.fn() }),
+}));
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({
     data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
@@ -124,74 +127,6 @@ vi.mock("./AgentStep", () => ({
     <div data-testid="agent-step" data-custom-provider={showCustomProvider ? "yes" : "no"} />
   ),
 }));
-
-function setupState(): OnboardingSetupApi {
-  const { result } = renderHook(() =>
-    useOnboardingSetupState("Payments Service", {
-      simulateDiscovery: false,
-      connected: new Set(["github"]),
-      initial: { vcsHost: "github", issuesChoice: "vcs", selectedRepo: "acme/api" },
-    }),
-  );
-  return result.current;
-}
-
-function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPageModel {
-  return {
-    setup: setupState(),
-    hostedAgentReady: false,
-    hostedModelsAvailable: false,
-    hostedModelsAvailableLoading: false,
-    bringYourOwnKey: false,
-    bringYourOwnKeyLoading: false,
-    customProvider: false,
-    agentCredentialChoice: null,
-    setAgentCredentialChoice: vi.fn(),
-    agentLoading: false,
-    agentModelPicker: undefined,
-    openSection: "issues",
-    setOpenSection: vi.fn(),
-    requestConnect: vi.fn(),
-    selectCatalogRepository: vi.fn().mockResolvedValue(true),
-    selectBitbucketRepository: vi.fn().mockResolvedValue(true),
-    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
-    bitbucketIntegrationId: "",
-    integrationDialogs: <></>,
-    canConfigureWorkspace: true,
-    saving: false,
-    saveName: vi.fn().mockResolvedValue(true),
-    saveAgent: vi.fn().mockResolvedValue(true),
-    saveIssues: vi.fn().mockResolvedValue(true),
-    finish: vi.fn(),
-    provisionedDestination: null,
-    githubOwner: undefined,
-    jiraIntegrationId: "",
-    jiraProjectId: "",
-    setJiraProjectId: vi.fn(),
-    jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
-    jiraProjects: [],
-    jiraProjectsLoading: false,
-    jiraProjectsError: false,
-    retryJiraProjects: vi.fn(),
-    linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
-    ...overrides,
-  };
-}
-
-function hostedVcsModel(overrides: Partial<OnboardingPageModel> = {}) {
-  return pageModel({
-    hostedAgentReady: true,
-    hostedModelsAvailable: true,
-    setup: { ...setupState(), issuesChoice: "vcs" },
-    ...overrides,
-  });
-}
 
 function StatefulSetup({ model }: { model: OnboardingPageModel }) {
   const [choice, setChoice] = useState<OnboardingAgentCredentialChoice | null>(null);

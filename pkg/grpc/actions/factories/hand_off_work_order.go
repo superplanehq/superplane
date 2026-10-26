@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
@@ -653,7 +654,7 @@ func parseBitbucketPullRequestURL(rawURL string) (parsedHandOffPullRequestURL, b
 
 func parseGitHubPullRequestURL(rawURL string) (repository string, number int, ok bool) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
+	if err != nil || !githubcommon.IsKnownGitHubWebHostname(parsed.Hostname()) {
 		return "", 0, false
 	}
 
