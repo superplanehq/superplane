@@ -18,7 +18,7 @@ The archive contains:
 
 - `docker-compose.yml` for the app, Fleet Manager, Postgres, RabbitMQ, and Caddy
 - `install.sh`, which keeps existing secrets when you run it again
-- `fleet-manager.yaml`, which configures the local Docker runner fleet
+- `uninstall.sh`, which removes this installation and preserves data by default
 - `Caddyfile` for automatic HTTPS
 
 The installer starts Fleet Manager automatically. Set
@@ -49,3 +49,23 @@ bash release/superplane-single-host-tarball/smoke-test.sh \
 ```
 
 Set `SUPERPLANE_SMOKE_KEEP=yes` to keep that install running.
+
+## Remove the installation
+
+Run `uninstall.sh` from the installation directory. It removes the verified
+Compose services, managed runners, and project network. It preserves named
+volumes, configuration, and OIDC keys by default.
+
+Stop new work and wait for tasks to finish. Use `--force` to permit interruption
+of running runners. Use `--yes` to skip confirmation. These flags do not delete
+volumes.
+
+When preserving data, the script retires runners through the application API
+before removal. If retirement fails, run `install.sh` to resume before retrying.
+
+Use `--purge` to delete verified project volumes after you back up the data.
+Host configuration and OIDC keys remain. After a preserving removal, run
+`install.sh` before a later purge so the script can verify resource ownership.
+
+The public [maintenance guide](https://docs.superplane.com/self-hosting/upgrade-and-uninstall/)
+contains the operator procedures. Do not use a global Docker prune command.
