@@ -82,7 +82,7 @@ func creditPurchaseFromOrder(order OrderData) (*CreditPurchaseQuote, error) {
 		subtotal < minimumUSDPriceCents || subtotal > maximumUSDPriceCents {
 		return nil, permanentApplyError("credit purchase metadata amounts are invalid")
 	}
-	if !strings.EqualFold(strings.TrimSpace(order.Currency), "usd") || order.NetAmount != subtotal {
+	if !strings.EqualFold(strings.TrimSpace(order.Currency), "usd") || !creditPurchaseChargeMatches(order, subtotal) {
 		return nil, permanentApplyError("credit purchase paid amount or currency does not match the checkout")
 	}
 	return &CreditPurchaseQuote{
@@ -91,6 +91,20 @@ func creditPurchaseFromOrder(order OrderData) (*CreditPurchaseQuote, error) {
 		SubtotalCents:      subtotal,
 		Currency:           "usd",
 	}, nil
+}
+
+// creditPurchaseChargeMatches accepts the quoted subtotal less a consistent
+// Polar discount. Orders without subtotal_amount must be undiscounted.
+func creditPurchaseChargeMatches(order OrderData, quotedSubtotal int64) bool {
+	orderSubtotal := order.NetAmount
+	if order.SubtotalAmount != nil {
+		orderSubtotal = *order.SubtotalAmount
+	}
+	return orderSubtotal == quotedSubtotal &&
+		order.DiscountAmount >= 0 &&
+		order.NetAmount >= 0 &&
+		order.NetAmount <= quotedSubtotal &&
+		order.NetAmount == orderSubtotal-order.DiscountAmount
 }
 
 func parseCreditPurchaseCents(value any) (int64, error) {
