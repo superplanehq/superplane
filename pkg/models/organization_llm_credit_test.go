@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
@@ -57,6 +58,33 @@ func Test__WelcomeGrantSetsExpiresAt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, summary.WelcomeCreditExpiresAt)
 	assert.WithinDuration(t, *grant.ExpiresAt, *summary.WelcomeCreditExpiresAt, time.Second)
+}
+
+func Test__NewBillingSignupCreditDoesNotDependOnPlan(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	support.Setup(t)
+	db := database.Conn()
+	account, err := models.CreateAccountInTransaction(db, support.RandomName("account"), support.RandomName("owner")+"@example.com")
+	require.NoError(t, err)
+	organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, organization.ID, features.FeatureNewBilling))
+	require.NoError(t, models.GrantWelcomeCredit(db, organization.ID, account.ID))
+	summary, err := models.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CentsToMicros(1000), summary.GrantMicros)
+	require.NotNil(t, summary.WelcomeCreditExpiresAt)
+	require.WithinDuration(t, time.Now().AddDate(0, 0, 365), *summary.WelcomeCreditExpiresAt, time.Minute)
+	require.NoError(t, models.GrantWelcomeCredit(db, organization.ID, account.ID))
+	again, err := models.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, summary.GrantMicros, again.GrantMicros)
+	second, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
+	require.NoError(t, err)
+	require.NoError(t, models.GrantWelcomeCredit(db, second.ID, account.ID))
+	secondCredit, err := models.DescribeOrganizationLLMCredit(db, second.ID)
+	require.NoError(t, err)
+	require.Zero(t, secondCredit.GrantMicros)
 }
 
 func Test__ExpiredWelcomeCreditIsNotUsable(t *testing.T) {

@@ -111,7 +111,25 @@ type OrganizationLLMCreditSummary struct {
 	WelcomeCreditExpiresAt   *time.Time
 }
 
+// GrantWelcomeCredit grants signup credit once per account. New billing uses
+// the same $10 credit for either starter plan, independent of plan selection.
 func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
+	settings, err := FindBillingPlan(tx, BillingPlanTrial)
+	if err != nil {
+		return err
+	}
+	newBilling, err := OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureNewBilling)
+	if err != nil {
+		return err
+	}
+	if newBilling {
+		settings.TrialCreditCents = 1000
+		settings.TrialLengthDays = 365
+	}
+	return grantWelcomeCredit(tx, orgID, accountID, settings)
+}
+
+func grantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID, settings *BillingPlan) error {
 	if accountID == uuid.Nil {
 		return errors.New("account is required for welcome credit")
 	}
@@ -127,10 +145,6 @@ func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
 		return nil
 	}
 
-	settings, err := FindBillingPlan(tx, BillingPlanTrial)
-	if err != nil {
-		return err
-	}
 	amount := CentsToMicros(settings.TrialCreditCents)
 	if amount <= 0 {
 		return nil
@@ -1041,6 +1055,10 @@ func includedCreditDeltaForTarget(tx *gorm.DB, orgID uuid.UUID, target int64, no
 }
 
 func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingPlan) error {
+	// Starter plans share signup credit; switching plans does not add another grant.
+	if next.Catalog.Key == "pay_as_you_go" || next.Catalog.Key == "starter" {
+		return nil
+	}
 	if previous == nil || previous.PlanSource == BillingPlanSourceAdmin || previous.Catalog.Category != "trial" ||
 		next.Catalog.Category != "paid" || next.Catalog.Visibility != "public" || next.Catalog.TrialCreditCents == 0 {
 		return nil

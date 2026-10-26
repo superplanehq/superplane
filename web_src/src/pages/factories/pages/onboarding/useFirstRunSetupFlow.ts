@@ -34,7 +34,11 @@ import {
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
-export type FirstRunScreen = "welcome" | "host" | "connect" | "choose" | "tickets" | "agent" | "complete";
+export type FirstRunScreen = "welcome" | "host" | "connect" | "choose" | "tickets" | "card" | "agent" | "complete";
+// Screens with no wizard step of their own use their name in the URL.
+const URL_ONLY_SCREENS: ReadonlySet<string> = new Set<FirstRunScreen>(["welcome", "host", "card", "complete"]);
+// Screens after the backlog step need a repository and a complete intake choice.
+const FINAL_SCREENS: ReadonlySet<FirstRunScreen> = new Set<FirstRunScreen>(["card", "agent", "complete"]);
 const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   vcs: "connect",
   repo: "choose",
@@ -54,9 +58,13 @@ const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
 function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen | null {
   const requestedStep = searchParams.get("step");
   if (requestedStep === "billing") return "complete";
-  if (requestedStep === "complete" || requestedStep === "welcome" || requestedStep === "host") return requestedStep;
+  if (requestedStep && URL_ONLY_SCREENS.has(requestedStep)) return requestedStep as FirstRunScreen;
   if (isWizardStepId(requestedStep)) return SCREEN_FOR_STEP[requestedStep];
   return null;
+}
+
+function urlStepFor(screen: FirstRunScreen): string {
+  return URL_ONLY_SCREENS.has(screen) ? screen : (STEP_FOR_SCREEN[screen] ?? "vcs");
 }
 
 function resumeFirstRunScreen(args: {
@@ -139,10 +147,7 @@ function useFirstRunNavigation(
 
   const goToScreen = (next: FirstRunScreen) => {
     const updated = new URLSearchParams(searchParams);
-    updated.set(
-      "step",
-      next === "complete" || next === "welcome" || next === "host" ? next : (STEP_FOR_SCREEN[next] ?? "vcs"),
-    );
+    updated.set("step", urlStepFor(next));
     setSearchParams(updated);
     const step = STEP_FOR_SCREEN[next];
     if (step) {
@@ -159,12 +164,12 @@ function useFirstRunNavigation(
   let screen = availableScreen;
   const intakePending = intakeLookupPending(model);
   const githubPending = connection.onboarding.isPending;
-  if ((screen === "complete" || screen === "agent") && !model.setup.selectedRepo) screen = "host";
-  if ((screen === "complete" || screen === "agent") && !intakePrerequisitesSatisfied(model)) screen = "tickets";
+  if (FINAL_SCREENS.has(screen) && !model.setup.selectedRepo) screen = "host";
+  if (FINAL_SCREENS.has(screen) && !intakePrerequisitesSatisfied(model)) screen = "tickets";
   useEffect(() => {
     if (githubPending && !initialFirstRunScreen(searchParams)) return;
-    const step = screen === "complete" || screen === "welcome" || screen === "host" ? screen : STEP_FOR_SCREEN[screen];
-    if (!step || searchParams.get("step") === step || (screen === "tickets" && intakePending)) return;
+    const step = urlStepFor(screen);
+    if (searchParams.get("step") === step || (screen === "tickets" && intakePending)) return;
     const updated = new URLSearchParams(searchParams);
     updated.set("step", step);
     if (searchParams.get("step") === "billing") {

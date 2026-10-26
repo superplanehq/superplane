@@ -74,16 +74,34 @@ The target requires the Docker `db` service and the Polar sandbox.
 | Plan | Monthly price | Maximum seats | Sandbox product ID |
 | --- | --- | --- | --- |
 | Team | $50 per seat | 50 | `633e8026-988b-44de-8d65-31829948c975` |
-| Starter | $20 | Unlimited | `abc9ef98-20c0-48b5-8204-1448df733737` |
-| Pay-as-you-go | Usage-based | Existing setting | None |
+| Starter | $20 | 10 | `abc9ef98-20c0-48b5-8204-1448df733737` |
+| Pay-as-you-go | Usage-based | 10 | None |
 
 All three plans are public and require a payment card. Team includes every
-defined feature. Starter and Pay-as-you-go include only BYOS.
+defined feature. Starter and Pay-as-you-go include only BYOS. The seed
+creates Pay-as-you-go with no monthly subscription. Both starter plans allow
+10 members. Pay-as-you-go allows five tasks at once; Starter has no task limit.
 The seed enables local gating for features other than BYOS to enforce plan access.
-Repeated runs refresh these settings and preserve existing prices, product links,
-seat limits, and credit policies.
+Repeated runs refresh these settings and preserve existing prices and product links.
 The seed does not assign plans to organizations or change subscriptions.
 Production migrations do not run this seed.
+
+## Onboarding plan selection
+
+With **New Billing**, workspace onboarding shows Pay-as-you-go and Starter
+after ticket-source setup. Pay-as-you-go is selected initially. The choices
+come from the public billing catalog. Team is not an onboarding choice.
+
+The person saves a card in Polar. Pay-as-you-go then activates without a
+subscription charge. Starter continues to subscription checkout and returns
+to onboarding. Organizations with an existing paid plan skip this step.
+There is no admin setting for a default onboarding plan.
+
+New Billing accounts receive $10 in signup credit, valid for 365 days,
+independent of their plan choice. The grant is limited to one per account.
+Selecting a starter plan does not add a second signup grant. Older accounts
+whose onboarding deferred credit receive the grant during plan selection.
+The existing Trial credit policy still applies outside New Billing.
 
 ## Credit policy and follow-up work
 
@@ -120,8 +138,8 @@ an example. Use your catalog price for the actual estimates.
 
 1. Configure the sandbox product and public Team plan as described above.
 2. Enable **New Billing** for a new Trial organization with an owner and one active teammate.
-3. Complete workspace onboarding without selecting a plan or entering payment details.
-4. Confirm that the organization remains on Trial with the original trial expiration.
+3. Complete workspace onboarding and select Pay-as-you-go. Confirm that card setup activates that plan.
+4. Confirm that the organization has one signup credit grant.
 5. Open **Settings → Billing → Payment method** as a billing manager.
 6. Confirm that Team starts at two seats and shows the effective plan maximum.
 7. Select three seats. At $20 per seat, confirm a $60 initial estimate and $60 monthly total.
