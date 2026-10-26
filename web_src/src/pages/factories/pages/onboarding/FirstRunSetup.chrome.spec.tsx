@@ -76,12 +76,15 @@ vi.mock("./useGitHubOnboarding", () => ({
   useGitHubInstallationChecks: vi.fn(),
 }));
 
-type BillingState = { enabled: boolean; newBilling: boolean; byok: boolean; planActive: boolean };
-const billingState: BillingState & { availablePlans?: OrganizationsBillingPlanOption[] } = {
+const defaultBillingState = {
   enabled: false,
   newBilling: false,
   byok: false,
   planActive: false,
+  hasPaymentMethod: false,
+};
+const billingState: typeof defaultBillingState & { availablePlans?: OrganizationsBillingPlanOption[] } = {
+  ...defaultBillingState,
 };
 const billingData = () => ({
   billingEnabled: billingState.enabled,
@@ -89,6 +92,7 @@ const billingData = () => ({
   productFeatures: { byo_key: true },
   planCategory: billingState.planActive ? "paid" : "none",
   creditPurchaseAllowed: billingState.planActive,
+  hasPaymentMethod: billingState.hasPaymentMethod,
 });
 const refetchBilling = vi.fn(async () => ({ data: billingData() }));
 vi.mock("@/hooks/useOrganizationBilling", () => ({
@@ -106,20 +110,16 @@ vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
     refetch: async () => ({ data: workspaceUsage }),
   }),
 }));
-const openCardSetup = vi.fn<(onSaved?: () => void) => void>();
-vi.mock("@/hooks/useBillingCardSetup", () => ({
-  useBillingCardSetup: () => ({
-    open: openCardSetup,
-    error: "",
-    isPending: false,
-    opening: false,
-    waitingForCard: false,
-  }),
-}));
+const openCardSetup = vi.fn(async () => {});
 const activateOnboardingPlan = vi.fn(async () => {
   billingState.planActive = true;
+  return false;
 });
-vi.mock("./onboardingCardPlan", () => ({ activateOnboardingPlan }));
+vi.mock("./onboardingCardPlan", () => ({
+  activateOnboardingPlan,
+  createOnboardingCardSession: openCardSetup,
+  resumeOnboardingPlan: vi.fn(async () => false),
+}));
 
 const navigateSpy = vi.fn();
 
@@ -252,7 +252,7 @@ describe("FirstRunSetup chrome", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
     navigateSpy.mockClear();
-    Object.assign(billingState, { byok: false, enabled: false, newBilling: false, planActive: false });
+    Object.assign(billingState, defaultBillingState);
     billingState.availablePlans = [{ key: "free", name: "Free" }];
     refetchBilling.mockClear();
     openCardSetup.mockReset();
@@ -516,8 +516,8 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
-  it("asks for a card after the backlog step, then starts Pay-as-you-go", async () => {
-    Object.assign(billingState, { enabled: true, newBilling: true });
+  it("starts Pay-as-you-go after the backlog step when a card is saved", async () => {
+    Object.assign(billingState, { enabled: true, newBilling: true, hasPaymentMethod: true });
     billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
     const user = userEvent.setup();
     const model = hostedVcsModel();
@@ -530,8 +530,7 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-back"));
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
-    await user.click(await screen.findByTestId("first-run-add-card"));
-    openCardSetup.mock.calls[0][0]?.();
+    await user.click(await screen.findByTestId("first-run-card-continue"));
     await waitFor(() =>
       expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "pay_as_you_go", expect.any(Object)),
     );

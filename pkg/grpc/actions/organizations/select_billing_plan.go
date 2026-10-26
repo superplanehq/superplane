@@ -19,7 +19,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreatePaymentMethodSession(ctx context.Context, orgID string, _ *pb.CreatePaymentMethodSessionRequest, accountID string) (*pb.CreateBillingPortalSessionResponse, error) {
+func CreatePaymentMethodSession(ctx context.Context, orgID string, req *pb.CreatePaymentMethodSessionRequest, accountID, baseURL string) (*pb.CreateBillingPortalSessionResponse, error) {
 	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
 		return nil, err
@@ -30,10 +30,23 @@ func CreatePaymentMethodSession(ctx context.Context, orgID string, _ *pb.CreateP
 	if err := requireNewBilling(ctx, organizationID); err != nil {
 		return nil, err
 	}
+	returnURL := ""
+	if returnPath := req.GetReturnPath(); returnPath != "" {
+		target, err := url.Parse(returnPath)
+		if err != nil || !strings.HasPrefix(returnPath, "/") || strings.HasPrefix(returnPath, "//") || strings.Contains(returnPath, `\`) || target.IsAbs() || target.Host != "" || target.Fragment != "" {
+			return nil, grpcerrors.InvalidArgument(nil, "The card setup return path must be a local path.")
+		}
+		origin, err := url.Parse(businessCheckoutSuccessURL(baseURL, organizationID))
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "Could not open card setup.")
+		}
+		returnURL = origin.ResolveReference(target).String()
+	}
 	if err := ensureOrganizationBillingCustomer(ctx, organizationID, accountID); err != nil {
 		return nil, err
 	}
 	session, err := openPolarPortal(ctx, polar.NewClientFromEnv(), polar.CustomerSessionRequest{
+		ReturnURL:          returnURL,
 		ExternalCustomerID: organizationID.String(),
 		ExternalMemberID:   organizationID.String(),
 	})

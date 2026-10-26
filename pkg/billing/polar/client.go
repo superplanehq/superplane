@@ -125,6 +125,7 @@ type CustomerSession struct {
 }
 
 type CustomerSessionRequest struct {
+	ReturnURL          string
 	CustomerID         string
 	ExternalCustomerID string
 	MemberID           string
@@ -456,6 +457,9 @@ func (c *Client) createCheckout(ctx context.Context, body map[string]any) (*Chec
 
 func (c *Client) CreateCustomerSession(ctx context.Context, req CustomerSessionRequest) (*CustomerSession, error) {
 	body := map[string]any{}
+	if req.ReturnURL != "" {
+		body["return_url"] = req.ReturnURL
+	}
 	if externalID := strings.TrimSpace(req.ExternalCustomerID); externalID != "" {
 		body["external_customer_id"] = externalID
 	} else {

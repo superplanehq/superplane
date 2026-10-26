@@ -1035,6 +1035,7 @@ message SelectBillingPlanRequest {
 
 message CreatePaymentMethodSessionRequest {
   string id = 1;
+  string return_path = 2;
 }
 
 message CreateBusinessCheckoutRequest {

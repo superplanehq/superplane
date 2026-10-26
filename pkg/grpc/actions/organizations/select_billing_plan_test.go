@@ -191,7 +191,7 @@ func TestNewBillingIsOptInAndKeepsMigratedTrial(t *testing.T) {
 
 	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, r.Account.ID.String(), "http://localhost")
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
-	_, err = CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{}, r.Account.ID.String())
+	_, err = CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{}, r.Account.ID.String(), "http://localhost")
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	require.Zero(t, requests, "legacy onboarding must not contact Polar")
 
@@ -347,6 +347,9 @@ func TestPaymentMethodSetupCreatesCustomerWithoutCheckout(t *testing.T) {
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_new", "external_id": r.Organization.ID.String()}))
 		case "/customer-sessions/":
 			require.True(t, created)
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			require.Equal(t, "http://localhost/org/setup?step=card&plan=pay_as_you_go&card_setup=1", body["return_url"])
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"customer_id": "cust_new", "customer_portal_url": "https://polar.sh/portal/payment-settings", "token": sessionToken}))
 		default:
 			t.Errorf("card setup must not create a checkout or subscription: %s", req.URL.Path)
@@ -354,14 +357,18 @@ func TestPaymentMethodSetupCreatesCustomerWithoutCheckout(t *testing.T) {
 		}
 	})
 	usePolarTestServer(t, server)
-	response, err := CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{}, r.Account.ID.String())
+	response, err := CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{ReturnPath: "/org/setup?step=card&plan=pay_as_you_go&card_setup=1"}, r.Account.ID.String(), "http://localhost")
 	require.NoError(t, err)
 	require.Equal(t, "polar_cst_setup", response.SessionToken)
 	settings, err := models.FindOrganizationLLMSettings(database.DB(t.Context()), r.Organization.ID)
 	require.NoError(t, err)
 	require.Equal(t, "cust_new", *settings.PolarCustomerID)
+	for _, path := range []string{"https://example.com", "//example.com", "/setup#fragment"} {
+		_, err := CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{ReturnPath: path}, r.Account.ID.String(), "http://localhost")
+		require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	}
 	sessionToken = ""
-	_, err = CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{}, r.Account.ID.String())
+	_, err = CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{ReturnPath: "/org/setup?step=card&plan=pay_as_you_go&card_setup=1"}, r.Account.ID.String(), "http://localhost")
 	require.Equal(t, codes.Internal, grpcerrors.Code(err))
 }
 

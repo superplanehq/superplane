@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
 import { FirstRunCardScreen, type FirstRunCardPhase } from "./onboarding/first-run/FirstRunCardScreen";
+import { FirstRunCardReturnScreen } from "./onboarding/first-run/FirstRunCardReturnScreen";
 import { firstRunStoryChrome } from "./onboarding/first-run/firstRunMocks";
 import { repositorySphereFor } from "./onboarding/first-run/firstRunSphereFor";
 import { FirstRunTicketsScreen } from "./onboarding/first-run/FirstRunTicketsScreen";
@@ -59,7 +60,29 @@ type Story = StoryObj<typeof meta>;
 
 export const ChoosePlan: Story = { render: () => <PlanPreview /> };
 export const CardSaved: Story = { render: () => <PlanPreview initialPhase="card-saved" /> };
-export const WaitingForCard: Story = { render: () => <PlanPreview initialPhase="waiting-for-card" /> };
+export const FinishingSetup: Story = {
+  render: () => (
+    <FirstRunCardReturnScreen
+      chrome={firstRunStoryChrome(4)}
+      sphere={repositorySphereFor("acme/payments-service")}
+      busy
+      onRetry={() => console.log("retry setup")}
+      onBack={() => console.log("back to plans")}
+    />
+  ),
+};
+export const FinishSetupError: Story = {
+  render: () => (
+    <FirstRunCardReturnScreen
+      chrome={firstRunStoryChrome(4)}
+      sphere={repositorySphereFor("acme/payments-service")}
+      busy={false}
+      error="Your subscription is not active yet. Wait a moment, then try again."
+      onRetry={() => console.log("retry setup")}
+      onBack={() => console.log("back to plans")}
+    />
+  ),
+};
 export const CardError: Story = {
-  render: () => <PlanPreview error="Allow pop-ups for SuperPlane, then try again." />,
+  render: () => <PlanPreview error="Could not open card setup. Try again." />,
 };

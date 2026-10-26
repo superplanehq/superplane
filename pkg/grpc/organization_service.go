@@ -215,7 +215,7 @@ func (s *OrganizationService) SelectBillingPlan(ctx context.Context, req *pb.Sel
 func (s *OrganizationService) CreatePaymentMethodSession(ctx context.Context, req *pb.CreatePaymentMethodSessionRequest) (*pb.CreateBillingPortalSessionResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	accountID, _ := accountIDFromContext(ctx)
-	return organizations.CreatePaymentMethodSession(ctx, orgID, req, accountID)
+	return organizations.CreatePaymentMethodSession(ctx, orgID, req, accountID, s.baseURL)
 }
 
 func (s *OrganizationService) PreviewSeatPurchase(ctx context.Context, req *pb.PreviewSeatPurchaseRequest) (*pb.PreviewSeatPurchaseResponse, error) {
