@@ -148,6 +148,13 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		if err != nil {
 			return nil, err
 		}
+		if account, err := uuid.Parse(accountID); err == nil {
+			if err := db.Transaction(func(tx *gorm.DB) error {
+				return billingmodels.GrantWelcomeCredit(tx, organizationID, account)
+			}); err != nil {
+				return nil, grpcerrors.Internal(err, "Could not apply signup credit.")
+			}
+		}
 		return &pb.CreateBusinessCheckoutResponse{CheckoutUrl: session.URL}, nil
 	}
 	if catalog.PriceCents != 0 {
@@ -165,10 +172,25 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 			return nil, grpcerrors.FailedPrecondition(nil, "Add a payment method before selecting this plan.")
 		}
 	}
-	if _, err := billingmodels.ActivateOrganizationBillingPlan(db, organizationID, catalog.Key); err != nil {
+	if err := activatePlanWithWelcomeCredit(db, organizationID, accountID, catalog); err != nil {
 		return nil, grpcerrors.FailedPrecondition(err, "Could not select this plan.")
 	}
 	return &pb.CreateBusinessCheckoutResponse{}, nil
+}
+
+// activatePlanWithWelcomeCredit selects a plan that needs no checkout. The
+// one-time signup credit is also granted if an earlier onboarding deferred it.
+func activatePlanWithWelcomeCredit(db *gorm.DB, organizationID uuid.UUID, accountID string, catalog *billingmodels.BillingPlan) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if _, err := billingmodels.ActivateOrganizationBillingPlan(tx, organizationID, catalog.Key); err != nil {
+			return err
+		}
+		account, err := uuid.Parse(accountID)
+		if err != nil {
+			return nil
+		}
+		return billingmodels.GrantWelcomeCredit(tx, organizationID, account)
+	})
 }
 
 func requireNewBilling(ctx context.Context, orgID uuid.UUID) error {

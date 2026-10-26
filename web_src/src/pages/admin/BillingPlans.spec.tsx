@@ -58,7 +58,7 @@ function stubBillingCatalog(
       const path = String(input);
       const method = init?.method ?? "GET";
       requests.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-      if (path.endsWith("feature-definitions")) return new Response("[]");
+      if (path.endsWith("feature-definitions") || path.includes("polar/products")) return new Response("[]");
       if (method === "GET" && path.endsWith("billing-plans")) {
         if (failNextRefresh) {
           failNextRefresh = false;

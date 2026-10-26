@@ -633,7 +633,7 @@ func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
 	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	plans := []billingmodels.BillingPlan{
-		{Name: "Flat price", Visibility: "public", PriceCents: 2000},
+		{Name: "Flat price", Visibility: "public", PriceCents: 2000, ParallelTaskLimit: new(2)},
 		{Name: "Seat price", Visibility: "public", PriceCents: 3000, PerSeat: true, SeatLimit: new(50)},
 		{Name: "Zero-price seats", Visibility: "public", PerSeat: true, SeatLimit: new(50)},
 		{Name: "Private", Visibility: "private", PriceCents: 1000},
@@ -662,6 +662,12 @@ func TestDescribeBillingListsPublicPlansWithoutPolarProducts(t *testing.T) {
 		require.NotNil(t, option, "public plans must remain visible before Polar setup")
 		require.Equal(t, plan.PriceCents, option.PriceCents)
 		require.Equal(t, plan.PerSeat, option.PerSeat)
+		if plan.ParallelTaskLimit == nil {
+			require.Nil(t, option.ParallelTaskLimit, "unlimited capacity must remain unset")
+		} else {
+			require.NotNil(t, option.ParallelTaskLimit)
+			require.EqualValues(t, *plan.ParallelTaskLimit, *option.ParallelTaskLimit)
+		}
 		require.True(t, option.SubscriptionRequired, "priced and per-seat plans must never use card-only activation")
 		request := &pb.SelectBillingPlanRequest{PlanKey: plan.Key}
 		if plan.PerSeat {
