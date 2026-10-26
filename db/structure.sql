@@ -1658,7 +1658,9 @@ CREATE TABLE public.runners (
     arch text DEFAULT ''::text NOT NULL,
     hostname text DEFAULT ''::text NOT NULL,
     ip text DEFAULT ''::text NOT NULL,
+    provider_deleted_at timestamp with time zone,
     CONSTRAINT runners_creation_idempotency_check CHECK ((((creation_idempotency_key IS NULL) AND (creation_request_hash IS NULL)) OR ((creation_idempotency_key IS NOT NULL) AND (creation_request_hash IS NOT NULL)))),
+    CONSTRAINT runners_provider_deleted_check CHECK (((provider_deleted_at IS NULL) OR ((state)::text = 'terminated'::text))),
     CONSTRAINT runners_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'idle'::character varying, 'busy'::character varying, 'terminated'::character varying])::text[]))),
     CONSTRAINT runners_termination_check CHECK (((((state)::text = 'terminated'::text) AND (terminated_at IS NOT NULL)) OR (((state)::text <> 'terminated'::text) AND (terminated_at IS NULL))))
 );
@@ -6309,7 +6311,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261025145014	f
+20261026125156	f
 \.
 
 
