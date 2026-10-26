@@ -146,9 +146,9 @@ func (s *Scheduler) Schedule(ctx context.Context, orgID uuid.UUID) (Result, erro
 }
 
 func (s *Scheduler) schedule(ctx context.Context, orgID uuid.UUID) (Result, error) {
-	// An abandoned purchase can stay in flight forever when nobody previews
-	// or buys seats again, and the skip rules would keep its organization
-	// unchecked. Settle or expire it from Polar before the skip rules. A
+	// A purchase whose success Polar can prove settles here, before the
+	// skip rules. A purchase without such evidence stays in flight, and the
+	// release rule below decides whether it still blocks the schedule. A
 	// failure to read the subscription of a purchase on another
 	// subscription does not stop the maintenance of the current one.
 	if err := polar.ReconcileSeatPurchase(ctx, s.db.WithContext(ctx), s.client, orgID); err != nil {

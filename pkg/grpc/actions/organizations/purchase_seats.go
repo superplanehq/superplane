@@ -147,7 +147,7 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 	}
 
 	// Settle an unfinished purchase before the local checks. Only a snapshot
-	// from the period of that purchase can settle it.
+	// that proves the success of that purchase can settle it.
 	reconcileSeatPurchaseAndScheduleRenewal(ctx, db, organizationID)
 
 	// The purchase sends an absolute seat count, so it must start from the
@@ -467,10 +467,15 @@ func replaySeatPurchaseOperation(tx *gorm.DB, orgID uuid.UUID, operation seatPur
 	return &seatPurchaseStart{purchase: stored, replayed: true}, nil
 }
 
-// recordAppliedSeatPurchase applies the snapshot of a confirmed update. Polar has
-// already charged, so a local failure leaves the purchase unknown. Later
-// reconciliation then applies the Polar snapshot.
+// recordAppliedSeatPurchase applies the snapshot of an accepted update and
+// records the success that the response proves. The response is evidence for
+// this purchase only when it names the purchase subscription, the purchase
+// period, and the target seats. Other responses repair the capacity, and the
+// purchase stays unknown. Polar has already charged, so a local failure also
+// leaves the purchase unknown. Later reconciliation then applies the Polar
+// snapshot.
 func recordAppliedSeatPurchase(ctx context.Context, purchase *models.SeatPurchase, snapshot *polar.SubscriptionData) error {
+	evidence := polar.SeatPurchaseResponseEvidence(*snapshot)
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if _, err := models.LockOrganization(tx, purchase.OrganizationID); err != nil {
 			return err
@@ -478,7 +483,15 @@ func recordAppliedSeatPurchase(ctx context.Context, purchase *models.SeatPurchas
 		if err := polar.ApplyOrganizationSubscription(ctx, tx, purchase.OrganizationID, *snapshot); err != nil {
 			return err
 		}
-		return purchase.UpdateStatus(tx, models.SeatPurchaseStatusSucceeded, "")
+		if purchase.SucceededBy(evidence) {
+			return purchase.UpdateStatus(tx, models.SeatPurchaseStatusSucceeded, "")
+		}
+		log.WithFields(log.Fields{
+			"organization_id":       purchase.OrganizationID.String(),
+			"seat_purchase_id":      purchase.ID.String(),
+			"polar_subscription_id": snapshot.ID,
+		}).Warn("the seat purchase response does not describe the purchase")
+		return purchase.UpdateStatus(tx, models.SeatPurchaseStatusUnknown, "")
 	})
 	if err == nil {
 		return nil
