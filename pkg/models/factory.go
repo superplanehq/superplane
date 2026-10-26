@@ -170,6 +170,12 @@ func (f *Factory) RouteSegment() string {
 	return strings.ToLower(f.Key) + "-" + f.URLID
 }
 
+func (f *Factory) LockForUpdate(tx *gorm.DB) error {
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND organization_id = ?", f.ID, f.OrganizationID).
+		First(f).Error
+}
+
 var newFactoryURLID = generateFactoryURLID
 
 func generateFactoryURLID() (string, error) {

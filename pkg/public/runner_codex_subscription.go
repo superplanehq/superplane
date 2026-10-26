@@ -198,8 +198,8 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		if err != nil {
 			return err
 		}
-		var connection models.FactoryCodexConnection
-		if err := tx.Where("id = ?", lease.ConnectionID).First(&connection).Error; err != nil {
+		connection, err := models.FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
+		if err != nil {
 			return err
 		}
 		locked, err := models.LockFactoryCodexConnection(tx, connection.OrganizationID, connection.FactoryID)

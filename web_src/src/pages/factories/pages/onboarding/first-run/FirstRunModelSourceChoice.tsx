@@ -1,4 +1,5 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
+import { Button } from "@/components/ui/button";
 
 import { cn } from "@/lib/utils";
 import { DARK_SURFACE_MARK_INVERT_CLASS } from "@/ui/componentSidebar/integrationIcons";
@@ -34,10 +35,11 @@ export function FirstRunModelSourceChoice({
           disabled={disabled}
           onSelect={() => onSelectModelSource("hosted")}
         />
-        <button
+        <Button
           type="button"
+          variant="link"
           className={cn(
-            "text-left text-[13px] underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50",
+            "h-auto justify-start rounded-none p-0 text-left text-[13px] font-normal underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50",
             alternativeSelected ? "font-medium text-foreground underline" : "text-muted-foreground",
           )}
           aria-pressed={alternativeSelected}
@@ -45,7 +47,7 @@ export function FirstRunModelSourceChoice({
           onClick={() => onSelectModelSource(providerKeysOffered ? "own-key" : "subscription")}
         >
           {providerKeysOffered ? (subscriptionOffered ? copy.ownKeyOrSubscription : copy.ownKey) : copy.subscription}
-        </button>
+        </Button>
       </div>
     </fieldset>
   );

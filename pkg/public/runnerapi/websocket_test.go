@@ -3,7 +3,6 @@ package runnerapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,9 +13,11 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
@@ -30,20 +31,37 @@ import (
 )
 
 func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
-	for _, cancelOnHeartbeat := range []bool{false, true} {
-		t.Run(fmt.Sprintf("cancel on heartbeat %t", cancelOnHeartbeat), func(t *testing.T) {
+	for _, scenario := range []string{"complete", "cancel", "queued subscription"} {
+		t.Run(scenario, func(t *testing.T) {
+			cancelOnHeartbeat := scenario == "cancel"
 			resource := support.Setup(t)
 			signer := jwt.NewSigner("registration-secret")
 			runner, registration, fleet := createRegistrationFixture(t)
 			db := database.DB(t.Context())
 
 			taskID := uuid.New()
-			payload, err := json.Marshal(map[string]any{
+			var subscription *models.FactoryCodexConnection
+			document := map[string]any{
 				"id":             taskID.String(),
 				"run_mode":       "bash_script",
 				"script":         "echo hello",
 				"execution_mode": "host",
-			})
+			}
+			if scenario == "queued subscription" {
+				require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
+				factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+				require.NoError(t, err)
+				subscription, err = models.CreateFactoryCodexConnection(db, resource.Organization.ID, factory.ID, resource.User, time.Now().Add(-time.Hour))
+				require.NoError(t, err)
+				require.NoError(t, db.Model(subscription).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+				subscription, err = models.ReserveFactoryCodexConnection(db, resource.Organization.ID, factory.ID, taskID, time.Now().Add(-time.Hour), resource.Encryptor)
+				require.NoError(t, err)
+				expired, err := signer.GenerateWithClaims(-time.Minute, map[string]string{"purpose": runneraction.CodexSubscriptionTokenPurpose})
+				require.NoError(t, err)
+				document["environment"] = []runneraction.TaskEnvironmentVariable{{Name: runneraction.EnvCodexSubscriptionToken, Value: expired}}
+				document["execution_timeout_seconds"] = 30
+			}
+			payload, err := json.Marshal(document)
 			require.NoError(t, err)
 			task := &models.RunnerTask{
 				ID:                taskID,
@@ -114,6 +132,20 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 			var delivered taskMessage
 			require.NoError(t, socket.ReadJSON(&delivered))
 			assert.Equal(t, messageTypeTask, delivered.Type)
+			if subscription != nil {
+				var received struct {
+					Environment []runneraction.TaskEnvironmentVariable `json:"environment"`
+				}
+				require.NoError(t, json.Unmarshal(delivered.Task, &received))
+				require.Len(t, received.Environment, 1)
+				scope, err := runneraction.ParseCodexSubscriptionToken(signer, received.Environment[0].Value)
+				require.NoError(t, err)
+				assert.Equal(t, task.ID, scope.TaskID)
+				assert.Equal(t, subscription.ID, scope.ConnectionID)
+				claims, err := signer.ValidateAndGetClaims(received.Environment[0].Value)
+				require.NoError(t, err)
+				assert.GreaterOrEqual(t, int64(claims["exp"].(float64)), time.Now().Add(29*time.Second).Unix())
+			}
 
 			if cancelOnHeartbeat {
 				require.NoError(t, task.RequestCancel(db, time.Now()))

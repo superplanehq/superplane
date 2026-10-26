@@ -102,6 +102,18 @@ func LockFactoryCodexConnection(tx *gorm.DB, organizationID, factoryID uuid.UUID
 	return &connection, nil
 }
 
+func FindFactoryCodexConnectionByID(tx *gorm.DB, id uuid.UUID) (*FactoryCodexConnection, error) {
+	var connection FactoryCodexConnection
+	err := tx.Where("id = ?", id).First(&connection).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrCodexConnectionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &connection, nil
+}
+
 func CreateFactoryCodexConnection(
 	tx *gorm.DB,
 	organizationID, factoryID, ownerUserID uuid.UUID,
@@ -266,17 +278,21 @@ func ReserveFactoryCodexConnection(
 	now time.Time,
 	encryptor crypto.Encryptor,
 ) (*FactoryCodexConnection, error) {
-	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
+	member, err := SoleHumanOrganizationMember(tx, organizationID)
+	if err != nil {
 		return nil, err
 	}
 	var connection *FactoryCodexConnection
-	err := tx.Transaction(func(tx *gorm.DB) error {
+	err = tx.Transaction(func(tx *gorm.DB) error {
 		locked, err := LockFactoryCodexConnection(tx, organizationID, factoryID)
 		if err != nil {
 			if errors.Is(err, ErrCodexConnectionNotFound) {
 				return ErrCodexConnectionNotReady
 			}
 			return err
+		}
+		if locked.OwnerUserID != member.ID {
+			return ErrCodexConnectionNotEligible
 		}
 		login, err := FindCodexLoginLease(tx, locked.ID)
 		if err != nil {
@@ -401,6 +417,19 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 	if err != nil {
 		return err
 	}
+	// Completion locks the task before the connection. Do the same here, and
+	// skip tasks held by another transaction so batched cleanup never waits
+	// for a task while it holds a connection from an earlier lease.
+	task, taskErr := FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}), lease.TaskID)
+	if errors.Is(taskErr, ErrRunnerTaskNotFound) {
+		if _, err := FindRunnerTask(tx, lease.TaskID); err == nil {
+			return nil
+		} else if !errors.Is(err, ErrRunnerTaskNotFound) {
+			return err
+		}
+	} else if taskErr != nil {
+		return taskErr
+	}
 	var connection FactoryCodexConnection
 	err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ?", lease.ConnectionID).
@@ -423,15 +452,14 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 		return err
 	}
 
-	task, err := FindRunnerTask(tx, lease.TaskID)
-	if err != nil {
-		if errors.Is(err, ErrRunnerTaskNotFound) {
+	if taskErr != nil {
+		if errors.Is(taskErr, ErrRunnerTaskNotFound) {
 			if lease.Login() {
 				return connection.finishLoginLease(tx, &lease, CodexConnectionStatusReconnectRequired, now)
 			}
 			return deleteCodexLease(tx, &lease)
 		}
-		return err
+		return taskErr
 	}
 	if !task.IsTerminal() {
 		if !lease.Login() || now.Before(lease.CreatedAt.Add(CodexLoginTimeout)) {
