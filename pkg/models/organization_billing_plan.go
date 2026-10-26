@@ -700,6 +700,12 @@ func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionA
 		}
 
 		now := time.Now()
+		// Ended subscriptions are history after an admin assigns a local plan.
+		// Replaying them must not remove access granted by that plan.
+		if existing.PlanSource == BillingPlanSourceAdmin && !PolarSubscriptionIsLive(sub.Status, sub.CancelAtPeriodEnd, sub.PeriodEnd, now) {
+			result = &PolarSubscriptionApplyResult{Plan: existing, Disposition: PolarSubscriptionIgnored}
+			return nil
+		}
 		var refreshedResult *PolarSubscriptionApplyResult
 		if existing.PolarSubscriptionID != nil && strings.TrimSpace(*existing.PolarSubscriptionID) != "" && !samePolarSubscription(existing, sub.ID) {
 			fields := log.Fields{
