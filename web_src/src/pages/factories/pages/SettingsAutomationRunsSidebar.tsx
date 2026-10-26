@@ -2,8 +2,8 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { RunsSidebarHrefProvider, type RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
-import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
-import { useMemo } from "react";
+import { useInfiniteCanvasRuns, type CanvasRunsFilters } from "@/hooks/useCanvasData";
+import { useMemo, useState } from "react";
 
 interface SettingsAutomationRunsSidebarProps {
   canvasId: string;
@@ -21,7 +21,8 @@ export function SettingsAutomationRunsSidebar({
   selectedRunId,
   onSelectRun,
 }: SettingsAutomationRunsSidebarProps) {
-  const runsQuery = useInfiniteCanvasRuns(canvasId, {}, Boolean(canvasId));
+  const [filters, setFilters] = useState<CanvasRunsFilters>({});
+  const runsQuery = useInfiniteCanvasRuns(canvasId, filters, Boolean(canvasId));
   const runs = useMemo(() => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []) ?? [], [runsQuery.data]);
 
   return (
@@ -29,6 +30,7 @@ export function SettingsAutomationRunsSidebar({
       <CanvasRunsSidebar isOpen>
         <RunsTabPanel
           canvasId={canvasId}
+          onFiltersChange={setFilters}
           runs={runs}
           selectedRunId={selectedRunId}
           onSelectRun={onSelectRun}

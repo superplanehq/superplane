@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -73,13 +74,13 @@ func Test__ListRuns__IncludeTaskReturnsLinkedTaskLabels(t *testing.T) {
 	_, err = factory.CreateWorkOrder(db, sharedTitle, "", &r.User, nil, nil)
 	require.NoError(t, err)
 
-	withoutTask, err := ListRuns(context.Background(), db, canvas, 0, nil, nil, nil, false)
+	withoutTask, err := ListRuns(context.Background(), db, canvas, &pb.ListRunsRequest{})
 	require.NoError(t, err)
 	for _, run := range withoutTask.Runs {
 		assert.Nil(t, run.Task, run.Id)
 	}
 
-	response, err := ListRuns(context.Background(), db, canvas, 0, nil, nil, nil, true)
+	response, err := ListRuns(context.Background(), db, canvas, &pb.ListRunsRequest{IncludeTask: proto.Bool(true)})
 	require.NoError(t, err)
 	byID := indexRuns(response.Runs)
 
@@ -129,7 +130,7 @@ func Test__ListRuns__IncludeTaskUsesRecordedExistingTask(t *testing.T) {
 	later := createRunExecution(t, retried, retriedRoot.ID, "create", models.CanvasNodeExecutionResultPassed)
 	require.NoError(t, db.Model(later).Update("created_at", time.Now().Add(time.Minute)).Error)
 
-	response, err := ListRuns(context.Background(), db, canvas, 0, nil, nil, nil, true)
+	response, err := ListRuns(context.Background(), db, canvas, &pb.ListRunsRequest{IncludeTask: proto.Bool(true)})
 	require.NoError(t, err)
 	byID := indexRuns(response.Runs)
 	assertTask(t, byID[duplicate.ID.String()], order, factory)

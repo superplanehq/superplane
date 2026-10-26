@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import { buildNodeMap, buildRunPresentation, type RunStatusFilter } from "@/ui/Runs/runPresentation";
+import {
+  buildNodeMap,
+  buildRunPresentation,
+  statusFiltersToApiFilters,
+  type RunStatusFilter,
+} from "@/ui/Runs/runPresentation";
 import { runMatchesStatusTriggerFilters } from "@/ui/Runs/runStatusTriggerFilter";
+import type { CanvasRunsFilters } from "@/hooks/useCanvasData";
 import { loadPersistedFilters, savePersistedFilters } from "./filterPersistence";
 import type { TriggerOption } from "./RunFiltersPopover";
 
@@ -10,13 +16,19 @@ interface UseRunFiltersParams {
   runs: CanvasesCanvasRun[];
   workflowNodes: ComponentsNode[];
   componentIconMap: Record<string, string>;
-  onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
+  onFiltersChange?: (filters: CanvasRunsFilters) => void;
 }
 
-export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange }: UseRunFiltersParams) {
+export function useRunFilters({ runs, workflowNodes, componentIconMap, onFiltersChange }: UseRunFiltersParams) {
   const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(() => loadPersistedFilters().triggerIds);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<RunStatusFilter>>(() => loadPersistedFilters().statuses);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
 
@@ -35,9 +47,8 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
   );
 
   useEffect(() => {
-    onStatusFiltersChange?.(Array.from(selectedStatuses));
     savePersistedFilters({ statuses: selectedStatuses, triggerIds: selectedTriggerIds });
-  }, [selectedStatuses, selectedTriggerIds, onStatusFiltersChange]);
+  }, [selectedStatuses, selectedTriggerIds]);
 
   useEffect(() => {
     if (triggerOptions.length === 0) return;
@@ -47,6 +58,14 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
       return nextTriggerIds.size === currentTriggerIds.size ? currentTriggerIds : nextTriggerIds;
     });
   }, [triggerOptions]);
+
+  useEffect(() => {
+    onFiltersChange?.({
+      ...statusFiltersToApiFilters(Array.from(selectedStatuses)),
+      triggerIds: Array.from(selectedTriggerIds).sort(),
+      search: debouncedSearch,
+    });
+  }, [selectedStatuses, selectedTriggerIds, debouncedSearch, onFiltersChange]);
 
   const decoratedRuns = useMemo(() => runs.map((run) => buildRunPresentation(run, nodeMap)), [runs, nodeMap]);
 
@@ -59,6 +78,7 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
   );
 
   const filteredRuns = useMemo(() => {
+    if (onFiltersChange) return decoratedRuns;
     const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
     return decoratedRuns.filter(({ run, haystack }) => {
@@ -68,7 +88,7 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
       if (normalizedSearchQuery && !haystack.includes(normalizedSearchQuery)) return false;
       return true;
     });
-  }, [decoratedRuns, searchQuery, statusTriggerFilters]);
+  }, [decoratedRuns, searchQuery, statusTriggerFilters, onFiltersChange]);
 
   const orderedRuns = useMemo(
     () => ({
