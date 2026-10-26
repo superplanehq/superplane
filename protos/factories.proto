@@ -1468,6 +1468,9 @@ message CreateFactoryIntakeRequest {
   // Optional intake settings applied when the canvas is created. Used by
   // the Jira wizard and first-run tickets step to store the completion column.
   optional FactoryIntake.Settings settings = 8;
+  // When true, the intake starts paused: live items are ignored until
+  // automatic intake is turned on. The initial import still runs.
+  bool paused = 9;
 }
 
 message CreateFactoryIntakeResponse {

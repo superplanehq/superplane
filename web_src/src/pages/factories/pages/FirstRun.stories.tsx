@@ -172,12 +172,16 @@ export const Board: Story = {
 
 function ImportChoiceStory() {
   const [skip, setSkip] = useState(false);
+  const [automaticIntake, setAutomaticIntake] = useState(true);
   return (
     <FirstRunTicketsScreen
       ticketSource="github-issues"
+      repository="acme/payments-service"
       githubConnected
       skipInitialImport={skip}
       onSkipInitialImportChange={setSkip}
+      automaticIntake={automaticIntake}
+      onAutomaticIntakeChange={setAutomaticIntake}
       onSelectTicketSource={() => undefined}
       onAnalyzeTickets={() => undefined}
     />
@@ -189,8 +193,10 @@ export const FirstWorkspaceImport: Story = {
   render: () => (
     <FirstRunTicketsScreen
       ticketSource="github-issues"
+      repository="acme/payments-service"
       githubConnected
       initialImportLimit={3}
+      onAutomaticIntakeChange={() => undefined}
       onSelectTicketSource={() => undefined}
       onAnalyzeTickets={() => undefined}
     />
