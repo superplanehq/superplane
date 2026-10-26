@@ -497,6 +497,8 @@ func (s *Service) createRunner(
 		return nil, nil, grpcerrors.NotFound(err, "fleet not found")
 	case errors.Is(err, models.ErrRunnerTaskNotFound):
 		return nil, nil, grpcerrors.NotFound(err, "task not found")
+	case errors.Is(err, models.ErrOrganizationRunnerCapacity):
+		return nil, nil, grpcerrors.ResourceExhausted(err, "Organization parallel runner limit reached.")
 	case errors.Is(err, models.ErrRunnerTaskNotReservable),
 		errors.Is(err, models.ErrRunnerTaskFleetMismatch),
 		errors.Is(err, models.ErrRunnerTaskBackendMismatch):
