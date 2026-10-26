@@ -463,8 +463,8 @@
   --sidebar-accent-foreground: #26251e;
   --status-success: #15803d;
   --status-success-dot: #16a34a;
-  --status-running: #1d4ed8;
-  --status-running-dot: #3b82f6;
+  --status-running: var(--status-running-fg);
+  --status-running-dot: var(--workflow-implement-accent);
   --status-warning: #b45309;
   --status-warning-dot: #f59e0b;
   --status-danger: #b91c1c;
@@ -473,25 +473,38 @@
   /* Semantic tokens driving the six work-order display statuses.
      `-fg` is text/icon, `-bg` is the pill fill, `-border` is the pill
      stroke, `-dot` is the small indicator dot on dense rows. */
-  --status-draft-fg: #52525b;
-  --status-draft-bg: #f4f4f5;
-  --status-draft-border: #e4e4e7;
-  --status-draft-dot: #a1a1aa;
+  /* Option 4: Clean Pastel workflow palette. */
+  --workflow-backlog-accent: #a7b0bc;
+  --workflow-implement-accent: #88bbdd;
+  --workflow-verify-accent: #e8b27f;
+  --workflow-done-accent: #8ac9b0;
+  --workflow-body-mix: 10%;
+  --workflow-header-mix: 16%;
+  --workflow-border-mix: 48%;
+  --workflow-vivid-mix: 100%;
+  --workflow-outline-mix: 72%;
+  --workflow-fg-mix: 60%;
+  --workflow-fg-contrast: #000;
 
-  --status-running-fg: #1d4ed8;
-  --status-running-bg: #eff6ff;
-  --status-running-border: #bfdbfe;
-  --status-running-lane-bg: #f5f9ff;
+  --status-draft-fg: color-mix(in srgb, var(--workflow-backlog-accent) var(--workflow-fg-mix), var(--workflow-fg-contrast));
+  --status-draft-bg: color-mix(in srgb, var(--workflow-backlog-accent) var(--workflow-body-mix), var(--background));
+  --status-draft-border: color-mix(in srgb, var(--workflow-backlog-accent) var(--workflow-border-mix), var(--background));
+  --status-draft-dot: var(--workflow-backlog-accent);
 
-  --status-waiting-fg: #b45309;
-  --status-waiting-bg: #fffbeb;
-  --status-waiting-border: #fde68a;
-  --status-waiting-dot: #f59e0b;
+  --status-running-fg: color-mix(in srgb, var(--workflow-implement-accent) var(--workflow-fg-mix), var(--workflow-fg-contrast));
+  --status-running-bg: color-mix(in srgb, var(--workflow-implement-accent) var(--workflow-body-mix), var(--background));
+  --status-running-border: color-mix(in srgb, var(--workflow-implement-accent) var(--workflow-border-mix), var(--background));
+  --status-running-lane-bg: var(--status-running-bg);
 
-  --status-completed-fg: #15803d;
-  --status-completed-bg: #ecfdf5;
-  --status-completed-border: #a7f3d0;
-  --status-completed-dot: #16a34a;
+  --status-waiting-fg: color-mix(in srgb, var(--workflow-verify-accent) var(--workflow-fg-mix), var(--workflow-fg-contrast));
+  --status-waiting-bg: color-mix(in srgb, var(--workflow-verify-accent) var(--workflow-body-mix), var(--background));
+  --status-waiting-border: color-mix(in srgb, var(--workflow-verify-accent) var(--workflow-border-mix), var(--background));
+  --status-waiting-dot: var(--workflow-verify-accent);
+
+  --status-completed-fg: color-mix(in srgb, var(--workflow-done-accent) var(--workflow-fg-mix), var(--workflow-fg-contrast));
+  --status-completed-bg: color-mix(in srgb, var(--workflow-done-accent) var(--workflow-body-mix), var(--background));
+  --status-completed-border: color-mix(in srgb, var(--workflow-done-accent) var(--workflow-border-mix), var(--background));
+  --status-completed-dot: var(--workflow-done-accent);
 
   --status-failed-fg: #b91c1c;
   --status-failed-bg: #fef2f2;
@@ -503,7 +516,7 @@
   --status-cancelled-border: #e4e4e7;
   --status-cancelled-dot: #a1a1aa;
 
-  --status-done-lane-bg: #f9fafb;
+  --status-done-lane-bg: var(--status-completed-bg);
 
   --work-order-mention-fg: #0969da;
   --work-order-mention-bg: #ddf4ff;
@@ -572,32 +585,45 @@
   --sidebar-accent-foreground: #edecec;
   --status-success: #86efac;
   --status-success-dot: #4ade80;
-  --status-running: #93c5fd;
-  --status-running-dot: #60a5fa;
+  --status-running: var(--status-running-fg);
+  --status-running-dot: var(--workflow-implement-accent);
   --status-warning: #fcd34d;
   --status-warning-dot: #f59e0b;
   --status-danger: #fca5a5;
   --status-danger-dot: #f87171;
 
-  --status-draft-fg: #a1a1aa;
-  --status-draft-bg: #26251e;
-  --status-draft-border: #33312b;
-  --status-draft-dot: #71717a;
+  /* Option 4: Clean Pastel workflow palette. */
+  --workflow-backlog-accent: #b3bdc8;
+  --workflow-implement-accent: #78adcf;
+  --workflow-verify-accent: #d69c6e;
+  --workflow-done-accent: #79b9a1;
+  --workflow-body-mix: 15%;
+  --workflow-header-mix: 22%;
+  --workflow-border-mix: 60%;
+  --workflow-vivid-mix: 43%;
+  --workflow-outline-mix: 56%;
+  --workflow-fg-mix: 98%;
+  --workflow-fg-contrast: #fff;
 
-  --status-running-fg: #93c5fd;
-  --status-running-bg: rgba(29, 78, 216, 0.16);
-  --status-running-border: rgba(59, 130, 246, 0.4);
-  --status-running-lane-bg: rgba(29, 78, 216, 0.08);
+  --status-draft-fg: color-mix(in srgb, var(--workflow-backlog-accent) var(--workflow-fg-mix), var(--workflow-fg-contrast));
+  --status-draft-bg: color-mix(in srgb, var(--workflow-backlog-accent) var(--workflow-body-mix), var(--background));
+  --status-draft-border: color-mix(in srgb, var(--workflow-backlog-accent) var(--workflow-border-mix), var(--background));
+  --status-draft-dot: var(--workflow-backlog-accent);
 
-  --status-waiting-fg: #fcd34d;
-  --status-waiting-bg: rgba(180, 83, 9, 0.18);
-  --status-waiting-border: rgba(245, 158, 11, 0.4);
-  --status-waiting-dot: #f59e0b;
+  --status-running-fg: color-mix(in srgb, var(--workflow-implement-accent) var(--workflow-fg-mix), var(--workflow-fg-contrast));
+  --status-running-bg: color-mix(in srgb, var(--workflow-implement-accent) var(--workflow-body-mix), var(--background));
+  --status-running-border: color-mix(in srgb, var(--workflow-implement-accent) var(--workflow-border-mix), var(--background));
+  --status-running-lane-bg: var(--status-running-bg);
 
-  --status-completed-fg: #86efac;
-  --status-completed-bg: rgba(21, 128, 61, 0.18);
-  --status-completed-border: rgba(74, 222, 128, 0.35);
-  --status-completed-dot: #4ade80;
+  --status-waiting-fg: color-mix(in srgb, var(--workflow-verify-accent) var(--workflow-fg-mix), var(--workflow-fg-contrast));
+  --status-waiting-bg: color-mix(in srgb, var(--workflow-verify-accent) var(--workflow-body-mix), var(--background));
+  --status-waiting-border: color-mix(in srgb, var(--workflow-verify-accent) var(--workflow-border-mix), var(--background));
+  --status-waiting-dot: var(--workflow-verify-accent);
+
+  --status-completed-fg: color-mix(in srgb, var(--workflow-done-accent) var(--workflow-fg-mix), var(--workflow-fg-contrast));
+  --status-completed-bg: color-mix(in srgb, var(--workflow-done-accent) var(--workflow-body-mix), var(--background));
+  --status-completed-border: color-mix(in srgb, var(--workflow-done-accent) var(--workflow-border-mix), var(--background));
+  --status-completed-dot: var(--workflow-done-accent);
 
   --status-failed-fg: #fca5a5;
   --status-failed-bg: rgba(185, 28, 28, 0.18);
@@ -609,7 +635,7 @@
   --status-cancelled-border: #33312b;
   --status-cancelled-dot: #71717a;
 
-  --status-done-lane-bg: rgba(255, 255, 255, 0.02);
+  --status-done-lane-bg: var(--status-completed-bg);
 
   --work-order-mention-fg: #4493f8;
   --work-order-mention-bg: rgba(56, 139, 253, 0.15);
@@ -1418,4 +1444,45 @@
   .sp-confidence-why[data-state="open"] {
     animation: none;
   }
+}
+
+/* Line-board colors share the workflow accents and theme-specific mixes. */
+.line-board-color-slate { --board-column-accent: var(--workflow-backlog-accent); }
+.line-board-color-sky { --board-column-accent: var(--workflow-implement-accent); }
+.line-board-color-yellow { --board-column-accent: var(--workflow-verify-accent); }
+.line-board-color-lime { --board-column-accent: var(--workflow-done-accent); }
+
+:is(.line-board-color-slate, .line-board-color-sky, .line-board-color-yellow, .line-board-color-lime) {
+  --board-column-vivid: color-mix(in srgb, var(--board-column-accent) var(--workflow-vivid-mix), var(--background));
+  --board-column-soft: color-mix(in srgb, var(--board-column-accent) var(--workflow-body-mix), var(--background));
+  --board-column-header: color-mix(in srgb, var(--board-column-accent) var(--workflow-header-mix), var(--background));
+  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-border-mix), var(--background));
+}
+
+.line-board-column-soft,
+.line-board-column-vivid {
+  border-color: var(--board-column-border);
+}
+
+.line-board-column-soft > header {
+  background: var(--board-column-header);
+  border-color: var(--board-column-border);
+}
+
+.line-board-column-vivid {
+  --muted-foreground: color-mix(in srgb, var(--foreground) 85%, var(--board-column-vivid));
+}
+
+.line-board-column-vivid > header {
+  background: var(--board-column-vivid);
+  border-color: var(--board-column-border);
+}
+
+.line-board-column-bordered {
+  --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-outline-mix), var(--background));
+}
+
+.line-board-column-bordered > header {
+  background: var(--card);
+  border-color: var(--board-column-border);
 }
