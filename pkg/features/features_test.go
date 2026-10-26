@@ -61,7 +61,7 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryCustomAutomations, f.ID)
 		assert.Equal(t, "Custom Automations", f.Label)
-		assert.Equal(t, "Add a blank custom automation to a board column", f.Description)
+		assert.Equal(t, "Add custom automations to board columns", f.Description)
 		assert.Nil(t, f.Released)
 	})
 
