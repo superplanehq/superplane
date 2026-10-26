@@ -94,7 +94,7 @@ function ImplementationAgentFields({
       appearance="fields"
       view="implementation"
       showResources={false}
-      showConcurrency={showsImplementAgentControls(node)}
+      showConcurrency
       draft={draft ?? draftFromNode(node, "implementation")}
       onChange={(next) => onDraftChange?.(next)}
       organizationId={organizationId}

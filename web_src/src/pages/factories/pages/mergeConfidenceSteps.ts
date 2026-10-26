@@ -81,7 +81,7 @@ export function withMergeCheckHeader(current: string | undefined, body: string):
   return `${header}${body}`;
 }
 
-function mergeCheckId(prompt: string | undefined): string | null {
+export function mergeCheckId(prompt: string | undefined): string | null {
   return prompt?.match(MERGE_CHECK_HEADER)?.[1] ?? null;
 }
 

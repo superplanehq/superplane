@@ -7,10 +7,12 @@ export function MergeConfidenceCheckList({
   checks,
   onToggle,
   idPrefix,
+  disabled = false,
 }: {
   checks: readonly MergeConfidenceCheck[];
   onToggle: (check: MergeConfidenceCheck, enabled: boolean) => void;
   idPrefix: string;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card px-3">
@@ -25,6 +27,7 @@ export function MergeConfidenceCheckList({
             <p className="text-[12px] leading-5 text-muted-foreground">{check.helper}</p>
           </div>
           <Switch
+            disabled={disabled}
             checked={checks.includes(check.id)}
             onCheckedChange={(enabled) => onToggle(check.id, enabled)}
             aria-label={check.label}
