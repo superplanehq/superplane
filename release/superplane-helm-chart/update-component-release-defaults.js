@@ -243,6 +243,17 @@ function updateSection(text, edit) {
   );
 }
 
+function componentReleaseSection(text) {
+  const { lines } = chartLines(text);
+  const { start, end } = sectionBounds(lines);
+  return lines.slice(start, end);
+}
+
+function reuseComponentReleases(sourceText, targetText) {
+  const sourceSection = componentReleaseSection(sourceText);
+  return updateSection(targetText, () => sourceSection);
+}
+
 function setRunnerDefaults(text, version) {
   return updateSection(text, (section) => {
     const next = section.slice();
@@ -333,6 +344,31 @@ function applySelectedReleases(text, releases) {
 }
 
 function main() {
+  if (process.argv[2] === "reuse") {
+    const sourcePath = process.argv[3];
+    const targetPath = process.argv[4];
+    if (!sourcePath || !targetPath) {
+      throw new Error(
+        "reuse requires candidate and target chart values paths",
+      );
+    }
+    if (!fs.existsSync(sourcePath)) {
+      throw new Error(`candidate chart values not found: ${sourcePath}`);
+    }
+    if (!fs.existsSync(targetPath)) {
+      throw new Error(`target chart values not found: ${targetPath}`);
+    }
+
+    const sourceText = fs.readFileSync(sourcePath, "utf8");
+    const targetText = fs.readFileSync(targetPath, "utf8");
+    writeValues(
+      targetPath,
+      reuseComponentReleases(sourceText, targetText),
+    );
+    console.log("* Reused candidate component release defaults");
+    return;
+  }
+
   const valuesPath =
     process.argv[2] || path.join(__dirname, "helm", "values.yaml");
   if (!fs.existsSync(valuesPath)) {

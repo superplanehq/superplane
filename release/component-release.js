@@ -116,6 +116,24 @@ function isPrerelease(version) {
   return parseVersion(version).includes("-");
 }
 
+function validateFinalization(candidateVersion, stableVersion) {
+  const candidate = parseVersion(candidateVersion);
+  const stable = parseVersion(stableVersion);
+
+  if (!candidate.includes("-")) {
+    throw new Error("candidate version must be a prerelease");
+  }
+  if (stable.includes("-")) {
+    throw new Error("stable version must not be a prerelease");
+  }
+
+  const expectedStableVersion = candidate.slice(0, candidate.indexOf("-"));
+  if (stable !== expectedStableVersion) {
+    throw new Error(`stable version must be ${expectedStableVersion}`);
+  }
+  return stable;
+}
+
 function sha256File(filePath) {
   const hash = crypto.createHash("sha256");
   const file = fs.openSync(filePath, "r");
@@ -453,6 +471,46 @@ function parseJSON(response, action) {
   }
 }
 
+async function verifyPublishedPrerelease({
+  apiURL,
+  repository,
+  token,
+  component,
+  version,
+  sha,
+}) {
+  const tag = componentTag(component, version);
+  validateSHA(sha);
+  if (!isPrerelease(version)) {
+    throw new Error(`release ${tag} is not a prerelease`);
+  }
+
+  const response = await request({
+    apiURL,
+    method: "GET",
+    pathname: `/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`,
+    token,
+  });
+  if (response.statusCode !== 200) {
+    throw new Error(
+      `get GitHub release ${tag} failed with HTTP ${response.statusCode}`,
+    );
+  }
+
+  const release = parseJSON(response, `get GitHub release ${tag}`);
+  if (
+    release.draft !== false ||
+    release.prerelease !== true ||
+    release.tag_name !== tag
+  ) {
+    throw new Error(`GitHub release ${tag} is not a published prerelease`);
+  }
+  if (release.target_commitish !== sha) {
+    throw new Error(`GitHub release ${tag} does not match source SHA ${sha}`);
+  }
+  return release;
+}
+
 function nextPage(linkHeader) {
   if (!linkHeader) {
     return undefined;
@@ -745,6 +803,22 @@ async function main() {
     console.log(componentTag(process.argv[3], process.argv[4]));
     return;
   }
+  if (command === "validate-finalization") {
+    console.log(validateFinalization(process.argv[3], process.argv[4]));
+    return;
+  }
+  if (command === "verify-published-prerelease") {
+    const release = await verifyPublishedPrerelease({
+      apiURL: process.env.GITHUB_API_URL || "https://api.github.com",
+      repository: process.env.GITHUB_REPOSITORY || "superplanehq/superplane",
+      token: process.env.GITHUB_TOKEN,
+      component: option("component"),
+      version: option("version"),
+      sha: option("sha"),
+    });
+    console.log(`Published release candidate ${release.tag_name} verified.`);
+    return;
+  }
   if (command === "generate-release-notes") {
     const includeGitHubAuthors = process.argv.includes("--github-authors");
     generateReleaseNotes({
@@ -853,5 +927,7 @@ module.exports = {
   parseVersion,
   publishGitHubRelease,
   stageGitHubRelease,
+  validateFinalization,
   verifyManifest,
+  verifyPublishedPrerelease,
 };
