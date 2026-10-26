@@ -26,6 +26,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -101,6 +102,7 @@ type Server struct {
 	authHandler           *authentication.Handler
 	isDev                 bool
 	licenseService        *licensing.Service
+	codexTokenRefresh     func(context.Context, string) (runner.CodexTokenSet, error)
 }
 
 // SetLicenseService connects the installation license. Without it, the server
@@ -431,6 +433,10 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/credentials", s.handleRunnerCodexSubscriptionCredentials).Methods("GET")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/checkpoint", s.handleRunnerCodexSubscriptionCheckpoint).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/progress", s.handleRunnerCodexSubscriptionProgress).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/refresh", s.handleRunnerCodexSubscriptionRefresh).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/updates", s.handleRunnerPlanningUpdate).Methods("POST")

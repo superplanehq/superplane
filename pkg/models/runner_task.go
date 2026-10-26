@@ -404,6 +404,9 @@ func (t *RunnerTask) Complete(
 	t.FinishedAt = &now
 	t.UpdatedAt = now
 	runner.UpdatedAt = now
+	if err := ReleaseCodexReservationForTask(tx, t.ID, now); err != nil {
+		return false, err
+	}
 	return true, nil
 }
 

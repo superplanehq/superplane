@@ -17,6 +17,30 @@ import (
 	goyaml "gopkg.in/yaml.v3"
 )
 
+func TestRewriteFactoryAgentUsesSubscriptionWithoutModel(t *testing.T) {
+	node := &yaml.Node{
+		Component: "runnerClaudeCode",
+		Configuration: map[string]any{
+			"model":       "claude-sonnet-4-6",
+			"maxTurns":    4,
+			"credentials": map[string]any{"source": "integration"},
+		},
+	}
+	rewriteFactoryAgent(node, &factoryTemplateAgent{
+		component:        "runnerCodex",
+		model:            "gpt-5",
+		credentialSource: runner.CredentialsSourceSubscription,
+	})
+
+	assert.Equal(t, "runnerCodex", node.Component)
+	credentials := node.Configuration["credentials"].(map[string]any)
+	assert.Equal(t, runner.CredentialsSourceSubscription, credentials["source"])
+	_, hasModel := node.Configuration["model"]
+	assert.False(t, hasModel)
+	_, hasTurns := node.Configuration["maxTurns"]
+	assert.False(t, hasTurns)
+}
+
 func TestMaterializeFactoryTemplate(t *testing.T) {
 	result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
 		appID:   "app-1",

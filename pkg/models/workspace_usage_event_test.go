@@ -72,6 +72,30 @@ func Test__RecordUsage__FactoryLinkedRunPersistsAndRollsUp(t *testing.T) {
 	assert.Equal(t, "claude-sonnet-4-6", byModel[0].Model)
 }
 
+func Test__RecordUsage__SubscriptionCostsNothingAndIsNotHosted(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	runID := requireExecutionRunID(t, execution)
+	input := sonnetUsage(t, r, runID)
+	input.FundingSource = models.UsageFundingSourceSubscription
+	require.NoError(t, models.RecordUsage(db, input))
+
+	event := requireUsageEventForRun(t, db, runID)
+	assert.Equal(t, models.UsageFundingSourceSubscription, event.FundingSource)
+	assert.Zero(t, event.CostMicros)
+	assert.Zero(t, event.ProviderCostMicros)
+
+	rows, _, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      &execution.FactoryID,
+	}, 50, 0)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Zero(t, rows[0].HostedCostCents())
+	assert.Zero(t, rows[0].BYOKCostCents())
+}
+
 func Test__RecordUsage__SameNodeExecutionRecordsEachBilledCall(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
