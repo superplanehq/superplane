@@ -1,6 +1,5 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { AgentAdditionalInstructions } from "./AgentAdditionalInstructions";
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import { ImplementDurationDraftProvider } from "./ImplementDurationDraft";
 import { MergeConfidenceCheckList } from "./MergeConfidenceCheckList";
@@ -54,6 +53,17 @@ function MergeConfidenceConfigurationView({
           data-testid="merge-confidence-settings"
         >
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-8 sm:px-10">
+            <AgentRunnerSettings
+              node={draft.agentBase}
+              draft={draft.agentDraft}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              factoryKey={factoryKey}
+              onSave={() => undefined}
+              onDraftChange={settings.updateAgentDraft}
+              view="implementation"
+              disabled={saving}
+            />
             <section className="space-y-3">
               <header>
                 <h2 className="text-[15px] font-semibold text-foreground">
@@ -70,24 +80,6 @@ function MergeConfidenceConfigurationView({
                 disabled={saving}
               />
             </section>
-            <AgentRunnerSettings
-              node={draft.agentBase}
-              draft={draft.agentDraft}
-              organizationId={organizationId}
-              factoryId={factoryId}
-              factoryKey={factoryKey}
-              onSave={() => undefined}
-              onDraftChange={settings.updateAgentDraft}
-              view="implementation"
-              disabled={saving}
-            />
-            <AgentAdditionalInstructions
-              draft={draft.agentDraft}
-              disabled={saving}
-              onChange={settings.updateAgentDraft}
-              description="Add requirements for pull request checks. Applies to future runs."
-              placeholder="For example: Check compatibility with the public API."
-            />
           </div>
         </section>
         <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">

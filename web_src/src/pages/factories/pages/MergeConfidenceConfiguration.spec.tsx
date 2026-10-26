@@ -156,9 +156,6 @@ describe("Merge confidence configuration", () => {
   it("removes Security only on Save and preserves custom checks and runner settings", async () => {
     const { onSave, onClose } = renderSettings([...steps, custom]);
     fireEvent.click(screen.getByRole("switch", { name: "Security" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Additional instructions" }), {
-      target: { value: "Review API compatibility." },
-    });
     const duration = screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" });
     fireEvent.change(duration, { target: { value: "120" } });
     fireEvent.blur(duration);
@@ -172,7 +169,6 @@ describe("Merge confidence configuration", () => {
         configuration: {
           model: "sonnet",
           executionTimeoutSeconds: 7200,
-          additionalInstructions: "Review API compatibility.",
           steps: [...steps.filter((step) => step.name !== "security"), custom],
         },
       }),

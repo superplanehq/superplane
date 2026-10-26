@@ -125,8 +125,12 @@ describe("MergeConfidenceConfigModal", () => {
       }
       expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
       expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(5);
-      expect(screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" })).toHaveValue(60);
-      expect(screen.getByRole("textbox", { name: "Additional instructions" })).toBeInTheDocument();
+      const duration = screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" });
+      expect(duration).toHaveValue(60);
+      expect(duration.compareDocumentPosition(screen.getByRole("switch", { name: "Blast radius" }))).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(screen.queryByRole("textbox", { name: "Additional instructions" })).not.toBeInTheDocument();
       expect(screen.queryByRole("region", { name: "Steps" })).not.toBeInTheDocument();
       await user.click(screen.getByRole("switch", { name: "Security" }));
       await user.click(screen.getByRole("tab", { name: "Runs" }));
