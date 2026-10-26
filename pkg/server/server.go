@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-
 	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
 	_ "net/http/pprof"
 	"os"
@@ -18,11 +17,17 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	eebilling "github.com/superplanehq/superplane/ee/billing"
+	billinghttp "github.com/superplanehq/superplane/ee/billing/http"
+	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
+	"github.com/superplanehq/superplane/ee/billing/polar"
+	billingworkers "github.com/superplanehq/superplane/ee/billing/workers"
 	"github.com/superplanehq/superplane/ee/rbac"
 	"github.com/superplanehq/superplane/pkg/agents"
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/blob"
 	blobazure "github.com/superplanehq/superplane/pkg/blob/azure"
@@ -378,14 +383,14 @@ func startWorkers(
 	if os.Getenv("START_PRICE_BOOK_SYNC_WORKER") == "yes" {
 		log.Println("Starting Price Book Sync Worker")
 
-		w := workers.NewPriceBookSyncWorker(encryptor, registry)
+		w := billingworkers.NewPriceBookSyncWorker(encryptor, registry)
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_SEAT_RENEWAL_SYNC_WORKER") == "yes" {
 		log.Println("Starting Seat Renewal Sync Worker")
 
-		w := workers.NewSeatRenewalSyncWorker()
+		w := billingworkers.NewSeatRenewalSyncWorker()
 		go w.Start(context.Background())
 	}
 
@@ -487,6 +492,7 @@ func buildGRPCServices(
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
+	features.Register(enterprise.Billing, billingorganizations.New())
 
 	return grpc.NewServices(grpc.ServicesConfig{
 		EmailService:     buildEmailService(encryptor),
@@ -628,6 +634,9 @@ func startPublicAPI(
 	}
 
 	server.SetLicenseService(licenseService)
+	server.SetBillingHTTPRegistrar(billinghttp.New(encryptor, registry, func() (string, string) {
+		return baseURL, webhooksBaseURL
+	}))
 
 	// Start the EventDistributer worker if enabled
 	if os.Getenv("START_EVENT_DISTRIBUTER") == "yes" {
@@ -759,6 +768,7 @@ func startPprofServer() {
 }
 
 func Start() {
+	billing.Bind(eebilling.New(polar.NewRuntime()))
 	configureLogging()
 	setupOtel()
 	startPprofServer()
@@ -767,11 +777,8 @@ func Start() {
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
 
-	if err := models.BindLegacyBillingProduct(database.Conn(), os.Getenv("POLAR_BUSINESS_PRODUCT_ID")); err != nil {
-		log.Fatalf("bind legacy billing product: %v", err)
-	}
-	if err := models.LoadCurrentPriceBook(database.Conn()); err != nil {
-		log.WithError(err).Warn("failed to load usage price book; using in-memory rates")
+	if err := billing.Initialize(database.Conn()); err != nil {
+		log.Fatalf("initialize billing: %v", err)
 	}
 
 	log.SetLevel(log.DebugLevel)

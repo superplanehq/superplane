@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -70,15 +71,15 @@ func WorkOrderExecutionFailureReasonFor(err error) string {
 	switch {
 	case err == nil:
 		return ""
-	case errors.Is(err, ErrHostedPaymentPastDue):
+	case errors.Is(err, billing.ErrHostedPaymentPastDue):
 		return WorkOrderExecutionFailureReasonPaymentPastDue
-	case errors.Is(err, ErrHostedSubscriptionPaused):
+	case errors.Is(err, billing.ErrHostedSubscriptionPaused):
 		return WorkOrderExecutionFailureReasonSubscriptionPaused
-	case errors.Is(err, ErrHostedSubscriptionRequired):
+	case errors.Is(err, billing.ErrHostedSubscriptionRequired):
 		return WorkOrderExecutionFailureReasonHostedSubscriptionRequired
-	case errors.Is(err, ErrHostedCreditEmpty), errors.Is(err, ErrSuperPlaneRunnerNoCredit):
+	case errors.Is(err, billing.ErrHostedCreditEmpty), errors.Is(err, ErrSuperPlaneRunnerNoCredit):
 		return WorkOrderExecutionFailureReasonNoHostedCredit
-	case errors.Is(err, ErrFactoryHostedBudgetEmpty), errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget):
+	case errors.Is(err, billing.ErrFactoryHostedBudgetEmpty), errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget):
 		return WorkOrderExecutionFailureReasonWorkspaceBudgetEmpty
 	default:
 		return ""

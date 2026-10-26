@@ -6,8 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/ee/billing/entitlements"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/entitlements"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -29,10 +30,10 @@ func TestSharedInviteLinkRequiresEmailInvitation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
-			t.Setenv(models.BillingEnabledEnv, "no")
+			t.Setenv(billingmodels.BillingEnabledEnv, "no")
 			db := database.Conn()
 			if tc.reservedSeat {
-				t.Setenv(models.BillingEnabledEnv, "yes")
+				t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 				setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(2))
 				invitations := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 				_, err := invitations.Create(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.CreateInvitationRequest{Email: "intended@example.com"})
@@ -131,8 +132,8 @@ func setPurchasedSeatPlan(t *testing.T, db *gorm.DB, orgID uuid.UUID, purchased 
 	t.Helper()
 	maximum := 50
 	product := "product_" + uuid.NewString()
-	plan := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", orgID).Updates(map[string]any{"plan_id": plan.ID, "plan": plan.Key, "plan_source": "polar", "polar_subscription_status": "active", "purchased_seats": purchased}).Error)
+	plan := billingmodels.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: &maximum, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", orgID).Updates(map[string]any{"plan_id": plan.ID, "plan": plan.Key, "plan_source": "polar", "polar_subscription_status": "active", "purchased_seats": purchased}).Error)
 	return product
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
 )
@@ -130,7 +131,7 @@ func ListOrganizationsPendingAccountDeletion(tx *gorm.DB, accountID uuid.UUID) (
 // clearances. The caller makes them before the transaction, because Polar
 // verification must not hold the organization lock. An organization without a
 // clearance stops the deletion.
-func (a *Account) SoftDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]*OrganizationDeletionClearance) error {
+func (a *Account) SoftDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]billing.DeletionGuard) error {
 	if a == nil {
 		return errors.New("account is required")
 	}
@@ -139,7 +140,7 @@ func (a *Account) SoftDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUI
 	})
 }
 
-func (a *Account) softDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]*OrganizationDeletionClearance) error {
+func (a *Account) softDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]billing.DeletionGuard) error {
 	candidates, err := listOrganizationsForAccountDeletion(tx, a.ID)
 	if err != nil {
 		return err

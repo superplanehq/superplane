@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -599,7 +599,7 @@ func fillBuckets(
 // ledgerCents rounds summed micros the way Spending does. Round a window
 // total, or one day, from its own micros. Do not sum already rounded days.
 func ledgerCents(micros int64) int64 {
-	return pricebook.MicrosToCents(micros)
+	return billing.MicrosToCents(micros)
 }
 
 func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVelocityTotals {
