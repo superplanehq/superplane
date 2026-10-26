@@ -166,6 +166,11 @@ func FindSelectableLLMModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, 
 	if err != nil {
 		return SelectableLLMModel{}, err
 	}
+	if parsed.Source.ID == UsageFundingSourceBYOK {
+		if err := RequireOrganizationBYOKAccess(tx, orgID, parsed.Provider.ID); err != nil {
+			return SelectableLLMModel{}, err
+		}
+	}
 	allowed, err := ModelIsSelectable(tx, orgID, factoryID, parsed.Provider.ID, parsed.Source.ID, parsed.Model.ID)
 	if err != nil {
 		return SelectableLLMModel{}, err

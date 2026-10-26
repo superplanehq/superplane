@@ -1,6 +1,8 @@
 package models_test
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,14 +10,30 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
 
+func setLegacyBillingPlanTestProduct(t *testing.T) {
+	t.Helper()
+	db := database.DB(t.Context())
+	catalog, err := models.FindBillingPlan(db, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	originalProduct := catalog.PolarProductID
+	if originalProduct != nil {
+		originalProduct = new(*originalProduct)
+	}
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.WithoutCancel(t.Context())).Model(catalog).Update("polar_product_id", originalProduct).Error)
+	})
+	require.NoError(t, db.Model(catalog).Update("polar_product_id", "prod_business").Error)
+}
+
 func Test__EnsureOrganizationBillingPlanIsTrial(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
@@ -26,9 +44,106 @@ func Test__EnsureOrganizationBillingPlanIsTrial(t *testing.T) {
 	assert.True(t, plan.IsOpenTrial(time.Now()))
 }
 
+func Test__InitialPaidPlanAddsConfiguredTrialCredit(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		trialCents int64
+		polar      bool
+	}{
+		{name: "pay as you go without trial"},
+		{name: "pay as you go with trial", trialCents: 1000},
+		{name: "subscription without trial", polar: true},
+		{name: "subscription with trial", trialCents: 1200, polar: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			restoreInstallationLLMSettings(t)
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+			plan := models.BillingPlan{
+				Key: "selected_" + uuid.NewString()[:8], Name: "Selected", Category: "paid", Visibility: "public",
+				TrialCreditCents: tc.trialCents, CreditFrequency: "none", CreditExpiration: "never",
+			}
+			product := "prod_" + uuid.NewString()
+			if tc.polar {
+				plan.PolarProductID = &product
+			}
+			require.NoError(t, models.SaveBillingPlan(db, &plan))
+			execution := dispatchWorkOrderExecution(t, r)
+			recordHostedPromptUsage(t, db, r.Organization.ID, requireExecutionRunID(t, execution))
+			before := describeCredit(t, db, r.Organization.ID)
+			require.Positive(t, before.BilledMicros)
+			require.Less(t, before.BilledMicros, models.CentsToMicros(1200))
+			if tc.polar {
+				_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+					ID: product, ProductID: product, Status: models.PolarSubscriptionStatusIncomplete,
+				}, nil)
+				require.NoError(t, err)
+				require.Equal(t, before.WelcomeRemainingMicros, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+			}
+
+			selectPlan := func() {
+				if tc.polar {
+					now := time.Now()
+					end := now.AddDate(0, 1, 0)
+					_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+						ID: product, ProductID: product, Status: models.PolarSubscriptionStatusActive,
+						PeriodStart: &now, PeriodEnd: &end,
+					}, nil)
+					require.NoError(t, err)
+					return
+				}
+				_, err := models.ActivateOrganizationBillingPlan(db, r.Organization.ID, plan.Key)
+				require.NoError(t, err)
+			}
+			selectPlan()
+			want := before.WelcomeRemainingMicros + models.CentsToMicros(tc.trialCents)
+			require.Equal(t, want, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+			selectPlan()
+			assert.Equal(t, want, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+		})
+	}
+}
+
+func Test__InitialPaidPlanTrialCreditIsNotRepeatedAfterReactivation(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	product := "prod_" + uuid.NewString()
+	plan := models.BillingPlan{
+		Key: "selected_" + uuid.NewString()[:8], Name: "Selected", Category: "paid", Visibility: "public",
+		TrialCreditCents: 1200, CreditFrequency: "none", CreditExpiration: "never", PolarProductID: &product,
+	}
+	require.NoError(t, models.SaveBillingPlan(db, &plan))
+
+	apply := func(status string) *models.OrganizationBillingPlan {
+		now := time.Now()
+		end := now.AddDate(0, 1, 0)
+		savedResult, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+			ID: product, ProductID: product, Status: status, PeriodStart: &now, PeriodEnd: &end,
+		}, nil)
+		require.NoError(t, err)
+		saved := savedResult.Plan
+		return saved
+	}
+
+	before := describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros
+	apply(models.PolarSubscriptionStatusActive)
+	granted := describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros
+	require.Equal(t, before+models.CentsToMicros(1200), granted)
+
+	canceled := apply(models.PolarSubscriptionStatusCanceled)
+	require.Equal(t, models.BillingPlanTrial, canceled.Plan)
+	require.True(t, canceled.IsOpenTrial(time.Now()))
+
+	apply(models.PolarSubscriptionStatusActive)
+	assert.Equal(t, granted, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+}
+
 func Test__ApplyPolarSubscriptionReplacesAdminTrialWithPaid(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, nil)
@@ -37,7 +152,7 @@ func Test__ApplyPolarSubscriptionReplacesAdminTrialWithPaid(t *testing.T) {
 
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
-	after, grantIncluded, err := models.ApplyPolarSubscription(
+	afterResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -46,8 +161,10 @@ func Test__ApplyPolarSubscriptionReplacesAdminTrialWithPaid(t *testing.T) {
 			PeriodStart: &now,
 			PeriodEnd:   &end,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	after, grantIncluded := afterResult.Plan, afterResult.GrantIncluded
 	assert.True(t, grantIncluded)
 	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
 	assert.Equal(t, "business_legacy", after.Catalog.Key)
@@ -55,41 +172,257 @@ func Test__ApplyPolarSubscriptionReplacesAdminTrialWithPaid(t *testing.T) {
 	assert.True(t, after.IsActiveBusiness())
 }
 
-func Test__ApplyPolarSubscriptionEndsAdminBusinessOnCancel(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
-	db := database.Conn()
+func Test__ApplyPolarSubscriptionPreservesAdminPlanOnCancel(t *testing.T) {
+	for _, catalogKey := range []string{models.BillingPlanBusinessManual, "superplane_only"} {
+		for _, retainedSubscription := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/retained_subscription=%t", catalogKey, retainedSubscription), func(t *testing.T) {
+				r := support.Setup(t)
+				setLegacyBillingPlanTestProduct(t)
+				db := database.DB(t.Context())
+				assignedKey := catalogKey
+				if catalogKey != models.BillingPlanBusinessManual {
+					assignedKey += "_" + uuid.NewString()[:8]
+					catalog := models.BillingPlan{
+						Key: assignedKey, Name: "SuperPlane only", Category: "paid", Visibility: "private",
+						CreditFrequency: "none", CreditExpiration: "never",
+					}
+					require.NoError(t, models.SaveBillingPlan(db, &catalog))
+					t.Cleanup(func() {
+						cleanupDB := database.DB(context.WithoutCancel(t.Context()))
+						require.NoError(t, cleanupDB.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBillingPlan{}).Error)
+						require.NoError(t, models.DeleteBillingPlan(cleanupDB, catalog.ID))
+					})
+				}
+				plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, assignedKey, nil)
+				require.NoError(t, err)
+				if retainedSubscription {
+					require.NoError(t, db.Model(plan).Update("polar_subscription_id", "sub_old").Error)
+				}
 
-	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
-	require.NoError(t, err)
-	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
-	assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
-	assert.True(t, plan.IsActiveBusiness())
-	assert.True(t, plan.AllowsCreditPurchase())
+				now := time.Now()
+				end := now.AddDate(0, 1, 0)
+				result, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+					ProductID: "prod_business", ID: "sub_old", Status: models.PolarSubscriptionStatusCanceled,
+					PeriodStart: &now, PeriodEnd: &end,
+				}, nil)
+				require.NoError(t, err)
+				assert.Equal(t, models.PolarSubscriptionIgnored, result.Disposition)
+				assert.False(t, result.GrantIncluded)
 
-	now := time.Now()
-	end := now.AddDate(0, 1, 0)
-	after, grantIncluded, err := models.ApplyPolarSubscription(
-		db,
-		r.Organization.ID,
-		models.PolarSubscriptionApply{ProductID: "prod_business",
-			ID:          "sub_admin",
-			Status:      models.PolarSubscriptionStatusCanceled,
-			PeriodStart: &now,
-			PeriodEnd:   &end,
-		},
-	)
-	require.NoError(t, err)
-	assert.False(t, grantIncluded)
-	assert.Equal(t, models.BillingPlanNone, after.Plan)
-	assert.Equal(t, models.BillingPlanSourcePolar, after.PlanSource)
-	assert.False(t, after.IsOpenTrial(time.Now()))
-	assert.False(t, after.IsActiveBusiness())
+				after, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+				require.NoError(t, err)
+				assert.Equal(t, plan.PlanID, after.PlanID)
+				assert.Equal(t, assignedKey, after.Catalog.Key)
+				assert.Equal(t, models.BillingPlanSourceAdmin, after.PlanSource)
+				assert.True(t, after.IsActiveBusiness())
+				assert.True(t, after.AllowsCreditPurchase())
+			})
+		}
+	}
+}
+
+func Test__SetAdminOrganizationPlanRejectsPerSeatPlans(t *testing.T) {
+	for _, requirePaymentMethod := range []bool{false, true} {
+		name := "without payment method requirement"
+		if requirePaymentMethod {
+			name = "with payment method requirement"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.Conn()
+			catalog := models.BillingPlan{
+				Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private",
+				PerSeat: true, SeatLimit: new(50), RequirePaymentMethod: requirePaymentMethod,
+				CreditFrequency: "none", CreditExpiration: "never",
+			}
+			require.NoError(t, models.SaveBillingPlan(db, &catalog))
+			t.Cleanup(func() { require.NoError(t, models.DeleteBillingPlan(db, catalog.ID)) })
+			before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+
+			assigned, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, catalog.Key, nil)
+
+			require.EqualError(t, err, "Per-seat plans need a Polar subscription. Use a seat limit override instead.")
+			require.Nil(t, assigned)
+			after, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+		})
+	}
+}
+
+func Test__SetAdminOrganizationPlanSerializesCatalogSave(t *testing.T) {
+	for _, assignmentFirst := range []bool{false, true} {
+		name := "save commits first and assignment rejects the per-seat plan"
+		if assignmentFirst {
+			name = "assignment commits first and save rejects the seat change"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			catalog := models.BillingPlan{
+				Key: "admin_race_" + uuid.NewString()[:8], Name: "Admin race", Category: "paid", Visibility: "private",
+				PolarProductID: new("product_" + uuid.NewString()), SeatLimit: new(50),
+				CreditFrequency: "none", CreditExpiration: "never",
+			}
+			require.NoError(t, models.SaveBillingPlan(db, &catalog))
+			before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+			changed := catalog
+			changed.PerSeat = true
+			tx := db.Begin()
+			require.NoError(t, tx.Error)
+			defer tx.Rollback()
+
+			if assignmentFirst {
+				_, err := models.SetAdminOrganizationPlan(tx, r.Organization.ID, catalog.Key, nil)
+				require.NoError(t, err)
+				saveError := runAfterCommit(t, db, tx, func(conn *gorm.DB) error {
+					return models.SaveBillingPlan(conn, &changed)
+				})
+				require.ErrorIs(t, saveError, models.ErrCatalogPlan)
+			} else {
+				require.NoError(t, models.SaveBillingPlan(tx, &changed))
+				assignmentError := runAfterCommit(t, db, tx, func(conn *gorm.DB) error {
+					_, err := models.SetAdminOrganizationPlan(conn, r.Organization.ID, catalog.Key, nil)
+					return err
+				})
+				require.EqualError(t, assignmentError, "Per-seat plans need a Polar subscription. Use a seat limit override instead.")
+			}
+
+			stored, err := models.FindBillingPlan(db, catalog.Key)
+			require.NoError(t, err)
+			require.Equal(t, !assignmentFirst, stored.PerSeat)
+			after, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+			require.NoError(t, err)
+			if assignmentFirst {
+				require.Equal(t, catalog.ID, after.PlanID)
+				require.Equal(t, models.BillingPlanSourceAdmin, after.PlanSource)
+				return
+			}
+			require.Equal(t, before, after)
+		})
+	}
+}
+
+func Test__ApplyPolarSubscriptionSerializesCatalogSave(t *testing.T) {
+	newLinkedPlan := func(t *testing.T, db *gorm.DB) *models.BillingPlan {
+		t.Helper()
+		plan := &models.BillingPlan{
+			Key: "race_" + uuid.NewString()[:8], Name: "Race", Category: "paid", Visibility: "private",
+			PolarProductID: new("product_" + uuid.NewString()), PriceCents: 2000,
+			CreditFrequency: "none", CreditExpiration: "never",
+		}
+		require.NoError(t, models.SaveBillingPlan(db, plan))
+		return plan
+	}
+
+	t.Run("apply holds the plan lock and save rejects after", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		plan := newLinkedPlan(t, db)
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+		_, err := models.ApplyPolarSubscription(tx, r.Organization.ID, models.PolarSubscriptionApply{
+			ID: "sub_race_apply", ProductID: *plan.PolarProductID, Status: models.PolarSubscriptionStatusActive,
+		}, nil)
+		require.NoError(t, err)
+
+		changed := *plan
+		changed.PriceCents = 4000
+		saveError := runAfterCommit(t, db, tx, func(conn *gorm.DB) error {
+			return models.SaveBillingPlan(conn, &changed)
+		})
+		require.ErrorIs(t, saveError, models.ErrCatalogPlan)
+
+		stored, err := models.FindBillingPlan(db, plan.Key)
+		require.NoError(t, err)
+		require.Equal(t, int64(2000), stored.PriceCents)
+		assigned, err := models.ListAssignedBillingPlanIDs(db, []uuid.UUID{plan.ID})
+		require.NoError(t, err)
+		require.True(t, assigned.Contains(plan.ID))
+	})
+
+	t.Run("save holds the plan lock and apply re-reads the product", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		plan := newLinkedPlan(t, db)
+		productID := *plan.PolarProductID
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+		moved := *plan
+		moved.PolarProductID = new("moved_" + uuid.NewString())
+		require.NoError(t, models.SaveBillingPlan(tx, &moved))
+
+		applyError := runAfterCommit(t, db, tx, func(conn *gorm.DB) error {
+			_, err := models.ApplyPolarSubscription(conn, r.Organization.ID, models.PolarSubscriptionApply{
+				ID: "sub_race_save", ProductID: productID, Status: models.PolarSubscriptionStatusActive,
+			}, nil)
+			return err
+		})
+		require.ErrorContains(t, applyError, "unknown subscription product")
+
+		assigned, err := models.ListAssignedBillingPlanIDs(db, []uuid.UUID{plan.ID})
+		require.NoError(t, err)
+		require.False(t, assigned.Contains(plan.ID))
+	})
+}
+
+// runAfterCommit requires op on another connection to block on the first
+// transaction's locks, then commits the first transaction and returns the
+// error op finished with.
+func runAfterCommit(t *testing.T, db, first *gorm.DB, op func(*gorm.DB) error) error {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	pid := make(chan int, 1)
+	finished := make(chan struct{})
+	var opError error
+	go func() {
+		defer close(finished)
+		opError = db.WithContext(ctx).Connection(func(conn *gorm.DB) error {
+			var backendPID int
+			if err := conn.Raw("SELECT pg_backend_pid()").Scan(&backendPID).Error; err != nil {
+				return err
+			}
+			pid <- backendPID
+			return op(conn.Session(&gorm.Session{NewDB: true}))
+		})
+	}()
+	defer func() { first.Rollback(); <-finished }()
+	var backendPID int
+	select {
+	case backendPID = <-pid:
+	case <-finished:
+		t.Fatalf("concurrent operation could not start: %v", opError)
+	}
+	require.Eventually(t, func() bool {
+		select {
+		case <-finished:
+			return true
+		default:
+		}
+		var blocked bool
+		err := db.Raw("SELECT cardinality(pg_blocking_pids(?)) > 0", backendPID).Scan(&blocked).Error
+		return err == nil && blocked
+	}, 5*time.Second, 10*time.Millisecond)
+	select {
+	case <-finished:
+		t.Fatalf("concurrent operation did not wait for the first transaction: %v", opError)
+	default:
+	}
+	require.NoError(t, first.Commit().Error)
+	<-finished
+	return opError
 }
 
 func Test__SetAdminOrganizationPlanAllowsPolarCustomerWithoutSubscription(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	require.NoError(t, models.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cust_polar"))
@@ -102,17 +435,17 @@ func Test__SetAdminOrganizationPlanAllowsPolarCustomerWithoutSubscription(t *tes
 
 func Test__SetAdminOrganizationPlanRejectsActivePolarSubscription(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
-	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
+	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 		ID:          "sub_paid",
 		Status:      models.PolarSubscriptionStatusActive,
 		PeriodStart: &now,
 		PeriodEnd:   &end,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, nil)
@@ -126,17 +459,17 @@ func Test__SetAdminOrganizationPlanRejectsActivePolarSubscription(t *testing.T) 
 
 func Test__SetAdminOrganizationPlanAllowsEndedPolarSubscription(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
-	_, _, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
+	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 		ID:          "sub_ended",
 		Status:      models.PolarSubscriptionStatusActive,
 		PeriodStart: &now,
 		PeriodEnd:   &end,
-	})
+	}, nil)
 	require.NoError(t, err)
 	ended := now.Add(-time.Hour)
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
@@ -145,13 +478,13 @@ func Test__SetAdminOrganizationPlanAllowsEndedPolarSubscription(t *testing.T) {
 			"trial_ends_at":      ended,
 			"current_period_end": ended,
 		}).Error)
-	_, _, err = models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
+	_, err = models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{ProductID: "prod_business",
 		ID:                "sub_ended",
 		Status:            models.PolarSubscriptionStatusCanceled,
 		PeriodStart:       &now,
 		PeriodEnd:         &ended,
 		CancelAtPeriodEnd: true,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
@@ -176,6 +509,11 @@ func Test__OrganizationBillingIsPolarManaged(t *testing.T) {
 		CancelAtPeriodEnd:       true,
 		CurrentPeriodEnd:        &ended,
 	}
+	pastDueCanceling := &models.OrganizationBillingPlan{
+		PolarSubscriptionStatus: models.PolarSubscriptionStatusPastDue,
+		CancelAtPeriodEnd:       true,
+		CurrentPeriodEnd:        &end,
+	}
 	incomplete := &models.OrganizationBillingPlan{
 		PlanSource:              models.BillingPlanSourcePolar,
 		PolarSubscriptionStatus: models.PolarSubscriptionStatusIncomplete,
@@ -185,6 +523,7 @@ func Test__OrganizationBillingIsPolarManaged(t *testing.T) {
 	assert.True(t, models.OrganizationBillingIsPolarManaged(paid))
 	assert.True(t, models.OrganizationBillingIsPolarManaged(canceling))
 	assert.False(t, models.OrganizationBillingIsPolarManaged(endedPlan))
+	assert.False(t, models.OrganizationBillingIsPolarManaged(pastDueCanceling))
 	assert.False(t, models.OrganizationBillingIsPolarManaged(incomplete))
 	assert.False(t, models.OrganizationBillingIsPolarManaged(adminTrial))
 	assert.False(t, models.OrganizationBillingIsPolarManaged(nil))
@@ -195,7 +534,7 @@ func Test__OrganizationBillingIsPolarManaged(t *testing.T) {
 
 func Test__SetAdminOrganizationPlanBusinessHasNoIncludedUsageByDefault(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
@@ -225,7 +564,7 @@ func Test__SetAdminOrganizationPlanBusinessHasNoIncludedUsageByDefault(t *testin
 
 func Test__SetAdminOrganizationPlanBusinessGrantsIncludedWhenPeriodWasMissing(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn().Begin()
 	require.NoError(t, db.Error)
 	defer db.Rollback()
@@ -253,7 +592,7 @@ func Test__SetAdminOrganizationPlanBusinessGrantsIncludedWhenPeriodWasMissing(t 
 
 func Test__SetAdminOrganizationPlanNoneAfterBusinessResubscribe(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
@@ -276,7 +615,7 @@ func Test__SetAdminOrganizationPlanNoneAfterBusinessResubscribe(t *testing.T) {
 
 func Test__SetAdminOrganizationPlanTrialExpiresIncludedUsage(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
@@ -299,7 +638,7 @@ func Test__SetAdminOrganizationPlanTrialExpiresIncludedUsage(t *testing.T) {
 
 func Test__SetAdminOrganizationPlanExplicitTrialEndKeepsOpenStart(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
@@ -365,7 +704,7 @@ func Test__SetAdminOrganizationPlanExplicitTrialEndKeepsOpenStart(t *testing.T) 
 
 func Test__SetAdminOrganizationPlanReopensExpiredTrialCredit(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
@@ -400,7 +739,7 @@ func Test__SetAdminOrganizationPlanReopensExpiredTrialCredit(t *testing.T) {
 
 func Test__SetAdminOrganizationPlanCustomTrialSyncsWelcomeExpiry(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	catalog := models.BillingPlan{
@@ -440,7 +779,7 @@ func Test__SetAdminOrganizationPlanCustomTrialSyncsWelcomeExpiry(t *testing.T) {
 
 func Test__SetAdminOrganizationPlanTrialDoesNotCreateWelcomeGrant(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	require.NoError(t, db.Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
 		Delete(&models.OrganizationLLMCreditGrant{}).Error)
@@ -453,7 +792,7 @@ func Test__SetAdminOrganizationPlanTrialDoesNotCreateWelcomeGrant(t *testing.T) 
 
 func Test__SetAdminOrganizationPlanNilTrialEndKeepsFourteenDayDefault(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
 	before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
@@ -475,7 +814,7 @@ func Test__SetAdminOrganizationPlanNilTrialEndKeepsFourteenDayDefault(t *testing
 
 func Test__SetAdminOrganizationPlanBusinessAndNoneClearTrialKeepWelcomeExpiry(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
 	planBefore, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
@@ -548,12 +887,12 @@ func assertGrantUnchanged(t *testing.T, db *gorm.DB, before models.OrganizationL
 
 func Test__ApplyPolarSubscriptionCancelRestoresOpenTrial(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
 
-	_, _, err := models.ApplyPolarSubscription(
+	_, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -562,10 +901,11 @@ func Test__ApplyPolarSubscriptionCancelRestoresOpenTrial(t *testing.T) {
 			PeriodStart: &now,
 			PeriodEnd:   &end,
 		},
+		nil,
 	)
 	require.NoError(t, err)
 
-	after, grantIncluded, err := models.ApplyPolarSubscription(
+	afterResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -574,8 +914,10 @@ func Test__ApplyPolarSubscriptionCancelRestoresOpenTrial(t *testing.T) {
 			PeriodStart: &now,
 			PeriodEnd:   &end,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	after, grantIncluded := afterResult.Plan, afterResult.GrantIncluded
 	assert.False(t, grantIncluded)
 	assert.Equal(t, models.BillingPlanTrial, after.Plan)
 	assert.True(t, after.IsOpenTrial(time.Now()))
@@ -584,12 +926,12 @@ func Test__ApplyPolarSubscriptionCancelRestoresOpenTrial(t *testing.T) {
 
 func Test__ApplyPolarSubscriptionCancelEndsPlanAfterTrial(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
 
-	_, _, err := models.ApplyPolarSubscription(
+	_, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -598,6 +940,7 @@ func Test__ApplyPolarSubscriptionCancelEndsPlanAfterTrial(t *testing.T) {
 			PeriodStart: &now,
 			PeriodEnd:   &end,
 		},
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -606,7 +949,7 @@ func Test__ApplyPolarSubscriptionCancelEndsPlanAfterTrial(t *testing.T) {
 		Where("organization_id = ?", r.Organization.ID).
 		Update("trial_ends_at", ended).Error)
 
-	after, grantIncluded, err := models.ApplyPolarSubscription(
+	afterResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -615,8 +958,10 @@ func Test__ApplyPolarSubscriptionCancelEndsPlanAfterTrial(t *testing.T) {
 			PeriodStart: &now,
 			PeriodEnd:   &end,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	after, grantIncluded := afterResult.Plan, afterResult.GrantIncluded
 	assert.False(t, grantIncluded)
 	assert.Equal(t, models.BillingPlanNone, after.Plan)
 	assert.False(t, after.IsOpenTrial(time.Now()))
@@ -625,12 +970,12 @@ func Test__ApplyPolarSubscriptionCancelEndsPlanAfterTrial(t *testing.T) {
 
 func Test__ApplyPolarSubscriptionIncompleteKeepsTrial(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
 
-	after, grantIncluded, err := models.ApplyPolarSubscription(
+	afterResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -639,8 +984,10 @@ func Test__ApplyPolarSubscriptionIncompleteKeepsTrial(t *testing.T) {
 			PeriodStart: &now,
 			PeriodEnd:   &end,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	after, grantIncluded := afterResult.Plan, afterResult.GrantIncluded
 	assert.False(t, grantIncluded)
 	assert.Equal(t, models.BillingPlanTrial, after.Plan)
 	assert.True(t, after.IsOpenTrial(time.Now()))
@@ -675,7 +1022,7 @@ func Test__CreateOrganizationSkipsTrialWhenBillingDisabled(t *testing.T) {
 
 func Test__AssertHostedRunAllowedSkipsLimitsWhenBillingDisabled(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	t.Setenv(models.BillingEnabledEnv, "no")
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
@@ -699,7 +1046,7 @@ func Test__AssertHostedRunAllowedSkipsLimitsWhenBillingDisabled(t *testing.T) {
 
 func Test__AssertHostedRunAllowedRequiresSubscriptionWhenPolarConfigured(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 
@@ -715,9 +1062,73 @@ func Test__AssertHostedRunAllowedRequiresSubscriptionWhenPolarConfigured(t *test
 	require.ErrorIs(t, err, models.ErrHostedSubscriptionRequired)
 }
 
+func Test__AssertOrganizationPlanAllowsRuns(t *testing.T) {
+	for _, polarToken := range []string{"", "oat_test"} {
+		t.Run("None plan with leftover credit is blocked, polar token "+polarToken, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.Conn()
+			t.Setenv("POLAR_ACCESS_TOKEN", polarToken)
+			_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, nil)
+			require.NoError(t, err)
+			credit, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.Greater(t, credit.RemainingMicros, int64(0))
+
+			require.ErrorIs(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID), models.ErrHostedSubscriptionRequired)
+			require.ErrorIs(t, models.AssertHostedRunAllowed(db, r.Organization.ID, nil), models.ErrHostedSubscriptionRequired)
+		})
+	}
+
+	t.Run("open trial is allowed", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		t.Setenv("POLAR_ACCESS_TOKEN", "")
+
+		require.NoError(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID))
+		require.NoError(t, models.AssertHostedRunAllowed(db, r.Organization.ID, nil))
+	})
+
+	t.Run("active paid plan is allowed", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		t.Setenv("POLAR_ACCESS_TOKEN", "")
+		_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
+		require.NoError(t, err)
+
+		require.NoError(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID))
+	})
+
+	t.Run("expired trial is blocked", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		t.Setenv("POLAR_ACCESS_TOKEN", "")
+		expireOrganizationTrial(t, db, r.Organization.ID)
+
+		require.ErrorIs(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID), models.ErrHostedSubscriptionRequired)
+	})
+
+	t.Run("billing disabled allows a None plan", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.Conn()
+		t.Setenv(models.BillingEnabledEnv, "no")
+		_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, nil)
+		require.NoError(t, err)
+
+		require.NoError(t, models.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID))
+	})
+
+	t.Run("nil organization is rejected", func(t *testing.T) {
+		support.Setup(t)
+
+		err := models.AssertOrganizationPlanAllowsRuns(database.Conn(), uuid.Nil)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, models.ErrHostedSubscriptionRequired)
+	})
+}
+
 func Test__ResolveOrganizationBillingPlanLeavesOpenTrial(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
@@ -733,7 +1144,7 @@ func Test__ResolveOrganizationBillingPlanLeavesOpenTrial(t *testing.T) {
 
 func Test__ResolveOrganizationBillingPlanLapsesExpiredTrial(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	expireOrganizationTrial(t, db, r.Organization.ID)
 
@@ -751,7 +1162,7 @@ func Test__ResolveOrganizationBillingPlanLapsesExpiredTrial(t *testing.T) {
 
 func Test__ResolveOrganizationBillingPlanInsertsNoneWhenMissing(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBillingPlan{}).Error)
 
@@ -769,7 +1180,7 @@ func Test__ResolveOrganizationBillingPlanInsertsNoneWhenMissing(t *testing.T) {
 
 func Test__ResolveOrganizationBillingPlanLeavesActiveBusiness(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
@@ -784,7 +1195,7 @@ func Test__ResolveOrganizationBillingPlanLeavesActiveBusiness(t *testing.T) {
 
 func Test__ResolveOrganizationBillingPlanExpiresIncludedUsage(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 
 	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
@@ -802,7 +1213,7 @@ func Test__ResolveOrganizationBillingPlanExpiresIncludedUsage(t *testing.T) {
 
 func Test__AssertHostedRunAllowedRejectsExpiredTrialWithTopup(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	expireOrganizationTrial(t, db, r.Organization.ID)
@@ -829,12 +1240,12 @@ func Test__AssertHostedRunAllowedRejectsExpiredTrialWithTopup(t *testing.T) {
 
 func Test__ApplyPolarSubscriptionCancelAtPeriodEndKeepsBusiness(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
 
-	after, grantIncluded, err := models.ApplyPolarSubscription(
+	afterResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -844,8 +1255,10 @@ func Test__ApplyPolarSubscriptionCancelAtPeriodEndKeepsBusiness(t *testing.T) {
 			PeriodEnd:         &end,
 			CancelAtPeriodEnd: true,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	after, grantIncluded := afterResult.Plan, afterResult.GrantIncluded
 	assert.True(t, grantIncluded)
 	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
 	assert.True(t, after.CancelAtPeriodEnd)
@@ -855,12 +1268,12 @@ func Test__ApplyPolarSubscriptionCancelAtPeriodEndKeepsBusiness(t *testing.T) {
 
 func Test__ApplyPolarSubscriptionCanceledKeepsBusinessUntilPeriodEnd(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
 
-	_, _, err := models.ApplyPolarSubscription(
+	_, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -869,10 +1282,11 @@ func Test__ApplyPolarSubscriptionCanceledKeepsBusinessUntilPeriodEnd(t *testing.
 			PeriodStart: &now,
 			PeriodEnd:   &end,
 		},
+		nil,
 	)
 	require.NoError(t, err)
 
-	after, grantIncluded, err := models.ApplyPolarSubscription(
+	afterResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -882,8 +1296,10 @@ func Test__ApplyPolarSubscriptionCanceledKeepsBusinessUntilPeriodEnd(t *testing.
 			PeriodEnd:         &end,
 			CancelAtPeriodEnd: true,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	after, grantIncluded := afterResult.Plan, afterResult.GrantIncluded
 	assert.False(t, grantIncluded)
 	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
 	assert.True(t, after.CancelAtPeriodEnd)
@@ -892,12 +1308,12 @@ func Test__ApplyPolarSubscriptionCanceledKeepsBusinessUntilPeriodEnd(t *testing.
 
 func Test__ApplyPolarSubscriptionResumeClearsCancelAtPeriodEnd(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
 
-	_, _, err := models.ApplyPolarSubscription(
+	_, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -907,10 +1323,11 @@ func Test__ApplyPolarSubscriptionResumeClearsCancelAtPeriodEnd(t *testing.T) {
 			PeriodEnd:         &end,
 			CancelAtPeriodEnd: true,
 		},
+		nil,
 	)
 	require.NoError(t, err)
 
-	after, grantIncluded, err := models.ApplyPolarSubscription(
+	afterResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -919,8 +1336,10 @@ func Test__ApplyPolarSubscriptionResumeClearsCancelAtPeriodEnd(t *testing.T) {
 			PeriodStart: &now,
 			PeriodEnd:   &end,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	after, grantIncluded := afterResult.Plan, afterResult.GrantIncluded
 	assert.False(t, grantIncluded)
 	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
 	assert.False(t, after.CancelAtPeriodEnd)
@@ -929,14 +1348,14 @@ func Test__ApplyPolarSubscriptionResumeClearsCancelAtPeriodEnd(t *testing.T) {
 
 func Test__ApplyPolarSubscriptionIgnoresStaleSnapshot(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	now := time.Now().UTC().Truncate(time.Second)
 	end := now.AddDate(0, 1, 0)
 	older := now.Add(-time.Minute)
 	newer := now
 
-	_, _, err := models.ApplyPolarSubscription(
+	_, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -946,10 +1365,11 @@ func Test__ApplyPolarSubscriptionIgnoresStaleSnapshot(t *testing.T) {
 			PeriodEnd:   &end,
 			ModifiedAt:  &older,
 		},
+		nil,
 	)
 	require.NoError(t, err)
 
-	resumed, _, err := models.ApplyPolarSubscription(
+	resumedResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -959,13 +1379,15 @@ func Test__ApplyPolarSubscriptionIgnoresStaleSnapshot(t *testing.T) {
 			PeriodEnd:   &end,
 			ModifiedAt:  &newer,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	resumed := resumedResult.Plan
 	require.False(t, resumed.CancelAtPeriodEnd)
 	require.NotNil(t, resumed.PolarModifiedAt)
 	assert.True(t, resumed.PolarModifiedAt.Equal(newer))
 
-	after, grantIncluded, err := models.ApplyPolarSubscription(
+	afterResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -976,8 +1398,10 @@ func Test__ApplyPolarSubscriptionIgnoresStaleSnapshot(t *testing.T) {
 			CancelAtPeriodEnd: true,
 			ModifiedAt:        &older,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	after, grantIncluded := afterResult.Plan, afterResult.GrantIncluded
 	assert.False(t, grantIncluded)
 	assert.False(t, after.CancelAtPeriodEnd)
 	assert.Equal(t, models.BillingPlanBusiness, after.Plan)
@@ -987,14 +1411,14 @@ func Test__ApplyPolarSubscriptionIgnoresStaleSnapshot(t *testing.T) {
 
 func Test__ApplyPolarSubscriptionTimestampLessSnapshotKeepsProviderOrder(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	now := time.Now().UTC().Truncate(time.Second)
 	end := now.AddDate(0, 1, 0)
 	provider := now.Add(-30 * time.Second)
 	laterWebhook := now.Add(-10 * time.Second)
 
-	_, _, err := models.ApplyPolarSubscription(
+	_, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -1004,10 +1428,11 @@ func Test__ApplyPolarSubscriptionTimestampLessSnapshotKeepsProviderOrder(t *test
 			PeriodEnd:   &end,
 			ModifiedAt:  &provider,
 		},
+		nil,
 	)
 	require.NoError(t, err)
 
-	canceled, _, err := models.ApplyPolarSubscription(
+	canceledResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -1017,13 +1442,15 @@ func Test__ApplyPolarSubscriptionTimestampLessSnapshotKeepsProviderOrder(t *test
 			PeriodEnd:         &end,
 			CancelAtPeriodEnd: true,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	canceled := canceledResult.Plan
 	assert.True(t, canceled.CancelAtPeriodEnd)
 	require.NotNil(t, canceled.PolarModifiedAt)
 	assert.True(t, canceled.PolarModifiedAt.Equal(provider))
 
-	after, grantIncluded, err := models.ApplyPolarSubscription(
+	afterResult, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -1033,8 +1460,10 @@ func Test__ApplyPolarSubscriptionTimestampLessSnapshotKeepsProviderOrder(t *test
 			PeriodEnd:   &end,
 			ModifiedAt:  &laterWebhook,
 		},
+		nil,
 	)
 	require.NoError(t, err)
+	after, grantIncluded := afterResult.Plan, afterResult.GrantIncluded
 	assert.False(t, grantIncluded)
 	assert.False(t, after.CancelAtPeriodEnd)
 	require.NotNil(t, after.PolarModifiedAt)
@@ -1043,12 +1472,12 @@ func Test__ApplyPolarSubscriptionTimestampLessSnapshotKeepsProviderOrder(t *test
 
 func Test__ResolveOrganizationBillingPlanLapsesEndedCancelAtPeriodEnd(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
 
-	_, _, err := models.ApplyPolarSubscription(
+	_, err := models.ApplyPolarSubscription(
 		db,
 		r.Organization.ID,
 		models.PolarSubscriptionApply{ProductID: "prod_business",
@@ -1058,6 +1487,7 @@ func Test__ResolveOrganizationBillingPlanLapsesEndedCancelAtPeriodEnd(t *testing
 			PeriodEnd:         &end,
 			CancelAtPeriodEnd: true,
 		},
+		nil,
 	)
 	require.NoError(t, err)
 	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
@@ -1087,4 +1517,246 @@ func expireOrganizationTrial(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
 			"plan_id":       db.Model(&models.BillingPlan{}).Select("id").Where("key = ?", "trial"),
 			"trial_ends_at": time.Now().Add(-time.Hour),
 		}).Error)
+}
+
+func Test__OrganizationBillingPlanHasLivePolarSubscription(t *testing.T) {
+	now := time.Now()
+	future := now.Add(time.Hour)
+	past := now.Add(-time.Hour)
+	subscriptionID := "sub_live"
+	blank := "  "
+
+	for _, tc := range []struct {
+		name string
+		plan models.OrganizationBillingPlan
+		live bool
+	}{
+		{name: "active", plan: polarPlan(&subscriptionID, "active", false, nil), live: true},
+		{name: "trialing", plan: polarPlan(&subscriptionID, "trialing", false, nil), live: true},
+		{name: "past due", plan: polarPlan(&subscriptionID, "past_due", false, nil), live: true},
+		{name: "paused", plan: polarPlan(&subscriptionID, "paused", false, nil), live: true},
+		{name: "status with different case and spaces", plan: polarPlan(&subscriptionID, " Active ", false, nil), live: true},
+		{name: "canceled", plan: polarPlan(&subscriptionID, "canceled", false, nil)},
+		{name: "revoked", plan: polarPlan(&subscriptionID, "revoked", false, nil)},
+		{name: "unpaid", plan: polarPlan(&subscriptionID, "unpaid", false, nil)},
+		{name: "incomplete", plan: polarPlan(&subscriptionID, "incomplete", false, nil)},
+		{name: "empty status", plan: polarPlan(&subscriptionID, "", false, nil)},
+		{name: "scheduled cancellation with period still open", plan: polarPlan(&subscriptionID, "active", true, &future), live: true},
+		{name: "canceled with paid period still open", plan: polarPlan(&subscriptionID, "canceled", true, &future), live: true},
+		{name: "active scheduled cancellation with period ended", plan: polarPlan(&subscriptionID, "active", true, &past), live: true},
+		{name: "active scheduled cancellation without period end", plan: polarPlan(&subscriptionID, "active", true, nil), live: true},
+		{name: "canceled after scheduled cancellation ended", plan: polarPlan(&subscriptionID, "canceled", true, &past)},
+		{name: "missing subscription ID", plan: polarPlan(nil, "active", false, nil)},
+		{name: "blank subscription ID", plan: polarPlan(&blank, "active", false, nil)},
+		{
+			name: "admin plan with active status",
+			plan: models.OrganizationBillingPlan{
+				PlanSource: models.BillingPlanSourceAdmin, PolarSubscriptionID: &subscriptionID, PolarSubscriptionStatus: "active",
+			},
+		},
+		{
+			name: "system plan with active status",
+			plan: models.OrganizationBillingPlan{
+				PlanSource: models.BillingPlanSourceSystem, PolarSubscriptionID: &subscriptionID, PolarSubscriptionStatus: "active",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.live, tc.plan.HasLivePolarSubscription(now))
+		})
+	}
+
+	t.Run("nil plan", func(t *testing.T) {
+		var plan *models.OrganizationBillingPlan
+		assert.False(t, plan.HasLivePolarSubscription(now))
+	})
+}
+
+func Test__OrganizationBillingPlanMayBeBillable(t *testing.T) {
+	now := time.Now()
+	future := now.Add(time.Hour)
+	past := now.Add(-time.Hour)
+	subscriptionID := "sub_billable"
+	blank := "  "
+
+	for _, tc := range []struct {
+		name     string
+		plan     models.OrganizationBillingPlan
+		billable bool
+	}{
+		{name: "active", plan: polarPlan(&subscriptionID, "active", false, nil), billable: true},
+		{name: "trialing", plan: polarPlan(&subscriptionID, "trialing", false, nil), billable: true},
+		{name: "past due", plan: polarPlan(&subscriptionID, "past_due", false, nil), billable: true},
+		{name: "paused", plan: polarPlan(&subscriptionID, "paused", false, nil), billable: true},
+		{name: "unpaid", plan: polarPlan(&subscriptionID, "unpaid", false, nil), billable: true},
+		{name: "incomplete", plan: polarPlan(&subscriptionID, "incomplete", false, nil), billable: true},
+		{name: "empty status", plan: polarPlan(&subscriptionID, "", false, nil), billable: true},
+		{name: "unknown status", plan: polarPlan(&subscriptionID, "suspended", false, nil), billable: true},
+		{name: "active scheduled cancellation with period ended", plan: polarPlan(&subscriptionID, "active", true, &past), billable: true},
+		{name: "canceled with paid period still open", plan: polarPlan(&subscriptionID, "canceled", true, &future), billable: true},
+		{name: "canceled", plan: polarPlan(&subscriptionID, "canceled", false, nil)},
+		{name: "canceled after scheduled cancellation ended", plan: polarPlan(&subscriptionID, "canceled", true, &past)},
+		{name: "revoked", plan: polarPlan(&subscriptionID, " Revoked ", false, nil)},
+		{name: "incomplete expired", plan: polarPlan(&subscriptionID, "incomplete_expired", false, nil)},
+		{name: "missing subscription ID", plan: polarPlan(nil, "active", false, nil)},
+		{name: "blank subscription ID", plan: polarPlan(&blank, "active", false, nil)},
+		{
+			name: "admin plan with active status",
+			plan: models.OrganizationBillingPlan{
+				PlanSource: models.BillingPlanSourceAdmin, PolarSubscriptionID: &subscriptionID, PolarSubscriptionStatus: "active",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.billable, tc.plan.MayBeBillable(now))
+		})
+	}
+
+	t.Run("nil plan", func(t *testing.T) {
+		var plan *models.OrganizationBillingPlan
+		assert.False(t, plan.MayBeBillable(now))
+	})
+}
+
+func polarPlan(subscriptionID *string, status string, cancelAtPeriodEnd bool, periodEnd *time.Time) models.OrganizationBillingPlan {
+	return models.OrganizationBillingPlan{
+		PlanSource:              models.BillingPlanSourcePolar,
+		PolarSubscriptionID:     subscriptionID,
+		PolarSubscriptionStatus: status,
+		CancelAtPeriodEnd:       cancelAtPeriodEnd,
+		CurrentPeriodEnd:        periodEnd,
+	}
+}
+
+func Test__ListSeatRenewalSyncPlansFindsSeatBasedPlansWithAChangeableSubscription(t *testing.T) {
+	support.Setup(t)
+	db := database.Conn()
+	save := func(perSeat bool) *models.BillingPlan {
+		catalog := models.BillingPlan{
+			Key: "sync_" + uuid.NewString()[:8], Name: "Sync", Category: "paid", Visibility: "private", PerSeat: perSeat,
+			CreditFrequency: "none", CreditExpiration: "never",
+		}
+		if perSeat {
+			catalog.SeatLimit = new(50)
+		}
+		require.NoError(t, models.SaveBillingPlan(db, &catalog))
+		return &catalog
+	}
+	perSeat, flat := save(true), save(false)
+	now := time.Now().UTC()
+
+	type row struct {
+		catalog      *models.BillingPlan
+		status       string
+		source       string
+		subscription *string
+		seats        *int
+		renewsIn     *time.Duration
+		deleted      bool
+		cancelAtEnd  bool
+	}
+	hours := func(n int) *time.Duration { return new(time.Duration(n) * time.Hour) }
+	subscription := func() *string { return new("sub_" + uuid.NewString()) }
+	polarSource := models.BillingPlanSourcePolar
+	rows := map[string]row{
+		// Included, ordered by renewal. A null renewal comes last.
+		"active":                    {catalog: perSeat, status: "active", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(4)},
+		"canceling":                 {catalog: perSeat, status: "active", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(1), cancelAtEnd: true},
+		"past due":                  {catalog: perSeat, status: "past_due", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(2)},
+		"unpaid":                    {catalog: perSeat, status: "unpaid", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(3)},
+		"paused":                    {catalog: perSeat, status: "paused", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(5)},
+		"lapsed with purchased":     {catalog: flat, status: "past_due", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(6)},
+		"lapsed without renewal":    {catalog: flat, status: "unpaid", source: polarSource, subscription: subscription(), seats: new(3)},
+		"per seat without purchase": {catalog: perSeat, status: "active", source: polarSource, subscription: subscription(), renewsIn: hours(7)},
+		// Excluded.
+		"canceled":                    {catalog: perSeat, status: "canceled", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(1)},
+		"revoked":                     {catalog: perSeat, status: "revoked", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(1)},
+		"admin plan":                  {catalog: perSeat, status: "active", source: models.BillingPlanSourceAdmin, subscription: subscription(), seats: new(3), renewsIn: hours(1)},
+		"deleted organization":        {catalog: perSeat, status: "active", source: polarSource, subscription: subscription(), seats: new(3), renewsIn: hours(1), deleted: true},
+		"empty subscription":          {catalog: perSeat, status: "active", source: polarSource, subscription: new(""), seats: new(3), renewsIn: hours(1)},
+		"no subscription":             {catalog: perSeat, status: "active", source: polarSource, seats: new(3), renewsIn: hours(1)},
+		"not seat based and no seats": {catalog: flat, status: "past_due", source: polarSource, subscription: subscription(), renewsIn: hours(1)},
+	}
+	ids := map[uuid.UUID]string{}
+	for name, tc := range rows {
+		org, err := models.CreateOrganizationInTransaction(db, "Org "+uuid.NewString()[:8], "")
+		require.NoError(t, err)
+		_, err = models.EnsureOrganizationBillingPlan(db, org.ID)
+		require.NoError(t, err)
+		var periodEnd *time.Time
+		if tc.renewsIn != nil {
+			periodEnd = new(now.Add(*tc.renewsIn))
+		}
+		require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", org.ID).Updates(map[string]any{
+			"plan_id": tc.catalog.ID, "plan": tc.catalog.Key, "plan_source": tc.source,
+			"polar_subscription_id": tc.subscription, "polar_subscription_status": tc.status,
+			"purchased_seats": tc.seats, "current_period_end": periodEnd, "cancel_at_period_end": tc.cancelAtEnd,
+		}).Error)
+		if tc.deleted {
+			require.NoError(t, db.Delete(org).Error)
+		}
+		ids[org.ID] = name
+	}
+
+	plans, err := models.ListSeatRenewalSyncPlans(db)
+
+	require.NoError(t, err)
+	var listed []string
+	for _, plan := range plans {
+		if name, ok := ids[plan.OrganizationID]; ok {
+			listed = append(listed, name)
+		}
+	}
+	assert.Equal(t, []string{
+		"canceling", "past due", "unpaid", "active", "paused", "lapsed with purchased", "per seat without purchase", "lapsed without renewal",
+	}, listed)
+}
+
+func Test__OrganizationSoftDeleteRequiresTerminationProof(t *testing.T) {
+	applySubscription := func(t *testing.T, orgID uuid.UUID, cancelAtPeriodEnd bool, periodEnd time.Time) {
+		t.Helper()
+		start := periodEnd.AddDate(0, -1, 0)
+		_, err := models.ApplyPolarSubscription(database.Conn(), orgID, models.PolarSubscriptionApply{
+			ID: "sub_soft_delete", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive,
+			PeriodStart: &start, PeriodEnd: &periodEnd, CancelAtPeriodEnd: cancelAtPeriodEnd,
+		}, nil)
+		require.NoError(t, err)
+	}
+	requireOrganizationKept := func(t *testing.T, orgID uuid.UUID) {
+		t.Helper()
+		organization, err := models.FindOrganizationByID(orgID.String())
+		require.NoError(t, err)
+		assert.False(t, organization.DeletedAt.Valid)
+	}
+
+	for _, tc := range []struct {
+		name              string
+		cancelAtPeriodEnd bool
+		periodEnd         time.Time
+	}{
+		{name: "live subscription", periodEnd: time.Now().AddDate(0, 1, 0)},
+		{name: "elapsed scheduled cancellation", cancelAtPeriodEnd: true, periodEnd: time.Now().Add(-time.Hour)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			setLegacyBillingPlanTestProduct(t)
+			db := database.DB(t.Context())
+			applySubscription(t, r.Organization.ID, tc.cancelAtPeriodEnd, tc.periodEnd)
+
+			require.ErrorIs(t, r.Organization.SoftDelete(db, nil), models.ErrOrganizationSubscriptionUnverified)
+			require.ErrorIs(t, models.SoftDeleteOrganizationInTransaction(db, r.Organization.ID.String()), models.ErrOrganizationSubscriptionLive)
+
+			requireOrganizationKept(t, r.Organization.ID)
+		})
+	}
+
+	t.Run("organization without a subscription is deleted", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.DB(t.Context())
+
+		require.NoError(t, models.SoftDeleteOrganizationInTransaction(db, r.Organization.ID.String()))
+
+		_, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
 }

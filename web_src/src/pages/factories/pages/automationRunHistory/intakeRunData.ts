@@ -8,6 +8,7 @@ export type RunHistoryIntakeSource = LineIntakeSourceId | "scheduled-intake";
 
 const summaries: Record<IntakeRunOutcome, string> = {
   created: "SuperPlane created a task from this source event.",
+  existing: "A task already exists for this source. SuperPlane did not create another task.",
   filtered: "This source event did not match the intake filters. No task was created.",
   processing: "SuperPlane is processing this source event. The final outcome is not available yet.",
   failed: "This intake run failed. Open the failed activity for details.",
@@ -48,15 +49,33 @@ function recordedIntakeOutcome(
     orders.some((order) => order.sourceRunId === run.id && Boolean(run.id))
   )
     return "created";
-  const rejected = lastFilterAttempts(run).filter(
-    (execution) => execution.outputChannels?.length === 1 && execution.outputChannels[0] === "false",
+  if (recordedExistingTaskId(run)) return "existing";
+  const rejected = lastAttempts(run).filter(
+    (execution) =>
+      execution.componentName === "if" &&
+      execution.result === "RESULT_PASSED" &&
+      execution.outputChannels?.length === 1 &&
+      execution.outputChannels[0] === "false",
   );
-  if (sourceId === "scheduled-intake")
-    return rejected.some((execution) => execution.nodeId === "has-proposal") ? "no-proposal" : "unknown";
-  return rejected.length > 0 ? "filtered" : "unknown";
+  if (rejected.length > 0) {
+    if (sourceId === "scheduled-intake")
+      return rejected.some((execution) => execution.nodeId === "has-proposal") ? "no-proposal" : "unknown";
+    return "filtered";
+  }
+  if (run.task?.id) return "created";
+  return "unknown";
 }
 
-function lastFilterAttempts(run: CanvasesCanvasRun) {
+export function recordedExistingTaskId(run: CanvasesCanvasRun): string | undefined {
+  return lastAttempts(run).find(
+    (execution) =>
+      execution.componentName === "createWorkOrder" &&
+      execution.result === "RESULT_PASSED" &&
+      Boolean(execution.existingTaskId),
+  )?.existingTaskId;
+}
+
+function lastAttempts(run: CanvasesCanvasRun) {
   const lastByNode = new Map<string, NonNullable<CanvasesCanvasRun["executions"]>[number]>();
   for (const execution of [...(run.executions ?? [])].sort((a, b) =>
     (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
@@ -65,9 +84,7 @@ function lastFilterAttempts(run: CanvasesCanvasRun) {
   }
   // Use recorded branches and historical component identity, never current
   // filters or the absence of a linked task. Incomplete old records stay unknown.
-  return [...lastByNode.values()].filter(
-    (execution) => execution.componentName === "if" && execution.result === "RESULT_PASSED",
-  );
+  return [...lastByNode.values()];
 }
 
 function eventDescription(payload: Record<string, unknown>): string {

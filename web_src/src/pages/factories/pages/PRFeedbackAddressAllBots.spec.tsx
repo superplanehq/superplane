@@ -57,7 +57,6 @@ function renderSettings(onSave = vi.fn(), settings: PRFeedbackDraftSettings = al
           organizationId="org-1"
           githubIntegrationId="gh-1"
           settings={settings}
-          healthy
           onSave={onSave}
           onClose={vi.fn()}
           fixed={false}

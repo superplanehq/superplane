@@ -19,8 +19,10 @@ import (
 )
 
 const (
-	defaultStableRunnerVersion       = "v0.1.0"
-	defaultStableFleetManagerVersion = "v0.1.4"
+	// Fallback when the chart does not set a version and GitHub lookup fails.
+	// Keep these equal to componentReleases in the SuperPlane Helm values.
+	defaultStableRunnerVersion       = "v0.2.1"
+	defaultStableFleetManagerVersion = "v0.1.5"
 	fleetManagerReleaseTagPrefix     = "fleet-manager/"
 	fleetManagerChartRepository      = "oci://ghcr.io/superplanehq/fleet-manager-chart"
 	fleetManagerImageRepository      = "ghcr.io/superplanehq/fleet-manager"

@@ -67,17 +67,11 @@ authentication:
 #
 # Application encryption. The first master key is primary.
 # Use env://<id>:<base64> or gcp-kms://<CryptoKey URI>.
-# For an upgrade, keep the existing base64-encoded key and set writeFormat
-# to legacy until all pods can read versioned values. Then set it to versioned.
-# Keep the legacy key until all legacy values have been migrated.
-# If secretName is set, supply ENCRYPTION_MASTER_KEYS and, during an upgrade,
-# ENCRYPTION_KEY in that Secret.
+# If secretName is set, supply ENCRYPTION_MASTER_KEYS in that Secret.
 #
 encryption:
   secretName: ""
-  key: ""
   masterKeys: ""
-  writeFormat: versioned
 
 #
 # Optional Enterprise license from an existing Kubernetes secret. When set,
@@ -117,12 +111,14 @@ fleetManagerSetup:
   serviceAccountName: superplane-fleet-manager
   infrastructure: {}
 
-# Saved versions are the fallback when release lookup fails.
+# A running installation uses the newest stable Runner and Fleet Manager
+# release. Release candidates are excluded. These versions apply when
+# release lookup fails.
 componentReleases:
-  runnerVersion: v0.2.0
+  runnerVersion: v0.2.1
   runnerVersions:
-    - v0.2.0
-  fleetManagerVersion: v0.1.4
+    - v0.2.1
+  fleetManagerVersion: v0.1.5
 
 sentry:
   secretName: ""
@@ -144,19 +140,21 @@ posthog:
   key: ""
 
 #
-# Self-hosted billing is off when this value is empty and Polar is off.
-# An empty value follows polar.enabled. Set false or "no" to keep billing
-# off when Polar is on. Set true or "yes" to force billing on. SuperPlane
-# Cloud does not set this off.
+# Self-hosted product billing is off. A Helm install sets
+# SUPERPLANE_BILLING_ENABLED=no, so the trial credit notice stays hidden.
+# Set true or "yes" only when this install sells hosted credit.
+# Polar credentials do not turn billing on.
 #
 billing:
-  enabled: ""
+  enabled: "no"
 
 polar:
   secretName: ""
   enabled: false
   accessToken: ""
   environment: "sandbox"
+  # Optional. Use superplane-inc for the production Polar dashboard.
+  dashboardOrganizationSlug: ""
   webhookSecret: ""
   # Optional. Overrides the Polar API version that SuperPlane pins in code.
   apiVersion: ""

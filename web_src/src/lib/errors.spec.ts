@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getApiErrorMessage, getResponseErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getApiErrorReason, getResponseErrorMessage } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts nested api error messages", () => {
@@ -91,5 +91,21 @@ describe("errors", () => {
     const response = new Response("", { status: 500 });
 
     await expect(getResponseErrorMessage(response, "fallback")).resolves.toBe("fallback");
+  });
+
+  it("extracts the SuperPlane error reason", () => {
+    const info = {
+      "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+      domain: "superplane.com",
+      reason: "SOME_REASON",
+    };
+
+    expect(getApiErrorReason(Object.assign(new Error("failed"), { details: [{ foo: "bar" }, info] }))).toBe(
+      "SOME_REASON",
+    );
+    expect(getApiErrorReason({ details: [{ ...info, domain: "example.com" }] })).toBeNull();
+    expect(getApiErrorReason({ details: "SOME_REASON" })).toBeNull();
+    expect(getApiErrorReason(new Error("failed"))).toBeNull();
+    expect(getApiErrorReason(null)).toBeNull();
   });
 });

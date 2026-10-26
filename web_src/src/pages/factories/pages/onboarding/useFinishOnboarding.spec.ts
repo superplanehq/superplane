@@ -114,6 +114,7 @@ describe("provisionWorkspace", () => {
       createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
       listIntakes: vi.fn().mockResolvedValue([]),
       createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
+      updateIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
       deleteIntake: vi.fn().mockResolvedValue({}),
       listApps: vi.fn().mockResolvedValue([]),
       workspaceName: "Payments Service",
@@ -147,6 +148,24 @@ describe("provisionWorkspace", () => {
         }),
       );
       expect(createIntake).toHaveBeenCalledWith(expect.objectContaining({ skipInitialImport: true }));
+    },
+  );
+
+  it.each(["vcs", "jira", "linear"] as const)(
+    "starts the %s intake paused when automatic intake is off",
+    async (issuesChoice) => {
+      const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" });
+      await provisionWorkspace(
+        provisionArgs({
+          issuesChoice,
+          paused: true,
+          createIntake,
+          jira: { integrationId: "jira-1", projectId: "project-1" },
+          linear: { integrationId: "linear-1", projectIds: ["project-1"] },
+        }),
+      );
+      expect(createIntake).toHaveBeenCalledWith(expect.objectContaining({ paused: true }));
+      expect(createIntake).not.toHaveBeenCalledWith(expect.objectContaining({ skipInitialImport: true }));
     },
   );
 
@@ -284,6 +303,24 @@ describe("provisionWorkspace", () => {
 });
 
 describe("afterWorkspaceProvisioned", () => {
+  it("opens the factory directly without skipping the import", async () => {
+    const navigate = vi.fn();
+    const onProvisioned = vi.fn();
+    await afterWorkspaceProvisioned({
+      factory: null,
+      organizationId: "org",
+      factoryId: "factory",
+      factoryKey: "PAY",
+      lineId: "line",
+      invalidateAccountOrganizations: vi.fn(),
+      navigate,
+      onProvisioned,
+      bypassAnalysis: true,
+      skipInitialImport: false,
+    });
+    expect(navigate).toHaveBeenCalled();
+    expect(onProvisioned).not.toHaveBeenCalled();
+  });
   it("opens the board directly when the user skipped importing", async () => {
     const navigate = vi.fn();
     const onProvisioned = vi.fn();

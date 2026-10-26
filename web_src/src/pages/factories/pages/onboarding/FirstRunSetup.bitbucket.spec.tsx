@@ -101,6 +101,10 @@ vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: [{ id: "org-1", name: "Acme" }] }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => false, isLoading: false, organizationReady: true }),
+}));
+
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 vi.mock("./AgentStep", () => ({ AgentStep: () => <div data-testid="agent-step" /> }));
 
@@ -159,13 +163,16 @@ function StatefulSetup({
   connected: Set<IntegrationId>;
   overrides: Partial<OnboardingPageModel>;
 }) {
-  const setup = useOnboardingSetupState("Payments", { connected, simulateDiscovery: false });
-  return <FirstRunSetup model={pageModel(setup, overrides)} />;
+  const setup = useOnboardingSetupState("Payments", {
+    connected,
+    simulateDiscovery: false,
+  });
+  return <FirstRunSetup model={pageModel(setup, { jiraProjectId: "PAY", ...overrides })} />;
 }
 
 function renderSetup(connected: Set<IntegrationId>, overrides: Partial<OnboardingPageModel> = {}) {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
       <StatefulSetup connected={connected} overrides={overrides} />
     </MemoryRouter>,
   );
@@ -268,7 +275,7 @@ describe("FirstRunSetup Bitbucket", () => {
     bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
     bitbucketOnboarding.repositories = [{ fullName: "acme-team/api" }];
     rerender(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
         <StatefulSetup connected={new Set()} overrides={{}} />
       </MemoryRouter>,
     );
@@ -329,7 +336,7 @@ describe("FirstRunSetup Bitbucket", () => {
     const user = userEvent.setup();
     const selectBitbucketRepository = vi.fn().mockResolvedValue(true);
     const requestConnect = vi.fn().mockResolvedValue(true);
-    renderSetup(new Set<IntegrationId>(["bitbucket"]), {
+    renderSetup(new Set<IntegrationId>(["bitbucket", "jira"]), {
       bitbucketIntegrationId: "bitbucket-1",
       selectBitbucketRepository,
       requestConnect,
@@ -342,11 +349,12 @@ describe("FirstRunSetup Bitbucket", () => {
     await waitFor(() => expect(selectBitbucketRepository).toHaveBeenCalledWith("acme-team/api"));
     expect(resources.calls).toContainEqual({ integrationId: "bitbucket-1", type: "repository", enabled: true });
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /GitHub Issues/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Connect GitHub" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Jira/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Linear/ })).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /GitHub issues/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Linear issues/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Jira issues/ }));
+    // Jira is connected, so the card opens on the project step.
+    expect(screen.getByTestId("first-run-step-connect")).toHaveAttribute("data-state", "done");
+    expect(screen.getByTestId("first-run-jira-projects")).toBeInTheDocument();
     expect(requestConnect).not.toHaveBeenCalled();
   });
 
@@ -472,3 +480,21 @@ describe("FirstRunSetup Bitbucket", () => {
     });
   });
 });
+
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
+  useOrganizationBilling: () => ({
+    data: { billingEnabled: false },
+    refetch: async () => ({ data: { billingEnabled: false } }),
+  }),
+}));
+
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({
+    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+  }),
+}));

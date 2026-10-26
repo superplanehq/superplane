@@ -91,6 +91,35 @@ describe("OrganizationSettingsBillingPage plans", () => {
     10000,
   );
 
+  it("uses the assigned catalog name and price with new billing enabled", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        experimentalFeatures={["new_billing"]}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: {
+            ...BUSINESS_ORGANIZATION_BILLING,
+            plan: "team",
+            planCategory: "paid",
+            planName: "Team",
+            planPriceCents: "2900",
+            planPerSeat: true,
+          },
+        }}
+      />,
+    );
+
+    const plans = await screen.findByTestId("billing-plans");
+    expect(within(plans).getByRole("heading", { name: "Team" })).toBeInTheDocument();
+    expect(plans).toHaveTextContent("$29.00");
+    expect(plans).toHaveTextContent("per seat per month");
+    expect(plans).not.toHaveTextContent("Business");
+    await user.click(within(plans).getByRole("button", { name: "Cancel Team" }));
+    expect(screen.getByRole("heading", { name: "Cancel Team?" })).toBeInTheDocument();
+  }, 10000);
+
   it("shows SuperPlane grant after top-up when remaining grant is greater than zero", async () => {
     render(
       <FactoriesHarness
@@ -294,4 +323,23 @@ describe("OrganizationSettingsBillingPage plans", () => {
     expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Keep Business" })).not.toBeInTheDocument();
   }, 10000);
+  it("shows public catalog plans independently of the legacy checkout flag", async () => {
+    render(
+      <FactoriesHarness
+        experimentalFeatures={["new_billing"]}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationBilling: {
+            ...defaultFactoriesFixture.organizationBilling,
+            subscriptionCheckoutEnabled: false,
+            availablePlans: [{ key: "payg", name: "Pay-as-you-go", requirePaymentMethod: true, priceCents: "0" }],
+          },
+        }}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: "Select Pay-as-you-go" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
+  });
 });

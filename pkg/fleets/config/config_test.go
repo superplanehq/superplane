@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -261,6 +262,9 @@ fleets:
       architecture: amd64
       runnerApiUrl: http://app:8000
       network: superplane_default
+      init: true
+      user: "0:0"
+      entrypoint: ["/usr/bin/setpriv", "--reuid=node", "--regid=node", "--init-groups", "/usr/local/bin/runner"]
 `
 
 	for _, extension := range []string{".yml", ".yaml"} {
@@ -274,6 +278,11 @@ fleets:
 			}
 			if config.Fleets[0].Docker.Image != "runner:dev" {
 				t.Fatalf("image = %q", config.Fleets[0].Docker.Image)
+			}
+			docker := config.Fleets[0].Docker
+			if !docker.Init || docker.User != "0:0" || !slices.Equal(docker.Entrypoint,
+				[]string{"/usr/bin/setpriv", "--reuid=node", "--regid=node", "--init-groups", "/usr/local/bin/runner"}) {
+				t.Fatalf("Docker process options = %#v", docker)
 			}
 			if config.ReconciliationInterval() != 2*time.Second {
 				t.Fatalf(
@@ -358,6 +367,28 @@ func TestLoadEnvironmentConfigurationAppliesInstallationAdminTokenOverride(t *te
 			"installation admin token = %q",
 			config.InstallationAdminToken,
 		)
+	}
+}
+
+func TestLoadEnvironmentConfigurationPrefersFleetManagerAPIToken(t *testing.T) {
+	t.Setenv("FLEET_MANAGER_CONFIG", `{
+		"id":"fleet-manager",
+		"superplaneUrl":"http://app:8000",
+		"fleets":[{
+			"id":"e1-large-amd64",
+			"provider":"docker",
+			"docker":{"image":"runner:dev","architecture":"amd64"}
+		}]
+	}`)
+	t.Setenv("INSTALLATION_ADMIN_TOKEN", "legacy-token")
+	t.Setenv("FLEET_MANAGER_API_TOKEN", "fleet-manager-token")
+
+	config, err := Load(filepath.Join(t.TempDir(), "missing.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.InstallationAdminToken != "fleet-manager-token" {
+		t.Fatalf("installation admin token = %q", config.InstallationAdminToken)
 	}
 }
 

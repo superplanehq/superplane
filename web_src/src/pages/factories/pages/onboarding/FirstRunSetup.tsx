@@ -1,4 +1,5 @@
-import { LoadingButton } from "@/components/ui/loading-button";
+import { Button } from "@/components/ui/button";
+import { FirstRunHeading, FirstRunShell } from "./first-run/FirstRunShell";
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
@@ -7,37 +8,29 @@ import { posthog } from "@/posthog";
 import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { AgentStep, type OnboardingAgentModelPicker } from "./AgentStep";
+import { FirstRunAgentScreen } from "./first-run/FirstRunAgentScreen";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
 import { FirstRunBitbucketChooseScreen } from "./first-run/FirstRunBitbucketChooseScreen";
 import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
 import { FirstRunHostScreen } from "./first-run/FirstRunHostScreen";
-import { FirstRunModelSourceChoice } from "./first-run/FirstRunModelSourceChoice";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
-import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
+import { FIRST_RUN_STEP_COUNT } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
 import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
-import {
-  agentFinishReady,
-  isAgentProviderConnected,
-  type OnboardingAgentCredentialChoice,
-} from "./onboardingAgentReadiness";
-import { WIZARD_STEPS } from "./onboardingFixtures";
+import { ownerOfRepository, repositoriesInOrganization } from "./first-run/githubOrganizations";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
 import {
   useFirstRunSetupFlow,
   type FirstRunScreen,
   type FirstRunSetupFlow,
-  type IntegrationId,
   type OnboardingPageModel,
 } from "./useFirstRunSetupFlow";
-import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   welcome: 0,
@@ -45,36 +38,18 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   connect: 1,
   choose: 2,
   tickets: 3,
+  complete: 4,
   agent: 4,
 };
 
-// A bring-your-own-key organization chooses the model source before the backlog.
-const STEP_INDEX_FOR_SCREEN_AGENT_FIRST: Record<FirstRunScreen, number> = {
-  ...STEP_INDEX_FOR_SCREEN,
-  agent: 3,
-  tickets: 4,
-};
-
-// The reverse path walks the exact screens in reverse order.
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   host: "welcome",
   connect: "host",
   choose: "connect",
   tickets: "choose",
+  complete: "tickets",
   agent: "tickets",
 };
-
-const BACK_SCREEN_AGENT_FIRST: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
-  ...BACK_SCREEN,
-  agent: "choose",
-  tickets: "agent",
-};
-
-/**
- * The first-run screens have no coding agent screen. This screen keeps the
- * wizard step copy, because provisioning needs a connected agent.
- */
-const AGENT_STEP: { id: "agent"; label: string; purpose: string } = WIZARD_STEPS[3];
 
 function firstNameOf(name: string | undefined): string | undefined {
   const first = name?.trim().split(/\s+/)[0];
@@ -86,118 +61,8 @@ function signOut() {
   window.location.href = "/logout";
 }
 
-type AgentModelSource = {
-  offered: boolean;
-  choice: OnboardingAgentCredentialChoice | null;
-  onSelect: (choice: OnboardingAgentCredentialChoice) => void;
-};
-
-function agentScreenBody(modelSource: AgentModelSource, customProvider: boolean): string {
-  if (modelSource.choice === "own-key") {
-    return customProvider ? FIRST_RUN_COPY.agent.ownKeyBodyWithCustom : FIRST_RUN_COPY.agent.ownKeyBody;
-  }
-  if (modelSource.offered) return FIRST_RUN_COPY.agent.modelSourceBody;
-  return AGENT_STEP.purpose;
-}
-
-function AgentScreen({
-  organizationId,
-  setup,
-  chrome,
-  sphere,
-  saving,
-  loading,
-  hostedAgentReady,
-  showCustomProvider,
-  modelSource,
-  onRequestConnect,
-  modelPicker,
-  onContinue,
-}: {
-  organizationId: string;
-  setup: OnboardingSetupApi;
-  chrome: FirstRunChrome;
-  sphere?: FirstRunSphereProps;
-  saving: boolean;
-  loading: boolean;
-  hostedAgentReady: boolean;
-  showCustomProvider: boolean;
-  modelSource: AgentModelSource;
-  onRequestConnect: (id: IntegrationId) => void;
-  modelPicker?: OnboardingAgentModelPicker;
-  onContinue: () => void;
-}) {
-  const credentialChoice = modelSource.offered && !modelSource.choice ? "hosted" : modelSource.choice;
-  const canFinish = agentFinishReady({
-    modelSourceChoice: modelSource.offered,
-    credentialChoice,
-    providerConnected: isAgentProviderConnected(setup.connected),
-    agentReady: setup.agentReady,
-    hostedAgentReady,
-  });
-  const showProviders = !modelSource.offered || modelSource.choice === "own-key";
-  return (
-    <FirstRunShell
-      testId="first-run-agent"
-      chrome={chrome}
-      busy={saving || loading}
-      width="wide"
-      sphere={sphere}
-      visual="preview"
-    >
-      <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource, showCustomProvider)}</p>
-      </FirstRunHeading>
-
-      <div className="mt-8 space-y-4">
-        {loading ? (
-          <p className="text-[13px] text-muted-foreground" role="status">
-            {FIRST_RUN_COPY.agent.loading}
-          </p>
-        ) : null}
-        {modelSource.offered ? (
-          <FirstRunPanel>
-            <FirstRunModelSourceChoice
-              disabled={saving || loading}
-              modelSource={modelSource.choice}
-              onSelectModelSource={modelSource.onSelect}
-            />
-          </FirstRunPanel>
-        ) : null}
-        {showProviders ? (
-          <fieldset disabled={saving || loading} className="mx-0 min-w-0 border-0 p-0">
-            <FirstRunPanel>
-              <AgentStep
-                organizationId={organizationId}
-                setup={setup}
-                showHostedCredit={modelSource.choice !== "own-key"}
-                showCustomProvider={showCustomProvider}
-                onRequestConnect={onRequestConnect}
-                modelPicker={modelPicker}
-              />
-            </FirstRunPanel>
-          </fieldset>
-        ) : null}
-        <div className="space-y-3">
-          <LoadingButton
-            type="button"
-            className="w-full"
-            disabled={!canFinish || loading || Boolean(modelPicker && !modelPicker.value)}
-            loading={saving}
-            loadingText={FIRST_RUN_COPY.finish.saving}
-            onClick={onContinue}
-            data-testid="first-run-finish-setup"
-          >
-            {modelSource.offered ? FIRST_RUN_COPY.tickets.continue : FIRST_RUN_COPY.finish.action}
-          </LoadingButton>
-        </div>
-      </div>
-    </FirstRunShell>
-  );
-}
-
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
-  const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
+  const backScreen = BACK_SCREEN[target];
   // Bitbucket has no separate connect screen.
   if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
     return () => flow.goToScreen("host");
@@ -205,15 +70,9 @@ function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => 
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
 
-/** Hosted credentials provision from this screen, so it shows finish progress. */
-function ticketsContinueLabel(ticketsFinishSetup: boolean): string {
-  return ticketsFinishSetup ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue;
-}
-
 function TicketsScreenHost({
   flow,
   model,
-  saving,
   chrome,
   sphere,
   initialWorkspace,
@@ -221,28 +80,45 @@ function TicketsScreenHost({
   initialWorkspace: boolean;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
-  saving: boolean;
   chrome: FirstRunChrome;
   sphere?: FirstRunSphereProps;
 }) {
-  const finishing = flow.blockingAction === "finishing-setup" || (flow.ticketsFinishSetup && saving);
+  const connecting =
+    flow.blockingAction === "opening-github" ||
+    flow.blockingAction === "connecting-jira" ||
+    flow.blockingAction === "connecting-linear";
+  // The backlog repository stays in the organization of the app repository,
+  // the same filter the Git host step applies.
+  const organization = ownerOfRepository(model.setup.selectedRepo);
+  const repositories = organization ? repositoriesInOrganization(flow.repositories, organization) : flow.repositories;
   return (
     <FirstRunTicketsScreen
-      initialImportLimit={initialWorkspace ? 3 : undefined}
+      initialImportLimit={3}
       skipInitialImport={model.setup.skipInitialImport}
+      // The first workspace always imports: that batch feeds the analysis.
       onSkipInitialImportChange={initialWorkspace ? undefined : model.setup.setSkipInitialImport}
+      automaticIntake={model.setup.automaticIntake}
+      onAutomaticIntakeChange={model.setup.setAutomaticIntake}
       githubAvailable={flow.vcsHost !== "bitbucket"}
       ticketSource={flow.ticketSource}
+      // GitHub is only a default until the user picks it on the list.
+      startOnSourceList={model.setup.issuesChoice == null}
+      repository={model.setup.issuesRepo ?? model.setup.selectedRepo ?? undefined}
+      repositories={repositories}
+      onSelectRepository={model.setup.selectIssuesRepo}
+      connecting={connecting}
       chrome={chrome}
       sphere={sphere}
       continueLabel={
-        flow.ticketsFinishSetup && !initialWorkspace && model.setup.skipInitialImport
-          ? FIRST_RUN_COPY.finish.action
-          : ticketsContinueLabel(flow.ticketsFinishSetup)
+        !flow.skipAgentScreen
+          ? FIRST_RUN_COPY.tickets.continue
+          : !initialWorkspace && model.setup.skipInitialImport
+            ? FIRST_RUN_COPY.finish.action
+            : FIRST_RUN_COPY.tickets.analyze
       }
-      continuePending={flow.agentGatePending}
-      saving={flow.blockingAction === "saving-ticket-source" || finishing}
-      savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
+      continuePending={false}
+      saving={flow.busy}
+      savingLabel={FIRST_RUN_COPY.tickets.saving}
       githubConnected={model.setup.connected.has("github")}
       onConnectGitHub={() => void flow.connectGitHubIssues()}
       jiraConnected={model.setup.connected.has("jira")}
@@ -450,8 +326,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       onLogOut: signOut,
       organizationSwitch: otherOrganizations.length > 0 ? { currentOrganizationRouteId: organizationId } : undefined,
       workspaceSwitch: hasOtherWorkspace ? { organizationId, currentFactoryId: factoryId, factories } : undefined,
-      stepIndex: (flow.agentBeforeTickets ? STEP_INDEX_FOR_SCREEN_AGENT_FIRST : STEP_INDEX_FOR_SCREEN)[target],
-      stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
+      stepIndex: STEP_INDEX_FOR_SCREEN[target] - Number(target === "complete" && flow.skipAgentScreen),
+      stepCount: FIRST_RUN_STEP_COUNT - Number(flow.skipAgentScreen),
       onBack: backActionFor(target, flow),
       busy: flow.busy,
     };
@@ -462,7 +338,11 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunAnalysisHost
         organizationId={destination.organizationId}
         factoryId={factoryId}
-        chrome={{ displayName: firstNameOf(account?.name), email: account?.email, onLogOut: signOut, stepIndex: 4 }}
+        chrome={{
+          ...chromeFor("complete"),
+          onBack: undefined,
+          stepIndex: FIRST_RUN_STEP_COUNT - 1 - Number(flow.skipAgentScreen),
+        }}
         selectedRepo={setup.selectedRepo}
         onGoToBoard={() => navigate(afterOnboardingPath(destination), { replace: true })}
       />
@@ -492,13 +372,22 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     );
   }
 
+  if (flow.screen === "complete") {
+    return (
+      <CompleteSetupScreen
+        flow={flow}
+        chrome={chromeFor("complete")}
+        sphere={sphereFor("complete", setup.selectedRepo, model.githubOwner)}
+      />
+    );
+  }
+
   if (flow.screen === "tickets") {
     return (
       <TicketsScreenHost
         initialWorkspace={factory?.onboarding?.initial === true}
         flow={flow}
         model={model}
-        saving={model.saving}
         chrome={chromeFor("tickets")}
         sphere={sphereFor("tickets", setup.selectedRepo, model.githubOwner)}
       />
@@ -506,7 +395,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   }
 
   return (
-    <AgentScreen
+    <FirstRunAgentScreen
       organizationId={organizationId}
       setup={setup}
       chrome={chromeFor("agent")}
@@ -516,16 +405,41 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       hostedAgentReady={model.hostedAgentReady}
       showCustomProvider={model.customProvider}
       modelSource={{
-        offered: flow.agentBeforeTickets,
+        offered: model.bringYourOwnKey && model.hostedModelsAvailable,
         choice: flow.credentialChoice,
         onSelect: flow.selectCredentialChoice,
       }}
       onRequestConnect={model.requestConnect}
       modelPicker={model.agentModelPicker}
       onContinue={() => {
-        if (flow.agentBeforeTickets && !flow.credentialChoice) flow.selectCredentialChoice("hosted");
+        if (model.bringYourOwnKey && !flow.credentialChoice) flow.selectCredentialChoice("hosted");
         void flow.continueFromAgent();
       }}
     />
+  );
+}
+
+function CompleteSetupScreen({
+  flow,
+  chrome,
+  sphere,
+}: {
+  flow: FirstRunSetupFlow;
+  chrome: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
+}) {
+  return (
+    <FirstRunShell testId="first-run-complete" chrome={chrome} busy={flow.busy} sphere={sphere} visual="preview">
+      <FirstRunHeading headline="Complete workspace setup">
+        <p>
+          {flow.accessError
+            ? "SuperPlane could not verify model access. Try again."
+            : "Continue with the models available to your organization."}
+        </p>
+      </FirstRunHeading>
+      <Button disabled={flow.busy} onClick={() => void flow.finishSetup()}>
+        Continue
+      </Button>
+    </FirstRunShell>
   );
 }

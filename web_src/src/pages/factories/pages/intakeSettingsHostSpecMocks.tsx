@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as FactoryIntakeDataModule from "@/hooks/useFactoryIntakeData";
@@ -59,11 +60,19 @@ vi.mock("@/hooks/useIntegrations", () => ({
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   ...unmockedSrc<typeof FactoryIntakeDataModule>("hooks/useFactoryIntakeData"),
-  useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
+  useUpdateFactoryIntake: () => useMutation({ mutationFn: updateIntake }),
   useDeleteFactoryIntake: () => ({ mutateAsync: deleteIntake, isPending: false, error: null }),
 }));
 
 vi.mock("@/hooks/useOrganizationData", () => ({
   ...unmockedSrc<typeof OrganizationDataModule>("hooks/useOrganizationData"),
-  useOrganizationUsers: () => ({ data: [], isLoading: false, isError: false }),
+  useOrganizationUsers: () => ({
+    data: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ currentUserId: "alice", canAct: () => false }),
 }));

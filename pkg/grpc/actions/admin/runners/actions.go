@@ -22,6 +22,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -32,6 +33,8 @@ const (
 	maxCapacityLongPoll       = 30 * time.Second
 	capacityLongPollFrequency = time.Second
 )
+
+var errRunnerStatePrecondition = errors.New("runner state does not match the requested states")
 
 type Service struct {
 	signer       *jwt.Signer
@@ -338,6 +341,9 @@ func (s *Service) DescribeRunner(
 }
 
 func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest) (*pb.DeleteRunnerResponse, error) {
+	if err := validateRunnerStates(req.GetStates()); err != nil {
+		return nil, err
+	}
 	fleet, err := findFleet(ctx, req.GetFleetId())
 	if err != nil {
 		return nil, err
@@ -349,9 +355,16 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 
 	var runner *models.Runner
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		runner, err = fleet.FindRunner(tx, runnerID)
+		runnerQuery := tx
+		if len(req.GetStates()) > 0 {
+			runnerQuery = runnerQuery.Clauses(clause.Locking{Strength: "UPDATE"})
+		}
+		runner, err = fleet.FindRunner(runnerQuery, runnerID)
 		if err != nil {
 			return err
+		}
+		if len(req.GetStates()) > 0 && !slices.Contains(req.GetStates(), runner.State) {
+			return errRunnerStatePrecondition
 		}
 		if runner.State == models.RunnerStateBusy {
 			if !runner.Ephemeral {
@@ -370,6 +383,9 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 	})
 	if errors.Is(err, models.ErrRunnerNotFound) {
 		return nil, grpcerrors.NotFound(err, "runner not found")
+	}
+	if errors.Is(err, errRunnerStatePrecondition) {
+		return nil, grpcerrors.Conflict(err, "runner state does not match the requested states")
 	}
 	if errors.Is(err, models.ErrRunnerBusy) ||
 		errors.Is(err, models.ErrRunnerTaskNotCompletable) {

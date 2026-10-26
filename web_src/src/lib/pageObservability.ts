@@ -34,6 +34,10 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
     return { pageKey: "inviteAccept", attributes: { invite_token: second } };
   }
 
+  if (first === "invitations" && second) {
+    return { pageKey: "invitationAccept", attributes: {} };
+  }
+
   if (first === "admin") {
     if (second === "accounts") {
       return { pageKey: "adminAccounts", attributes: {} };

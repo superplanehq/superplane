@@ -48,7 +48,7 @@ func TestUploadTaskLogChunk(t *testing.T) {
 
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, &task.ID)
 	require.NoError(t, err)
-	server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StoreFS)
+	server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StoreFS, nil)
 	require.NoError(t, err)
 	response := executeRegistrationRequest(t, server, token, runner.RunnerVersion)
 	require.Equal(t, http.StatusOK, response.Code)

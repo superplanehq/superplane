@@ -19,14 +19,13 @@ import (
 
 type AdminKeysService struct {
 	pb.UnimplementedKeysServer
-	store             *encryption.Store
-	migrationsEnabled bool
+	store *encryption.Store
 }
 
 var errMigrationAlreadyRunning = errors.New("an encryption migration is already unfinished")
 
-func NewAdminKeysService(store *encryption.Store, migrationsEnabled bool) *AdminKeysService {
-	return &AdminKeysService{store: store, migrationsEnabled: migrationsEnabled}
+func NewAdminKeysService(store *encryption.Store) *AdminKeysService {
+	return &AdminKeysService{store: store}
 }
 
 func (s *AdminKeysService) ListKeys(ctx context.Context, _ *pb.ListKeysRequest) (*pb.ListKeysResponse, error) {
@@ -71,7 +70,7 @@ func (s *AdminKeysService) RewrapKeys(ctx context.Context, _ *pb.RewrapKeysReque
 }
 
 func (s *AdminKeysService) StartMigration(ctx context.Context, _ *pb.StartMigrationRequest) (*pb.MigrationResponse, error) {
-	if !s.migrationsEnabled {
+	if s.store == nil {
 		return nil, s.migrationUnavailable()
 	}
 	var job *models.ApplicationEncryptionMigration
@@ -113,7 +112,7 @@ func (s *AdminKeysService) StartMigration(ctx context.Context, _ *pb.StartMigrat
 }
 
 func (s *AdminKeysService) GetMigration(ctx context.Context, req *pb.GetMigrationRequest) (*pb.MigrationResponse, error) {
-	if !s.migrationsEnabled {
+	if s.store == nil {
 		return nil, s.migrationUnavailable()
 	}
 	id, err := uuid.Parse(req.Id)
@@ -131,7 +130,7 @@ func (s *AdminKeysService) GetMigration(ctx context.Context, req *pb.GetMigratio
 }
 
 func (s *AdminKeysService) ListMigrations(ctx context.Context, _ *pb.ListMigrationsRequest) (*pb.ListMigrationsResponse, error) {
-	if !s.migrationsEnabled {
+	if s.store == nil {
 		return nil, s.migrationUnavailable()
 	}
 	migrations, err := models.ListApplicationEncryptionMigrations(database.DB(ctx))
@@ -146,10 +145,7 @@ func (s *AdminKeysService) ListMigrations(ctx context.Context, _ *pb.ListMigrati
 }
 
 func (s *AdminKeysService) migrationUnavailable() error {
-	if s.store == nil {
-		return status.Error(codes.Unavailable, "application encryption keys are not configured")
-	}
-	return status.Error(codes.FailedPrecondition, "encryption migrations are unavailable while legacy writes are enabled")
+	return status.Error(codes.Unavailable, "application encryption keys are not configured")
 }
 
 func migrationResponse(job *models.ApplicationEncryptionMigration) *pb.MigrationResponse {

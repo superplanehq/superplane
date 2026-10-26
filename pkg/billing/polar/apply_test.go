@@ -9,14 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test__ApplyOrderPaidGrantsFaceValueOnce(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	event := paidPackEvent(r.Organization.ID, orderID, 2500)
+	event := paidPackEvent(org.ID, orderID, 2500)
 
 	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
 	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
@@ -26,21 +25,21 @@ func Test__ApplyOrderPaidGrantsFaceValueOnce(t *testing.T) {
 	assert.Equal(t, models.LLMCreditGrantKindTopup, grant.Kind)
 	assert.Equal(t, models.CentsToMicros(2500), grant.AmountMicros)
 
-	settings, err := models.FindOrganizationLLMSettings(db, r.Organization.ID)
+	settings, err := models.FindOrganizationLLMSettings(db, org.ID)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
 	require.NotNil(t, settings.PolarCustomerID)
 	assert.Equal(t, "cust_polar_1", *settings.PolarCustomerID)
 
-	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	summary, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(2500), summary.GrantMicros)
 }
 
 func Test__ApplyOrderPaidIgnoresNonPacks(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	before, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 
 	err = ApplyOrderPaid(context.Background(), db, &OrderWebhookEvent{
@@ -49,7 +48,7 @@ func Test__ApplyOrderPaidIgnoresNonPacks(t *testing.T) {
 			ID: uuid.NewString(),
 			Customer: OrderCustomer{
 				ID:         "cust_other",
-				ExternalID: r.Organization.ID.String(),
+				ExternalID: org.ID.String(),
 			},
 			Product: OrderProduct{
 				Metadata: map[string]any{"superplane_credit_pack": false},
@@ -59,16 +58,16 @@ func Test__ApplyOrderPaidIgnoresNonPacks(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	after, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros, after.GrantMicros)
 }
 
 func Test__ApplyOrderPaidGrantsCustomPaidAmount(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	event := paidCustomPackEvent(r.Organization.ID, orderID, 7350)
+	event := paidCustomPackEvent(org.ID, orderID, 7350)
 
 	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
 	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
@@ -78,11 +77,120 @@ func Test__ApplyOrderPaidGrantsCustomPaidAmount(t *testing.T) {
 	assert.Equal(t, models.CentsToMicros(7350), grant.AmountMicros)
 }
 
-func Test__ApplyOrderPaidUsesPurchasedPrice(t *testing.T) {
-	r := support.Setup(t)
+func TestApplyOrderPaidGrantsCreditsWithoutProcessingFeeOnce(t *testing.T) {
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	event := paidPackEvent(r.Organization.ID, orderID, 2500)
+	event := paidFeePackEvent(org.ID, orderID)
+
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, orderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(10000), grant.AmountMicros)
+}
+
+func TestApplyOrderPaidRejectsInvalidCreditPurchaseMetadata(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	for _, test := range []struct {
+		name   string
+		change func(*OrderData)
+	}{
+		{name: "missing version", change: func(order *OrderData) { delete(order.Metadata, "superplane_credit_purchase_version") }},
+		{name: "unsupported version", change: func(order *OrderData) { order.Metadata["superplane_credit_purchase_version"] = "2" }},
+		{name: "missing credit amount", change: func(order *OrderData) { delete(order.Metadata, "superplane_credit_amount_cents") }},
+		{name: "fractional credit amount", change: func(order *OrderData) { order.Metadata["superplane_credit_amount_cents"] = "10000.5" }},
+		{name: "numeric credit amount", change: func(order *OrderData) { order.Metadata["superplane_credit_amount_cents"] = 10000 }},
+		{name: "zero credits", change: func(order *OrderData) { order.Metadata["superplane_credit_amount_cents"] = "0" }},
+		{name: "credits exceed price", change: func(order *OrderData) { order.Metadata["superplane_credit_amount_cents"] = "10580" }},
+		{name: "missing subtotal", change: func(order *OrderData) { delete(order.Metadata, "superplane_credit_subtotal_cents") }},
+		{name: "amount overflow", change: func(order *OrderData) { order.Metadata["superplane_credit_subtotal_cents"] = "9223372036854775808" }},
+		{name: "wrong paid amount", change: func(order *OrderData) { order.NetAmount = 10578 }},
+		{name: "wrong currency", change: func(order *OrderData) { order.Currency = "eur" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			event := paidFeePackEvent(org.ID, uuid.NewString())
+			test.change(&event.Data)
+			err := ApplyOrderPaid(t.Context(), db, event, nil)
+			require.Error(t, err)
+			assert.True(t, IsPermanentApplyError(err))
+			_, err = models.FindLLMCreditGrantByPolarOrderID(db, event.Data.ID)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestApplyOrderRefundedProratesFeePurchaseCumulatively(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	event := paidFeePackEvent(org.ID, uuid.NewString())
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+	event.Type = orderRefundedType
+	event.Data.Status = "partially_refunded"
+
+	for _, test := range []struct {
+		refundedCents int64
+		reverseMicros int64
+	}{
+		{refundedCents: 1, reverseMicros: 9452},
+		{refundedCents: 5289, reverseMicros: 49995273},
+		{refundedCents: 5289, reverseMicros: 49995273},
+	} {
+		event.Data.RefundedAmount = test.refundedCents
+		require.NoError(t, ApplyOrderRefunded(t.Context(), db, event, nil))
+		reversed, err := models.PolarRefundMicrosForOrder(db, event.Data.ID)
+		require.NoError(t, err)
+		assert.Equal(t, test.reverseMicros, reversed)
+	}
+
+	event.Data.Status = "refunded"
+	event.Data.RefundedAmount = 0
+	require.NoError(t, ApplyOrderRefunded(t.Context(), db, event, nil))
+	reversed, err := models.PolarRefundMicrosForOrder(db, event.Data.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(10000), reversed)
+}
+
+func TestApplyOrderRefundedProratesLargePurchaseWithoutOverflow(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	event := paidFeePackEvent(org.ID, uuid.NewString())
+	event.Data.Metadata["superplane_credit_amount_cents"] = "90000000"
+	event.Data.Metadata["superplane_credit_subtotal_cents"] = "99999999"
+	event.Data.NetAmount = 99999999
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+	event.Type = orderRefundedType
+	event.Data.Status = "partially_refunded"
+	event.Data.RefundedAmount = 99999998
+	require.NoError(t, ApplyOrderRefunded(t.Context(), db, event, nil))
+	reversed, err := models.PolarRefundMicrosForOrder(db, event.Data.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(899999990999), reversed)
+}
+
+func TestApplyOrderRefundedRejectsMetadataThatDiffersFromGrant(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	event := paidFeePackEvent(org.ID, uuid.NewString())
+	require.NoError(t, ApplyOrderPaid(t.Context(), db, event, nil))
+	event.Type = orderRefundedType
+	event.Data.Status = "partially_refunded"
+	event.Data.RefundedAmount = 1000
+	event.Data.Metadata["superplane_credit_amount_cents"] = "9999"
+	err := ApplyOrderRefunded(t.Context(), db, event, nil)
+	require.Error(t, err)
+	assert.True(t, IsPermanentApplyError(err))
+	reversed, err := models.PolarRefundMicrosForOrder(db, event.Data.ID)
+	require.NoError(t, err)
+	assert.Zero(t, reversed)
+}
+
+func Test__ApplyOrderPaidUsesPurchasedPrice(t *testing.T) {
+	org := setupBillingOrganization(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	event := paidPackEvent(org.ID, orderID, 2500)
 	event.Data.Product.Prices = []priceJSON{
 		{AmountType: "fixed", PriceAmount: 2500},
 		{AmountType: "fixed", PriceAmount: 2300},
@@ -97,10 +205,10 @@ func Test__ApplyOrderPaidUsesPurchasedPrice(t *testing.T) {
 }
 
 func Test__ApplyOrderPaidGrantsFixedPriceWhenCatalogAlsoHasCustom(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	event := paidPackEvent(r.Organization.ID, orderID, 2500)
+	event := paidPackEvent(org.ID, orderID, 2500)
 	event.Data.NetAmount = 2000
 	event.Data.Product.Prices = []priceJSON{
 		{AmountType: "fixed", PriceAmount: 2500},
@@ -116,10 +224,10 @@ func Test__ApplyOrderPaidGrantsFixedPriceWhenCatalogAlsoHasCustom(t *testing.T) 
 }
 
 func Test__ApplyOrderPaidGrantsCustomAmountWhenMixedCatalogSelectsCustom(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	event := paidCustomPackEvent(r.Organization.ID, orderID, 7350)
+	event := paidCustomPackEvent(org.ID, orderID, 7350)
 	event.Data.Product.Prices = []priceJSON{
 		{AmountType: "fixed", PriceAmount: 2500},
 		{AmountType: "custom"},
@@ -133,27 +241,27 @@ func Test__ApplyOrderPaidGrantsCustomAmountWhenMixedCatalogSelectsCustom(t *test
 }
 
 func Test__ApplyOrderPaidIgnoresSubscriptionCycle(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	before, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 
-	event := paidPackEvent(r.Organization.ID, uuid.NewString(), 2500)
+	event := paidPackEvent(org.ID, uuid.NewString(), 2500)
 	event.Data.BillingReason = "subscription_cycle"
 	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
 
-	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	after, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros, after.GrantMicros)
 }
 
 func Test__ApplyOrderPaidUsesExternalCustomerID(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	event := paidPackEvent(r.Organization.ID, orderID, 10000)
+	event := paidPackEvent(org.ID, orderID, 10000)
 	event.Data.Customer.ExternalID = ""
-	event.Data.ExternalCustomerID = r.Organization.ID.String()
+	event.Data.ExternalCustomerID = org.ID.String()
 
 	require.NoError(t, ApplyOrderPaid(context.Background(), db, event, nil))
 
@@ -163,10 +271,10 @@ func Test__ApplyOrderPaidUsesExternalCustomerID(t *testing.T) {
 }
 
 func Test__ApplyOrderPaidUsesItemPackMetadata(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	event := paidPackEvent(r.Organization.ID, orderID, 10000)
+	event := paidPackEvent(org.ID, orderID, 10000)
 	event.Data.Product = OrderProduct{ID: "prod_100"}
 	event.Data.ProductPrice = priceJSON{}
 	event.Data.Items = []orderItemJSON{{
@@ -188,10 +296,10 @@ func Test__ApplyOrderPaidUsesItemPackMetadata(t *testing.T) {
 }
 
 func Test__ApplyOrderPaidLooksUpMissingPackMetadata(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	event := paidPackEvent(r.Organization.ID, orderID, 2500)
+	event := paidPackEvent(org.ID, orderID, 2500)
 	event.Data.Product.Metadata = nil
 	lookup := creditPackLookupFunc(func(_ context.Context, productID string) (*Product, error) {
 		assert.Equal(t, "prod_25", productID)
@@ -206,10 +314,10 @@ func Test__ApplyOrderPaidLooksUpMissingPackMetadata(t *testing.T) {
 }
 
 func Test__ApplyOrderPaidRetriesWhenAPIVersionIsUnsupported(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	event := paidPackEvent(r.Organization.ID, orderID, 2500)
+	event := paidPackEvent(org.ID, orderID, 2500)
 	event.Data.Product.Metadata = nil
 	lookup := creditPackLookupFunc(func(_ context.Context, _ string) (*Product, error) {
 		return nil, ErrUnsupportedAPIVersion
@@ -225,14 +333,14 @@ func Test__ApplyOrderPaidRetriesWhenAPIVersionIsUnsupported(t *testing.T) {
 }
 
 func Test__ApplyOrderPaidPermanentErrors(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 
 	err := ApplyOrderPaid(context.Background(), db, paidPackEvent(uuid.New(), uuid.NewString(), 2500), nil)
 	require.Error(t, err)
 	assert.True(t, IsPermanentApplyError(err))
 
-	event := paidPackEvent(r.Organization.ID, uuid.NewString(), 2500)
+	event := paidPackEvent(org.ID, uuid.NewString(), 2500)
 	event.Data.Customer.ExternalID = "not-a-uuid"
 	err = ApplyOrderPaid(context.Background(), db, event, nil)
 	require.Error(t, err)
@@ -240,65 +348,65 @@ func Test__ApplyOrderPaidPermanentErrors(t *testing.T) {
 }
 
 func Test__ApplyOrderRefundedFullAndIdempotent(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(r.Organization.ID, orderID, 2500), nil))
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(org.ID, orderID, 2500), nil))
+	before, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 
-	refund := refundedPackEvent(r.Organization.ID, orderID, "refunded", 2500)
+	refund := refundedPackEvent(org.ID, orderID, "refunded", 2500)
 	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refund, nil))
 	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refund, nil))
 
-	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	after, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros-models.CentsToMicros(2500), after.GrantMicros)
 	assert.GreaterOrEqual(t, after.RemainingMicros, int64(0))
 }
 
 func Test__ApplyOrderRefundedCustomFullAndPartial(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidCustomPackEvent(r.Organization.ID, orderID, 7350), nil))
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidCustomPackEvent(org.ID, orderID, 7350), nil))
+	before, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 
-	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedCustomPackEvent(r.Organization.ID, orderID, "partially_refunded", 7350, 2000), nil))
-	partial, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedCustomPackEvent(org.ID, orderID, "partially_refunded", 7350, 2000), nil))
+	partial, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros-models.CentsToMicros(2000), partial.GrantMicros)
 
-	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedCustomPackEvent(r.Organization.ID, orderID, "refunded", 7350, 7350), nil))
-	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedCustomPackEvent(org.ID, orderID, "refunded", 7350, 7350), nil))
+	after, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros-models.CentsToMicros(7350), after.GrantMicros)
 	assert.GreaterOrEqual(t, after.RemainingMicros, int64(0))
 }
 
 func Test__ApplyOrderRefundedPartialDoesNotGoBelowZero(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(r.Organization.ID, orderID, 2500), nil))
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(org.ID, orderID, 2500), nil))
 
-	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedPackEvent(r.Organization.ID, orderID, "partially_refunded", 1000), nil))
-	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedPackEvent(org.ID, orderID, "partially_refunded", 1000), nil))
+	summary, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(1500), summary.GrantMicros)
 
-	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedPackEvent(r.Organization.ID, orderID, "partially_refunded", 99999), nil))
-	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedPackEvent(org.ID, orderID, "partially_refunded", 99999), nil))
+	after, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), after.GrantMicros)
 	assert.GreaterOrEqual(t, after.RemainingMicros, int64(0))
 }
 
 func Test__ApplyOrderRefundedIgnoresNonPacks(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	before, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 
 	err = ApplyOrderRefunded(context.Background(), db, &OrderWebhookEvent{
@@ -307,7 +415,7 @@ func Test__ApplyOrderRefundedIgnoresNonPacks(t *testing.T) {
 			ID:     uuid.NewString(),
 			Status: "refunded",
 			Customer: OrderCustomer{
-				ExternalID: r.Organization.ID.String(),
+				ExternalID: org.ID.String(),
 			},
 			Product: OrderProduct{
 				ID:       "prod_other",
@@ -318,70 +426,70 @@ func Test__ApplyOrderRefundedIgnoresNonPacks(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	after, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros, after.GrantMicros)
 }
 
 func Test__ApplyOrderRefundedUsesExistingGrantWithoutPackMetadata(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(r.Organization.ID, orderID, 2500), nil))
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(org.ID, orderID, 2500), nil))
+	before, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 
-	refund := refundedPackEvent(r.Organization.ID, orderID, "refunded", 2500)
+	refund := refundedPackEvent(org.ID, orderID, "refunded", 2500)
 	refund.Data.Product.Metadata = map[string]any{"superplane_credit_pack": false}
 	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refund, nil))
 
-	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	after, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros-models.CentsToMicros(2500), after.GrantMicros)
 }
 
 func Test__ApplyOrderRefundedDoesNotOverDebitConcurrently(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(r.Organization.ID, orderID, 2500), nil))
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(org.ID, orderID, 2500), nil))
+	before, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 
 	errs := make(chan error, 2)
 	go func() {
-		errs <- ApplyOrderRefunded(context.Background(), db, refundedPackEvent(r.Organization.ID, orderID, "refunded", 2500), nil)
+		errs <- ApplyOrderRefunded(context.Background(), db, refundedPackEvent(org.ID, orderID, "refunded", 2500), nil)
 	}()
 	go func() {
-		errs <- ApplyOrderRefunded(context.Background(), db, refundedPackEvent(r.Organization.ID, orderID, "partially_refunded", 1000), nil)
+		errs <- ApplyOrderRefunded(context.Background(), db, refundedPackEvent(org.ID, orderID, "partially_refunded", 1000), nil)
 	}()
 	require.NoError(t, <-errs)
 	require.NoError(t, <-errs)
 
-	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	after, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros-models.CentsToMicros(2500), after.GrantMicros)
 	assert.GreaterOrEqual(t, after.RemainingMicros, int64(0))
 }
 
 func Test__ApplyOrderRefundedRetriesUntilGrantExists(t *testing.T) {
-	r := support.Setup(t)
+	org := setupBillingOrganization(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
-	refund := refundedPackEvent(r.Organization.ID, orderID, "refunded", 2500)
+	refund := refundedPackEvent(org.ID, orderID, "refunded", 2500)
 
 	err := ApplyOrderRefunded(context.Background(), db, refund, nil)
 	require.Error(t, err)
 	assert.False(t, IsPermanentApplyError(err))
 
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	before, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), before.GrantMicros)
 
-	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(r.Organization.ID, orderID, 2500), nil))
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(org.ID, orderID, 2500), nil))
 	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refund, nil))
 
-	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	after, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.GrantMicros, after.GrantMicros)
 }
@@ -406,6 +514,18 @@ func paidPackEvent(orgID uuid.UUID, orderID string, amountCents int64) *OrderWeb
 			ProductPrice: priceJSON{AmountType: "fixed", PriceAmount: amountCents},
 		},
 	}
+}
+
+func paidFeePackEvent(orgID uuid.UUID, orderID string) *OrderWebhookEvent {
+	event := paidPackEvent(orgID, orderID, 10579)
+	event.Data.Currency = "usd"
+	event.Data.NetAmount = 10579
+	event.Data.Metadata = map[string]any{
+		"superplane_credit_purchase_version": "1",
+		"superplane_credit_amount_cents":     "10000",
+		"superplane_credit_subtotal_cents":   "10579",
+	}
+	return event
 }
 
 func paidCustomPackEvent(orgID uuid.UUID, orderID string, paidCents int64) *OrderWebhookEvent {
@@ -448,4 +568,26 @@ type creditPackLookupFunc func(ctx context.Context, productID string) (*Product,
 
 func (f creditPackLookupFunc) GetCreditPack(ctx context.Context, productID string) (*Product, error) {
 	return f(ctx, productID)
+}
+
+func setupBillingOrganization(t *testing.T) *models.Organization {
+	t.Helper()
+	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+	catalog, err := models.FindBillingPlan(db, models.BillingPlanBusiness)
+	require.NoError(t, err)
+	originalProduct := catalog.PolarProductID
+	if originalProduct != nil {
+		originalProduct = new(*originalProduct)
+	}
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.WithoutCancel(t.Context())).Model(catalog).Update("polar_product_id", originalProduct).Error)
+	})
+	require.NoError(t, db.Model(catalog).Update("polar_product_id", nil).Error)
+	org, err := models.CreateOrganization("billing-"+uuid.NewString(), "")
+	require.NoError(t, err)
+	account, err := models.CreateAccount("Billing test", uuid.NewString()+"@example.com")
+	require.NoError(t, err)
+	require.NoError(t, models.GrantWelcomeCredit(database.Conn(), org.ID, account.ID))
+	return org
 }

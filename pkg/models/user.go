@@ -86,7 +86,13 @@ func (u *User) SoftDelete(tx *gorm.DB, now time.Time, tombstoneEmail string) err
 		updates["email"] = tombstoneEmail
 	}
 
-	return tx.Unscoped().Model(u).Updates(updates).Error
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Model(u).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		return tx.Where("user_id = ?", u.ID).Delete(&UserAPIToken{}).Error
+	})
 }
 
 func (u *User) Restore() error {
@@ -509,11 +515,7 @@ func CountActiveUsersByOrganizationIDs(orgIDs []string) (map[string]int64, error
 	return counts, nil
 }
 
-func CountActiveHumanUsersByOrganization(orgID string) (int64, error) {
-	return CountActiveHumanUsersByOrganizationInTransaction(database.Conn(), orgID)
-}
-
-func CountActiveHumanUsersByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64, error) {
+func CountActiveHumanUsersByOrganization(tx *gorm.DB, orgID string) (int64, error) {
 	var count int64
 	err := tx.
 		Model(&User{}).

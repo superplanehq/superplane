@@ -8,9 +8,10 @@ import { AgentStep, type OnboardingAgentModelPicker } from "./AgentStep";
 import type { IntegrationId } from "./onboardingFixtures";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 
-const spendState: { remainingCreditCents: string; grantTotalCents: string } = {
+const spendState: { remainingCreditCents: string; grantTotalCents: string; billingEnabled: boolean } = {
   remainingCreditCents: "4124",
   grantTotalCents: "5000",
+  billingEnabled: true,
 };
 
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
@@ -19,12 +20,15 @@ vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
 
 function renderAgentStep(args?: {
   connected?: IntegrationId[];
-  spend?: { remainingCreditCents: string; grantTotalCents: string };
+  spend?: { remainingCreditCents: string; grantTotalCents: string; billingEnabled?: boolean };
   showCustomProvider?: boolean;
   onRequestConnect?: (id: IntegrationId) => void;
   modelPicker?: OnboardingAgentModelPicker;
 }) {
-  Object.assign(spendState, args?.spend ?? { remainingCreditCents: "4124", grantTotalCents: "5000" });
+  const spend = args?.spend ?? { remainingCreditCents: "4124", grantTotalCents: "5000" };
+  spendState.remainingCreditCents = spend.remainingCreditCents;
+  spendState.grantTotalCents = spend.grantTotalCents;
+  spendState.billingEnabled = spend.billingEnabled ?? true;
   const onRequestConnect = args?.onRequestConnect ?? vi.fn();
 
   function Harness() {
@@ -99,7 +103,7 @@ describe("AgentStep", () => {
     expect(screen.getByText("SuperPlane-hosted credit")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "This organization has $41.24 of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.",
+        "This organization has $41.24 of trial usage for machines and managed models. Contact an installation admin to keep hosted runs after the trial.",
       ),
     ).toBeInTheDocument();
   });
@@ -111,6 +115,15 @@ describe("AgentStep", () => {
 
     expect(screen.getByRole("button", { name: "Connect Anthropic" })).toBeInTheDocument();
     expect(screen.queryByTestId("hosted-credit-grant")).not.toBeInTheDocument();
+  });
+
+  it("hides the grant block when product billing is off", () => {
+    renderAgentStep({
+      spend: { remainingCreditCents: "5000", grantTotalCents: "5000", billingEnabled: false },
+    });
+
+    expect(screen.queryByTestId("hosted-credit-grant")).not.toBeInTheDocument();
+    expect(screen.queryByText("SuperPlane-hosted credit")).not.toBeInTheDocument();
   });
 
   it("shows Anthropic, OpenAI, and OpenRouter as connectable", () => {
@@ -130,7 +143,7 @@ describe("AgentStep", () => {
 
     expect(screen.getByTestId("hosted-credit-grant")).toBeInTheDocument();
     expect(
-      screen.getByText("Trial credit is used up. Subscribe to Business or connect a provider to continue."),
+      screen.getByText("Trial credit is used up. Contact an installation admin or connect a provider to continue."),
     ).toBeInTheDocument();
   });
 

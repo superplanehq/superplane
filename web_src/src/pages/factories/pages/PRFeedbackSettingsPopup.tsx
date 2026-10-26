@@ -1,13 +1,11 @@
-import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { useEffect, useRef, useState } from "react";
 
-import { PRFeedbackAutomationTab, PRFeedbackSettingsFooter } from "./PRFeedbackSettingsChrome";
-import {
-  PRFeedbackChecksFields,
-  PRFeedbackDiscussionFields,
-  PRFeedbackHealthSection,
-} from "./PRFeedbackSettingsFields";
-import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import { PRFeedbackSettingsFooter } from "./PRFeedbackSettingsChrome";
+import { PRFeedbackChecksFields, PRFeedbackDiscussionFields } from "./PRFeedbackSettingsFields";
+import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import { PlanningReviewForm } from "./PlanningReviewForm";
+import type { PlanningReviewDraft } from "./planningReviewMockup";
+import { getApiErrorMessage } from "@/lib/errors";
 import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
 import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
 import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
@@ -25,7 +23,6 @@ interface PRFeedbackSettingsPopupProps {
   githubIntegrationId?: string;
   vcsProvider?: string;
   settings: PRFeedbackDraftSettings;
-  healthy: boolean;
   automationGraph?: IntakeAutomationGraph;
   automationLoading?: boolean;
   automationError?: boolean;
@@ -35,9 +32,7 @@ interface PRFeedbackSettingsPopupProps {
   savePending?: boolean;
   deletePending?: boolean;
   saveError?: string;
-  editAutomationHref?: string;
   canvasId?: string;
-  runHrefFor?: RunsSidebarHrefForRun;
   agent?: PlanningReviewAgentSlot;
   onClose: () => void;
   fixed?: boolean;
@@ -50,7 +45,6 @@ export function PRFeedbackSettingsPopup({
   githubIntegrationId,
   vcsProvider,
   settings,
-  healthy,
   automationGraph,
   automationLoading = false,
   automationError = false,
@@ -60,9 +54,7 @@ export function PRFeedbackSettingsPopup({
   savePending = false,
   deletePending = false,
   saveError,
-  editAutomationHref,
   canvasId,
-  runHrefFor,
   agent,
   onClose,
   fixed = true,
@@ -70,6 +62,30 @@ export function PRFeedbackSettingsPopup({
 }: PRFeedbackSettingsPopupProps) {
   const [draft, setDraft] = useState(settings);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editedAgent, setEditedAgent] = useState<PlanningReviewDraft>();
+  const [saving, setSaving] = useState(false);
+  const [localSaveError, setLocalSaveError] = useState<string>();
+  const agentDraft = editedAgent ?? agent?.draft;
+  const agentUnavailable = Boolean(agent && (agent.isLoading || !agentDraft?.components.length));
+  const busy = saving || savePending;
+
+  const save = async (next: PRFeedbackDraftSettings) => {
+    if (busy || agentUnavailable) return;
+    setSaving(true);
+    setLocalSaveError(undefined);
+    try {
+      if (editedAgent) {
+        if (!agent?.onSave) throw new Error(PR_FEEDBACK_SETTINGS_COPY.saveError);
+        await agent.onSave(editedAgent);
+      }
+      await onSave(next);
+    } catch (error) {
+      setLocalSaveError(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.saveError));
+      throw error;
+    } finally {
+      setSaving(false);
+    }
+  };
   const history = useFactoryAutomationNavigation({
     organizationId,
     factoryId,
@@ -77,7 +93,7 @@ export function PRFeedbackSettingsPopup({
     agent,
     parameter: "prFeedbackSettings",
     initialTab,
-    hasAgent: Boolean(agent),
+    hasAgent: false,
   });
   const { tab, setTab } = history;
   const settingsKey = JSON.stringify(settings);
@@ -98,7 +114,7 @@ export function PRFeedbackSettingsPopup({
         <FactoryAutomationSettingsTabs
           tab={tab}
           onTabChange={setTab}
-          hasAgent={Boolean(agent)}
+          hasAgent={false}
           historyEnabled={history.enabled}
           label={PR_FEEDBACK_SETTINGS_COPY.tabsLabel}
           testId="pr-feedback-settings"
@@ -115,43 +131,22 @@ export function PRFeedbackSettingsPopup({
           error={automationError}
           onRetry={onRetryAutomation}
         />
-      ) : tab === "automation" ? (
-        <PRFeedbackAutomationTab
-          graph={automationGraph}
-          canvasId={canvasId}
-          runHrefFor={runHrefFor}
-          editHref={editAutomationHref}
-          loading={automationLoading}
-          error={automationError}
-          onRetry={onRetryAutomation}
-        />
-      ) : tab === "agent" && agent ? (
-        <PlanningReviewEditor
-          key={agent.draft?.components[0]?.id ?? "agent"}
-          initialDraft={agent.draft}
-          onSave={agent.onSave}
-          organizationId={agent.organizationId}
-          factoryId={agent.factoryId}
-          factoryKey={agent.factoryKey}
-          automationId={agent.automationId}
-          isLoading={agent.isLoading}
-          showAutomationNote={false}
-          showCancel={false}
-          showVisualEvidenceSetting={agent.showVisualEvidenceSetting}
-        />
       ) : (
         <PRFeedbackGeneralTab
           organizationId={organizationId}
           githubIntegrationId={githubIntegrationId}
           vcsProvider={vcsProvider}
           draft={draft}
-          healthy={healthy}
           confirmDelete={confirmDelete}
-          savePending={savePending}
+          agent={agent}
+          agentDraft={agentDraft}
+          onAgentChange={setEditedAgent}
+          saveDisabled={agentUnavailable}
+          savePending={busy}
           deletePending={deletePending}
-          saveError={saveError}
+          saveError={localSaveError || saveError}
           onUpdate={(key, value) => update(key, value)}
-          onSave={onSave}
+          onSave={save}
           onDelete={onDelete}
           onConfirmDelete={(next) => setConfirmDelete(next)}
           onClose={onClose}
@@ -166,8 +161,11 @@ function PRFeedbackGeneralTab({
   githubIntegrationId,
   vcsProvider,
   draft,
-  healthy,
   confirmDelete,
+  agent,
+  agentDraft,
+  onAgentChange,
+  saveDisabled,
   savePending,
   deletePending,
   saveError,
@@ -181,8 +179,11 @@ function PRFeedbackGeneralTab({
   githubIntegrationId?: string;
   vcsProvider?: string;
   draft: PRFeedbackDraftSettings;
-  healthy: boolean;
   confirmDelete: boolean;
+  agent?: PlanningReviewAgentSlot;
+  agentDraft?: PlanningReviewDraft;
+  onAgentChange: (next: PlanningReviewDraft) => void;
+  saveDisabled: boolean;
   savePending?: boolean;
   deletePending?: boolean;
   saveError?: string;
@@ -196,9 +197,29 @@ function PRFeedbackGeneralTab({
 
   return (
     <>
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+      <div inert={savePending || undefined} className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-          <PRFeedbackHealthSection healthy={healthy} checks={checks} />
+          {agent?.isLoading ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              Loading model settings...
+            </p>
+          ) : agentDraft?.components.length ? (
+            <PlanningReviewForm
+              draft={agentDraft}
+              onChange={onAgentChange}
+              organizationId={agent?.organizationId}
+              factoryId={agent?.factoryId}
+              appearance="fields"
+              view="pr-feedback"
+              showResources={false}
+              showConcurrency={false}
+              disabled={savePending}
+            />
+          ) : agent ? (
+            <p role="alert" className="text-sm text-destructive">
+              Could not load model settings.
+            </p>
+          ) : null}
           {checks ? (
             <PRFeedbackChecksFields
               organizationId={organizationId}
@@ -221,6 +242,7 @@ function PRFeedbackGeneralTab({
         draft={draft}
         confirmDelete={confirmDelete}
         savePending={savePending}
+        saveDisabled={saveDisabled}
         deletePending={deletePending}
         saveError={saveError}
         onSave={onSave}

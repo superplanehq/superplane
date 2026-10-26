@@ -88,7 +88,28 @@ function applyAnalysisContinuation(taskDir, promptCount, prompt) {
 }
 
 function envFlag(env, name) {
-  return Boolean(String((env && env[name]) || "").trim());
+  return Boolean(envValue(env, name));
+}
+
+function envValue(env, name) {
+  return String((env && env[name]) || "").trim();
+}
+
+function requireCodexAPIKey(env = process.env) {
+  const apiKey = envValue(env, "CODEX_API_KEY") || envValue(env, "OPENAI_API_KEY");
+  if (!apiKey) {
+    throw new Error(
+      "Codex API key is missing. Set OPENAI_API_KEY or CODEX_API_KEY.",
+    );
+  }
+  return apiKey;
+}
+
+function codexExecEnv(env = process.env) {
+  return {
+    ...env,
+    CODEX_API_KEY: requireCodexAPIKey(env),
+  };
 }
 
 function planningEnabled(env = process.env) {
@@ -173,6 +194,10 @@ function codexExecArgs(
     args.push("-m", model);
   }
   args.push(...thinkingArgs(thinking));
+  const baseURL = envValue(env, "OPENAI_BASE_URL");
+  if (baseURL) {
+    args.push("-c", `openai_base_url=${tomlString(baseURL)}`);
+  }
   return args;
 }
 
@@ -218,8 +243,6 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
     "-c",
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
     "-c",
-    'mcp_servers.superplane.default_tools_approval_mode="approve"',
-    "-c",
     `mcp_servers.superplane.env_vars=${tomlStringArray([
       "SUPERPLANE_BASE_URL",
       "SUPERPLANE_RUN_TOKEN",
@@ -230,6 +253,16 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
       "SUPERPLANE_ANALYSIS_SPEC_FILE",
       "SUPERPLANE_ANALYSIS_SCORE_FILE",
     ])}`,
+    // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
+    // answer that prompt, so approve only these planning tools, not shell writes.
+    ...(planningEnabled(env)
+      ? [
+          "-c",
+          'mcp_servers.superplane.tools.propose_update.approval_mode="approve"',
+          "-c",
+          'mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"',
+        ]
+      : []),
     ...workspaceMCPConfigOverrides(env),
   ];
 }
@@ -337,6 +370,7 @@ async function runPrompt(promptFile, model, thinking) {
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
+  requireCodexAPIKey(process.env);
 
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
@@ -383,6 +417,7 @@ async function runPrompt(promptFile, model, thinking) {
   codexArgs.push(prompt);
 
   const child = spawn("codex", codexArgs, {
+    env: codexExecEnv(process.env),
     stdio: ["ignore", "pipe", "pipe"],
   });
   const stderrDone = pipeRedactedStderr(child.stderr);
@@ -635,7 +670,7 @@ function createCodexFormatter(telemetry, activityOverride) {
     activity.startTool({
       id,
       kind: normalizeCodexToolKind(item),
-      name: String(item.name || item.type || "tool"),
+      name: String(item.tool || item.name || item.type || "tool"),
       input: toolTextForItem(item),
     });
     return id;
@@ -664,7 +699,11 @@ function createCodexFormatter(telemetry, activityOverride) {
       id = rememberTool(item);
     }
     emitStart(id);
-    const output = item.aggregated_output || item.output || "";
+    const output =
+      item.aggregated_output ||
+      item.output ||
+      (item.error && item.error.message) ||
+      "";
     if (typeof output === "string" && output.trim()) {
       if (activity.enabled) {
         activity.appendToolOutput(
@@ -862,6 +901,11 @@ function toolTextForItem(item) {
       ? paths.map(String).join("\n")
       : String(item.path || "file");
   }
+  if (type === "mcp_tool_call") {
+    return [item.server, item.tool || item.name || "mcp"]
+      .filter(Boolean)
+      .join(".");
+  }
   return String(
     item.command || item.path || item.query || item.name || type || "tool",
   );
@@ -872,7 +916,18 @@ function stripBashLc(command) {
 }
 
 function toolFailed(item) {
-  if (item.status === "failed") {
+  const status = String(item.status || "").toLowerCase();
+  if (
+    [
+      "failed",
+      "declined",
+      "cancelled",
+      "canceled",
+      "timed_out",
+      "timeout",
+      "interrupted",
+    ].includes(status)
+  ) {
     return true;
   }
   const exit = Number(item.exit_code);
@@ -937,6 +992,7 @@ module.exports = {
   createCodexFormatter,
   normalizeCodexToolKind,
   codexExecArgs,
+  codexExecEnv,
   thinkingArgs,
   codexSessionForPrompt,
   codexSessionIDFromEvent,

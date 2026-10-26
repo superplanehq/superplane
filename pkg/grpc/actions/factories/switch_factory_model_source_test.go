@@ -46,6 +46,7 @@ func Test__RewriteWorkspaceAgentNode__PlanningNodeKeepsPlanningModel(t *testing.
 
 func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -90,6 +91,7 @@ func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 	assert.Equal(t, models.FactoryOnboardingAgentHarnessClaudeCode, reloaded.OnboardingConfigValue().AgentHarness)
 	assert.NotEmpty(t, reloaded.OnboardingConfigValue().AgentIntegrationID)
 
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	_, _, err = SwitchFactoryModelSourceInTransaction(
 		t.Context(),
 		r.Registry,
@@ -216,6 +218,7 @@ func stubProviderModels(reg *registry.Registry, appName string, ids []string) {
 
 func Test__SwitchFactoryModelSource__StopsWhenTheKeyCannotListModels(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -271,6 +274,7 @@ func Test__ProviderModelListUsesDefaults(t *testing.T) {
 
 func Test__SwitchFactoryModelSource__UsesDefaultsWhenTheModelListIsUnavailable(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -303,6 +307,7 @@ func Test__SwitchFactoryModelSource__UsesDefaultsWhenTheModelListIsUnavailable(t
 
 func Test__SwitchFactoryModelSource__ReusesReadyIntegration(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -332,6 +337,7 @@ func Test__SwitchFactoryModelSource__ReusesReadyIntegration(t *testing.T) {
 
 func Test__SwitchFactoryModelSource__CustomProviderRequiresBothFlags(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -356,6 +362,7 @@ func Test__SwitchFactoryModelSource__CustomProviderRequiresBothFlags(t *testing.
 
 func Test__SwitchFactoryModelSource__CustomProviderRewritesAgents(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -395,6 +402,7 @@ func Test__SwitchFactoryModelSource__CustomProviderRewritesAgents(t *testing.T) 
 
 func Test__SwitchFactoryModelSource__CustomProviderRequiresTokenWhenURLChanges(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

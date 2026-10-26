@@ -83,7 +83,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Shared run history components with sample data for each intake, Planning, Implement, and Verify. Open rows for details. Use Controls for loading, empty, and error states. The app uses these components behind factory_run_history.",
+          "Shared run history components with sample data for each intake, Planning, Implement, and Verify. Open rows for details. Use Controls for loading, empty, and error states. The app uses these components for automation run history.",
       },
     },
   },
@@ -91,7 +91,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const GitHub: Story = { name: "GitHub" };
+export const GitHub: Story = {
+  name: "GitHub",
+  argTypes: {
+    view: { options: ["history", "created", "existing", "filtered", "processing", "failed", "unknown", "cancelled"] },
+  },
+};
 export const Sentry: Story = { args: { sourceId: "sentry-exceptions" } };
 export const Dependabot: Story = { args: { sourceId: "dependabot-alerts" } };
 export const Linear: Story = { args: { sourceId: "linear-issues" } };

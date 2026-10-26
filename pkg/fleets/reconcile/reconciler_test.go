@@ -29,6 +29,9 @@ type fakeAdmin struct {
 	createRequests    []adminclient.CreateRunnerRequest
 	deletedRunnerIDs  []string
 	providerDeleted   []string
+	deleteStates      [][]string
+	deleteResponse    *adminclient.Runner
+	deleteError       error
 	capacityWaits     []int
 	events            *[]string
 }
@@ -107,9 +110,16 @@ func (f *fakeAdmin) MarkRunnerProviderDeleted(
 
 func (f *fakeAdmin) DeleteRunner(
 	_ context.Context,
-	_, runnerID string,
+	_, runnerID string, states []string,
 ) (adminclient.Runner, error) {
 	f.deletedRunnerIDs = append(f.deletedRunnerIDs, runnerID)
+	f.deleteStates = append(f.deleteStates, states)
+	if f.deleteError != nil {
+		return adminclient.Runner{}, f.deleteError
+	}
+	if f.deleteResponse != nil {
+		return *f.deleteResponse, nil
+	}
 	return adminclient.Runner{ID: runnerID, State: adminclient.RunnerStateTerminated}, nil
 }
 
@@ -553,6 +563,41 @@ func TestMaximumCapacityTerminatesExcessIdleRunners(t *testing.T) {
 	if len(admin.deletedRunnerIDs) != 1 ||
 		admin.deletedRunnerIDs[0] != "runner-oldest" {
 		t.Fatalf("deleted runners = %#v", admin.deletedRunnerIDs)
+	}
+	if len(admin.deleteStates) != 1 || !slices.Equal(admin.deleteStates[0], []string{adminclient.RunnerStateIdle}) {
+		t.Fatalf("termination state preconditions = %#v", admin.deleteStates)
+	}
+}
+
+func TestScaleDownKeepsProviderResourceUnlessRunnerTerminated(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		response *adminclient.Runner
+		err      error
+	}{
+		{name: "state precondition conflict", err: &adminclient.HTTPError{StatusCode: http.StatusConflict}},
+		{name: "successful cancellation response", response: &adminclient.Runner{ID: "runner-idle", State: adminclient.RunnerStateBusy}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			admin := newFakeAdmin()
+			admin.capacity.IdleRunners = 1
+			admin.activeRunners = []adminclient.Runner{{ID: "runner-idle", State: adminclient.RunnerStateIdle}}
+			admin.deleteResponse = test.response
+			admin.deleteError = test.err
+			resourceProvider := &fakeProvider{resources: []provider.Resource{{
+				ID: "resource-idle", RunnerID: "runner-idle", FleetID: "fleet-a",
+			}}}
+			reconciler := newTestReconciler(t, admin, &fakeArtifactResolver{}, resourceProvider, 0, 1)
+			if err := reconciler.Reconcile(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if len(admin.deletedRunnerIDs) != 1 {
+				t.Fatalf("termination requests = %#v", admin.deletedRunnerIDs)
+			}
+			if len(resourceProvider.deleted) != 0 {
+				t.Fatalf("deleted resources for active runner = %#v", resourceProvider.deleted)
+			}
+		})
 	}
 }
 

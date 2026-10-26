@@ -1,9 +1,6 @@
 import { useMemo, useState } from "react";
 
-import {
-  FleetManagerCommandBlock,
-  FleetManagerInstallCommands,
-} from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
+import { FleetManagerInstallCommands } from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
 import {
   FleetManagerFleetSection,
   FleetManagerProviderSection,
@@ -14,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
 import {
-  fleetManagerDockerCommand,
   fleetManagerHelmCommand,
   fleetManagerValuesFileCommand,
   type FleetManagerDraft,
@@ -76,15 +72,9 @@ function InstallActions({
   );
 }
 
-function installSectionCopy(isDocker: boolean, draftIsValid: boolean) {
+function installSectionCopy(draftIsValid: boolean) {
   if (!draftIsValid) {
-    return { title: isDocker ? "Start runners on this VM" : "Install Fleet Manager", description: undefined };
-  }
-  if (isDocker) {
-    return {
-      title: "Start runners on this VM",
-      description: "Run this command in the SuperPlane install directory.",
-    };
+    return { title: "Install Fleet Manager", description: undefined };
   }
   return {
     title: "Install Fleet Manager",
@@ -94,7 +84,7 @@ function installSectionCopy(isDocker: boolean, draftIsValid: boolean) {
 }
 
 function ProviderChoice({ setup }: { setup: FleetManagerSetupState }) {
-  const copy = fleetProviderChoiceCopy(singleHostInstall(setup.metadata?.installationType));
+  const copy = fleetProviderChoiceCopy();
   return (
     <SectionCard title={copy.title} description={copy.description}>
       <FleetManagerProviderSection setup={setup} />
@@ -105,8 +95,6 @@ function ProviderChoice({ setup }: { setup: FleetManagerSetupState }) {
 function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
   const [submittedDraft, setSubmittedDraft] = useState<FleetManagerDraft | null>(null);
   const draft = setup.draft;
-  const isDocker = draft?.provider === "docker";
-  const dockerCommand = isDocker && setup.installationToken ? fleetManagerDockerCommand(setup.installationToken) : "";
   const draftIsValid = setup.validationErrors.length === 0;
   const submittedDraftIsCurrent = submittedDraft !== null && draft === submittedDraft;
   const verification = useFleetManagerVerification(submittedDraftIsCurrent, submittedDraft, setup.metadata);
@@ -117,38 +105,31 @@ function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
       helmCommand: fleetManagerHelmCommand(setup.metadata, draft.namespace),
     };
   }, [draft, setup.metadata, setup.values]);
-  const installCopy = installSectionCopy(isDocker, draftIsValid);
-  const canCheck =
-    draftIsValid && !submittedDraftIsCurrent && (isDocker ? Boolean(dockerCommand) : Boolean(setup.values));
+  const installCopy = installSectionCopy(draftIsValid);
+  const canCheck = draftIsValid && !submittedDraftIsCurrent && Boolean(setup.values);
 
   return (
     <div className="space-y-5">
       <ProviderChoice setup={setup} />
-      {isDocker ? null : (
-        <SectionCard
-          title="Configure the default fleet"
-          description="Set the cloud machine type and how many machines to keep ready."
-        >
-          <FleetManagerFleetSection setup={setup} />
-        </SectionCard>
-      )}
+      <SectionCard
+        title="Configure the default fleet"
+        description="Set the cloud machine type and how many machines to keep ready."
+      >
+        <FleetManagerFleetSection setup={setup} />
+      </SectionCard>
       <SectionCard title={installCopy.title} description={installCopy.description}>
         <div className="space-y-5">
-          {isDocker && dockerCommand ? (
-            <FleetManagerCommandBlock code={dockerCommand} language="shell" copyLabel="Copy runner command" />
-          ) : (
-            <InstallActions
-              draftIsValid={draftIsValid}
-              error={setup.validationErrors[0]}
-              commands={
-                commands && setup.values
-                  ? { valuesCommand: commands.valuesCommand, helmCommand: commands.helmCommand }
-                  : null
-              }
-              isPreparingInstallation={setup.isPreparingInstallation}
-              onGenerate={() => void setup.prepareInstallation()}
-            />
-          )}
+          <InstallActions
+            draftIsValid={draftIsValid}
+            error={setup.validationErrors[0]}
+            commands={
+              commands && setup.values
+                ? { valuesCommand: commands.valuesCommand, helmCommand: commands.helmCommand }
+                : null
+            }
+            isPreparingInstallation={setup.isPreparingInstallation}
+            onGenerate={() => void setup.prepareInstallation()}
+          />
           {setup.tokenError ? (
             <p role="alert" className="text-sm text-destructive">
               {setup.tokenError}
@@ -169,6 +150,18 @@ function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
 export function FleetManagerSetup() {
   const organizations = useAccountOrganizations();
   const setup = useFleetManagerSetup(true, organizations.data?.[0]?.id ?? "");
+
+  if (singleHostInstall(setup.metadata?.installationType)) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-2">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Local runners</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          This installation manages Fleet Manager automatically. Use the installation files on the VM to change runner
+          capacity.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

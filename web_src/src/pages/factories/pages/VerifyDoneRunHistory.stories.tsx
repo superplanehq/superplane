@@ -47,7 +47,6 @@ function VerificationPreview({ source, detail = false }: { source: VerificationS
               maximumAttempts: 3,
               runnerIntegrationIds: [],
             }}
-            healthy
             onSave={(next) => console.log("Save PR feedback", next)}
             onClose={() => console.log("Close feedback")}
             agent={{
@@ -128,8 +127,4 @@ export const CustomDone: Story = {
 export const RunPermalink: Story = {
   args: { source: "merge-confidence", detail: true },
   parameters: { msw: { handlers: factoryHistoryHandlers("merge-confidence") } },
-};
-export const FeatureDisabled: Story = {
-  args: { source: "merge-confidence" },
-  parameters: { msw: { handlers: factoryHistoryHandlers("merge-confidence", false) } },
 };

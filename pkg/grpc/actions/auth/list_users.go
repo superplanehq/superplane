@@ -4,7 +4,10 @@ import (
 	"context"
 	"slices"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/entitlements"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -23,6 +26,19 @@ func ListUsers(
 		return nil, grpcerrors.InvalidArgument(nil, "domain type must be organization")
 	}
 
+	orgID, err := uuid.Parse(domainID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
+	}
+	seats, err := entitlements.ResolveSeats(database.DB(ctx), orgID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to resolve seat limit")
+	}
+	var seatLimit *int32
+	if limit := seats.JoinLimit(); limit != nil {
+		quantity := int32(*limit)
+		seatLimit = &quantity
+	}
 	users, err := models.ListAllActiveUsersInOrganization(domainID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to fetch users")
@@ -36,7 +52,7 @@ func ListUsers(
 	protoUsers := usersToProto(users, accountProviders)
 	if !includeRoles {
 		return &pb.ListUsersResponse{
-			Users: protoUsers,
+			Users: protoUsers, SeatLimit: seatLimit,
 		}, nil
 	}
 
@@ -91,6 +107,6 @@ func ListUsers(
 	}
 
 	return &pb.ListUsersResponse{
-		Users: protoUsers,
+		Users: protoUsers, SeatLimit: seatLimit,
 	}, nil
 }

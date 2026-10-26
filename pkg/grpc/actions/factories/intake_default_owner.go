@@ -2,6 +2,7 @@ package factories
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -9,12 +10,21 @@ import (
 	"gorm.io/gorm"
 )
 
+var intakeSourcesWithDefaultOwner = []string{
+	models.FactoryIntakeSourceGitHubIssues,
+	models.FactoryIntakeSourceSentryExceptions,
+}
+
+func intakeSourceSupportsDefaultOwner(source string) bool {
+	return slices.Contains(intakeSourcesWithDefaultOwner, source)
+}
+
 func validateIntakeDefaultOwner(tx *gorm.DB, organizationID uuid.UUID, source, currentOwner string, settings *pb.FactoryIntake_Settings) error {
 	if settings == nil || settings.DefaultOwnerId == nil {
 		return nil
 	}
-	if source != models.FactoryIntakeSourceGitHubIssues {
-		return invalidArgument("default task owner is only supported for GitHub issues")
+	if !intakeSourceSupportsDefaultOwner(source) {
+		return invalidArgument("default task owner is not supported for this intake")
 	}
 	ownerID := settings.GetDefaultOwnerId()
 	if ownerID == "" || ownerID == currentOwner {

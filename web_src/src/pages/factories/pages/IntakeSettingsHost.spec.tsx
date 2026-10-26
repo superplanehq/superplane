@@ -14,9 +14,7 @@ import {
   resetHostMocks,
   updateIntake,
   useCanvas,
-  useInfiniteCanvasRuns,
 } from "./IntakeSettingsHost.spec.fixtures";
-import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomationsCopy";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS, INTAKE_SETTINGS_COPY, intakeSettingsToApi } from "./intakeSourceSettingsModel";
 import "./intakeSettingsHostSentryCases";
 
@@ -42,8 +40,8 @@ describe("IntakeSettingsHost", () => {
       within(dialog)
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
-    ).toEqual(["General", "Automation"]);
-    expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
+    ).toEqual(["General", "Runs"]);
+    expect(within(dialog).getByRole("tab", { name: "Runs" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("intake-source-settings-automatic-intake")).toBeChecked();
     expect(within(dialog).getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
     expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument();
@@ -93,58 +91,12 @@ describe("IntakeSettingsHost", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("shows the automation of the intake canvas from the Automation tab", async () => {
-    const user = userEvent.setup();
-    renderHost();
-
-    await user.click(screen.getByRole("tab", { name: "Automation" }));
-
-    expect(useCanvas).toHaveBeenCalledWith("org-1", "app-github-issues-intake", { enabled: true });
-    const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
-    expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
-    expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
-    const edit = within(automation).getByRole("link", { name: "Edit automation" });
-    expect(edit).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/rf/automations/app-github-issues-intake?configure=1&agent=1&from=lines&lineId=line-plan",
-    );
-    expect(useInfiniteCanvasRuns).toHaveBeenCalledWith("app-github-issues-intake", {}, true);
-    const sidebar = within(automation).getByTestId("factory-automation-runs-sidebar");
-    expect(within(sidebar).getByText("On mention on Issue")).toBeInTheDocument();
-    expect(within(sidebar).getByRole("link", { name: "On mention on Issue" })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/rf/automations/app-github-issues-intake?run=run-intake-1&from=lines&lineId=line-plan",
-    );
-  });
-
-  it("loads the selected run on the automation canvas", async () => {
-    const user = userEvent.setup();
-    renderHost({ initialTab: "automation" });
-
-    const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
-    expect(automation).not.toHaveAttribute("data-selected-run-id");
-    expect(automation.querySelector(".sp-canvas-live")).toBeNull();
-
-    await user.click(within(automation).getByRole("link", { name: "On mention on Issue" }));
-
-    expect(automation).toHaveAttribute("data-selected-run-id", "run-intake-1");
-    expect(automation.querySelector(".sp-canvas-live")).not.toBeNull();
-    expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
-    expect(within(automation).getByTestId("rf__node-github-issues-filter")).toBeInTheDocument();
-    expect(within(automation).getByTestId("rf__node-github-issues-create")).toBeInTheDocument();
-  });
-
-  it("reports an intake without an automation instead of drawing one", async () => {
+  it("shows empty history for an intake without an automation", async () => {
     useCanvas.mockReturnValue({ data: undefined, isPending: false });
-    const user = userEvent.setup();
-    renderHost();
-
-    await user.click(screen.getByRole("tab", { name: "Automation" }));
-
-    const automation = screen.getByTestId("intake-source-automation");
-    expect(automation).toHaveTextContent("This intake has no automation yet.");
-    expect(within(automation).queryByTestId("rf__node-github-issues-trigger")).not.toBeInTheDocument();
+    renderHost({ intake: { ...GITHUB_INTAKE, appId: "" } });
+    await userEvent.click(screen.getByRole("tab", { name: "Runs" }));
+    expect(screen.getByText("No runs yet")).toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
   });
 
   it("saves the settings without renaming the intake", async () => {
@@ -312,38 +264,27 @@ describe("IntakeSettingsHost", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("opens Dependabot intake in the split config panel", async () => {
-    useCanvas.mockReturnValue({
-      data: DEPENDABOT_INTAKE_CANVAS,
-      isPending: false,
-      isError: false,
-      refetch: vi.fn().mockResolvedValue(undefined),
-    });
+  it("opens Dependabot filters alongside shared run history", async () => {
     const user = userEvent.setup();
+    useCanvas.mockReturnValue({ data: DEPENDABOT_INTAKE_CANVAS, isPending: false, isError: false, refetch: vi.fn() });
     renderHost({ intake: DEPENDABOT_INTAKE, repository: "superplanehq/superplane" });
-
-    const dialog = screen.getByTestId("merge-confidence-config");
-    expect(screen.queryByTestId("intake-source-settings")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("heading", { name: "Dependabot alerts" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
-    expect(within(dialog).getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Intake Dependabot alerts" })).toBeInTheDocument();
     expect(
       within(dialog)
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
-    ).toEqual(["Automation", "Runs"]);
-    const form = within(dialog).getByTestId("merge-confidence-config-form");
-    expect(within(form).getByRole("heading", { name: "On Dependabot Alert" })).toBeInTheDocument();
+    ).toEqual(["General", "Runs"]);
+    const form = dialog;
     expect(within(form).getByText("Repository")).toBeInTheDocument();
     expect(within(form).getByText("superplanehq/superplane")).toBeInTheDocument();
     expect(within(form).getByText("Create a task for these severities:")).toBeInTheDocument();
+    expect(within(form).queryByRole("button", { name: "Default task owner" })).not.toBeInTheDocument();
     expect(within(form).getByRole("checkbox", { name: "Critical" })).toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "Low" })).toBeChecked();
-    expect(within(dialog).queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("tab", { name: "Runs" }));
 
-    await user.click(within(dialog).getByTestId("merge-confidence-config-tab-runs"));
-
-    expect(within(dialog).getByTestId("factory-automation-runs-sidebar")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Open run run-intake-1" })).toBeInTheDocument();
   });
 
   it("keeps Dependabot severity settings when the intake has no canvas", async () => {
@@ -359,16 +300,14 @@ describe("IntakeSettingsHost", () => {
       repository: "superplanehq/superplane",
     });
 
-    const dialog = screen.getByTestId("merge-confidence-config");
-    const form = within(dialog).getByTestId("merge-confidence-config-form");
-    expect(within(form).getByRole("heading", { name: "On Dependabot Alert" })).toBeInTheDocument();
+    const dialog = screen.getByTestId("intake-source-settings");
+    const form = dialog;
     expect(within(form).getByRole("checkbox", { name: "Critical" })).toBeChecked();
     expect(within(form).queryByTestId("merge-confidence-config-form-collapse")).not.toBeInTheDocument();
-    expect(within(dialog).getByText(COLUMN_AUTOMATIONS_COPY.viewEmpty)).toBeInTheDocument();
-    expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("tab", { name: "Runs" })).toBeInTheDocument();
 
     await user.click(within(form).getByRole("checkbox", { name: "Low" }));
-    await user.click(within(form).getByTestId("dependabot-intake-config-save"));
+    await user.click(within(form).getByTestId("intake-source-settings-save"));
 
     expect(updateIntake).toHaveBeenCalledWith({
       intakeId: "intake-dependabot",
@@ -389,14 +328,12 @@ describe("IntakeSettingsHost", () => {
     const user = userEvent.setup();
     renderHost({ intake: DEPENDABOT_INTAKE, repository: "superplanehq/superplane" });
 
-    const dialog = screen.getByTestId("merge-confidence-config");
-    const form = within(dialog).getByTestId("merge-confidence-config-form");
+    const dialog = screen.getByTestId("intake-source-settings");
+    const form = dialog;
     expect(within(form).getByRole("checkbox", { name: "High" })).toBeChecked();
-    expect(within(dialog).getByText(COLUMN_AUTOMATIONS_COPY.viewError)).toBeInTheDocument();
     expect(within(dialog).getByRole("tab", { name: "Runs" })).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: COLUMN_AUTOMATIONS_COPY.viewRetry }));
-    await user.click(within(form).getByTestId("dependabot-intake-config-save"));
+    await user.click(within(form).getByTestId("intake-source-settings-save"));
 
     expect(refetch).toHaveBeenCalled();
     expect(updateIntake).toHaveBeenCalledWith({
@@ -418,7 +355,7 @@ describe("IntakeSettingsHost", () => {
     const view = renderHost({ intake: DEPENDABOT_INTAKE, repository: "superplanehq/superplane" });
 
     await user.click(screen.getByRole("checkbox", { name: "Low" }));
-    await user.click(screen.getByTestId("dependabot-intake-config-save"));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
 
     expect(updateIntake).toHaveBeenCalledWith({
       intakeId: "intake-dependabot",
@@ -454,12 +391,12 @@ describe("IntakeSettingsHost", () => {
     const user = userEvent.setup();
     renderHost({ intake: DEPENDABOT_INTAKE });
 
-    await user.click(screen.getByTestId("dependabot-intake-config-save"));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
 
-    expect(screen.getByTestId("dependabot-intake-config-save-error")).toHaveTextContent("save failed");
+    expect(await screen.findByRole("alert")).toHaveTextContent("save failed");
   });
 
-  it("deletes a Dependabot intake from the actions menu", async () => {
+  it("deletes a Dependabot intake from settings", async () => {
     useCanvas.mockReturnValue({
       data: DEPENDABOT_INTAKE_CANVAS,
       isPending: false,
@@ -470,11 +407,8 @@ describe("IntakeSettingsHost", () => {
     const user = userEvent.setup();
     renderHost({ intake: DEPENDABOT_INTAKE, onClose });
 
-    await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(screen.getByRole("menuitem", { name: INTAKE_SETTINGS_COPY.delete }));
-    expect(screen.getByRole("alertdialog", { name: INTAKE_SETTINGS_COPY.deleteTitle })).toHaveTextContent(
-      INTAKE_SETTINGS_COPY.deleteDescription,
-    );
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
     await user.click(screen.getByRole("button", { name: INTAKE_SETTINGS_COPY.deleteConfirm }));
 
     expect(deleteIntake).toHaveBeenCalledWith("intake-dependabot");
@@ -493,11 +427,10 @@ describe("IntakeSettingsHost", () => {
     const user = userEvent.setup();
     renderHost({ intake: DEPENDABOT_INTAKE, onClose });
 
-    await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(screen.getByRole("menuitem", { name: INTAKE_SETTINGS_COPY.delete }));
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
     await user.click(screen.getByRole("button", { name: INTAKE_SETTINGS_COPY.deleteConfirm }));
 
-    expect(screen.getByTestId("merge-confidence-config-delete-error")).toHaveTextContent("delete failed");
+    expect(screen.getByTestId("intake-delete-error")).toHaveTextContent("delete failed");
     expect(onClose).not.toHaveBeenCalled();
   });
 });

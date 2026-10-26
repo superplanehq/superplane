@@ -7,11 +7,11 @@ var taskArtifactMCPScript string
 
 func TaskArtifactMCPScript() string { return taskArtifactMCPScript }
 
-func TaskArtifactMCPFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "task_artifact_mcp.js", Content: taskArtifactMCPScript, Mode: "0644"}
+func TaskArtifactMCPFile() TaskFile {
+	return TaskFile{Path: "task_artifact_mcp.js", Content: taskArtifactMCPScript, Mode: "0644"}
 }
 
-func AppendTaskArtifactMCP(environment []BrokerEnvironmentVariable, files []BrokerTaskFile) []BrokerTaskFile {
+func AppendTaskArtifactMCP(environment []TaskEnvironmentVariable, files []TaskFile) []TaskFile {
 	if !HasArtifactUploadToken(environment) {
 		return files
 	}

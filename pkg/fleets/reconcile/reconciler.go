@@ -34,7 +34,7 @@ type AdminClient interface {
 	) (adminclient.CreateRunnerResponse, error)
 	DescribeRunner(context.Context, string, string) (adminclient.Runner, error)
 	ListRunners(context.Context, string, []string, int) ([]adminclient.Runner, error)
-	DeleteRunner(context.Context, string, string) (adminclient.Runner, error)
+	DeleteRunner(context.Context, string, string, []string) (adminclient.Runner, error)
 	MarkRunnerProviderDeleted(context.Context, string, string) (adminclient.Runner, error)
 }
 
@@ -464,7 +464,7 @@ func (r *Reconciler) rollbackProvision(
 		"terminating logical runner after provisioning failure",
 		slog.String("runner_id", runnerID),
 	)
-	_, rollbackError := r.admin.DeleteRunner(ctx, r.config.FleetID, runnerID)
+	_, rollbackError := r.admin.DeleteRunner(ctx, r.config.FleetID, runnerID, []string{adminclient.RunnerStatePending})
 	if rollbackError != nil {
 		return errors.Join(
 			provisionError,
@@ -573,7 +573,7 @@ func (r *Reconciler) terminateRunners(
 			"terminating logical runner",
 			slog.String("runner_id", runner.ID),
 		)
-		_, err := r.admin.DeleteRunner(ctx, r.config.FleetID, runner.ID)
+		terminated, err := r.admin.DeleteRunner(ctx, r.config.FleetID, runner.ID, []string{runner.State})
 		if adminclient.IsStatus(err, http.StatusConflict) {
 			continue
 		}
@@ -583,6 +583,14 @@ func (r *Reconciler) terminateRunners(
 				runner.ID,
 				err,
 			))
+			continue
+		}
+		if terminated.State != adminclient.RunnerStateTerminated {
+			r.logAction(
+				"keeping provider resources for active runner",
+				slog.String("runner_id", runner.ID),
+				slog.String("state", terminated.State),
+			)
 			continue
 		}
 		for _, resource := range resourcesByRunner[runner.ID] {
