@@ -23,6 +23,11 @@ type FirstRunTicketsScreenProps = {
   automaticIntake?: boolean;
   onAutomaticIntakeChange?: (on: boolean) => void;
   ticketSource: FirstRunTicketSource | null;
+  /**
+   * Open on the source list even when a source is already selected, for
+   * example a default the user did not choose. The card opens on click.
+   */
+  startOnSourceList?: boolean;
   /** Repository the GitHub intake reads, e.g. "acme/payments". */
   repository?: string;
   chrome?: FirstRunChrome;
@@ -144,8 +149,8 @@ function sourceConnected(
  * project, set intake settings, then the final action. Back walks the
  * card backwards and then returns to the list.
  */
-function useTicketScreenPhase(ticketSource: FirstRunTicketSource | null) {
-  const [browsing, setBrowsing] = useState(false);
+function useTicketScreenPhase(ticketSource: FirstRunTicketSource | null, startOnSourceList: boolean) {
+  const [browsing, setBrowsing] = useState(startOnSourceList);
   const [confirmedFor, setConfirmedFor] = useState<FirstRunTicketSource | null>(null);
   const projectsConfirmed = confirmedFor !== null && confirmedFor === ticketSource;
   const listPhase = ticketSource === null || browsing;
@@ -178,7 +183,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
   const resolved: ResolvedTicketsProps = { ...TICKET_SCREEN_DEFAULTS, ...props };
   const { ticketSource, chrome, sphere, saving, linearChoiceBlock } = resolved;
   const copy = FIRST_RUN_COPY.tickets;
-  const phase = useTicketScreenPhase(ticketSource);
+  const phase = useTicketScreenPhase(ticketSource, Boolean(resolved.startOnSourceList));
   const stepperSource = phase.listPhase ? null : ticketSource;
   // On the card, Back walks the steps and then returns to the list.
   const screenChrome = chrome && stepperSource ? { ...chrome, onBack: phase.back } : chrome;

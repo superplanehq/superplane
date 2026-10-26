@@ -96,6 +96,8 @@ function TicketsScreenHost({
       onAutomaticIntakeChange={model.setup.setAutomaticIntake}
       githubAvailable={flow.vcsHost !== "bitbucket"}
       ticketSource={flow.ticketSource}
+      // GitHub is only a default until the user picks it on the list.
+      startOnSourceList={model.setup.issuesChoice == null}
       repository={model.setup.issuesRepo ?? model.setup.selectedRepo ?? undefined}
       connecting={connecting}
       chrome={chrome}

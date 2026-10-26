@@ -21,6 +21,8 @@ describe("FirstRunFlow", () => {
     await user.click(screen.getByTestId("first-run-continue-to-tickets"));
 
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.tickets.headline })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /GitHub issues/ }));
     expect(
       screen.getByRole("heading", { name: FIRST_RUN_COPY.tickets.setupHeadline(FIRST_RUN_COPY.tickets.githubIssues) }),
     ).toBeInTheDocument();

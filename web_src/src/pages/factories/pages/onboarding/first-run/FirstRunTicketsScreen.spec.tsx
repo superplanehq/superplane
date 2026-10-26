@@ -36,6 +36,31 @@ describe("FirstRunTicketsScreen", () => {
       expect(onConnectJira).not.toHaveBeenCalled();
     });
 
+    it("stays on the list when the source is only a default, and opens the card on click", async () => {
+      const user = userEvent.setup();
+      const onSelectTicketSource = vi.fn();
+
+      render(
+        <FirstRunTicketsScreen
+          ticketSource="github-issues"
+          startOnSourceList
+          githubConnected
+          onSelectTicketSource={onSelectTicketSource}
+          onAnalyzeTickets={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole("heading", { name: copy.headline })).toBeInTheDocument();
+      const githubIssues = screen.getByRole("button", { name: /GitHub issues/ });
+      expect(githubIssues).toHaveAttribute("aria-pressed", "true");
+      expect(screen.queryByTestId("first-run-analyze-tickets")).not.toBeInTheDocument();
+
+      await user.click(githubIssues);
+      expect(onSelectTicketSource).toHaveBeenCalledWith("github-issues");
+      expect(screen.getByRole("heading", { name: copy.setupHeadline(copy.githubIssues) })).toBeInTheDocument();
+      expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
+    });
+
     it("keeps Linear as coming soon while the feature lookup is loading and still lets the user pick Jira", async () => {
       const user = userEvent.setup();
       const onSelectTicketSource = vi.fn();

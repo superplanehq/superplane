@@ -37,6 +37,7 @@ export function FirstRunFlow({
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>("github-issues");
+  const [ticketChosen, setTicketChosen] = useState(false);
   const [jiraConnected, setJiraConnected] = useState(false);
   const [jiraProjectId, setJiraProjectId] = useState("");
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
@@ -111,6 +112,7 @@ export function FirstRunFlow({
     return (
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
+        startOnSourceList={!ticketChosen}
         repository={selectedRepository ?? undefined}
         githubConnected
         chrome={chromeFor(3, () => setScreen("choose"))}
@@ -118,7 +120,10 @@ export function FirstRunFlow({
         jiraConnected={jiraConnected}
         jiraProjects={STORY_JIRA_PROJECTS}
         jiraProjectId={jiraProjectId}
-        onSelectTicketSource={setTicketSource}
+        onSelectTicketSource={(source) => {
+          setTicketChosen(true);
+          setTicketSource(source);
+        }}
         onConnectJira={() => {
           setTicketSource("jira");
           setJiraConnected(true);
