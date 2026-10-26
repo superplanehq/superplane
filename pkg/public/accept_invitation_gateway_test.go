@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -25,7 +26,7 @@ func TestAcceptInvitationGatewayAuthenticatesRecipientWithoutMembership(t *testi
 	server, _, ownerCookie := setupTestServer(r, t)
 	server.InitRouter()
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	account, err := models.CreateAccount("Invitee", "invitee@example.com")
 	require.NoError(t, err)
 	token := "recipient-invitation"
@@ -61,18 +62,18 @@ func TestInvitationGatewayReportsPastDuePayment(t *testing.T) {
 	server, _, ownerCookie := setupTestServer(r, t)
 	server.InitRouter()
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.DB(t.Context())
 	productID := "prod_invite_" + uuid.NewString()
 	subscriptionID := "sub_" + uuid.NewString()
-	plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: &productID, CreditFrequency: "none", CreditExpiration: "never"}
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
-		ID: subscriptionID, ProductID: productID, Status: models.PolarSubscriptionStatusActive, PurchasedSeats: gatewaySeatCount(3),
+	plan := billingmodels.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private", PerSeat: true, SeatLimit: gatewaySeatCount(50), PolarProductID: &productID, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	_, err := billingmodels.ApplyPolarSubscription(db, r.Organization.ID, billingmodels.PolarSubscriptionApply{
+		ID: subscriptionID, ProductID: productID, Status: billingmodels.PolarSubscriptionStatusActive, PurchasedSeats: gatewaySeatCount(3),
 	}, nil)
 	require.NoError(t, err)
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
-		"polar_subscription_status": models.PolarSubscriptionStatusPastDue,
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
+		"polar_subscription_status": billingmodels.PolarSubscriptionStatusPastDue,
 	}).Error)
 
 	account, err := models.CreateAccount("Invitee", "invitee@example.com")
@@ -99,11 +100,11 @@ func TestInvitationGatewayReportsPastDuePayment(t *testing.T) {
 		status  string
 		blocked bool
 	}{
-		{status: models.PolarSubscriptionStatusPastDue, blocked: true},
-		{status: models.PolarSubscriptionStatusActive, blocked: false},
+		{status: billingmodels.PolarSubscriptionStatusPastDue, blocked: true},
+		{status: billingmodels.PolarSubscriptionStatusActive, blocked: false},
 	} {
 		t.Run(phase.status, func(t *testing.T) {
-			_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+			_, err := billingmodels.ApplyPolarSubscription(db, r.Organization.ID, billingmodels.PolarSubscriptionApply{
 				ID: subscriptionID, ProductID: productID, Status: phase.status, PurchasedSeats: gatewaySeatCount(3),
 			}, nil)
 			require.NoError(t, err)

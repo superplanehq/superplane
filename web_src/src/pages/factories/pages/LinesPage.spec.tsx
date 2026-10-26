@@ -1638,17 +1638,16 @@ describe("LinesPage board editing", () => {
 
   it("saves supported Implement settings after the user confirms", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
-    const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
-    const dialog = screen.getByTestId("merge-confidence-config");
+    fireEvent.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
+    const dialog = await screen.findByTestId("merge-confidence-config");
     const concurrency = within(dialog).getByRole("spinbutton", { name: "Maximum simultaneous runs" });
     fireEvent.change(concurrency, { target: { value: "3" } });
     expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
     expect(commitCanvasStagingMutateAsync).not.toHaveBeenCalled();
 
-    await user.click(within(dialog).getByTestId("implement-settings-save"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step"));
     const saved = updateCanvasVersionMutateAsync.mock.calls.at(-1)?.[0] as { canvasYaml?: string };

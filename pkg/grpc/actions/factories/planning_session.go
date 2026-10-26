@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -116,14 +116,14 @@ func sendPlanningSessionMessage(
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
 	}
 	db := database.DB(ctx)
-	if err := polar.AssertOrganizationPaymentMethod(db, session.OrganizationID); err != nil {
-		if errors.Is(err, models.ErrPaymentMethodRequired) {
+	if err := billing.AssertOrganizationPaymentMethod(db, session.OrganizationID); err != nil {
+		if errors.Is(err, billing.ErrPaymentMethodRequired) {
 			return nil, grpcerrors.FailedPrecondition(err, err.Error())
 		}
 		return nil, grpcerrors.Internal(err, "Could not verify the payment method.")
 	}
-	if err := models.AssertOrganizationPlanAllowsRuns(db, session.OrganizationID); err != nil {
-		if errors.Is(err, models.ErrHostedSubscriptionRequired) {
+	if err := billing.AssertOrganizationPlanAllowsRuns(db, session.OrganizationID); err != nil {
+		if errors.Is(err, billing.ErrHostedSubscriptionRequired) {
 			return nil, grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
 		}
 		return nil, grpcerrors.Internal(err, "Could not verify the organization plan.")

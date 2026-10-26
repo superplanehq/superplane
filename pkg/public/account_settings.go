@@ -16,7 +16,7 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -187,22 +187,22 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = s.softDeleteAccount(r.Context(), account)
-	if errors.Is(err, models.ErrOrganizationSubscriptionLive) {
+	if errors.Is(err, billing.ErrOrganizationSubscriptionLive) {
 		log.WithError(err).WithField("account_id", account.ID.String()).Info("account deletion blocked by a live subscription")
-		http.Error(w, models.ErrOrganizationSubscriptionLive.Error(), http.StatusConflict)
+		http.Error(w, billing.ErrOrganizationSubscriptionLive.Error(), http.StatusConflict)
 		return
 	}
-	if errors.Is(err, models.ErrOrganizationCheckoutPending) {
+	if errors.Is(err, billing.ErrOrganizationCheckoutPending) {
 		log.WithError(err).WithField("account_id", account.ID.String()).Info("account deletion blocked by a pending checkout")
-		http.Error(w, models.ErrOrganizationCheckoutPending.Error(), http.StatusConflict)
+		http.Error(w, billing.ErrOrganizationCheckoutPending.Error(), http.StatusConflict)
 		return
 	}
-	if errors.Is(err, models.ErrOrganizationSubscriptionUnverified) {
+	if errors.Is(err, billing.ErrOrganizationSubscriptionUnverified) {
 		log.WithError(err).WithField("account_id", account.ID.String()).Warn("account deletion could not verify subscription termination")
-		http.Error(w, models.ErrOrganizationSubscriptionUnverified.Error(), http.StatusServiceUnavailable)
+		http.Error(w, billing.ErrOrganizationSubscriptionUnverified.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	if errors.Is(err, models.ErrBillingPlanChanged) {
+	if errors.Is(err, billing.ErrBillingPlanChanged) {
 		log.WithField("account_id", account.ID.String()).Info("account deletion stopped by a billing change")
 		http.Error(w, "The billing record changed during deletion. Try again.", http.StatusConflict)
 		return
@@ -238,7 +238,7 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 	}
 
 	var deletedOrganizations []models.Organization
-	var capacityAlerts polar.SeatCapacityAlerts
+	var capacityAlerts billing.CapacityAlerts
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockAccount(tx, account.ID)
 		if err != nil {
@@ -278,14 +278,14 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 	return deletedOrganizations, nil
 }
 
-func verifyAccountOrganizationDeletions(ctx context.Context, account *models.Account) (map[uuid.UUID]*models.OrganizationDeletionClearance, error) {
+func verifyAccountOrganizationDeletions(ctx context.Context, account *models.Account) (map[uuid.UUID]billing.DeletionGuard, error) {
 	pending, err := models.ListOrganizationsPendingAccountDeletion(database.DB(ctx), account.ID)
 	if err != nil {
 		return nil, err
 	}
-	clearances := make(map[uuid.UUID]*models.OrganizationDeletionClearance, len(pending))
+	clearances := make(map[uuid.UUID]billing.DeletionGuard, len(pending))
 	for _, organization := range pending {
-		clearance, err := polar.VerifyOrganizationDeletion(ctx, organization.ID)
+		clearance, err := billing.PrepareDeletion(ctx, organization.ID)
 		if err != nil {
 			return nil, fmt.Errorf("organization %s: %w", organization.ID, err)
 		}
@@ -296,10 +296,10 @@ func verifyAccountOrganizationDeletions(ctx context.Context, account *models.Acc
 
 // recheckSeatCapacityAfterAccountDeletion updates the over-capacity record of
 // each organization that keeps running after the account left it.
-func recheckSeatCapacityAfterAccountDeletion(tx *gorm.DB, organizationIDs []uuid.UUID) (polar.SeatCapacityAlerts, error) {
-	checks := make(polar.SeatCapacityAlerts, 0, len(organizationIDs))
+func recheckSeatCapacityAfterAccountDeletion(tx *gorm.DB, organizationIDs []uuid.UUID) (billing.CapacityAlerts, error) {
+	checks := make(billing.CapacityAlerts, 0, len(organizationIDs))
 	for _, organizationID := range organizationIDs {
-		check, err := polar.RecheckSeatCapacity(tx, organizationID, polar.SeatCapacityCauseAccountDeleted)
+		check, err := billing.RecheckSeatCapacity(tx, organizationID, "account_deletion")
 		if err != nil {
 			return nil, err
 		}

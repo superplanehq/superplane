@@ -7,13 +7,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
-
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/ee/billing/pricebook"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func Test__DescribeFactoryUsage(t *testing.T) {
@@ -114,11 +114,11 @@ func Test__DescribeFactoryUsageCreditGates(t *testing.T) {
 
 	// A sub-cent organization remainder rounds down to zero cents, but the
 	// exact gate stays open, same as AssertHostedCreditAvailable.
-	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	before, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+	_, err = billingmodels.AdjustOrganizationLLMCreditBalance(db, billingmodels.CreditBalanceAdjustment{
 		OrganizationID: r.Organization.ID,
-		Bucket:         models.CreditBalanceBucketTrial,
+		Bucket:         billingmodels.CreditBalanceBucketTrial,
 		TargetMicros:   5000,
 		ExpectedMicros: before.WelcomeRemainingMicros,
 		Note:           "support",
@@ -129,7 +129,7 @@ func Test__DescribeFactoryUsageCreditGates(t *testing.T) {
 	resp = describe()
 	assert.Zero(t, resp.RemainingCreditCents)
 	assert.True(t, resp.HostedCreditAvailable)
-	require.NoError(t, models.AssertHostedCreditAvailable(db, r.Organization.ID))
+	require.NoError(t, billingmodels.AssertHostedCreditAvailable(db, r.Organization.ID))
 
 	// A capped workspace reports its own gate. A zero cap is exhausted even
 	// though the organization still has credit.
@@ -140,7 +140,7 @@ func Test__DescribeFactoryUsageCreditGates(t *testing.T) {
 	require.NotNil(t, resp.HostedSpendBudgetCents)
 	assert.True(t, resp.HostedCreditAvailable)
 	assert.False(t, resp.FactoryHostedBudgetAvailable)
-	assert.ErrorIs(t, models.AssertFactoryHostedBudgetAvailable(db, factory), models.ErrFactoryHostedBudgetEmpty)
+	assert.ErrorIs(t, billingmodels.AssertFactoryHostedBudgetAvailable(db, factory), billingmodels.ErrFactoryHostedBudgetEmpty)
 
 	// Removing the cap opens the workspace gate again.
 	require.NoError(t, factory.UpdateHostedSpendBudget(db, nil))
