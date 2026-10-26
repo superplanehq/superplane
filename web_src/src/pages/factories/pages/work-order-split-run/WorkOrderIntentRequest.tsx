@@ -136,9 +136,10 @@ function AnalysisRequestChat({
               files={transcriptFiles}
               activities={analysis.view.activities}
             />
-            {state.active ? (
+            {state.active || analysis.view.machineStatus === "queued" ? (
               <AnalysisLiveWork
                 machineStatus={analysis.view.machineStatus}
+                queueReason={analysis.view.queueReason}
                 organizationId={analysis.organizationId}
                 canvasId={analysis.view.canvasId}
                 executionId={analysis.view.executionId}

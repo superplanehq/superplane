@@ -1,7 +1,7 @@
 import type { FactoriesFactoryLine, FactoriesFactoryPullRequest } from "@/api-client";
 import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
-import { Bot } from "lucide-react";
+import { Bot, Clock } from "lucide-react";
 import { Link } from "react-router";
 import {
   getWorkOrderAttentionReasons,
@@ -162,7 +162,17 @@ export function WorkOrderCard({
     : "";
   const updatedAt = entry.updatedAtMs > 0 ? new Date(entry.updatedAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
-  const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
+  const planningSession = entry.order.planningSession;
+  const runnerState =
+    isDraft && planningSession?.state !== "ended" && planningSession?.waitState !== "pending"
+      ? planningSession?.runnerState
+      : undefined;
+  const planningQueued = runnerState === "queued";
+  const { showAgentQuestion, agentWorking } = draftCardActionFlags(
+    isDraft,
+    isAnalyzing && !planningQueued,
+    hasAgentQuestion,
+  );
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const source = workOrderCardSource(entry.order);
   const mergeConfidenceChecks = mergeConfidence ? mergeConfidence.checks : entry.order.checkScores;
@@ -206,6 +216,9 @@ export function WorkOrderCard({
           onAssigneesSave={onAssigneesSave}
         />
 
+        {!showAgentQuestion && (runnerState === "queued" || runnerState === "running") ? (
+          <WorkOrderCardPlanningStatus state={runnerState} queueReason={planningSession?.queueReason} />
+        ) : null}
         <WorkOrderCardStatusRow
           entryId={entry.id}
           reasons={attentionReasons}
@@ -292,6 +305,38 @@ function WorkOrderCardOpenControl({
     );
   }
   return <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${title}`} />;
+}
+
+function WorkOrderCardPlanningStatus({ state, queueReason }: { state: "queued" | "running"; queueReason?: string }) {
+  const queued = state === "queued";
+  const atParallelismLimit = queued && queueReason === "parallelism_limit";
+  const Icon = queued ? Clock : Bot;
+
+  return (
+    <div className="mt-1.5 space-y-1" role="status" aria-label="Planning status">
+      <span
+        className={cn(
+          "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+          queued
+            ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+            : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+        )}
+      >
+        <Icon className="size-3 shrink-0" aria-hidden />
+        {queued ? "Queued for planning" : "Planning"}
+      </span>
+      {queued ? (
+        <div className="text-[11px] leading-4 text-muted-foreground">
+          {atParallelismLimit ? <p>Parallelism limit reached.</p> : null}
+          <p>
+            {atParallelismLimit
+              ? "Starts automatically when a slot is free."
+              : "Starts automatically when a runner is available."}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function WorkOrderCardStatusRow({

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { Clock } from "lucide-react";
 
 import type { CreateWithAgentMachineStatus } from "../createWithAgentTypes";
 import { AgentActivityView } from "./AgentActivityView";
@@ -17,17 +18,37 @@ type LiveStatus = {
 
 export function AnalysisLiveWork({
   machineStatus,
+  queueReason,
   organizationId,
   canvasId,
   executionId,
   activities,
 }: {
   machineStatus: CreateWithAgentMachineStatus;
+  queueReason?: string;
   organizationId?: string;
   canvasId?: string;
   executionId?: string;
   activities?: AgentActivity[];
 }) {
+  if (machineStatus === "queued") {
+    return (
+      <div
+        role="status"
+        aria-label="Queued for planning"
+        className="mt-3 flex gap-2 rounded-md border border-border bg-muted/50 p-3 text-[13px] leading-5"
+      >
+        <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <div>
+          <p className="font-medium text-foreground">Queued for planning</p>
+          <p className="text-muted-foreground">
+            {queueReason === "parallelism_limit" ? "Parallelism limit reached." : "Waiting for a runner."} Planning
+            starts automatically when a slot is free.
+          </p>
+        </div>
+      </div>
+    );
+  }
   return (
     <AgentLiveActivity
       active={machineStatus === "starting" || machineStatus === "running"}

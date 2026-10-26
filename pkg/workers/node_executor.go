@@ -307,6 +307,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 
 	runCancellations := &RunCancellationNotifier{}
 
+	var processedRunID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -334,7 +335,6 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 			metricReason = executorReasonLocked
 			return ErrRecordLocked
 		}
-
 		node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
@@ -343,6 +343,9 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
+		if models.IsAgentRunnerComponent(metricComponent) {
+			processedRunID = execution.RunID
+		}
 		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
@@ -364,6 +367,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	contexts.ApplyFileBindCleanups(pendingFileBindCleanups, nil)
+	messages.PublishPlanningBoardStatusForRun(database.DB(context.Background()), processedRunID)
 	for _, event := range pendingProductAnalytics {
 		productanalytics.Capture(event)
 	}
