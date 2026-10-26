@@ -17,6 +17,7 @@ import (
 
 const (
 	liveSubscriptionDeleteReason       = "ORGANIZATION_SUBSCRIPTION_LIVE"
+	pendingCheckoutDeleteReason        = "ORGANIZATION_CHECKOUT_PENDING"
 	unverifiedSubscriptionDeleteReason = "ORGANIZATION_SUBSCRIPTION_UNVERIFIED"
 	billingChangedDeleteMessage        = "The billing record changed during deletion. Try again."
 )
@@ -64,6 +65,9 @@ func deleteOrganizationError(orgID string, err error) error {
 	case errors.Is(err, models.ErrOrganizationSubscriptionLive):
 		log.WithError(err).WithField("organization_id", orgID).Info("organization deletion blocked by a live subscription")
 		return grpcerrors.FailedPreconditionWithReason(models.ErrOrganizationSubscriptionLive.Error(), liveSubscriptionDeleteReason)
+	case errors.Is(err, models.ErrOrganizationCheckoutPending):
+		log.WithError(err).WithField("organization_id", orgID).Info("organization deletion blocked by a pending checkout")
+		return grpcerrors.FailedPreconditionWithReason(models.ErrOrganizationCheckoutPending.Error(), pendingCheckoutDeleteReason)
 	case errors.Is(err, models.ErrOrganizationSubscriptionUnverified):
 		log.WithError(err).WithField("organization_id", orgID).Warn("organization deletion could not verify subscription termination")
 		return grpcerrors.UnavailableWithReason(models.ErrOrganizationSubscriptionUnverified.Error(), unverifiedSubscriptionDeleteReason)

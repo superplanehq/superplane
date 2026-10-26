@@ -152,25 +152,42 @@ func Test__MatchesSelectionComparesPlanProductAndSeats(t *testing.T) {
 	assert.False(t, flat.MatchesSelection("business", "prod_business", new(1)))
 }
 
-func Test__SubscriptionResolvesOnlyTheMatchingProductIntent(t *testing.T) {
+func Test__SubscriptionResolvesOnlyTheIntentOfItsPolarCheckout(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	intent := claimBillingCheckout(t, r.Organization.ID, "prod_team", new(3))
 	require.NoError(t, intent.MarkOpen(db, models.PolarCheckoutSnapshot{CheckoutID: "chk_1", Status: "open"}))
 
-	require.NoError(t, models.ResolveOrganizationBillingCheckoutForSubscription(db, r.Organization.ID, "prod_other"))
-	stored, err := models.FindUnresolvedOrganizationBillingCheckout(db, r.Organization.ID)
-	require.NoError(t, err)
-	require.NotNil(t, stored)
+	// The same product and seat count can describe another checkout.
+	for _, checkoutID := range []string{"chk_other", "", " "} {
+		require.NoError(t, models.ResolveOrganizationBillingCheckoutForSubscription(db, r.Organization.ID, checkoutID))
+		stored, err := models.FindUnresolvedOrganizationBillingCheckout(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.NotNil(t, stored, "checkout %q must not resolve the intent", checkoutID)
+	}
 
-	require.NoError(t, models.ResolveOrganizationBillingCheckoutForSubscription(db, r.Organization.ID, "prod_team"))
-	stored, err = models.FindUnresolvedOrganizationBillingCheckout(db, r.Organization.ID)
+	require.NoError(t, models.ResolveOrganizationBillingCheckoutForSubscription(db, r.Organization.ID, "chk_1"))
+	stored, err := models.FindUnresolvedOrganizationBillingCheckout(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Nil(t, stored)
 	var resolved models.OrganizationBillingCheckout
 	require.NoError(t, db.First(&resolved, "id = ?", intent.ID).Error)
 	assert.Equal(t, models.BillingCheckoutStateSucceeded, resolved.State)
 	assert.NotNil(t, resolved.ResolvedAt)
+}
+
+func Test__ClaimRejectsSeatsBelowTheCurrentMembers(t *testing.T) {
+	r := support.Setup(t)
+	support.CreateUser(t, r, r.Organization.ID)
+
+	_, claimed, err := models.ClaimOrganizationBillingCheckout(database.Conn(), r.Organization.ID, "team", "prod_team", new(1))
+
+	require.ErrorIs(t, err, models.ErrBillingCheckoutSeatsBelowMembers)
+	assert.False(t, claimed)
+	stored, err := models.FindUnresolvedOrganizationBillingCheckout(database.Conn(), r.Organization.ID)
+	require.NoError(t, err)
+	assert.Nil(t, stored)
+	claimBillingCheckout(t, r.Organization.ID, "prod_team", new(2))
 }
 
 func Test__PreexistingCheckoutIsAdoptedOnlyForAnOrganizationWithoutIntents(t *testing.T) {

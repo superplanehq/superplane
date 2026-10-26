@@ -14,7 +14,6 @@ import (
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -333,8 +332,6 @@ func newSeatPurchasePolar(t *testing.T, organizationID string) *seatPurchasePola
 	}
 	server := httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(server.Close)
-	// Renewal schedules that purchases start must end before the server closes.
-	t.Cleanup(seatrenewal.Wait)
 	t.Setenv("POLAR_API_BASE_URL", server.URL)
 	t.Setenv("POLAR_ACCESS_TOKEN", "seat-purchase-tabs-test")
 	t.Setenv(models.BillingEnabledEnv, "yes")

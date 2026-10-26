@@ -326,7 +326,8 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	s.canvas.Create()
 	s.canvas.EnterEditMode()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
+	// Keep the execution active while the browser opens the inspector on CI.
+	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Minutes")
 	s.session.TakeScreenshot()
 	s.canvas.Connect("Start", "Wait")
 	s.canvas.Save()
@@ -607,6 +608,7 @@ func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int)
 		query := database.Conn().
 			Where("workflow_id = ?", waitNode.WorkflowID).
 			Where("node_id = ?", waitNode.NodeID).
+			Where("state IN ?", []string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted}).
 			Order("created_at DESC")
 
 		err = query.Find(&executions).Error
@@ -637,11 +639,10 @@ func (s *CanvasPageSteps) stopRunFromInspector() {
 }
 
 func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
-	executions := s.canvas.GetExecutionsForNode(nodeName)
-	require.Greater(s.t, len(executions), 0, "expected at least one execution")
-
-	execution := executions[0]
-	require.Equal(s.t, models.CanvasNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
+	require.Eventually(s.t, func() bool {
+		executions := s.canvas.GetExecutionsForNode(nodeName)
+		return len(executions) > 0 && executions[0].Result == models.CanvasNodeExecutionResultCancelled
+	}, 10*time.Second, 200*time.Millisecond, "expected execution to be cancelled")
 }
 
 func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName string) {
