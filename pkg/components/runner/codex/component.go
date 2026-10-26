@@ -67,7 +67,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 
 ## Configuration
 - **Machine type**: Runner fleet available to the organization (required).
-- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Steps**: One or more ordered bash commands or agent prompts.
 - **Credentials**: SuperPlane secret or OpenAI integration used as ` + "`OPENAI_API_KEY`" + `.
 - **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.

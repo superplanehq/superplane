@@ -5,7 +5,7 @@ import type {
   FactoriesFactory,
   FactoriesFactoryIntakeSettings,
   FactoriesFactoryLine,
-  FactoryLineStep,
+  FactoriesFactoryLineStep as FactoryLineStep,
 } from "@/api-client";
 import { accountOrganizationsQueryKey } from "@/hooks/useAccountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";

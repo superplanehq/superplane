@@ -1,5 +1,6 @@
 export { AutomationsPage } from "./AutomationsPage";
 export { ComingSoonPage } from "./ComingSoonPage";
+export { CustomVerificationSetupPage } from "./CustomVerificationSetupPage";
 export { CreateWorkOrderComposeRedirect } from "./CreateWorkOrderComposeRedirect";
 export { FactoryAppCanvasPage } from "./FactoryAppCanvasPage";
 export { FactoryAppSplitRunPage } from "./work-order-split-run/FactoryAppSplitRunPage";

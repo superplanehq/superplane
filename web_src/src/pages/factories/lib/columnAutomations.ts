@@ -11,9 +11,7 @@ import {
   AGENT_STEP_CATALOG_ID,
   ANALYSIS_CATALOG_ID,
   ANALYSIS_ENTRY,
-  CUSTOM_CATALOG_ID,
   CUSTOM_ENTRY,
-  EVENT_CUSTOM_ENTRY,
   PR_CLOSURE_CATALOG_ID,
   PR_CLOSURE_ENTRY,
   RISK_SCORE_CATALOG_ID,
@@ -22,12 +20,14 @@ import {
   VISUAL_EVIDENCE_ENTRY,
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
+import { customColumnAutomations, type ColumnAutomationApp } from "./customColumnAutomations";
 import {
   factoryColumnAutomationViewPath,
   factoryIntakePath,
   factoryPlanningPath,
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
+import { factoryCustomVerificationSetupPath } from "./customVerificationPaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
 
@@ -41,6 +41,7 @@ export type ColumnAutomationKind =
   | "analysis"
   | "agent-step"
   | "custom"
+  | "custom-verification"
   | "pr-discussion"
   | "pr-checks"
   | "pr-closure"
@@ -82,7 +83,7 @@ export type ColumnAutomationsInput = {
   columns?: LinePhaseColumn[];
   intakes?: FactoriesFactoryIntake[];
   prFeedbackHandlers?: FactoriesFactoryPrFeedbackHandler[];
-  apps?: Array<{ id?: string; name?: string; columnKey?: string }>;
+  apps?: ColumnAutomationApp[];
   workOrders?: FactoriesWorkOrder[];
   planningEnabled?: boolean;
   vcsProvider?: string;
@@ -150,7 +151,7 @@ function automationsForColumn(
   if (key === "backlog") {
     return [
       ...intakeAutomations(input.intakes ?? [], workOrders),
-      ...customColumnAutomations(input.apps ?? [], "backlog", workOrders, new Set()),
+      ...customColumnAutomations(input.apps ?? [], "backlog", workOrders, new Set(), runningCountForApp),
       ...analysisAutomation(input.apps ?? [], workOrders, input.planningEnabled !== false),
     ];
   }
@@ -164,13 +165,13 @@ function automationsForColumn(
       ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders, input.vcsProvider),
       ...riskScore,
       ...visualEvidence,
-      ...customColumnAutomations(input.apps ?? [], "verify", workOrders, skip),
+      ...customColumnAutomations(input.apps ?? [], "verify", workOrders, skip, runningCountForApp),
     ];
   }
   if (key === "done") {
     const closure = closureAutomation(input.apps ?? [], workOrders, input.vcsProvider);
     const skip = new Set(closure.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
-    return [...closure, ...customColumnAutomations(input.apps ?? [], "done", workOrders, skip)];
+    return [...closure, ...customColumnAutomations(input.apps ?? [], "done", workOrders, skip, runningCountForApp)];
   }
   return agentStepAutomation(key, input.columnTitle, input.columns ?? [], workOrders);
 }
@@ -273,36 +274,6 @@ function prFeedbackAutomations(
   return handlers.flatMap((handler) => {
     const automation = prFeedbackAutomation(handler, workOrders, vcsProvider);
     return automation ? [automation] : [];
-  });
-}
-
-function customColumnAutomations(
-  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
-  columnKey: "backlog" | "verify" | "done",
-  workOrders: FactoriesWorkOrder[],
-  skipIds: Set<string>,
-): ColumnAutomation[] {
-  return apps.flatMap((app) => {
-    const id = app.id?.trim();
-    if (!id || skipIds.has(id) || app.columnKey !== columnKey) {
-      return [];
-    }
-    return [
-      {
-        id: `custom-${id}`,
-        kind: "custom" as const,
-        name: app.name?.trim() || EVENT_CUSTOM_ENTRY.name,
-        iconName: columnKey === "backlog" ? "alarm-clock" : undefined,
-        trigger: columnKey === "backlog" ? "On schedule" : EVENT_CUSTOM_ENTRY.trigger,
-        action: columnKey === "backlog" ? "Proposes a task" : EVENT_CUSTOM_ENTRY.action,
-        iconSrc: EVENT_CUSTOM_ENTRY.iconSrc,
-        iconAlt: EVENT_CUSTOM_ENTRY.iconAlt,
-        health: "healthy" as const,
-        runningCount: runningCountForApp(id, workOrders),
-        catalogId: columnKey === "backlog" ? "scheduled-intake" : CUSTOM_CATALOG_ID,
-        canvasId: id,
-      },
-    ];
   });
 }
 
@@ -472,6 +443,9 @@ export function columnAutomationOpenPath(
   }
   if (automation.kind === "analysis") {
     return factoryPlanningPath(args.organizationId, args.factoryKey, args.lineId);
+  }
+  if (automation.kind === "custom-verification" && automation.canvasId && args.lineId) {
+    return factoryCustomVerificationSetupPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
   }
   if (!automation.canvasId) {
     return undefined;
