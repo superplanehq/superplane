@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	sentrytest "github.com/superplanehq/superplane/test/support/sentry"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -319,7 +319,7 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hook := logtest.NewGlobal()
 			t.Cleanup(func() { hook.Reset() })
-			transport := bindTestSentryHub(t)
+			transport := sentrytest.BindHub(t)
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", nil)
 			req.Pattern = "/api/v1/runner/planning-sessions/clarity"
 			if tt.cancelRequest {
@@ -358,7 +358,7 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 				_, present := event.Tags[key]
 				assert.False(t, present, "tag %s should be omitted", key)
 			}
-			assert.Contains(t, capturedExceptionText(event), tt.wantMessage)
+			assert.Contains(t, sentrytest.ExceptionText(event), tt.wantMessage)
 		})
 	}
 }
@@ -371,7 +371,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("client disconnect returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		ctx, cancel := context.WithCancel(req.Context())
 		cancel()
@@ -393,7 +393,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("driver timeout on canceled request returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		ctx, cancel := context.WithCancel(req.Context())
 		cancel()
@@ -413,7 +413,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	})
 
 	t.Run("canceled error with live request stays 500", func(t *testing.T) {
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
@@ -429,7 +429,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("dropped database connection returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		rec := httptest.NewRecorder()
 		lookupReset := fmt.Errorf("lookup: %w", errors.New("pgproto3.writeError: write failed: write tcp 10.96.2.5:43492->10.32.160.2:5432: write: connection reset by peer"))
@@ -449,7 +449,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("wrapped postgres connection reset returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		rec := httptest.NewRecorder()
 		lookupReset := fmt.Errorf("pgproto3.writeError: write failed: %w", &net.OpError{
@@ -473,7 +473,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("bad database connection returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		rec := httptest.NewRecorder()
 
@@ -490,7 +490,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	})
 
 	t.Run("blob connection reset stays 500", func(t *testing.T) {
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
@@ -509,7 +509,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	})
 
 	t.Run("deadlock with live request stays 500", func(t *testing.T) {
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
@@ -524,7 +524,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	})
 
 	t.Run("generic lookup error with live request stays 500", func(t *testing.T) {
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
@@ -539,7 +539,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 }
 
 func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	activityID := uuid.New()
 	path := "/api/v1/runner/planning-sessions/activities/" + activityID.String()
 	router := mux.NewRouter()
@@ -557,7 +557,7 @@ func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
 }
 
 func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	activityID := uuid.New()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), nil)
 	rec := httptest.NewRecorder()
@@ -570,7 +570,7 @@ func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
 
 func TestRunnerPlanningSessionSpecWithoutDraftReturnsLookupFailed(t *testing.T) {
 	r := support.Setup(t)
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	server, session, _, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	session.DraftWorkOrderID = nil
@@ -593,7 +593,7 @@ func TestRunnerPlanningSessionSpecWithoutDraftReturnsLookupFailed(t *testing.T) 
 	assert.Equal(t, session.ID.String(), event.Tags["planning_session_id"])
 	_, hasDraft := event.Tags["draft_work_order_id"]
 	assert.False(t, hasDraft)
-	assert.Contains(t, capturedExceptionText(event), models.ErrFactoryPlanningSessionNoDraft.Error())
+	assert.Contains(t, sentrytest.ExceptionText(event), models.ErrFactoryPlanningSessionNoDraft.Error())
 }
 
 func assertLegacyPlanningScoreRejected(t *testing.T, server *Server, token string, path string, score string) {
@@ -1585,31 +1585,6 @@ func requireResolvedMessageWait(t *testing.T, db *gorm.DB, session *models.Facto
 	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
 }
 
-func bindTestSentryHub(t *testing.T) *memorySentryTransport {
-	t.Helper()
-	transport := &memorySentryTransport{}
-	client, err := sentry.NewClient(sentry.ClientOptions{
-		Dsn:       "https://public@localhost/1",
-		Transport: transport,
-	})
-	require.NoError(t, err)
-	hub := sentry.CurrentHub()
-	previous := hub.Client()
-	hub.BindClient(client)
-	t.Cleanup(func() {
-		hub.BindClient(previous)
-	})
-	return transport
-}
-
-func capturedExceptionText(event *sentry.Event) string {
-	var values []string
-	for _, exception := range event.Exception {
-		values = append(values, exception.Value)
-	}
-	return strings.Join(values, "\n")
-}
-
 func requireCapturedException(t *testing.T, events []*sentry.Event) *sentry.Event {
 	t.Helper()
 	for _, event := range events {
@@ -1619,30 +1594,6 @@ func requireCapturedException(t *testing.T, events []*sentry.Event) *sentry.Even
 	}
 	require.Fail(t, "expected a captured exception", "events=%d", len(events))
 	return nil
-}
-
-type memorySentryTransport struct {
-	mu     sync.Mutex
-	events []*sentry.Event
-}
-
-func (t *memorySentryTransport) Configure(sentry.ClientOptions) {}
-
-func (t *memorySentryTransport) Flush(time.Duration) bool { return true }
-
-func (t *memorySentryTransport) SendEvent(event *sentry.Event) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	clone := *event
-	t.events = append(t.events, &clone)
-}
-
-func (t *memorySentryTransport) Events() []*sentry.Event {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	out := make([]*sentry.Event, len(t.events))
-	copy(out, t.events)
-	return out
 }
 
 type errAfterFirstCheckContext struct {

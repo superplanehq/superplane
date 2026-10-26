@@ -1,0 +1,8 @@
+package github_test
+
+import (
+	eebilling "github.com/superplanehq/superplane/ee/billing"
+	"github.com/superplanehq/superplane/pkg/billing"
+)
+
+func init() { billing.Bind(eebilling.New(nil)) }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -29,7 +30,7 @@ func TestAcceptInvitationMembershipLifecycle(t *testing.T) {
 		t.Run(map[bool]string{false: "new member", true: "removed member"}[restore], func(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
-			t.Setenv(models.BillingEnabledEnv, "yes")
+			t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 			db := database.Conn()
 			setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(2))
 			account, err := models.CreateAccount("Invitee", "invitee@example.com")
@@ -88,7 +89,7 @@ func TestAcceptInvitationRejectsInvalidRecipientOrState(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
-			t.Setenv(models.BillingEnabledEnv, "yes")
+			t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 			db := database.Conn()
 			setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(2))
 			account, err := models.CreateAccount("Invitee", "invitee@example.com")
@@ -116,10 +117,10 @@ func TestAcceptInvitationRejectsInvalidRecipientOrState(t *testing.T) {
 				_, err := s.Resend(context.Background(), r.Organization.ID.String(), r.User.String(), created.Invitation.Id)
 				require.NoError(t, err)
 			case "capacity removed":
-				require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 1).Error)
+				require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 1).Error)
 			case "member limit":
-				require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, seatQuantity(1)))
-				require.NoError(t, db.Model(&models.BillingPlan{}).Where("id = (SELECT plan_id FROM organization_billing_plans WHERE organization_id = ?)", r.Organization.ID).Update("per_seat", false).Error)
+				require.NoError(t, billingmodels.SetOrganizationSeatLimitOverride(db, r.Organization.ID, seatQuantity(1)))
+				require.NoError(t, db.Model(&billingmodels.BillingPlan{}).Where("id = (SELECT plan_id FROM organization_billing_plans WHERE organization_id = ?)", r.Organization.ID).Update("per_seat", false).Error)
 			case "unknown token":
 				token = "unknown"
 				expected = codes.NotFound
@@ -154,7 +155,7 @@ func TestAcceptInvitationRejectsInvalidRecipientOrState(t *testing.T) {
 func TestAcceptInvitationForExistingMemberWhilePaymentBlocked(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(2))
 	account, err := models.CreateAccount("Invitee", "invitee@example.com")
@@ -165,7 +166,7 @@ func TestAcceptInvitationForExistingMemberWhilePaymentBlocked(t *testing.T) {
 	// The invitee joins through another path before accepting this invitation.
 	_, err = models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
 	require.NoError(t, err)
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("polar_subscription_status", models.PolarSubscriptionStatusPastDue).Error)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("polar_subscription_status", billingmodels.PolarSubscriptionStatusPastDue).Error)
 	token := strings.TrimPrefix(created.AcceptanceUrl, "https://example.com/invitations/")
 	for range 2 {
 		response, err := s.Accept(context.Background(), account.ID.String(), token)
@@ -180,7 +181,7 @@ func TestAcceptInvitationForExistingMemberWhilePaymentBlocked(t *testing.T) {
 func TestAcceptInvitationConcurrentRetries(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(2))
 	account, err := models.CreateAccount("Invitee", "invitee@example.com")
@@ -233,7 +234,7 @@ func (a failingInvitationAuthorization) AssignRoleInTransaction(tx *gorm.DB, use
 func TestAcceptInvitationRollsBackMembershipAndRole(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	db := database.Conn()
 	account, err := models.CreateAccount("Removed member", "removed@example.com")
 	require.NoError(t, err)
@@ -261,7 +262,7 @@ func TestAcceptInvitationRollsBackMembershipAndRole(t *testing.T) {
 func TestAcceptInvitationRequiresCurrentCustomRoleLicense(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	account, err := models.CreateAccount("Invitee", "invitee@example.com")
 	require.NoError(t, err)
 	require.NoError(t, r.AuthService.CreateCustomRole(r.Organization.ID.String(), &authorization.RoleDefinition{Name: "support", DomainType: models.DomainTypeOrganization, InheritsFrom: &authorization.RoleDefinition{Name: models.RoleOrgOperator}}))
@@ -295,7 +296,7 @@ func invitationRoleNames(roles []*authorization.RoleDefinition) []string {
 func TestAcceptInvitationsCompeteForLastSeat(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(3))
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
@@ -310,7 +311,7 @@ func TestAcceptInvitationsCompeteForLastSeat(t *testing.T) {
 		tokens = append(tokens, strings.TrimPrefix(created.AcceptanceUrl, "https://example.com/invitations/"))
 	}
 	// Capacity can change after invitations have reserved it.
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 2).Error)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 2).Error)
 	start := make(chan struct{})
 	results := make(chan error, 2)
 	for i := range accounts {
@@ -342,7 +343,7 @@ func TestAcceptInvitationsCompeteForLastSeat(t *testing.T) {
 func TestInvitationResendTokenHistory(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	db := database.Conn()
 	account, err := models.CreateAccount("Invitee", "invitee@example.com")
 	require.NoError(t, err)
@@ -381,7 +382,7 @@ func TestInvitationResendTokenHistory(t *testing.T) {
 func TestInvitationFailedResendKeepsPreviousToken(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	db := database.Conn()
 	account, err := models.CreateAccount("Invitee", "invitee@example.com")
 	require.NoError(t, err)
@@ -419,7 +420,7 @@ type invitationOperationContextKey struct{}
 func TestAcceptInvitationRechecksHistoryAfterOrganizationLock(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	db := database.Conn()
 	account, err := models.CreateAccount("Invitee", "invitee@example.com")
 	require.NoError(t, err)
@@ -482,7 +483,7 @@ func createInvitationAdmin(t *testing.T, r *support.ResourceRegistry, email stri
 func TestAcceptInvitationRequiresInviterToManageMembers(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	db := database.Conn()
 	orgID := r.Organization.ID.String()
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}

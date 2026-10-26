@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -40,7 +41,7 @@ func ListFactoryWorkOrderRunUsage(
 	}
 	factoryID := factory.ID
 
-	rows, total, err := models.ListWorkOrderRunUsage(db, models.UsageReportFilter{
+	rows, total, err := billing.ListWorkOrderRunUsage(db, billing.UsageReportFilter{
 		OrganizationID: orgID,
 		FactoryID:      &factoryID,
 		Since:          since,
@@ -58,7 +59,7 @@ func ListFactoryWorkOrderRunUsage(
 	}, nil
 }
 
-func resolveRunUsageModelAliases(rows []models.WorkOrderRunUsage) []models.WorkOrderRunUsage {
+func resolveRunUsageModelAliases(rows []billing.WorkOrderRunUsage) []billing.WorkOrderRunUsage {
 	for i := range rows {
 		rows[i].Models = resolveModelNames(rows[i].Models)
 		rows[i].BYOKModels = resolveModelNames(rows[i].BYOKModels)
@@ -95,7 +96,7 @@ func resolveWorkOrderRunUsageWindow(req *pb.ListFactoryWorkOrderRunUsageRequest)
 		since = req.GetStartTime().AsTime()
 	}
 
-	if err := models.ValidateSpendingReportWindow(since, until); err != nil {
+	if err := billing.ValidateSpendingReportWindow(since, until); err != nil {
 		return time.Time{}, time.Time{}, err
 	}
 	return since, until, nil
@@ -111,7 +112,7 @@ func clampWorkOrderRunUsagePageSize(limit int) int {
 	return limit
 }
 
-func serializeWorkOrderRunUsageRows(factory *models.Factory, rows []models.WorkOrderRunUsage) []*pb.WorkOrderRunUsageRow {
+func serializeWorkOrderRunUsageRows(factory *models.Factory, rows []billing.WorkOrderRunUsage) []*pb.WorkOrderRunUsageRow {
 	out := make([]*pb.WorkOrderRunUsageRow, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, serializeWorkOrderRunUsageRow(factory, row))
@@ -119,7 +120,7 @@ func serializeWorkOrderRunUsageRows(factory *models.Factory, rows []models.WorkO
 	return out
 }
 
-func serializeWorkOrderRunUsageRow(factory *models.Factory, row models.WorkOrderRunUsage) *pb.WorkOrderRunUsageRow {
+func serializeWorkOrderRunUsageRow(factory *models.Factory, row billing.WorkOrderRunUsage) *pb.WorkOrderRunUsageRow {
 	item := &pb.WorkOrderRunUsageRow{
 		WorkOrderId:      row.WorkOrderID.String(),
 		WorkOrderNumber:  row.WorkOrderNumber,

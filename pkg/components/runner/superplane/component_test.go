@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	openrouterapi "github.com/superplanehq/superplane/pkg/integrations/openrouter"
@@ -368,7 +368,7 @@ func TestRunSuperPlaneExecuteSoftBlocksWhenHostedCreditIsEmpty(t *testing.T) {
 				Provider: models.UsageProviderAnthropic,
 				Model:    "claude-sonnet-4-6",
 			},
-			CreditErr: models.ErrHostedCreditEmpty,
+			CreditErr: billingmodels.ErrHostedCreditEmpty,
 			Access: core.HostedLLMAccess{
 				APIKey:        "sk-hosted",
 				AllowedModels: []string{"claude-sonnet-4-6"},
@@ -378,7 +378,7 @@ func TestRunSuperPlaneExecuteSoftBlocksWhenHostedCreditIsEmpty(t *testing.T) {
 		Requests:       &contexts.RequestContext{},
 	})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, models.ErrHostedCreditEmpty)
+	assert.ErrorIs(t, err, billingmodels.ErrHostedCreditEmpty)
 }
 
 func executeSuperPlane(t *testing.T, defaultModel core.DefaultHostedLLMModel, access core.HostedLLMAccess) createTaskRequest {

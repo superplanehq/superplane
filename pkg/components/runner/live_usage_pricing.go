@@ -2,15 +2,15 @@ package runner
 
 import (
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/gorm"
 )
 
 // HostedUsagePricing prices live display usage without writing a billing event.
 type HostedUsagePricing struct {
-	Rate      pricebook.Rate `json:"rate"`
-	MarkupBPS int            `json:"markup_bps"`
+	Rate      billing.Rate `json:"rate"`
+	MarkupBPS int          `json:"markup_bps"`
 }
 
 // ResolveHostedUsagePricing returns display pricing for a hosted execution.
@@ -24,11 +24,11 @@ func ResolveHostedUsagePricing(tx *gorm.DB, orgID uuid.UUID, component string, c
 	if selected, err := models.ParseHostedLLMModelKey(model); err == nil && selected.IsSet() {
 		provider, model = selected.Provider, selected.Model
 	}
-	rate, ok := pricebook.Lookup(provider, model)
+	rate, ok := billing.LookupRate(provider, model)
 	if !ok {
 		return nil, nil
 	}
-	markup, err := models.ResolveOrganizationMarkupBPS(tx, orgID)
+	markup, err := billing.ResolveMarkupBPS(tx, orgID)
 	if err != nil {
 		return nil, err
 	}
