@@ -434,6 +434,10 @@ func (s *Server) reconcileRunnerConnection(
 	if !json.Valid(payload) {
 		return errors.New("runner task payload is invalid")
 	}
+	payload, err = s.refreshCodexSubscriptionTaskToken(ctx, task, payload)
+	if err != nil {
+		return err
+	}
 	if err := connection.write(taskMessage{
 		Type: messageTypeTask,
 		Task: json.RawMessage(payload),
