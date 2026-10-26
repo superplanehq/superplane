@@ -130,14 +130,24 @@ func (c *Client) ListRunners(
 	states []string,
 	limit int,
 ) ([]Runner, error) {
-	query := listQuery(states, limit)
-	var response struct {
-		Runners []Runner `json:"runners"`
+	page, err := c.ListRunnersPage(ctx, fleetID, ListRunnersRequest{States: states, Limit: limit})
+	return page.Runners, err
+}
+
+func (c *Client) ListRunnersPage(
+	ctx context.Context,
+	fleetID string,
+	request ListRunnersRequest,
+) (RunnerListPage, error) {
+	query := listQuery(request.States, request.Limit)
+	if request.AfterID != "" {
+		query.Set("afterId", request.AfterID)
 	}
+	var response RunnerListPage
 	if err := c.do(ctx, http.MethodGet, fleetPath(fleetID)+"/runners", query, nil, &response); err != nil {
-		return nil, err
+		return RunnerListPage{}, err
 	}
-	return response.Runners, nil
+	return response, nil
 }
 
 func (c *Client) DescribeRunner(ctx context.Context, fleetID, runnerID string) (Runner, error) {
