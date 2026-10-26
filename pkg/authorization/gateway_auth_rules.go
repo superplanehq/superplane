@@ -424,11 +424,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "GET", Pattern: "/api/v1/organizations/{id}/invite-link"}: {
-			Resource:   "members",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
-		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/workspace-usage"}: {
 			Resource:   "org",
 			Action:     "read",
@@ -668,11 +663,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		{Method: "PATCH", Pattern: "/api/v1/organizations/{id}/integrations/{integration_id}/previous"}: {
 			Resource:   "integrations",
 			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "PATCH", Pattern: "/api/v1/organizations/{id}/invite-link"}: {
-			Resource:   "members",
-			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "PATCH", Pattern: "/api/v1/organizations/{id}/users/{user_id}/owner"}: {
@@ -916,11 +906,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/integrations"}: {
 			Resource:   "integrations",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "POST", Pattern: "/api/v1/organizations/{id}/invite-link/reset"}: {
-			Resource:   "members",
 			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},

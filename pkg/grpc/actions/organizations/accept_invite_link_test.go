@@ -53,8 +53,7 @@ func TestSharedInviteLinkRequiresEmailInvitation(t *testing.T) {
 				require.Equal(t, 1, before.PendingInvitations)
 				require.Zero(t, *before.Invitable)
 			}
-			link, err := models.FindOrCreateInviteLink(db, r.Organization.ID)
-			require.NoError(t, err)
+			link := support.SeedHistoricalInviteLink(t, r.Organization.ID, true)
 
 			response, err := AcceptInviteLink(context.Background(), r.AuthService, account.ID.String(), link.Token.String())
 
@@ -76,8 +75,7 @@ func TestSharedInviteLinkRedirectsExistingMember(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.Conn()
-	link, err := models.FindOrCreateInviteLink(db, r.Organization.ID)
-	require.NoError(t, err)
+	link := support.SeedHistoricalInviteLink(t, r.Organization.ID, true)
 
 	response, err := AcceptInviteLink(context.Background(), r.AuthService, r.Account.ID.String(), link.Token.String())
 
@@ -88,6 +86,43 @@ func TestSharedInviteLinkRedirectsExistingMember(t *testing.T) {
 	occupied, err := models.CountActiveHumanUsersByOrganization(db, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.EqualValues(t, 1, occupied)
+}
+
+func TestDisabledSharedInviteLinkIsDenied(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		existingMember bool
+	}{
+		{name: "existing member", existingMember: true},
+		{name: "new account"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			db := database.Conn()
+			account := r.Account
+			if !tc.existingMember {
+				var err error
+				account, err = models.CreateAccount("Uninvited person", uuid.NewString()+"@example.com")
+				require.NoError(t, err)
+			}
+			link := support.SeedHistoricalInviteLink(t, r.Organization.ID, false)
+
+			response, err := AcceptInviteLink(context.Background(), r.AuthService, account.ID.String(), link.Token.String())
+
+			require.Nil(t, response)
+			code, message, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			require.Equal(t, codes.PermissionDenied, code)
+			require.Equal(t, "invite link disabled", message)
+			occupied, err := models.CountActiveHumanUsersByOrganization(db, r.Organization.ID.String())
+			require.NoError(t, err)
+			require.EqualValues(t, 1, occupied)
+			stored, err := models.FindInviteLinkByToken(db, link.Token.String())
+			require.NoError(t, err)
+			require.False(t, stored.Enabled)
+		})
+	}
 }
 
 func seatQuantity(quantity int) *int { return &quantity }
