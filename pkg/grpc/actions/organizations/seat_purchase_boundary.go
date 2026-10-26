@@ -29,6 +29,7 @@ const (
 const (
 	messageSeatPurchaseRenewsSoon   = "The billing period renews soon. Buy seats after the renewal."
 	messageSeatPurchasePeriodChange = "The billing period changed. Refresh and try again."
+	messageSeatPurchaseBindingStale = "The subscription or billing period changed. Review the new price and confirm again."
 )
 
 // seatPurchaseClock reads the current time. Production code uses time.Now.
@@ -50,4 +51,18 @@ func checkSeatPurchasePeriodUnchanged(seen, current *seatPurchaseState) error {
 		return nil
 	}
 	return grpcerrors.Conflict(nil, messageSeatPurchasePeriodChange)
+}
+
+// checkSeatPurchaseBinding rejects a purchase when the subscription or the
+// billing period is not the one that the confirmed preview showed. A renewal
+// that kept the seat count, or a replacement subscription with the same
+// counts and dates, makes the old confirmation stale. The caller must show
+// a new preview and get a new confirmation.
+func checkSeatPurchaseBinding(binding *seatPurchaseBinding, current *seatPurchaseState) error {
+	if binding.subscriptionID == current.subscriptionID &&
+		binding.periodStart.Equal(current.periodStart) &&
+		binding.periodEnd.Equal(current.periodEnd) {
+		return nil
+	}
+	return grpcerrors.Conflict(nil, messageSeatPurchaseBindingStale)
 }
