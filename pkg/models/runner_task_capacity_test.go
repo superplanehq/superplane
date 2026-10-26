@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -98,7 +99,7 @@ func TestRunnerCapacityCountsJobsFromOneAutomationAndSeparatesOrganizations(t *t
 	require.ErrorIs(t, err, models.ErrRunnerTaskNotFound)
 
 	otherOrganization := support.CreateOrganization(t, f.resource, f.resource.User)
-	_, err = models.SetAdminOrganizationPlan(f.db, otherOrganization.ID, f.plan.Key, nil)
+	_, err = billingmodels.SetAdminOrganizationPlan(f.db, otherOrganization.ID, f.plan.Key, nil)
 	require.NoError(t, err)
 	otherTask := f.task(otherOrganization.ID, fleet.ID)
 	reserved, err := f.runner(fleet.ID).ReserveNextTask(f.db)
@@ -116,7 +117,7 @@ func TestRunnerCapacitySkipsFullAndLockedOrganizationsWithoutRetainingLocks(t *t
 			f := newRunnerCapacityTest(t, new(1))
 			fleet := f.fleet("shared-amd64")
 			otherOrganization := support.CreateOrganization(t, f.resource, f.resource.User)
-			_, err := models.SetAdminOrganizationPlan(f.db, otherOrganization.ID, f.plan.Key, nil)
+			_, err := billingmodels.SetAdminOrganizationPlan(f.db, otherOrganization.ID, f.plan.Key, nil)
 			require.NoError(t, err)
 
 			if !locked {
@@ -382,7 +383,7 @@ func TestRunnerCapacityReadsPlanChangesWithoutRevokingReservations(t *testing.T)
 	nextRunner := f.runner(fleet.ID)
 
 	f.plan.ParallelTaskLimit = new(1)
-	require.NoError(t, models.SaveBillingPlan(f.db, f.plan))
+	require.NoError(t, billingmodels.SaveBillingPlan(f.db, f.plan))
 	require.NoError(t, first.Reserve(f.db, firstRunner.ID))
 	require.NoError(t, second.Reserve(f.db, secondRunner.ID))
 	require.ErrorIs(t, queued.Reserve(f.db, nextRunner.ID), models.ErrOrganizationRunnerCapacity)
@@ -399,11 +400,11 @@ func TestRunnerCapacityReadsPlanChangesWithoutRevokingReservations(t *testing.T)
 	additionalRunner := f.runner(fleet.ID)
 	require.ErrorIs(t, additional.Reserve(f.db, additionalRunner.ID), models.ErrOrganizationRunnerCapacity)
 	f.plan.ParallelTaskLimit = new(2)
-	require.NoError(t, models.SaveBillingPlan(f.db, f.plan))
+	require.NoError(t, billingmodels.SaveBillingPlan(f.db, f.plan))
 	require.NoError(t, additional.Reserve(f.db, additionalRunner.ID))
 
 	f.plan.ParallelTaskLimit = nil
-	require.NoError(t, models.SaveBillingPlan(f.db, f.plan))
+	require.NoError(t, billingmodels.SaveBillingPlan(f.db, f.plan))
 	unlimited := f.task(f.organizationID, fleet.ID)
 	require.NoError(t, unlimited.Reserve(f.db, f.runner(fleet.ID).ID))
 }
@@ -417,7 +418,7 @@ func TestRunnerCapacityUnlimitedAndBillingDisabled(t *testing.T) {
 			}
 			f := newRunnerCapacityTest(t, limit)
 			if mode == "billing disabled" {
-				t.Setenv(models.BillingEnabledEnv, "no")
+				t.Setenv(billingmodels.BillingEnabledEnv, "no")
 			}
 			fleet := f.fleet("unlimited-amd64")
 			for range 3 {
@@ -438,22 +439,22 @@ func TestRunnerCapacityUsesTheEffectivePlan(t *testing.T) {
 			occupied := f.task(f.organizationID, fleet.ID)
 			require.NoError(t, occupied.Reserve(f.db, f.runner(fleet.ID).ID))
 			if change == "missing plan" {
-				require.NoError(t, f.db.Where("organization_id = ?", f.organizationID).Delete(&models.OrganizationBillingPlan{}).Error)
+				require.NoError(t, f.db.Where("organization_id = ?", f.organizationID).Delete(&billingmodels.OrganizationBillingPlan{}).Error)
 			} else {
 				f.plan.Category = "trial"
-				require.NoError(t, models.SaveBillingPlan(f.db, f.plan))
-				_, err := models.SetAdminOrganizationPlan(f.db, f.organizationID, f.plan.Key, nil)
+				require.NoError(t, billingmodels.SaveBillingPlan(f.db, f.plan))
+				_, err := billingmodels.SetAdminOrganizationPlan(f.db, f.organizationID, f.plan.Key, nil)
 				require.NoError(t, err)
-				require.NoError(t, f.db.Model(&models.OrganizationBillingPlan{}).
+				require.NoError(t, f.db.Model(&billingmodels.OrganizationBillingPlan{}).
 					Where("organization_id = ?", f.organizationID).
 					Update("trial_ends_at", time.Now().Add(-time.Minute)).Error)
 			}
 			queued := f.task(f.organizationID, fleet.ID)
 			require.NoError(t, queued.Reserve(f.db, f.runner(fleet.ID).ID))
-			plan, err := models.FindOrganizationBillingPlan(f.db, f.organizationID)
+			plan, err := billingmodels.FindOrganizationBillingPlan(f.db, f.organizationID)
 			require.NoError(t, err)
 			require.NotNil(t, plan)
-			assert.Equal(t, models.BillingPlanNone, plan.Plan)
+			assert.Equal(t, billingmodels.BillingPlanNone, plan.Plan)
 		})
 	}
 }
@@ -482,13 +483,13 @@ type runnerCapacityTest struct {
 	db             *gorm.DB
 	resource       *support.ResourceRegistry
 	organizationID uuid.UUID
-	plan           *models.BillingPlan
+	plan           *billingmodels.BillingPlan
 	queuedAt       time.Time
 }
 
 func newRunnerCapacityTest(t *testing.T, limit *int) *runnerCapacityTest {
 	t.Helper()
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	resource := support.Setup(t)
 	f := &runnerCapacityTest{
 		t:              t,
@@ -497,7 +498,7 @@ func newRunnerCapacityTest(t *testing.T, limit *int) *runnerCapacityTest {
 		organizationID: resource.Organization.ID,
 		queuedAt:       time.Now(),
 	}
-	f.plan = &models.BillingPlan{
+	f.plan = &billingmodels.BillingPlan{
 		Key:               "runner_" + uuid.NewString()[:8],
 		Name:              "Runner capacity",
 		Category:          "paid",
@@ -506,8 +507,8 @@ func newRunnerCapacityTest(t *testing.T, limit *int) *runnerCapacityTest {
 		CreditExpiration:  "never",
 		ParallelTaskLimit: limit,
 	}
-	require.NoError(t, models.SaveBillingPlan(f.db, f.plan))
-	_, err := models.SetAdminOrganizationPlan(f.db, f.organizationID, f.plan.Key, nil)
+	require.NoError(t, billingmodels.SaveBillingPlan(f.db, f.plan))
+	_, err := billingmodels.SetAdminOrganizationPlan(f.db, f.organizationID, f.plan.Key, nil)
 	require.NoError(t, err)
 	return f
 }
