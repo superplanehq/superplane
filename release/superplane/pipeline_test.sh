@@ -7,8 +7,9 @@ ruby -ryaml -e '
   prepare = YAML.safe_load(File.read(ARGV[0]))
   blocks = prepare.fetch("blocks").to_h { |block| [block.fetch("name"), block] }
   expected_builds = ["Build amd64 Image", "Build arm64 Image", "Build Release Assets"]
+  raise "candidate verification must depend on validation" unless blocks.fetch("Verify Release Candidate").fetch("dependencies") == ["Validate Release"]
   expected_builds.each do |name|
-    raise "#{name} must depend only on validation" unless blocks.fetch(name).fetch("dependencies") == ["Validate Release"]
+    raise "#{name} must depend on candidate verification" unless blocks.fetch(name).fetch("dependencies") == ["Verify Release Candidate"]
   end
   raise "release assembly must join every build" unless blocks.fetch("Assemble Release").fetch("dependencies").sort == expected_builds.sort
   arm_machine = blocks.fetch("Build arm64 Image").dig("task", "agent", "machine", "type")
@@ -31,6 +32,13 @@ ruby -ryaml -e '
     raise "SuperPlane assembly must not include #{asset}" if assemble.include?(asset)
   end
   raise "release prepare must not boot the single-host archive" if blocks.key?("Smoke Test Single Host")
+  candidate_verification = blocks.fetch("Verify Release Candidate").dig("task", "jobs", 0, "commands").join("\n")
+  raise "candidate verification must check the published prerelease" unless candidate_verification.include?("verify-published-prerelease")
+  raise "candidate verification must verify the prepared manifest" unless candidate_verification.include?("verify-manifest")
+  raise "candidate verification must export resolved component defaults" unless candidate_verification.include?("component-releases-${RELEASE_CANDIDATE_VERSION}.yaml")
+  asset_build = blocks.fetch("Build Release Assets").dig("task", "jobs", 0, "commands").join("\n")
+  reuses_candidate_defaults = asset_build.include?("update-component-release-defaults.js") && asset_build.include?("COMPONENT_RELEASES_ALREADY_RESOLVED=yes")
+  raise "stable assets must reuse candidate component defaults" unless reuses_candidate_defaults
 
   publish = YAML.safe_load(File.read(ARGV[1]))
   publish_blocks = publish.fetch("blocks").to_h { |block| [block.fetch("name"), block] }
@@ -45,6 +53,14 @@ ruby -ryaml -e '
   %w[superplane-cli- install.sh].each do |asset|
     raise "SuperPlane publication must not include #{asset}" if publish_commands.include?(asset)
   end
+  finalization = publish.fetch("promotions").find { |promotion| promotion.fetch("name") == "Finalize SuperPlane Release" }
+  raise "finalization must reuse the prepare pipeline" unless finalization.fetch("pipeline_file") == "prepare-superplane-release.yml"
+  raise "finalization must stay manual" if finalization.key?("auto_promote")
+  parameters = finalization.dig("parameters", "env_vars").to_h { |parameter| [parameter.fetch("name"), parameter] }
+  candidate = parameters.fetch("RELEASE_CANDIDATE_VERSION")
+  raise "finalization must inherit the published candidate" unless candidate.fetch("default_value") == "${{parameters.RELEASE_VERSION}}"
+  stable = parameters.fetch("RELEASE_VERSION")
+  raise "finalization must require a stable version" unless stable.fetch("required") && stable.fetch("default_value") == "vX.Y.Z"
 ' "${REPO_ROOT}/.semaphore/prepare-superplane-release.yml" \
   "${REPO_ROOT}/.semaphore/publish-superplane-release.yml"
 

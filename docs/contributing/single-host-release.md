@@ -33,6 +33,27 @@ Fleet Manager and the runner image are separate release artifacts:
 The release pipeline publishes the archive. It does not boot it. Boot the
 archive on a machine before you rely on a new release.
 
+## Finalize a release candidate
+
+Use the approved release candidate pipeline to create the stable release. The
+finalization rebuilds versioned artifacts from the same Git commit. It also
+keeps the Runner and Fleet Manager versions from the release candidate.
+
+1. Open the completed `Publish SuperPlane Release` pipeline for the approved
+   release candidate.
+2. Select `Finalize SuperPlane Release`.
+3. Confirm that `RELEASE_CANDIDATE_VERSION` contains the approved version.
+4. Set `RELEASE_VERSION` to the stable version with the same version core.
+5. Start the promotion.
+
+For example, finalize `v1.0.0-rc8` as `v1.0.0`. The pipeline rejects a target
+such as `v1.0.1` or `v1.0.0-final`.
+
+The pipeline verifies the published release candidate and its prepared
+manifest before it starts the stable builds. It then prepares and publishes
+the stable release. If the candidate workflow artifacts are unavailable, the
+finalization stops without selecting newer component versions.
+
 To test the archive without starting containers:
 
 ```bash
