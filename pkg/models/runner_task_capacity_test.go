@@ -308,6 +308,65 @@ func TestRunnerCapacityFollowsExistingLifecycleRelease(t *testing.T) {
 	}
 }
 
+func TestRunnerCapacityRegistrationExpiryReleasesReservations(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		name := "uncanceled reservation returns to queue"
+		if canceled {
+			name = "canceled reservation finishes"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := newRunnerCapacityTest(t, new(1))
+			fleet := f.fleet("expiry-amd64")
+			runner := f.runner(fleet.ID)
+			require.NoError(t, f.db.Model(runner).Update("state", models.RunnerStatePending).Error)
+			task := f.task(f.organizationID, fleet.ID)
+			queued := f.task(f.organizationID, fleet.ID)
+			nextRunner := f.runner(fleet.ID)
+			require.NoError(t, task.Reserve(f.db, runner.ID))
+			if canceled {
+				require.NoError(t, task.RequestCancel(f.db, time.Now()))
+			}
+			require.ErrorIs(t, queued.Reserve(f.db, nextRunner.ID), models.ErrOrganizationRunnerCapacity)
+
+			now := time.Now()
+			require.NoError(t, f.db.Create(&models.RunnerRegistration{
+				JTI:       uuid.New(),
+				RunnerID:  runner.ID,
+				ExpiresAt: now.Add(-time.Minute),
+				CreatedAt: now.Add(-2 * time.Minute),
+			}).Error)
+			require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error {
+				locked, err := models.LockRunner(tx, runner.ID)
+				if err != nil {
+					return err
+				}
+				return locked.Expire(tx, now)
+			}))
+
+			stored, err := models.FindRunnerTask(f.db, task.ID)
+			require.NoError(t, err)
+			assert.Nil(t, stored.RunnerID)
+			assert.Nil(t, stored.ReservedAt)
+			expectedNext := task.ID
+			if canceled {
+				assert.Equal(t, models.RunnerTaskStateCanceled, stored.State)
+				assert.True(t, stored.IsTerminal())
+				require.NotNil(t, stored.FinishedAt)
+				require.NotNil(t, stored.CancelRequestedAt)
+				assert.False(t, stored.FinishedAt.Before(*stored.CancelRequestedAt))
+				require.ErrorIs(t, stored.Reserve(f.db, nextRunner.ID), models.ErrRunnerTaskNotReservable)
+				expectedNext = queued.ID
+			} else {
+				assert.Equal(t, models.RunnerTaskStateQueued, stored.State)
+				assert.Nil(t, stored.FinishedAt)
+			}
+			reserved, err := nextRunner.ReserveNextTask(f.db)
+			require.NoError(t, err)
+			assert.Equal(t, expectedNext, reserved.ID)
+		})
+	}
+}
+
 func TestRunnerCapacityReadsPlanChangesWithoutRevokingReservations(t *testing.T) {
 	f := newRunnerCapacityTest(t, new(2))
 	fleet := f.fleet("plan-amd64")
