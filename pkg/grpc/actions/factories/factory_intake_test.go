@@ -516,6 +516,41 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "ENG", trigger.Configuration["project"])
 	})
 
+	t.Run("a paused Jira intake starts with automatic intake off and keeps its first batch", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "ENG",
+			Paused:        true,
+		})
+
+		assert.True(t, intake.GetPaused())
+		assert.NotEqual(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED, intake.GetInitialImportStatus())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetPaused())
+	})
+
+	t.Run("a paused start is rejected for a source that cannot pause", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "datadog")
+
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			Source:        pb.FactoryIntake_SOURCE_DATADOG,
+			IntegrationId: integrationID,
+			ResourceId:    "checkout",
+			Paused:        true,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
 	t.Run("a Jira intake stores the completion column on the trigger", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
