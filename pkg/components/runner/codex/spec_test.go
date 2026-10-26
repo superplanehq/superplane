@@ -55,7 +55,8 @@ func TestValidateCodexConfigurationAcceptsSubscription(t *testing.T) {
 	err := configuration.ValidateConfiguration((&RunCodex{}).Configuration(), map[string]any{
 		"machineType":   "e1-large-amd64",
 		"credentials":   map[string]any{"source": runner.CredentialsSourceSubscription},
-		"thinkingLevel": "high",
+		"model":         "gpt-5.4",
+		"thinkingLevel": "xhigh",
 		"steps": []any{
 			map[string]any{"name": "Plan task", "type": runner.AgentStepPrompt, "prompt": "Plan this task"},
 		},
@@ -146,21 +147,24 @@ func TestBuildCodexTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
 }
 
-func TestBuildCodexTaskRestoresSubscriptionWithDefaultModel(t *testing.T) {
+func TestBuildCodexTaskRestoresSubscriptionWithSelectedModel(t *testing.T) {
 	t.Parallel()
 
 	spec := RunCodexSpec{
 		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceSubscription},
+		Model:       "gpt-5.4",
 		Steps: []runner.AgentStep{
 			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
 		},
 	}
 	task := buildCodexTask(spec, "", nil, nil, nil, false)
-	require.GreaterOrEqual(t, len(task.Commands), 3)
+	require.GreaterOrEqual(t, len(task.Commands), 4)
 	assert.Equal(t, "Prepare Codex", task.Commands[0].Name)
 	assert.Equal(t, "Restore ChatGPT sign-in", task.Commands[1].Name)
+	assert.Equal(t, "Save ChatGPT usage", task.Commands[len(task.Commands)-1].Name)
+	assert.Contains(t, task.Commands[len(task.Commands)-1].Command, "usage")
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js"`)
-	assert.Contains(t, task.Commands[2].Command, `"$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" ''`)
+	assert.Contains(t, task.Commands[2].Command, "gpt-5.4")
 	assert.Contains(t, requireTaskFile(t, task.Files, "codex_subscription.js").Content, "auth.json")
 }
 
@@ -218,6 +222,26 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	assert.Equal(t, runner.FollowUpLoopFile().Content, requireTaskFile(t, got.Files, "follow_up_loop.js").Content)
 	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentFetchScriptPath).Content)
 	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentProcessScriptPath).Content)
+}
+
+func TestApplyPlanningFollowUpKeepsSubscriptionCheckpointLast(t *testing.T) {
+	t.Parallel()
+
+	spec := RunCodexSpec{
+		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceSubscription},
+		Steps: []runner.AgentStep{
+			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet")},
+		},
+	}
+	base := buildCodexTask(spec, "", nil, nil, nil, false)
+	got := applyPlanningFollowUp(base, []runner.TaskEnvironmentVariable{{
+		Name:  runner.EnvSuperplanePlanningID,
+		Value: "session-1",
+	}}, spec)
+
+	require.Len(t, got.Commands, len(base.Commands)+1)
+	assert.Equal(t, "Wait for the next message", got.Commands[len(got.Commands)-2].Name)
+	assert.Equal(t, "Save ChatGPT usage", got.Commands[len(got.Commands)-1].Name)
 }
 
 func requireTaskFile(t *testing.T, files []runner.TaskFile, path string) runner.TaskFile {
