@@ -157,7 +157,11 @@ func (*Service) GetInstallationSettings(tx *gorm.DB) (billing.InstallationSettin
 	if err != nil {
 		return billing.InstallationSettings{}, err
 	}
-	return billing.InstallationSettings{TrialCreditCents: settings.WelcomeGrantCents, MarkupBPS: settings.MarkupBPS,
+	trial, err := billingmodels.FindBillingPlan(tx, billingmodels.BillingPlanTrial)
+	if err != nil {
+		return billing.InstallationSettings{}, err
+	}
+	return billing.InstallationSettings{TrialCreditCents: trial.TrialCreditCents, MarkupBPS: settings.MarkupBPS,
 		WarningThresholdBPS: settings.WarningThresholdBPS, CreditPurchaseFeeBPS: settings.CreditPurchaseFeeBPS,
 		CreditPurchaseFixedFeeCents: settings.CreditPurchaseFixedFeeCents}, nil
 }

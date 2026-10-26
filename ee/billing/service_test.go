@@ -33,6 +33,38 @@ func TestRuntimeInitializesOrganizationBilling(t *testing.T) {
 	assert.NotNil(t, plan.TrialEndsAt)
 }
 
+func TestInstallationSettingsUseCatalogTrialCredit(t *testing.T) {
+	t.Cleanup(billing.Bind(eebilling.New(nil)))
+	tx := database.DB(t.Context()).Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
+
+	legacy, err := billingmodels.GetInstallationLLMSettings(tx)
+	require.NoError(t, err)
+	legacy.WelcomeGrantCents = 1000
+	legacy.MarkupBPS = 2500
+	legacy.WarningThresholdBPS = 1500
+	legacy.CreditPurchaseFeeBPS = 500
+	legacy.CreditPurchaseFixedFeeCents = 50
+	_, err = billingmodels.UpdateInstallationLLMSettings(tx, *legacy)
+	require.NoError(t, err)
+
+	trial, err := billingmodels.FindBillingPlan(tx, billingmodels.BillingPlanTrial)
+	require.NoError(t, err)
+	trial.TrialCreditCents = 7500
+	require.NoError(t, billingmodels.SaveBillingPlan(tx, trial))
+
+	settings, err := billing.GetInstallationSettings(tx)
+	require.NoError(t, err)
+	assert.Equal(t, billing.InstallationSettings{
+		TrialCreditCents:            7500,
+		MarkupBPS:                   2500,
+		WarningThresholdBPS:         1500,
+		CreditPurchaseFeeBPS:        500,
+		CreditPurchaseFixedFeeCents: 50,
+	}, settings)
+}
+
 func TestBoundRuntimeRecordsUsageAcrossBillingModes(t *testing.T) {
 	for _, enabled := range []string{"yes", "no"} {
 		t.Run(enabled, func(t *testing.T) {
