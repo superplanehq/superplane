@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 
 	"gorm.io/gorm"
@@ -109,12 +110,16 @@ func (s *FactoryPlanningSession) ProposeUpdate(tx *gorm.DB, update PlanningSessi
 // sub-parameters, and any scores sent later must be complete and valid.
 func validatePlanningSessionUpdate(update PlanningSessionUpdate, checks []FactoryWorkOrderCheck) error {
 	if update.Scores != nil {
-		return validatePlanningReviewScores(*update.Scores)
+		if err := validatePlanningReviewScores(*update.Scores); err != nil {
+			return err
+		}
+	} else if !hasPlanningReviewScores(checks) {
+		return fmt.Errorf("%w: the first plan turn must include scores", ErrFactoryPlanningSessionInvalid)
 	}
-	if hasPlanningReviewScores(checks) {
-		return nil
+	if update.Survey != nil && planningReviewAtMaximum(update.Scores, checks) {
+		return fmt.Errorf("%w: a survey cannot be published when all review scores are 3; remove the survey or lower Clarity if a user decision is needed", ErrFactoryPlanningSessionInvalid)
 	}
-	return fmt.Errorf("%w: the first plan turn must include scores", ErrFactoryPlanningSessionInvalid)
+	return nil
 }
 
 func validatePlanningReviewScores(scores PlanningReviewScores) error {
@@ -125,6 +130,23 @@ func validatePlanningReviewScores(scores PlanningReviewScores) error {
 		}
 	}
 	return nil
+}
+
+func planningReviewAtMaximum(scores *PlanningReviewScores, checks []FactoryWorkOrderCheck) bool {
+	for _, kind := range planningReviewScoreKinds {
+		if scores != nil {
+			if scores.value(kind.key).Score != kind.max {
+				return false
+			}
+			continue
+		}
+		if !slices.ContainsFunc(checks, func(check FactoryWorkOrderCheck) bool {
+			return check.Key == kind.key && check.Score == kind.max
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 func validatePlanningReviewScore(kind planningScoreKind, value PlanningScoreValue) error {
