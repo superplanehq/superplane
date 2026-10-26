@@ -136,6 +136,15 @@ func AssertHostedRunAllowed(tx *gorm.DB, organizationID uuid.UUID, factoryID *uu
 	return implementation.AssertHostedRunAllowed(tx, organizationID, factoryID)
 }
 
+// ResolveParallelTaskLimit returns nil when the effective plan has no runner limit.
+func ResolveParallelTaskLimit(tx *gorm.DB, organizationID uuid.UUID) (*int, error) {
+	implementation, err := Current()
+	if err != nil {
+		return nil, err
+	}
+	return implementation.ResolveParallelTaskLimit(tx, organizationID)
+}
+
 func ResolveProductFeatures(tx *gorm.DB, organizationID uuid.UUID) (map[string]bool, error) {
 	implementation, err := Current()
 	if err != nil {
