@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	agentservice "github.com/superplanehq/superplane/pkg/agents"
 	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -22,13 +23,13 @@ func TestAgentActionsRequirePaymentMethod(t *testing.T) {
 	canvas := setupCanvas(t, r)
 	chatID := uuid.NewString()
 	missingCard := func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
-		return nil, models.ErrPaymentMethodRequired
+		return nil, billingmodels.ErrPaymentMethodRequired
 	}
 
 	t.Run("load chat", func(t *testing.T) {
 		svc := &stubService{
 			ensureSession: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error) {
-				return nil, models.ErrPaymentMethodRequired
+				return nil, billingmodels.ErrPaymentMethodRequired
 			},
 		}
 		_, err := actionsagents.GetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{
@@ -40,7 +41,7 @@ func TestAgentActionsRequirePaymentMethod(t *testing.T) {
 	t.Run("reset chat", func(t *testing.T) {
 		svc := &stubService{
 			resetSession: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error) {
-				return nil, models.ErrPaymentMethodRequired
+				return nil, billingmodels.ErrPaymentMethodRequired
 			},
 		}
 		_, err := actionsagents.ResetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.ResetCanvasAgentChatRequest{
@@ -58,7 +59,7 @@ func TestAgentActionsRequirePaymentMethod(t *testing.T) {
 	})
 
 	t.Run("define outcome", func(t *testing.T) {
-		_, err := actionsagents.DefineAgentOutcome(context.Background(), &stubService{defineErr: models.ErrPaymentMethodRequired}, r.Organization.ID.String(), r.User.String(), &pb.DefineAgentOutcomeRequest{
+		_, err := actionsagents.DefineAgentOutcome(context.Background(), &stubService{defineErr: billingmodels.ErrPaymentMethodRequired}, r.Organization.ID.String(), r.User.String(), &pb.DefineAgentOutcomeRequest{
 			ChatId: chatID,
 			Rubric: "The change is complete",
 		})
@@ -72,7 +73,7 @@ func requirePaymentMethod(t *testing.T, err error) {
 	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	message, ok := grpcerrors.HandlerMessage(err)
 	require.True(t, ok)
-	assert.Equal(t, models.ErrPaymentMethodRequired.Error(), message)
+	assert.Equal(t, billingmodels.ErrPaymentMethodRequired.Error(), message)
 }
 
 func TestAgentActionsRequireActivePlan(t *testing.T) {
@@ -83,7 +84,7 @@ func TestAgentActionsRequireActivePlan(t *testing.T) {
 	t.Run("send message", func(t *testing.T) {
 		svc := &stubService{
 			sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
-				return nil, models.ErrHostedSubscriptionRequired
+				return nil, billingmodels.ErrHostedSubscriptionRequired
 			},
 		}
 		_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
@@ -94,7 +95,7 @@ func TestAgentActionsRequireActivePlan(t *testing.T) {
 	})
 
 	t.Run("define outcome", func(t *testing.T) {
-		svc := &stubService{defineErr: models.ErrHostedSubscriptionRequired}
+		svc := &stubService{defineErr: billingmodels.ErrHostedSubscriptionRequired}
 		_, err := actionsagents.DefineAgentOutcome(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.DefineAgentOutcomeRequest{
 			ChatId: chatID,
 			Rubric: "The change is complete",
@@ -109,5 +110,5 @@ func requireActivePlan(t *testing.T, err error) {
 	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	message, ok := grpcerrors.HandlerMessage(err)
 	require.True(t, ok)
-	assert.Equal(t, models.ErrHostedSubscriptionRequired.Error(), message)
+	assert.Equal(t, billingmodels.ErrHostedSubscriptionRequired.Error(), message)
 }

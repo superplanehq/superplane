@@ -8,10 +8,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/entitlements"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/utils"
@@ -153,51 +151,12 @@ func lockAcceptingAccount(tx *gorm.DB, accountID uuid.UUID) (*models.Account, er
 	return account, nil
 }
 
-// requireSeatForNewMember checks, under the organization lock, that one more
-// member fits the plan and every checkout that can still activate.
 func requireSeatForNewMember(tx *gorm.DB, orgID uuid.UUID) error {
-	seats, err := entitlements.ResolveSeats(tx, orgID)
-	if err != nil {
-		return err
-	}
-	if seats.PaymentBlocked {
-		return grpcerrors.FailedPreconditionWithReason("This organization cannot add members until its payment is updated. Ask an organization admin.", "PAYMENT_PAST_DUE")
-	}
-	if limit := seats.JoinLimit(); limit != nil && seats.Occupied >= *limit {
-		if seats.PerSeat {
-			return grpcerrors.FailedPreconditionWithReason("No seat is available. Ask an organization admin to free or buy a seat.", "NO_SEAT_AVAILABLE")
-		}
-		return grpcerrors.FailedPreconditionWithReason("This organization reached its member limit. Ask an organization admin.", "MEMBER_LIMIT_REACHED")
-	}
-	if !models.BillingEnabled() {
-		return nil
-	}
-	err = polar.CheckCheckoutAdmission(tx, orgID, seats.Occupied+1)
-	if errors.Is(err, polar.ErrCheckoutSeatLimit) {
-		return grpcerrors.FailedPreconditionWithReason(checkoutSeatLimitMessage, checkoutSeatLimitReason)
-	}
-	return err
+	return billing.ValidateMemberAdmission(tx, orgID)
 }
 
-const (
-	checkoutSeatLimitReason  = "CHECKOUT_SEAT_LIMIT"
-	checkoutSeatLimitMessage = "This organization is changing its plan. The new plan has no seat for you yet. Ask an organization admin to finish the plan change and buy a seat for you."
-	billingUnverifiedReason  = "BILLING_UNVERIFIED"
-	billingUnverifiedMessage = "SuperPlane could not check the billing state of this organization. Try again later."
-)
-
-// prepareCheckoutAdmission verifies the checkout restrictions of the
-// organization with Polar, outside every lock.
 func prepareCheckoutAdmission(ctx context.Context, orgID uuid.UUID) error {
-	if !models.BillingEnabled() || !polar.Configured() {
-		return nil
-	}
-	err := polar.NewCheckoutLifecycle(polar.NewClientFromEnv()).PrepareAdmission(ctx, orgID)
-	if err != nil {
-		log.WithError(err).WithField("organization_id", orgID.String()).Warn("could not verify checkout restrictions before an invitation acceptance")
-		return grpcerrors.UnavailableWithReason(billingUnverifiedMessage, billingUnverifiedReason)
-	}
-	return nil
+	return billing.PrepareAdmission(ctx, orgID)
 }
 
 // Elevated invitations are valid only while the inviter can still grant them.

@@ -87,6 +87,11 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		featureRegistry = enterprise.NewRegistry()
 	}
 
+	billingImplementation, err := enterprise.Get[enterprise.BillingOperations](featureRegistry, enterprise.Billing)
+	if err != nil {
+		return nil, err
+	}
+
 	groups, err := NewGroupsService(cfg.AuthService, featureRegistry)
 	if err != nil {
 		return nil, err
@@ -96,7 +101,7 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		return nil, err
 	}
 
-	organizationService := NewOrganizationService(cfg.AuthService, cfg.Registry, cfg.OIDCProvider, cfg.BaseURL, cfg.WebhooksBaseURL)
+	organizationService := NewOrganizationService(cfg.AuthService, cfg.Registry, cfg.OIDCProvider, cfg.BaseURL, cfg.WebhooksBaseURL, billingImplementation)
 	organizationService.invitations.Entitlements = entitlements
 	if cfg.EmailService != nil {
 		organizationService.invitations.EmailService = cfg.EmailService

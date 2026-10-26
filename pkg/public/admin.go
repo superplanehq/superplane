@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -19,7 +19,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
@@ -143,11 +142,13 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 	if req.InvitationDurationDays != nil && (*req.InvitationDurationDays < 1 || *req.InvitationDurationDays > 365) {
 		return errors.Join(errInvalidInstallationSettingsRequest, errors.New("invitation duration must be between 1 and 365 days"))
 	}
-	if req.PastDueGraceDays != nil && (*req.PastDueGraceDays < 0 || *req.PastDueGraceDays > models.MaxPastDueGraceDays) {
-		return errors.Join(errInvalidInstallationSettingsRequest, fmt.Errorf("past due grace must be between 0 and %d days", models.MaxPastDueGraceDays))
+	if req.PastDueGraceDays != nil {
+		if err := billing.ValidatePastDueGraceDays(*req.PastDueGraceDays); err != nil {
+			return errors.Join(errInvalidInstallationSettingsRequest, err)
+		}
 	}
 	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil || req.InvitationDurationDays != nil || req.PastDueGraceDays != nil {
+		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil || req.InvitationDurationDays != nil {
 			err := models.ApplyInstallationMetadata(tx, func(metadata *models.InstallationMetadata) {
 				if req.AllowPrivateNetworkAccess != nil {
 					metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
@@ -161,13 +162,15 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 					metadata.InvitationDurationDays = *req.InvitationDurationDays
 				}
 
-				if req.PastDueGraceDays != nil {
-					metadata.PastDueGraceDays = *req.PastDueGraceDays
-				}
-
 				metadata.UpdatedAt = time.Now()
 			})
 			if err != nil {
+				return err
+			}
+		}
+
+		if req.PastDueGraceDays != nil {
+			if err := billing.UpdatePastDueGraceDays(tx, *req.PastDueGraceDays); err != nil {
 				return err
 			}
 		}
@@ -191,11 +194,16 @@ func (s *Server) buildInstallationSettingsResponse() (installationSettingsRespon
 		return installationSettingsResponse{}, err
 	}
 
+	graceDays, err := billing.GetPastDueGraceDays(database.Conn())
+	if err != nil {
+		return installationSettingsResponse{}, err
+	}
+
 	response := installationSettingsResponse{
 		AllowPrivateNetworkAccess:  policy.AllowPrivateNetworkAccess,
 		SignupsEnabled:             metadata.SignupsEnabled,
 		InvitationDurationDays:     metadata.InvitationDurationDays,
-		PastDueGraceDays:           metadata.PastDueGraceDays,
+		PastDueGraceDays:           graceDays,
 		SignupsBlockedByEnv:        s.authHandler.SignupsBlockedByEnvironment(),
 		EffectiveBlockedHTTPHosts:  policy.BlockedHosts,
 		EffectivePrivateIPRanges:   policy.PrivateIPRanges,
@@ -1106,7 +1114,7 @@ func adminOrganizationRemainingCents(ctx context.Context, organizations []models
 			missing = append(missing, org.ID)
 			continue
 		}
-		cents[org.ID] = pricebook.MicrosToCents(*org.RemainingCreditMicros)
+		cents[org.ID] = billing.MicrosToCents(*org.RemainingCreditMicros)
 	}
 	if len(missing) == 0 {
 		return cents, nil
@@ -1123,14 +1131,14 @@ func adminOrganizationRemainingCents(ctx context.Context, organizations []models
 }
 
 func remainingCreditCentsByOrganization(ctx context.Context, organizationIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
-	micros, err := models.RemainingHostedCreditMicros(database.DB(ctx), organizationIDs)
+	micros, err := billing.RemainingCreditMicros(database.DB(ctx), organizationIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	cents := make(map[uuid.UUID]int64, len(organizationIDs))
 	for _, id := range organizationIDs {
-		cents[id] = pricebook.MicrosToCents(micros[id])
+		cents[id] = billing.MicrosToCents(micros[id])
 	}
 	return cents, nil
 }

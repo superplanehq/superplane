@@ -73,6 +73,7 @@ blocks:
             - make check.proto.field.numbers
             - make check.configuration.fields
             - make check.grpc.actions.status
+            - make check.ee.imports
             - make check.models.tx.debt
             - make check.generated.artifacts
 
