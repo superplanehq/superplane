@@ -30,6 +30,7 @@ const (
 	messageSeatPurchaseKeyMissing        = "Add an operation key to the seat purchase request."
 	messageSeatPurchaseKeyInvalid        = "The operation key must have 1 to 128 printable ASCII characters and no spaces."
 	messageSeatPurchaseKeyReused         = "This operation key was used for another seat purchase. Refresh and try again."
+	messageSeatPurchaseNeedsPreview      = "Preview the purchase again and confirm it."
 )
 
 // maxSeatPurchaseOperationKeyLength limits the caller operation key.
@@ -38,8 +39,19 @@ const maxSeatPurchaseOperationKeyLength = 128
 // seatPurchaseOperation identifies one purchase request of an organization.
 // A repeat with the same key and fingerprint is the same purchase.
 type seatPurchaseOperation struct {
-	key         string
-	fingerprint string
+	key          string
+	fingerprints models.SeatPurchaseFingerprints
+	// binding is the confirmed preview context. It is nil when the request
+	// does not carry all of it. Such a request can only replay.
+	binding *seatPurchaseBinding
+}
+
+// seatPurchaseBinding is the subscription and the billing period that the
+// confirmed preview showed.
+type seatPurchaseBinding struct {
+	subscriptionID string
+	periodStart    time.Time
+	periodEnd      time.Time
 }
 
 // seatPurchaseState is the verified subscription state that a seat purchase
@@ -85,6 +97,8 @@ func previewSeatPurchase(ctx context.Context, orgID string, req *pb.PreviewSeatP
 		NewMonthlyTotalCents: int64(state.target) * priceCents,
 		Estimate:             true,
 		ExcludesTax:          true,
+		SubscriptionId:       state.subscriptionID,
+		BillingPeriodStart:   protoTimestamp(&state.periodStart),
 	}
 	if state.seats.Purchasable != nil {
 		response.PurchasableSeats = new(int32(*state.seats.Purchasable))
@@ -97,7 +111,8 @@ func previewSeatPurchase(ctx context.Context, orgID string, req *pb.PreviewSeatP
 // succeeds. Capacity changes only from the Polar snapshot.
 //
 // The purchase never reaches Polar near the end of the billing period, or after
-// the period changed. See seatPurchaseBoundaryWindow.
+// the subscription or the period changed from the confirmed preview. See
+// seatPurchaseBoundaryWindow and checkSeatPurchaseBinding.
 func PurchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsRequest, userID string) (*pb.PurchaseSeatsResponse, error) {
 	return purchaseSeats(ctx, orgID, req, userID, time.Now)
 }
@@ -124,6 +139,13 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 		return seatPurchaseResponse(ctx, organizationID, stored), nil
 	}
 
+	// A new purchase charges only for the subscription and the period that
+	// the user confirmed. A request without that context, such as one from
+	// a client before the binding, cannot start a charge.
+	if operation.binding == nil {
+		return nil, grpcerrors.InvalidArgument(nil, messageSeatPurchaseNeedsPreview)
+	}
+
 	// Settle an unfinished purchase before the local checks. Only a snapshot
 	// from the period of that purchase can settle it.
 	reconcileSeatPurchaseAndScheduleRenewal(ctx, db, organizationID)
@@ -133,6 +155,9 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 	// were added elsewhere. Requests that cannot take seats are rejected
 	// before the Polar read.
 	state, err := checkSeatPurchase(db, organizationID, req.GetAdditionalSeats(), clock())
+	if err == nil {
+		err = checkSeatPurchaseBinding(operation.binding, state)
+	}
 	if err != nil {
 		return replaySeatPurchaseBeforeError(ctx, organizationID, operation, err)
 	}
@@ -189,11 +214,14 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 }
 
 // newSeatPurchaseOperation validates the operation key of a purchase request
-// and computes the fingerprint of the charge that the request asks for.
+// and computes the fingerprints of the charge that the request asks for.
 //
 // The key is required. A request without a key could not be replayed safely,
 // so no purchase path charges without one. A client from before operation
 // keys gets InvalidArgument and no charge until it sends a key.
+//
+// The bound fingerprint is computed only when the request carries the
+// complete confirmed context. A partial context counts as no context.
 func newSeatPurchaseOperation(req *pb.PurchaseSeatsRequest) (seatPurchaseOperation, error) {
 	key := req.GetOperationKey()
 	if key == "" {
@@ -202,10 +230,27 @@ func newSeatPurchaseOperation(req *pb.PurchaseSeatsRequest) (seatPurchaseOperati
 	if !validSeatPurchaseOperationKey(key) {
 		return seatPurchaseOperation{}, grpcerrors.InvalidArgument(nil, messageSeatPurchaseKeyInvalid)
 	}
-	return seatPurchaseOperation{
-		key:         key,
-		fingerprint: models.SeatPurchaseFingerprint(int(req.GetAdditionalSeats()), int(req.GetExpectedPurchasedSeats())),
-	}, nil
+	additionalSeats, expectedPurchasedSeats := int(req.GetAdditionalSeats()), int(req.GetExpectedPurchasedSeats())
+	operation := seatPurchaseOperation{
+		key:          key,
+		fingerprints: models.SeatPurchaseFingerprints{Counts: models.SeatPurchaseFingerprint(additionalSeats, expectedPurchasedSeats)},
+		binding:      seatPurchaseBindingFromRequest(req),
+	}
+	if binding := operation.binding; binding != nil {
+		operation.fingerprints.Bound = models.SeatPurchaseBoundFingerprint(additionalSeats, expectedPurchasedSeats, binding.subscriptionID, binding.periodStart, binding.periodEnd)
+	}
+	return operation, nil
+}
+
+// seatPurchaseBindingFromRequest returns the confirmed preview context, or
+// nil when any part of it is missing or not valid.
+func seatPurchaseBindingFromRequest(req *pb.PurchaseSeatsRequest) *seatPurchaseBinding {
+	subscriptionID := req.GetConfirmedSubscriptionId()
+	start, end := req.GetConfirmedPeriodStart(), req.GetConfirmedPeriodEnd()
+	if subscriptionID == "" || start.CheckValid() != nil || end.CheckValid() != nil {
+		return nil
+	}
+	return &seatPurchaseBinding{subscriptionID: subscriptionID, periodStart: start.AsTime(), periodEnd: end.AsTime()}
 }
 
 func validSeatPurchaseOperationKey(key string) bool {
@@ -231,7 +276,7 @@ func findSeatPurchaseOperation(tx *gorm.DB, orgID uuid.UUID, operation seatPurch
 	if stored == nil {
 		return nil, nil
 	}
-	if !stored.MatchesRequest(operation.fingerprint) {
+	if !stored.MatchesRequest(operation.fingerprints) {
 		return nil, grpcerrors.FailedPrecondition(nil, messageSeatPurchaseKeyReused)
 	}
 	return stored, nil
@@ -340,12 +385,15 @@ type seatPurchaseStart struct {
 
 // beginSeatPurchase checks the request and records a pending purchase under the
 // organization lock. The lock is not held during the Polar call. The billing
-// period must be the period that the caller saw before the Polar refresh.
+// period must be the period that the caller saw before the Polar refresh, and
+// the subscription and the period must still be the confirmed ones.
 //
 // The purchase stores the operation, the subscription, and the billing period,
-// so a repeat and a later settlement can refer to them. The lock serializes
-// requests with the same operation. The unique operation key index catches a
-// writer that does not take the lock.
+// so a repeat and a later settlement can refer to them. The stored
+// subscription and period come from the locked state, which equals the
+// confirmed binding. The lock serializes requests with the same operation.
+// The unique operation key index catches a writer that does not take the
+// lock.
 func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSeatsRequest, operation seatPurchaseOperation, userID string, seen *seatPurchaseState, clock seatPurchaseClock) (*seatPurchaseStart, error) {
 	var started *seatPurchaseStart
 	db := database.DB(ctx)
@@ -369,6 +417,11 @@ func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSea
 		if err := checkSeatPurchasePeriodUnchanged(seen, state); err != nil {
 			return err
 		}
+		// The refresh can apply a renewal or another change to the
+		// subscription that the user confirmed.
+		if err := checkSeatPurchaseBinding(operation.binding, state); err != nil {
+			return err
+		}
 		if int(req.GetExpectedPurchasedSeats()) != state.purchased {
 			return grpcerrors.Conflict(nil, messageSeatCountChanged)
 		}
@@ -382,7 +435,7 @@ func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSea
 
 		purchase := models.NewSeatPurchase(orgID, parseUserID(userID), state.subscriptionID, state.purchased, state.target, &models.SeatPurchaseOperation{
 			Key:         operation.key,
-			Fingerprint: operation.fingerprint,
+			Fingerprint: operation.fingerprints.Bound,
 			PeriodStart: state.periodStart,
 			PeriodEnd:   state.periodEnd,
 		})

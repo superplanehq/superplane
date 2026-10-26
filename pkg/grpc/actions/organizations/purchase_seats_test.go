@@ -23,6 +23,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const seatPriceCents = 2000
@@ -208,16 +209,59 @@ func (f *seatPurchaseFixture) patchCount() int {
 	return len(f.patchBodies)
 }
 
-// purchase sends a new purchase request with a new operation key.
+// purchase sends a new purchase request with a new operation key, confirmed
+// for the subscription and the period that a preview shows now.
 func (f *seatPurchaseFixture) purchase(additional, expected int32) (*pb.PurchaseSeatsResponse, error) {
 	return f.purchaseWithKey(uuid.NewString(), additional, expected)
 }
 
-// purchaseWithKey sends a purchase request with the given operation key. A
-// repeat of the same key and request is a retry of the same purchase.
+// purchaseWithKey sends a purchase request with the given operation key,
+// confirmed for the subscription and the period that a preview shows now.
 func (f *seatPurchaseFixture) purchaseWithKey(key string, additional, expected int32) (*pb.PurchaseSeatsResponse, error) {
-	return PurchaseSeats(context.Background(), f.r.Organization.ID.String(),
-		&pb.PurchaseSeatsRequest{AdditionalSeats: additional, ExpectedPurchasedSeats: expected, OperationKey: key}, f.r.User.String())
+	return f.purchaseConfirmed(key, f.confirmation(), additional, expected)
+}
+
+// purchaseConfirmed sends a purchase request with the given operation key
+// and confirmed preview context. A repeat of the same key and request is a
+// retry of the same purchase.
+func (f *seatPurchaseFixture) purchaseConfirmed(key string, confirmed seatPurchaseConfirmation, additional, expected int32) (*pb.PurchaseSeatsResponse, error) {
+	return PurchaseSeats(context.Background(), f.r.Organization.ID.String(), f.request(key, confirmed, additional, expected), f.r.User.String())
+}
+
+// seatPurchaseConfirmation is the preview context that a client confirms.
+type seatPurchaseConfirmation struct {
+	subscriptionID string
+	periodStart    time.Time
+	periodEnd      time.Time
+}
+
+// confirmation returns the subscription and the billing period that a
+// preview shows now: the ones in the local plan.
+func (f *seatPurchaseFixture) confirmation() seatPurchaseConfirmation {
+	f.t.Helper()
+	plan := f.plan()
+	var confirmed seatPurchaseConfirmation
+	if plan.PolarSubscriptionID != nil {
+		confirmed.subscriptionID = *plan.PolarSubscriptionID
+	}
+	if plan.CurrentPeriodStart != nil {
+		confirmed.periodStart = *plan.CurrentPeriodStart
+	}
+	if plan.CurrentPeriodEnd != nil {
+		confirmed.periodEnd = *plan.CurrentPeriodEnd
+	}
+	return confirmed
+}
+
+func (f *seatPurchaseFixture) request(key string, confirmed seatPurchaseConfirmation, additional, expected int32) *pb.PurchaseSeatsRequest {
+	return &pb.PurchaseSeatsRequest{
+		AdditionalSeats:         additional,
+		ExpectedPurchasedSeats:  expected,
+		OperationKey:            key,
+		ConfirmedSubscriptionId: confirmed.subscriptionID,
+		ConfirmedPeriodStart:    timestamppb.New(confirmed.periodStart),
+		ConfirmedPeriodEnd:      timestamppb.New(confirmed.periodEnd),
+	}
 }
 
 func (f *seatPurchaseFixture) preview(additional int32) (*pb.PreviewSeatPurchaseResponse, error) {
@@ -227,7 +271,7 @@ func (f *seatPurchaseFixture) preview(additional int32) (*pb.PreviewSeatPurchase
 // purchaseAt runs a purchase with a controlled clock.
 func (f *seatPurchaseFixture) purchaseAt(clock seatPurchaseClock, additional, expected int32) (*pb.PurchaseSeatsResponse, error) {
 	return purchaseSeats(context.Background(), f.r.Organization.ID.String(),
-		&pb.PurchaseSeatsRequest{AdditionalSeats: additional, ExpectedPurchasedSeats: expected, OperationKey: uuid.NewString()}, f.r.User.String(), clock)
+		f.request(uuid.NewString(), f.confirmation(), additional, expected), f.r.User.String(), clock)
 }
 
 // setPeriodEnd moves the end of the billing period, both locally and in Polar.
@@ -250,6 +294,17 @@ func (f *seatPurchaseFixture) renew(seats int) {
 	f.periodEnd = f.periodStart.Add(30 * 24 * time.Hour)
 	f.polarSeats = seats
 	f.pendingSeats = nil
+}
+
+// replaceSubscription replaces the subscription with another one that has
+// the same seats and period, both locally and in Polar.
+func (f *seatPurchaseFixture) replaceSubscription() {
+	f.t.Helper()
+	f.mu.Lock()
+	f.subscriptionID = "sub_" + uuid.NewString()
+	subscriptionID := f.subscriptionID
+	f.mu.Unlock()
+	f.updateBillingPlan(map[string]any{"polar_subscription_id": subscriptionID})
 }
 
 func (f *seatPurchaseFixture) scheduleCount() int {
@@ -330,8 +385,10 @@ func Test__PreviewSeatPurchaseEstimatesWithoutChangingAnything(t *testing.T) {
 	assert.EqualValues(t, seatPriceCents, preview.SeatPriceCents)
 	assert.EqualValues(t, 1533, preview.ProratedChargeCents, "23 of 30 days of a $20 seat")
 	assert.EqualValues(t, 4*seatPriceCents, preview.NewMonthlyTotalCents)
+	assert.Equal(t, f.subscriptionID, preview.SubscriptionId)
+	assert.True(t, preview.BillingPeriodStart.AsTime().Equal(f.periodStart))
 	assert.True(t, preview.PeriodEnd.AsTime().Equal(f.periodEnd))
-	assert.WithinDuration(t, time.Now(), preview.PeriodStart.AsTime(), time.Minute)
+	assert.WithinDuration(t, time.Now(), preview.PeriodStart.AsTime(), time.Minute, "period_start stays the coverage start")
 	require.NotNil(t, preview.PurchasableSeats)
 	assert.EqualValues(t, 47, *preview.PurchasableSeats)
 	assert.True(t, preview.Estimate)
@@ -478,9 +535,11 @@ func Test__PurchaseSeatsRejectsSubscriptionsThatCannotTakeSeats(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newSeatPurchaseFixture(t, 3, new(50))
+			// The user confirmed a preview before the subscription changed.
+			confirmed := f.confirmation()
 			tt.change(f)
 
-			_, err := f.purchase(1, 3)
+			_, err := f.purchaseConfirmed(uuid.NewString(), confirmed, 1, 3)
 			requireGRPCCode(t, codes.FailedPrecondition, err)
 			if tt.message != "" {
 				assert.ErrorContains(t, err, tt.message)
@@ -672,7 +731,7 @@ func Test__PurchaseSeatsStoresTheOperationAndThePeriod(t *testing.T) {
 	require.NotNil(t, stored.OperationKey)
 	assert.Equal(t, key, *stored.OperationKey)
 	require.NotNil(t, stored.RequestFingerprint)
-	assert.Equal(t, models.SeatPurchaseFingerprint(1, 3), *stored.RequestFingerprint)
+	assert.Equal(t, models.SeatPurchaseBoundFingerprint(1, 3, f.subscriptionID, f.periodStart, f.periodEnd), *stored.RequestFingerprint)
 	assert.Equal(t, f.subscriptionID, stored.PolarSubscriptionID)
 	require.NotNil(t, stored.PeriodStart)
 	require.NotNil(t, stored.PeriodEnd)
@@ -683,10 +742,11 @@ func Test__PurchaseSeatsStoresTheOperationAndThePeriod(t *testing.T) {
 func Test__PurchaseSeatsReplayReturnsTheStoredPurchaseWithoutCharging(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 3, new(50))
 	key := uuid.NewString()
-	first, err := f.purchaseWithKey(key, 1, 3)
+	confirmed := f.confirmation()
+	first, err := f.purchaseConfirmed(key, confirmed, 1, 3)
 	require.NoError(t, err)
 
-	replay, err := f.purchaseWithKey(key, 1, 3)
+	replay, err := f.purchaseConfirmed(key, confirmed, 1, 3)
 	require.NoError(t, err)
 	assert.Equal(t, first.Purchase.Id, replay.Purchase.Id)
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, replay.Purchase.Status)
@@ -697,11 +757,112 @@ func Test__PurchaseSeatsReplayReturnsTheStoredPurchaseWithoutCharging(t *testing
 	f.renew(3)
 	f.applyWebhook(3, time.Now())
 
-	replay, err = f.purchaseWithKey(key, 1, 3)
+	replay, err = f.purchaseConfirmed(key, confirmed, 1, 3)
 	require.NoError(t, err)
 	assert.Equal(t, first.Purchase.Id, replay.Purchase.Id)
 	assert.Equal(t, 1, f.patchCount(), "a replay after the renewal does not charge again")
 	assert.Equal(t, 3, f.purchasedSeats())
+
+	// Another subscription replaces the confirmed one.
+	f.replaceSubscription()
+
+	replay, err = f.purchaseConfirmed(key, confirmed, 1, 3)
+	require.NoError(t, err)
+	assert.Equal(t, first.Purchase.Id, replay.Purchase.Id)
+	assert.Equal(t, 1, f.patchCount(), "a replay after the replacement does not charge again")
+}
+
+func Test__PurchaseSeatsReplaysALegacyOperationByItsSeatCounts(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 3, new(50))
+	key := uuid.NewString()
+	// A purchase recorded before the binding has only the v1 fingerprint.
+	legacy := models.NewSeatPurchase(f.r.Organization.ID, &f.r.User, f.subscriptionID, 3, 4, &models.SeatPurchaseOperation{
+		Key: key, Fingerprint: models.SeatPurchaseFingerprint(1, 3), PeriodStart: f.periodStart, PeriodEnd: f.periodEnd,
+	})
+	legacy.Status = models.SeatPurchaseStatusSucceeded
+	require.NoError(t, legacy.Create(database.DB(t.Context())))
+
+	for name, request := range map[string]*pb.PurchaseSeatsRequest{
+		"without a binding": {AdditionalSeats: 1, ExpectedPurchasedSeats: 3, OperationKey: key},
+		"with a binding":    f.request(key, f.confirmation(), 1, 3),
+	} {
+		t.Run(name, func(t *testing.T) {
+			replay, err := PurchaseSeats(t.Context(), f.r.Organization.ID.String(), request, f.r.User.String())
+
+			require.NoError(t, err)
+			assert.Equal(t, legacy.ID.String(), replay.Purchase.Id)
+			assert.Zero(t, f.patchCount())
+			assert.Zero(t, f.getCount, "a replay never reaches Polar")
+		})
+	}
+
+	_, err := PurchaseSeats(t.Context(), f.r.Organization.ID.String(),
+		&pb.PurchaseSeatsRequest{AdditionalSeats: 2, ExpectedPurchasedSeats: 3, OperationKey: key}, f.r.User.String())
+	requireGRPCCode(t, codes.FailedPrecondition, err)
+	assert.ErrorContains(t, err, "This operation key was used for another seat purchase.")
+}
+
+func Test__PurchaseSeatsWithoutACompleteConfirmationNeverReachesPolar(t *testing.T) {
+	tests := map[string]func(req *pb.PurchaseSeatsRequest){
+		"no confirmation": func(req *pb.PurchaseSeatsRequest) {
+			req.ConfirmedSubscriptionId, req.ConfirmedPeriodStart, req.ConfirmedPeriodEnd = "", nil, nil
+		},
+		"no subscription": func(req *pb.PurchaseSeatsRequest) { req.ConfirmedSubscriptionId = "" },
+		"no period start": func(req *pb.PurchaseSeatsRequest) { req.ConfirmedPeriodStart = nil },
+		"no period end":   func(req *pb.PurchaseSeatsRequest) { req.ConfirmedPeriodEnd = nil },
+		"invalid time":    func(req *pb.PurchaseSeatsRequest) { req.ConfirmedPeriodEnd = &timestamppb.Timestamp{Nanos: -1} },
+	}
+	for name, change := range tests {
+		t.Run(name, func(t *testing.T) {
+			f := newSeatPurchaseFixture(t, 3, new(50))
+			req := f.request(uuid.NewString(), f.confirmation(), 1, 3)
+			change(req)
+
+			_, err := PurchaseSeats(t.Context(), f.r.Organization.ID.String(), req, f.r.User.String())
+
+			requireGRPCCode(t, codes.InvalidArgument, err)
+			assert.ErrorContains(t, err, "Preview the purchase again and confirm it.")
+			assert.Zero(t, f.patchCount())
+			assert.Zero(t, f.getCount, "the request never reaches Polar")
+			latest, findErr := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+			require.NoError(t, findErr)
+			assert.Nil(t, latest)
+		})
+	}
+}
+
+func Test__PurchaseSeatsRejectsAStaleConfirmationWithTheSameSeatCounts(t *testing.T) {
+	tests := map[string]func(f *seatPurchaseFixture){
+		"renewal with the same seats": func(f *seatPurchaseFixture) {
+			f.renew(3)
+			f.applyWebhook(3, time.Now())
+		},
+		"replacement subscription with the same counts and dates": func(f *seatPurchaseFixture) {
+			f.replaceSubscription()
+		},
+	}
+	for name, change := range tests {
+		t.Run(name, func(t *testing.T) {
+			f := newSeatPurchaseFixture(t, 3, new(50))
+			stale := f.confirmation()
+			change(f)
+
+			_, err := f.purchaseConfirmed(uuid.NewString(), stale, 1, 3)
+
+			requireGRPCCode(t, codes.Aborted, err)
+			assert.ErrorContains(t, err, "The subscription or billing period changed. Review the new price and confirm again.")
+			assert.Zero(t, f.patchCount())
+			latest, findErr := models.FindLatestSeatPurchase(database.Conn(), f.r.Organization.ID)
+			require.NoError(t, findErr)
+			assert.Nil(t, latest, "no attempt is recorded")
+
+			// A fresh preview and confirmation buys the seats.
+			_, err = f.purchase(1, 3)
+			require.NoError(t, err)
+			assert.Equal(t, 1, f.patchCount())
+			assert.Equal(t, f.subscriptionID, f.latestPurchase().PolarSubscriptionID)
+		})
+	}
 }
 
 func Test__PurchaseSeatsRejectsAKeyReusedForAnotherRequest(t *testing.T) {
@@ -710,11 +871,24 @@ func Test__PurchaseSeatsRejectsAKeyReusedForAnotherRequest(t *testing.T) {
 	_, err := f.purchaseWithKey(key, 1, 3)
 	require.NoError(t, err)
 
-	for _, request := range [][2]int32{{2, 4}, {1, 4}, {2, 3}} {
-		_, err = f.purchaseWithKey(key, request[0], request[1])
+	confirmed := f.confirmation()
+	otherSubscription, otherStart, otherEnd := confirmed, confirmed, confirmed
+	otherSubscription.subscriptionID = "sub_other"
+	otherStart.periodStart = confirmed.periodStart.Add(time.Second)
+	otherEnd.periodEnd = confirmed.periodEnd.Add(time.Second)
+	for name, request := range map[string]*pb.PurchaseSeatsRequest{
+		"more seats from another count": f.request(key, confirmed, 2, 4),
+		"another expected count":        f.request(key, confirmed, 1, 4),
+		"more seats":                    f.request(key, confirmed, 2, 3),
+		"another subscription":          f.request(key, otherSubscription, 1, 3),
+		"another period start":          f.request(key, otherStart, 1, 3),
+		"another period end":            f.request(key, otherEnd, 1, 3),
+		"no binding":                    {AdditionalSeats: 1, ExpectedPurchasedSeats: 3, OperationKey: key},
+	} {
+		_, err = PurchaseSeats(t.Context(), f.r.Organization.ID.String(), request, f.r.User.String())
 
 		requireGRPCCode(t, codes.FailedPrecondition, err)
-		assert.ErrorContains(t, err, "This operation key was used for another seat purchase.")
+		assert.ErrorContains(t, err, "This operation key was used for another seat purchase.", name)
 	}
 	assert.Equal(t, 1, f.patchCount())
 	assert.Equal(t, 4, f.purchasedSeats())
@@ -780,6 +954,7 @@ func Test__ConcurrentIdenticalPurchaseReplaysBeforeReturningPreLockErrors(t *tes
 			// This server must remain available until background schedules end.
 			t.Cleanup(seatrenewal.Wait)
 			key := uuid.NewString()
+			confirmed := f.confirmation()
 
 			// Pause after the initial operation lookup, before the local check.
 			checking := make(chan struct{})
@@ -796,7 +971,7 @@ func Test__ConcurrentIdenticalPurchaseReplaysBeforeReturningPreLockErrors(t *tes
 			go func() {
 				defer close(done)
 				replay, replayErr = purchaseSeats(t.Context(), f.r.Organization.ID.String(),
-					&pb.PurchaseSeatsRequest{AdditionalSeats: 2, ExpectedPurchasedSeats: 3, OperationKey: key}, f.r.User.String(), func() time.Time {
+					f.request(key, confirmed, 2, 3), f.r.User.String(), func() time.Time {
 						pause.Do(func() {
 							close(checking)
 							<-resume
@@ -833,7 +1008,8 @@ func Test__ReplayAfterALostResponseAndARenewalReductionDoesNotChargeAgain(t *tes
 		require.NoError(f.t, conn.Close())
 	}
 	key := uuid.NewString()
-	first, err := f.purchaseWithKey(key, 1, 3)
+	confirmed := f.confirmation()
+	first, err := f.purchaseConfirmed(key, confirmed, 1, 3)
 	require.NoError(t, err)
 	assert.Equal(t, seatPurchaseAwaitingConfirmation, first.Purchase.Status)
 
@@ -841,7 +1017,7 @@ func Test__ReplayAfterALostResponseAndARenewalReductionDoesNotChargeAgain(t *tes
 	f.renew(3)
 	f.applyWebhook(3, time.Now())
 
-	replay, err := f.purchaseWithKey(key, 1, 3)
+	replay, err := f.purchaseConfirmed(key, confirmed, 1, 3)
 
 	require.NoError(t, err)
 	assert.Equal(t, first.Purchase.Id, replay.Purchase.Id)

@@ -3,8 +3,17 @@
 // gives a known outcome. A retry of the same request, also after a page
 // refresh or in another tab, then sends the same key and the server replays
 // the stored purchase instead of charging again.
+//
+// Version 2 records also keep the subscription and the billing period of
+// the confirmed preview. The server charges a new operation only for that
+// context. Version 1 records have no such context: their period start was
+// the coverage start. They are kept as legacy operations that can only
+// replay a purchase that the server already recorded.
 
-const STORAGE_VERSION = 1;
+import type { OrganizationsPreviewSeatPurchaseResponse } from "@/api-client";
+
+const STORAGE_VERSION = 2;
+const LEGACY_STORAGE_VERSION = 1;
 const STORAGE_PREFIX = "superplane:seat-purchase-operation:";
 
 export type SeatPurchaseRequest = {
@@ -12,19 +21,35 @@ export type SeatPurchaseRequest = {
   expectedPurchasedSeats: number;
 };
 
-export type SeatPurchasePeriod = {
-  periodStart?: string;
-  periodEnd?: string;
+/** The subscription and the billing period that the confirmed preview showed. */
+export type SeatPurchaseBinding = {
+  subscriptionId: string;
+  periodStart: string;
+  periodEnd: string;
 };
 
-export type SeatPurchaseOperation = SeatPurchaseRequest &
-  SeatPurchasePeriod & {
-    organizationId: string;
-    operationKey: string;
-    confirmedAt: string;
-  };
+export type SeatPurchaseOperation = SeatPurchaseRequest & {
+  organizationId: string;
+  operationKey: string;
+  confirmedAt: string;
+  /** Undefined for a legacy operation from version 1 storage. */
+  binding?: SeatPurchaseBinding;
+};
 
 type StoredSeatPurchaseOperation = SeatPurchaseOperation & { version: number };
+
+/**
+ * Returns the subscription and the billing period that a preview priced, or
+ * undefined when the preview does not give all of them. The preview period
+ * start is the coverage start, so it is not part of the binding.
+ */
+export function previewSeatPurchaseBinding(
+  preview: OrganizationsPreviewSeatPurchaseResponse,
+): SeatPurchaseBinding | undefined {
+  const { subscriptionId, billingPeriodStart, periodEnd } = preview;
+  if (!subscriptionId || !billingPeriodStart || !periodEnd) return undefined;
+  return { subscriptionId, periodStart: billingPeriodStart, periodEnd };
+}
 
 // Preserve failed writes while continuing to read keys saved by other tabs.
 const memoryOperations = new Map<string, SeatPurchaseOperation[]>();
@@ -35,24 +60,52 @@ function storageKey(organizationId: string) {
   return `${STORAGE_PREFIX}${organizationId}`;
 }
 
-function optionalString(value: unknown) {
-  return value === undefined || typeof value === "string";
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value !== "";
 }
 
-function isStoredOperation(value: unknown, organizationId: string): value is StoredSeatPurchaseOperation {
+function isBinding(value: unknown): value is SeatPurchaseBinding {
   if (!value || typeof value !== "object") return false;
-  const record = value as Record<string, unknown>;
+  const record = value as StoredRecord;
   return (
-    record.version === STORAGE_VERSION &&
+    nonEmptyString(record.subscriptionId) && nonEmptyString(record.periodStart) && nonEmptyString(record.periodEnd)
+  );
+}
+
+type StoredRecord = Record<string, unknown>;
+
+function isStoredRequest(
+  record: StoredRecord,
+  organizationId: string,
+): record is StoredRecord & Omit<SeatPurchaseOperation, "binding"> {
+  return (
     record.organizationId === organizationId &&
-    typeof record.operationKey === "string" &&
-    record.operationKey !== "" &&
+    nonEmptyString(record.operationKey) &&
     Number.isSafeInteger(record.additionalSeats) &&
     Number.isSafeInteger(record.expectedPurchasedSeats) &&
-    typeof record.confirmedAt === "string" &&
-    optionalString(record.periodStart) &&
-    optionalString(record.periodEnd)
+    typeof record.confirmedAt === "string"
   );
+}
+
+function parseOperation(value: unknown, organizationId: string): SeatPurchaseOperation | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as StoredRecord;
+  if (!isStoredRequest(record, organizationId)) return undefined;
+  const { operationKey, additionalSeats, expectedPurchasedSeats, confirmedAt } = record;
+  const operation: SeatPurchaseOperation = {
+    organizationId,
+    operationKey,
+    additionalSeats,
+    expectedPurchasedSeats,
+    confirmedAt,
+  };
+  if (record.version === STORAGE_VERSION && isBinding(record.binding)) {
+    const { subscriptionId, periodStart, periodEnd } = record.binding;
+    return { ...operation, binding: { subscriptionId, periodStart, periodEnd } };
+  }
+  // A legacy period start is a coverage start, so it is not a binding.
+  if (record.version === LEGACY_STORAGE_VERSION) return operation;
+  return undefined;
 }
 
 function parseOperations(raw: string | null, organizationId: string): SeatPurchaseOperation[] {
@@ -62,8 +115,8 @@ function parseOperations(raw: string | null, organizationId: string): SeatPurcha
     // Keep the single-operation format from earlier clients readable.
     const records: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
     return records
-      .filter((record): record is StoredSeatPurchaseOperation => isStoredOperation(record, organizationId))
-      .map(({ version: _version, ...operation }) => operation);
+      .map((record) => parseOperation(record, organizationId))
+      .filter((operation): operation is SeatPurchaseOperation => operation !== undefined);
   } catch {
     return [];
   }
@@ -87,7 +140,7 @@ export function loadSeatPurchaseOperations(organizationId: string): SeatPurchase
 
 function saveSeatPurchaseOperations(organizationId: string, operations: SeatPurchaseOperation[]) {
   const stored: StoredSeatPurchaseOperation[] = operations.map((operation) => ({
-    version: STORAGE_VERSION,
+    version: operation.binding ? STORAGE_VERSION : LEGACY_STORAGE_VERSION,
     ...operation,
   }));
   try {
@@ -108,14 +161,15 @@ function sameRequest(operation: SeatPurchaseOperation, request: SeatPurchaseRequ
 
 /**
  * Returns the operation for a confirmed request. The same request reuses the
- * unresolved operation and keeps its original period. Another request gets a
- * new key, which is stored before the request is sent. Earlier unresolved
+ * unresolved operation with its original key and binding, so the server can
+ * replay it. Another request gets a new key with the binding of the confirmed
+ * preview, which is stored before the request is sent. Earlier unresolved
  * requests keep their keys until their own outcomes are known.
  */
 export function confirmSeatPurchaseOperation(
   organizationId: string,
   request: SeatPurchaseRequest,
-  period: SeatPurchasePeriod,
+  binding: SeatPurchaseBinding,
 ): SeatPurchaseOperation {
   const operations = loadSeatPurchaseOperations(organizationId);
   const stored = operations.find((operation) => sameRequest(operation, request));
@@ -124,8 +178,7 @@ export function confirmSeatPurchaseOperation(
     organizationId,
     operationKey: crypto.randomUUID(),
     ...request,
-    periodStart: period.periodStart,
-    periodEnd: period.periodEnd,
+    binding: { ...binding },
     confirmedAt: new Date().toISOString(),
   };
   saveSeatPurchaseOperations(organizationId, [...operations, operation]);

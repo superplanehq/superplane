@@ -207,8 +207,8 @@ func Test__SeatPurchaseOperationKeyIsUniqueWithinTheOrganization(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, first.ID, stored.ID)
-	assert.True(t, stored.MatchesRequest(models.SeatPurchaseFingerprint(1, 3)))
-	assert.False(t, stored.MatchesRequest(models.SeatPurchaseFingerprint(2, 3)))
+	assert.True(t, stored.MatchesRequest(models.SeatPurchaseFingerprints{Counts: models.SeatPurchaseFingerprint(1, 3)}))
+	assert.False(t, stored.MatchesRequest(models.SeatPurchaseFingerprints{Counts: models.SeatPurchaseFingerprint(2, 3)}))
 	require.NotNil(t, stored.PeriodStart)
 	assert.True(t, stored.PeriodStart.Equal(operation.PeriodStart))
 
@@ -246,8 +246,10 @@ func Test__SeatPurchaseBlocksRenewalMaintenanceUntilVerifiedEvidenceReleasesIt(t
 	periodEnd := created.Add(20 * 24 * time.Hour)
 	afterWindow := created.Add(window + time.Second)
 	keyed := func(status string) *models.SeatPurchase {
+		// A new purchase stores the bound subscription and period.
 		purchase := models.NewSeatPurchase(uuid.New(), nil, "sub_team", 9, 10, &models.SeatPurchaseOperation{
-			Key: "key", Fingerprint: models.SeatPurchaseFingerprint(1, 9), PeriodStart: periodStart, PeriodEnd: periodEnd,
+			Key: "key", Fingerprint: models.SeatPurchaseBoundFingerprint(1, 9, "sub_team", periodStart, periodEnd),
+			PeriodStart: periodStart, PeriodEnd: periodEnd,
 		})
 		purchase.Status, purchase.CreatedAt = status, created
 		return purchase
@@ -321,4 +323,60 @@ func Test__ListUnresolvedSeatPurchasesCreatedBeforeFindsAgedPurchasesOfAllOrgani
 	require.Len(t, purchases, 2)
 	assert.Equal(t, pending.ID, purchases[0].ID, "the oldest purchase comes first")
 	assert.Equal(t, unknown.ID, purchases[1].ID)
+}
+
+func Test__SeatPurchaseMatchesRequestByTheStoredFingerprintVersion(t *testing.T) {
+	periodStart := time.Now().Add(-7 * 24 * time.Hour).UTC().Truncate(time.Second)
+	periodEnd := periodStart.Add(30 * 24 * time.Hour)
+	request := func(additional, expected int, subscriptionID string, start, end time.Time) models.SeatPurchaseFingerprints {
+		return models.SeatPurchaseFingerprints{
+			Counts: models.SeatPurchaseFingerprint(additional, expected),
+			Bound:  models.SeatPurchaseBoundFingerprint(additional, expected, subscriptionID, start, end),
+		}
+	}
+	unbound := func(additional, expected int) models.SeatPurchaseFingerprints {
+		return models.SeatPurchaseFingerprints{Counts: models.SeatPurchaseFingerprint(additional, expected)}
+	}
+	stored := func(fingerprint string) *models.SeatPurchase {
+		return models.NewSeatPurchase(uuid.New(), nil, "sub_team", 3, 4, &models.SeatPurchaseOperation{
+			Key: "key", Fingerprint: fingerprint, PeriodStart: periodStart, PeriodEnd: periodEnd,
+		})
+	}
+	bound := stored(models.SeatPurchaseBoundFingerprint(1, 3, "sub_team", periodStart, periodEnd))
+	legacy := stored(models.SeatPurchaseFingerprint(1, 3))
+
+	tests := []struct {
+		name     string
+		purchase *models.SeatPurchase
+		request  models.SeatPurchaseFingerprints
+		matches  bool
+	}{
+		{name: "bound purchase and the same binding", purchase: bound, request: request(1, 3, "sub_team", periodStart, periodEnd), matches: true},
+		{name: "bound purchase and no binding", purchase: bound, request: unbound(1, 3)},
+		{name: "bound purchase and another subscription", purchase: bound, request: request(1, 3, "sub_new", periodStart, periodEnd)},
+		{name: "bound purchase and another period start", purchase: bound, request: request(1, 3, "sub_team", periodEnd, periodEnd)},
+		{name: "bound purchase and another period end", purchase: bound, request: request(1, 3, "sub_team", periodStart, periodEnd.Add(time.Second))},
+		{name: "bound purchase and another quantity", purchase: bound, request: request(2, 3, "sub_team", periodStart, periodEnd)},
+		{name: "legacy purchase and no binding", purchase: legacy, request: unbound(1, 3), matches: true},
+		{name: "legacy purchase and a binding", purchase: legacy, request: request(1, 3, "sub_new", periodEnd, periodEnd), matches: true},
+		{name: "legacy purchase and another quantity", purchase: legacy, request: request(2, 3, "sub_team", periodStart, periodEnd)},
+		{name: "purchase without an operation", purchase: models.NewSeatPurchase(uuid.New(), nil, "sub_team", 3, 4, nil), request: unbound(1, 3)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.matches, tt.purchase.MatchesRequest(tt.request))
+		})
+	}
+}
+
+func Test__SeatPurchaseBoundFingerprintIsStableForEqualInstants(t *testing.T) {
+	periodStart := time.Now().Add(-7 * 24 * time.Hour).UTC().Truncate(time.Microsecond)
+	periodEnd := periodStart.Add(30 * 24 * time.Hour)
+	elsewhere := time.FixedZone("UTC+9", 9*60*60)
+
+	utc := models.SeatPurchaseBoundFingerprint(1, 3, "sub_team", periodStart, periodEnd)
+
+	assert.Equal(t, utc, models.SeatPurchaseBoundFingerprint(1, 3, "sub_team", periodStart.In(elsewhere), periodEnd.In(elsewhere)))
+	assert.NotEqual(t, utc, models.SeatPurchaseBoundFingerprint(1, 3, "sub_team", periodStart.Add(time.Microsecond), periodEnd))
+	assert.NotEqual(t, utc, models.SeatPurchaseFingerprint(1, 3), "the v2 fingerprint never equals the v1 fingerprint")
 }

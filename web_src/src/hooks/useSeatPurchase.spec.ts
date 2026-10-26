@@ -44,8 +44,11 @@ const estimate: OrganizationsPreviewSeatPurchaseResponse = {
   purchasedSeats: 4,
   targetSeats: 5,
   proratedChargeCents: "473",
+  periodStart: "2026-10-20T08:00:00Z",
   periodEnd: "2026-11-15T00:00:00Z",
   newMonthlyTotalCents: "5000",
+  subscriptionId: "sub_team",
+  billingPeriodStart: "2026-10-15T00:00:00Z",
 };
 
 function deferred<T>() {
@@ -212,6 +215,9 @@ describe("useSeatPurchase", () => {
       additionalSeats: 1,
       expectedPurchasedSeats: 8,
       operationKey: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      confirmedSubscriptionId: "sub_team",
+      confirmedPeriodStart: "2026-10-15T00:00:00Z",
+      confirmedPeriodEnd: "2026-11-15T00:00:00Z",
     });
     act(() => hook.result.current.setAdditionalSeats("2"));
     expect(hook.result.current.additionalSeats).toBe("1");
