@@ -28,6 +28,7 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
   /** `checkbox` draws a check row. The canvas editor uses `switch`. */
   booleanControl?: "switch" | "checkbox";
   hideLabel?: boolean;
+  modelOnly?: boolean;
 }
 
 type ConfigurationField = FieldRendererProps["field"];
@@ -126,6 +127,7 @@ export const ConfigurationFieldRenderer = ({
   booleanControl = "switch",
   hideLabel = false,
   triggerClassName,
+  modelOnly,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -299,6 +301,7 @@ export const ConfigurationFieldRenderer = ({
     expressionErrorMessage,
     expressionTemplateValue,
     triggerClassName,
+    modelOnly,
   };
 
   if (readOnly && !shouldRenderFieldForReadOnly(field)) {

@@ -51,8 +51,10 @@ export function previewSeatPurchaseBinding(
   return { subscriptionId, periodStart: billingPeriodStart, periodEnd };
 }
 
-// Preserve failed writes while continuing to read keys saved by other tabs.
-const memoryOperations = new Map<string, SeatPurchaseOperation[]>();
+// The operations that this tab confirmed but could not save. Keys that other
+// tabs saved stay only in storage, so a key that another tab retires after a
+// failed write in this tab does not come back from memory.
+const unsavedOperations = new Map<string, SeatPurchaseOperation[]>();
 // A stale storage collection must not restore a key retired in this tab.
 const retiredOperationKeys = new Map<string, Set<string>>();
 
@@ -126,7 +128,7 @@ function parseOperations(raw: string | null, organizationId: string): SeatPurcha
 export function loadSeatPurchaseOperations(organizationId: string): SeatPurchaseOperation[] {
   if (!organizationId) return [];
   const operations = new Map(
-    (memoryOperations.get(organizationId) ?? []).map((operation) => [operation.operationKey, operation]),
+    (unsavedOperations.get(organizationId) ?? []).map((operation) => [operation.operationKey, operation]),
   );
   try {
     const stored = parseOperations(window.localStorage.getItem(storageKey(organizationId)), organizationId);
@@ -138,6 +140,11 @@ export function loadSeatPurchaseOperations(organizationId: string): SeatPurchase
   return [...operations.values()].filter((operation) => !retired?.has(operation.operationKey));
 }
 
+/**
+ * Writes the complete collection of the organization. The collection
+ * includes the unsaved operations of this tab, so a successful write saves
+ * them too. A failed write keeps them unsaved.
+ */
 function saveSeatPurchaseOperations(organizationId: string, operations: SeatPurchaseOperation[]) {
   const stored: StoredSeatPurchaseOperation[] = operations.map((operation) => ({
     version: operation.binding ? STORAGE_VERSION : LEGACY_STORAGE_VERSION,
@@ -146,10 +153,15 @@ function saveSeatPurchaseOperations(organizationId: string, operations: SeatPurc
   try {
     if (stored.length === 0) window.localStorage.removeItem(storageKey(organizationId));
     else window.localStorage.setItem(storageKey(organizationId), JSON.stringify(stored));
-    memoryOperations.delete(organizationId);
+    unsavedOperations.delete(organizationId);
   } catch {
-    memoryOperations.set(organizationId, operations);
+    // Storage can be full or blocked. The unsaved operations stay in memory.
   }
+}
+
+function keepUnsaved(organizationId: string, operations: SeatPurchaseOperation[]) {
+  if (operations.length === 0) unsavedOperations.delete(organizationId);
+  else unsavedOperations.set(organizationId, operations);
 }
 
 function sameRequest(operation: SeatPurchaseOperation, request: SeatPurchaseRequest) {
@@ -181,6 +193,7 @@ export function confirmSeatPurchaseOperation(
     binding: { ...binding },
     confirmedAt: new Date().toISOString(),
   };
+  keepUnsaved(organizationId, [...(unsavedOperations.get(organizationId) ?? []), operation]);
   saveSeatPurchaseOperations(organizationId, [...operations, operation]);
   return operation;
 }
@@ -197,6 +210,11 @@ export function retireSeatPurchaseOperation({
   const retired = retiredOperationKeys.get(organizationId) ?? new Set<string>();
   retired.add(operationKey);
   retiredOperationKeys.set(organizationId, retired);
+  const unsaved = unsavedOperations.get(organizationId) ?? [];
+  keepUnsaved(
+    organizationId,
+    unsaved.filter((operation) => operation.operationKey !== operationKey),
+  );
   const remaining = operations.filter((operation) => operation.operationKey !== operationKey);
   if (remaining.length === operations.length) return;
   saveSeatPurchaseOperations(organizationId, remaining);

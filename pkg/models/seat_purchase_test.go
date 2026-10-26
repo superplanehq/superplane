@@ -83,35 +83,56 @@ func Test__SeatPurchaseUpdateStatusKeepsASettledOutcome(t *testing.T) {
 	assert.Empty(t, late.ErrorCode)
 }
 
-func Test__SeatPurchaseSettlementFollowsPolarSnapshots(t *testing.T) {
+func Test__SeatPurchaseSucceedsOnlyFromEvidenceAboutThePurchase(t *testing.T) {
 	now := time.Now()
 	before, after := now.Add(-time.Hour), now.Add(time.Hour)
 	periodStart := now.Add(-7 * 24 * time.Hour)
 	renewed := now.Add(23 * 24 * time.Hour)
 	seats := func(n int) *int { return &n }
+	evidence := func(change func(e *models.SeatPurchaseEvidence)) models.SeatPurchaseEvidence {
+		e := models.SeatPurchaseEvidence{SubscriptionID: "sub_team", PeriodStart: &periodStart, Seats: seats(5), ModifiedAt: &after}
+		change(&e)
+		return e
+	}
 
 	tests := []struct {
-		name       string
-		status     string
-		seats      *int
-		modifiedAt *time.Time
-		// periodStart is the period of the snapshot. Nil means the period
-		// in which the purchase started.
-		periodStart *time.Time
-		want        string
+		name      string
+		status    string
+		evidence  models.SeatPurchaseEvidence
+		succeeded bool
 	}{
-		{name: "target reached while pending", status: models.SeatPurchaseStatusPending, seats: seats(5), want: models.SeatPurchaseStatusSucceeded},
-		{name: "above target while unknown", status: models.SeatPurchaseStatusUnknown, seats: seats(6), want: models.SeatPurchaseStatusSucceeded},
-		{name: "unchanged after the purchase", status: models.SeatPurchaseStatusUnknown, seats: seats(3), modifiedAt: &after, want: models.SeatPurchaseStatusFailed},
-		{name: "unchanged before the purchase", status: models.SeatPurchaseStatusUnknown, seats: seats(3), modifiedAt: &before},
-		{name: "unchanged without a modification time", status: models.SeatPurchaseStatusUnknown, seats: seats(3)},
-		{name: "pending request can still arrive", status: models.SeatPurchaseStatusPending, seats: seats(3), modifiedAt: &after},
-		{name: "between the two counts", status: models.SeatPurchaseStatusUnknown, seats: seats(4), modifiedAt: &after},
-		{name: "snapshot without seats", status: models.SeatPurchaseStatusUnknown, modifiedAt: &after},
-		{name: "settled purchase", status: models.SeatPurchaseStatusFailed, seats: seats(5)},
-		{name: "target reached in a later period", status: models.SeatPurchaseStatusUnknown, seats: seats(5), modifiedAt: &after, periodStart: &renewed},
-		{name: "unchanged in a later period", status: models.SeatPurchaseStatusUnknown, seats: seats(3), modifiedAt: &after, periodStart: &renewed},
-		{name: "pending target reached in a later period", status: models.SeatPurchaseStatusPending, seats: seats(5), periodStart: &renewed},
+		{name: "response with the target", status: models.SeatPurchaseStatusPending, succeeded: true,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.Response, e.ModifiedAt = true, nil })},
+		{name: "snapshot with the target after the purchase", status: models.SeatPurchaseStatusUnknown, succeeded: true,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) {})},
+		{name: "pending purchase and the target after the purchase", status: models.SeatPurchaseStatusPending, succeeded: true,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) {})},
+		{name: "snapshot with the target before the purchase", status: models.SeatPurchaseStatusUnknown,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.ModifiedAt = &before })},
+		{name: "snapshot with the target at the purchase time", status: models.SeatPurchaseStatusUnknown,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.ModifiedAt = &now })},
+		{name: "snapshot without a modification time", status: models.SeatPurchaseStatusUnknown,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.ModifiedAt = nil })},
+		{name: "above the target", status: models.SeatPurchaseStatusUnknown,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.Seats = seats(6) })},
+		{name: "original seats after the purchase", status: models.SeatPurchaseStatusUnknown,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.Seats = seats(3) })},
+		{name: "between the two counts", status: models.SeatPurchaseStatusUnknown,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.Seats = seats(4) })},
+		{name: "response with the original seats", status: models.SeatPurchaseStatusPending,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.Response, e.Seats = true, seats(3) })},
+		{name: "no seats", status: models.SeatPurchaseStatusUnknown,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.Seats = nil })},
+		{name: "another subscription", status: models.SeatPurchaseStatusUnknown,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.SubscriptionID = "sub_other" })},
+		{name: "response from another subscription", status: models.SeatPurchaseStatusPending,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.Response, e.SubscriptionID = true, "sub_other" })},
+		{name: "target in a later period", status: models.SeatPurchaseStatusUnknown,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.PeriodStart = &renewed })},
+		{name: "response in a later period", status: models.SeatPurchaseStatusPending,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.Response, e.PeriodStart = true, &renewed })},
+		{name: "settled purchase", status: models.SeatPurchaseStatusFailed,
+			evidence: evidence(func(e *models.SeatPurchaseEvidence) { e.Response = true })},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -119,41 +140,32 @@ func Test__SeatPurchaseSettlementFollowsPolarSnapshots(t *testing.T) {
 				Key: "key", Fingerprint: models.SeatPurchaseFingerprint(2, 3), PeriodStart: periodStart, PeriodEnd: renewed,
 			})
 			purchase.Status, purchase.CreatedAt = tt.status, now
-			snapshotPeriod := &periodStart
-			if tt.periodStart != nil {
-				snapshotPeriod = tt.periodStart
-			}
-			got, settled := purchase.SettlementFor(snapshotPeriod, tt.seats, tt.modifiedAt)
-			assert.Equal(t, tt.want != "", settled)
-			assert.Equal(t, tt.want, got)
+
+			assert.Equal(t, tt.succeeded, purchase.SucceededBy(tt.evidence))
 		})
 	}
 }
 
 // Rows from before operation keys have no stored period. Only a snapshot
 // whose period started before the purchase can be evidence for them.
-func Test__SeatPurchaseWithoutAStoredPeriodSettlesOnlyFromItsCreationPeriod(t *testing.T) {
+func Test__SeatPurchaseWithoutAStoredPeriodSucceedsOnlyFromItsCreationPeriod(t *testing.T) {
 	now := time.Now()
 	after := now.Add(time.Minute)
-	seats := func(n int) *int { return &n }
+	target := 5
 	creationPeriod := now.Add(-7 * 24 * time.Hour)
 	renewed := now.Add(time.Second)
 	purchase := models.NewSeatPurchase(uuid.New(), nil, "sub_team", 3, 5, nil)
 	purchase.Status, purchase.CreatedAt = models.SeatPurchaseStatusUnknown, now
-
-	status, settled := purchase.SettlementFor(&creationPeriod, seats(5), &after)
-	assert.True(t, settled)
-	assert.Equal(t, models.SeatPurchaseStatusSucceeded, status)
-
-	for _, period := range []*time.Time{&renewed, nil} {
-		_, settled = purchase.SettlementFor(period, seats(5), &after)
-		assert.False(t, settled, "success needs a snapshot from the creation period")
-		_, settled = purchase.SettlementFor(period, seats(3), &after)
-		assert.False(t, settled, "failure needs a snapshot from the creation period")
+	evidence := func(periodStart *time.Time) models.SeatPurchaseEvidence {
+		return models.SeatPurchaseEvidence{SubscriptionID: "sub_team", PeriodStart: periodStart, Seats: &target, ModifiedAt: &after}
 	}
+
+	assert.True(t, purchase.SucceededBy(evidence(&creationPeriod)))
+	assert.False(t, purchase.SucceededBy(evidence(&renewed)), "success needs a snapshot from the creation period")
+	assert.False(t, purchase.SucceededBy(evidence(nil)), "success needs a snapshot with a period")
 }
 
-func Test__SettleSeatPurchaseIgnoresSnapshotsFromAnotherPeriod(t *testing.T) {
+func Test__SettleSeatPurchaseKeepsAnUnprovedOutcomeAndAProvedOne(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	orgID := r.Organization.ID
@@ -164,23 +176,39 @@ func Test__SettleSeatPurchaseIgnoresSnapshotsFromAnotherPeriod(t *testing.T) {
 	})
 	purchase.Status = models.SeatPurchaseStatusUnknown
 	require.NoError(t, purchase.Create(db))
-	later := time.Now().Add(time.Minute)
-
-	for _, seats := range []int{3, 4, 10} {
+	settle := func(seats int, periodStart time.Time, modifiedAt time.Time) {
+		t.Helper()
 		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-			return models.SettleSeatPurchase(tx, orgID, "sub_team", &periodEnd, &seats, &later)
+			return models.SettleSeatPurchase(tx, orgID, models.SeatPurchaseEvidence{
+				SubscriptionID: "sub_team", PeriodStart: &periodStart, Seats: &seats, ModifiedAt: &modifiedAt,
+			})
 		}))
 		require.NoError(t, db.First(purchase, "id = ?", purchase.ID).Error)
-		assert.Equal(t, models.SeatPurchaseStatusUnknown, purchase.Status, "a renewed period with %d seats proves nothing", seats)
 	}
+	later := time.Now().Add(time.Minute)
 
-	seats := 3
-	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		return models.SettleSeatPurchase(tx, orgID, "sub_team", &periodStart, &seats, &later)
-	}))
-	require.NoError(t, db.First(purchase, "id = ?", purchase.ID).Error)
-	assert.Equal(t, models.SeatPurchaseStatusFailed, purchase.Status, "a snapshot from the purchase period settles it")
-	assert.Equal(t, models.SeatPurchaseErrorNotApplied, purchase.ErrorCode)
+	settle(3, periodStart, later)
+	assert.Equal(t, models.SeatPurchaseStatusUnknown, purchase.Status, "the original seats after the purchase prove nothing")
+	settle(4, periodEnd, later)
+	assert.Equal(t, models.SeatPurchaseStatusUnknown, purchase.Status, "the target in a renewed period proves nothing")
+
+	settle(4, periodStart, later)
+	require.Equal(t, models.SeatPurchaseStatusSucceeded, purchase.Status)
+
+	for _, event := range []struct {
+		name       string
+		seats      int
+		modifiedAt time.Time
+	}{
+		{name: "duplicate", seats: 4, modifiedAt: later},
+		{name: "reordered", seats: 3, modifiedAt: later.Add(-30 * time.Second)},
+		{name: "equal-timestamp", seats: 3, modifiedAt: later},
+		{name: "newer", seats: 3, modifiedAt: later.Add(time.Minute)},
+	} {
+		settle(event.seats, periodStart, event.modifiedAt)
+		assert.Equal(t, models.SeatPurchaseStatusSucceeded, purchase.Status, "a %s event keeps the success", event.name)
+		assert.Empty(t, purchase.ErrorCode)
+	}
 }
 
 func Test__SeatPurchaseOperationKeyIsUniqueWithinTheOrganization(t *testing.T) {
@@ -237,59 +265,6 @@ func Test__FindExpectedSeatCountIgnoresPurchasesFromAnEarlierPeriod(t *testing.T
 	expected, err = models.FindExpectedSeatCount(db, orgID, "sub_team", current)
 	require.NoError(t, err)
 	assert.Nil(t, expected, "a renewal reduction back to 3 seats is not compared with the old target")
-}
-
-func Test__SeatPurchaseBlocksRenewalMaintenanceUntilVerifiedEvidenceReleasesIt(t *testing.T) {
-	const window = 5 * time.Minute
-	created := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
-	periodStart := created.Add(-10 * 24 * time.Hour)
-	periodEnd := created.Add(20 * 24 * time.Hour)
-	afterWindow := created.Add(window + time.Second)
-	keyed := func(status string) *models.SeatPurchase {
-		// A new purchase stores the bound subscription and period.
-		purchase := models.NewSeatPurchase(uuid.New(), nil, "sub_team", 9, 10, &models.SeatPurchaseOperation{
-			Key: "key", Fingerprint: models.SeatPurchaseBoundFingerprint(1, 9, "sub_team", periodStart, periodEnd),
-			PeriodStart: periodStart, PeriodEnd: periodEnd,
-		})
-		purchase.Status, purchase.CreatedAt = status, created
-		return purchase
-	}
-	legacy := func() *models.SeatPurchase {
-		purchase := models.NewSeatPurchase(uuid.New(), nil, "sub_team", 9, 10, nil)
-		purchase.Status, purchase.CreatedAt = models.SeatPurchaseStatusUnknown, created
-		return purchase
-	}
-
-	tests := []struct {
-		name           string
-		purchase       *models.SeatPurchase
-		subscriptionID string
-		periodStart    *time.Time
-		now            time.Time
-		blocks         bool
-	}{
-		{name: "later period of the purchase subscription", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", periodStart: &periodEnd, now: afterWindow},
-		{name: "pending purchase in a later period", purchase: keyed(models.SeatPurchaseStatusPending), subscriptionID: "sub_team", periodStart: &periodEnd, now: afterWindow},
-		{name: "replacement subscription", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_new", periodStart: &periodStart, now: afterWindow},
-		{name: "purchase period", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", periodStart: &periodStart, now: afterWindow, blocks: true},
-		{name: "period that starts before the purchase period ends", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", periodStart: new(periodEnd.Add(-time.Second)), now: afterWindow, blocks: true},
-		{name: "submission can still reach Polar", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", periodStart: &periodEnd, now: created.Add(window), blocks: true},
-		{name: "replacement subscription inside the submission window", purchase: keyed(models.SeatPurchaseStatusPending), subscriptionID: "sub_new", periodStart: &periodStart, now: created.Add(window), blocks: true},
-		{name: "no verified period", purchase: keyed(models.SeatPurchaseStatusUnknown), subscriptionID: "sub_team", now: afterWindow.Add(90 * 24 * time.Hour), blocks: true},
-		{name: "no verified subscription", purchase: keyed(models.SeatPurchaseStatusUnknown), periodStart: &periodEnd, now: afterWindow, blocks: true},
-		{name: "legacy purchase in a period that started after its window", purchase: legacy(), subscriptionID: "sub_team", periodStart: new(created.Add(window + time.Second)), now: afterWindow},
-		{name: "legacy purchase in a period that started at its window end", purchase: legacy(), subscriptionID: "sub_team", periodStart: new(created.Add(window)), now: afterWindow, blocks: true},
-		{name: "legacy purchase in its creation period", purchase: legacy(), subscriptionID: "sub_team", periodStart: &periodStart, now: afterWindow, blocks: true},
-		{name: "settled purchase", purchase: keyed(models.SeatPurchaseStatusFailed), subscriptionID: "sub_team", periodStart: &periodStart, now: created},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			before := *tt.purchase
-
-			assert.Equal(t, tt.blocks, tt.purchase.BlocksRenewalMaintenance(tt.subscriptionID, tt.periodStart, tt.now, window))
-			assert.Equal(t, before, *tt.purchase, "the release rule changes no purchase state")
-		})
-	}
 }
 
 func Test__ListUnresolvedSeatPurchasesCreatedBeforeFindsAgedPurchasesOfAllOrganizations(t *testing.T) {

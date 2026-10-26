@@ -72,7 +72,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 ## Configuration
 - **Machine type**: Runner fleet available to the organization (required).
 - **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty. If the organization does not allow that model, SuperPlane uses another allowed model.
-- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Steps**: One or more ordered bash commands or agent prompts.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 

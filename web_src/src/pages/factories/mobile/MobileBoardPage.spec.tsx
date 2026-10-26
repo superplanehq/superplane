@@ -114,6 +114,7 @@ vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: (resource: string, action: string) =>
       resource === "work_orders" && action === "create" ? canCreateWorkOrder : true,
+    hasPermission: () => true,
     currentUserId: "user-1",
     isLoading: false,
   }),

@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/gorm"
 )
 
 func TestCreateOrganizationWithoutInviteLink(t *testing.T) {
@@ -15,6 +14,11 @@ func TestCreateOrganizationWithoutInviteLink(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, organization)
 
-	_, err = FindInviteLinkByOrganizationID(database.DB(t.Context()), organization.ID.String())
-	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	var links int64
+	require.NoError(t, database.DB(t.Context()).
+		Model(&OrganizationInviteLink{}).
+		Where("organization_id = ?", organization.ID).
+		Count(&links).
+		Error)
+	require.Zero(t, links)
 }

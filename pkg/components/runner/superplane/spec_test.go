@@ -83,7 +83,7 @@ func TestValidateRunSuperPlaneSpecRejectsInvalidModel(t *testing.T) {
 	assert.Contains(t, err.Error(), "model")
 }
 
-func TestValidateRunSuperPlaneSpecRequiresPrompt(t *testing.T) {
+func TestValidateRunSuperPlaneSpecAllowsBashOnly(t *testing.T) {
 	t.Parallel()
 
 	spec := RunSuperPlaneSpec{
@@ -92,9 +92,7 @@ func TestValidateRunSuperPlaneSpecRequiresPrompt(t *testing.T) {
 			{Name: "Clone", Type: runner.AgentStepBash, Command: strPtr("git clone")},
 		},
 	}
-	err := validateRunSuperPlaneSpec(spec)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "prompt")
+	require.NoError(t, validateRunSuperPlaneSpec(spec))
 }
 
 func TestValidateRunSuperPlaneSpecRejectsReservedEnv(t *testing.T) {

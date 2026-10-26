@@ -36,6 +36,7 @@ export function AgentRunnerSettings({
   onDraftChange,
   view = "step",
   disabled = false,
+  modelDescription,
 }: {
   node: SuperplaneComponentsNode;
   organizationId?: string;
@@ -46,6 +47,7 @@ export function AgentRunnerSettings({
   onDraftChange?: (draft: PlanningReviewDraft) => void;
   view?: "step" | "implementation";
   disabled?: boolean;
+  modelDescription?: string;
 }) {
   if (view === "implementation") {
     return (
@@ -57,6 +59,7 @@ export function AgentRunnerSettings({
         factoryKey={factoryKey}
         onDraftChange={onDraftChange}
         disabled={disabled}
+        modelDescription={modelDescription}
       />
     );
   }
@@ -80,6 +83,7 @@ function ImplementationAgentFields({
   factoryKey,
   onDraftChange,
   disabled = false,
+  modelDescription,
 }: {
   node: SuperplaneComponentsNode;
   draft?: PlanningReviewDraft;
@@ -88,6 +92,7 @@ function ImplementationAgentFields({
   factoryKey?: string;
   onDraftChange?: (draft: PlanningReviewDraft) => void;
   disabled?: boolean;
+  modelDescription?: string;
 }) {
   return (
     <PlanningReviewForm
@@ -101,6 +106,7 @@ function ImplementationAgentFields({
       factoryId={factoryId}
       factoryKey={factoryKey}
       disabled={disabled}
+      modelDescription={modelDescription}
     />
   );
 }

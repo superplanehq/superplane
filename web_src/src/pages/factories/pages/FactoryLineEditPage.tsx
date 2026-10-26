@@ -1,4 +1,8 @@
-import type { FactoriesFactoryLine, FactoryAutomation, FactoryLineStep } from "@/api-client";
+import type {
+  FactoriesFactoryLine,
+  FactoriesFactoryLineStep as FactoryLineStep,
+  FactoryAutomation,
+} from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryAutomations } from "@/hooks/useFactoryData";

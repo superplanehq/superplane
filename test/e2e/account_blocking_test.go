@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -97,8 +98,11 @@ func (s *accountBlockingSteps) createTargetAccountWithPassword() {
 	account, err := models.CreateAccount("Blocked Target", s.targetEmail)
 	require.NoError(s.t, err)
 
-	_, err = models.CreateUser(s.session.OrgID, account.ID, account.Email, account.Name)
+	user, err := models.CreateUser(s.session.OrgID, account.ID, account.Email, account.Name)
 	require.NoError(s.t, err)
+	authService, err := authorization.NewAuthService()
+	require.NoError(s.t, err)
+	require.NoError(s.t, authService.AssignRole(user.ID.String(), models.RoleOrgOperator, s.session.OrgID.String(), models.DomainTypeOrganization))
 
 	hash, err := crypto.HashPassword(s.targetPassword)
 	require.NoError(s.t, err)

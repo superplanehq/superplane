@@ -1038,9 +1038,9 @@ func Test__ApplySubscriptionIgnoresForeignCancellation(t *testing.T) {
 }
 
 // An ended snapshot of a replaced subscription cannot take the replacement
-// back, but it still proves the outcome of the replaced subscription's
-// in-flight seat purchase. The purchase must settle, or it stays unknown and
-// blocks purchases on the replacement forever.
+// back, but it can still prove the success of the replaced subscription's
+// in-flight seat purchase. A snapshot that proves nothing leaves the purchase
+// unknown: fewer seats than the target do not show that Polar did not charge.
 func Test__ApplySubscriptionSettlesSeatPurchaseOnIgnoredForeignSnapshot(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	for _, tc := range []struct {
@@ -1049,16 +1049,15 @@ func Test__ApplySubscriptionSettlesSeatPurchaseOnIgnoredForeignSnapshot(t *testi
 		foreignSeats    int
 		foreignModified time.Time
 		wantStatus      string
-		wantErrorCode   string
 	}{
 		{name: "replacement live and target reached", foreignSeats: 4, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusSucceeded},
 		{name: "replacement ended and target reached", endReplacement: true, foreignSeats: 4, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusSucceeded},
-		{name: "target never applied", foreignSeats: 3, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusFailed, wantErrorCode: models.SeatPurchaseErrorNotApplied},
-		{name: "snapshot proves nothing", foreignSeats: 3, foreignModified: now.Add(-time.Hour), wantStatus: models.SeatPurchaseStatusUnknown},
-		{name: "old above-target snapshot with live replacement", foreignSeats: 5, foreignModified: now.Add(-time.Hour), wantStatus: models.SeatPurchaseStatusUnknown},
-		{name: "old above-target snapshot with ended replacement", endReplacement: true, foreignSeats: 5, foreignModified: now.Add(-time.Hour), wantStatus: models.SeatPurchaseStatusUnknown},
-		{name: "above-target snapshot without timestamp", foreignSeats: 5, wantStatus: models.SeatPurchaseStatusUnknown},
-		{name: "above-target snapshot at purchase creation", foreignSeats: 5, foreignModified: now, wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "original seats after the purchase", foreignSeats: 3, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "above-target snapshot after the purchase", foreignSeats: 5, foreignModified: now.Add(time.Minute), wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "old target snapshot with live replacement", foreignSeats: 4, foreignModified: now.Add(-time.Hour), wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "old target snapshot with ended replacement", endReplacement: true, foreignSeats: 4, foreignModified: now.Add(-time.Hour), wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "target snapshot without timestamp", foreignSeats: 4, wantStatus: models.SeatPurchaseStatusUnknown},
+		{name: "target snapshot at purchase creation", foreignSeats: 4, foreignModified: now, wantStatus: models.SeatPurchaseStatusUnknown},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			org := setupBillingOrganization(t)
@@ -1094,7 +1093,7 @@ func Test__ApplySubscriptionSettlesSeatPurchaseOnIgnoredForeignSnapshot(t *testi
 			assert.Equal(t, before.grants, after.grants)
 			require.NotNil(t, after.purchase)
 			assert.Equal(t, tc.wantStatus, after.purchase.Status)
-			assert.Equal(t, tc.wantErrorCode, after.purchase.ErrorCode)
+			assert.Empty(t, after.purchase.ErrorCode)
 			inFlight, err := models.FindInFlightSeatPurchase(db, org.ID)
 			require.NoError(t, err)
 			if tc.wantStatus == models.SeatPurchaseStatusUnknown {
@@ -1393,18 +1392,19 @@ func Test__ApplySubscriptionReleasesLocksDuringPolarReads(t *testing.T) {
 					}
 					stored.Data.Status = "canceled"
 					stored.Data.ModifiedAt = polarTime{Time: now.Add(2 * time.Second)}
-					if err := ApplyOrganizationSubscription(req.Context(), tx, org.ID, stored.Data); err != nil {
+					if _, err := StageOrganizationSubscription(req.Context(), tx, org.ID, stored.Data); err != nil {
 						return err
 					}
 					concurrent := subscriptionEvent(org.ID, concurrentID, "active", now, end)
 					concurrent.Data.ModifiedAt = polarTime{Time: now.Add(3 * time.Second)}
-					if err := ApplyOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data); err != nil {
+					if _, err := StageOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data); err != nil {
 						return err
 					}
 					if tc.adoptIncoming {
 						concurrent.Data.Status = "canceled"
 						concurrent.Data.ModifiedAt = polarTime{Time: now.Add(4 * time.Second)}
-						return ApplyOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data)
+						_, err := StageOrganizationSubscription(req.Context(), tx, org.ID, concurrent.Data)
+						return err
 					}
 					return nil
 				})
@@ -1474,9 +1474,10 @@ func Test__ApplySubscriptionRequiresReadsOutsideCallerTransaction(t *testing.T) 
 			return err
 		}
 		incoming := subscriptionEvent(org.ID, "sub_foreign_"+uuid.NewString(), "active", now, end)
-		return ApplyOrganizationSubscription(t.Context(), tx, org.ID, incoming.Data)
+		_, err := StageOrganizationSubscription(t.Context(), tx, org.ID, incoming.Data)
+		return err
 	})
-	require.Error(t, err)
+	require.ErrorIs(t, err, models.ErrPolarSubscriptionRefreshFailed)
 	assert.NotErrorIs(t, err, ErrPermanentApply)
 	assert.Zero(t, requests)
 	assert.Equal(t, before, captureSubscriptionState(t, db, org.ID))

@@ -101,40 +101,6 @@ service Organizations {
     };
   }
 
-  rpc GetInviteLink(GetInviteLinkRequest) returns (GetInviteLinkResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/invite-link"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get an organization invite link";
-      description: "Returns the invite link for an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc UpdateInviteLink(UpdateInviteLinkRequest) returns (UpdateInviteLinkResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/organizations/{id}/invite-link"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update an organization invite link";
-      description: "Enables or disables the invite link for an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc ResetInviteLink(ResetInviteLinkRequest) returns (ResetInviteLinkResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/invite-link/reset"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Reset an organization invite link";
-      description: "Generates a new invite link token for an organization";
-      tags: "Organization";
-    };
-  }
-
   rpc DescribeOrganizationWorkspaceUsage(DescribeOrganizationWorkspaceUsageRequest) returns (DescribeOrganizationWorkspaceUsageResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/workspace-usage"
@@ -591,31 +557,6 @@ message InviteLink {
   bool enabled = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
-}
-
-message GetInviteLinkRequest {
-  string id = 1;
-}
-
-message GetInviteLinkResponse {
-  InviteLink invite_link = 1;
-}
-
-message UpdateInviteLinkRequest {
-  string id = 1;
-  bool enabled = 2;
-}
-
-message UpdateInviteLinkResponse {
-  InviteLink invite_link = 1;
-}
-
-message ResetInviteLinkRequest {
-  string id = 1;
-}
-
-message ResetInviteLinkResponse {
-  InviteLink invite_link = 1;
 }
 
 message DescribeOrganizationWorkspaceUsageRequest {

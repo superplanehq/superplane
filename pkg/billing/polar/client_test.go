@@ -234,15 +234,13 @@ func Test__CreateCheckoutForwardsSubscriptionOptions(t *testing.T) {
 				} else {
 					assert.Equal(t, map[string]any{CheckoutIntentMetadataKey: "intent-1"}, body["metadata"])
 				}
+				assert.NotContains(t, body, "allow_discount_codes", "Polar default allows discount codes")
 				if tc.seats == nil {
-					assert.NotContains(t, body, "allow_discount_codes")
 					assert.NotContains(t, body, "seats")
 					assert.NotContains(t, body, "min_seats")
 					assert.NotContains(t, body, "max_seats")
 				}
 				if tc.seats != nil {
-					require.Contains(t, body, "allow_discount_codes")
-					assert.Equal(t, false, body["allow_discount_codes"])
 					for _, field := range []string{"seats", "min_seats", "max_seats"} {
 						assert.Equal(t, float64(*tc.seats), body[field], field)
 					}
@@ -284,7 +282,7 @@ func TestCreateCreditCheckoutLocksChargeAndCreditMetadata(t *testing.T) {
 		assert.Equal(t, "org-1", body["external_customer_id"])
 		assert.Equal(t, "https://app.example/return", body["success_url"])
 		assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
-		assert.Equal(t, false, body["allow_discount_codes"])
+		assert.NotContains(t, body, "allow_discount_codes", "Polar default allows discount codes")
 		assert.Equal(t, map[string]any{
 			"prod_credits": []any{map[string]any{
 				"amount_type": "fixed", "price_amount": float64(10579),
@@ -700,53 +698,6 @@ func Test__UpdateSubscriptionSeatsInvoicesTheProratedChange(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 5, *updated.Seats)
 	assert.Equal(t, map[string]any{"seats": float64(5), "proration_behavior": "invoice"}, body)
-}
-
-func Test__ScheduleSubscriptionSeatsChangesOnlyTheNextPeriod(t *testing.T) {
-	appliesAt := time.Now().Add(10 * 24 * time.Hour).UTC().Truncate(time.Second)
-	var body map[string]any
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPatch, r.Method)
-		assert.Equal(t, "/subscriptions/sub_team", r.URL.Path)
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
-			"id": "sub_team", "status": "active", "seats": 10,
-			"pending_update": map[string]any{"seats": 9, "applies_at": appliesAt.Format(time.RFC3339)},
-		}))
-	}))
-	t.Cleanup(server.Close)
-
-	client := NewClient(server.URL, "oat_test", server.Client())
-	updated, err := client.ScheduleSubscriptionSeats(context.Background(), " sub_team ", 9)
-	require.NoError(t, err)
-	assert.Equal(t, map[string]any{"seats": float64(9), "proration_behavior": "next_period"}, body)
-	assert.Equal(t, 10, *updated.Seats, "the current period keeps its seats")
-	require.NotNil(t, updated.PendingUpdate)
-	assert.True(t, updated.PendingUpdate.AppliesAt.Time.Equal(appliesAt))
-	assert.Equal(t, 9, *updated.NextPeriodSeats())
-
-	_, err = client.ScheduleSubscriptionSeats(context.Background(), " ", 9)
-	require.ErrorContains(t, err, "subscription id is required")
-}
-
-func Test__NextPeriodSeatsPrefersTheScheduledSeatCount(t *testing.T) {
-	tests := []struct {
-		name string
-		body string
-		want *int
-	}{
-		{name: "no pending update", body: `{"id":"sub","seats":10}`, want: new(10)},
-		{name: "null pending update", body: `{"id":"sub","seats":10,"pending_update":null}`, want: new(10)},
-		{name: "pending update without seats", body: `{"id":"sub","seats":10,"pending_update":{"seats":null,"applies_at":"2026-12-01T00:00:00Z"}}`, want: new(10)},
-		{name: "no seats", body: `{"id":"sub"}`, want: nil},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var data SubscriptionData
-			require.NoError(t, json.Unmarshal([]byte(tt.body), &data))
-			assert.Equal(t, tt.want, data.NextPeriodSeats())
-		})
-	}
 }
 
 func Test__UpdateSubscriptionSeatsRequiresIDInRequestAndResponse(t *testing.T) {

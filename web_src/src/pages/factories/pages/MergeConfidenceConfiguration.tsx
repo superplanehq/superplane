@@ -62,6 +62,7 @@ function MergeConfidenceConfigurationView({
               onSave={() => undefined}
               onDraftChange={settings.updateAgentDraft}
               view="implementation"
+              modelDescription="The model used for each run."
               disabled={saving}
             />
             <section className="space-y-3">

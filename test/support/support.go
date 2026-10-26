@@ -253,6 +253,18 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 	return user
 }
 
+// SeedHistoricalInviteLink stores a shared invite link as older releases did.
+// SuperPlane no longer creates these links, but stored links stay readable.
+func SeedHistoricalInviteLink(t require.TestingT, organizationID uuid.UUID, enabled bool) *models.OrganizationInviteLink {
+	link := &models.OrganizationInviteLink{
+		OrganizationID: organizationID,
+		Token:          uuid.New(),
+		Enabled:        enabled,
+	}
+	require.NoError(t, database.Conn().Create(link).Error)
+	return link
+}
+
 func EmitCanvasEventForNode(t require.TestingT, canvasID uuid.UUID, nodeID string, channel string, executionID *uuid.UUID) *models.CanvasEvent {
 	return EmitCanvasEventForNodeWithData(t, canvasID, nodeID, channel, executionID, map[string]any{"key": "value"})
 }

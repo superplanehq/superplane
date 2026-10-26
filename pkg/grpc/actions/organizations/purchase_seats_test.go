@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -40,17 +39,18 @@ type seatPurchaseFixture struct {
 	periodEnd      time.Time
 
 	mu sync.Mutex
-	// patchBodies are the seat purchase updates. Renewal schedules are in schedules.
+	// patchBodies are the seat purchase updates. Next-period updates are in
+	// schedules.
 	patchBodies []map[string]any
 	getCount    int
 	// onPatch writes the seat purchase response. The default applies the update.
 	onPatch func(w http.ResponseWriter, f *seatPurchaseFixture, seats int)
 	// polarSeats is the seat count that GET reports.
 	polarSeats int
-	// schedules are the next_period updates that schedule the renewal seat count.
+	// schedules are the next_period updates. SuperPlane must send none.
 	schedules []map[string]any
-	// pendingSeats is the seat count that Polar renews with, when it differs
-	// from polarSeats.
+	// pendingSeats is a next-period seat count that the retired automatic
+	// scheduler left in Polar, when it differs from polarSeats.
 	pendingSeats *int
 	// modifiedAt is the subscription modification time that snapshots report.
 	// The zero value makes each snapshot report the current time.
@@ -61,14 +61,6 @@ type seatPurchaseFixture struct {
 	pastDueAt *time.Time
 	// cancelAtPeriodEnd is the cancel_at_period_end that snapshots report.
 	cancelAtPeriodEnd bool
-	// scheduleRejection, when set, answers every next_period update with
-	// this Polar error.
-	scheduleRejection *polarRejection
-}
-
-type polarRejection struct {
-	status int
-	code   string
 }
 
 func newSeatPurchaseFixture(t *testing.T, purchased int, seatLimit *int) *seatPurchaseFixture {
@@ -109,9 +101,6 @@ func newSeatPurchaseFixture(t *testing.T, purchased int, seatLimit *int) *seatPu
 
 	server := polarAPIServer(t, f.serve)
 	usePolarTestServer(t, server)
-	// Background renewal schedules must end before the server and the
-	// database close.
-	t.Cleanup(seatrenewal.Wait)
 	return f
 }
 
@@ -119,6 +108,10 @@ func (f *seatPurchaseFixture) serve(w http.ResponseWriter, req *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if req.URL.Path == "/customers/external/"+f.r.Organization.ID.String()+"/payment-methods" {
+		f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
+		return
+	}
+	if req.URL.Path == "/checkouts/" && req.Method == http.MethodGet {
 		f.writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
 		return
 	}
@@ -146,15 +139,6 @@ func (f *seatPurchaseFixture) serve(w http.ResponseWriter, req *http.Request) {
 		seats := int(body["seats"].(float64))
 		if body["proration_behavior"] == "next_period" {
 			f.schedules = append(f.schedules, body)
-			if f.scheduleRejection != nil {
-				f.writeJSON(w, f.scheduleRejection.status, map[string]any{"error": f.scheduleRejection.code, "detail": "details"})
-				return
-			}
-			// Like Polar, an update back to the current seats clears the scheduled one.
-			f.pendingSeats = &seats
-			if seats == f.polarSeats {
-				f.pendingSeats = nil
-			}
 			f.writeJSON(w, http.StatusOK, f.snapshot(f.polarSeats))
 			return
 		}
@@ -172,7 +156,7 @@ func (f *seatPurchaseFixture) snapshot(seats int) map[string]any {
 	}
 	snapshot := map[string]any{
 		"id": f.subscriptionID, "product_id": f.product, "status": "active", "seats": seats,
-		"cancel_at_period_end": f.cancelAtPeriodEnd, "modified_at": modifiedAt.UTC().Format(time.RFC3339),
+		"cancel_at_period_end": f.cancelAtPeriodEnd, "modified_at": modifiedAt.UTC().Format(time.RFC3339Nano),
 		"current_period_start": f.periodStart.Format(time.RFC3339), "current_period_end": f.periodEnd.Format(time.RFC3339),
 		"customer_id": "cust_1", "external_customer_id": f.r.Organization.ID.String(),
 		"pending_update": nil,
@@ -347,7 +331,14 @@ func (f *seatPurchaseFixture) updateBillingPlan(values map[string]any) {
 func (f *seatPurchaseFixture) applyWebhook(seats int, modifiedAt time.Time) {
 	f.t.Helper()
 	data := f.snapshot(seats)
-	data["modified_at"] = modifiedAt.UTC().Format(time.RFC3339)
+	data["modified_at"] = modifiedAt.UTC().Format(time.RFC3339Nano)
+	f.applySubscriptionEvent(data)
+}
+
+// applySubscriptionEvent delivers a subscription.updated webhook with the
+// snapshot data.
+func (f *seatPurchaseFixture) applySubscriptionEvent(data map[string]any) {
+	f.t.Helper()
 	body, err := json.Marshal(map[string]any{"type": "subscription.updated", "data": data})
 	require.NoError(f.t, err)
 	var event polar.SubscriptionWebhookEvent
@@ -660,24 +651,56 @@ func Test__WebhookAddsCapacityForAnUnconfirmedPurchase(t *testing.T) {
 	assert.Equal(t, 1, f.patchCount())
 }
 
-func Test__WebhookWithUnchangedSeatsFailsAnUnconfirmedPurchase(t *testing.T) {
+// The renewal schedule read 3 seats before the purchase was recorded. Its
+// next_period update reaches Polar after the purchase was recorded, and the
+// webhook of that update arrives late. Polar then charges the purchase, but
+// the response is lost. The delayed event reports the original seats after
+// the purchase, but it is about another update, so it proves nothing.
+func Test__DelayedScheduleEventLeavesALostPurchaseUnknownUntilPolarProvesIt(t *testing.T) {
 	f := newSeatPurchaseFixture(t, 3, new(50))
-	f.dropConnection()
-	_, err := f.purchase(1, 3)
+	var delayedSchedule map[string]any
+	f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
+		f.pendingSeats = new(1)
+		delayedSchedule = f.snapshot(f.polarSeats)
+		f.polarSeats, f.pendingSeats = seats, nil
+		conn, _, err := w.(http.Hijacker).Hijack()
+		require.NoError(f.t, err)
+		require.NoError(f.t, conn.Close())
+	}
+	key := uuid.NewString()
+	confirmed := f.confirmation()
+
+	first, err := f.purchaseConfirmed(key, confirmed, 2, 3)
+	require.NoError(t, err)
+	require.Equal(t, seatPurchaseAwaitingConfirmation, first.Purchase.Status)
+
+	f.applySubscriptionEvent(delayedSchedule)
+
+	stored := f.latestPurchase()
+	assert.Equal(t, first.Purchase.Id, stored.ID.String())
+	assert.Equal(t, models.SeatPurchaseStatusUnknown, stored.Status, "the delayed schedule event must not fail the purchase")
+	assert.Empty(t, stored.ErrorCode)
+	assert.Equal(t, 3, f.purchasedSeats(), "capacity follows the applied snapshot")
+
+	// The next read from Polar shows the target in the purchase period after
+	// the purchase was recorded.
+	_, err = f.preview(1)
 	require.NoError(t, err)
 
-	f.applyWebhook(3, time.Now().Add(time.Minute))
+	stored = f.latestPurchase()
+	assert.Equal(t, first.Purchase.Id, stored.ID.String(), "the original operation settles")
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, stored.Status)
+	assert.Equal(t, 5, f.purchasedSeats())
+	assert.Equal(t, 1, f.patchCount(), "the settlement does not charge again")
 
-	assert.Equal(t, 3, f.purchasedSeats())
-	stored := f.latestPurchase()
-	assert.Equal(t, models.SeatPurchaseStatusFailed, stored.Status)
-	assert.Equal(t, models.SeatPurchaseErrorNotApplied, stored.ErrorCode)
-
-	f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
-		f.writeJSON(w, http.StatusOK, f.snapshot(seats))
-	}
-	_, err = f.purchase(1, 3)
-	require.NoError(t, err, "a failed purchase no longer blocks a new one")
+	// A duplicate delivery of the delayed event does not replace the outcome.
+	f.applySubscriptionEvent(delayedSchedule)
+	replay, err := f.purchaseConfirmed(key, confirmed, 2, 3)
+	require.NoError(t, err)
+	assert.Equal(t, first.Purchase.Id, replay.Purchase.Id)
+	assert.Equal(t, models.SeatPurchaseStatusSucceeded, replay.Purchase.Status)
+	assert.Equal(t, 5, f.purchasedSeats())
+	assert.Equal(t, 1, f.patchCount(), "the replay does not charge again")
 }
 
 func Test__RetryAfterAnUnconfirmedPurchaseDoesNotChargeAgain(t *testing.T) {
@@ -691,7 +714,7 @@ func Test__RetryAfterAnUnconfirmedPurchaseDoesNotChargeAgain(t *testing.T) {
 
 	requireGRPCCode(t, codes.Aborted, err)
 	assert.Equal(t, 1, f.patchCount(), "the retry must not send a second update")
-	assert.Equal(t, new(1), f.pendingRenewalSeats(), "reconciliation restores the reduction without another purchase")
+	assert.Zero(t, f.scheduleCount(), "reconciliation schedules no seat count")
 	assert.Equal(t, 4, f.purchasedSeats())
 	assert.Equal(t, models.SeatPurchaseStatusSucceeded, f.latestPurchase().Status)
 }
@@ -951,8 +974,6 @@ func Test__ConcurrentIdenticalPurchaseReplaysBeforeReturningPreLockErrors(t *tes
 				f.serve(w, req)
 			})
 			usePolarTestServer(t, server)
-			// This server must remain available until background schedules end.
-			t.Cleanup(seatrenewal.Wait)
 			key := uuid.NewString()
 			confirmed := f.confirmation()
 
@@ -983,7 +1004,6 @@ func Test__ConcurrentIdenticalPurchaseReplaysBeforeReturningPreLockErrors(t *tes
 
 			first, err := f.purchaseWithKey(key, 2, 3)
 			require.NoError(t, err)
-			seatrenewal.Wait()
 			rejectRefresh.Store(test.rejectRefresh)
 			release.Do(func() { close(resume) })
 			<-done
@@ -1092,28 +1112,41 @@ func Test__PurchaseSeatsKeepsSeatsAddedElsewhere(t *testing.T) {
 	assert.Equal(t, 7, f.purchasedSeats())
 }
 
-func Test__PurchaseRecoversAnUnconfirmedPurchaseBelowTheTarget(t *testing.T) {
-	f := newSeatPurchaseFixture(t, 3, new(50))
-	f.dropConnection()
-	_, err := f.purchase(2, 3)
-	require.NoError(t, err)
-	first := f.latestPurchase()
-	stale := time.Now().Add(-2 * polar.SeatPurchaseConfirmationWindow)
-	require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("id = ?", first.ID).Update("created_at", stale).Error)
-	f.polarSeats = 4 // Polar never applied 5; an outside change set 4 instead
-	f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
-		f.polarSeats = seats
-		f.writeJSON(w, http.StatusOK, f.snapshot(seats))
+// Neither the time since an unknown purchase nor a seat count below its
+// target proves that Polar did not charge. The purchase stays unknown and
+// keeps blocking new purchases. The verified snapshot still repairs the
+// capacity.
+func Test__UnknownPurchaseWithoutEvidenceBlocksNewPurchasesWhileCapacityIsRepaired(t *testing.T) {
+	for name, polarSeats := range map[string]int{
+		"original seats":                  3,
+		"outside change below the target": 4,
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newSeatPurchaseFixture(t, 3, new(50))
+			f.dropConnection()
+			_, err := f.purchase(2, 3)
+			require.NoError(t, err)
+			unknown := f.latestPurchase()
+			stale := time.Now().Add(-2 * polar.SeatPurchaseConfirmationWindow)
+			require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("id = ?", unknown.ID).Update("created_at", stale).Error)
+			f.polarSeats = polarSeats
+			f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
+				f.polarSeats = seats
+				f.writeJSON(w, http.StatusOK, f.snapshot(seats))
+			}
+
+			_, err = f.purchase(1, int32(polarSeats))
+
+			requireGRPCCode(t, codes.Aborted, err)
+			assert.ErrorContains(t, err, "A seat purchase is already in progress.")
+			assert.Equal(t, 1, f.patchCount(), "a new purchase does not charge while the first one is unknown")
+			assert.Equal(t, polarSeats, f.purchasedSeats(), "the verified snapshot repairs the capacity")
+			stored := f.latestPurchase()
+			assert.Equal(t, unknown.ID, stored.ID)
+			assert.Equal(t, models.SeatPurchaseStatusUnknown, stored.Status)
+			assert.Empty(t, stored.ErrorCode)
+		})
 	}
-
-	_, err = f.purchase(1, 4)
-
-	require.NoError(t, err, "the expired purchase below its target must not block purchases")
-	assert.Equal(t, 2, f.patchCount())
-	assert.Equal(t, 5, f.purchasedSeats())
-	require.NoError(t, database.Conn().First(first, "id = ?", first.ID).Error)
-	assert.Equal(t, models.SeatPurchaseStatusFailed, first.Status)
-	assert.Equal(t, models.SeatPurchaseErrorNotApplied, first.ErrorCode)
 }
 
 func Test__PreviewSettlesAnUnconfirmedPurchaseFromPolar(t *testing.T) {
@@ -1144,25 +1177,6 @@ func Test__PurchaseWaitsWhileAnUnconfirmedPurchaseIsOpen(t *testing.T) {
 	assert.ErrorContains(t, err, "A seat purchase is already in progress.")
 	assert.Equal(t, 1, f.patchCount())
 	assert.Equal(t, models.SeatPurchaseStatusUnknown, f.latestPurchase().Status)
-}
-
-func Test__PurchaseSettlesAnUnconfirmedPurchaseThatPolarNeverApplied(t *testing.T) {
-	f := newSeatPurchaseFixture(t, 3, new(50))
-	f.dropConnection()
-	_, err := f.purchase(1, 3)
-	require.NoError(t, err)
-	stale := time.Now().Add(-2 * polar.SeatPurchaseConfirmationWindow)
-	require.NoError(t, database.Conn().Model(&models.SeatPurchase{}).Where("organization_id = ?", f.r.Organization.ID).Update("created_at", stale).Error)
-	f.onPatch = func(w http.ResponseWriter, f *seatPurchaseFixture, seats int) {
-		f.polarSeats = seats
-		f.writeJSON(w, http.StatusOK, f.snapshot(seats))
-	}
-
-	_, err = f.purchase(1, 3)
-
-	require.NoError(t, err)
-	assert.Equal(t, 2, f.patchCount())
-	assert.Equal(t, 4, f.purchasedSeats())
 }
 
 func Test__ConcurrentPurchasesThatExceedTheMaximumSendOneUpdate(t *testing.T) {
@@ -1220,9 +1234,9 @@ func Test__DescribeBillingShowsTheLatestSeatPurchase(t *testing.T) {
 	assert.EqualValues(t, 4, after.LastSeatPurchase.ToSeats)
 }
 
-func Test__SyncBillingReconcilesExpiredUnknownSeatPurchases(t *testing.T) {
+func Test__SyncBillingKeepsAnExpiredUnknownSeatPurchaseWithoutEvidence(t *testing.T) {
 	for _, polarAvailable := range []bool{true, false} {
-		name := "unchanged subscription fails the expired purchase"
+		name := "unchanged subscription proves nothing"
 		if !polarAvailable {
 			name = "unavailable Polar preserves the unconfirmed purchase"
 		}
@@ -1266,16 +1280,8 @@ func Test__SyncBillingReconcilesExpiredUnknownSeatPurchases(t *testing.T) {
 			assert.EqualValues(t, 3, billing.GetPurchasedSeats())
 			assert.Equal(t, 3, f.purchasedSeats())
 			assert.Zero(t, purchaseUpdates.Load(), "refreshing billing cannot submit a purchase")
-			stored := f.latestPurchase()
-			if !polarAvailable {
-				assert.Equal(t, models.SeatPurchaseStatusUnknown, stored.Status)
-				assert.Equal(t, seatPurchaseAwaitingConfirmation, billing.LastSeatPurchase.Status)
-				return
-			}
-			assert.Equal(t, models.SeatPurchaseStatusFailed, stored.Status)
-			assert.Equal(t, models.SeatPurchaseErrorNotApplied, stored.ErrorCode)
-			assert.Equal(t, models.SeatPurchaseStatusFailed, billing.LastSeatPurchase.Status)
-			assert.Equal(t, "Polar did not apply the seat purchase. No seats were added.", billing.LastSeatPurchase.Message)
+			assert.Equal(t, models.SeatPurchaseStatusUnknown, f.latestPurchase().Status)
+			assert.Equal(t, seatPurchaseAwaitingConfirmation, billing.LastSeatPurchase.Status)
 		})
 	}
 }

@@ -2,6 +2,7 @@ package models
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,6 +68,41 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 
 	e.RunID = run.ID
 	return nil
+}
+
+// CreateDeduplicatedRootEvent creates one root event for a stable external
+// identity. The advisory lock and indexed lookup keep concurrent webhook and
+// API starts idempotent without coupling deduplication to run state.
+func (n *CanvasNode) CreateDeduplicatedRootEvent(tx *gorm.DB, event *CanvasEvent, key string) (bool, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return true, tx.Create(event).Error
+	}
+
+	event.DedupKey = &key
+	created := false
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		lockKey := "canvas-event:" + n.WorkflowID.String() + ":" + n.NodeID + ":" + key
+		if err := inner.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+			return err
+		}
+
+		var count int64
+		if err := inner.Model(&CanvasEvent{}).
+			Where("workflow_id = ? AND node_id = ? AND dedup_key = ?", n.WorkflowID, n.NodeID, key).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return nil
+		}
+		if err := inner.Create(event).Error; err != nil {
+			return err
+		}
+		created = true
+		return nil
+	})
+	return created, err
 }
 
 func FindCanvasEvents(tx *gorm.DB, ids []string) ([]CanvasEvent, error) {

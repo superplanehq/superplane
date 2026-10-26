@@ -233,6 +233,38 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	assert.Equal(t, "git push", requireTaskFile(t, req.Files, "steps/03-after.sh").Content)
 }
 
+func TestRunClaudeCodeExecuteSkipsAPIKeyWhenStepsAreBashOnly(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
+
+	component := &RunClaudeCode{}
+	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
+		Configuration: map[string]any{
+			"machineType": testRunnerMachineType,
+			"steps": []map[string]any{
+				{"name": "Deploy", "type": "bash", "command": "echo deploy"},
+			},
+			"credentials": map[string]any{
+				"source":      "integration",
+				"integration": map[string]any{"name": "claude"},
+			},
+		},
+		HTTP:           &contexts.HTTPContext{},
+		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{}},
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.NoError(t, err)
+
+	var req createTaskRequest
+	require.NoError(t, json.Unmarshal(tasks.Payload, &req))
+	assert.Equal(t, "Deploy", req.Commands[len(req.Commands)-1].Name)
+	for _, variable := range req.Environment {
+		assert.NotEqual(t, envAnthropicAPIKey, variable.Name)
+	}
+}
+
 func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
 	tasks := &contexts.RunnerTaskContext{}
 

@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/entitlements"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -78,7 +77,7 @@ func previewSeatPurchase(ctx context.Context, orgID string, req *pb.PreviewSeatP
 		return nil, err
 	}
 	db := database.DB(ctx)
-	reconcileSeatPurchaseAndScheduleRenewal(ctx, db, organizationID)
+	reconcileSeatPurchase(ctx, db, organizationID)
 
 	now := clock()
 	state, err := checkSeatPurchase(db, organizationID, req.GetAdditionalSeats(), now)
@@ -147,8 +146,8 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 	}
 
 	// Settle an unfinished purchase before the local checks. Only a snapshot
-	// from the period of that purchase can settle it.
-	reconcileSeatPurchaseAndScheduleRenewal(ctx, db, organizationID)
+	// that proves the success of that purchase can settle it.
+	reconcileSeatPurchase(ctx, db, organizationID)
 
 	// The purchase sends an absolute seat count, so it must start from the
 	// seats Polar reports now. A stale local count could remove seats that
@@ -197,8 +196,6 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 		if err := recordAppliedSeatPurchase(settleCtx, purchase, snapshot); err != nil {
 			return nil, err
 		}
-		// The invoice update replaced any scheduled renewal seat count.
-		seatrenewal.ScheduleAsync(settleCtx, organizationID)
 		return seatPurchaseResponse(ctx, organizationID, purchase), nil
 	}
 
@@ -467,20 +464,41 @@ func replaySeatPurchaseOperation(tx *gorm.DB, orgID uuid.UUID, operation seatPur
 	return &seatPurchaseStart{purchase: stored, replayed: true}, nil
 }
 
-// recordAppliedSeatPurchase applies the snapshot of a confirmed update. Polar has
-// already charged, so a local failure leaves the purchase unknown. Later
-// reconciliation then applies the Polar snapshot.
+// recordAppliedSeatPurchase applies the snapshot of an accepted update and
+// records the success that the response proves. The response is evidence for
+// this purchase only when it names the purchase subscription, the purchase
+// period, and the target seats. Other responses repair the capacity, and the
+// purchase stays unknown. Polar has already charged, so a local failure also
+// leaves the purchase unknown. Later reconciliation then applies the Polar
+// snapshot.
+//
+// This transaction owns the capacity alerts of the snapshot. They are written
+// only after the commit, so a local failure never reports a capacity change
+// that the database does not hold.
 func recordAppliedSeatPurchase(ctx context.Context, purchase *models.SeatPurchase, snapshot *polar.SubscriptionData) error {
+	evidence := polar.SeatPurchaseResponseEvidence(*snapshot)
+	var alerts polar.SeatCapacityAlerts
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if _, err := models.LockOrganization(tx, purchase.OrganizationID); err != nil {
 			return err
 		}
-		if err := polar.ApplyOrganizationSubscription(ctx, tx, purchase.OrganizationID, *snapshot); err != nil {
+		var err error
+		alerts, err = polar.StageOrganizationSubscription(ctx, tx, purchase.OrganizationID, *snapshot)
+		if err != nil {
 			return err
 		}
-		return purchase.UpdateStatus(tx, models.SeatPurchaseStatusSucceeded, "")
+		if purchase.SucceededBy(evidence) {
+			return purchase.UpdateStatus(tx, models.SeatPurchaseStatusSucceeded, "")
+		}
+		log.WithFields(log.Fields{
+			"organization_id":       purchase.OrganizationID.String(),
+			"seat_purchase_id":      purchase.ID.String(),
+			"polar_subscription_id": snapshot.ID,
+		}).Warn("the seat purchase response does not describe the purchase")
+		return purchase.UpdateStatus(tx, models.SeatPurchaseStatusUnknown, "")
 	})
 	if err == nil {
+		alerts.Emit()
 		return nil
 	}
 	log.WithError(err).WithField("organization_id", purchase.OrganizationID.String()).Error("could not apply the seat purchase snapshot")
@@ -592,20 +610,12 @@ func seatPurchaseResponse(ctx context.Context, orgID uuid.UUID, purchase *models
 }
 
 // reconcileSeatPurchase settles an earlier unconfirmed purchase from Polar.
-// When Polar cannot confirm it, the purchase stays in flight and blocks a new one.
-func reconcileSeatPurchase(ctx context.Context, db *gorm.DB, orgID uuid.UUID) error {
+// When Polar cannot confirm it, the purchase stays in flight and blocks a new
+// one. It never writes a seat count to Polar.
+func reconcileSeatPurchase(ctx context.Context, db *gorm.DB, orgID uuid.UUID) {
 	if err := polar.ReconcileSeatPurchase(ctx, db, polar.NewClientFromEnv(), orgID); err != nil {
 		log.WithError(err).WithField("organization_id", orgID.String()).Warn("could not reconcile the seat purchase")
-		return err
 	}
-	return nil
-}
-
-func reconcileSeatPurchaseAndScheduleRenewal(ctx context.Context, db *gorm.DB, orgID uuid.UUID) {
-	if err := reconcileSeatPurchase(ctx, db, orgID); err != nil {
-		return
-	}
-	seatrenewal.ScheduleAfterSeatPurchaseAsync(ctx, orgID)
 }
 
 func parseUserID(userID string) *uuid.UUID {

@@ -16,6 +16,7 @@ import {
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: () => true,
+    hasPermission: () => true,
     isLoading: false,
   }),
 }));

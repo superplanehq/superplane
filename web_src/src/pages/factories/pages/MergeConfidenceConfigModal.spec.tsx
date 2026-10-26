@@ -124,6 +124,7 @@ describe("MergeConfidenceConfigModal", () => {
         expect(screen.getByRole("switch", { name: label })).toBeChecked();
       }
       expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
+      expect(screen.getByText("The model used for each run.")).toBeInTheDocument();
       expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(5);
       const duration = screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" });
       expect(duration).toHaveValue(60);

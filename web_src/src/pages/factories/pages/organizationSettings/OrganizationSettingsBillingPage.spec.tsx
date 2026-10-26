@@ -26,15 +26,10 @@ const WELCOME_EXPIRY_LABEL = new Date(ACTIVE_TRIAL_ENDS_AT).toLocaleDateString()
 let canUpdateOrg = true;
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({
-    canAct: (resource: string, action: string) => {
-      if (resource === "org" && action === "update") {
-        return canUpdateOrg;
-      }
-      return true;
-    },
-    isLoading: false,
-  }),
+  usePermissions: () => {
+    const canAct = (resource: string, action: string) => resource !== "org" || action !== "update" || canUpdateOrg;
+    return { canAct, hasPermission: canAct, isLoading: false };
+  },
 }));
 
 describe("OrganizationSettingsBillingPage", () => {

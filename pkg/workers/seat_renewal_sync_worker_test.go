@@ -59,14 +59,6 @@ func (f *seatRenewalSyncFixture) addOrganization(seats int, renewsIn time.Durati
 	return org.ID, f.polar.AddSeatPlan(database.Conn(), org.ID, seats, f.now.Add(renewsIn))
 }
 
-func (f *seatRenewalSyncFixture) patchedSubscriptions() []string {
-	var ids []string
-	for _, patch := range f.polar.Patches() {
-		ids = append(ids, patch.SubscriptionID)
-	}
-	return ids
-}
-
 func (f *seatRenewalSyncFixture) entries(level log.Level, message string) []log.Entry {
 	var found []log.Entry
 	for _, entry := range f.logs.AllEntries() {
@@ -77,35 +69,27 @@ func (f *seatRenewalSyncFixture) entries(level log.Level, message string) []log.
 	return found
 }
 
-func Test__SeatRenewalSyncFixesTheOrganizationThatRenewsFirstFirst(t *testing.T) {
-	f := newSeatRenewalSyncFixture(t)
-	laterOrg, later := f.addOrganization(4, 20*24*time.Hour)
-	soonOrg, soon := f.addOrganization(3, 12*time.Hour)
-	_, inSync := f.addOrganization(1, 6*time.Hour)
-
-	f.worker.tick(context.Background())
-
-	// The in-sync organization renews first and already has the target
-	// count. It still gets one idempotent update, because the plan records
-	// only counts that SuperPlane sent.
-	assert.Equal(t, []string{inSync.ID, soon.ID, later.ID}, f.patchedSubscriptions())
-	for _, patch := range f.polar.Patches() {
-		assert.Equal(t, map[string]any{"seats": float64(1), "proration_behavior": "next_period"}, patch.Body)
+func (f *seatRenewalSyncFixture) gets() []string {
+	var ids []string
+	for _, request := range f.polar.Requests() {
+		if request.Method == http.MethodGet {
+			ids = append(ids, request.SubscriptionID)
+		}
 	}
-	assert.Nil(t, f.polar.Subscription(inSync.ID).PendingSeats)
-	assert.Equal(t, 3, f.polar.Subscription(soon.ID).Seats, "the current period keeps its seats")
+	return ids
+}
 
-	fixed := f.entries(log.WarnLevel, seatRenewalMismatchFixedKey)
-	require.Len(t, fixed, 2, "a count that already matches is recorded, not fixed")
-	assert.Equal(t, soonOrg.String(), fixed[0].Data["organization_id"])
-	assert.Equal(t, soon.ID, fixed[0].Data["polar_subscription_id"])
-	assert.Equal(t, 1, fixed[0].Data["renewal_target_seats"])
-	assert.Equal(t, 3, fixed[0].Data["next_period_seats"])
-	assert.Equal(t, 3, fixed[0].Data["current_seats"])
-	assert.Equal(t, laterOrg.String(), fixed[1].Data["organization_id"])
+func Test__SeatRenewalSyncReconcilesTheOrganizationThatRenewsFirstFirst(t *testing.T) {
+	f := newSeatRenewalSyncFixture(t)
+	_, later := f.addOrganization(4, 20*24*time.Hour)
+	_, soon := f.addOrganization(3, 12*time.Hour)
+	_, sooner := f.addOrganization(1, 6*time.Hour)
 
 	f.worker.tick(context.Background())
-	assert.Len(t, f.polar.Patches(), 3, "counts and records that already match need no update")
+
+	assert.Equal(t, []string{sooner.ID, soon.ID, later.ID}, f.gets())
+	assert.Empty(t, f.polar.Patches(), "the sync never writes a seat count, even with spare seats")
+	assert.Nil(t, f.polar.Subscription(later.ID).PendingSeats, "renewal keeps the paid seats")
 }
 
 func Test__SeatRenewalSyncResumesWhereARateLimitStopped(t *testing.T) {
@@ -120,21 +104,15 @@ func Test__SeatRenewalSyncResumesWhereARateLimitStopped(t *testing.T) {
 
 	f.worker.tick(context.Background())
 
-	assert.Empty(t, f.polar.Patches())
 	assert.Equal(t, middleOrg, f.worker.resumeAfter)
-	for _, request := range f.polar.Requests() {
-		assert.NotEqual(t, later.ID, request.SubscriptionID, "the rate limit stops the run before later organizations")
-	}
+	assert.Equal(t, []string{soon.ID, middle.ID}, f.gets(), "the rate limit stops the run before later organizations")
 
 	requests := len(f.polar.Requests())
 	f.worker.tick(context.Background())
 
 	// The next run continues where the rate limit stopped it, so the
 	// organizations later in the list are checked too.
-	assert.Equal(t, []string{middle.ID, later.ID}, f.patchedSubscriptions())
-	for _, request := range f.polar.Requests()[requests:] {
-		assert.NotEqual(t, soon.ID, request.SubscriptionID, "the resumed run does not spend its budget again on earlier organizations")
-	}
+	assert.Equal(t, []string{middle.ID, later.ID}, f.gets()[requests:], "the resumed run does not spend its budget again on earlier organizations")
 	assert.Equal(t, uuid.Nil, f.worker.resumeAfter, "a completed run clears the position")
 
 	requests = len(f.polar.Requests())
@@ -142,52 +120,43 @@ func Test__SeatRenewalSyncResumesWhereARateLimitStopped(t *testing.T) {
 
 	// After a completed run, the next run starts again with the
 	// organization that renews first.
-	require.Greater(t, len(f.polar.Requests()), requests)
-	assert.Equal(t, soon.ID, f.polar.Requests()[requests].SubscriptionID)
-	assert.Equal(t, []string{middle.ID, later.ID, soon.ID}, f.patchedSubscriptions())
+	assert.Equal(t, []string{soon.ID, middle.ID, later.ID}, f.gets()[requests:])
+	assert.Empty(t, f.polar.Patches())
 }
 
-func Test__SeatRenewalSyncFixesTheCountAfterAPolarOutage(t *testing.T) {
+func Test__SeatRenewalSyncReportsAFailureCloseToRenewalAsAnError(t *testing.T) {
 	f := newSeatRenewalSyncFixture(t)
 	soonOrg, soon := f.addOrganization(3, 12*time.Hour)
-	_, later := f.addOrganization(3, 10*24*time.Hour)
+	f.addOrganization(3, 10*24*time.Hour)
 	f.polar.FailNext(2, http.StatusServiceUnavailable, "")
 
 	f.worker.tick(context.Background())
 
-	assert.Empty(t, f.polar.Patches())
 	failed := f.entries(log.ErrorLevel, seatRenewalSyncFailedKey)
 	require.Len(t, failed, 1, "only a failure close to renewal is an error")
 	assert.Equal(t, soonOrg.String(), failed[0].Data["organization_id"])
 	assert.Equal(t, soon.ID, failed[0].Data["polar_subscription_id"])
-
-	f.worker.tick(context.Background())
-
-	assert.Equal(t, []string{soon.ID, later.ID}, f.patchedSubscriptions())
-	assert.Len(t, f.entries(log.WarnLevel, seatRenewalMismatchFixedKey), 2)
 }
 
-func Test__SeatRenewalSyncWaitsUntilTheSeatPurchaseSettles(t *testing.T) {
+func Test__SeatRenewalSyncKeepsReconcilingWhileAPurchaseIsInFlight(t *testing.T) {
 	f := newSeatRenewalSyncFixture(t)
 	orgID, sub := f.addOrganization(3, 12*time.Hour)
 	purchase := models.NewSeatPurchase(orgID, nil, sub.ID, 3, 4, nil)
 	require.NoError(t, purchase.Create(database.Conn()))
+	// A renewal event was lost while the purchase is in its confirmation window.
+	renewedStart := sub.PeriodEnd
+	f.polar.Update(sub.ID, func(s *polarfake.Subscription) {
+		s.PeriodStart = renewedStart
+		s.PeriodEnd = renewedStart.AddDate(0, 1, 0)
+	})
 
 	f.worker.tick(context.Background())
-	assert.Empty(t, f.polar.Patches(), "a purchase in its confirmation window owns the next seat change")
-	blocked := f.entries(log.WarnLevel, seatRenewalBlockedByPurchaseKey)
-	require.Len(t, blocked, 1)
-	assert.Equal(t, orgID.String(), blocked[0].Data["organization_id"])
-	assert.Equal(t, purchase.ID.String(), blocked[0].Data["seat_purchase_id"])
-	assert.Equal(t, sub.ID, blocked[0].Data["polar_subscription_id"])
+
+	plan, err := models.FindOrganizationBillingPlan(database.Conn(), orgID)
+	require.NoError(t, err)
+	assert.True(t, plan.CurrentPeriodStart.Equal(renewedStart), "the stored period follows Polar")
+	assert.Empty(t, f.polar.Patches())
 	assert.Empty(t, f.entries(log.ErrorLevel, seatPurchaseUnresolvedKey), "a recent purchase is not unresolved yet")
-
-	f.polar.Update(sub.ID, func(s *polarfake.Subscription) { s.Seats = 4 })
-	require.NoError(t, purchase.UpdateStatus(database.Conn(), models.SeatPurchaseStatusSucceeded, ""))
-
-	f.worker.tick(context.Background())
-	require.Len(t, f.polar.Patches(), 1)
-	assert.Equal(t, map[string]any{"seats": float64(1), "proration_behavior": "next_period"}, f.polar.Patches()[0].Body)
 }
 
 // addSetupOrganization puts the organization of the test setup on a per-seat
@@ -269,7 +238,6 @@ func Test__SeatRenewalSyncRepairsDroppedFailureAndRecoveryEvents(t *testing.T) {
 	assert.True(t, seatUsage().PaymentBlocked)
 	_, err := f.invitations().Accept(context.Background(), invitee.ID.String(), token)
 	requireInvitationReason(t, err, "PAYMENT_PAST_DUE")
-	assert.Equal(t, []string{sub.ID}, f.patchedSubscriptions(), "a past-due plan keeps its renewal seat count")
 
 	f.polar.Update(sub.ID, func(s *polarfake.Subscription) { s.Status = models.PolarSubscriptionStatusActive })
 	f.worker.tick(context.Background())
@@ -278,7 +246,7 @@ func Test__SeatRenewalSyncRepairsDroppedFailureAndRecoveryEvents(t *testing.T) {
 	assert.Equal(t, models.PolarSubscriptionStatusActive, plan.PolarSubscriptionStatus)
 	assert.True(t, plan.Catalog.PerSeat, "the plan returns to the per-seat catalog plan")
 	assert.False(t, seatUsage().PaymentBlocked)
-	assert.Equal(t, []string{sub.ID}, f.patchedSubscriptions(), "the recovered plan already renews with its seat count")
+	assert.Empty(t, f.polar.Patches())
 }
 
 // agedPurchase records an unknown purchase that started two hours ago in the
@@ -298,7 +266,7 @@ func (f *seatRenewalSyncFixture) assertStillUnresolved(purchase *models.SeatPurc
 	f.t.Helper()
 	var stored models.SeatPurchase
 	require.NoError(f.t, database.Conn().First(&stored, "id = ?", purchase.ID).Error)
-	assert.Equal(f.t, models.SeatPurchaseStatusUnknown, stored.Status, "the report and the schedule never settle a purchase")
+	assert.Equal(f.t, models.SeatPurchaseStatusUnknown, stored.Status, "the report and the reconciliation never settle a purchase")
 }
 
 func (f *seatRenewalSyncFixture) unresolvedLine(purchase *models.SeatPurchase) log.Entry {
@@ -333,7 +301,7 @@ func Test__SeatRenewalSyncReportsAnAgedPurchaseOutsideTheCandidateList(t *testin
 	assert.True(t, sub.PeriodStart.Equal(line.Data["purchase_period_start"].(time.Time)))
 	assert.True(t, sub.PeriodEnd.Equal(line.Data["purchase_period_end"].(time.Time)))
 	assert.Equal(t, int64(2*time.Hour/time.Second), line.Data["age_seconds"])
-	assert.Equal(t, "no_renewal_maintenance", line.Data["renewal_impact"])
+	assert.NotContains(t, line.Data, "renewal_impact", "no purchase blocks renewal maintenance")
 	f.assertStillUnresolved(purchase)
 
 	f.worker.tick(context.Background())
@@ -341,32 +309,20 @@ func Test__SeatRenewalSyncReportsAnAgedPurchaseOutsideTheCandidateList(t *testin
 	assert.Len(t, f.entries(log.ErrorLevel, seatPurchaseUnresolvedKey), 2, "the line repeats while the purchase stays unresolved")
 }
 
-func Test__SeatRenewalSyncReportsAnAgedPurchaseWhateverTheScheduleDoes(t *testing.T) {
+func Test__SeatRenewalSyncReportsAnAgedPurchaseWhateverTheReconciliationDoes(t *testing.T) {
 	tests := []struct {
 		name string
 		// setup prepares the organization and returns its purchase.
-		setup  func(f *seatRenewalSyncFixture, orgID uuid.UUID, sub polarfake.Subscription) *models.SeatPurchase
-		impact string
-		// patched is true when the schedule sends the renewal count.
-		patched bool
+		setup func(f *seatRenewalSyncFixture, orgID uuid.UUID, sub polarfake.Subscription) *models.SeatPurchase
 	}{
 		{
-			name: "schedule succeeds", impact: "renewal_maintenance_continues", patched: true,
+			name: "reconciliation succeeds",
 			setup: func(f *seatRenewalSyncFixture, orgID uuid.UUID, sub polarfake.Subscription) *models.SeatPurchase {
 				return f.agedPurchase(orgID, sub.ID, sub.PeriodStart.AddDate(0, -1, 0), sub.PeriodStart)
 			},
 		},
 		{
-			name: "schedule skips", impact: "no_renewal_maintenance",
-			setup: func(f *seatRenewalSyncFixture, orgID uuid.UUID, sub polarfake.Subscription) *models.SeatPurchase {
-				f.polar.Update(sub.ID, func(s *polarfake.Subscription) { s.CancelAtPeriodEnd = true })
-				require.NoError(f.t, database.Conn().Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", orgID).
-					Update("cancel_at_period_end", true).Error)
-				return f.agedPurchase(orgID, sub.ID, sub.PeriodStart.AddDate(0, -1, 0), sub.PeriodStart)
-			},
-		},
-		{
-			name: "schedule fails", impact: "blocks_renewal_maintenance",
+			name: "reconciliation fails",
 			setup: func(f *seatRenewalSyncFixture, orgID uuid.UUID, sub polarfake.Subscription) *models.SeatPurchase {
 				f.polar.FailNext(1, http.StatusServiceUnavailable, "")
 				return f.agedPurchase(orgID, sub.ID, sub.PeriodStart, sub.PeriodEnd)
@@ -381,12 +337,8 @@ func Test__SeatRenewalSyncReportsAnAgedPurchaseWhateverTheScheduleDoes(t *testin
 
 			f.worker.tick(context.Background())
 
-			assert.Equal(t, tt.impact, f.unresolvedLine(purchase).Data["renewal_impact"])
-			if tt.patched {
-				assert.Equal(t, []string{sub.ID}, f.patchedSubscriptions())
-			} else {
-				assert.Empty(t, f.polar.Patches())
-			}
+			assert.Equal(t, orgID.String(), f.unresolvedLine(purchase).Data["organization_id"])
+			assert.Empty(t, f.polar.Patches())
 			f.assertStillUnresolved(purchase)
 		})
 	}
