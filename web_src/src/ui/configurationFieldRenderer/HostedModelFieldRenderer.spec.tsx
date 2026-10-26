@@ -429,6 +429,27 @@ describe("HostedModelFieldRenderer", () => {
     expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
   });
 
+  it("offers Codex effort levels for OpenAI models", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    mockSelectableModels([selectableModel("byok", "openai", "gpt-5.4")]);
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField("openai")}
+        value="gpt-5.4"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "gpt-5.4" }}
+        organizationId="org-1"
+      />,
+    );
+
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "Extra high");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-5.4", thinkingLevel: "xhigh" });
+  });
+
   it("clears thinkingLevel when Default is selected", async () => {
     const user = userEvent.setup();
     const onValuesChange = vi.fn();

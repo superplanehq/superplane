@@ -3,6 +3,7 @@ package models_test
 import (
 	"github.com/superplanehq/superplane/pkg/features"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -137,6 +138,21 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	require.NoError(t, err)
 
 	byok, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, &factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceBYOK)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"gpt-4.1", "gpt-4o"}, byok)
+
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	require.NoError(t, err)
+	used := 0.0
+	duration := int64(300)
+	reset := time.Now().Add(time.Hour).Unix()
+	limits := []models.CodexUsageLimit{{LimitID: "codex", Primary: &models.CodexUsageWindow{UsedPercent: &used, WindowDurationMins: &duration, ResetsAt: &reset}}}
+	require.NoError(t, connection.StoreUsage(db, limits, []models.CodexModel{{Model: "gpt-5.4"}}, time.Now()))
+	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
+	byok, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, &factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceBYOK)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"gpt-4.1", "gpt-4o", "gpt-5.4"}, byok)
+	byok, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, &otherFactory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceBYOK)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"gpt-4.1", "gpt-4o"}, byok)
 
