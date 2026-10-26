@@ -56,8 +56,8 @@ func TestRunnerCleanupRefreshesQueuedPlanningAfterCapacityRelease(t *testing.T) 
 			require.NoError(t, db.Model(execution).Update("run_id", run.ID).Error)
 			require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, entry, execution.ID, "task_id", queued.ID.String()))
 			var releasedStates []string
-			restore := messages.SetFactoryWorkOrderUpdatedPublisherForTest(func(factoryID, orderID, _ string) error {
-				if factoryID != factoryModel.ID.String() || orderID != order.ID.String() {
+			restore := messages.SetFactoryWorkOrderUpdatedPublisherForTest(func(factoryID, orderID, reason string) error {
+				if factoryID != factoryModel.ID.String() || orderID != "" || reason != "runner_capacity" {
 					return nil
 				}
 				stored, err := models.FindRunnerTask(database.DB(t.Context()), occupying.ID)

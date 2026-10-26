@@ -493,6 +493,7 @@ func (s *Service) createRunner(
 	})
 	if err == nil && reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetID, models.RunnerFleetScopeInstallation)
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), reservedTask)
 	}
 	if idempotencyKey != "" && models.IsRunnerCreationIdempotencyKeyConflict(err) {
 		runner, err = loadIdempotentRunner(database.DB(ctx), idempotencyKey, requestHash)

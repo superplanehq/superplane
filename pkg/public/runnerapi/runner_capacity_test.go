@@ -57,9 +57,7 @@ func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
 	occupyingTask := newTask(otherFleet.ID)
 	require.NoError(t, occupyingTask.Reserve(db, occupyingRunner.ID))
 	queued := newTask(fleet.ID)
-	attachSession := func(task *models.RunnerTask) *models.FactoryPlanningSession {
-		factoryModel, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
+	attachSession := func(task *models.RunnerTask, factoryModel *models.Factory) *models.FactoryPlanningSession {
 		order, err := factoryModel.CreateWorkOrder(db, "Queued planning", "", &resource.User, nil, nil)
 		require.NoError(t, err)
 		canvas, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, resource, factoryModel.ID, "Backlog", "start")
@@ -75,41 +73,43 @@ func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
 		require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, entrypoint, execution.ID, "task_id", task.ID.String()))
 		return session
 	}
-	session := attachSession(queued)
-	otherSession := attachSession(newTask(otherFleet.ID))
+	ownFactory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	otherFactory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	session := attachSession(queued, ownFactory)
+	attachSession(newTask(otherFleet.ID), otherFactory)
+	attachSession(newTask(otherFleet.ID), otherFactory)
 	type boardUpdate struct {
-		orderID string
-		state   string
+		factoryID string
+		orderID   string
+		reason    string
+		state     string
 	}
-	updates := make(chan boardUpdate, 4)
-	restorePublisher := messages.SetFactoryWorkOrderUpdatedPublisherForTest(func(factoryID, orderID, _ string) error {
-		ownSession := factoryID == session.FactoryID.String() && orderID == session.DraftWorkOrderID.String()
-		queuedSession := factoryID == otherSession.FactoryID.String() && orderID == otherSession.DraftWorkOrderID.String()
-		if !ownSession && !queuedSession {
-			return nil
-		}
+	updates := make(chan boardUpdate, 12)
+	restorePublisher := messages.SetFactoryWorkOrderUpdatedPublisherForTest(func(factoryID, orderID, reason string) error {
 		// Read through another connection: the notification must follow commit.
 		stored, findErr := models.FindRunnerTask(database.DB(t.Context()), queued.ID)
 		if findErr != nil {
 			return findErr
 		}
-		updates <- boardUpdate{orderID: orderID, state: stored.State}
+		updates <- boardUpdate{factoryID: factoryID, orderID: orderID, reason: reason, state: stored.State}
 		return nil
 	})
 	defer restorePublisher()
-	assertUpdates := func(state string) {
+	assertUpdates := func(expected []boardUpdate) {
 		t.Helper()
-		var orderIDs []string
-		for range 2 {
+		var received []boardUpdate
+		for range len(expected) {
 			select {
 			case update := <-updates:
-				orderIDs = append(orderIDs, update.orderID)
-				assert.Equal(t, state, update.state)
+				received = append(received, update)
 			case <-time.After(time.Second):
 				t.Fatal("the planning boards did not receive the runner capacity update")
 			}
 		}
-		assert.ElementsMatch(t, []string{session.DraftWorkOrderID.String(), otherSession.DraftWorkOrderID.String()}, orderIDs)
+		assert.ElementsMatch(t, expected, received)
+		assert.Empty(t, updates, "reserved-to-running must not refresh other planning boards")
 	}
 
 	activeStore, err := runnerlogsfs.New(t.TempDir())
@@ -168,7 +168,11 @@ func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
 		return err == nil && started.State == models.RunnerTaskStateRunning &&
 			started.RunnerID != nil && *started.RunnerID == runner.ID
 	}, time.Second, 10*time.Millisecond)
-	assertUpdates(models.RunnerTaskStateRunning)
+	assertUpdates([]boardUpdate{
+		{ownFactory.ID.String(), session.DraftWorkOrderID.String(), "order.updated", models.RunnerTaskStateReserved},
+		{otherFactory.ID.String(), "", "runner_capacity", models.RunnerTaskStateReserved},
+		{ownFactory.ID.String(), session.DraftWorkOrderID.String(), "order.updated", models.RunnerTaskStateRunning},
+	})
 
 	require.NoError(t, socket.WriteJSON(typedMessage{Type: "invalid"}))
 	require.NoError(t, socket.ReadJSON(&invalid))
@@ -180,5 +184,8 @@ func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
 	var ack ackMessage
 	require.NoError(t, socket.ReadJSON(&ack))
 	assert.Equal(t, requestID, ack.RequestID)
-	assertUpdates(models.RunnerTaskStateSucceeded)
+	assertUpdates([]boardUpdate{
+		{ownFactory.ID.String(), session.DraftWorkOrderID.String(), "order.updated", models.RunnerTaskStateSucceeded},
+		{otherFactory.ID.String(), "", "runner_capacity", models.RunnerTaskStateSucceeded},
+	})
 }

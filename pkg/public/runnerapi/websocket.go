@@ -395,6 +395,7 @@ func (s *Server) reconcileRunnerConnection(
 	}
 	if reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug, fleetScope)
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), reservedTask)
 	}
 
 	if shouldStartTask {
@@ -465,7 +466,7 @@ func (s *Server) startRunnerTask(
 	if err != nil {
 		return err
 	}
-	messages.PublishPlanningRunnerStatus(database.DB(ctx), startedTask)
+	messages.PublishPlanningBoardStatusForTask(database.DB(ctx), startedTask)
 	return nil
 }
 
