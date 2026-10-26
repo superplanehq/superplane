@@ -14,7 +14,7 @@ vi.mock("./onboardingCardPlan", () => ({
 }));
 const chrome = { stepIndex: 4, stepCount: 6 };
 const plans = [
-  { key: "pay_as_you_go", name: "Pay-as-you-go", priceCents: "0" },
+  { key: "pay_as_you_go", name: "Pay-as-you-go", priceCents: "0", parallelTaskLimit: 5 },
   { key: "starter", name: "Starter", priceCents: "2000", subscriptionRequired: true },
 ];
 function cardStep(overrides: Partial<OnboardingCardStep> = {}): OnboardingCardStep {
@@ -39,6 +39,20 @@ beforeEach(() => {
   openCardSetup.mockReset().mockResolvedValue({ token: "polar_cst_test", origin: "https://sandbox.polar.sh" });
   activateOnboardingPlan.mockReset().mockResolvedValue(false);
   resumeOnboardingPlan.mockReset().mockResolvedValue(false);
+});
+
+it.each([1, 2])("shows the saved task limit of %i instead of inferring it from the plan name", (limit) => {
+  renderHost(
+    cardStep({
+      plans: [
+        { ...plans[0], parallelTaskLimit: undefined },
+        { ...plans[1], parallelTaskLimit: limit },
+      ],
+    }),
+  );
+  expect(screen.getByText(`Up to ${limit} ${limit === 1 ? "task" : "tasks"} at once`)).toBeInTheDocument();
+  expect(screen.getByText("Unlimited tasks at once")).toBeInTheDocument();
+  expect(screen.queryByText("Up to 5 tasks at once")).not.toBeInTheDocument();
 });
 
 it("sends Starter directly to checkout without a separate card setup", async () => {

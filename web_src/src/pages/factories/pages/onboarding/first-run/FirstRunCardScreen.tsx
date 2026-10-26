@@ -40,7 +40,6 @@ function PlanChoice({
   disabled: boolean;
   onSelect: (key: string) => void;
 }) {
-  const starter = plan.key === "starter";
   const price = (Number(plan.priceCents ?? 0) / 100).toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
@@ -84,7 +83,7 @@ function PlanChoice({
         <span className="text-[13px] text-muted-foreground">{copy.monthly}</span>
       </span>
       <span className="mt-3 border-t border-border pt-3 text-[13px] font-medium">
-        {starter ? copy.starterCapacity : copy.paygCapacity}
+        {copy.capacity(plan.parallelTaskLimit)}
       </span>
     </Label>
   );

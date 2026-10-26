@@ -161,8 +161,8 @@ export const FIRST_RUN_COPY = {
     headline: "Choose your starting plan",
     credit: "$10 in signup credit",
     creditBody: "Included with either plan for sandbox time and model usage.",
-    paygCapacity: "Up to 5 tasks at once",
-    starterCapacity: "Unlimited tasks at once",
+    capacity: (limit?: number) =>
+      limit == null ? "Unlimited tasks at once" : `Up to ${limit} ${limit === 1 ? "task" : "tasks"} at once`,
     monthly: "/ month",
     continueWith: (planName: string) => `Continue with ${planName}`,
     cardNext: "Next: add your card in Polar. No subscription charge on Pay-as-you-go.",

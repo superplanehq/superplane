@@ -8,7 +8,7 @@ import { repositorySphereFor } from "./onboarding/first-run/firstRunSphereFor";
 import { FirstRunTicketsScreen } from "./onboarding/first-run/FirstRunTicketsScreen";
 
 const plans = [
-  { key: "pay_as_you_go", name: "Pay-as-you-go", priceCents: "0" },
+  { key: "pay_as_you_go", name: "Pay-as-you-go", priceCents: "0", parallelTaskLimit: 5 },
   { key: "starter", name: "Starter", priceCents: "2000", subscriptionRequired: true },
 ];
 
