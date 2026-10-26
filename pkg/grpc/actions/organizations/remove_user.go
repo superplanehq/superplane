@@ -46,18 +46,11 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 			return err
 		}
 
-		roles, err := authService.GetUserRolesForOrg(ctx, user.ID.String(), orgID)
-		if err != nil {
-			log.Errorf("Error determing user roles for %s: %v", user.ID.String(), err)
-			return grpcerrors.Internal(err, "error determing user roles")
-		}
-
-		for _, role := range roles {
-			err = authService.RemoveRoleInTransaction(tx, user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
-			if err != nil {
-				log.Errorf("Error removing role %s for %s: %v", role.Name, user.ID.String(), err)
-				return grpcerrors.Internal(err, "error removing role")
-			}
+		// Group memberships are separate from direct roles. Both must go,
+		// or a later invitation restores the old authority.
+		if err := authService.RemoveUserFromOrganizationInTransaction(tx, user.ID.String(), orgID); err != nil {
+			log.Errorf("Error removing organization grants for %s: %v", user.ID.String(), err)
+			return grpcerrors.Internal(err, "error removing role")
 		}
 
 		if err := user.SoftDelete(tx, time.Now(), ""); err != nil {
