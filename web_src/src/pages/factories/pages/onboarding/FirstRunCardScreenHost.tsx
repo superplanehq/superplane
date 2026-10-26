@@ -56,7 +56,12 @@ export function FirstRunCardScreenHost({
     setError("");
     setStarting(true);
     try {
-      await activateOnboardingPlan(organizationId, plan.key);
+      const seats = plan.perSeat ? Math.max(cardStep.occupiedSeats ?? 1, 1) : undefined;
+      const checkout = await activateOnboardingPlan(organizationId, plan.key, {
+        seats,
+        returnPath: `${window.location.pathname}${window.location.search}`,
+      });
+      if (checkout) return;
       await cardStep.refetch();
       await flow.finishSetup();
     } catch (cause) {

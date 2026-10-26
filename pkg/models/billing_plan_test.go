@@ -193,20 +193,21 @@ func TestOnboardingDefaultBillingPlan(t *testing.T) {
 		return plan
 	}
 
-	t.Run("only a plan that activates without checkout can be the default", func(t *testing.T) {
-		for _, tc := range []struct {
-			name   string
-			change func(*models.BillingPlan)
-		}{
-			{"priced", func(p *models.BillingPlan) { p.PriceCents = 1000 }},
-			{"per seat", func(p *models.BillingPlan) { p.PerSeat = true; p.SeatLimit = new(50) }},
-			{"private", func(p *models.BillingPlan) { p.Visibility = "private" }},
-			{"polar product", func(p *models.BillingPlan) { p.PolarProductID = new("product_" + uuid.NewString()) }},
-		} {
-			plan := newPlan("Invalid default")
-			tc.change(&plan)
-			require.ErrorIs(t, models.SaveBillingPlan(db, &plan), models.ErrCatalogPlan, tc.name)
-		}
+	t.Run("only a public paid plan can be the default", func(t *testing.T) {
+		private := newPlan("Private")
+		private.Visibility = "private"
+		require.ErrorIs(t, models.SaveBillingPlan(db, &private), models.ErrCatalogPlan)
+
+		trial := newPlan("Trial")
+		trial.Category = "trial"
+		require.ErrorIs(t, models.SaveBillingPlan(db, &trial), models.ErrCatalogPlan)
+
+		priced := newPlan("Priced")
+		priced.PriceCents = 2000
+		priced.PerSeat = true
+		priced.SeatLimit = new(50)
+		priced.PolarProductID = new("product_" + uuid.NewString())
+		require.NoError(t, models.SaveBillingPlan(db, &priced))
 	})
 
 	t.Run("the last saved default replaces the earlier one", func(t *testing.T) {

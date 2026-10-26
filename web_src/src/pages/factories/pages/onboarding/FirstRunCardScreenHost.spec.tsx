@@ -65,7 +65,13 @@ it("saves a card, starts the default plan with its credit, and continues setup",
   expect(activateOnboardingPlan).not.toHaveBeenCalled();
 
   cardSetup.open.mock.calls[0][0]?.();
-  await waitFor(() => expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "pay_as_you_go"));
+  await waitFor(() =>
+    expect(activateOnboardingPlan).toHaveBeenCalledWith(
+      "org-1",
+      "pay_as_you_go",
+      expect.objectContaining({ returnPath: `${window.location.pathname}${window.location.search}` }),
+    ),
+  );
   await waitFor(() => expect(finishSetup).toHaveBeenCalledTimes(1));
   expect(step.refetch).toHaveBeenCalled();
 });
@@ -76,7 +82,31 @@ it("starts the plan at once when a card is already saved", async () => {
   await userEvent.setup().click(screen.getByTestId("first-run-card-continue"));
   expect(cardSetup.open).not.toHaveBeenCalled();
   await waitFor(() => expect(finishSetup).toHaveBeenCalledTimes(1));
-  expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "pay_as_you_go");
+  expect(activateOnboardingPlan).toHaveBeenCalledWith(
+    "org-1",
+    "pay_as_you_go",
+    expect.objectContaining({ returnPath: `${window.location.pathname}${window.location.search}` }),
+  );
+});
+
+it("checks out a per-seat plan for the occupied seats and does not finish setup", async () => {
+  activateOnboardingPlan.mockResolvedValue(true);
+  const { finishSetup } = renderHost(
+    cardStep({
+      hasPaymentMethod: true,
+      occupiedSeats: 2,
+      plan: { ...plan, perSeat: true },
+    }),
+  );
+  await userEvent.setup().click(screen.getByTestId("first-run-card-continue"));
+  await waitFor(() =>
+    expect(activateOnboardingPlan).toHaveBeenCalledWith(
+      "org-1",
+      "pay_as_you_go",
+      expect.objectContaining({ seats: 2 }),
+    ),
+  );
+  expect(finishSetup).not.toHaveBeenCalled();
 });
 
 it("continues without a plan change when the plan is already active", async () => {

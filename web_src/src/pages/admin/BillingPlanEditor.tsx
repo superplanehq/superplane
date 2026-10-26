@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { BillingHelp } from "./BillingHelp";
 import { PolarProductSelect } from "./PolarProductSelect";
-import { type BillingPlan, type FeatureDefinition, planActivatesWithoutCheckout } from "./billingPlansApi";
+import { type BillingPlan, type FeatureDefinition, planCanBeOnboardingDefault } from "./billingPlansApi";
 type PlanFieldsProps = { plan: BillingPlan; onChange: (plan: BillingPlan) => void };
 type PlanPricingProps = PlanFieldsProps & { assigned: boolean };
 
@@ -196,7 +196,7 @@ function PlanAccessFields({
 }
 
 function OnboardingDefaultField({ plan, onChange }: { plan: BillingPlan; onChange: (checked: boolean) => void }) {
-  const eligible = planActivatesWithoutCheckout(plan);
+  const eligible = planCanBeOnboardingDefault(plan);
   return (
     <div className="space-y-2 border-t pt-5">
       <Label className="flex items-center gap-2">
@@ -209,8 +209,8 @@ function OnboardingDefaultField({ plan, onChange }: { plan: BillingPlan; onChang
       </Label>
       <p className="text-sm text-muted-foreground">
         {eligible
-          ? "New organizations start on this plan after they add a card. Its trial credit is their welcome credit. Only one plan can be the default."
-          : "Only a public paid plan with no price, no Polar product, and no seats can be the default."}
+          ? "New organizations start on this plan after they add a card. Only one plan can be the default."
+          : "Only a public paid plan can be the default."}
       </p>
     </div>
   );

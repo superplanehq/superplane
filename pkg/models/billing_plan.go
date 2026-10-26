@@ -98,13 +98,6 @@ func (p BillingPlan) IsSystem() bool {
 	return slices.Contains(systemBillingPlanKeys, p.Key)
 }
 
-// ActivatesWithoutCheckout reports whether an organization can select the plan
-// locally, with no Polar checkout. This is the shape that
-// ActivateOrganizationBillingPlan accepts for a paid plan.
-func (p BillingPlan) ActivatesWithoutCheckout() bool {
-	return p.Category == "paid" && p.Visibility == "public" && p.PriceCents == 0 && p.PolarProductID == nil && !p.PerSeat
-}
-
 // Contains reports whether the set references the plan.
 func (a BillingPlanAssignments) Contains(planID uuid.UUID) bool {
 	_, ok := a[planID]
@@ -358,8 +351,8 @@ func validateBillingPlan(p *BillingPlan) error {
 	if p.Key == BillingPlanBusinessManual && p.PolarProductID != nil {
 		return invalid("Business Manual cannot use a Polar product")
 	}
-	if p.OnboardingDefault && !p.ActivatesWithoutCheckout() {
-		return invalid("the default onboarding plan must be a public paid plan with no price, no Polar product, and no seats")
+	if p.OnboardingDefault && (p.Category != "paid" || p.Visibility != "public") {
+		return invalid("the default onboarding plan must be a public paid plan")
 	}
 	return nil
 }

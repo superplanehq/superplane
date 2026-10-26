@@ -533,7 +533,7 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await user.click(await screen.findByTestId("first-run-add-card"));
     openCardSetup.mock.calls[0][0]?.();
-    await waitFor(() => expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "payg"));
+    await waitFor(() => expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "payg", expect.any(Object)));
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
   });
 

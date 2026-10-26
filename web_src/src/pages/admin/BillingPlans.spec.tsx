@@ -369,7 +369,7 @@ it("protects Business Manual from deletion and unsupported catalog edits", async
   expect(screen.getByRole("combobox", { name: "Polar product" })).toBeDisabled();
 });
 
-it("marks a free public plan as the default plan after onboarding", async () => {
+it("marks a public paid plan as the default plan after onboarding", async () => {
   const { requests } = stubBillingCatalog([
     listedPlan({
       id: "starter",
@@ -390,6 +390,7 @@ it("marks a free public plan as the default plan after onboarding", async () => 
       seat_limit: 50,
       polar_product_id: "prod_team",
     }),
+    listedPlan({ id: "internal", key: "internal", name: "Internal", visibility: "private" }),
   ]);
   const user = userEvent.setup();
   render(
@@ -402,8 +403,11 @@ it("marks a free public plan as the default plan after onboarding", async () => 
   const paygRow = screen.getByRole("button", { name: "Edit Pay as you go" }).closest("tr")!;
   expect(within(paygRow).queryByText("Onboarding default")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Edit Team" }));
+  expect(screen.getByRole("checkbox", { name: "Default plan after onboarding" })).toBeEnabled();
+  await user.keyboard("{Escape}");
+  await user.click(screen.getByRole("button", { name: "Edit Internal" }));
   expect(screen.getByRole("checkbox", { name: "Default plan after onboarding" })).toBeDisabled();
-  expect(screen.getByText(/Only a public paid plan with no price/)).toBeInTheDocument();
+  expect(screen.getByText("Only a public paid plan can be the default.")).toBeInTheDocument();
   await user.keyboard("{Escape}");
 
   await user.click(screen.getByRole("button", { name: "Edit Pay as you go" }));

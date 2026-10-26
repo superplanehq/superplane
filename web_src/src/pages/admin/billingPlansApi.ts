@@ -24,16 +24,8 @@ export type BillingPlan = {
   onboarding_default: boolean;
 };
 
-// An organization can select the plan with no Polar checkout. Only such a plan
-// can be the onboarding default.
-export function planActivatesWithoutCheckout(plan: BillingPlan): boolean {
-  return (
-    plan.category === "paid" &&
-    plan.visibility === "public" &&
-    plan.price_cents === 0 &&
-    !plan.per_seat &&
-    !plan.polar_product_id
-  );
+export function planCanBeOnboardingDefault(plan: BillingPlan): boolean {
+  return plan.category === "paid" && plan.visibility === "public";
 }
 
 // The admin list adds delete_disabled_reason and assigned. They are display

@@ -95,11 +95,13 @@ Polar portal. SuperPlane then starts the organization on the plan marked
 **Default plan after onboarding** in the admin Billing plans editor, and
 continues setup.
 
-Only one plan can be the default. It must be a public paid plan with no
-price, no Polar product, and no seats, so SuperPlane can activate it with no
-checkout. The plan's **Trial credit** is the organization's welcome credit.
-It expires after the plan's **Trial length**. SuperPlane grants it when the
-plan starts, not at signup, and grants one welcome credit per account.
+Only one plan can be the default. It must be a public paid plan. Price, a
+Polar product, and seats do not block the mark. After the card is saved,
+SuperPlane starts that plan. A plan with no Polar product and no price starts
+at once. Its **Trial credit** is the organization's welcome credit. It expires
+after the plan's **Trial length**. SuperPlane grants it when the plan starts,
+not at signup, and grants one welcome credit per account. A plan with a Polar
+product continues in checkout. A per-seat plan uses the current seat count.
 
 Without a default plan, or for an organization that already has a paid plan,
 onboarding skips the card step. New organizations then receive the Trial
