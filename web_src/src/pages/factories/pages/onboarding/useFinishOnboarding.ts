@@ -153,6 +153,8 @@ export async function provisionWorkspace(args: {
   backlogRepository: string;
   issuesChoice: IssuesChoiceId | null;
   skipInitialImport?: boolean;
+  /** Start the intake with automatic intake off. */
+  paused?: boolean;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   vcs: { id: string; provider: VcsHostId };
   agentPlan: OnboardingAgentPlan;
@@ -214,6 +216,7 @@ export async function provisionWorkspace(args: {
     deleteIntake: args.deleteIntake,
     issuesChoice: args.issuesChoice,
     skipInitialImport: args.skipInitialImport,
+    paused: args.paused,
     jira: args.jira,
     linear: args.linear,
   });
@@ -337,7 +340,11 @@ export function useFinishOnboarding(args: {
   const usage = useOrganizationWorkspaceUsage(args.organizationId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // The first workspace in an organization always imports: that batch is
+  // what the onboarding analysis and the first tasks are built from.
   const skipInitialImport = !args.factory?.onboarding?.initial && args.setup.skipInitialImport;
+  // Only an explicit "off" pauses the intake.
+  const paused = args.setup.automaticIntake === false;
   // A caller that just changed the issues answer in the same click (the
   // ticket screen's Analyze action) passes it here instead of reading
   // `args.setup.issuesChoice`. That value comes from a render captured before
@@ -390,6 +397,7 @@ export function useFinishOnboarding(args: {
         backlogRepository,
         issuesChoice,
         skipInitialImport,
+        paused,
         vcs: { id: vcs.id, provider: vcsHost },
         agentPlan: plan,
         agentRewrite: agentRewriteFromPlan(plan, selections),

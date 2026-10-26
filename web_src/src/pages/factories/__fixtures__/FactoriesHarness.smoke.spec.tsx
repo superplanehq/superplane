@@ -363,9 +363,9 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     expect(await screen.findByTestId("first-run-tickets", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /GitHub Issues/ }, { timeout: 8000 })).toHaveAttribute(
-      "aria-pressed",
-      "true",
+    expect(await screen.findByTestId("first-run-step-connect", {}, { timeout: 8000 })).toHaveAttribute(
+      "data-state",
+      "done",
     );
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
   }, 15000);

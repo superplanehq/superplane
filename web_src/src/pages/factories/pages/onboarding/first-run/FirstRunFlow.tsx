@@ -111,6 +111,7 @@ export function FirstRunFlow({
     return (
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
+        repository={selectedRepository ?? undefined}
         githubConnected
         chrome={chromeFor(3, () => setScreen("choose"))}
         sphere={repositorySphereFor(selectedRepository)}
