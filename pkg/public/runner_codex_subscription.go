@@ -97,12 +97,18 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		return
 	}
 	var usage struct {
-		Limits []models.CodexUsageLimit `json:"limits"`
-		Models []models.CodexModel      `json:"models"`
+		Limits json.RawMessage `json:"limits"`
+		Models json.RawMessage `json:"models"`
 	}
-	validUsage := json.Unmarshal(request.Usage, &usage) == nil &&
-		models.ValidateCodexUsageLimits(usage.Limits) == nil &&
-		models.ValidateCodexModels(usage.Models) == nil
+	_ = json.Unmarshal(request.Usage, &usage)
+	var limits []models.CodexUsageLimit
+	if json.Unmarshal(usage.Limits, &limits) != nil || models.ValidateCodexUsageLimits(limits) != nil {
+		limits = nil
+	}
+	var availableModels []models.CodexModel
+	if json.Unmarshal(usage.Models, &availableModels) != nil || models.ValidateCodexModels(availableModels) != nil {
+		availableModels = nil
+	}
 	var version int64
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		if eligibleErr := codexSubscriptionStillEligible(tx, scope.OrganizationID); eligibleErr != nil {
@@ -117,10 +123,8 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 			return err
 		}
 		if lease.Purpose == models.CodexLeasePurposeRun {
-			if validUsage {
-				if err := connection.StoreUsage(tx, usage.Limits, usage.Models, time.Now()); err != nil {
-					return err
-				}
+			if err := connection.StoreUsage(tx, limits, availableModels, time.Now()); err != nil {
+				return err
 			}
 			version = connection.CredentialVersion
 			return nil
@@ -140,11 +144,9 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		if storeErr := connection.StoreBundle(tx, scope.TaskID, scope.Generation, next, ciphertext, label, request.Final, time.Now()); storeErr != nil {
 			return storeErr
 		}
-		// Usage is optional. Invalid quota data must not prevent a credential save.
-		if validUsage {
-			if err := connection.StoreUsage(tx, usage.Limits, usage.Models, time.Now()); err != nil {
-				return err
-			}
+		// Catalog and quota data are independent and optional.
+		if err := connection.StoreUsage(tx, limits, availableModels, time.Now()); err != nil {
+			return err
 		}
 		version = connection.CredentialVersion
 		return nil

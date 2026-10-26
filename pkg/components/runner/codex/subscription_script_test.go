@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,12 @@ import (
 
 func TestSubscriptionScriptReportsUsageWithoutAuthBundle(t *testing.T) {
 	var body map[string]any
+	var unavailable atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if unavailable.Load() {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		require.Equal(t, "/api/v1/runner/codex-subscription/checkpoint", r.URL.Path)
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		_ = json.NewEncoder(w).Encode(map[string]any{"accepted": true, "version": 2})
@@ -67,6 +73,17 @@ reportUsage().catch((err) => { process.stderr.write(err.message + "\n"); process
 	usage, ok := body["usage"].(map[string]any)
 	require.True(t, ok)
 	assert.NotEmpty(t, usage["limits"])
+	unavailable.Store(true)
+	cmd = exec.Command("node", filepath.Join(filepath.Dir(callerFile), "codex_subscription.js"), "usage")
+	cmd.Env = append(os.Environ(),
+		"PATH="+binDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_BASE_URL="+server.URL,
+		"SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=runner-token",
+	)
+	out, err = cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Contains(t, string(out), "Codex usage could not be saved")
 }
 
 func TestSubscriptionScriptRestoresCheckpointsAndHidesTokens(t *testing.T) {
@@ -144,6 +161,7 @@ if (process.argv[2] === "app-server") {
           codex_other: { limitId: "codex_other", primary: { usedPercent: 60, windowDurationMins: 60, resetsAt: 1900000000 } },
         };
       }
+      if (fs.existsSync(path.join(process.env.CODEX_HOME, "empty"))) reply.result = {};
       process.stdout.write(JSON.stringify({ id: request.id, ...reply }) + "\n");
     }
     if (request.method === "model/list") {
@@ -180,6 +198,9 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
   fs.writeFileSync(child.CODEX_HOME + "/unavailable", "");
   await checkpoint();
   fs.unlinkSync(child.CODEX_HOME + "/unavailable");
+  fs.writeFileSync(child.CODEX_HOME + "/empty", "");
+  await checkpoint();
+  fs.unlinkSync(child.CODEX_HOME + "/empty");
   fs.writeFileSync(child.CODEX_HOME + "/multi", "");
   await login();
   process.stdout.write(redacted + "\n");
@@ -220,7 +241,12 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 	primary := limits[0].(map[string]any)["primary"].(map[string]any)
 	assert.Equal(t, float64(25), primary["usedPercent"])
 	assert.Equal(t, float64(300), primary["windowDurationMins"])
-	assert.Nil(t, checkpoints[len(checkpoints)-2]["usage"], "an unavailable quota must not block credential saves")
+	for _, checkpoint := range checkpoints[1 : len(checkpoints)-1] {
+		usage, ok := checkpoint["usage"].(map[string]any)
+		require.True(t, ok, "an unavailable quota must not discard the catalog")
+		assert.Empty(t, usage["limits"])
+		assert.Len(t, usage["models"], 2)
+	}
 	assert.NotContains(t, string(out), "provider unavailable access-token-value")
 	assert.Equal(t, "https://auth.openai.com/codex/device", progress["verificationUrl"])
 	assert.Equal(t, "CODE-1234", progress["verificationCode"])

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 
@@ -11,6 +11,32 @@ import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 vi.mock("@/api-client", () => ({ meListCodexUsage: vi.fn() }));
 
 describe("Codex usage", () => {
+  it("hides a saved percentage when its reset time passes while the page stays open", () => {
+    vi.useFakeTimers();
+    const now = Date.now();
+    const view = render(
+      <CodexUsageConnections
+        connections={[
+          {
+            id: "connection-1",
+            observedAt: new Date(now).toISOString(),
+            limits: [{ limitId: "codex", primary: { usedPercent: 25, resetsAt: new Date(now + 1000).toISOString() } }],
+          },
+        ]}
+      />,
+    );
+    try {
+      expect(screen.getByText("75% remaining")).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByText("Update needed")).toBeInTheDocument();
+      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+      expect(screen.queryByText("75% remaining")).not.toBeInTheDocument();
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it("shows separate quota windows and hides percentages after the reset time", () => {
     const now = Date.now();
     const connections: MeCodexUsageConnection[] = [

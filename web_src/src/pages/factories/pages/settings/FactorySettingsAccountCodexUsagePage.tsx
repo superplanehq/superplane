@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 import { meListCodexUsage, type MeCodexUsageConnection, type MeCodexUsageWindow } from "@/api-client";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,21 @@ export function CodexUsageConnections({ connections }: { connections: MeCodexUsa
 }
 
 function QuotaWindow({ window, label }: { window: MeCodexUsageWindow; label: string }) {
+  const [now, setNow] = useState(Date.now);
+  const resetsAt = window.resetsAt ? new Date(window.resetsAt).getTime() : NaN;
+  useEffect(() => {
+    if (!Number.isFinite(resetsAt)) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleReset = () => {
+      const current = Date.now();
+      setNow(current);
+      if (resetsAt > current) {
+        timer = setTimeout(scheduleReset, Math.min(resetsAt - current, 2147483647));
+      }
+    };
+    scheduleReset();
+    return () => clearTimeout(timer);
+  }, [resetsAt]);
   const minutes = Number(window.windowDurationMins);
   const windowLabel =
     minutes > 0
@@ -93,7 +109,7 @@ function QuotaWindow({ window, label }: { window: MeCodexUsageWindow; label: str
           ? `${minutes / 60}-hour window`
           : `${minutes}-minute window`
       : label;
-  const expired = window.resetsAt ? new Date(window.resetsAt).getTime() <= Date.now() : false;
+  const expired = resetsAt <= Math.max(now, Date.now());
   const remaining = window.usedPercent === undefined ? undefined : Math.max(0, Math.min(100, 100 - window.usedPercent));
 
   return (

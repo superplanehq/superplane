@@ -81,6 +81,13 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 		assert.Equal(t, observed, *connection.UsageObservedAt)
 		assert.Equal(t, 25.0, *connection.UsageLimits[0].Primary.UsedPercent)
 	}
+	response = checkpoint(token, map[string]any{"models": []any{map[string]any{"model": "gpt-5.3"}}})
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+	require.Len(t, connection.AvailableModels, 1)
+	assert.Equal(t, "gpt-5.3", connection.AvailableModels[0].Model)
+	assert.Equal(t, observed, *connection.UsageObservedAt)
+	assert.Equal(t, 25.0, *connection.UsageLimits[0].Primary.UsedPercent)
 	scope.Generation++
 	staleToken, err := runneraction.MintCodexSubscriptionToken(signer, scope, time.Hour)
 	require.NoError(t, err)

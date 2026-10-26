@@ -6,6 +6,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ConfigurationField } from "@/api-client";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
+import { useFactoryCodexConnection } from "@/pages/factories/pages/onboarding/useFactoryCodexConnection";
 import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
 
 const useCanvasMock = vi.hoisted(() =>
@@ -26,6 +27,41 @@ vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: useCanvasMock,
 }));
+
+vi.mock("@/pages/factories/pages/onboarding/useFactoryCodexConnection", () => ({
+  useFactoryCodexConnection: vi.fn(),
+}));
+
+describe("subscription model picker", () => {
+  it("uses the subscription catalog instead of API-key models", async () => {
+    vi.mocked(useFactoryCodexConnection).mockReturnValue({
+      query: {
+        data: { status: "ready", availableModels: ["gpt-5.4", "gpt-5.3"] },
+        isLoading: false,
+        isError: false,
+      },
+    } as unknown as ReturnType<typeof useFactoryCodexConnection>);
+    mockSelectableModels([selectableModel("byok", "openai", "gpt-4o")]);
+    render(
+      <MemoryRouter>
+        <HostedModelFieldRenderer
+          field={createField("openai")}
+          value=""
+          onChange={vi.fn()}
+          organizationId="org-1"
+          factoryId="factory-1"
+          modelOnly
+          allValues={{ credentials: { source: "subscription" } }}
+        />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    expect(screen.getByRole("menuitem", { name: "gpt-5.4" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "gpt-5.3" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /gpt-4o/ })).not.toBeInTheDocument();
+  });
+});
 
 function createField(provider = "anthropic"): ConfigurationField {
   return {

@@ -30,6 +30,11 @@ func TestCodexRunReadsModelFromRolloutAndMapsUsage(t *testing.T) {
 	codexHome := filepath.Join(taskDir, "codex-home")
 	require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), []byte(`module.exports = {
+  subscriptionEnabled: () => true,
+  subscriptionChildEnv: (env) => env,
+  reportUsage: async () => { throw new Error("Usage upload unavailable"); },
+};`), 0o600))
 	fakeCodex := filepath.Join(taskDir, "codex")
 	require.NoError(t, os.WriteFile(fakeCodex, []byte(`#!/usr/bin/env node
 const fs = require("fs");
@@ -57,6 +62,7 @@ process.stdout.write(JSON.stringify({ type: "turn.completed", usage: { input_tok
 	)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
+	assert.Contains(t, string(out), "Usage upload unavailable")
 
 	var result map[string]any
 	content, err := os.ReadFile(resultPath)

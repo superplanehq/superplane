@@ -286,14 +286,7 @@ func ResolveSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UU
 	if subset != nil && hasAllowedModel(subset.AllowedModels) {
 		resolved = IntersectModelIDs(parent, subset.AllowedModels)
 	}
-	if source != UsageFundingSourceBYOK || provider != UsageProviderOpenAI {
-		return resolved, nil
-	}
-	subscriptionModels, err := FactoryCodexSubscriptionModels(tx, orgID, *factoryID)
-	if err != nil {
-		return nil, err
-	}
-	return CompactModelIDs(append(resolved, subscriptionModels...)), nil
+	return resolved, nil
 }
 
 func ModelIsSelectable(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provider, fundingSource, model string) (bool, error) {

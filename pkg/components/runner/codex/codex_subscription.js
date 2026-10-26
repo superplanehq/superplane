@@ -172,10 +172,13 @@ function readUsage(env) {
       stdio: ["pipe", "pipe", "ignore"],
     });
     const lines = readline.createInterface({ input: child.stdout });
-    const timeout = setTimeout(
-      () => finish(new Error("Codex usage request timed out")),
-      10000,
-    );
+    const timeout = setTimeout(() => {
+      if (limits !== undefined || models !== undefined) {
+        finish(null, { limits, models: models ?? undefined });
+        return;
+      }
+      finish(new Error("Codex usage request timed out"));
+    }, 10000);
     let settled = false;
     let limits;
     let models;
@@ -195,7 +198,7 @@ function readUsage(env) {
     }
     function finishSnapshot() {
       if (limits !== undefined && models !== undefined) {
-        finish(null, { limits, models });
+        finish(null, { limits, models: models ?? undefined });
       }
     }
     child.on("error", () => finish(new Error("Codex usage process failed")));
@@ -207,8 +210,13 @@ function readUsage(env) {
       try {
         const message = JSON.parse(line);
         if (message.id !== 1 && message.id !== 2 && message.id !== 3) return;
-        if (message.error)
-          return finish(new Error("Codex usage request failed"));
+        if (message.error) {
+          if (message.id === 1) return finish(new Error("Codex usage request failed"));
+          if (message.id === 2) limits = [];
+          if (message.id === 3) models = null;
+          finishSnapshot();
+          return;
+        }
         if (message.id === 1) {
           send({ method: "initialized" });
           send({ id: 2, method: "account/rateLimits/read" });
@@ -236,7 +244,7 @@ function readUsage(env) {
           finishSnapshot();
           return;
         }
-        const result = message.result;
+        const result = message.result || {};
         const buckets = Object.entries(result.rateLimitsByLimitId || {});
         limits = buckets.length
           ? buckets.map(([id, limit]) => ({
@@ -251,8 +259,6 @@ function readUsage(env) {
                 },
               ]
             : [];
-        if (!limits.length)
-          return finish(new Error("Codex usage was not returned"));
         finishSnapshot();
       } catch (_err) {
         finish(new Error("Codex usage response is invalid"));
@@ -290,7 +296,12 @@ async function reportUsage(env = process.env) {
     process.stdout.write("Codex usage is unavailable.\n");
     return;
   }
-  await requestJSON(env, "POST", "/api/v1/runner/codex-subscription/checkpoint", { usage });
+  try {
+    await requestJSON(env, "POST", "/api/v1/runner/codex-subscription/checkpoint", { usage });
+    process.stdout.write("ChatGPT usage saved\n");
+  } catch (_err) {
+    process.stderr.write("Codex usage could not be saved. The run can continue.\n");
+  }
 }
 
 async function login(env = process.env) {
@@ -355,7 +366,6 @@ async function main(argv = process.argv.slice(2)) {
   }
   if (command === "usage") {
     await reportUsage();
-    process.stdout.write("ChatGPT usage saved\n");
     return;
   }
   if (command === "login") {

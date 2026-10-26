@@ -232,8 +232,15 @@ func (c *FactoryCodexConnection) BeginCatalogRefresh(tx *gorm.DB, taskID uuid.UU
 		} else if busy != nil {
 			return &CodexConnectionBusyError{TaskID: busy.TaskID}
 		}
-		_, err := c.createLease(tx, taskID, CodexLeasePurposeLogin, nil, now)
-		return err
+		if _, err := c.createLease(tx, taskID, CodexLeasePurposeLogin, nil, now); err != nil {
+			return err
+		}
+		if err := tx.Model(c).Updates(map[string]any{"resume_status": c.Status, "updated_at": now}).Error; err != nil {
+			return err
+		}
+		c.ResumeStatus = c.Status
+		c.UpdatedAt = now
+		return nil
 	})
 }
 
@@ -738,17 +745,24 @@ func ValidateCodexModels(availableModels []CodexModel) error {
 }
 
 func (c *FactoryCodexConnection) StoreUsage(tx *gorm.DB, limits []CodexUsageLimit, availableModels []CodexModel, now time.Time) error {
-	if err := ValidateCodexUsageLimits(limits); err != nil {
-		return err
+	updates := map[string]any{}
+	if len(limits) > 0 {
+		if err := ValidateCodexUsageLimits(limits); err != nil {
+			return err
+		}
+		updates["usage_limits"] = datatypes.NewJSONSlice(limits)
+		updates["usage_observed_at"] = now
 	}
-	if err := ValidateCodexModels(availableModels); err != nil {
-		return err
+	if availableModels != nil {
+		if err := ValidateCodexModels(availableModels); err != nil {
+			return err
+		}
+		updates["available_models"] = datatypes.NewJSONSlice(availableModels)
 	}
-	return tx.Model(c).Updates(map[string]any{
-		"usage_limits":      datatypes.NewJSONSlice(limits),
-		"available_models":  datatypes.NewJSONSlice(availableModels),
-		"usage_observed_at": now,
-	}).Error
+	if len(updates) == 0 {
+		return nil
+	}
+	return tx.Model(c).Updates(updates).Error
 }
 
 func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]string, error) {

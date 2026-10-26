@@ -523,7 +523,6 @@ async function runPrompt(promptFile, model, thinking) {
       await subscription.reportUsage();
     } catch (err) {
       writeStderr(`${err && err.message ? err.message : "ChatGPT usage was not saved"}\n`);
-      return 1;
     }
   }
   return exitCode;
