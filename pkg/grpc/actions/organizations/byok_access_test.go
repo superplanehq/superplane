@@ -3,10 +3,12 @@ package organizations
 import (
 	"context"
 	"errors"
+	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -31,12 +33,12 @@ func TestBYOKAccess(t *testing.T) {
 			"default_hosted_model":    settings.DefaultHostedModel,
 		}).Error)
 	})
-	var original models.PlanFeatureDefinition
+	var original billingmodels.PlanFeatureDefinition
 	require.NoError(t, db.First(&original, "key = ?", "byo_key").Error)
-	t.Cleanup(func() { require.NoError(t, models.UpdatePlanFeatureDefinition(db, &original)) })
-	plan := models.BillingPlan{Key: "byok_" + uuid.NewString()[:8], Name: "BYOK", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	t.Cleanup(func() { require.NoError(t, billingmodels.UpdatePlanFeatureDefinition(db, &original)) })
+	plan := billingmodels.BillingPlan{Key: "byok_" + uuid.NewString()[:8], Name: "BYOK", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	_, err = billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
 	for _, provider := range []string{models.UsageProviderAnthropic, models.UsageProviderOpenAI, models.UsageProviderOpenRouter, models.UsageProviderCustom} {
 		_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{"test-model"})
@@ -80,17 +82,17 @@ func TestBYOKAccess(t *testing.T) {
 				"default_hosted_model":    model,
 			}).Error)
 			if tc.billing {
-				t.Setenv(models.BillingEnabledEnv, "yes")
+				t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 			} else {
-				t.Setenv(models.BillingEnabledEnv, "no")
+				t.Setenv(billingmodels.BillingEnabledEnv, "no")
 			}
-			require.NoError(t, models.UpdatePlanFeatureDefinition(db, &models.PlanFeatureDefinition{Key: "byo_key", Label: original.Label, Gated: tc.gated}))
+			require.NoError(t, billingmodels.UpdatePlanFeatureDefinition(db, &billingmodels.PlanFeatureDefinition{Key: "byo_key", Label: original.Label, Gated: tc.gated}))
 			plan.Features = []string{}
 			if tc.included {
 				plan.Features = []string{"byo_key"}
 			}
-			require.NoError(t, models.SaveBillingPlan(db, &plan))
-			require.NoError(t, models.SetOrganizationFeatureGrant(db, models.OrganizationFeatureGrant{OrganizationID: r.Organization.ID, FeatureKey: "byo_key", Enabled: tc.grant}))
+			require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+			require.NoError(t, billingmodels.SetOrganizationFeatureGrant(db, billingmodels.OrganizationFeatureGrant{OrganizationID: r.Organization.ID, FeatureKey: "byo_key", Enabled: tc.grant}))
 			flags := datatypes.JSONSlice[string]{}
 			if tc.rollout {
 				flags = append(flags, features.FeatureOrganizationBYOK)
@@ -99,7 +101,7 @@ func TestBYOKAccess(t *testing.T) {
 				flags = append(flags, features.FeatureOrganizationBYOKCustomProvider)
 			}
 			require.NoError(t, db.Model(r.Organization).Update("enabled_experimental_features", flags).Error)
-			billing, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+			billing, err := billingorganizations.DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
 			require.NoError(t, err)
 			require.Equal(t, !tc.billing || !tc.gated || tc.included || tc.grant, billing.ProductFeatures["byo_key"])
 			_, err = ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{Provider: tc.provider})

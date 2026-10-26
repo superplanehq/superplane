@@ -23,20 +23,13 @@ const (
 	OwnerSetupStepFleetDocker   = "fleet-docker"
 )
 
-// MaxPastDueGraceDays is the longest grace period an installation can set.
-// Polar cancels a past-due subscription after its last retry on day 21.
-const MaxPastDueGraceDays = 21
-
-// InstallationMetadata holds installation settings. PastDueGraceDays is how
-// long Team features stay on after a failed renewal payment. Zero turns them
-// off at once.
+// InstallationMetadata holds general installation settings.
 type InstallationMetadata struct {
 	ID                        int    `gorm:"primary_key"`
 	InstallationID            string `gorm:"type:varchar(64)"`
 	AllowPrivateNetworkAccess bool
 	SignupsEnabled            bool
 	InvitationDurationDays    int     `gorm:"default:7"`
-	PastDueGraceDays          int     `gorm:"default:0"`
 	OwnerSetupStep            *string `gorm:"type:text"`
 	ShareOwnerIdentity        bool
 	CreatedAt                 time.Time
@@ -188,7 +181,6 @@ func writeInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) erro
 			"allow_private_network_access": metadata.AllowPrivateNetworkAccess,
 			"signups_enabled":              metadata.SignupsEnabled,
 			"invitation_duration_days":     metadata.InvitationDurationDays,
-			"past_due_grace_days":          metadata.PastDueGraceDays,
 			"updated_at":                   metadata.UpdatedAt,
 		}).
 		Error
@@ -225,7 +217,6 @@ func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error
 		InstallationID:         uuid.NewString(),
 		SignupsEnabled:         true,
 		InvitationDurationDays: 7,
-		PastDueGraceDays:       0,
 	}
 
 	if err := tx.Clauses(clause.OnConflict{

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -42,7 +43,7 @@ func ExportFactoryWorkOrderRunUsage(
 	}
 	factoryID := factory.ID
 
-	rows, err := models.ListAllWorkOrderRunUsage(db, models.UsageReportFilter{
+	rows, err := billing.ListAllWorkOrderRunUsage(db, billing.UsageReportFilter{
 		OrganizationID: orgID,
 		FactoryID:      &factoryID,
 	})
@@ -71,7 +72,7 @@ func workOrderRunUsageCSVFilename(factory *models.Factory) string {
 
 // workOrderRunUsageCSV writes one row per task run, at the same grain as
 // serializeWorkOrderRunUsageRow, so the export matches the table exactly.
-func workOrderRunUsageCSV(factory *models.Factory, rows []models.WorkOrderRunUsage) (string, error) {
+func workOrderRunUsageCSV(factory *models.Factory, rows []billing.WorkOrderRunUsage) (string, error) {
 	var buf bytes.Buffer
 	buf.WriteString(utf8BOM)
 

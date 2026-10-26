@@ -8,17 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/sync/semaphore"
-	"google.golang.org/protobuf/proto"
-	"gorm.io/gorm"
-
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/renderedtext/go-tackle"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -32,6 +28,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 var ErrRecordLocked = errors.New("record locked")
@@ -543,10 +542,10 @@ func (w *NodeExecutor) executeActionNode(
 	}
 
 	ctx.Logger = logger
-	if err := polar.AssertOrganizationPaymentMethod(tx, workflow.OrganizationID); err != nil {
+	if err := billing.AssertOrganizationPaymentMethod(tx, workflow.OrganizationID); err != nil {
 		// Only a confirmed missing card fails the node. Temporary verification
 		// errors roll back the transaction, so the pending execution is retried.
-		if !errors.Is(err, models.ErrPaymentMethodRequired) {
+		if !errors.Is(err, billing.ErrPaymentMethodRequired) {
 			return err
 		}
 		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
@@ -555,8 +554,8 @@ func (w *NodeExecutor) executeActionNode(
 	// BYOK keys do not replace the plan. Database failures leave the execution
 	// pending for the worker retry.
 	if models.IsAgentRunnerComponent(componentName) {
-		if err := models.AssertOrganizationPlanAllowsRuns(tx, workflow.OrganizationID); err != nil {
-			if !errors.Is(err, models.ErrHostedSubscriptionRequired) {
+		if err := billing.AssertOrganizationPlanAllowsRuns(tx, workflow.OrganizationID); err != nil {
+			if !errors.Is(err, billing.ErrHostedSubscriptionRequired) {
 				return err
 			}
 			return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
@@ -604,11 +603,11 @@ func withFactoryOrder(logger *log.Entry, tx *gorm.DB, runID uuid.UUID) *log.Entr
 // withRejectedHostedCredit adds the credit buckets that made the hosted
 // check fail. The next log line can then be compared with the billing page.
 func withRejectedHostedCredit(logger *log.Entry, orgID uuid.UUID, err error) *log.Entry {
-	if logger == nil || !errors.Is(err, models.ErrHostedCreditEmpty) || orgID == uuid.Nil {
+	if logger == nil || !errors.Is(err, billing.ErrHostedCreditEmpty) || orgID == uuid.Nil {
 		return logger
 	}
 
-	summary, describeErr := models.DescribeOrganizationLLMCredit(database.Conn(), orgID)
+	summary, describeErr := billing.DescribeCredit(database.Conn(), orgID)
 	if describeErr != nil {
 		return logger.WithField("hosted_credit_lookup_error", describeErr.Error())
 	}

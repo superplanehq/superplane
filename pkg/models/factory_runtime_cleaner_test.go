@@ -188,24 +188,8 @@ func Test__FactoryRuntimeCleaner__KeepsWorkspaceAndWipesRuntime(t *testing.T) {
 		TotalTokens:     1_000_000,
 	}))
 
-	_, err = models.AddAdminLLMCreditGrant(db, r.Organization.ID, 1_000_000, "local top-up", &r.Account.ID)
-	require.NoError(t, err)
-	expireWelcomeGrant(t, db, r.Organization.ID)
-	require.NoError(t, models.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cus_local"))
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
-		Where("organization_id = ?", r.Organization.ID).
-		Updates(map[string]any{
-			"plan":                      models.BillingPlanBusiness,
-			"plan_source":               models.BillingPlanSourcePolar,
-			"polar_subscription_id":     "sub_local",
-			"polar_subscription_status": models.PolarSubscriptionStatusActive,
-		}).Error)
-
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		if err := models.NewFactoryRuntimeCleaner(tx, factoryModel).Run(); err != nil {
-			return err
-		}
-		return models.ResetOrganizationBillingTrial(tx, r.Organization.ID)
+		return models.NewFactoryRuntimeCleaner(tx, factoryModel).Run()
 	}))
 
 	reloaded, err := models.FindFactory(db, r.Organization.ID, factoryModel.ID)
@@ -249,36 +233,10 @@ func Test__FactoryRuntimeCleaner__KeepsWorkspaceAndWipesRuntime(t *testing.T) {
 	assertCount(t, db, &models.FactoryPlanningSession{}, "factory_id = ?", factoryModel.ID, 0)
 	assertCount(t, db, &models.FactoryVelocityRepositoryMerge{}, "factory_id = ?", factoryModel.ID, 0)
 	assertCount(t, db, &models.FactoryVelocitySync{}, "factory_id = ?", factoryModel.ID, 0)
-	assertCount(t, db, &models.WorkspaceUsageEvent{}, "organization_id = ?", r.Organization.ID, 0)
 
 	_, err = models.FindFile(db, file.ID)
 	assert.ErrorIs(t, err, models.ErrFileNotFound)
 
-	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
-	require.NoError(t, err)
-	require.NotNil(t, plan)
-	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
-	assert.Equal(t, models.BillingPlanSourceSystem, plan.PlanSource)
-	assert.Nil(t, plan.PolarSubscriptionID)
-	require.NotNil(t, plan.TrialEndsAt)
-	assert.WithinDuration(t, time.Now().Add(models.DefaultWelcomeGrantTTL), *plan.TrialEndsAt, 5*time.Second)
-
-	settings, err := models.FindOrganizationLLMSettings(db, r.Organization.ID)
-	require.NoError(t, err)
-	require.NotNil(t, settings)
-	assert.Nil(t, settings.PolarCustomerID)
-
-	var extraGrants int64
-	require.NoError(t, db.Model(&models.OrganizationLLMCreditGrant{}).
-		Where("organization_id = ? AND kind <> ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
-		Count(&extraGrants).Error)
-	assert.Equal(t, int64(0), extraGrants)
-
-	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.RemainingMicros)
-	require.NotNil(t, summary.WelcomeCreditExpiresAt)
-	assert.WithinDuration(t, time.Now().Add(models.DefaultWelcomeGrantTTL), *summary.WelcomeCreditExpiresAt, 5*time.Second)
 }
 
 func assertCount(t *testing.T, db *gorm.DB, model any, query string, arg any, want int64) {

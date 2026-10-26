@@ -39,8 +39,8 @@ func ConcreteClaudeModelID(stored string, candidates []string) string {
 	if fallback == "" {
 		return trimmed
 	}
-	if match := firstVersionedModelID(candidates, leaf); match != "" {
-		return joinModelProvider(provider, canonicalSpendingModelName(match))
+	if match := FirstVersionedModelID(candidates, leaf); match != "" {
+		return joinModelProvider(provider, CanonicalModelName(match))
 	}
 	return joinModelProvider(provider, fallback)
 }

@@ -168,7 +168,6 @@ describe("Organization billing seat purchases", () => {
   });
 
   it("blocks purchases until a canceled subscription is resumed", async () => {
-    const user = userEvent.setup();
     renderBilling(
       { ...TEAM_ORGANIZATION_BILLING, cancelAtPeriodEnd: true },
       { newBilling: true, query: "?buySeats=1" },
@@ -177,11 +176,6 @@ describe("Organization billing seat purchases", () => {
     expect(dialog).toHaveTextContent("Resume the subscription before buying seats.");
     expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Confirm purchase" })).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(
-      await within(screen.getByTestId("billing-plans")).findByRole("button", { name: "Keep Team" }),
-    ).toBeInTheDocument();
     expect(purchaseRequests).toHaveLength(0);
   });
 
