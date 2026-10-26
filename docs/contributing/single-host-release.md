@@ -33,26 +33,47 @@ Fleet Manager and the runner image are separate release artifacts:
 The release pipeline publishes the archive. It does not boot it. Boot the
 archive on a machine before you rely on a new release.
 
-## Finalize a release candidate
+## Release SuperPlane
 
-Use the approved release candidate pipeline to create the stable release. The
-finalization rebuilds versioned artifacts from the same Git commit. It also
-keeps the Runner and Fleet Manager versions from the release candidate.
+SuperPlane releases must use a commit from `main` with successful CI.
+
+```mermaid
+flowchart LR
+    M[Main CI passes] --> R[Prepare and publish RC]
+    R --> T[Test RC]
+    T -->|Problem found| F[Merge fix to main]
+    F --> M
+    T -->|RC approved| S[Finalize stable release]
+```
+
+### Publish a release candidate
+
+1. Merge all release changes into `main`.
+2. Wait for the Semaphore pipeline to pass.
+3. Select `Prepare SuperPlane Release`.
+4. Set `RELEASE_VERSION` to the next candidate, such as `v1.0.0-rc8`.
+5. Start the promotion.
+6. Wait for `Publish SuperPlane Release` to finish.
+7. Test the published release candidate.
+
+If you find a problem, merge the fix into `main`. Repeat these steps with the
+next candidate version, such as `v1.0.0-rc9`.
+
+### Publish the stable release
 
 1. Open the completed `Publish SuperPlane Release` pipeline for the approved
-   release candidate.
+   candidate.
 2. Select `Finalize SuperPlane Release`.
-3. Confirm that `RELEASE_CANDIDATE_VERSION` contains the approved version.
-4. Set `RELEASE_VERSION` to the stable version with the same version core.
+3. Confirm `RELEASE_CANDIDATE_VERSION`, such as `v1.0.0-rc8`.
+4. Set `RELEASE_VERSION` to the matching stable version, such as `v1.0.0`.
 5. Start the promotion.
+6. Wait for the stable publication to finish.
 
-For example, finalize `v1.0.0-rc8` as `v1.0.0`. The pipeline rejects a target
-such as `v1.0.1` or `v1.0.0-final`.
+The stable version must match the candidate version core. For example,
+`v1.0.0-rc8` can only become `v1.0.0`.
 
-The pipeline verifies the published release candidate and its prepared
-manifest before it starts the stable builds. It then prepares and publishes
-the stable release. If the candidate workflow artifacts are unavailable, the
-finalization stops without selecting newer component versions.
+Finalization uses the candidate Git commit and component versions. It stops if
+the candidate artifacts are missing or modified.
 
 To test the archive without starting containers:
 
