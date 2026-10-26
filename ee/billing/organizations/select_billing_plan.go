@@ -149,7 +149,9 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 			return nil, err
 		}
 		if account, err := uuid.Parse(accountID); err == nil {
-			if err := billingmodels.GrantWelcomeCredit(db, organizationID, account); err != nil {
+			if err := db.Transaction(func(tx *gorm.DB) error {
+				return billingmodels.GrantWelcomeCredit(tx, organizationID, account)
+			}); err != nil {
 				return nil, grpcerrors.Internal(err, "Could not apply signup credit.")
 			}
 		}

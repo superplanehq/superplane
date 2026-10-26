@@ -1106,4 +1106,3 @@ func stampWelcomeCreditGrantedAt(tx *gorm.DB, accountID uuid.UUID, grantedAt tim
 		Where("id = ? AND welcome_credit_granted_at IS NULL", accountID).
 		Update("welcome_credit_granted_at", grantedAt).Error
 }
-

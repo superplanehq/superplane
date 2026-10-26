@@ -371,8 +371,6 @@ func TestPaymentMethodSetupCreatesCustomerWithoutCheckout(t *testing.T) {
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_new", "external_id": r.Organization.ID.String()}))
 		case "/customer-sessions/":
 			require.True(t, created)
-			var body map[string]any
-			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"customer_id": "cust_new", "customer_portal_url": "https://polar.sh/portal/payment-settings", "token": sessionToken}))
 		default:
 			t.Errorf("card setup must not create a checkout or subscription: %s", req.URL.Path)
