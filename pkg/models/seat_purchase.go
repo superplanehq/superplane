@@ -91,13 +91,36 @@ func NewSeatPurchase(orgID uuid.UUID, userID *uuid.UUID, subscriptionID string, 
 	return purchase
 }
 
-// SeatPurchaseFingerprint identifies the charge that a purchase request asks
-// for. Two requests with the same fingerprint buy the same seats from the
-// same seat count. The user is not part of the charge, so it is not included.
+// SeatPurchaseFingerprints are the fingerprints of one purchase request.
+// Counts is the v1 fingerprint of the seat counts. Bound is the v2
+// fingerprint that also binds the confirmed subscription and billing period.
+// Bound is empty when the request has no complete binding.
+type SeatPurchaseFingerprints struct {
+	Counts string
+	Bound  string
+}
+
+// SeatPurchaseFingerprint is the v1 fingerprint: it identifies the charge
+// from the seat counts only. Two requests with the same fingerprint buy the
+// same seats from the same seat count. The user is not part of the charge,
+// so it is not included.
+//
+// New purchases store SeatPurchaseBoundFingerprint. Rows recorded before
+// the binding existed keep this fingerprint and stay replayable.
 func SeatPurchaseFingerprint(additionalSeats, expectedPurchasedSeats int) string {
-	canonical := fmt.Sprintf("seat_purchase/v1;additional_seats=%d;expected_purchased_seats=%d", additionalSeats, expectedPurchasedSeats)
-	sum := sha256.Sum256([]byte(canonical))
-	return hex.EncodeToString(sum[:])
+	return seatPurchaseHash(fmt.Sprintf("seat_purchase/v1;additional_seats=%d;expected_purchased_seats=%d", additionalSeats, expectedPurchasedSeats))
+}
+
+// SeatPurchaseBoundFingerprint is the v2 fingerprint: the seat counts plus
+// the subscription and the billing period that the caller confirmed. The
+// period times are normalized to UTC, so equal instants in other time zones
+// give the same fingerprint.
+func SeatPurchaseBoundFingerprint(additionalSeats, expectedPurchasedSeats int, subscriptionID string, periodStart, periodEnd time.Time) string {
+	return seatPurchaseHash(fmt.Sprintf(
+		"seat_purchase/v2;additional_seats=%d;expected_purchased_seats=%d;subscription_id=%q;period_start=%s;period_end=%s",
+		additionalSeats, expectedPurchasedSeats, subscriptionID,
+		periodStart.UTC().Format(time.RFC3339Nano), periodEnd.UTC().Format(time.RFC3339Nano),
+	))
 }
 
 func (SeatPurchase) TableName() string {
@@ -109,10 +132,19 @@ func (p *SeatPurchase) InFlight() bool {
 	return p.Status == SeatPurchaseStatusPending || p.Status == SeatPurchaseStatusUnknown
 }
 
-// MatchesRequest reports that the purchase was started by a request with
-// this fingerprint.
-func (p *SeatPurchase) MatchesRequest(fingerprint string) bool {
-	return p.RequestFingerprint != nil && *p.RequestFingerprint == fingerprint
+// MatchesRequest reports that the purchase was started by this request.
+//
+// A purchase with a v2 fingerprint matches only a request with the same
+// counts and the same binding. A legacy purchase with a v1 fingerprint
+// matches a request with the same counts, with or without a binding. A v2
+// fingerprint never equals a v1 fingerprint, so a request without a binding
+// never matches a v2 purchase.
+func (p *SeatPurchase) MatchesRequest(request SeatPurchaseFingerprints) bool {
+	if p.RequestFingerprint == nil {
+		return false
+	}
+	stored := *p.RequestFingerprint
+	return stored == request.Counts || (request.Bound != "" && stored == request.Bound)
 }
 
 // StartedInPeriod reports that a Polar snapshot with this period start
@@ -331,4 +363,9 @@ func (p *SeatPurchase) periodEndedBy(periodStart, submissionClosedAt time.Time) 
 		return !p.PeriodEnd.After(periodStart)
 	}
 	return periodStart.After(submissionClosedAt)
+}
+
+func seatPurchaseHash(canonical string) string {
+	sum := sha256.Sum256([]byte(canonical))
+	return hex.EncodeToString(sum[:])
 }

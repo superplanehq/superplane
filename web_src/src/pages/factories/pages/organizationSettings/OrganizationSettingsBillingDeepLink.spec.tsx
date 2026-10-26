@@ -101,7 +101,15 @@ beforeEach(() => {
   featuresLoading = false;
   organizationReady = true;
   newBilling = true;
-  previewPurchase.mockReset().mockResolvedValue({ data: { purchasedSeats: 10, targetSeats: 11 } });
+  previewPurchase.mockReset().mockResolvedValue({
+    data: {
+      purchasedSeats: 10,
+      targetSeats: 11,
+      subscriptionId: "sub_team",
+      billingPeriodStart: "2026-10-01T00:00:00Z",
+      periodEnd: "2026-11-01T00:00:00Z",
+    },
+  });
   purchaseSeats.mockReset();
   syncBilling.mockReset().mockImplementation(async () => billing);
 });

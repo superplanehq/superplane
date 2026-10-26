@@ -5,6 +5,7 @@ import {
   EMPTY_USAGE_REPORT,
   TEAM_ORGANIZATION_BILLING,
 } from "./usageReportFixtures";
+import { THIRTY_DAYS_AGO } from "./factoryPageIds";
 import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
@@ -1618,6 +1619,8 @@ function seatPurchasePreview(
     purchasableSeats: billing.purchasableSeats,
     estimate: true,
     excludesTax: true,
+    subscriptionId: "sub_storybook_team",
+    billingPeriodStart: THIRTY_DAYS_AGO,
   };
 }
 

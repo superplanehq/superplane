@@ -10,7 +10,9 @@ import {
 import { getApiErrorMessage } from "@/lib/errors";
 import {
   confirmSeatPurchaseOperation,
+  previewSeatPurchaseBinding,
   retireSeatPurchaseOperation,
+  type SeatPurchaseBinding,
   type SeatPurchaseOperation,
 } from "@/lib/seatPurchaseOperations";
 import { validAdditionalSeats } from "@/lib/seatPurchases";
@@ -82,27 +84,35 @@ function purchaseChanged(
   );
 }
 
-function confirmOperation(organizationId: string, preview: CompletedSeatPurchasePreview, billing: Billing | undefined) {
+function confirmOperation(organizationId: string, preview: CompletedSeatPurchasePreview) {
   const { estimate, additionalSeats } = preview;
-  if (estimate.purchasedSeats === undefined) return undefined;
+  const binding = previewSeatPurchaseBinding(estimate);
+  if (estimate.purchasedSeats === undefined || !binding) return undefined;
   return confirmSeatPurchaseOperation(
     organizationId,
     { additionalSeats, expectedPurchasedSeats: estimate.purchasedSeats },
-    {
-      periodStart: estimate.periodStart ?? billing?.currentPeriodStart,
-      periodEnd: estimate.periodEnd ?? billing?.currentPeriodEnd,
-    },
+    binding,
   );
+}
+
+function confirmedContext(binding: SeatPurchaseBinding | undefined) {
+  // A legacy operation has no binding. The server can only replay it.
+  if (!binding) return {};
+  return {
+    confirmedSubscriptionId: binding.subscriptionId,
+    confirmedPeriodStart: binding.periodStart,
+    confirmedPeriodEnd: binding.periodEnd,
+  };
 }
 
 async function submitPurchase(operation: SeatPurchaseOperation) {
   // Direct submission has no automatic retries. Recovery only reads billing.
-  const { organizationId, additionalSeats, expectedPurchasedSeats, operationKey } = operation;
+  const { organizationId, additionalSeats, expectedPurchasedSeats, operationKey, binding } = operation;
   const response = await organizationsPurchaseSeats<false>({
     ...withOrganizationHeader({
       organizationId,
       path: { id: organizationId },
-      body: { additionalSeats, expectedPurchasedSeats, operationKey },
+      body: { additionalSeats, expectedPurchasedSeats, operationKey, ...confirmedContext(binding) },
     }),
     throwOnError: false,
   });
@@ -197,7 +207,7 @@ export function useSeatPurchaseSubmission({
       return;
     const billing = queryClient.getQueryData<Billing>(organizationBillingQueryKey(organizationId));
     if (!billingMatchesPreview(confirmed, billing)) return;
-    const operation = confirmOperation(organizationId, confirmed, billing);
+    const operation = confirmOperation(organizationId, confirmed);
     if (!operation) return;
     state.submissionLock.current = true;
     const submission = {

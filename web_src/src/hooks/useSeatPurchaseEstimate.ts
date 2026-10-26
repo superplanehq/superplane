@@ -2,6 +2,7 @@ import { useEffect, useState, type RefObject } from "react";
 
 import { organizationsPreviewSeatPurchase, type OrganizationsPreviewSeatPurchaseResponse } from "@/api-client";
 import { getApiErrorMessage } from "@/lib/errors";
+import { previewSeatPurchaseBinding } from "@/lib/seatPurchaseOperations";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 export type CompletedSeatPurchasePreview = {
@@ -50,7 +51,8 @@ export function useSeatPurchaseEstimate({
           withOrganizationHeader({ organizationId, path: { id: organizationId }, body: { additionalSeats: count } }),
         );
         if (!isCurrent()) return;
-        if (response.data?.purchasedSeats === undefined)
+        // A preview without its subscription and billing period cannot be confirmed.
+        if (response.data?.purchasedSeats === undefined || !previewSeatPurchaseBinding(response.data))
           throw new Error("SuperPlane could not estimate this purchase. Try again.");
         setCompleted({
           estimate: response.data,

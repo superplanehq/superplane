@@ -66,6 +66,8 @@ describe("Organization billing seat purchases", () => {
             proratedChargeCents: "1234",
             newMonthlyTotalCents: "35123",
             periodEnd: ACTIVE_BILLING_PERIOD_ENDS_AT,
+            subscriptionId: "sub_team",
+            billingPeriodStart: "2026-10-01T00:00:00Z",
           },
         },
       },
