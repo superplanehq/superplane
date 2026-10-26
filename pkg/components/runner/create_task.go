@@ -21,6 +21,12 @@ func CreateTask(tasks core.RunnerTaskContext, params CreateTaskParams) (string, 
 		return "", err
 	}
 	id := uuid.New()
+	if rawID := strings.TrimSpace(params.TaskID); rawID != "" {
+		id, err = uuid.Parse(rawID)
+		if err != nil {
+			return "", fmt.Errorf("invalid runner task ID: %w", err)
+		}
+	}
 	timeout := params.TimeoutSeconds
 	if timeout <= 0 {
 		timeout = DefaultExecutionTimeoutSeconds

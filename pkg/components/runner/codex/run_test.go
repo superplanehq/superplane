@@ -277,34 +277,64 @@ func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCodexRunPassesOpenAIAPIKeyToCodexChild(t *testing.T) {
-	taskDir := t.TempDir()
-	prompt := filepath.Join(taskDir, "prompt.txt")
-	result := filepath.Join(taskDir, "result.json")
-	received := filepath.Join(taskDir, "received-key")
-	require.NoError(t, os.WriteFile(prompt, []byte("hello"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
-	require.NoError(t, os.WriteFile(
-		filepath.Join(taskDir, "codex"),
-		[]byte("#!/bin/sh\nprintf '%s' \"$CODEX_API_KEY\" > \"$RECEIVED_KEY\"\nprintf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"thread-1\"}' '{\"type\":\"item.completed\",\"item\":{\"id\":\"reply-1\",\"type\":\"agent_message\",\"text\":\"ok\"}}'\n"),
-		0o700,
-	))
-
-	script, err := filepath.Abs("run.js")
-	require.NoError(t, err)
-	cmd := exec.Command("node", script, prompt)
-	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
-		"PATH="+taskDir+":"+os.Getenv("PATH"),
-		"SUPERPLANE_TASK_DIR="+taskDir,
-		"SUPERPLANE_RESULT_FILE="+result,
-		"RECEIVED_KEY="+received,
-		"OPENAI_API_KEY=sk-from-openai",
-	)
-	output, err := cmd.CombinedOutput()
-	require.NoError(t, err, string(output))
-	got, err := os.ReadFile(received)
-	require.NoError(t, err)
-	assert.Equal(t, "sk-from-openai", string(got))
+func TestCodexRunSelectsAuthenticationForCodexChild(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		subscription bool
+		suppliedKeys bool
+	}{
+		{name: "API key", suppliedKeys: true},
+		{name: "subscription without API keys", subscription: true},
+		{name: "subscription removes API keys", subscription: true, suppliedKeys: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			taskDir := t.TempDir()
+			prompt := filepath.Join(taskDir, "prompt.txt")
+			result := filepath.Join(taskDir, "result.json")
+			received := filepath.Join(taskDir, "received-environment.json")
+			require.NoError(t, os.WriteFile(prompt, []byte("hello"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(`#!/usr/bin/env node
+const fs = require("fs");
+fs.writeFileSync(process.env.RECEIVED_ENVIRONMENT, JSON.stringify(process.env));
+process.stdout.write('{"type":"thread.started","thread_id":"thread-1"}\n{"type":"item.completed","item":{"id":"reply-1","type":"agent_message","text":"ok"}}\n');
+`), 0o700))
+			script, err := filepath.Abs("run.js")
+			require.NoError(t, err)
+			cmd := exec.Command("node", script, prompt)
+			cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+				"PATH="+taskDir+":"+os.Getenv("PATH"),
+				"SUPERPLANE_TASK_DIR="+taskDir,
+				"SUPERPLANE_RESULT_FILE="+result,
+				"RECEIVED_ENVIRONMENT="+received,
+			)
+			if test.suppliedKeys {
+				cmd.Env = append(cmd.Env, "OPENAI_API_KEY=sk-from-openai", "OPENAI_BASE_URL=https://api.example.com")
+				if test.subscription {
+					cmd.Env = append(cmd.Env, "CODEX_API_KEY=sk-codex")
+				}
+			}
+			if test.subscription {
+				require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), []byte(subscriptionScript), 0o600))
+				cmd.Env = append(cmd.Env, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=subscription-token")
+			}
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, string(output))
+			encoded, err := os.ReadFile(received)
+			require.NoError(t, err)
+			var got map[string]string
+			require.NoError(t, json.Unmarshal(encoded, &got))
+			if test.subscription {
+				assert.Empty(t, got["CODEX_API_KEY"])
+				assert.Empty(t, got["OPENAI_API_KEY"])
+				assert.Empty(t, got["OPENAI_BASE_URL"])
+				assert.Equal(t, filepath.Join(taskDir, "codex-home"), got["CODEX_HOME"])
+				return
+			}
+			assert.Equal(t, "sk-from-openai", got["CODEX_API_KEY"])
+			assert.Equal(t, "sk-from-openai", got["OPENAI_API_KEY"])
+		})
+	}
 }
 
 func TestCodexRunRejectsMissingAPIKeyBeforeSpawn(t *testing.T) {

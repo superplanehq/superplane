@@ -1,7 +1,6 @@
-import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
-import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -11,8 +10,8 @@ import { unmockedPackage } from "@/test/unmockedModule";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FirstRunSetup } from "./FirstRunSetup";
-import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
-import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+import { pageModel, setupState } from "./firstRunSetup.test-support";
+import { NavigableSetup, StatefulSetup } from "./firstRunSetupComponents.test-support";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
@@ -139,78 +138,6 @@ vi.mock("./AgentStep", () => ({
     <div data-testid="agent-step" data-custom-provider={showCustomProvider ? "yes" : "no"} />
   ),
 }));
-
-function setupState(): OnboardingSetupApi {
-  const { result } = renderHook(() =>
-    useOnboardingSetupState("Payments Service", {
-      simulateDiscovery: false,
-      connected: new Set(["github"]),
-      initial: { vcsHost: "github", issuesChoice: "vcs", selectedRepo: "acme/api" },
-    }),
-  );
-  return result.current;
-}
-
-function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPageModel {
-  return {
-    setup: setupState(),
-    hostedAgentReady: false,
-    hostedModelsAvailable: false,
-    hostedModelsAvailableLoading: false,
-    bringYourOwnKey: false,
-    bringYourOwnKeyLoading: false,
-    customProvider: false,
-    agentCredentialChoice: null,
-    setAgentCredentialChoice: vi.fn(),
-    agentLoading: false,
-    agentModelPicker: undefined,
-    openSection: "issues",
-    setOpenSection: vi.fn(),
-    requestConnect: vi.fn(),
-    selectCatalogRepository: vi.fn().mockResolvedValue(true),
-    selectBitbucketRepository: vi.fn().mockResolvedValue(true),
-    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
-    bitbucketIntegrationId: "",
-    integrationDialogs: <></>,
-    canConfigureWorkspace: true,
-    saving: false,
-    saveName: vi.fn().mockResolvedValue(true),
-    saveAgent: vi.fn().mockResolvedValue(true),
-    saveIssues: vi.fn().mockResolvedValue(true),
-    finish: vi.fn(),
-    provisionedDestination: null,
-    githubOwner: undefined,
-    jiraIntegrationId: "",
-    jiraProjectId: "",
-    setJiraProjectId: vi.fn(),
-    jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
-    jiraProjects: [],
-    jiraProjectsLoading: false,
-    jiraProjectsError: false,
-    retryJiraProjects: vi.fn(),
-    linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
-    ...overrides,
-  };
-}
-
-function StatefulSetup({ model }: { model: OnboardingPageModel }) {
-  const [choice, setChoice] = useState<OnboardingAgentCredentialChoice | null>(null);
-  return <FirstRunSetup model={{ ...model, agentCredentialChoice: choice, setAgentCredentialChoice: setChoice }} />;
-}
-
-function NavigableSetup({ model }: { model: OnboardingPageModel }) {
-  const setup = useOnboardingSetupState("Payments Service", {
-    simulateDiscovery: false,
-    connected: new Set(["github"]),
-  });
-  return <StatefulSetup model={{ ...model, setup }} />;
-}
 
 function renderStatefulSetup(overrides: Partial<OnboardingPageModel>) {
   billingState.byok = overrides.bringYourOwnKey ?? false;
@@ -436,6 +363,35 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
   });
 
+  it("reveals subscription sign-in with own-key choices and switches back to hosted models", async () => {
+    const user = userEvent.setup();
+    const startCodexConnection = vi.fn();
+    renderStatefulSetup({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      codexSubscriptionOffered: true,
+      startCodexConnection,
+    });
+
+    expect(screen.queryByRole("button", { name: /Use your ChatGPT subscription/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Use your own key or subscription" }));
+    expect(screen.getByTestId("agent-step")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Connect ChatGPT" }));
+
+    expect(startCodexConnection).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId("agent-step")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) }));
+    expect(screen.queryByTestId("first-run-codex-subscription")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-finish-setup")).toBeEnabled();
+  });
+
   it("blocks the model screen while provisioning is in progress", async () => {
     const user = userEvent.setup();
     let complete!: () => void;
@@ -458,6 +414,35 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
     await act(async () => complete());
   });
+
+  it.each(["own-key", "subscription"] as const)(
+    "requires a provider model only for own-key credentials (%s)",
+    (agentCredentialChoice) => {
+      renderSetup(
+        pageModel({
+          hostedModelsAvailable: true,
+          bringYourOwnKey: true,
+          agentCredentialChoice,
+          codexSubscriptionOffered: true,
+          codexSubscriptionReady: true,
+          agentModelPicker: {
+            models: [],
+            value: "",
+            loading: false,
+            error: false,
+            retry: vi.fn(),
+            onChange: vi.fn(),
+          },
+          setup: { ...setupState(), connected: new Set(["github", "claude"]) },
+        }),
+        "/org-1/workspaces/PAY/setup?step=agent",
+      );
+
+      expect(screen.getByTestId("first-run-finish-setup").hasAttribute("disabled")).toBe(
+        agentCredentialChoice === "own-key",
+      );
+    },
+  );
 
   it("offers a custom provider on the agent card when that flag is on", async () => {
     const user = userEvent.setup();
@@ -482,6 +467,23 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
     expect(screen.queryByTestId("first-run-model-source")).not.toBeInTheDocument();
+  });
+
+  it("offers ChatGPT after intake without offering unavailable provider keys", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      codexSubscriptionOffered: true,
+    });
+    renderSetup(model);
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
+
+    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
+    expect(model.finish).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: FIRST_RUN_COPY.agent.ownKey })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-step")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.agent.subscription })).toBeInTheDocument();
   });
 
   it("hides the model source when only a provider key can run the agent", () => {
