@@ -306,7 +306,6 @@ CREATE TABLE public.billing_plans (
     require_payment_method boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    onboarding_default boolean DEFAULT false NOT NULL,
     CONSTRAINT billing_plans_category_check CHECK ((category = ANY (ARRAY['none'::text, 'trial'::text, 'paid'::text]))),
     CONSTRAINT billing_plans_check CHECK (((credit_expiration <> 'after_days'::text) OR (credit_validity_days > 0))),
     CONSTRAINT billing_plans_credit_amount_cents_check CHECK ((credit_amount_cents >= 0)),
@@ -3497,13 +3496,6 @@ CREATE UNIQUE INDEX application_encryption_keys_one_active ON public.application
 --
 
 CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.application_encryption_migrations USING btree ((1)) WHERE (state = ANY (ARRAY['pending'::text, 'running'::text, 'auditing'::text]));
-
-
---
--- Name: billing_plans_single_onboarding_default; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX billing_plans_single_onboarding_default ON public.billing_plans USING btree ((true)) WHERE onboarding_default;
 
 
 --
