@@ -97,8 +97,9 @@ export function FirstRunCardForm({
         ref={frame}
         title="Secure card setup"
         src={url.toString()}
-        className="mt-6 w-full border-0"
+        className="mt-6 block w-full border-0"
         style={{ height, colorScheme: "dark" }}
+        scrolling="no"
         allow={`payment 'self' ${session.origin}; publickey-credentials-get 'self' ${session.origin};`}
       />
       {error && (
