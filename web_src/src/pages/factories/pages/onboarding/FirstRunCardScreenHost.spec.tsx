@@ -33,21 +33,13 @@ function cardStep(overrides: Partial<OnboardingCardStep> = {}): OnboardingCardSt
   };
 }
 
-const summary = {
-  repository: "acme/payments",
-  ticketSource: "github-issues" as const,
-  initialImportCount: 3,
-  automaticIntake: true,
-};
-
-function renderHost(step: OnboardingCardStep, summaryOverrides: Partial<typeof summary> = {}) {
+function renderHost(step: OnboardingCardStep) {
   const finishSetup = vi.fn(async () => {});
   render(
     <FirstRunCardScreenHost
       organizationId="org-1"
       flow={{ busy: false, cardStep: step, finishSetup }}
       chrome={chrome}
-      summary={{ ...summary, ...summaryOverrides }}
     />,
   );
   return { finishSetup };
@@ -65,11 +57,11 @@ it("saves a card, starts the default plan with its credit, and continues setup",
   const step = cardStep();
   const { finishSetup } = renderHost(step);
   expect(screen.getByRole("heading", { name: "Start with $10 in credit" })).toBeInTheDocument();
-  expect(screen.getByText(/\$10 on the Pay as you go plan/)).toBeInTheDocument();
-  expect(screen.getByText("Polar saves your card. SuperPlane does not charge it.")).toBeInTheDocument();
-  expect(screen.getByTestId("first-run-step-repository")).toHaveTextContent("Repository: acme/payments");
-  expect(screen.getByTestId("first-run-step-tickets")).toHaveTextContent("Imports your 3 newest GitHub issues");
-  expect(screen.getByTestId("first-run-step-card")).toHaveAttribute("data-state", "active");
+  expect(screen.getByTestId("first-run-credit-tile")).toHaveTextContent("$10");
+  expect(screen.getByTestId("first-run-card-today")).toHaveTextContent(
+    "SuperPlane applies $10 in credit and charges nothing",
+  );
+  expect(screen.getByTestId("first-run-card-after")).toHaveTextContent("You pay only for what your agents use");
   expect(screen.queryByRole("button", { name: /skip/i })).not.toBeInTheDocument();
   expect(screen.getByLabelText("Step 5 of 6")).toBeInTheDocument();
 
@@ -91,7 +83,8 @@ it("saves a card, starts the default plan with its credit, and continues setup",
 
 it("starts the plan at once when a card is already saved", async () => {
   const { finishSetup } = renderHost(cardStep({ hasPaymentMethod: true }));
-  expect(screen.getByText("Your card is saved.")).toBeInTheDocument();
+  expect(screen.getByTestId("first-run-card-today")).toHaveTextContent("Your card is saved.");
+  expect(screen.getByTestId("first-run-card-today")).toHaveAttribute("data-done", "true");
   await userEvent.setup().click(screen.getByTestId("first-run-card-continue"));
   expect(cardSetup.open).not.toHaveBeenCalled();
   await waitFor(() => expect(finishSetup).toHaveBeenCalledTimes(1));
@@ -102,9 +95,10 @@ it("starts the plan at once when a card is already saved", async () => {
   );
 });
 
-it("describes the intake when the first import is off", () => {
-  renderHost(cardStep(), { initialImportCount: 0, automaticIntake: true });
-  expect(screen.getByTestId("first-run-step-tickets")).toHaveTextContent("Imports new GitHub issues only");
+it("tells the user that checkout follows the card for a Polar plan", () => {
+  renderHost(cardStep({ plan: { key: "team", name: "Team", onboardingDefault: true, subscriptionRequired: true } }));
+  expect(screen.getByTestId("first-run-card-today")).toHaveTextContent("then complete checkout for the Team plan");
+  expect(screen.getByTestId("first-run-credit-tile")).toHaveTextContent("Your plan");
 });
 
 it("checks out a per-seat plan for the occupied seats and does not finish setup", async () => {
@@ -117,7 +111,7 @@ it("checks out a per-seat plan for the occupied seats and does not finish setup"
     }),
   );
   expect(screen.getByRole("heading", { name: "Start on the Team plan" })).toBeInTheDocument();
-  expect(screen.getByText("Add a payment card, then complete checkout for the Team plan.")).toBeInTheDocument();
+  expect(screen.getByTestId("first-run-card-after")).toHaveTextContent("Your organization runs on the Team plan.");
   await userEvent.setup().click(screen.getByTestId("first-run-card-continue"));
   await waitFor(() =>
     expect(activateOnboardingPlan).toHaveBeenCalledWith("org-1", "team", expect.objectContaining({ seats: 2 })),

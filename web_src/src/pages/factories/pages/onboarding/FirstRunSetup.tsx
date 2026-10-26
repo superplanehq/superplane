@@ -88,17 +88,6 @@ function ticketsContinueLabel(flow: FirstRunSetupFlow, skipInitialImport: boolea
   return FIRST_RUN_COPY.tickets.analyze;
 }
 
-// The card step shows the finished steps above the card row.
-function cardSummaryFor(flow: FirstRunSetupFlow, model: OnboardingPageModel, initialWorkspace: boolean) {
-  const importsExisting = initialWorkspace || !model.setup.skipInitialImport;
-  return {
-    repository: model.setup.selectedRepo ?? undefined,
-    ticketSource: flow.ticketSource,
-    initialImportCount: importsExisting ? INITIAL_IMPORT_LIMIT : 0,
-    automaticIntake: model.setup.automaticIntake,
-  };
-}
-
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
   const backScreen = BACK_SCREEN[target];
   // Bitbucket has no separate connect screen.
@@ -413,7 +402,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         flow={flow}
         chrome={chromeFor("card")}
         sphere={sphereFor("card", setup.selectedRepo, model.githubOwner)}
-        summary={cardSummaryFor(flow, model, initialWorkspace)}
       />
     );
   }
