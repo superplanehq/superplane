@@ -44,7 +44,7 @@ blocks:
           # Only main stores these caches, so the keys carry no branch name.
           # See scripts/ci_cache_store_go.sh.
           - "cache restore go-mod-$(checksum go.sum),go-mod"
-          - "cache restore go-build-$(checksum go.sum),go-build"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
           - make dev.up
           - make dev.setup
       jobs:
@@ -120,7 +120,7 @@ blocks:
       prologue:
         commands:
           - "cache restore go-mod-$(checksum go.sum),go-mod"
-          - "cache restore go-build-$(checksum go.sum),go-build"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
           - make dev.up
           - make dev.setup
       jobs:
@@ -167,7 +167,7 @@ blocks:
       prologue:
         commands:
           - "cache restore go-mod-$(checksum go.sum),go-mod"
-          - "cache restore go-build-$(checksum go.sum),go-build"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
           - make dev.up
           - make dev.setup.npm
       jobs:
