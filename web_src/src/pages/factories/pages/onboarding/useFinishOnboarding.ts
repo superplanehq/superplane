@@ -33,6 +33,7 @@ import {
   type InstallOnboardingApp,
   type ListFactoryApps,
   type ListFactoryIntakes,
+  type UpdateFactoryIntake,
   type UpdateOnboarding,
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
@@ -145,6 +146,7 @@ export async function provisionWorkspace(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  updateIntake: UpdateFactoryIntake;
   deleteIntake: DeleteFactoryIntake;
   listApps: ListFactoryApps;
   workspaceName: string;
@@ -213,6 +215,7 @@ export async function provisionWorkspace(args: {
     vcsProvider: args.vcs.provider,
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
+    updateIntake: args.updateIntake,
     deleteIntake: args.deleteIntake,
     issuesChoice: args.issuesChoice,
     skipInitialImport: args.skipInitialImport,
@@ -322,6 +325,7 @@ export function useFinishOnboarding(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  updateIntake: UpdateFactoryIntake;
   deleteIntake: DeleteFactoryIntake;
   listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
