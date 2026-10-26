@@ -66,7 +66,10 @@ describe("useBillingCardSetup", () => {
   it("automatically detects the first saved card and completes without requiring popup closure", async () => {
     const popup = createPopup();
     refetch.mockResolvedValueOnce({ data: { hasPaymentMethod: false } });
-    const onSaved = vi.fn();
+    let closedBeforeContinue = false;
+    const onSaved = vi.fn(() => {
+      closedBeforeContinue = popup.close.mock.calls.length > 0;
+    });
     const { result, unmount } = renderHook(() => useBillingCardSetup("org-1"), { wrapper });
     await act(async () => result.current.open(onSaved));
     await act(async () => vi.advanceTimersByTime(0));
@@ -79,6 +82,7 @@ describe("useBillingCardSetup", () => {
     expect(popup.closed).toBe(false);
     expect(popup.close).toHaveBeenCalled();
     expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(closedBeforeContinue).toBe(true);
     unmount();
   });
 });

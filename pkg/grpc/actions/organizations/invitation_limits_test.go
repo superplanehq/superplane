@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -33,7 +34,7 @@ func newInvitationLimitFixture(t *testing.T) *invitationLimitFixture {
 	t.Helper()
 	r := support.Setup(t)
 	t.Cleanup(r.Close)
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	mail := services.NewNoopEmailService()
 	return &invitationLimitFixture{
 		t:       t,
@@ -282,14 +283,14 @@ func TestLoadInvitationLimitsIgnoresInvalidValues(t *testing.T) {
 func TestPendingInvitationLimit(t *testing.T) {
 	for _, tc := range []struct{ name, plan, billing string }{
 		{name: "billing off", billing: "no"},
-		{name: "none plan", plan: models.BillingPlanNone, billing: "yes"},
-		{name: "trial plan", plan: models.BillingPlanTrial, billing: "yes"},
+		{name: "none plan", plan: billingmodels.BillingPlanNone, billing: "yes"},
+		{name: "trial plan", plan: billingmodels.BillingPlanTrial, billing: "yes"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newInvitationLimitFixture(t)
-			t.Setenv(models.BillingEnabledEnv, tc.billing)
+			t.Setenv(billingmodels.BillingEnabledEnv, tc.billing)
 			if tc.plan != "" {
-				_, err := models.SetAdminOrganizationPlan(f.db, f.r.Organization.ID, tc.plan, nil)
+				_, err := billingmodels.SetAdminOrganizationPlan(f.db, f.r.Organization.ID, tc.plan, nil)
 				require.NoError(t, err)
 			}
 			first, err := f.create("first@example.com")

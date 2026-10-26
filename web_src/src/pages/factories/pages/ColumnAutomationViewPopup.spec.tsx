@@ -11,8 +11,8 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { ColumnAutomationViewHost, ColumnAutomationViewPopup } from "./ColumnAutomationViewPopup";
-import { MergeConfidenceSettingsForm } from "./MergeConfidenceSettingsForm";
-import type { PlanningReviewDraft } from "./planningReviewMockup";
+import { ColumnAutomationFooterAction } from "./columnAutomationFooterSlot";
+import { Button } from "@/components/ui/button";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
@@ -159,27 +159,18 @@ describe("ColumnAutomationViewPopup", () => {
   });
 
   it("puts save and delete on one footer line", () => {
-    const draft: PlanningReviewDraft = {
-      title: "Assess Merge Confidence",
-      components: [
-        {
-          id: "assess-risk",
-          title: "Assess Merge Confidence",
-          description: "",
-          expanded: true,
-          configuration: { steps: [] },
-          concurrency: { max: "1", key: "" },
-        },
-      ],
-    };
     renderPopup({
       onDelete: vi.fn(),
-      general: <MergeConfidenceSettingsForm draft={draft} onSave={vi.fn()} />,
+      general: (
+        <ColumnAutomationFooterAction>
+          <Button>Save settings</Button>
+        </ColumnAutomationFooterAction>
+      ),
     });
 
     const footer = screen.getByTestId("column-automation-view-footer");
     expect(within(footer).getByTestId("column-automation-view-delete")).toBeInTheDocument();
-    expect(within(footer).getByTestId("merge-confidence-settings-save")).toBeInTheDocument();
+    expect(within(footer).getByRole("button", { name: "Save settings" })).toBeInTheDocument();
     expect(screen.getByTestId("column-automation-view").querySelectorAll("footer")).toHaveLength(1);
   });
 
@@ -293,6 +284,37 @@ function renderHost() {
 }
 
 describe("ColumnAutomationViewHost", () => {
+  it("opens Merge confidence from a line column as a settings form", () => {
+    useCanvas.mockReturnValue({
+      data: {
+        metadata: { id: "app-risk-score", name: "Merge confidence", liveVersionId: "version-live" },
+        spec: {
+          nodes: [
+            { id: "on-pr-risk", name: "On Pull Request", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+            {
+              id: "assess-risk",
+              name: "Assess risk",
+              type: "TYPE_ACTION",
+              component: "runnerClaudeCode",
+              configuration: {
+                steps: [{ name: "Security", type: "prompt", prompt: "Merge check: security.\nCheck security." }],
+              },
+            },
+          ],
+          edges: [],
+        },
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    renderHost();
+    expect(screen.getByRole("tab", { name: "Configuration" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Security" })).toBeChecked();
+    expect(screen.getAllByRole("switch")).toHaveLength(5);
+    expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
+  });
+
   it("opens supported Implement settings without a canvas", () => {
     useCanvas.mockReturnValue({
       data: {

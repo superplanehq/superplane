@@ -27,6 +27,8 @@ spec:
       name: Assess Merge Confidence
       type: TYPE_ACTION
       component: runnerClaudeCode
+      concurrency:
+        max: 5
       configuration:
         executionTimeoutSeconds: 1800
         includeVisualEvidence: false

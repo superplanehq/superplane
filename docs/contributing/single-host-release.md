@@ -33,6 +33,48 @@ Fleet Manager and the runner image are separate release artifacts:
 The release pipeline publishes the archive. It does not boot it. Boot the
 archive on a machine before you rely on a new release.
 
+## Release SuperPlane
+
+SuperPlane releases must use a commit from `main` with successful CI.
+
+```mermaid
+flowchart LR
+    M[Main CI passes] --> R[Prepare and publish RC]
+    R --> T[Test RC]
+    T -->|Problem found| F[Merge fix to main]
+    F --> M
+    T -->|RC approved| S[Finalize stable release]
+```
+
+### Publish a release candidate
+
+1. Merge all release changes into `main`.
+2. Wait for the Semaphore pipeline to pass.
+3. Select `Prepare SuperPlane Release`.
+4. Set `RELEASE_VERSION` to the next candidate, such as `v1.0.0-rc8`.
+5. Start the promotion.
+6. Wait for `Publish SuperPlane Release` to finish.
+7. Test the published release candidate.
+
+If you find a problem, merge the fix into `main`. Repeat these steps with the
+next candidate version, such as `v1.0.0-rc9`.
+
+### Publish the stable release
+
+1. Open the completed `Publish SuperPlane Release` pipeline for the approved
+   candidate.
+2. Select `Finalize SuperPlane Release`.
+3. Confirm `RELEASE_CANDIDATE_VERSION`, such as `v1.0.0-rc8`.
+4. Set `RELEASE_VERSION` to the matching stable version, such as `v1.0.0`.
+5. Start the promotion.
+6. Wait for the stable publication to finish.
+
+The stable version must match the candidate version core. For example,
+`v1.0.0-rc8` can only become `v1.0.0`.
+
+Finalization uses the candidate Git commit and component versions. It stops if
+the candidate artifacts are missing or modified.
+
 To test the archive without starting containers:
 
 ```bash

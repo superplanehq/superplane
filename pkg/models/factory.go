@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -39,7 +40,7 @@ var ErrFactoryKeyRequired = errors.New("factory key is required")
 var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
 var ErrFactoryURLIDAlreadyExists = errors.New("factory url id already exists")
-var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
+var ErrFactoryHostedSpendBudgetNegative = billing.ErrFactoryHostedSpendBudgetNegative
 var ErrFactoryOnboardingNotComplete = errors.New("factory onboarding is not complete")
 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
@@ -544,23 +545,14 @@ func (f *Factory) Update(tx *gorm.DB, name, description, key *string) error {
 }
 
 func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error {
-	if budgetCents != nil && *budgetCents < 0 {
-		return ErrFactoryHostedSpendBudgetNegative
+	if err := billing.UpdateFactoryHostedBudget(tx, f.OrganizationID, f.ID, budgetCents); err != nil {
+		return err
 	}
-
-	now := time.Now()
-	err := tx.Model(f).
-		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
-		Select("hosted_spend_budget_cents", "updated_at").
-		Updates(map[string]any{
-			"hosted_spend_budget_cents": budgetCents,
-			"updated_at":                now,
-		}).Error
+	saved, err := FindFactory(tx, f.OrganizationID, f.ID)
 	if err != nil {
 		return err
 	}
-	f.HostedSpendBudgetCents = budgetCents
-	f.UpdatedAt = now
+	*f = *saved
 	return nil
 }
 

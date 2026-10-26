@@ -72,6 +72,31 @@ Resolves: #123
 - Issue/PR references belong at the end of the body, not stuffed into the
   subject.
 
+## DCO identity and publication checks
+
+A sign-off must match the commit author's **exact name and email**. The same
+email with a different name fails DCO. `git commit -s` uses the committer's
+configured identity; it does not prove that the author's identity matches.
+
+Before publishing, inspect every new commit's author, committer, and trailers:
+
+```bash
+git show -s --format='Author: %an <%ae>%nCommitter: %cn <%ce>%n%B' HEAD
+```
+
+- Match each author's name and email to a `Signed-off-by` trailer. Use the
+  identity in the commit metadata. Do not substitute a login or display name.
+- When a GitHub app or API creates a commit, it can use a different identity
+  from local Git. Inspect the created remote commit **before updating a branch
+  ref**. If its author does not match the trailer, create a corrected commit
+  before publishing the ref. Never hardcode a personal identity in this skill.
+- After publishing, check DCO on the PR's current head. Report DCO as passed
+  only after that check succeeds. Pending or failed is not complete.
+- Preserve the user's history constraints. Use a follow-up remediation commit
+  only if the repository's DCO app enables it. Do not bypass DCO or change its
+  configuration to hide an invalid sign-off. When a metadata amendment is
+  authorized, preserve the code tree and use the exact old head as a lease.
+
 ## Pull request titles
 
 PR titles are the public subject line for a whole change set.

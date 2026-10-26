@@ -85,11 +85,15 @@ func TestNewServicesDefaultsToCommunity(t *testing.T) {
 	r := support.Setup(t)
 	ctx := organizationContext(r.Organization.ID.String(), r.User.String())
 
+	registry := enterprise.NewRegistry()
+	registry.Register(enterprise.Billing, organizationBillingStub{})
+
 	services, err := NewServices(ServicesConfig{
 		AuthService: r.AuthService,
 		Registry:    r.Registry,
 		Encryptor:   r.Encryptor,
 		JWTSigner:   jwt.NewSigner("test-secret"),
+		Enterprise:  registry,
 	})
 	require.NoError(t, err)
 

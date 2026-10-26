@@ -40,7 +40,7 @@ export function BillingPlansTable({
               Limits{" "}
               <BillingHelp
                 label="Plan limits"
-                text="Seats are organization members. Parallel task limits are saved but not enforced."
+                text="Seats are organization members. The parallel runner limit counts reserved or running runner jobs across all workspaces and fleets."
               />
             </TableHeader>
             <TableHeader>Features</TableHeader>
@@ -77,7 +77,7 @@ export function BillingPlansTable({
               <TableCell>
                 <div>{plan.seat_limit ?? "Unlimited"} seats</div>
                 <div className="text-xs text-muted-foreground">
-                  {plan.parallel_task_limit ?? "Unlimited"} parallel tasks
+                  Parallel runner limit: {plan.parallel_task_limit ?? "Unlimited"}
                 </div>
               </TableCell>
               <TableCell>{plan.features.length}</TableCell>
