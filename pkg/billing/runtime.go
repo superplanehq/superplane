@@ -78,6 +78,7 @@ type Runtime interface {
 	AssertOrganizationPaymentMethod(*gorm.DB, uuid.UUID) error
 	AssertOrganizationPlanAllowsRuns(*gorm.DB, uuid.UUID) error
 	AssertHostedRunAllowed(*gorm.DB, uuid.UUID, *uuid.UUID) error
+	ResolveParallelTaskLimit(*gorm.DB, uuid.UUID) (*int, error)
 	ResolveProductFeatures(*gorm.DB, uuid.UUID) (map[string]bool, error)
 	ResolveMarkupBPS(*gorm.DB, uuid.UUID) (int, error)
 	RemainingCreditMicros(*gorm.DB, []uuid.UUID) (map[uuid.UUID]int64, error)

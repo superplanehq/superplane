@@ -102,6 +102,13 @@ func (*Service) AssertOrganizationPlanAllowsRuns(tx *gorm.DB, organizationID uui
 func (*Service) AssertHostedRunAllowed(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID) error {
 	return billingmodels.AssertHostedRunAllowed(tx, organizationID, factoryID)
 }
+func (*Service) ResolveParallelTaskLimit(tx *gorm.DB, organizationID uuid.UUID) (*int, error) {
+	plan, err := billingmodels.ResolveOrganizationBillingPlan(tx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	return plan.Catalog.ParallelTaskLimit, nil
+}
 func (*Service) ResolveProductFeatures(tx *gorm.DB, organizationID uuid.UUID) (map[string]bool, error) {
 	return billingmodels.ResolveOrganizationProductFeatures(tx, organizationID)
 }
