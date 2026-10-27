@@ -12,13 +12,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/ee/billing/pricebook"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
@@ -144,53 +145,53 @@ func TestAdminListOrganizationsRemainingCredit(t *testing.T) {
 	require.NoError(t, err)
 
 	expired := time.Now().Add(-time.Hour).UTC()
-	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
+	require.NoError(t, db.Create(&billingmodels.OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: high.ID,
-		Kind:           models.LLMCreditGrantKindWelcome,
-		AmountMicros:   models.CentsToMicros(5000),
+		Kind:           billingmodels.LLMCreditGrantKindWelcome,
+		AmountMicros:   billingmodels.CentsToMicros(5000),
 		CreatedAt:      expired.Add(-2 * time.Hour),
 		ExpiresAt:      &expired,
 	}).Error)
-	insertHostedSpend(t, db, high.ID, models.CentsToMicros(2000), expired.Add(-time.Minute))
-	insertHostedSpend(t, db, high.ID, models.CentsToMicros(500), time.Now())
-	insertHostedSpendWithSource(t, db, high.ID, models.CentsToMicros(9000), time.Now(), models.UsageFundingSourceBYOK)
-	_, err = models.AddTopupLLMCreditGrant(db, high.ID, models.CentsToMicros(8000), uuid.NewString())
+	insertHostedSpend(t, db, high.ID, billingmodels.CentsToMicros(2000), expired.Add(-time.Minute))
+	insertHostedSpend(t, db, high.ID, billingmodels.CentsToMicros(500), time.Now())
+	insertHostedSpendWithSource(t, db, high.ID, billingmodels.CentsToMicros(9000), time.Now(), models.UsageFundingSourceBYOK)
+	_, err = billingmodels.AddTopupLLMCreditGrant(db, high.ID, billingmodels.CentsToMicros(8000), uuid.NewString())
 	require.NoError(t, err)
 
-	_, err = models.AddAdminLLMCreditGrant(db, alpha.ID, models.CentsToMicros(1500), "support", nil)
+	_, err = billingmodels.AddAdminLLMCreditGrant(db, alpha.ID, billingmodels.CentsToMicros(1500), "support", nil)
 	require.NoError(t, err)
-	_, err = models.AddAdminLLMCreditGrant(db, beta.ID, models.CentsToMicros(1500), "support", nil)
+	_, err = billingmodels.AddAdminLLMCreditGrant(db, beta.ID, billingmodels.CentsToMicros(1500), "support", nil)
 	require.NoError(t, err)
 
 	sameA, err := models.CreateOrganization("CreditSort SameA", "")
 	require.NoError(t, err)
 	sameZ, err := models.CreateOrganization("CreditSort SameZ", "")
 	require.NoError(t, err)
-	_, err = models.AddAdminLLMCreditGrant(db, sameA.ID, 12_500, "support", nil)
+	_, err = billingmodels.AddAdminLLMCreditGrant(db, sameA.ID, 12_500, "support", nil)
 	require.NoError(t, err)
-	_, err = models.AddAdminLLMCreditGrant(db, sameZ.ID, 19_999, "support", nil)
+	_, err = billingmodels.AddAdminLLMCreditGrant(db, sameZ.ID, 19_999, "support", nil)
 	require.NoError(t, err)
 
 	other, err := models.CreateOrganization("CreditSort Other", "")
 	require.NoError(t, err)
 	otherExpired := time.Now().Add(-2 * time.Hour).UTC()
-	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
+	require.NoError(t, db.Create(&billingmodels.OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: other.ID,
-		Kind:           models.LLMCreditGrantKindWelcome,
-		AmountMicros:   models.CentsToMicros(1000),
+		Kind:           billingmodels.LLMCreditGrantKindWelcome,
+		AmountMicros:   billingmodels.CentsToMicros(1000),
 		CreatedAt:      otherExpired.Add(-2 * time.Hour),
 		ExpiresAt:      &otherExpired,
 	}).Error)
-	insertHostedSpend(t, db, other.ID, models.CentsToMicros(400), otherExpired.Add(-time.Minute))
-	insertHostedSpend(t, db, other.ID, models.CentsToMicros(100), time.Now())
-	_, err = models.AddTopupLLMCreditGrant(db, other.ID, models.CentsToMicros(300), uuid.NewString())
+	insertHostedSpend(t, db, other.ID, billingmodels.CentsToMicros(400), otherExpired.Add(-time.Minute))
+	insertHostedSpend(t, db, other.ID, billingmodels.CentsToMicros(100), time.Now())
+	_, err = billingmodels.AddTopupLLMCreditGrant(db, other.ID, billingmodels.CentsToMicros(300), uuid.NewString())
 	require.NoError(t, err)
 
 	expected := map[string]int64{}
 	for _, org := range []*models.Organization{high, alpha, beta, none, sameA, sameZ, other} {
-		summary, err := models.DescribeOrganizationLLMCredit(db, org.ID)
+		summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 		require.NoError(t, err)
 		expected[org.ID.String()] = pricebook.MicrosToCents(summary.RemainingMicros)
 	}
@@ -1174,7 +1175,7 @@ func TestGetAccountIncludesInstallationAdmin(t *testing.T) {
 	})
 
 	t.Run("billing_enabled is false when product billing is off", func(t *testing.T) {
-		t.Setenv(models.BillingEnabledEnv, "no")
+		t.Setenv(billingmodels.BillingEnabledEnv, "no")
 		response := execRequest(server, requestParams{
 			method:     "GET",
 			path:       "/account",

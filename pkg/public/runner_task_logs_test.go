@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	sentrytest "github.com/superplanehq/superplane/test/support/sentry"
 	"io"
 	"net/http"
 	"testing"
@@ -188,7 +189,7 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 
 	t.Run("records a final log read error for the error tracker", func(t *testing.T) {
 		const forcedError = "blob head refused the log object"
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		previous := blob.Current()
 		blob.SetCurrent(headErrorBlob{Provider: previous, err: errors.New(forcedError)})
 		t.Cleanup(func() { blob.SetCurrent(previous) })
@@ -201,7 +202,7 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 
 		events := transport.Events()
 		require.Len(t, events, 1)
-		assert.Equal(t, forcedError, capturedExceptionText(events[0]))
+		assert.Equal(t, forcedError, sentrytest.ExceptionText(events[0]))
 		assert.NotContains(t, events[0].Message, "HTTP 500")
 	})
 
@@ -216,7 +217,7 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 
 	t.Run("records a signed URL error for the error tracker", func(t *testing.T) {
 		const forcedError = "signed url mint refused"
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		blob.SetCurrent(signingErrorBlob{Provider: provider, err: errors.New(forcedError)})
 		t.Cleanup(func() { blob.SetCurrent(provider) })
 
@@ -228,7 +229,7 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 
 		events := transport.Events()
 		require.Len(t, events, 1)
-		assert.Equal(t, forcedError, capturedExceptionText(events[0]))
+		assert.Equal(t, forcedError, sentrytest.ExceptionText(events[0]))
 		assert.NotContains(t, events[0].Message, "HTTP 500")
 	})
 }
@@ -301,7 +302,7 @@ func TestHandleRunnerTaskLogsRecordsUnexpectedLookupFailure(t *testing.T) {
 	)
 
 	const forcedError = "canvas lookup connection refused"
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	db := database.Conn()
 	const callbackName = "test:runner-log-canvas-lookup-failure"
 	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callbackName, func(tx *gorm.DB) {
@@ -322,7 +323,7 @@ func TestHandleRunnerTaskLogsRecordsUnexpectedLookupFailure(t *testing.T) {
 
 	events := transport.Events()
 	require.Len(t, events, 1)
-	assert.Contains(t, capturedExceptionText(events[0]), forcedError)
+	assert.Contains(t, sentrytest.ExceptionText(events[0]), forcedError)
 	assert.NotContains(t, events[0].Message, "HTTP 500")
 }
 

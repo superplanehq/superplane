@@ -58,7 +58,7 @@ function stubBillingCatalog(
       const path = String(input);
       const method = init?.method ?? "GET";
       requests.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-      if (path.endsWith("feature-definitions")) return new Response("[]");
+      if (path.endsWith("feature-definitions") || path.includes("polar/products")) return new Response("[]");
       if (method === "GET" && path.endsWith("billing-plans")) {
         if (failNextRefresh) {
           failNextRefresh = false;
@@ -269,8 +269,8 @@ it("edits a linked plan in a dialog, preserves locked pricing and credit policie
   expect(maximum).toHaveValue(10);
   await user.clear(maximum);
   await user.type(maximum, "75");
-  await user.clear(screen.getByLabelText("Parallel task limit", { exact: true }));
-  await user.type(screen.getByLabelText("Parallel task limit", { exact: true }), "2");
+  await user.clear(screen.getByLabelText("Parallel runner limit", { exact: true }));
+  await user.type(screen.getByLabelText("Parallel runner limit", { exact: true }), "2");
   // Happy DOM incorrectly rejects decimal steps, so submit the form directly.
   fireEvent.submit(screen.getByRole("button", { name: "Save plan" }).closest("form")!);
   await waitFor(() =>
@@ -328,7 +328,7 @@ it("locks legacy Business pricing and usage limits in the editor", async () => {
   await user.click(await screen.findByRole("button", { name: "Edit Business" }));
   expect(screen.getByLabelText("Price (USD)", { exact: true })).toBeDisabled();
   expect(screen.getByLabelText("Seat limit", { exact: true })).toBeDisabled();
-  expect(screen.getByLabelText("Parallel task limit", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Parallel runner limit", { exact: true })).toBeDisabled();
 });
 
 it("protects Business Manual from deletion and unsupported catalog edits", async () => {
@@ -677,7 +677,7 @@ it("keeps a rejected update open with its values and saves a corrected retry", a
   await user.click(await screen.findByRole("button", { name: "Edit Custom" }));
   const dialog = within(screen.getByRole("dialog", { name: "Edit Custom" }));
   fireEvent.change(dialog.getByLabelText("Name", { exact: true }), { target: { value: "Custom Pro" } });
-  fireEvent.change(dialog.getByLabelText("Parallel task limit", { exact: true }), { target: { value: "3" } });
+  fireEvent.change(dialog.getByLabelText("Parallel runner limit", { exact: true }), { target: { value: "3" } });
   // Happy DOM incorrectly rejects decimal steps, so submit the form directly.
   fireEvent.submit(dialog.getByRole("button", { name: "Save plan" }).closest("form")!);
 
@@ -685,7 +685,7 @@ it("keeps a rejected update open with its values and saves a corrected retry", a
   expect(alert).toHaveTextContent("Billing plan changes were rejected. Try again.");
   expect(alert).not.toHaveTextContent("{");
   expect(dialog.getByLabelText("Name", { exact: true })).toHaveValue("Custom Pro");
-  expect(dialog.getByLabelText("Parallel task limit", { exact: true })).toHaveValue(3);
+  expect(dialog.getByLabelText("Parallel runner limit", { exact: true })).toHaveValue(3);
 
   fireEvent.submit(dialog.getByRole("button", { name: "Save plan" }).closest("form")!);
   await waitFor(() => expect(updates).toHaveLength(2));

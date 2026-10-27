@@ -156,6 +156,7 @@ func (f *fakeProvider) ArchiveSession(_ context.Context, providerSessionID strin
 
 func newService(t *testing.T, r *support.ResourceRegistry, provider agents.Provider) *agents.Service {
 	t.Helper()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	return agents.NewService(provider, r.AuthService)
 }
 

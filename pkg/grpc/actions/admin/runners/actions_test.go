@@ -112,6 +112,83 @@ func TestCreateGenericRunnerWithoutIdempotencyKeyCreatesNewRunnerEachTime(t *tes
 	assert.True(t, second.Runner.Ephemeral)
 }
 
+func TestRunnerProviderOwnershipSurvivesRegistrationAndFencesDeletion(t *testing.T) {
+	support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+	service := newTestRunnerService()
+	request := &pb.CreateRunnerRequest{
+		FleetId: fleet.Slug, Ephemeral: true, IdempotencyKey: "owned-runner",
+		FleetManagerId: "manager-a", Provider: "aws",
+	}
+	created, err := service.CreateRunner(t.Context(), request)
+	require.NoError(t, err)
+	assert.Equal(t, "manager-a", created.Runner.Tags["fleet_manager_id"])
+	assert.Equal(t, "aws", created.Runner.Tags["runner_provider"])
+
+	request.FleetManagerId = "manager-b"
+	_, err = service.CreateRunner(t.Context(), request)
+	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+	request.FleetManagerId = "manager-a"
+	request.Provider = "azure"
+	_, err = service.CreateRunner(t.Context(), request)
+	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+
+	runner, err := models.FindRunner(db, uuid.MustParse(created.Runner.Id))
+	require.NoError(t, err)
+	registration, err := models.FindRunnerRegistration(db, runner.ID)
+	require.NoError(t, err)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return runner.Register(tx, registration.JTI, fleet.Slug, nil, runner.RunnerVersion, models.RunnerHost{
+			Tags: map[string]string{"fleet_manager_id": "manager-b", "runner_provider": "azure", "host": "worker"},
+		}, "access-token-hash", time.Now())
+	}))
+	runner, err = models.FindRunner(db, runner.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "manager-a", runner.Tags.Data()["fleet_manager_id"])
+	assert.Equal(t, "aws", runner.Tags.Data()["runner_provider"])
+	assert.Equal(t, "worker", runner.Tags.Data()["host"])
+	require.NoError(t, runner.Terminate(db, models.RunnerTerminationRequested))
+
+	for _, owner := range []struct{ manager, provider string }{
+		{"manager-b", "aws"}, {"manager-a", "azure"}, {"", ""},
+	} {
+		_, err = service.MarkRunnerProviderDeleted(t.Context(), &pb.MarkRunnerProviderDeletedRequest{
+			FleetId: fleet.Slug, RunnerId: runner.ID.String(), FleetManagerId: owner.manager, Provider: owner.provider,
+		})
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+		reloaded, findErr := models.FindRunner(db, runner.ID)
+		require.NoError(t, findErr)
+		assert.Nil(t, reloaded.ProviderDeletedAt)
+	}
+	marked, err := service.MarkRunnerProviderDeleted(t.Context(), &pb.MarkRunnerProviderDeletedRequest{
+		FleetId: fleet.Slug, RunnerId: runner.ID.String(), FleetManagerId: "manager-a", Provider: "aws",
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, marked.Runner.ProviderDeletedAt)
+
+	// A runner that never registers still has durable ownership.
+	pending, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
+		FleetId: fleet.Slug, Ephemeral: true, FleetManagerId: "manager-a", Provider: "aws",
+	})
+	require.NoError(t, err)
+	_, err = service.DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{FleetId: fleet.Slug, RunnerId: pending.Runner.Id})
+	require.NoError(t, err)
+	_, err = service.MarkRunnerProviderDeleted(t.Context(), &pb.MarkRunnerProviderDeletedRequest{
+		FleetId: fleet.Slug, RunnerId: pending.Runner.Id, FleetManagerId: "manager-a", Provider: "aws",
+	})
+	require.NoError(t, err)
+
+	legacy, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{FleetId: fleet.Slug, Ephemeral: true})
+	require.NoError(t, err)
+	_, err = service.DeleteRunner(t.Context(), &pb.DeleteRunnerRequest{FleetId: fleet.Slug, RunnerId: legacy.Runner.Id})
+	require.NoError(t, err)
+	_, err = service.MarkRunnerProviderDeleted(t.Context(), &pb.MarkRunnerProviderDeletedRequest{
+		FleetId: fleet.Slug, RunnerId: legacy.Runner.Id, FleetManagerId: "manager-a", Provider: "aws",
+	})
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+}
+
 func TestCreateGenericInstallationRunnerMustBeEphemeral(t *testing.T) {
 	support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)

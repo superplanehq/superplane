@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -140,9 +141,6 @@ func Test__InstallationDefaultHostedLLMModel(t *testing.T) {
 
 	t.Run("rejects a default that is not on an offered allowlist", func(t *testing.T) {
 		_, err := models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-			WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-			MarkupBPS:             models.DefaultMarkupBPS,
-			WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
 			DefaultHostedProvider: stringPtr("anthropic"),
 			DefaultHostedModel:    stringPtr("claude-sonnet-4-6"),
 		})
@@ -159,9 +157,6 @@ func Test__InstallationDefaultHostedLLMModel(t *testing.T) {
 		require.NoError(t, err)
 
 		saved, err := models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-			WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-			MarkupBPS:             models.DefaultMarkupBPS,
-			WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
 			DefaultHostedProvider: stringPtr("anthropic"),
 			DefaultHostedModel:    stringPtr("claude-sonnet-4-6"),
 		})
@@ -187,9 +182,9 @@ func Test__SuperPlaneRunnerReadinessMessage(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, models.SuperPlaneRunnerNoCreditMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerNoCredit))
-	assert.Equal(t, models.SuperPlaneRunnerNoCreditMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrHostedCreditEmpty))
+	assert.Equal(t, models.SuperPlaneRunnerNoCreditMessage, models.SuperPlaneRunnerReadinessMessage(billingmodels.ErrHostedCreditEmpty))
 	assert.Equal(t, models.SuperPlaneRunnerNoFactoryBudgetMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerNoFactoryBudget))
-	assert.Equal(t, models.SuperPlaneRunnerNoFactoryBudgetMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrFactoryHostedBudgetEmpty))
+	assert.Equal(t, models.SuperPlaneRunnerNoFactoryBudgetMessage, models.SuperPlaneRunnerReadinessMessage(billingmodels.ErrFactoryHostedBudgetEmpty))
 	assert.Equal(t, models.SuperPlaneRunnerNoModelMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerNoModel))
 	assert.Equal(t, models.SuperPlaneRunnerModelNotAllowedMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerModelNotAllowed))
 	assert.Equal(t, "organization is required for hosted LLM credit", models.SuperPlaneRunnerReadinessMessage(fmt.Errorf("organization is required for hosted LLM credit")))
@@ -198,6 +193,7 @@ func Test__SuperPlaneRunnerReadinessMessage(t *testing.T) {
 func Test__SuperPlaneRunnerReadinessError(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 
 	t.Cleanup(func() {
@@ -215,9 +211,6 @@ func Test__SuperPlaneRunnerReadinessError(t *testing.T) {
 	})
 	require.NoError(t, err)
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
 		DefaultHostedProvider: stringPtr("anthropic"),
 		DefaultHostedModel:    stringPtr("claude-sonnet-4-6"),
 	})
@@ -229,6 +222,7 @@ func Test__SuperPlaneRunnerReadinessError(t *testing.T) {
 func Test__ResolveRunnableHostedLLMModel__UsesAllowedModelWhenDefaultIsExcluded(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
 		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
@@ -251,9 +245,6 @@ func Test__ResolveRunnableHostedLLMModel__UsesAllowedModelWhenDefaultIsExcluded(
 	})
 	require.NoError(t, err)
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
 		DefaultHostedProvider: stringPtr("anthropic"),
 		DefaultHostedModel:    stringPtr("claude-sonnet-4-6"),
 	})
@@ -280,6 +271,7 @@ func Test__ResolveRunnableHostedLLMModel__UsesAllowedModelWhenDefaultIsExcluded(
 func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
 		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
@@ -308,9 +300,6 @@ func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(
 	})
 	require.NoError(t, err)
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
 		DefaultHostedProvider: stringPtr("anthropic"),
 		DefaultHostedModel:    stringPtr("claude-sonnet-4-6"),
 	})
@@ -352,9 +341,6 @@ func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(
 	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.JSONSlice[string]{"openai/gpt-4.1-mini"})
 	require.NoError(t, err)
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
 		DefaultHostedProvider: stringPtr("openrouter"),
 		DefaultHostedModel:    stringPtr("openai/gpt-4.1"),
 	})
@@ -368,6 +354,7 @@ func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(
 func Test__AnnotateSuperPlaneRunnerNodes(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 
 	t.Run("stamps a missing instance model", func(t *testing.T) {
@@ -399,4 +386,14 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func restoreInstallationLLMSettings(t *testing.T) {
+	t.Helper()
+	reset := func() {
+		_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{})
+		require.NoError(t, err)
+	}
+	reset()
+	t.Cleanup(reset)
 }

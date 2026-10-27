@@ -59,6 +59,8 @@ export function useBillingCardSetup(organizationId: string) {
       if (result.data?.hasPaymentMethod) {
         const onSaved = onCardSaved.current;
         onCardSaved.current = undefined;
+        popup.opened.close();
+        window.focus();
         setPopup(null);
         onSaved?.();
         return;

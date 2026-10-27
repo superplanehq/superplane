@@ -1,11 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><title>SuperPlane invitation</title></head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperPlane invitation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.6;
+            color: #000000;
+            background-color: #ffffff;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            overflow-wrap: break-word;
+        }
+
+        .heading {
+            font-size: 24px;
+            font-weight: 600;
+            line-height: 1.35;
+            margin: 0 0 20px;
+        }
+
+        .text {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .invitation-link {
+            color: #000000;
+            text-decoration: underline;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .instruction-text {
+            font-size: 14px;
+            color: #666666;
+            margin-top: 15px;
+            font-style: italic;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #cccccc;
+            color: #000000;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 20px 15px;
+            }
+        }
+    </style>
+</head>
 <body>
-  <h1>Join {{.OrganizationName}} on SuperPlane</h1>
-  <p>{{.InviterName}} invited you to join {{.OrganizationName}} with the role {{.Role}}.</p>
-  <p><a href="{{.AcceptanceURL}}">Accept the invitation</a></p>
-  <p>This invitation expires on {{.ExpiresAt}}.</p>
-  <p>If you do not know this organization, you can ignore this email.</p>
+    <h1 class="heading">Join {{.OrganizationName}} on SuperPlane</h1>
+
+    <div class="text">
+        {{.InviterName}} invited you to join {{.OrganizationName}} with the role {{.Role}}.
+    </div>
+
+    <div class="text">
+        <a href="{{.AcceptanceURL}}" class="invitation-link">Accept the invitation</a>
+    </div>
+
+    <div class="instruction-text">
+        This invitation expires on {{.ExpiresAt}}.
+    </div>
+
+    <div class="instruction-text">
+        If you do not know this organization, you can ignore this email.
+    </div>
+
+    <div class="footer">
+        Best regards,<br>The SuperPlane Team
+    </div>
 </body>
 </html>

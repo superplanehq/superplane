@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	sentrytest "github.com/superplanehq/superplane/test/support/sentry"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -443,7 +444,7 @@ func TestHandlerSentryAppWebhook_droppedDeliveryPreservesStatus(t *testing.T) {
 	})
 	require.NoError(t, database.Conn().Save(integration).Error)
 
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
 	rec := httptest.NewRecorder()
 
@@ -455,13 +456,13 @@ func TestHandlerSentryAppWebhook_droppedDeliveryPreservesStatus(t *testing.T) {
 	delivery := requireEventWithTag(t, events, "inner_status", "502")
 	assert.Equal(t, integration.ID.String(), delivery.Tags["integration_id"])
 	assert.Equal(t, "issue", delivery.Tags["hook_resource"])
-	assert.Contains(t, capturedExceptionText(delivery), "delivery failed for integration "+integration.ID.String())
+	assert.Contains(t, sentrytest.ExceptionText(delivery), "delivery failed for integration "+integration.ID.String())
 
 	aggregate := requireEventWithTag(t, events, "inner_statuses", "502")
 	assert.Equal(t, "install-1", aggregate.Tags["installation_uuid"])
 	assert.Equal(t, integration.ID.String(), aggregate.Tags["integration_ids"])
 	assert.Equal(t, "issue", aggregate.Tags["hook_resource"])
-	assert.Contains(t, capturedExceptionText(aggregate), "dropped webhook delivery for installation install-1")
+	assert.Contains(t, sentrytest.ExceptionText(aggregate), "dropped webhook delivery for installation install-1")
 }
 
 type sentryWebhookStatusStub struct {

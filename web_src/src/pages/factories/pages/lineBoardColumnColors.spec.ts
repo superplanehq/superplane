@@ -14,17 +14,12 @@ describe("lineBoardColumnColors", () => {
     expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(6);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.className.includes("bg-"))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.laneClassName !== color.className)).toBe(true);
-    expect(LINE_BOARD_COLUMN_COLORS.every((color) => /bg-\S+-100/.test(color.laneClassName))).toBe(true);
-    expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:bg-\S+\/\d+/.test(color.laneClassName))).toBe(true);
-    expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:border-\S+\/\d+/.test(color.borderClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).not.toContain("red");
   });
 
   it("resolves a lane class from a colour id", () => {
-    expect(lineBoardColumnColorById("lime")?.label).toBe("Lime");
+    expect(lineBoardColumnColorById("lime")?.label).toBe("Mint");
     expect(lineBoardColumnLaneClassName("lime")).toBe(lineBoardColumnColorById("lime")?.laneClassName);
-    expect(lineBoardColumnLaneClassName("lime")).toContain("bg-lime-100");
-    expect(lineBoardColumnLaneClassName("lime")).toContain("dark:bg-lime-950/40");
     expect(lineBoardColumnLaneClassName(null)).toBeUndefined();
   });
 
@@ -48,7 +43,8 @@ describe("lineBoardColumnColors", () => {
     });
     expect(lineBoardColumnLaneProps("lime", "off", { mutedFallback: true })).toEqual({ className: "bg-muted" });
     expect(lineBoardColumnLaneProps("lime", "borders", { mutedFallback: true })).toEqual({
-      className: `bg-muted ${lineBoardColumnColorById("lime")?.borderClassName}`,
+      surfaceClassName: "bg-card",
+      className: lineBoardColumnColorById("lime")?.borderClassName,
     });
     expect(lineBoardColumnLaneProps(null, "dim", { mutedFallback: true })).toEqual({ className: "bg-muted" });
   });

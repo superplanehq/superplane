@@ -14,7 +14,6 @@ it("shows the failed renewal, hides plan checkout, and keeps the seats summary",
   const failedAt = "2026-10-20T10:00:00Z";
   render(
     <FactoriesHarness
-      experimentalFeatures={["new_billing"]}
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
       factoriesFixture={{
         ...defaultFactoriesFixture,

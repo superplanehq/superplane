@@ -8,7 +8,7 @@ import { LiveAgentSteps } from "./LiveAgentSteps";
 import { idleStream, implementPhase, implementStage, RUNNING_RUNNER } from "./LiveAgentSteps.testHelpers";
 
 const FAILED_RUN_HREF =
-  "/demo/workspaces/newwo/automations/a455baf7-cee0-42ed-bb87-ef8849a24ff2?run=b3bac36f-7a97-488c-9a12-c11e5bdef8e6&from=task&orderNumber=78";
+  "/demo/workspaces/newwo/automations/a455baf7-cee0-42ed-bb87-ef8849a24ff2/runs/b3bac36f-7a97-488c-9a12-c11e5bdef8e6?from=task&orderNumber=78";
 
 function bashSection(status: "running" | "passed" | "failed") {
   return {
@@ -272,7 +272,7 @@ describe("LiveAgentSteps finished runs", () => {
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByText("Broken node")).toBeInTheDocument();
     expect(screen.getByText(/unknown name asdad/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Debug" })).toHaveAttribute("href", FAILED_RUN_HREF);
+    expect(screen.getByRole("link", { name: "View run details" })).toHaveAttribute("href", FAILED_RUN_HREF);
     expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
   });
 
@@ -387,7 +387,7 @@ describe("LiveAgentSteps finished runs", () => {
     expect(screen.getByText("Fail intentionally")).toBeInTheDocument();
     expect(screen.getByText(/unknown name asdad/)).toBeInTheDocument();
     expect(screen.getByText("Clone Repo")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Debug" })).toHaveAttribute("href", FAILED_RUN_HREF);
+    expect(screen.getByRole("link", { name: "View run details" })).toHaveAttribute("href", FAILED_RUN_HREF);
     expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
   });
 

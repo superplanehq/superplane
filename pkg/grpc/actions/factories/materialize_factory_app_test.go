@@ -12,12 +12,11 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	_ "github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
-
-	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
 func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
@@ -531,9 +530,6 @@ func enableInstanceSuperPlaneDefault(t *testing.T) {
 	provider := models.UsageProviderOpenRouter
 	model := "x-ai/grok-4.6"
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     previous.WelcomeGrantCents,
-		MarkupBPS:             previous.MarkupBPS,
-		WarningThresholdBPS:   previous.WarningThresholdBPS,
 		DefaultHostedProvider: &provider,
 		DefaultHostedModel:    &model,
 	})

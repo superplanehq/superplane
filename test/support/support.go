@@ -8,7 +8,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	eebilling "github.com/superplanehq/superplane/ee/billing"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	billingtestsupport "github.com/superplanehq/superplane/ee/billing/testsupport"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,7 +22,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	// Import components, triggers, and integrations to register them via init()
+	// Register components, triggers, integrations, and widgets for fixtures.
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
 	_ "github.com/superplanehq/superplane/pkg/components/display"
@@ -75,6 +79,7 @@ func Setup(t require.TestingT) *ResourceRegistry {
 }
 
 func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistry {
+	ensureBilling(t)
 	require.NoError(t, database.TruncateTables())
 	restoreSeedUsagePriceBooks(t)
 
@@ -141,7 +146,7 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		t.FailNow()
 	}
 
-	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+	err = billing.GrantWelcomeCredit(tx, organization.ID, account.ID)
 	if !assert.NoError(t, err) {
 		tx.Rollback()
 		t.FailNow()
@@ -208,6 +213,7 @@ func AuthService(t require.TestingT) *authorization.AuthService {
 }
 
 func CreateOrganization(t require.TestingT, r *ResourceRegistry, userID uuid.UUID) *models.Organization {
+	ensureBilling(t)
 	tx := database.Conn().Begin()
 	organization, err := models.CreateOrganizationInTransaction(tx, RandomName("org"), RandomName("org-display"))
 	if !assert.NoError(t, err) {
@@ -227,7 +233,7 @@ func CreateOrganization(t require.TestingT, r *ResourceRegistry, userID uuid.UUI
 			tx.Rollback()
 			t.FailNow()
 		}
-		err = models.GrantWelcomeCredit(tx, organization.ID, r.Account.ID)
+		err = billing.GrantWelcomeCredit(tx, organization.ID, r.Account.ID)
 		if !assert.NoError(t, err) {
 			tx.Rollback()
 			t.FailNow()
@@ -730,12 +736,42 @@ func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID str
 	require.NoError(t, database.Conn().Create(&node).Error)
 }
 
-var seedUsagePriceBookVersions = []string{"2026-09-23.1"}
-
 func restoreSeedUsagePriceBooks(t require.TestingT) {
+	require.NoError(t, billingtestsupport.RestoreSeedUsagePriceBooks(database.Conn()))
+}
+
+// AssignOpenSystemTrial stores an open system trial on an organization that
+// already has a billing row. New organizations start on None. Tests that need
+// an active trial assign one here.
+func AssignOpenSystemTrial(t require.TestingT, organizationID uuid.UUID) {
+	ensureBilling(t)
 	db := database.Conn()
-	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBookRate{}).Error)
-	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBook{}).Error)
-	require.NoError(t, models.ActivateUsagePriceBook(db, "2026-09-23.1"))
-	require.NoError(t, models.LoadCurrentPriceBook(db))
+	catalog, err := billingmodels.FindBillingPlan(db, billingmodels.BillingPlanTrial)
+	require.NoError(t, err)
+	now := time.Now()
+	end := now.AddDate(0, 0, catalog.TrialLengthDays)
+	result := db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", organizationID).Updates(map[string]any{
+		"plan":             catalog.ResponsePlan(),
+		"plan_id":          catalog.ID,
+		"plan_source":      billingmodels.BillingPlanSourceSystem,
+		"trial_started_at": now,
+		"trial_ends_at":    end,
+	})
+	require.NoError(t, result.Error)
+	require.Equal(t, int64(1), result.RowsAffected)
+}
+
+func ensureBilling(t require.TestingT) {
+	_, err := billing.Current()
+	if err == nil {
+		return
+	}
+	require.ErrorIs(t, err, billing.ErrImplementationMissing)
+	billing.Bind(eebilling.New(nil))
+}
+
+func init() {
+	if _, err := billing.Current(); err != nil {
+		billing.Bind(eebilling.New(nil))
+	}
 }

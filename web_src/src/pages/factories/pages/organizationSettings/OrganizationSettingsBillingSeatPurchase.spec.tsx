@@ -2,7 +2,6 @@ import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
 import type { OrganizationsDescribeOrganizationBillingResponse } from "@/api-client";
 import { client } from "@/api-client/client.gen";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
@@ -24,12 +23,11 @@ vi.mock("@/contexts/usePermissions", () => ({
 
 function renderBilling(
   billing: OrganizationsDescribeOrganizationBillingResponse,
-  options: { query?: string; newBilling?: boolean; fixture?: Partial<FactoriesFixture> } = {},
+  options: { query?: string; fixture?: Partial<FactoriesFixture> } = {},
 ) {
   return render(
     <FactoriesHarness
       pathSuffix={"workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing" + (options.query ?? "")}
-      experimentalFeatures={options.newBilling ? [FEATURE_NEW_BILLING] : []}
       factoriesFixture={{ ...defaultFactoriesFixture, organizationBilling: billing, ...options.fixture }}
     />,
   );
@@ -58,7 +56,6 @@ describe("Organization billing seat purchases", () => {
     renderBilling(
       { ...TEAM_ORGANIZATION_BILLING },
       {
-        newBilling: true,
         query: entry === "deep link" ? "?buySeats=1&tab=seats" : undefined,
         fixture: {
           seatPurchasePreview: {
@@ -91,10 +88,10 @@ describe("Organization billing seat purchases", () => {
 
   it("denies the deep link without making purchase requests", async () => {
     canManageBilling = false;
-    renderBilling({ ...TEAM_ORGANIZATION_BILLING }, { newBilling: true, query: "?buySeats=1" });
+    renderBilling({ ...TEAM_ORGANIZATION_BILLING }, { query: "?buySeats=1" });
     const card = await screen.findByTestId("billing-seats");
     expect(card).toHaveTextContent("Ask an organization admin to buy seats.");
-    expect(screen.getByText("Ask an organization admin to set up payment or change plans.")).toBeInTheDocument();
+    expect(screen.getByText("Ask an organization admin to manage billing.")).toBeInTheDocument();
     expect(within(card).queryByRole("button", { name: "Buy seats" })).not.toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 350));
     expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument();
@@ -103,10 +100,7 @@ describe("Organization billing seat purchases", () => {
 
   it("clears the over-capacity notice after buying enough seats", async () => {
     const user = userEvent.setup();
-    renderBilling(
-      { ...TEAM_ORGANIZATION_BILLING, purchasedSeats: 8, occupiedSeats: 9, availableSeats: 0 },
-      { newBilling: true },
-    );
+    renderBilling({ ...TEAM_ORGANIZATION_BILLING, purchasedSeats: 8, occupiedSeats: 9, availableSeats: 0 }, {});
     const card = await screen.findByTestId("billing-seats");
     expect(within(card).getByRole("status")).toHaveTextContent(
       "9 members, 8 paid seats. Buy seats or remove members to invite again.",
@@ -123,11 +117,10 @@ describe("Organization billing seat purchases", () => {
   });
 
   it.each([
-    { name: "admin-sourced plan", overrides: { planSource: "admin" }, newBilling: true },
-    { name: "inactive subscription", overrides: { polarSubscriptionStatus: "canceled" }, newBilling: true },
-    { name: "New Billing disabled", overrides: {}, newBilling: false },
-  ])("does not offer purchases for $name", async ({ overrides, newBilling }) => {
-    renderBilling({ ...TEAM_ORGANIZATION_BILLING, ...overrides }, { newBilling, query: "?buySeats=1" });
+    { name: "admin-sourced plan", overrides: { planSource: "admin" } },
+    { name: "inactive subscription", overrides: { polarSubscriptionStatus: "canceled" } },
+  ])("does not offer purchases for $name", async ({ overrides }) => {
+    renderBilling({ ...TEAM_ORGANIZATION_BILLING, ...overrides }, { query: "?buySeats=1" });
     const card = await screen.findByTestId("billing-seats");
     expect(within(card).queryByRole("button", { name: "Buy seats" })).not.toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 350));
@@ -136,7 +129,7 @@ describe("Organization billing seat purchases", () => {
   });
 
   it("explains the plan maximum without purchase controls", async () => {
-    renderBilling({ ...TEAM_ORGANIZATION_BILLING, purchasableSeats: 0 }, { newBilling: true, query: "?buySeats=1" });
+    renderBilling({ ...TEAM_ORGANIZATION_BILLING, purchasableSeats: 0 }, { query: "?buySeats=1" });
     const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
     expect(dialog).toHaveTextContent(
       "Your plan allows 50 seats. Remove a member or cancel an invitation to free a seat.",
@@ -155,7 +148,7 @@ describe("Organization billing seat purchases", () => {
         planMaximumSeats: undefined,
         invitableSeats: undefined,
       },
-      { newBilling: true, query: "?buySeats=1" },
+      { query: "?buySeats=1" },
     );
     const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
     const input = within(dialog).getByRole("spinbutton", { name: "Additional seats" });
@@ -169,19 +162,16 @@ describe("Organization billing seat purchases", () => {
 
   it("blocks purchases until a canceled subscription is resumed", async () => {
     const user = userEvent.setup();
-    renderBilling(
-      { ...TEAM_ORGANIZATION_BILLING, cancelAtPeriodEnd: true },
-      { newBilling: true, query: "?buySeats=1" },
-    );
+    renderBilling({ ...TEAM_ORGANIZATION_BILLING, cancelAtPeriodEnd: true }, { query: "?buySeats=1" });
     const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
     expect(dialog).toHaveTextContent("Resume the subscription before buying seats.");
     expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Confirm purchase" })).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(
-      await within(screen.getByTestId("billing-plans")).findByRole("button", { name: "Keep Team" }),
-    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(screen.getByTestId("billing-plans")).getByRole("button", { name: "Keep Team" })).toBeVisible(),
+    );
     expect(purchaseRequests).toHaveLength(0);
   });
 
@@ -196,7 +186,6 @@ describe("Organization billing seat purchases", () => {
     renderBilling(
       { ...TEAM_ORGANIZATION_BILLING },
       {
-        newBilling: true,
         query: "?buySeats=1",
         fixture: {
           seatPurchaseResponse: {
@@ -220,7 +209,7 @@ describe("Organization billing seat purchases", () => {
     const message = "Seat purchases pause while the subscription renews. Try again after 18:00.";
     renderBilling(
       { ...TEAM_ORGANIZATION_BILLING },
-      { newBilling: true, query: "?buySeats=1", fixture: { seatPurchasePreviewError: { status: 409, message } } },
+      { query: "?buySeats=1", fixture: { seatPurchasePreviewError: { status: 409, message } } },
     );
     const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(message);
@@ -270,10 +259,7 @@ describe("Organization billing seat purchases", () => {
         },
       });
       try {
-        renderBilling(
-          { ...TEAM_ORGANIZATION_BILLING, hasPaymentMethod: true },
-          { newBilling: true, query: "?buySeats=1" },
-        );
+        renderBilling({ ...TEAM_ORGANIZATION_BILLING, hasPaymentMethod: true }, { query: "?buySeats=1" });
         let dialog = await screen.findByRole("dialog", { name: "Buy seats" });
         const confirm = () => screen.getByRole<HTMLButtonElement>("button", { name: "Confirm purchase" });
         const quantity = within(dialog).getByRole("spinbutton", { name: "Additional seats" });
@@ -340,7 +326,7 @@ describe("Organization billing seat purchases", () => {
       },
     });
     try {
-      renderBilling({ ...TEAM_ORGANIZATION_BILLING }, { newBilling: true, query: "?buySeats=1" });
+      renderBilling({ ...TEAM_ORGANIZATION_BILLING }, { query: "?buySeats=1" });
       const dialog = await screen.findByRole("dialog", { name: "Buy seats" });
       await waitFor(() =>
         expect(within(dialog).getByRole<HTMLButtonElement>("button", { name: "Confirm purchase" }).disabled).toBe(

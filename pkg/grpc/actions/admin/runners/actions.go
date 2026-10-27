@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -261,9 +262,24 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 	if len(idempotencyKey) > maxIdempotencyKeyLength {
 		return nil, grpcerrors.InvalidArgument(nil, "idempotency key is too long")
 	}
+	fleetManagerID := strings.TrimSpace(req.GetFleetManagerId())
+	providerName := strings.TrimSpace(req.GetProvider())
+	if (fleetManagerID == "") != (providerName == "") {
+		return nil, grpcerrors.InvalidArgument(nil, "fleet manager ID and provider must be supplied together")
+	}
 	requestHash := ""
 	if idempotencyKey != "" {
 		requestHash = createRunnerRequestHash(fleetID, taskID, req.GetEphemeral())
+		if fleetManagerID != "" {
+			// Preserve hashes for older clients that did not supply ownership.
+			sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%q:%q", requestHash, fleetManagerID, providerName)))
+			requestHash = hex.EncodeToString(sum[:])
+		}
+	}
+	tags := map[string]string{}
+	if fleetManagerID != "" {
+		tags[models.RunnerTagFleetManagerID] = fleetManagerID
+		tags[models.RunnerTagProvider] = providerName
 	}
 
 	runner, registration, err := s.createRunner(
@@ -273,6 +289,7 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 		req.GetEphemeral(),
 		idempotencyKey,
 		requestHash,
+		tags,
 	)
 	if err != nil {
 		return nil, err
@@ -354,6 +371,7 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 	}
 
 	var runner *models.Runner
+	var releasedTask *models.RunnerTask
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		runnerQuery := tx
 		if len(req.GetStates()) > 0 {
@@ -379,6 +397,10 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 			}
 			return task.RequestCancel(tx, time.Now())
 		}
+		releasedTask, err = runner.FindActiveTask(tx)
+		if err != nil && !errors.Is(err, models.ErrRunnerTaskNotFound) {
+			return err
+		}
 		return runner.Terminate(tx, models.RunnerTerminationRequested)
 	})
 	if errors.Is(err, models.ErrRunnerNotFound) {
@@ -393,6 +415,9 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 	}
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to terminate runner")
+	}
+	if releasedTask != nil {
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), releasedTask)
 	}
 	_ = runnercontrol.Publish(runnercontrol.Notification{RunnerID: runner.ID.String()})
 	return &pb.DeleteRunnerResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
@@ -414,6 +439,11 @@ func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRun
 		if err != nil {
 			return err
 		}
+		if req.GetFleetManagerId() == "" || req.GetProvider() == "" ||
+			runner.Tags.Data()[models.RunnerTagFleetManagerID] != req.GetFleetManagerId() ||
+			runner.Tags.Data()[models.RunnerTagProvider] != req.GetProvider() {
+			return fmt.Errorf("runner provider ownership does not match the confirming manager")
+		}
 		return runner.MarkProviderDeleted(tx, time.Now())
 	})
 	if errors.Is(err, models.ErrRunnerNotFound) {
@@ -431,6 +461,7 @@ func (s *Service) createRunner(
 	taskID *uuid.UUID,
 	ephemeral bool,
 	idempotencyKey, requestHash string,
+	tags map[string]string,
 ) (*models.Runner, *models.RunnerRegistration, error) {
 	var runner *models.Runner
 	var registration *models.RunnerRegistration
@@ -470,6 +501,7 @@ func (s *Service) createRunner(
 			State:         models.RunnerStatePending,
 			RunnerVersion: fleet.RunnerVersion,
 			Ephemeral:     ephemeral,
+			Tags:          datatypes.NewJSONType(tags),
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		}
@@ -511,6 +543,7 @@ func (s *Service) createRunner(
 	})
 	if err == nil && reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetID, models.RunnerFleetScopeInstallation)
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), reservedTask)
 	}
 	if idempotencyKey != "" && models.IsRunnerCreationIdempotencyKeyConflict(err) {
 		runner, err = loadIdempotentRunner(database.DB(ctx), idempotencyKey, requestHash)
@@ -524,6 +557,8 @@ func (s *Service) createRunner(
 		return nil, nil, grpcerrors.NotFound(err, "fleet not found")
 	case errors.Is(err, models.ErrRunnerTaskNotFound):
 		return nil, nil, grpcerrors.NotFound(err, "task not found")
+	case errors.Is(err, models.ErrOrganizationRunnerCapacity):
+		return nil, nil, grpcerrors.ResourceExhausted(err, "Organization parallel runner limit reached.")
 	case errors.Is(err, models.ErrRunnerTaskNotReservable),
 		errors.Is(err, models.ErrRunnerTaskFleetMismatch),
 		errors.Is(err, models.ErrRunnerTaskBackendMismatch):

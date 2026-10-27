@@ -195,6 +195,29 @@ Further reading:
 - Component design & quality: [docs/contributing/component-design.md](docs/contributing/component-design.md)
 - UI component workflow: [web_src/AGENTS.md](web_src/AGENTS.md)
 
+## Deployment dependencies
+
+Before a change adds or activates a runtime dependency, trace which processes
+need its configuration. This includes removing feature flags or guards around
+existing code.
+
+- Identify the required service endpoints, environment variables, and Secret
+  keys for each affected API, worker, and runner process.
+- Check local Docker Compose, `release/superplane-helm-chart/helm`, the hosted
+  chart in [superplanehq/helm-chart](https://github.com/superplanehq/helm-chart),
+  and environment values and Secret references in
+  [superplanehq/launchpad](https://github.com/superplanehq/launchpad).
+  The two charts are separate. Configuration on API pods does not configure
+  workers. Tests that supply credentials do not verify deployment configuration.
+- Update each affected deployment source. If a required repository or live
+  configuration is unavailable, flag the missing change or verification.
+- In the PR Summary, name the affected processes, required configuration keys,
+  companion PRs, and rollout order. Explicitly flag deployment changes required
+  before the new code path is activated.
+
+Keep credential values out of code and PR text. Distinguish prepared changes
+from published charts and verified deployed configuration.
+
 ## Coding Style & Naming Conventions
 
 - Always write clean code: work test-first by default, then keep names clear,

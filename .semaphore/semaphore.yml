@@ -44,7 +44,7 @@ blocks:
           # Only main stores these caches, so the keys carry no branch name.
           # See scripts/ci_cache_store_go.sh.
           - "cache restore go-mod-$(checksum go.sum),go-mod"
-          - "cache restore go-build-$(checksum go.sum),go-build"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
           - make dev.up
           - make dev.setup
       jobs:
@@ -73,6 +73,7 @@ blocks:
             - make check.proto.field.numbers
             - make check.configuration.fields
             - make check.grpc.actions.status
+            - make check.ee.imports
             - make check.models.tx.debt
             - make check.generated.artifacts
 
@@ -108,6 +109,11 @@ blocks:
           commands:
             - bash ./scripts/check_committed_secrets.sh
 
+        - name: Licenses
+          commands:
+            - bash scripts/license-check-test.sh
+            - make test.license.check
+
         - name: npm audit
           commands:
             - make check.npm.audit.critical
@@ -120,7 +126,7 @@ blocks:
       prologue:
         commands:
           - "cache restore go-mod-$(checksum go.sum),go-mod"
-          - "cache restore go-build-$(checksum go.sum),go-build"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
           - make dev.up
           - make dev.setup
       jobs:
@@ -167,7 +173,7 @@ blocks:
       prologue:
         commands:
           - "cache restore go-mod-$(checksum go.sum),go-mod"
-          - "cache restore go-build-$(checksum go.sum),go-build"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
           - make dev.up
           - make dev.setup.npm
       jobs:

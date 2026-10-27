@@ -3,6 +3,7 @@ package public
 import (
 	"encoding/json"
 	"errors"
+	sentrytest "github.com/superplanehq/superplane/test/support/sentry"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -50,7 +51,7 @@ func Test__HandleWebhook_ServerErrorCapturesCause(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			transport := bindTestSentryHub(t)
+			transport := sentrytest.BindHub(t)
 			response, ids := postFailingWebhook(t, testCase.nodeType, testCase.status, testCase.deliveryID)
 
 			require.Equal(t, testCase.status, response.Code)
@@ -60,7 +61,7 @@ func Test__HandleWebhook_ServerErrorCapturesCause(t *testing.T) {
 			require.Len(t, events, 1)
 			event := events[0]
 			assert.Empty(t, event.Message)
-			assert.Contains(t, capturedExceptionText(event), webhookSentryCause)
+			assert.Contains(t, sentrytest.ExceptionText(event), webhookSentryCause)
 			assert.Equal(t, ids.webhookID, event.Tags["webhook_id"])
 			assert.Equal(t, ids.nodeID, event.Tags["node_id"])
 			assert.Equal(t, ids.canvasID, event.Tags["canvas_id"])
@@ -95,7 +96,7 @@ func assertEventOmitsWebhookBody(t *testing.T, event *sentry.Event, encoded []by
 }
 
 func Test__HandleWebhook_ServerErrorRepliesBeforeOrganizationLookup(t *testing.T) {
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	resources := support.Setup(t)
 	t.Cleanup(resources.Close)
 
@@ -190,7 +191,7 @@ func workflowIDLookup(tx *gorm.DB, workflowID uuid.UUID) bool {
 }
 
 func Test__HandleWebhook_ClientErrorIsNotSentToSentry(t *testing.T) {
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	response, _ := postFailingWebhook(t, models.NodeTypeTrigger, http.StatusBadRequest, "delivery-400")
 
 	require.Equal(t, http.StatusBadRequest, response.Code)
