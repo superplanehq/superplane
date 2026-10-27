@@ -14,6 +14,19 @@ const { spawn } = require("child_process");
 
 const SESSION_FILE = "codex_session";
 
+// Codex starts stdio MCP servers with a minimal environment. Forward by name,
+// not with mcp_servers.<id>.env, so tokens stay out of the codex argv.
+const SUPERPLANE_MCP_ENV_VARS = [
+  "SUPERPLANE_BASE_URL",
+  "SUPERPLANE_RUN_TOKEN",
+  "SUPERPLANE_TASK_DIR",
+  "SUPERPLANE_ACTIVITY_ID",
+  "SUPERPLANE_ANALYSIS_SPEC_FILE",
+  "SUPERPLANE_ANALYSIS_SCORE_FILE",
+  "SUPERPLANE_ARTIFACT_TOKEN",
+  "SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
+];
+
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
   const candidates = [
@@ -242,6 +255,8 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
     `mcp_servers.superplane.command=${tomlString("node")}`,
     "-c",
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+    "-c",
+    `mcp_servers.superplane.env_vars=${tomlStringArray(SUPERPLANE_MCP_ENV_VARS)}`,
     // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
     // answer that prompt, so approve only these planning tools, not shell writes.
     ...(planningEnabled(env)
@@ -692,6 +707,7 @@ function createCodexFormatter(telemetry, activityOverride) {
       item.aggregated_output ||
       item.output ||
       (item.error && item.error.message) ||
+      failedToolResultText(item) ||
       "";
     if (typeof output === "string" && output.trim()) {
       if (activity.enabled) {
@@ -921,6 +937,17 @@ function toolFailed(item) {
   }
   const exit = Number(item.exit_code);
   return Number.isFinite(exit) && exit !== 0;
+}
+
+function failedToolResultText(item) {
+  if (!toolFailed(item)) {
+    return "";
+  }
+  const content = item.result && Array.isArray(item.result.content) ? item.result.content : [];
+  return content
+    .filter((part) => part && part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("\n");
 }
 
 function codexToolStatus(item) {
